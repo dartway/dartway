@@ -48,8 +48,16 @@ class AdminSettingsForm extends ConsumerWidget {
               AdminTextSettingRow(
                 key: ValueKey(('supportPhone', stored.supportPhone)),
                 label: l10n.supportPhoneLabel,
-                value: stored.supportPhone,
-                onSave: (phone) => save(SaveClubSettings(supportPhone: phone)),
+                value: stored.supportPhone ?? '',
+                // Emptied, the phone is cleared: the club has none.
+                clearable: true,
+                onSave: (phone) => save(
+                  SaveClubSettings(
+                    supportPhone: phone.isEmpty
+                        ? const DwFieldPatch.clear()
+                        : DwFieldPatch.set(phone),
+                  ),
+                ),
               ),
             ],
           ),

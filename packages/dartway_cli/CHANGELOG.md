@@ -9,6 +9,8 @@
   `String key` beside a `String value`; `fieldPatchMatched` — `DwSetField`, `DwClearField` or
   `DwKeepField` named in the server, shared or Flutter package (`lib/`, `bin/`, `test/`). Migration
   note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
+  A project adopting these names its latest migration under `deploy/config.yaml` > `migrations` >
+  `dataChecksAfter` (a new project-level key of that file); only later migrations are judged.
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
   `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature
   law says (dartway/dartway#380). Wording only; no check changed.

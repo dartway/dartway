@@ -37,24 +37,29 @@ class AdminToggleSettingRow extends StatelessWidget {
 }
 
 /// A text setting. Saving is offered once the value has actually changed and
-/// is not blank.
+/// is not blank — or, when [clearable], also once it has been emptied: an
+/// optional setting is cleared that way.
 class AdminTextSettingRow extends HookWidget {
   const AdminTextSettingRow({
     super.key,
     required this.label,
     required this.value,
     required this.onSave,
+    this.clearable = false,
   });
 
   final String label;
   final String value;
+  final bool clearable;
+
+  /// Called with the trimmed text; an empty one only when [clearable].
   final DwUiAction<void> Function(String value) onSave;
 
   @override
   Widget build(BuildContext context) {
     final draft = useState(value);
     final trimmed = draft.value.trim();
-    final canSave = trimmed.isNotEmpty && trimmed != value;
+    final canSave = (clearable || trimmed.isNotEmpty) && trimmed != value;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),

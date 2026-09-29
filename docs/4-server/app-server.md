@@ -266,7 +266,7 @@ final chatFeature = DwServerFeature(
   startup: [
     DwSeedRows(
       'staff channels',
-      table: (db) => db.chatChannels,
+      table: ChatChannelRow.tableDef,
       key: (t) => [t.slug],
       rows: staffChannels,
     ),
@@ -284,9 +284,17 @@ At every start, in one statement (`DwTableRepository.upsertAll`):
 - a stored row the declaration does not name is left alone. Retiring one is a column of its own
   (`isPublished: false`), declared like any other value, since other rows may point at it.
 
-The key names unique columns — a natural key, never the `id`, which differs between databases. Two
-declared rows with one key stop the start. A seed whose rows point at another seed's is listed after
-it.
+**A seed owns its rows: only rows nobody edits outside the code are a seed** — the next start
+writes the declaration back over an edit made in an admin panel.
+
+The key names unique, `NOT NULL` columns — a natural key, never the `id`, which differs between
+databases; one `@DwUniqueColumn` or exactly a unique index. A nullable key column (a conflict never
+matches a null, so every start would insert the row again), a key that is not unique and two declared
+rows with one key are refused before the database is opened. The rows are constants: a value
+computed at start (`DateTime.now()`) rewrites the row at every start. During a rolling deploy the
+old and the new server each converge the table at their own start — the last one to start wins, and
+a row the new version dropped stays as the old one wrote it. A seed whose rows point at another
+seed's is listed after it.
 
 ### `DwFirstAdministrator`
 

@@ -503,8 +503,10 @@ class DwDeployTarget {
       if (!_projectKeys.contains(key.toString())) key.toString(),
   ];
 
-  /// Top-level keys of `deploy/config.yaml` that are not deployments.
-  static const _projectKeys = {'requires', localSection};
+  /// Top-level keys of `deploy/config.yaml` that are not deployments: the
+  /// hoisted `requires`, `local`, and `migrations` — where `dartway check`
+  /// reads which migrations predate a rule (`dataChecksAfter`).
+  static const _projectKeys = {'requires', localSection, 'migrations'};
 
   /// The section holding the environment a developer's machine starts a server
   /// with, in this file and in `deploy/secrets.yaml`.

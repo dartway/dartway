@@ -631,7 +631,7 @@ final catalogFeature = DwServerFeature(
   startup: [
     DwSeedRows(
       'exercise catalogue',
-      table: (db) => db.exercises,
+      table: ExerciseRow.tableDef,
       key: (t) => [t.slug],
       rows: exerciseCatalogue,
     ),
@@ -641,8 +641,11 @@ final catalogFeature = DwServerFeature(
 
 Every start inserts a declared row that is missing, writes a changed one over the stored row with
 the same key (keeping its id), touches nothing unchanged, and leaves rows it does not declare alone —
-retire one with a column (`isPublished: false`), since other rows may point at it. The key is a
-unique natural key, never the `id`. A seed whose rows point at another seed's comes after it.
+retire one with a column (`isPublished: false`), since other rows may point at it. **A seed owns its
+rows: only rows nobody edits outside the code are a seed** — the next start writes the declaration
+back over an edit. The key is a unique, `NOT NULL` natural key, never the `id` (a nullable or
+non-unique key refuses the start). The rows are constants — no `DateTime.now()`. A seed whose rows
+point at another seed's comes after it.
 
 **Where data goes:**
 
@@ -654,11 +657,12 @@ unique natural key, never the `id`. A seed whose rows point at another seed's co
 | anything else that must be true before the first call | a `DwStartupStep` |
 | development data, never in production | `bin/seed_dev.dart` |
 
-A migration changes the schema: `dart run dartway_cli:dartway check` fails an `INSERT`, `UPDATE` or `DELETE` in one
-outside `m.backfill` (`migrationChangesData`), and anything but logging after `server.start()` in
-`bin/server.dart` (`workAfterServerStart`). Rows operators own after they exist are not a seed — the
-next start would write the declaration back over their edit: their starting values are defaults in
-the code, and the rows are made in the admin panel.
+A migration changes the schema: `dart run dartway_cli:dartway check` fails an `INSERT`, `UPDATE` or
+`DELETE` in one outside `m.backfill` (`migrationChangesData`), and anything but logging after
+`server.start()` in `bin/server.dart` (`workAfterServerStart`). Migrations older than
+`deploy/config.yaml` > `migrations` > `dataChecksAfter` are not judged — an applied migration is
+never edited. Rows operators own after they exist are not a seed: their starting values are
+defaults in the code, and the rows are made in the admin panel.
 
 ## 9b. Settings — one typed value per app
 
@@ -670,10 +674,11 @@ declares no table, no row and no lock for it.
 final settings = await ctx.settings.read<BillingSettings>();   // the defaults until saved; never null
 
 // An edit of some fields: the row is locked between the read and the write.
+// A nullable field arrives as a DwFieldPatch, so it can be cleared.
 final saved = await ctx.settings.update<BillingSettings>(
   (current) => current.copyWith(
     dueDays: command.dueDays,
-    remindersEnabled: command.remindersEnabled,
+    invoiceFooter: command.invoiceFooter.trimmedOrCleared,
   ),
 );
 ctx.publish(AppChannels.settings, saved);
@@ -681,9 +686,13 @@ ctx.publish(AppChannels.settings, saved);
 await ctx.settings.save(const BillingSettings(dueDays: 30));   // the whole value, one upsert
 ```
 
-Stored is only what differs from the defaults, so a default changed in the code reaches every
-value nobody changed, and a field added later reads as its default. A key/value table of strings is
-refused (`settingsKeyValueTable`). A preference **per member** stays a row of the member's table;
+Stored is only what differs from the defaults: a field added later reads as its default, and a
+default changed in the code changes every value that equalled the old one. Renaming the class
+resets it to its defaults. A stored field that no longer decodes (an enum value removed, a type
+changed) reads as its default and is logged once; a read never fails over what is stored. A
+key/value table of strings is refused (`settingsKeyValueTable`); the migration that drops one
+carries its values with `m.carrySettings('BillingSettings', fromSql: …)` — a project never writes
+`dw_*` tables itself. A preference **per member** stays a row of the member's table;
 without the row, the reader maps to the data object's own defaults (`const NotificationPrefs()`).
 
 **A setting whose value belongs to this deployment has no default.** `DW_ADMIN_IDENTIFIER` above,

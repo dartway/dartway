@@ -129,7 +129,7 @@ abstract class DwCallContext {
   /// The app's settings: `await ctx.settings.read<SignInSettings>()` answers
   /// the stored value or its defaults, never `null`; `save` and `update`
   /// write it without a lock of the project's own. See [DwSettingsStore].
-  DwSettingsStore get settings => DwSettingsStore(db, protocol);
+  DwSettingsStore get settings => DwSettingsStore(db, protocol, log);
 
   /// The server's module of class [M] — how a module's context extension
   /// (`ctx.push`) reaches its runtime. Throws [StateError] when the server

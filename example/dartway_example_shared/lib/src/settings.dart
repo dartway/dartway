@@ -12,7 +12,7 @@ final class ClubSettings extends DwDataObject with _$ClubSettings {
   const ClubSettings({
     this.clubName = 'DartWay Fitness',
     this.bookingEnabled = true,
-    this.supportPhone = '',
+    this.supportPhone,
   });
 
   /// There is one: its identity is fixed.
@@ -25,8 +25,8 @@ final class ClubSettings extends DwDataObject with _$ClubSettings {
   /// Whether the schedule is open for booking.
   final bool bookingEnabled;
 
-  /// The phone members call when something goes wrong; empty for none.
-  final String supportPhone;
+  /// The phone members call when something goes wrong, or `null` for none.
+  final String? supportPhone;
 }
 
 final class GetClubSettings extends DwSingleRequest<ClubSettings>
@@ -46,12 +46,14 @@ final class SaveClubSettings extends DwActionCommand<ClubSettings>
   const SaveClubSettings({
     this.clubName,
     this.bookingEnabled,
-    this.supportPhone,
+    this.supportPhone = const DwFieldPatch.keep(),
   });
 
   final String? clubName;
   final bool? bookingEnabled;
-  final String? supportPhone;
+
+  /// Nullable in the settings, so a patch: it can be cleared.
+  final DwFieldPatch<String> supportPhone;
 
   @override
   List<DwCallRefusal> validate() => [

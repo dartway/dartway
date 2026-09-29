@@ -271,20 +271,36 @@ final class EditInvoice extends DwActionCommand<CustomerInvoice>
 
 The app's settings are one data object: a default for every field — the value while nobody has
 saved one — and a fixed `id`. The server keeps it through `ctx.settings` (`dartway-server`); it is
-read with a `DwSingleRequest` and changed by a command whose fields are nullable, `null` keeping:
+read with a `DwSingleRequest` and changed by a command whose fields keep when absent — `null` for a
+non-nullable setting, a `DwFieldPatch` for a nullable one:
 
 ```dart
 final class BillingSettings extends DwDataObject with _$BillingSettings {
-  const BillingSettings({this.dueDays = 14, this.remindersEnabled = true});
+  const BillingSettings({this.dueDays = 14, this.invoiceFooter});
 
   @override
   String get id => 'billing';
 
   final int dueDays;
-  final bool remindersEnabled;
+  final String? invoiceFooter;
+}
+
+final class SaveBillingSettings extends DwActionCommand<BillingSettings>
+    with _$SaveBillingSettings {
+  const SaveBillingSettings({
+    this.dueDays,
+    this.invoiceFooter = const DwFieldPatch.keep(),
+  });
+
+  final int? dueDays;
+
+  /// Nullable in the object, so a patch here: it can be cleared.
+  final DwFieldPatch<String> invoiceFooter;
 }
 ```
 
+A nullable setting is never `''` meaning none: the object holds `null`, and the command clears it
+with `DwFieldPatch.clear()`.
 Never a key/value list of strings: every reader then parses text and supplies its own default.
 
 ## 6. Defaults on the wire

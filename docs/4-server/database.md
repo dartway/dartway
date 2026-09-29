@@ -312,9 +312,34 @@ final class AppSettings extends DwDataObject with _$AppSettings {
 | `ctx.settings.update<AppSettings>((current) => …)` | reads, applies the change and stores the result with the row locked in between, so two edits of different fields both land; a change that leaves the value equal writes nothing |
 
 The value is stored in the framework's `dw_setting` table under the object's wire name, as the JSON
-the wire carries — which holds only what differs from the defaults. A default changed in the code
-reaches every value nobody changed, and a field added later reads as its default; renaming the
-class orphans what was stored under the old name. A settings object is published like any data
+the wire carries — which holds only what differs from the defaults. How it survives the object
+changing under it:
+
+- **a field added** reads as its default;
+- **a field removed** is ignored, and dropped at the next write;
+- **a stored field that no longer decodes** — an enum value that was removed, a field whose type
+  changed — reads as that field's default, the rest as stored, and the server logs it once. A read
+  never fails over what is stored, and the next `update` or `save` writes the value clean;
+- **a default changed** changes every value that equalled the old default, since nothing of it was
+  stored — say so in the change if that is not what is meant;
+- **the class renamed** resets it to its defaults: the area is its wire name.
+
+A nullable field is changed by a `DwFieldPatch` field of the command, applied with the helpers, so it
+can be cleared — never an empty string meaning none.
+
+**Values kept elsewhere before** — a key/value table, a single-row table of the project's own — are
+carried by the migration that drops that table. A project never writes `dw_*` tables itself;
+`m.carrySettings` is the one statement that does, merging one JSON object over what is stored:
+
+```dart
+await m.carrySettings('ClubSettings', fromSql: '''
+  SELECT jsonb_strip_nulls(jsonb_build_object(
+    'clubName', (SELECT value FROM app_setting WHERE key = 'clubName'),
+    'bookingEnabled',
+      (SELECT lower(value) = 'true' FROM app_setting WHERE key = 'bookingEnabled')))''');
+await m.dropTable('app_setting');
+```
+ A settings object is published like any data
 object (`ctx.publish(AppChannels.settings, saved)`) and read by the app with a `DwSingleRequest`.
 The type argument names the object: left to inference it is `DwDataObject`, and the call throws
 `StateError`.

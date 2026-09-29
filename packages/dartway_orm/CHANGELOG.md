@@ -5,7 +5,8 @@
 - **`DwTableRepository.upsertAll(rows, conflictOn:)`** (dartway/dartway#388): every row inserted, or
   written over the row with the same unique key unless that row already holds exactly these values,
   in one statement; answers how many rows were inserted or changed, so a second run with the same
-  rows writes nothing. Refuses two rows with one key and a row with an id. What `DwSeedRows` runs.
+  rows writes nothing. Refuses two rows with one key (compared by value), a row with an id and a
+  nullable conflict column. What `DwSeedRows` runs.
 - **`DwMigrationContext.backfill(sql)`**: runs like `sql`, and is the one place `dartway check`
   accepts an `INSERT`, `UPDATE` or `DELETE` in a project migration (`migrationChangesData`) — for
   rows a schema change strands. Content is a seed step. Re-exports `DwTextFieldPatch`.

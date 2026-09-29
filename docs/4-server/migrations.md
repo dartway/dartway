@@ -140,14 +140,17 @@ day, forever; written through today's row classes it silently changes meaning th
 field is renamed, while its checksum says nothing happened. That is why `DwMigrationContext`
 offers `sql`, `query` and `backfill` and no typed tables.
 
-**An applied migration that did its rewrite through `m.sql`** is moved to `m.backfill` with the same
-statement, resealed (`dart run bin/migrate.dart rehash`), and declares the text it replaces in
-`supersededChecksums`, since what it does did not change:
+**Migrations written before a project adopted the rule stay as they are** — an applied migration is
+never edited. The project names its latest migration once, in `deploy/config.yaml`, and only the
+migrations after it are judged:
 
-```dart
-@override
-Set<String> get supersededChecksums => const {'1df626ad307d5b1a1c231a1c8a870451'};
+```yaml
+migrations:
+  dataChecksAfter: 20260918_062959_member_tombstone
 ```
+
+A project that never set it — every new one — has all its migrations judged. A value that is not a
+migration id, or names none in `lib/src/migrations/`, is a finding of its own.
 
 ## Namespaces
 

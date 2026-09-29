@@ -150,7 +150,7 @@ final class DwFirstAdministrator extends DwStartupStep {
 /// database, so content put there never reaches a database that applied it
 /// before the content changed, and code after `server.start()` runs while
 /// calls are already being answered. A seed step runs before the port opens,
-/// in the start's transaction, at every start:
+/// in a transaction of its own, at every start:
 ///
 /// - a declared row missing from the table is inserted;
 /// - a stored row with the same [key] values and other values is written over
@@ -164,19 +164,29 @@ final class DwFirstAdministrator extends DwStartupStep {
 /// ```dart
 /// DwSeedRows(
 ///   'exercise catalogue',
-///   table: (db) => db.exercises,
+///   table: ExerciseRow.tableDef,
 ///   key: (t) => [t.slug],
 ///   rows: exerciseCatalogue,
 /// )
 /// ```
 ///
-/// [key] names unique columns — the natural key a person would use, never
-/// the `id`, which differs between databases. The rows are the rows as
-/// declared, without ids. Steps run in the order they are listed, so a seed
-/// whose rows point at another seed's comes after it.
+/// A seed owns its rows: **only rows nobody edits outside the code are a
+/// seed** — the next start writes the declaration back over an edit made in
+/// an admin panel.
 ///
-/// Rows an administrator edits afterwards are not a seed: the next start
-/// would write the declaration back over the edit.
+/// [key] names the columns a declared row is found by: a natural key, never
+/// the `id`, which differs between databases. They must be `NOT NULL` — a
+/// conflict never matches a null, so every start would insert the row again —
+/// and unique together, by `@DwUniqueColumn` or a unique index. Both, and two
+/// declared rows with one key, are refused before the database is opened.
+///
+/// The rows are constants: a value computed at start (`DateTime.now()`)
+/// differs at every start, so the row is rewritten every time. During a
+/// rolling deploy the old and the new server both run their declaration
+/// against one table, each at its own start: the last to start wins, and a
+/// row the new version dropped is left as the old one wrote it. Steps run in
+/// the order they are listed, so a seed whose rows point at another seed's
+/// comes after it.
 final class DwSeedRows<R extends DwTableRow, T extends DwTableDef<R>>
     extends DwStartupStep {
   const DwSeedRows(
@@ -189,20 +199,80 @@ final class DwSeedRows<R extends DwTableRow, T extends DwTableDef<R>>
   @override
   final String name;
 
-  /// The table, as the project's generated repository: `(db) => db.exercises`.
-  final DwTableRepository<R, T> Function(DwDatabaseHandle db) table;
+  /// The table, as its row class declares it: `ExerciseRow.tableDef`.
+  final T table;
 
-  /// The unique columns a declared row is found by.
+  /// The unique, `NOT NULL` columns a declared row is found by.
   final List<DwTableColumn<Object?>> Function(T t) key;
 
   final Iterable<R> rows;
 
   @override
+  List<String> problems(DwAuthConfig auth) {
+    final columns = key(table);
+    final where = 'seed "$name" (${table.tableName})';
+    if (columns.isEmpty) return ['$where: the key names no column'];
+    final problems = <String>[
+      for (final column in columns)
+        if (column.nullable)
+          '$where: key column "${column.name}" is nullable — a conflict never '
+              'matches a null, and every start would insert the row again',
+    ];
+    final names = {for (final column in columns) column.name};
+    final unique =
+        (columns.length == 1 && columns.single.unique) ||
+        table.indexSchemas.any(
+          (index) =>
+              index.unique &&
+              index.columns.length == names.length &&
+              index.columns.toSet().containsAll(names),
+        );
+    if (!unique) {
+      problems.add(
+        '$where: the key (${names.join(', ')}) is not unique — declare '
+        '@DwUniqueColumn or a unique index on exactly these columns',
+      );
+    }
+    final seen = <_DwSeedKey>{};
+    for (final row in rows) {
+      final values = table.toRow(row);
+      final key = _DwSeedKey([for (final name in names) values[name]]);
+      if (!seen.add(key)) {
+        problems.add(
+          '$where: two declared rows share the key '
+          '(${names.join(', ')}) = (${key.values.join(', ')})',
+        );
+      }
+    }
+    return problems;
+  }
+
+  @override
   Future<void> run(DwCallContext ctx) async {
     final declared = rows.toList(growable: false);
-    final written = await table(ctx.db).upsertAll(declared, conflictOn: key);
+    final written = await ctx.db
+        .repository(table)
+        .upsertAll(declared, conflictOn: key);
     if (written > 0) {
       ctx.log.info('seed $name: $written of ${declared.length} rows written');
     }
   }
+}
+
+/// The key values of a declared row, compared value by value.
+final class _DwSeedKey {
+  _DwSeedKey(this.values);
+
+  final List<Object?> values;
+
+  @override
+  bool operator ==(Object other) =>
+      other is _DwSeedKey &&
+      other.values.length == values.length &&
+      Iterable.generate(values.length).every(
+        (i) => other.values[i] == values[i],
+      );
+
+  @override
+  int get hashCode => Object.hashAll(values);
 }

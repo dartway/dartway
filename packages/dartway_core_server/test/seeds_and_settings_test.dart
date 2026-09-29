@@ -1,6 +1,9 @@
+import 'dart:convert';
+
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:test/test.dart';
 
+import 'support/defaults.dart' show Tone;
 import 'support/test_app.dart';
 
 /// Seeds are startup steps that converge on the declaration at every start;
@@ -43,7 +46,7 @@ void main() {
               startup: [
                 DwSeedRows(
                   'catalog',
-                  table: (db) => db.catalogItems,
+                  table: CatalogItemRow.tableDef,
                   key: (t) => [t.slug],
                   rows: catalogue,
                 ),
@@ -131,11 +134,52 @@ void main() {
     test('a declaration naming one key twice stops the start', () async {
       await expectLater(
         started([yoga, yoga.copyWith(title: 'Twice')], stored),
-        throwsA(anything),
+        throwsA(
+          isA<DwStartupException>().having(
+            (error) => error.problems.join('\n'),
+            'problems',
+            contains('two declared rows share the key (slug) = (yoga)'),
+          ),
+        ),
       );
+    });
+  });
+
+  group('DwSeedRows.problems, before the database is opened', () {
+    final auth = TestApp().auth();
+    List<String> problems(
+      List<DwTableColumn<Object?>> Function(CatalogItemTable t) key, [
+      List<CatalogItemRow> rows = const [
+        CatalogItemRow(slug: 'yoga', title: 'Yoga'),
+      ],
+    ]) => DwSeedRows(
+      'catalog',
+      table: CatalogItemRow.tableDef,
+      key: key,
+      rows: rows,
+    ).problems(auth);
+
+    test('a unique NOT NULL key passes', () {
+      expect(problems((t) => [t.slug]), isEmpty);
+    });
+
+    test('a nullable key column is refused', () {
+      expect(problems((t) => [t.note]).join(), contains('"note" is nullable'));
+    });
+
+    test('a key that is not unique is refused', () {
+      expect(problems((t) => [t.title]).join(), contains('is not unique'));
+    });
+
+    test('a key unique by an index passes, and compares rows by value', () {
+      expect(problems((t) => [t.title, t.published]), isEmpty);
       expect(
-        RecordingLogger.lines,
-        contains(contains('startup step "catalog" failed')),
+        problems((t) => [t.title, t.published], const [
+          CatalogItemRow(slug: 'a', title: 'Yoga'),
+          CatalogItemRow(slug: 'b', title: 'Yoga', published: false),
+          CatalogItemRow(slug: 'c', title: 'Yoga'),
+        ]),
+        [contains('share the key (title, published) = (Yoga, true)')],
       );
     });
   });
@@ -249,6 +293,61 @@ void main() {
       expect(await version(), before);
     });
 
+    Future<void> store(Map<String, Object?> value) => harness().db.execute(
+      "INSERT INTO dw_setting (area, value) VALUES ('ClubSettings', "
+      '@value::jsonb) ON CONFLICT (area) DO UPDATE SET value = EXCLUDED.value',
+      params: {'value': jsonEncode(value)},
+    );
+
+    test('a removed enum value reads as its default, the rest as stored, '
+        'and is reported once', () async {
+      RecordingLogger.lines.clear();
+      await store({'name': 'Acme', 'tone': 'shouting'});
+      for (var i = 0; i < 2; i++) {
+        expect(
+          await inContext((ctx) => ctx.settings.read<ClubSettings>()),
+          const ClubSettings(name: 'Acme'),
+        );
+      }
+      expect(
+        RecordingLogger.lines.where(
+          (line) => line.contains('settings ClubSettings'),
+        ),
+        [contains('stored tone no longer read')],
+      );
+    });
+
+    test('a changed type reads as its default, and an update writes the '
+        'value clean', () async {
+      await store({'name': 'Acme', 'signUpOpen': 'yes', 'gone': 1});
+      expect(
+        await inContext((ctx) => ctx.settings.read<ClubSettings>()),
+        const ClubSettings(name: 'Acme'),
+      );
+      final updated = await inContext(
+        (ctx) => ctx.settings.update<ClubSettings>(
+          (current) => current.copyWith(tone: Tone.warm),
+        ),
+      );
+      expect(updated, const ClubSettings(name: 'Acme', tone: Tone.warm));
+      expect((await rows()).single['value'], {'name': 'Acme', 'tone': 'warm'});
+    });
+
+    test('a migration carries values kept elsewhere, merged over the stored '
+        'ones', () async {
+      await store({'name': 'Stored', 'tone': 'warm'});
+      await DwMigrationRunner(
+        harness().db,
+        migrations: {
+          'carry_test': [const _CarryMigration()],
+        },
+      ).apply();
+      expect(
+        await inContext((ctx) => ctx.settings.read<ClubSettings>()),
+        const ClubSettings(name: 'Legacy', signUpOpen: false, tone: Tone.warm),
+      );
+    });
+
     test('a type outside the protocol is refused by name', () async {
       await expectLater(
         inContext((ctx) => ctx.settings.read<UnregisteredSettings>()),
@@ -280,18 +379,25 @@ void main() {
 /// A settings object: every field defaulted, a fixed id. Hand-written in the
 /// shape `dartway generate` gives a data object.
 final class ClubSettings extends DwDataObject {
-  const ClubSettings({this.name = 'Club', this.signUpOpen = true});
+  const ClubSettings({
+    this.name = 'Club',
+    this.signUpOpen = true,
+    this.tone = Tone.plain,
+  });
 
   @override
   String get id => 'club';
 
   final String name;
   final bool signUpOpen;
+  final Tone tone;
 
-  ClubSettings copyWith({String? name, bool? signUpOpen}) => ClubSettings(
-    name: name ?? this.name,
-    signUpOpen: signUpOpen ?? this.signUpOpen,
-  );
+  ClubSettings copyWith({String? name, bool? signUpOpen, Tone? tone}) =>
+      ClubSettings(
+        name: name ?? this.name,
+        signUpOpen: signUpOpen ?? this.signUpOpen,
+        tone: tone ?? this.tone,
+      );
 
   @override
   String get dwTypeName => 'ClubSettings';
@@ -300,24 +406,56 @@ final class ClubSettings extends DwDataObject {
   Map<String, Object?> toJson() => {
     if (name != 'Club') 'name': name,
     if (!signUpOpen) 'signUpOpen': signUpOpen,
+    if (tone != Tone.plain) 'tone': tone.name,
   };
 
   static ClubSettings fromJson(Map<String, Object?> json) => ClubSettings(
     name: json['name'] == null ? 'Club' : json['name']! as String,
     signUpOpen: json['signUpOpen'] == null ? true : json['signUpOpen']! as bool,
+    tone: json['tone'] == null
+        ? Tone.plain
+        : DwJsonCodec.decodeEnum(json['tone'], Tone.values),
   );
 
   @override
   bool operator ==(Object other) =>
       other is ClubSettings &&
       other.name == name &&
-      other.signUpOpen == signUpOpen;
+      other.signUpOpen == signUpOpen &&
+      other.tone == tone;
 
   @override
-  int get hashCode => Object.hash(name, signUpOpen);
+  int get hashCode => Object.hash(name, signUpOpen, tone);
 
   @override
-  String toString() => 'ClubSettings(name: $name, signUpOpen: $signUpOpen)';
+  String toString() =>
+      'ClubSettings(name: $name, signUpOpen: $signUpOpen, tone: $tone)';
+}
+
+/// Values a project kept in a table of its own, carried by a migration.
+final class _CarryMigration extends DwDatabaseMigration {
+  const _CarryMigration();
+
+  @override
+  String get id => '20260930_130000_legacy_settings';
+
+  @override
+  String get checksum => 'legacy-settings-1';
+
+  @override
+  Future<void> up(DwMigrationContext m) async {
+    await m.sql(
+      'CREATE TABLE legacy_setting (key text PRIMARY KEY, value text NOT NULL); '
+      "INSERT INTO legacy_setting VALUES ('name', 'Legacy'), ('open', 'false')",
+    );
+    await m.carrySettings(
+      'ClubSettings',
+      fromSql: """
+        SELECT jsonb_build_object(
+          'name', (SELECT value FROM legacy_setting WHERE key = 'name'),
+          'signUpOpen', (SELECT value = 'true' FROM legacy_setting WHERE key = 'open'))""",
+    );
+  }
 }
 
 /// A field without a default: not something a settings object may have.
@@ -360,6 +498,7 @@ final class CatalogItemRow extends DwTableRow {
     required this.slug,
     required this.title,
     this.published = true,
+    this.note,
   });
 
   @override
@@ -367,12 +506,14 @@ final class CatalogItemRow extends DwTableRow {
   final String slug;
   final String title;
   final bool published;
+  final String? note;
 
   CatalogItemRow copyWith({String? title, bool? published}) => CatalogItemRow(
     id: id,
     slug: slug,
     title: title ?? this.title,
     published: published ?? this.published,
+    note: note,
   );
 
   static const tableDef = CatalogItemTable();
@@ -390,8 +531,25 @@ final class CatalogItemTable extends DwTableDef<CatalogItemRow> {
   DwTableColumn<bool> get published =>
       const DwTableColumn('published', DwColumnType.boolean);
 
+  DwTableColumn<String?> get note =>
+      const DwTableColumn('note', DwColumnType.text);
+
   @override
-  List<DwTableColumn<Object?>> get tableColumns => [id, slug, title, published];
+  List<DwTableColumn<Object?>> get tableColumns => [
+    id,
+    slug,
+    title,
+    published,
+    note,
+  ];
+
+  @override
+  List<DwIndexSchema> get indexSchemas => [
+    DwIndexSchema('catalog_item_title_published', [
+      'title',
+      'published',
+    ], unique: true),
+  ];
 
   @override
   CatalogItemRow fromRow(DwResultRow row) => CatalogItemRow(
@@ -399,6 +557,7 @@ final class CatalogItemTable extends DwTableDef<CatalogItemRow> {
     slug: row.decode(slug),
     title: row.decode(title),
     published: row.decode(published),
+    note: row.decode(note),
   );
 
   @override
@@ -407,6 +566,7 @@ final class CatalogItemTable extends DwTableDef<CatalogItemRow> {
     'slug': row.slug,
     'title': row.title,
     'published': row.published,
+    'note': row.note,
   };
 }
 
@@ -423,7 +583,8 @@ final class _CatalogMigration extends DwDatabaseMigration {
   Future<void> up(DwMigrationContext m) => m.sql(
     'CREATE TABLE catalog_item (id bigserial PRIMARY KEY, '
     'slug text NOT NULL UNIQUE, title text NOT NULL, '
-    'published boolean NOT NULL)',
+    'published boolean NOT NULL, note text, '
+    'UNIQUE (title, published))',
   );
 }
 

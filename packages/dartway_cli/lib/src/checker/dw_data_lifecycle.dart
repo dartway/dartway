@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
@@ -60,10 +61,28 @@ class DwDataLifecycleInspector {
         final folder = Directory(
           p.join(server.path, 'lib', 'src', 'migrations'),
         );
-        for (final file in _dartFiles(folder, recursive: false)) {
-          if (!RegExp(r'^m\d.*\.dart$').hasMatch(p.basename(file.path))) {
-            continue;
-          }
+        final migrations = {
+          for (final file in _dartFiles(folder, recursive: false))
+            if (RegExp(r'^m(\d.*)\.dart$').firstMatch(p.basename(file.path))
+                case final match?)
+              match.group(1)!: file,
+        };
+        final (after, problem) = dataChecksAfter(Directory(root));
+        if (problem != null) {
+          _add(DwCheckType.migrationChangesData, problem);
+        } else if (after != null && !migrations.containsKey(after)) {
+          _add(
+            DwCheckType.migrationChangesData,
+            '`$configKey: $after` in deploy/config.yaml names no migration '
+            'in ${p.relative(folder.path, from: root)}',
+          );
+        }
+        final judged = migrations.keys.toList()..sort();
+        for (final id in judged) {
+          // Migrations up to the cutoff were applied before the project
+          // adopted this rule: an applied migration is never edited.
+          if (after != null && id.compareTo(after) <= 0) continue;
+          final file = migrations[id]!;
           for (final (line, statement) in dataChangesIn(
             file.readAsStringSync(),
           )) {
@@ -148,6 +167,41 @@ class DwDataLifecycleInspector {
 
   void _add(DwCheckType type, String finding) => _findings.add((type, finding));
 
+  /// The key in `deploy/config.yaml` naming the last migration that is not
+  /// judged by [DwCheckType.migrationChangesData].
+  static const configKey = 'migrations > dataChecksAfter';
+
+  /// The migration id `deploy/config.yaml` > `migrations` >
+  /// `dataChecksAfter` names, or `null` when it names none; and a problem when
+  /// the key is there but is not a migration id.
+  ///
+  /// A project that adopts the rule has migrations that already ran
+  /// everywhere, and an applied migration is never edited. It names its
+  /// latest migration here once, and only the migrations after it are judged;
+  /// a project that never set it — every new one — has all of them judged.
+  static (String?, String?) dataChecksAfter(Directory projectRoot) {
+    final file = File(p.join(projectRoot.path, 'deploy', 'config.yaml'));
+    if (!file.existsSync()) return (null, null);
+    final Object? document;
+    try {
+      document = loadYaml(file.readAsStringSync());
+    } on YamlException {
+      return (null, null);
+    }
+    if (document is! YamlMap) return (null, null);
+    final migrations = document['migrations'];
+    if (migrations == null) return (null, null);
+    final value = migrations is YamlMap ? migrations['dataChecksAfter'] : null;
+    if (value is String && RegExp(r'^\d{8}_\d{6}_\w+$').hasMatch(value)) {
+      return (value, null);
+    }
+    return (
+      null,
+      'deploy/config.yaml: `$configKey` must be a migration id '
+          '(`20260930_120000_name`), got `${value ?? migrations}`',
+    );
+  }
+
   /// Every `.dart` file under [folder] that is not generated, in path order.
   static List<File> _dartFiles(Directory folder, {bool recursive = true}) {
     if (!folder.existsSync()) return const [];
@@ -174,10 +228,24 @@ class DwDataLifecycleInspector {
 
   /// Bodies of functions and procedures are definitions, not statements the
   /// migration runs.
-  static final _routineBody = RegExp(
-    r'\bcreate\s+(?:or\s+replace\s+)?(?:function|procedure|trigger|rule)\b',
+  /// A function or procedure being defined: its dollar-quoted body is a
+  /// definition, not statements the migration runs.
+  static final _routine = RegExp(
+    r'\bcreate\s+(?:or\s+replace\s+)?(?:function|procedure)\b',
     caseSensitive: false,
   );
+
+  static final _dollarQuoted = RegExp(r'\$(\w*)\$[\s\S]*?\$\1\$');
+
+  static final _sqlLineComment = RegExp(r'--[^\n]*');
+
+  /// [sql] as the statements it runs: `--` comments dropped, and a routine's
+  /// body when it is defining one.
+  static String _statements(String sql) {
+    var text = sql.replaceAll(_sqlLineComment, ' ');
+    if (_routine.hasMatch(text)) text = text.replaceAll(_dollarQuoted, ' ');
+    return text;
+  }
 
   /// `INSERT`, `UPDATE` and `DELETE` statements in [content]'s strings that
   /// are not an argument of `backfill(…)`, as `(line, statement keyword)`.
@@ -189,8 +257,7 @@ class DwDataLifecycleInspector {
     final source = DwDartSource(content);
     final found = <(int, String)>[];
     for (final group in source.stringGroups()) {
-      if (_routineBody.hasMatch(group.text)) continue;
-      final match = _dataChange.firstMatch(group.text);
+      final match = _dataChange.firstMatch(_statements(group.text));
       if (match == null) continue;
       if (source.enclosingCall(group.start) == 'backfill') continue;
       found.add((
@@ -201,24 +268,51 @@ class DwDataLifecycleInspector {
     return found;
   }
 
-  static final _start = RegExp(r'\.\s*start\s*\(\s*\)');
+  /// A variable holding the app's server: `final server =
+  /// AcmeServer.build(…)` or `= DwAppServer(…)`.
+  static final _serverVariable = RegExp(
+    r'\b(?:final|var)\s+(?:\w+\s+)?(\w+)\s*=\s*(?:await\s+)?'
+    r'(?:DwAppServer\s*\(|\w*Server\s*\.\s*build\s*\()',
+  );
+
+  /// Where the server's own `.start()` ends: the start of the variable a
+  /// server was assigned to, or — with none found — the first awaited
+  /// `x.start()`. Never a cascade (`Stopwatch()..start()`).
+  static int? _serverStartEnd(String code) {
+    for (final variable in _serverVariable.allMatches(code)) {
+      final name = RegExp.escape(variable.group(1)!);
+      final start = RegExp(
+        '(?<![.\\w])$name\\s*\\.\\s*start\\s*\\([^)]*\\)',
+      ).allMatches(code, variable.end).firstOrNull;
+      if (start != null) return start.end;
+    }
+    return RegExp(
+      r'\bawait\s+\w+\s*\.\s*start\s*\(\s*\)',
+    ).firstMatch(code)?.end;
+  }
+
   static final _work = RegExp(
     r'\bawait\b|\.\s*db\b|\.\s*accounts\b|\brunInContext\b',
   );
-  static final _stop = RegExp(r'^await\s+[\w.]+\.\s*(stop|close)\s*\(');
 
-  /// What [content] does after its first `.start()` in the function that
+  /// Shutdown, not work: awaiting the server's `stop()`/`close()`, or a
+  /// signal to stop on.
+  static final _shutdown = RegExp(
+    r'^await\s+(?:[\w.]+\.\s*(?:stop|close)\s*\(|[^;]*\bProcessSignal\b)',
+  );
+
+  /// What [content] does after the server's `.start()` in the function that
   /// calls it, as `(line, what)`: an `await`, or a reach into the started
-  /// server's database or accounts. Awaiting `stop()`/`close()` is shutdown,
-  /// not work, and passes.
+  /// server's database or accounts. Awaiting `stop()`/`close()` or a
+  /// `ProcessSignal` is shutdown, not work, and passes.
   static List<(int, String)> workAfterStartIn(String content) {
     final source = DwDartSource(content);
     final code = source.code;
-    final start = _start.firstMatch(code);
-    if (start == null) return const [];
+    final startEnd = _serverStartEnd(code);
+    if (startEnd == null) return const [];
     var depth = 0;
     var end = code.length;
-    for (var i = start.end; i < code.length; i++) {
+    for (var i = startEnd; i < code.length; i++) {
       final char = code[i];
       if (char == '{') depth++;
       if (char == '}') {
@@ -231,9 +325,9 @@ class DwDataLifecycleInspector {
     }
     final found = <(int, String)>[];
     final lines = <int>{};
-    for (final match in _work.allMatches(code.substring(start.end, end))) {
-      final at = start.end + match.start;
-      if (_stop.hasMatch(code.substring(at))) continue;
+    for (final match in _work.allMatches(code.substring(startEnd, end))) {
+      final at = startEnd + match.start;
+      if (_shutdown.hasMatch(code.substring(at))) continue;
       final line = source.lineOf(at);
       if (!lines.add(line)) continue;
       // The whole line as written, strings included.
@@ -258,13 +352,22 @@ class DwDataLifecycleInspector {
     final source = DwDartSource(content);
     // Table names are strings, which the blanked code no longer holds: the
     // annotations are found in the source, and judged in the code.
-    final tables = _table.allMatches(content).toList();
+    final code = source.code;
     final found = <(int, String)>[];
-    for (final (index, table) in tables.indexed) {
-      final end = index + 1 < tables.length
-          ? tables[index + 1].start
-          : content.length;
-      final body = source.code.substring(table.start, end);
+    for (final table in _table.allMatches(content)) {
+      // The annotated class's own body, from its `{` to the matching `}`.
+      final open = code.indexOf('{', table.end);
+      if (open < 0) continue;
+      var depth = 0;
+      var close = code.length;
+      for (var i = open; i < code.length; i++) {
+        if (code[i] == '{') depth++;
+        if (code[i] == '}' && --depth == 0) {
+          close = i;
+          break;
+        }
+      }
+      final body = code.substring(table.start, close);
       if (_uniqueKey.hasMatch(body) && _value.hasMatch(body)) {
         found.add((source.lineOf(table.start), table.group(1)!));
       }
@@ -398,13 +501,23 @@ final class DwDartSource {
             }
             final end = k + 1 > content.length ? content.length : k + 1;
             inner.write(content.substring(j, end));
-            value.write(' ');
+            // Read as a name, so `UPDATE ${table} SET` is still a statement.
+            value.write('dw_interpolated');
             j = end;
             continue;
           }
           final step = !raw && content[j] == r'\' ? 2 : 1;
           final end = j + step > content.length ? content.length : j + step;
-          value.write(content.substring(j, end));
+          // The text the literal holds: an escaped line break is one.
+          value.write(
+            step == 2 && end == j + 2
+                ? switch (content[j + 1]) {
+                    'n' => '\n',
+                    't' => '\t',
+                    final other => other,
+                  }
+                : content.substring(j, end),
+          );
           for (var k = j; k < end; k++) {
             inner.write(content[k] == '\n' ? '\n' : ' ');
           }

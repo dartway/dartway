@@ -1,3 +1,6 @@
+import 'dart:collection';
+
+import 'package:collection/collection.dart';
 import 'package:meta/meta.dart';
 import 'package:postgres/postgres.dart' as pg;
 
@@ -341,8 +344,10 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   /// catalogue, the reasons a project refuses something — which is what
   /// `DwSeedRows` runs it for.
   ///
-  /// Throws [ArgumentError] for a row that has an id, and for two rows with
-  /// the same [conflictOn] values: one statement cannot write a row twice.
+  /// Throws [ArgumentError] for a row that has an id, for a nullable
+  /// [conflictOn] column (a conflict never matches a null, so every run would
+  /// insert again), and for two rows with the same [conflictOn] values: one
+  /// statement cannot write a row twice.
   Future<int> upsertAll(
     Iterable<R> rows, {
     required List<DwTableColumn<Object?>> Function(T t) conflictOn,
@@ -356,13 +361,24 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
         'upsertAll: a row has an id; its key is its identity',
       );
     }
+    for (final column in target) {
+      if (column.nullable) {
+        // A conflict never matches a null: every run would insert again.
+        throw ArgumentError(
+          'upsertAll: conflict column "${column.name}" is nullable',
+        );
+      }
+    }
     final columns = _sql.insertColumns(withId: false);
     final arrays = [for (final _ in columns) <Object?>[]];
-    final seen = <String>{};
+    final seen = LinkedHashSet<List<Object?>>(
+      equals: const ListEquality<Object?>().equals,
+      hashCode: const ListEquality<Object?>().hash,
+    );
     for (final row in list) {
       final values = _valuesOf(row);
       final key = [for (final column in target) values[column.name]];
-      if (!seen.add(key.toString())) {
+      if (!seen.add(key)) {
         throw ArgumentError(
           'upsertAll: two rows share ${target.map((c) => c.name).join(', ')} '
           '= ${key.join(', ')}',

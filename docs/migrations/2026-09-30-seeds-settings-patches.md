@@ -19,20 +19,21 @@ hold the patterns below. Nothing stops compiling; the checks are what fail.
 
 The server applies a new framework migration, `dw_setting`, at its next start; nothing to do for it.
 
-## A rewrite of existing rows in a migration
+## Migrations you already have
 
-A statement that carries rows across the migration's own schema change — a renamed value, a
-backfilled column, rows a new constraint forbids — goes to `m.backfill` instead of `m.sql`/`m.query`,
-unchanged. The migration is already applied, so reseal it and accept its previous text:
+They stay as they are: an applied migration is never edited. Name the latest one in
+`deploy/config.yaml`, so `migrationChangesData` judges only the migrations written from now on:
 
-    - await m.sql("UPDATE issue SET stage = 'review' WHERE stage = 'validation'");
-    + await m.backfill("UPDATE issue SET stage = 'review' WHERE stage = 'validation'");
+    + migrations:
+    +   dataChecksAfter: <the id of your latest migration, e.g. 20260928_090917_course_modules>
 
-    + @override
-    + Set<String> get supersededChecksums => const {'<the checksum it declared before>'};
+From then on, a statement that carries rows across a migration's own schema change — a renamed
+value, a backfilled column, rows a new constraint forbids — goes to `m.backfill`:
 
-then `dart run bin/migrate.dart rehash`. Only the call changes; a statement kept in a variable is
-passed to `backfill` directly (the check judges a literal where it is written).
+    await m.backfill("UPDATE issue SET stage = 'review' WHERE stage = 'validation'");
+
+A statement kept in a variable is passed to `backfill` directly (the check judges a literal where it
+is written).
 
 ## Content in a migration → a seed step
 
@@ -52,17 +53,19 @@ Rows the code declares — a questionnaire, a catalogue — leave the migration 
 3. Declare the step on the feature:
 
        DwServerFeature('survey', …, startup: [
-         DwSeedRows('onboarding questions', table: (db) => db.surveyQuestions,
+         DwSeedRows('onboarding questions', table: SurveyQuestionRow.tableDef,
              key: (t) => [t.slug], rows: onboardingQuestions),
        ]);
 
    Rows that point at another seed's rows (options of a question) are a second step after it, with
    the parent's id read in a `DwStartupStep` of your own — or keyed by the parent's slug if the table
    can hold it.
-4. Delete the `INSERT`s from the old migration, keep its schema statements, reseal it and declare its
-   previous checksum in `supersededChecksums`: after the next start the seed has written the same
-   rows, so every database ends where the old text left it. A row the old text unpublished rather
-   than deleted is declared with the same column (`isPublished: false`).
+4. Leave the old migration as it is. The seed, keyed by the natural key of step 1, finds the rows
+   the migration created and adopts them — from the next start on, the declaration is what they
+   hold, in every database, and a fresh database gets them from the seed alone. A row the old text
+   unpublished rather than deleted is declared with the same column (`isPublished: false`).
+   Only rows nobody edits outside the code are a seed: the next start writes the declaration back
+   over an edit.
 
 ## Work after `server.start()` → startup steps
 
@@ -89,8 +92,10 @@ object's default (below). Only logging stays after `start()`.
        }
 
    Replace `List…Settings`/`Save…Setting(key, value)` with `GetAppSettings extends
-   DwSingleRequest<AppSettings>` and `SaveAppSettings` whose fields are nullable (`null` keeps); drop
-   the key-set validation and its refusal.
+   DwSingleRequest<AppSettings>` and `SaveAppSettings` whose fields keep when absent: `null` for a
+   non-nullable setting, a `DwFieldPatch` (default `keep()`) for a nullable one — applied with
+   `trimmedOrCleared`/`apply`, so it can be cleared, never an `''` meaning none. Drop the key-set
+   validation and its refusal.
 2. On the server: `ctx.settings.read<AppSettings>()` where a row was read and a string compared
    (`row?.value == 'true'` → `settings.paywallBypass`); `ctx.settings.update<AppSettings>((s) =>
    s.copyWith(…))` in the save handler, then `ctx.publish(…, saved)`. No advisory lock, no
@@ -98,16 +103,16 @@ object's default (below). Only logging stays after `start()`.
 3. A typed single-row table of its own (`SignInSettingRow`, read as `findFirst()` with `??`
    defaults, saved under an advisory lock) moves the same way: its fields become the object's, its
    `findFirst` a `read`, its lock and insert-or-update an `update`.
-4. Carry the stored values over if they matter, in the migration that drops the table:
+4. Carry the stored values over, in the migration that drops the old table — a project never writes
+   `dw_setting` itself:
 
-       await m.backfill('''
-         INSERT INTO dw_setting (area, value)
-         SELECT 'AppSettings', jsonb_build_object('paywallBypass', value = 'true')
-         FROM app_setting WHERE key = 'paywallBypass'
-         ON CONFLICT (area) DO NOTHING''');
+       await m.carrySettings('AppSettings', fromSql: '''
+         SELECT jsonb_strip_nulls(jsonb_build_object(
+           'paywallBypass',
+             (SELECT lower(value) = 'true' FROM app_setting WHERE key = 'paywallBypass')))''');
        await m.dropTable('app_setting');
 
-   The area is the class's wire name, the value only what differs from the defaults.
+   The area is the class's wire name; what is carried is merged over anything already stored.
 5. In the app: a `ref.watch(dw.request(const GetAppSettings()))` answers the object; a catalogue of
    keys with parsers (`AppSettingKey`) goes.
 

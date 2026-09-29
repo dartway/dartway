@@ -327,6 +327,15 @@ void main() {
       expect(await db().appSettings.count(), 0);
     });
 
+    test('refuses a nullable conflict column', () async {
+      await expectLater(
+        db().appSettings.upsertAll([
+          setting('appName', 'A'),
+        ], conflictOn: (t) => [t.featuredServiceId]),
+        throwsArgumentError,
+      );
+    });
+
     test('nothing is sent for no rows', () async {
       expect(
         await db().appSettings.upsertAll(const [], conflictOn: (t) => [t.key]),

@@ -98,7 +98,7 @@ final contentHandlers = <DwCallHandler>[
         (current) => current.copyWith(
           clubName: command.clubName?.trim(),
           bookingEnabled: command.bookingEnabled,
-          supportPhone: command.supportPhone?.trim(),
+          supportPhone: command.supportPhone.trimmedOrCleared,
         ),
       );
       ctx.publish(AppChannels.settings, saved);

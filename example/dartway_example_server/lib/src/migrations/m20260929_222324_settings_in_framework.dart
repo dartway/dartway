@@ -10,12 +10,23 @@ final class M20260929222324SettingsInFramework extends DwDatabaseMigration {
   String get id => '20260929_222324_settings_in_framework';
 
   @override
-  String get checksum => '6a2438f237c7bff6e0a4febc8a86a663';
+  String get checksum => '9fb0e842532280a0a20a83ff505f5f89';
 
   @override
   Future<void> up(DwMigrationContext m) async {
     // The club's settings are a settings object in the framework's
     // `dw_setting` (`ctx.settings`), with their defaults in the contract.
+    // What was saved is carried over first: a text as it was (a blank phone
+    // is no phone), a toggle read the way the app read it.
+    await m.carrySettings('ClubSettings', fromSql: r'''
+SELECT jsonb_strip_nulls(jsonb_build_object(
+  'clubName',
+    (SELECT nullif(trim(value), '') FROM app_setting WHERE key = 'clubName'),
+  'bookingEnabled',
+    (SELECT lower(trim(value)) IN ('true', '1', 'yes')
+     FROM app_setting WHERE key = 'bookingEnabled'),
+  'supportPhone',
+    (SELECT nullif(trim(value), '') FROM app_setting WHERE key = 'supportPhone')))''');
     await m.dropTable('app_setting');
   }
 

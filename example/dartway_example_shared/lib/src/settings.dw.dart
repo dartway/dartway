@@ -11,7 +11,7 @@ mixin _$ClubSettings on DwDataObject {
   Map<String, Object?> toJson() => {
     if (_self.clubName != 'DartWay Fitness') 'clubName': _self.clubName,
     if (!_self.bookingEnabled) 'bookingEnabled': _self.bookingEnabled,
-    if (_self.supportPhone != '') 'supportPhone': _self.supportPhone,
+    if (_self.supportPhone != null) 'supportPhone': _self.supportPhone,
   };
 
   @override
@@ -38,20 +38,18 @@ ClubSettings $ClubSettingsFromJson(Map<String, Object?> json) => ClubSettings(
   bookingEnabled: json['bookingEnabled'] == null
       ? true
       : json['bookingEnabled']! as bool,
-  supportPhone: json['supportPhone'] == null
-      ? ''
-      : json['supportPhone']! as String,
+  supportPhone: json['supportPhone'] as String?,
 );
 
 extension ClubSettingsCopyWith on ClubSettings {
   ClubSettings copyWith({
     String? clubName,
     bool? bookingEnabled,
-    String? supportPhone,
+    DwFieldPatch<String> supportPhone = const DwFieldPatch.keep(),
   }) => ClubSettings(
     clubName: clubName ?? this.clubName,
     bookingEnabled: bookingEnabled ?? this.bookingEnabled,
-    supportPhone: supportPhone ?? this.supportPhone,
+    supportPhone: supportPhone.apply(this.supportPhone),
   );
 }
 
@@ -83,11 +81,14 @@ mixin _$SaveClubSettings on DwActionCommand<ClubSettings> {
   String get dwTypeName => 'SaveClubSettings';
 
   @override
-  Map<String, Object?> toJson() => {
-    if (_self.clubName != null) 'clubName': _self.clubName,
-    if (_self.bookingEnabled != null) 'bookingEnabled': _self.bookingEnabled,
-    if (_self.supportPhone != null) 'supportPhone': _self.supportPhone,
-  };
+  Map<String, Object?> toJson() {
+    final json = <String, Object?>{
+      if (_self.clubName != null) 'clubName': _self.clubName,
+      if (_self.bookingEnabled != null) 'bookingEnabled': _self.bookingEnabled,
+    };
+    DwJsonCodec.writePatch(json, 'supportPhone', _self.supportPhone, (v) => v);
+    return json;
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -110,5 +111,9 @@ SaveClubSettings $SaveClubSettingsFromJson(Map<String, Object?> json) =>
     SaveClubSettings(
       clubName: json['clubName'] as String?,
       bookingEnabled: json['bookingEnabled'] as bool?,
-      supportPhone: json['supportPhone'] as String?,
+      supportPhone: DwJsonCodec.readPatch(
+        json,
+        'supportPhone',
+        (v) => v! as String,
+      ),
     );

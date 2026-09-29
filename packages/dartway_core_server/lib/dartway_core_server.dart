@@ -53,4 +53,5 @@ export 'src/server/dw_server_module.dart';
 export 'src/server/dw_server_settings.dart';
 export 'src/server/dw_startup_step.dart'
     show DwFirstAdministrator, DwSeedRows, DwStartupStep;
-export 'src/settings/dw_settings_store.dart' show DwSettingsStore;
+export 'src/settings/dw_settings_store.dart'
+    show DwSettingsMigration, DwSettingsStore;
