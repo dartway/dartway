@@ -538,8 +538,7 @@ echo "nginx restarted and running"
     if (target.storage == DwStorageMode.bundled)
       DwDeployStep(
         id: 'storage',
-        title:
-            'Start the bundled storage and set up its public and private '
+        title: 'Start the bundled storage and set up its public and private '
             'bucket',
         run: startStorage,
         showOutput: true,

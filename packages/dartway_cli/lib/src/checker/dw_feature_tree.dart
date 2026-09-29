@@ -6,7 +6,12 @@ import 'package:path/path.dart' as p;
 const dwFeatureInternalFolders = {'widgets', 'logic'};
 
 /// Folders that are never part of the feature tree.
-const dwIgnoredFolders = {'generated', 'gen', 'l10n', '.dart_tool'};
+const dwIgnoredFolders = {
+  'generated',
+  'gen',
+  'l10n',
+  '.dart_tool',
+};
 
 /// A node of the project tree below an area (`lib/app`, `lib/admin`, ...).
 ///

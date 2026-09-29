@@ -67,9 +67,7 @@ class DwImageRegistry {
       var response = await _head(client, manifestUrl, null);
       if (response.statusCode == 401) {
         final challenge = response.headers.value('www-authenticate');
-        final token = challenge == null
-            ? null
-            : await _token(client, challenge);
+        final token = challenge == null ? null : await _token(client, challenge);
         if (token == null) {
           return DwImageResolution.fail(
             '${ref.registryHost} demands authentication this check cannot '
@@ -185,7 +183,9 @@ class DwImageRegistry {
     ).firstMatch(challenge.trim());
     if (match == null) return null;
     final params = <String, String>{
-      for (final part in RegExp(r'(\w+)="([^"]*)"').allMatches(match.group(1)!))
+      for (final part in RegExp(
+        r'(\w+)="([^"]*)"',
+      ).allMatches(match.group(1)!))
         part.group(1)!: part.group(2)!,
     };
     final realm = params['realm'];
@@ -255,7 +255,7 @@ class DwImageRef {
   final String repository;
   final String tag;
 
-  /// Hosts that name Docker Hub explicitly rather than by leaving the host
+    /// Hosts that name Docker Hub explicitly rather than by leaving the host
   /// out — `docker pull docker.io/postgres` and `docker pull postgres` name
   /// the same image, and both take the `library/` rule; only a *different*
   /// registry does not.
@@ -274,8 +274,7 @@ class DwImageRef {
         rest = image.substring(firstSlash + 1);
       }
     }
-    final isDockerHub =
-        explicitHost == null || _dockerHubHosts.contains(explicitHost);
+    final isDockerHub = explicitHost == null || _dockerHubHosts.contains(explicitHost);
     final tagColon = rest.lastIndexOf(':');
     final repoNoTag = tagColon == -1 ? rest : rest.substring(0, tagColon);
     final tag = tagColon == -1 ? 'latest' : rest.substring(tagColon + 1);

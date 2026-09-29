@@ -17,7 +17,10 @@ class ToolkitInstaller {
   /// Removed before every install, then re-copied from the toolkit — so a
   /// command that has been retired disappears from a project instead of
   /// lingering as a stale `/slash` nobody maintains.
-  static const managedCommandFiles = ['commit.md', 'dartway-checkup.md'];
+  static const managedCommandFiles = [
+    'commit.md',
+    'dartway-checkup.md',
+  ];
 
   /// Copies the toolkit from [toolkitDir] into `<projectRoot>/.claude/`,
   /// substituting [tokens] in the managed markdown files.
