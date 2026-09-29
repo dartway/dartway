@@ -9,12 +9,13 @@
 // scaffolds and the app then owns outright. What the framework ships is the
 // mechanism an app should not have to reinvent: `dw.action` guards a
 // `DwUiAction` behind any tappable widget, and `DwReadBuilder` renders a
-// read's loading/refused/failed/data uniformly. See DESIGN.md for the design principles.
+// read's loading/refused/failed/data uniformly. See DESIGN.md for the design
+// principles.
 //
-// lib/src is grouped into: data (DwFlutterCore and the Riverpod bindings over the
-// client), core (the ambient dw + config + plugins), bootstrap (app runner), ui
-// (actions, read, window_list, notifications, confirmation) and diagnostics (error
-// reporting, feature declarations).
+// lib/src is grouped into: data (DwFlutterCore and the Riverpod bindings over
+// the client), core (the ambient dw + config + plugins), bootstrap (app
+// runner), ui (actions, read, window_list, notifications, confirmation) and
+// diagnostics (error reporting, feature declarations).
 
 // The family re-exports what a project imports directly (D-032): the shared
 // contract (DTO kinds, results, refusals, channels), the client, and the

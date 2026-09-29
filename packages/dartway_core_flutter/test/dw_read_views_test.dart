@@ -501,6 +501,28 @@ void main() {
       await close(tester);
     });
 
+    testWidgets('a failed page after an empty one is the edge slot\'s retry, '
+        'not a reported failure', (tester) async {
+      await start();
+      feed = rooms(2);
+      var calls = 0;
+      feedAnswer = (_) => switch (calls++) {
+        0 => const DwCallOk(DwPageResult<RoomView>([], hasMore: true)),
+        1 => const DwCallFailed('incident-next'),
+        _ => null,
+      };
+      await tester.pumpWidget(list());
+      await settle(tester);
+      expect(find.byIcon(Icons.refresh), findsOneWidget);
+      expect(find.text('failed: DwFailedException'), findsNothing);
+      expect(reports, isEmpty);
+
+      await tester.tap(find.byIcon(Icons.refresh));
+      await settle(tester);
+      expect(find.text('r1'), findsOneWidget);
+      await close(tester);
+    });
+
     testWidgets('as a sliver in the page\'s own scroll view', (tester) async {
       await start();
       feed = rooms(40);

@@ -1,5 +1,6 @@
 import 'package:dartway_example_flutter/app/chat/logic/chat_counts.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_channel_view.dart';
+import 'package:dartway_example_flutter/app/chat/widgets/staff_channel_chip.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/profile/my_profile.dart';
@@ -157,15 +158,10 @@ class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
                           for (final item in channels)
                             Padding(
                               padding: const EdgeInsets.only(right: 8),
-                              child: ChatChannelChip(
+                              child: StaffChannelChip(
                                 key: ValueKey('chat-channel-${item.id}'),
-                                title: item.title,
+                                channel: item,
                                 selected: item.id == channel.id,
-                                unread: item.id == channel.id
-                                    ? 0
-                                    : ref.watch(
-                                        chatUnreadCountProvider(item.id),
-                                      ),
                                 onTap: () {
                                   search.value = null;
                                   selectedId.value = item.id;

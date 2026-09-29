@@ -11,8 +11,8 @@ import '../../private/dw_singleton.dart';
 typedef DwRefusedBuilder =
     Widget Function(BuildContext context, DwCallRefusal refusal);
 
-/// The branches every read on screen shares — `DwReadBuilder`, `DwPagedListView`
-/// and `DwWindowListView` — for the answers that are not data: loading, a
+/// The branches every read on screen shares — `DwReadBuilder`,
+/// `DwPagedListView` and `DwWindowListView` — for the answers that are not data: loading, a
 /// refusal with a branch of its own, a signed-out read, and everything else
 /// as the app's retryable view. One implementation, so the three agree.
 abstract final class DwReadStates {

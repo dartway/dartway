@@ -28,6 +28,10 @@ class DwFlutterConfig {
   /// skeleton from — `DwReadBuilder`, `DwPagedListView`, `DwWindowListView`.
   /// The app's kit supplies it once (a skeleton block, an indicator), so no
   /// screen spells its own spinner. Required by `DwFlutterCore`.
+  ///
+  /// It is also what a list's edge slot shows while the next page loads —
+  /// a slot 48 pixels high — so it sizes itself to the room it is given: a
+  /// centred indicator, not a block of fixed height.
   final WidgetBuilder? readLoadingBuilder;
 
   /// What a read shows when it did not answer with data and no branch of its

@@ -146,8 +146,9 @@ class DwWindowListView<T extends DwDataObject> extends ConsumerStatefulWidget {
   /// The slot past the loaded items at an end that has more: loading, idle
   /// (a load starts as it comes near), or [error] with [retry] when the last
   /// load failed. Default: 48 pixels holding the app's `readLoadingBuilder`
-  /// while loading, or a retry button — the same slot as `DwPagedListView`'s. Keep its height constant: it stands between
-  /// the rows on screen and the rows a load brings.
+  /// while loading, or a retry button — the same slot as
+  /// `DwPagedListView`'s. Keep its height constant: it stands between the
+  /// rows on screen and the rows a load brings.
   final Widget Function(
     BuildContext context,
     DwWindowListEdge edge,

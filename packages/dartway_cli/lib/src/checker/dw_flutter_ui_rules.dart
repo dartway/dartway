@@ -461,8 +461,8 @@ class DwFlutterUiInspector {
   );
 
   /// A route parameter set to `0` or `-1`: `AdminParams.courseId.set(0)` —
-  /// the parameter enums are `…Params` (or `…Param`), which is what tells a route
-  /// parameter from `DwFieldPatch.set(0)` or any other `set`.
+  /// the parameter enums are `…Params` (or `…Param`), which is what tells a
+  /// route parameter from `DwFieldPatch.set(0)` or any other `set`.
   static final _sentinel = RegExp(
     r'(?<![\w$])\w*Params?\s*\.\s*\w+\s*\.\s*set\s*\(\s*(?:0|-\s*1)\s*\)',
   );

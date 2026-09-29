@@ -345,6 +345,9 @@ spinner — `CircularProgressIndicator` outside `ui_kit/` is `forbiddenProgressI
 **Several reads nest.** The inner builder stands in the outer one's `builder`; each loads, fails and
 retries on its own.
 
+**A box, not a sliver.** `DwReadBuilder`'s branches are box widgets: in a `CustomScrollView`'s
+`slivers` it goes inside a `SliverToBoxAdapter`, and a feed there is `DwPagedListView.sliver`.
+
 **The body comes from a builder; the chrome from `logic/`.** A value the screen's chrome needs
 whatever the read answers — a title, whether a button is enabled, a badge, whether to leave room for
 a bar — is a provider in the feature's `logic/` answering a plain value with a fallback (a `.select`

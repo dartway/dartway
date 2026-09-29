@@ -36,6 +36,10 @@ import 'dw_read_states.dart';
 /// Several reads on one screen nest: the inner builder sits in the outer
 /// one's [builder].
 ///
+/// **A box, not a sliver.** Its branches are box widgets, so in a sliver
+/// position — a `CustomScrollView`'s `slivers` — it goes inside a
+/// `SliverToBoxAdapter`; a feed there is `DwPagedListView.sliver`.
+///
 /// **A value derived from reads** — a provider of the project's own in
 /// `logic/` answering an `AsyncValue` — is rendered the same way with
 /// [DwReadBuilder.derived], which takes the provider and says how to ask

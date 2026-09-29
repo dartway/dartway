@@ -23,7 +23,8 @@ import 'dw_upload_notifier.dart';
 ///     appVersion: '1.4.2+57',
 ///     refusalText: (refusal) => t.refusal(refusal),
 ///     readLoadingBuilder: (context) => const AppLoadingBlock(),
-///     readFailedBuilder: (context, error, retry) => LoadFailedMessage(onRetry: retry),
+///     readFailedBuilder: (context, error, retry) =>
+///         LoadFailedMessage(onRetry: retry),
 ///     updateRequiredScreen: (context, refusal) => const UpdateTheAppPage(),
 ///   ),
 ///   protocol: appProtocol,
@@ -33,7 +34,7 @@ import 'dw_upload_notifier.dart';
 /// DwAppRunner(appInitializers: [dw.init], child: const App()).run();
 ///
 /// DwReadBuilder(dw.request(const ListUpcomingSessions()), builder: …);
-/// DwPagedListView(request: const FeedPosts(), itemBuilder: …, emptyBuilder: …);
+/// DwPagedListView(request: const FeedPosts(), itemBuilder: …);
 /// ref.watch(dw.request(const ListUpcomingSessions()));  // AsyncValue<List<ClubSession>>
 /// ref.watch(dw.pages(const FeedPosts()));               // AsyncValue<DwPagedData<FeedPost>>
 /// ref.watch(dw.table(const ListClients(page: 2)));      // AsyncValue<DwTablePage<ClientCard>>
@@ -296,9 +297,10 @@ class DwFlutterCore extends DwFlutterToolbox {
     }
     if (config.readLoadingBuilder == null || config.readFailedBuilder == null) {
       throw ArgumentError(
-        'DwFlutterConfig.readLoadingBuilder and readFailedBuilder are required by '
-        'DwFlutterCore: every read on screen goes through DwReadBuilder, and the '
-        'app is what says how a read looks while it loads and when it fails.',
+        'DwFlutterConfig.readLoadingBuilder and readFailedBuilder are required '
+        'by DwFlutterCore: every read on screen goes through DwReadBuilder, '
+        'and the app is what says how a read looks while it loads and when it '
+        'fails.',
       );
     }
     if (config.appVersion == null) {

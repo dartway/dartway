@@ -190,17 +190,20 @@ class DwPagedListView<T extends DwDataObject> extends ConsumerWidget {
       if (!data.hasMore) return _fill(emptyBuilder(context));
       // A page that came back empty while more follow — rows the server
       // filtered out of it — is not an empty feed: keep asking.
-      if (data.loadMoreError == null && !data.loadingMore) loadMoreAfterFrame();
+      final error = data.loadMoreError;
+      if (error == null && !data.loadingMore) loadMoreAfterFrame();
+      // A failed next page is the edge slot's failure, however many rows
+      // stand above it: a retry, and no report — as below the rows.
       return _fill(
-        data.loadMoreError == null
+        error == null
             ? DwReadStates.loading(context)
-            : DwReadStates.failed(
-                context,
-                data.loadMoreError!,
-                StackTrace.empty,
-                retry: () async => loadMore(),
-                onRefused: onRefused,
-              ),
+            : edgeBuilder?.call(context, error, loadMore) ??
+                  DwReadStates.edge(
+                    context,
+                    loading: false,
+                    error: error,
+                    retry: loadMore,
+                  ),
       );
     }
     return SliverList.builder(
