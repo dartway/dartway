@@ -612,10 +612,13 @@ context and one transaction (`ctx.db`, `ctx.accounts`, `ctx.publish`, `ctx.jobs`
 throws stops the start — in a deployment, with the previous server still serving.
 
 ```dart
-startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+startup: [
+  DwFirstAdministrator(grant: AppBootstrap.grantAdmin, identifier: adminIdentifier),
+],
 ```
 
-`DwFirstAdministrator` brings the account named by `DW_ADMIN_IDENTIFIER` into existence and hands
+`adminIdentifier` is the factory's `required String? adminIdentifier`, from
+`env.server.adminIdentifier` (`DW_ADMIN_IDENTIFIER`). `DwFirstAdministrator` brings that account into existence and hands
 it to `grant`, which is where the project gives its own admin role — the framework knows accounts,
 not roles.
 

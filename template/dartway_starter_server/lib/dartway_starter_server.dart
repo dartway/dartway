@@ -39,7 +39,7 @@ abstract final class DartwayStarterServer {
     int port = 8080,
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
-    String? adminIdentifier,
+    required String? adminIdentifier,
   }) => DwAppServer(
     protocol: appProtocol,
     schema: dartwayStarterSchema,

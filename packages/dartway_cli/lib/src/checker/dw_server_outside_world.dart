@@ -71,7 +71,11 @@ class DwServerOutsideWorldInspector {
   static final _overlayCall = RegExp(
     r'DwLocalEnvironment\s*\.\s*overlay\s*\(\s*$',
   );
-  static final _readByName = RegExp(r'''\[\s*(['"])([A-Z][A-Z0-9_]*)\1\s*\]''');
+  // An index: `[` right after a name, a call or another index — not a list
+  // literal such as `['RU']`.
+  static final _readByName = RegExp(
+    r'''(?<=[\w$)\]])\s*\[\s*(['"])([A-Z][A-Z0-9_]*)\1\s*\]''',
+  );
 
   /// Lines of [content] that read `Platform.environment`.
   static List<int> environmentReadsIn(String content) =>

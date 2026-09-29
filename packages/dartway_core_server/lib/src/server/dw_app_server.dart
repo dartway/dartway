@@ -222,6 +222,8 @@ final class DwAppServer {
 
   /// Starts the server; on SIGINT or SIGTERM it stops gracefully.
   ///
+  /// [migrateOnly] is required, so an entry point cannot forget it: a server
+  /// that ignored it would start serving in the deploy's migration step.
   /// With [migrateOnly] — `DwServerEnvironment.migrateOnly`,
   /// `DW_MIGRATE_ONLY=true` — it serves nothing: it applies the pending
   /// migrations ([migrate]) and ends the process — 0 when they applied,
@@ -231,7 +233,7 @@ final class DwAppServer {
   /// The process ends here rather than returning, because what a project's
   /// `main` does after `start` (bootstrapping an administrator) needs a
   /// running server.
-  Future<void> start({bool migrateOnly = false}) async {
+  Future<void> start({required bool migrateOnly}) async {
     if (migrateOnly) {
       try {
         await migrate();

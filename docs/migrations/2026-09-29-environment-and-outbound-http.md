@@ -66,22 +66,39 @@ as constants on `AppFiles` (`defaultPublicBucket`, `defaultPrivateBucket`) and d
     + settings: DwServerSettings(allowedOrigins: env.server.allowedOrigins),
 
 and hand each sub-config to the server factory, which passes it to what uses it. The first
-administrator and migrate-only come from the same read — without these two lines the server makes
-no administrator and a deploy's migration step starts serving instead of exiting:
+administrator and migrate-only come from the same read. Both are required parameters now —
+`start({required bool migrateOnly})`, `DwFirstAdministrator({required String? identifier})` — so the
+compiler names every place that has to pass them (`migrateOnly: false` in `bin/seed_dev.dart`,
+`identifier: null` where no administrator is meant); skipping them would have made a deploy's
+migration step start serving and the administrator silently disappear:
 
     + adminIdentifier: env.server.adminIdentifier,   // → DwFirstAdministrator(identifier: …)
     - await server.start();
     + await server.start(migrateOnly: env.server.migrateOnly);
 
-In the factory: `DwFirstAdministrator(grant: …, identifier: adminIdentifier)`. `bin/seed_dev.dart`
+In the factory: `DwFirstAdministrator(grant: …, identifier: adminIdentifier)`, with
+`required String? adminIdentifier` as its parameter so the entry points and test harnesses say what
+they mean.
+
+A project that named its administrator with a variable of its own (Molodey's
+`MOLODEY_BOOTSTRAP_ADMIN`, U90's `AppBootstrap.adminVariable`) either renames it to
+`DW_ADMIN_IDENTIFIER` in `deploy/config.yaml` and the secret store (`dartway secret set
+DW_ADMIN_IDENTIFIER --env <name>`), or keeps its name, reads it in `AppEnvironment` —
+`read.optional('MOLODEY_BOOTSTRAP_ADMIN')` — and passes that as `identifier:`. `bin/seed_dev.dart`
 reads `AppEnvironment` the same way; any other `env['NAME']` in `bin/` becomes a field of
 `AppEnvironment`.
 
 Studio: `StudioEnvironment`, `WorkerConfiguration.fromEnvironment` and
 `AutomationConfiguration.fromEnvironment` fold into sub-configs of `AppEnvironment`, and so do the
 reads of `STUDIO_CLAUDE_EXECUTABLE`, `STUDIO_WORKSPACES`, `STUDIO_DARTWAY_CLI` and `PATH` — a child
-process's `PATH` is a field (`read.optional('PATH')`) passed to what spawns it. `bin/import_github.dart`'s `STUDIO_TOKEN` is read
-through `AppEnvironment` too.
+process's `PATH` is a field (`read.optional('PATH')`) passed to what spawns it. A token only a
+command-line entry point needs — `bin/import_github.dart`'s `STUDIO_TOKEN` — is read there, not in
+`AppEnvironment`:
+
+    final token = DwEnvironmentReader.read(
+      DwLocalEnvironment.overlay(Platform.environment),
+      (read) => read.required('STUDIO_TOKEN'),
+    );
 
 **3. Outbound HTTP through `ctx.http`.** Replace each client of your own:
 

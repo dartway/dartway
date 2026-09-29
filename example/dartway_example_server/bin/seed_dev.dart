@@ -28,8 +28,11 @@ Future<void> main() async {
     // Bound to whatever port is free: the seed serves nobody, it only needs
     // what a server has — a migrated database, the project's auth, a context.
     port: 0,
+    // The seed makes its own personas; the declared administrator is the
+    // real server's business.
+    adminIdentifier: null,
   );
-  await server.start();
+  await server.start(migrateOnly: false);
   try {
     await server.runInContext(_seed, scope: 'seed');
   } finally {

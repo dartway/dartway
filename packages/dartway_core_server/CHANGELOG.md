@@ -13,8 +13,9 @@
   `DW_STORAGE_PROVISION`, `PORT`, `DW_ALLOWED_ORIGINS` — so `bin/server.dart` parses nothing by
   hand. It also reads `DW_ADMIN_IDENTIFIER` (`adminIdentifier`) and `DW_MIGRATE_ONLY`
   (`migrateOnly`), so the local overlay reaches both (dartway/dartway#402): **BREAKING**,
-  `DwFirstAdministrator` takes `identifier:` instead of reading `Platform.environment` (`variable:`,
-  `environment:` and `defaultVariable` are gone), and `DwAppServer.start({bool migrateOnly})` replaces
+  `DwFirstAdministrator` takes a required `identifier:` instead of reading `Platform.environment`
+  (`variable:`, `environment:` and `defaultVariable` are gone), and `DwAppServer.start({required bool
+  migrateOnly})` replaces
   its own read of `DW_MIGRATE_ONLY` (`DwAppServer.migrateOnlyVariable` moved to
   `DwServerEnvironment`). `DwFileStorageConfig` no longer repeats the user info of a URL in a
   problem. `AppFiles.storageConfig` is gone from the template. Migration note: `docs/migrations/2026-09-29-environment-and-outbound-http.md`.

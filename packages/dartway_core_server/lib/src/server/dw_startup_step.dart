@@ -69,13 +69,15 @@ abstract class DwStartupStep {
 final class DwFirstAdministrator extends DwStartupStep {
   const DwFirstAdministrator({
     required this.grant,
-    this.identifier,
+    required this.identifier,
     this.kindOf = DwIdentifierKind.of,
   });
 
   /// The phone or e-mail to make an administrator: the server's
   /// `DwServerEnvironment.adminIdentifier`, handed in by `bin/server.dart`
-  /// through the project's server factory. `null` or blank for none.
+  /// through the project's server factory. `null` or blank for none —
+  /// required all the same, so a factory that forgot to pass it does not
+  /// compile rather than silently making no administrator.
   final String? identifier;
 
   /// Which kind of identifier the value is. The default is the framework's

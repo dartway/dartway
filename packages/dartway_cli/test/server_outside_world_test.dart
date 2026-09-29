@@ -83,6 +83,9 @@ final cli = DwMigrationCli(
 // final port = env['PORT'];
 final text = 'env["PORT"] in a string is not a read';
 final list = ['a', 'b'];
+final languages = ['RU'];
+final nested = [['EN']];
+print(['PORT']);
 '''),
         isEmpty,
       );
@@ -96,6 +99,7 @@ final env = DwLocalEnvironment.overlay(raw);
 final port = int.parse(env['PORT'] ?? '8080');
 final origins = env["DW_ALLOWED_ORIGINS"];
 final home = Platform.environment['HOME'];
+final chained = settings()['REGION'];
 '''),
         [
           (1, '`Platform.environment`'),
@@ -103,6 +107,7 @@ final home = Platform.environment['HOME'];
           (4, "`['DW_ALLOWED_ORIGINS']`"),
           (5, '`Platform.environment`'),
           (5, "`['HOME']`"),
+          (6, "`['REGION']`"),
         ],
       );
     });
