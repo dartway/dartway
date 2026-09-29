@@ -18,6 +18,7 @@ const dwServerFeatureFileKinds = [
   'publications',
   'jobs',
   'access',
+  'routes',
 ];
 
 /// The one subfolder a server feature may have.
@@ -164,11 +165,14 @@ class DwServerFeatureInspector {
       final name = p.basename(entity.path);
       if (name.startsWith('.')) continue;
       if (entity is Directory) {
-        if (dwServerForbiddenFolders.contains(name)) {
-          _fileFindings.add(_layerFolder('$label/$name'));
-        } else {
-          _checkLogic(entity, feature, '$label/$name');
-        }
+        // Logic that needs grouping is a feature too big for one folder: it
+        // splits into features, or into `<part>` files.
+        _fileFindings.add(
+          '$label/$name/ — $dwServerFeatureLogicFolder/ is flat'
+          '${dwServerForbiddenFolders.contains(name) ? ', and `$name` is a layer name' : ''}; '
+          'logic that needs grouping means the feature is too big — split it '
+          'into features, or into ${feature}_<part>_<kind>.dart files',
+        );
         continue;
       }
       final kind = RegExp(
@@ -217,6 +221,11 @@ class DwServerFeatureInspector {
   /// A job kind or definition constructed.
   static final _job = RegExp(
     r'\b(?:DwQueuedJob|DwRecurringJob|DwJobKind)\s*(?:<[^;]*?>)?\s*\(',
+  );
+
+  /// A door declared: `DwHttpRoute.post(` or a `<DwHttpRoute>[` list.
+  static final _route = RegExp(
+    r'\bDwHttpRoute\s*\.\s*\w+\s*\(|<\s*DwHttpRoute\s*>\s*\[',
   );
 
   static final _serverFeature = RegExp(r'\bDwServerFeature\s*\(');
@@ -296,6 +305,7 @@ class DwServerFeatureInspector {
       if (kind != 'handlers') misplaced(_handler, 'handlers', 'handlers');
       if (kind != 'rows') misplaced(_row, 'row classes', 'rows');
       if (kind != 'jobs') misplaced(_job, 'jobs or job kinds', 'jobs');
+      if (kind != 'routes') misplaced(_route, 'routes (DwHttpRoute)', 'routes');
       if (!isDeclaration) {
         final match = _serverFeature.firstMatch(code);
         if (match != null) {

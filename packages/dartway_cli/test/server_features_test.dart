@@ -69,8 +69,10 @@ final class SendMessage extends DwActionCommand<ChatMessage> {}
         'chat/chat_publications.dart': '',
         'chat/chat_jobs.dart': '',
         'chat/chat_access.dart': '',
+        'chat/chat_routes.dart': '',
+        'chat/chat_webhook_routes.dart': '',
         'chat/logic/amo_client.dart': '',
-        'chat/logic/pricing/rules.dart': '',
+        'chat/logic/pricing_rules.dart': '',
         'daily_plan/daily_plan_feature.dart':
             "final f = DwServerFeature('daily_plan');",
         'core/push/app_push.dart': '',
@@ -136,13 +138,14 @@ final class SendMessage extends DwActionCommand<ChatMessage> {}
       );
     });
 
-    test('logic/ holds no kind-suffixed file, at any depth', () {
+    test('logic/ holds no kind-suffixed file', () {
       final findings = inspect({
         'chat/chat_feature.dart': declaration,
         'chat/logic/chat_send_handlers.dart': '',
-        'chat/logic/deep/member_access.dart': '',
+        'chat/logic/member_access.dart': '',
+        'chat/logic/stripe_routes.dart': '',
       }).fileFindings;
-      expect(findings, hasLength(2));
+      expect(findings, hasLength(3));
       expect(
         findings.join('\n'),
         allOf([
@@ -150,15 +153,30 @@ final class SendMessage extends DwActionCommand<ChatMessage> {}
             'chat/logic/chat_send_handlers.dart — logic/ holds what is '
             'not one of the kinds',
           ),
-          contains('chat/logic/deep/member_access.dart'),
+          contains('chat/logic/member_access.dart'),
+          contains('chat/logic/stripe_routes.dart'),
         ]),
       );
+    });
+
+    test('logic/ is flat: a folder inside it is a feature too big', () {
+      final findings = inspect({
+        'chat/chat_feature.dart': declaration,
+        'chat/logic/activity/score.dart': '',
+      }).fileFindings;
+      expect(findings, [
+        contains(
+          'chat/logic/activity/ — logic/ is flat; logic that needs grouping '
+          'means the feature is too big — split it into features, or into '
+          'chat_<part>_<kind>.dart files',
+        ),
+      ]);
     });
 
     test('a layer name is refused at any depth, core/ included', () {
       final findings = inspect({
         'chat/chat_feature.dart': declaration,
-        'chat/logic/domain/rules.dart': '',
+        'chat/logic/domain/': '',
         'core/services/mailer.dart': '',
         'core/push/helpers/x.dart': '',
       }).fileFindings;
@@ -166,7 +184,10 @@ final class SendMessage extends DwActionCommand<ChatMessage> {}
       expect(
         findings.join('\n'),
         allOf([
-          contains('chat/logic/domain/ — `domain` is a layer name'),
+          contains(
+            'chat/logic/domain/ — logic/ is flat, and `domain` is a '
+            'layer name',
+          ),
           contains('core/services/ — `services` is a layer name'),
           contains('core/push/helpers/ — `helpers` is a layer name'),
         ]),
@@ -281,6 +302,48 @@ final chatJobs = <DwJobDefinition>[
             'live in chat_jobs.dart',
           ),
           contains('core/bootstrap.dart:1 declares jobs'),
+        ]),
+      );
+    });
+
+    test('routes: in *_routes.dart pass, elsewhere fail', () {
+      const routes = '''
+final githubRoutes = <DwHttpRoute>[
+  DwHttpRoute.post('/webhooks/github', (ctx, request) async => x),
+];
+''';
+      expect(
+        inspect({
+          'github/github_feature.dart': "final f = DwServerFeature('github');",
+          'github/github_routes.dart': routes,
+          'github/github_webhook_routes.dart': routes,
+          // Named, not constructed.
+          'github/github_handlers.dart': 'void f(DwHttpRoute route) {}',
+        }).codeFindings,
+        isEmpty,
+      );
+      sandbox.deleteSync(recursive: true);
+      sandbox.createSync();
+      final findings = inspect({
+        'github/github_feature.dart':
+            "final f = DwServerFeature('github', routes: [\n"
+            "  DwHttpRoute.get('/x', handle),\n]);\n",
+        'github/github_handlers.dart': routes,
+        'core/doors.dart': routes,
+      }).codeFindings;
+      expect(findings, hasLength(3));
+      expect(
+        findings.join('\n'),
+        allOf([
+          contains(
+            'github/github_feature.dart:2 declares routes (DwHttpRoute) — '
+            'they live in github_routes.dart or github_<part>_routes.dart',
+          ),
+          contains('github/github_handlers.dart:1 declares routes'),
+          contains(
+            'core/doors.dart:1 declares routes (DwHttpRoute) — core/ '
+            'holds none',
+          ),
         ]),
       );
     });
@@ -487,6 +550,7 @@ const text = 'DwServerFeature(\'chat\') ${"DwQueuedJob("}';
       'jobs',
     );
     expect(dwServerFeatureFileKind('chat', 'chat_feature.dart'), 'feature');
+    expect(dwServerFeatureFileKind('mcp', 'mcp_routes.dart'), 'routes');
     expect(dwServerFeatureFileKind('chat', 'chat_reads_feature.dart'), isNull);
     expect(dwServerFeatureFileKind('chat', 'chat_send.dart'), isNull);
     expect(dwServerFeatureFileKind('chat', 'chats_rows.dart'), isNull);

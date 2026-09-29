@@ -54,9 +54,10 @@ __SERVER_PKG__/
     <feature>_publications.dart  what a change publishes, and to whom
     <feature>_jobs.dart        its job kinds and job definitions
     <feature>_access.dart      its access rules, when they outgrow the handlers
+    <feature>_routes.dart      its DwHttpRoute doors, when it has them
     <feature>_<part>_<kind>.dart  a kind split in parts: the only way a feature splits
     logic/                     everything that is none of the kinds — clients, calculators,
-                               domain rules; free names, never a kind's suffix
+                               domain rules; flat, free names, never a kind's suffix
   test/
 ```
 
@@ -67,7 +68,7 @@ the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`,
 `services/`) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
 `dart run dartway_cli:dartway check`. **So is a feature**: the files above and nothing else, a layer
 name at no depth, and each kind declared only in its own file — handlers in `_handlers`, row classes
-in `_rows`, jobs in `_jobs`, a function that publishes in `_publications`, a row → data object
+in `_rows`, jobs in `_jobs`, routes in `_routes`, a function that publishes in `_publications`, a row → data object
 mapping in `_objects`, and none of them in `core/` (`invalidServerFeatureFile`,
 `misplacedServerCode`; what counts as each —
 [project layout](https://dartway.dev/1-getting-started/project-layout)). A feature split across layers ends up in four places, with a
@@ -482,7 +483,7 @@ DwHttpRoute.post('/webhooks/payments', (ctx, request) async {
 });
 ```
 
-Registered in a feature's `DwServerFeature(routes: [...])`, matched by exact path; `/dw/…` and `/health` are the
+Declared in the feature's `<feature>_routes.dart` and registered in its `DwServerFeature(routes: [...])`, matched by exact path; `/dw/…` and `/health` are the
 framework's. `auth:` is `DwRouteAuth.none` by default (the sender proves itself otherwise);
 `optional`/`required` read `Authorization: Bearer` like a call. A refusal thrown in a route is
 answered as JSON with its status; anything else as `500` with an incident id.

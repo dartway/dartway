@@ -88,7 +88,8 @@ my_app_server/
       profile_publications.dart what a change publishes, and to whom
       profile_jobs.dart    its job kinds and definitions, when it has jobs
       profile_access.dart  its access rules, when they outgrow the handlers
-      logic/               everything else the feature needs, when it needs it
+      profile_routes.dart  its DwHttpRoute doors, when it has them
+      logic/               everything else the feature needs, flat, when it needs it
     admin/, settings/      the skeleton's other features, the same shape
   test/                    acceptance tests on a real server, database and storage
   docker-compose.yaml      development Postgres and RustFS
@@ -109,15 +110,17 @@ writes and reads migrations by that path.
 project. A feature folder `<feature>/` holds:
 
 - files named `<feature>_<kind>.dart`, the kind one of `feature`, `rows`, `handlers`, `objects`,
-  `publications`, `jobs`, `access` — exactly one `<feature>_feature.dart`, the rest when the
+  `publications`, `jobs`, `access`, `routes` — exactly one `<feature>_feature.dart`, the rest when the
   feature has them;
 - `<feature>_<part>_<kind>.dart` when a kind outgrows one file — `orders_refunds_handlers.dart` beside
   `orders_handlers.dart`. This is the only way a feature splits;
 - one optional subfolder, `logic/`, for everything that is none of the kinds: a client of an
-  outside service, a calculator, the rules of a domain. Names inside it are free, subfolders
-  included, but none ends in a kind (`logic/send_handlers.dart` is a handlers file in hiding).
+  outside service, a calculator, the rules of a domain. Names inside it are free, but none ends in
+  a kind (`logic/send_handlers.dart` is a handlers file in hiding), and it is **flat**: logic that
+  needs folders of its own is a feature too big for one folder, and it splits into features, or
+  into `<part>` files.
 
-No other subfolder, and no folder anywhere under `src/` — `core/` and `logic/` included — named for
+No other subfolder, and no folder anywhere under `src/` — `core/` included — named for
 a layer: `domain`, `rows`, `handlers`, `services`, `models`, `objects`, `repositories`, `utils`,
 `helpers`, `entities`, `publications` (`invalidServerFeatureFile`).
 
@@ -129,6 +132,7 @@ a layer: `domain`, `rows`, `handlers`, `services`, `models`, `objects`, `reposit
 | a handler — `DwCallHandler.…(`, a `<DwCallHandler>[…]` list | `*_handlers.dart` |
 | a row class — `@DwSqlTable`, `extends DwTableRow` | `*_rows.dart` |
 | a job — `DwQueuedJob`, `DwRecurringJob`, a `DwJobKind` constructed | `*_jobs.dart` |
+| a route — `DwHttpRoute.…(`, a `<DwHttpRoute>[…]` list | `*_routes.dart` |
 | `DwServerFeature(` | `<feature>_feature.dart` |
 | a publication — a named function or method that calls `.publish(` itself, outside the closures it hands on | `*_publications.dart` |
 | a mapping — a named function or method that takes a row (a `…Row` parameter, or a member of a row class or of an extension on one), returns a data object of the shared package, and builds one | `*_objects.dart` |

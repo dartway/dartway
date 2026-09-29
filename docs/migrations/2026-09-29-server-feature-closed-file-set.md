@@ -20,8 +20,11 @@ Run `dart run dartway_cli:dartway check --type invalidServerFeatureFile`, then
 - **A layer subfolder in a feature** (`chat/rows/`, `chat/handlers/`, `chat/domain/`): row classes
   into `chat_rows.dart` — or `chat_<part>_rows.dart` when one file is too much — handlers into
   `chat_handlers.dart` / `chat_<part>_handlers.dart`, and everything in `domain/` into
-  `chat/logic/`. Subfolders inside `logic/` are fine; a layer name (`domain`, `services`, `models`,
-  `utils`, `helpers`, …) is not, at any depth. Moving a row class changes nothing in the database —
+  `chat/logic/`. `logic/` is **flat**: a `domain/activity/`, `domain/plan/` grouping means the
+  feature is too big for one folder — split it into features (`activity/`, `plan/`, each with its
+  own `<feature>_feature.dart`), or flatten it into `logic/` and `<feature>_<part>_<kind>.dart`
+  files. A layer name (`domain`, `services`, `models`, `utils`, `helpers`, …) is refused at any depth
+  of `lib/src/`. Moving a row class changes nothing in the database —
   the table is named by `@DwSqlTable` — but rename its `part '….dw.dart'` to the new file and run
   `dart run dartway_cli:dartway generate`.
 - **Any other subfolder** (`chat/worker/`, `orders/refunds/`): into `logic/`, or, when it is a
@@ -39,6 +42,10 @@ Run `dart run dartway_cli:dartway check --type invalidServerFeatureFile`, then
   `ctx.publish` inline is not a publication and stays.
 - **A row → data object helper** outside `_objects.dart` (`_toObject(row)` in a handlers file, a
   `toObject()` on a row class): into `<feature>_objects.dart`.
+- **A file declaring `DwHttpRoute`s** (`mcp/mcp_door.dart`, `github/github_webhook.dart`): it is the
+  feature's routes file — `mcp/mcp_routes.dart`, `github/github_routes.dart` (or
+  `github/github_webhook_routes.dart` when the feature has more than one door). A route declared
+  inline in `<feature>_feature.dart` moves there too.
 - **A `DwJobKind`, `DwQueuedJob` or `DwRecurringJob`** declared in a flow or handlers file: into
   `<feature>_jobs.dart`.
 

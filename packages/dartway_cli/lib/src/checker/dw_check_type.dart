@@ -127,8 +127,8 @@ enum DwCheckType {
   /// A file or folder inside a server feature outside its closed set:
   /// `<feature>_<kind>.dart` or `<feature>_<part>_<kind>.dart` with kind one
   /// of `feature`, `rows`, `handlers`, `objects`, `publications`, `jobs`,
-  /// `access`, and one `logic/` subfolder for everything else — which holds no
-  /// kind-suffixed file. A layer name (`domain/`, `rows/`, `services/`, …) is
+  /// `access`, `routes`, and one flat `logic/` subfolder for everything else —
+  /// no folders inside it, and no kind-suffixed file. A layer name (`domain/`, `rows/`, `services/`, …) is
   /// refused at any depth of `lib/src/`, `core/` included.
   ///
   /// Every live project had grown its own layout inside a feature — layer
@@ -138,7 +138,8 @@ enum DwCheckType {
 
   /// Server code declared in a file of the wrong kind: handlers outside
   /// `*_handlers.dart`, row classes outside `*_rows.dart`, jobs and job kinds
-  /// outside `*_jobs.dart`, a `DwServerFeature` outside `<feature>_feature.dart`,
+  /// outside `*_jobs.dart`, a `DwHttpRoute` outside `*_routes.dart`, a
+  /// `DwServerFeature` outside `<feature>_feature.dart`,
   /// a function that publishes outside `*_publications.dart`, a function
   /// mapping a row to a data object outside `*_objects.dart`. `core/` and
   /// `logic/` hold none of them.
