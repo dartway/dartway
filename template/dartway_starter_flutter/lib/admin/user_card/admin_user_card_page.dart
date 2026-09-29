@@ -20,7 +20,7 @@ class AdminUserCardPage extends ConsumerWidget implements DwFeatureWidget {
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'admin/user-card',
+    id: 'user_card/user-card',
     title: 'User card',
     purpose:
         'Everything the app knows about one person on one screen, and what an '

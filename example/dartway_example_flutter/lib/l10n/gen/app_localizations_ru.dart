@@ -101,9 +101,6 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get cancelBooking => 'Отменить запись';
-
-  @override
   String get leaveReview => 'Оставить отзыв';
 
   @override

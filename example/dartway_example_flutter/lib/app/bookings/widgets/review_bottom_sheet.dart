@@ -5,6 +5,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
+import 'package:dartway_example_flutter/app/bookings/logic/bookings_commands.dart';
 
 /// Collects a review of an attended visit. The rules — the caller's own
 /// attended booking, one review per visit, a rating from 1 to 5 — are the
@@ -42,16 +43,11 @@ class ReviewBottomSheet extends HookWidget {
         AppButton.primary(
           l10n.submitReview,
           onTap: dw.action(
-            (_) {
-              final text = reviewText.value.trim();
-              return dw.command(
-                ReviewVisit(
-                  bookingId: booking.id,
-                  rating: rating.value,
-                  text: text.isEmpty ? null : text,
-                ),
-              );
-            },
+            (_) => BookingsCommands.review(
+              booking,
+              rating: rating.value,
+              text: reviewText.value,
+            ),
             onSuccessNotification: l10n.thanksForFeedback,
             followUpIfMountedAction: (context, _) =>
                 Navigator.of(context).pop(),

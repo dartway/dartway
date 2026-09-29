@@ -15,7 +15,7 @@ class ProfileIdentitySection extends StatelessWidget
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'profile/identity',
+    id: 'identity/identifiers',
     title: 'Sign-in identifiers',
     purpose:
         'A member keeps the ways they sign in current: a second identifier as '

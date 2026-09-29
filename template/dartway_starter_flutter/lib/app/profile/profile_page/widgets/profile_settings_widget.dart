@@ -1,3 +1,4 @@
+import 'package:dartway_starter_flutter/app/profile/profile_page/logic/profile_page_commands.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
@@ -37,11 +38,12 @@ class _ProfileForm extends HookWidget {
     final lastName = useState(profile.lastName ?? '');
     final gender = useState(profile.gender);
 
-    final trimmedFirst = firstName.value.trim();
-    final trimmedLast = lastName.value.trim();
-    final firstChanged = trimmedFirst != profile.firstName;
-    final lastChanged = trimmedLast != (profile.lastName ?? '');
-    final genderChanged = gender.value != profile.gender;
+    final change = ProfilePageCommands.changeOf(
+      profile,
+      firstName: firstName.value,
+      lastName: lastName.value,
+      gender: gender.value,
+    );
 
     return Form(
       child: Column(
@@ -78,30 +80,13 @@ class _ProfileForm extends HookWidget {
                 ),
             ],
           ),
-          if (firstChanged || lastChanged || genderChanged) ...[
+          if (change != null) ...[
             const Gap(16),
             AppButton.primary(
               l10n.saveChanges,
               requireValidation: true,
-              // Only what changed is sent: an unchanged field is kept, and a
-              // cleared one is cleared rather than being indistinguishable
-              // from leaving it alone.
               onTap: dw.action(
-                (_) => dw.command(
-                  UpdateMyProfile(
-                    firstName: firstChanged ? trimmedFirst : null,
-                    lastName: switch (trimmedLast) {
-                      _ when !lastChanged => const DwFieldPatch.keep(),
-                      '' => const DwFieldPatch.clear(),
-                      final value => DwFieldPatch.set(value),
-                    },
-                    gender: switch (gender.value) {
-                      _ when !genderChanged => const DwFieldPatch.keep(),
-                      final UserGender value => DwFieldPatch.set(value),
-                      null => const DwFieldPatch.clear(),
-                    },
-                  ),
-                ),
+                (_) => ProfilePageCommands.save(change),
                 onSuccessNotification: l10n.profileUpdated,
               ),
             ),

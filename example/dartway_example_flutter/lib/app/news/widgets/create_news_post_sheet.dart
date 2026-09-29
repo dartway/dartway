@@ -1,10 +1,10 @@
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
-import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
+import 'package:dartway_example_flutter/app/news/logic/news_commands.dart';
 
 /// Publishes a post under the signed-in staff member's name. The author is not
 /// sent: the server takes it from the caller. A refusal — not staff, an
@@ -46,11 +46,9 @@ class CreateNewsPostSheet extends HookWidget {
           l10n.publish,
           onTap: isFormValid
               ? dw.action(
-                  (_) => dw.command(
-                    PublishNews(
-                      title: title.value.trim(),
-                      text: text.value.trim(),
-                    ),
+                  (_) => NewsCommands.publish(
+                    title: title.value,
+                    text: text.value,
                   ),
                   onSuccessNotification: l10n.postPublished,
                   followUpIfMountedAction: (context, _) =>

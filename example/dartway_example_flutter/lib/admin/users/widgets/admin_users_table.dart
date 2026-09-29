@@ -5,6 +5,7 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/admin/users/logic/users_commands.dart';
 
 /// One page of members, with the role editable inline and the pager under
 /// it. The page is live: rows change in place, and a new member reads it
@@ -106,7 +107,7 @@ class _UserRow extends StatelessWidget {
           // Changing someone's role is a rights change — confirm it. The row
           // changes when the answer carries the updated profile.
           dw.action(
-            (_) => dw.command(ChangeRole(profileId: user.id, role: role)),
+            (_) => UsersCommands.changeRole(user, role),
             label: 'changeUserRole',
             confirmation: DwUiConfirmation(
               context.l10n.confirmChangeRole(

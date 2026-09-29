@@ -4,6 +4,8 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
+import 'package:dartway_example_flutter/app/schedule/logic/schedule_commands.dart';
+import 'package:dartway_example_flutter/app/cancel_booking/cancel_booking_button.dart';
 
 class SessionCard extends StatelessWidget {
   const SessionCard({
@@ -60,19 +62,13 @@ class SessionCard extends StatelessWidget {
             // the session, and both lists on screen take them before the
             // command completes; other devices get them on their channels.
             if (booking != null)
-              AppButton.secondary(
-                l10n.cancel,
-                onTap: dw.action(
-                  (_) => dw.command(CancelBooking(bookingId: booking.id)),
-                  onSuccessNotification: l10n.bookingCancelled,
-                ),
-              )
+              CancelBookingButton(booking: booking)
             else if (session.startsAt.isAfter(DateTime.now()))
               session.spotsLeft > 0
                   ? AppButton.primary(
                       l10n.book,
                       onTap: dw.action(
-                        (_) => dw.command(BookSession(sessionId: session.id)),
+                        (_) => ScheduleCommands.book(session),
                         onSuccessNotification: l10n.youAreBooked,
                       ),
                     )

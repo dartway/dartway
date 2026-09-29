@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/app_test_app.dart';
+import '../../support/app_test_app.dart';
 
 void main() {
   testWidgets('booking a session flips its card and its spots from the answer '

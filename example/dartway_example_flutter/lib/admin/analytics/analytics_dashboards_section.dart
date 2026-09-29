@@ -22,7 +22,7 @@ class AnalyticsDashboardsSection extends HookConsumerWidget
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'admin/analytics',
+    id: 'analytics/dashboards',
     title: 'Analytics dashboards',
     purpose:
         'What people do in the app, as the numbers the team watches — built '

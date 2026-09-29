@@ -16,7 +16,7 @@ class AdminUsersPage extends HookWidget implements DwFeatureWidget {
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'admin/users',
+    id: 'users/members',
     title: 'Members',
     purpose: 'An admin finds a person and changes what they are allowed to do.',
     behaviors: [

@@ -16,7 +16,7 @@ class ProfilePage extends StatelessWidget implements DwFeatureWidget {
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'profile/my-profile',
+    id: 'profile_page/my-profile',
     title: 'My profile',
     purpose:
         'A member manages their own account — photo, name, how they sign in '

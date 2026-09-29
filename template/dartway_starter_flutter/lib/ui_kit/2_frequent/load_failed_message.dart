@@ -48,10 +48,8 @@ extension AsyncSection<T> on AsyncValue<T> {
     required Future<void> Function() onRetry,
     required Widget Function(T value) builder,
   }) {
-    assert(
-      (loadingValue == null) != (loadingWidget == null),
-      'A section loads with either a loadingValue or a loadingWidget.',
-    );
+    // A section loads with either a loadingValue or a loadingWidget.
+    assert((loadingValue == null) != (loadingWidget == null));
     // The session ended under a screen that is on its way out: the sign-in
     // screen is the message, and the read is not an incident to report.
     if (this case AsyncError(error: DwNotAuthenticatedException())) {

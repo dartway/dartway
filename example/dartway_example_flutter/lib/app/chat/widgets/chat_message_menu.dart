@@ -8,6 +8,7 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_commands.dart';
 
 /// The menu a chat message opens on a long press or a secondary tap.
 abstract final class ChatMessageMenu {
@@ -41,12 +42,10 @@ abstract final class ChatMessageMenu {
                 selected: mine == null ? null : kinds.indexOf(mine),
                 onSelected: (index) {
                   close();
-                  dw.command(
-                    ReactToChatMessage(
-                      messageId: message.id,
-                      reaction: kinds[index] == mine ? null : kinds[index],
-                    ),
-                  );
+                  dw.action(
+                    (_) =>
+                        ChatCommands.react(message, kinds[index], mine: mine),
+                  )(context);
                 },
               ),
               const Divider(),
@@ -84,12 +83,9 @@ abstract final class ChatMessageMenu {
                 title: Text(message.isPinned ? l10n.chatUnpin : l10n.chatPin),
                 onTap: () {
                   close();
-                  dw.command(
-                    PinChatMessage(
-                      messageId: message.id,
-                      pinned: !message.isPinned,
-                    ),
-                  );
+                  dw.action(
+                    (_) => ChatCommands.pin(message, pinned: !message.isPinned),
+                  )(context);
                 },
               ),
               if (message.author.id == me.id || me.isClubAdmin)
@@ -115,9 +111,9 @@ abstract final class ChatMessageMenu {
                         ],
                       ),
                     );
-                    if (sure == true) {
-                      await dw.command(
-                        DeleteChatMessage(messageId: message.id),
+                    if (sure == true && context.mounted) {
+                      await dw.action((_) => ChatCommands.delete(message))(
+                        context,
                       );
                     }
                   },

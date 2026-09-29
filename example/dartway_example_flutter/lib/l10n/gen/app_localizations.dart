@@ -248,12 +248,6 @@ abstract class AppLocalizations {
   /// **'{status, select, booked{Booked} cancelled{Cancelled} attended{Attended} other{—}}'**
   String bookingStatus(String status);
 
-  /// No description provided for @cancelBooking.
-  ///
-  /// In en, this message translates to:
-  /// **'Cancel booking'**
-  String get cancelBooking;
-
   /// No description provided for @leaveReview.
   ///
   /// In en, this message translates to:

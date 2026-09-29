@@ -1,4 +1,5 @@
 import 'package:dartway_starter_flutter/admin/settings/logic/app_setting_label.dart';
+import 'package:dartway_starter_flutter/admin/settings/logic/settings_commands.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
@@ -24,13 +25,11 @@ class AdminSettingRow extends StatelessWidget {
   /// The stored text, or `null` while nobody has saved this setting.
   final String? storedValue;
 
-  /// Saves this setting alone. Two admins editing different settings
-  /// therefore cannot overwrite each other.
   DwUiAction<DwCallResult<AppSetting>> _save(
     BuildContext context,
     String rawValue,
   ) => dw.action(
-    (_) => dw.command(SaveAppSetting(key: setting.key, value: rawValue)),
+    (_) => SettingsCommands.save(setting.key, rawValue),
     onSuccessNotification: context.l10n.settingsSaved,
   );
 

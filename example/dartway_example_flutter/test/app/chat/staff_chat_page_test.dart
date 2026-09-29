@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/app_test_app.dart';
+import '../../support/app_test_app.dart';
 
 const boris = PersonCard(id: 2, firstName: 'Boris');
 const desk = ChatChannel(id: 1, title: 'Front desk');

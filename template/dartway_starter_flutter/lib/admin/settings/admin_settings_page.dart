@@ -13,7 +13,7 @@ class AdminSettingsPage extends StatelessWidget implements DwFeatureWidget {
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'admin/settings',
+    id: 'settings/app-settings',
     title: 'App settings',
     purpose:
         'An admin changes how the app behaves and what it says about itself '

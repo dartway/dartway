@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/app_test_app.dart';
+import '../../support/app_test_app.dart';
 
 UserProfile member(int n) => UserProfile(
   id: 100 + n,

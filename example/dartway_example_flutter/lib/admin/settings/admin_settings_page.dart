@@ -13,7 +13,7 @@ class AdminSettingsPage extends StatelessWidget implements DwFeatureWidget {
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'admin/settings',
+    id: 'settings/app-settings',
     title: 'Club settings',
     purpose:
         'An admin changes what the app says about the club without waiting '

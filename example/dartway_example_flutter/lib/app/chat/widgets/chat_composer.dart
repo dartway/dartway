@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_commands.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_session.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -132,45 +133,37 @@ class ChatComposer extends HookConsumerWidget {
       if (!canSend) return;
       sending.value = true;
       try {
-        final DwCallResult<ChatMessage> result;
+        // A refusal or a failure is shown by the action; the draft stays.
+        final result = await dw.action(
+          (_) => editing != null
+              ? ChatCommands.edit(editing, controller.text)
+              : ChatCommands.send(
+                  channelId,
+                  controller.text,
+                  replyTo: replyTo,
+                  attachments: [
+                    for (final file in files.value)
+                      ChatAttachmentDraft(
+                        id: file.stored!.id,
+                        width: file.width,
+                        height: file.height,
+                      ),
+                  ],
+                ),
+          label: editing != null ? 'editChatMessage' : 'sendChatMessage',
+          onErrorNotification: l10n.actionFailed,
+        )(context);
+        if (result == null || !context.mounted) return;
         if (editing != null) {
-          result = await dw.command(
-            EditChatMessage(messageId: editing.id, text: controller.text),
-          );
+          draftBeforeEdit.value = null;
+          session.editing.value = null;
+          controller.clear();
         } else {
-          result = await dw.command(
-            SendChatMessage(
-              channelId: channelId,
-              text: controller.text,
-              replyToMessageId: replyTo?.id,
-              attachments: [
-                for (final file in files.value)
-                  ChatAttachmentDraft(
-                    id: file.stored!.id,
-                    width: file.width,
-                    height: file.height,
-                  ),
-              ],
-            ),
-          );
-        }
-        switch (result) {
-          case DwCallOk():
-            if (editing != null) {
-              draftBeforeEdit.value = null;
-              session.editing.value = null;
-              controller.clear();
-            } else {
-              controller.clear();
-              drafts.remove(channelId);
-              files.value = const [];
-              session.replyTo.value = null;
-              unawaited(session.list.jumpToNewest());
-            }
-          case DwCallRefused(:final refusal):
-            dw.notify.error(dw.config.refusalText!(refusal));
-          case DwNotAuthenticated() || DwCallFailed():
-            dw.notify.error(l10n.actionFailed);
+          controller.clear();
+          drafts.remove(channelId);
+          files.value = const [];
+          session.replyTo.value = null;
+          unawaited(session.list.jumpToNewest());
         }
       } finally {
         if (context.mounted) sending.value = false;

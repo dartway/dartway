@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/app_test_app.dart';
+import '../../support/app_test_app.dart';
 
 void main() {
   testWidgets('the app name comes from the server settings, and a name saved '

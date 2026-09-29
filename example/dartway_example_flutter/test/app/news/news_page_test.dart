@@ -2,7 +2,7 @@ import 'package:dartway_example_flutter/app/news/widgets/news_post_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/app_test_app.dart';
+import '../../support/app_test_app.dart';
 
 const coach = PersonCard(id: 2, firstName: 'Boris');
 

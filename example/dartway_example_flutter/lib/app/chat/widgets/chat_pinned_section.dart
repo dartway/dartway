@@ -8,6 +8,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_commands.dart';
 
 /// The pinned messages of the channel over its list, newest first: a tap
 /// scrolls to the one shown — reopening the history around it when it is
@@ -49,7 +50,7 @@ class ChatPinnedSection extends HookConsumerWidget {
         unawaited(session.showMessage(message.id, message.sentAt));
       },
       onUnpin: () =>
-          dw.command(PinChatMessage(messageId: message.id, pinned: false)),
+          dw.action((_) => ChatCommands.pin(message, pinned: false))(context),
     );
   }
 }

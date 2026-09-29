@@ -1,5 +1,6 @@
-import 'package:dartway_starter_flutter/admin/role_picker/logic/role_picker_actions.dart';
+import 'package:dartway_starter_flutter/admin/role_picker/logic/role_picker_commands.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
@@ -39,7 +40,17 @@ class RolePicker extends StatelessWidget implements DwFeatureWidget {
           ? null
           : (role) {
               if (role == null || role == user.role) return;
-              RolePickerActions.changeRole(user, role)(context);
+              // A change of rights: confirmed first.
+              dw.action(
+                (_) => RolePickerCommands.changeRole(user, role),
+                label: 'changeUserRole',
+                confirmation: DwUiConfirmation(
+                  l10n.confirmChangeRole(
+                    user.displayName,
+                    l10n.roleName(role.name),
+                  ),
+                ),
+              )(context);
             },
       items: [
         for (final role in UserRole.values)

@@ -1,7 +1,7 @@
 import 'package:dartway_example_flutter/app/news/news_page.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/app_test_app.dart';
+import '../../support/app_test_app.dart';
 
 void main() {
   testWidgets('a signed-in member\'s device is registered once', (

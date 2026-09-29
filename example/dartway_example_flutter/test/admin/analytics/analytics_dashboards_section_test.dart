@@ -3,7 +3,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/app_test_app.dart';
+import '../../support/app_test_app.dart';
+
+/// Scrolls [finder] into view and taps it: the dashboards sit under the
+/// counters, below the fold of a phone.
+Future<void> tapShown(TestApp app, WidgetTester tester, Finder finder) async {
+  await tester.ensureVisible(finder);
+  await app.tap(tester, finder);
+}
 
 /// The analytics dashboards of the admin panel over a fake server: built,
 /// changed and read without code.
@@ -16,7 +23,7 @@ void main() {
     fake.server
       ..onRequest<GetAdminCounters>(
         (request, call) => const DwCallOk(
-          AdminCounters(members: 3, admins: 1, marketingOptIns: 0),
+          AdminCounters(members: 3, upcomingSessions: 0, newsPosts: 0),
         ),
       )
       ..onRequest<DwListAnalyticsDashboards>(
@@ -82,8 +89,8 @@ void main() {
 
   Future<TestApp> openDashboard(WidgetTester tester, FakeApp fake) async {
     final app = await TestApp.start(tester, fake, size: const Size(390, 900));
-    await app.tap(tester, find.text('Profile'));
-    await app.tap(tester, find.text('Admin panel'));
+    await tapShown(app, tester, find.text('Profile'));
+    await tapShown(app, tester, find.text('Admin panel'));
     return app;
   }
 
@@ -94,8 +101,8 @@ void main() {
     String current,
     String option,
   ) async {
-    await app.tap(tester, find.text(current).last);
-    await app.tap(tester, find.text(option).last);
+    await tapShown(app, tester, find.text(current).last);
+    await tapShown(app, tester, find.text(option).last);
   }
 
   testWidgets('a dashboard is created, and "home clicks by block name" is '
@@ -105,20 +112,22 @@ void main() {
     expect(find.text('Analytics'), findsOneWidget);
     expect(find.textContaining('No dashboards yet'), findsOneWidget);
 
-    await app.tap(tester, find.byTooltip('New dashboard'));
-    await app.enter(tester, find.byType(TextField).last, 'Home');
-    await app.tap(tester, find.text('Save'));
+    await tapShown(app, tester, find.byTooltip('New dashboard'));
+    await tester.enterText(find.byType(TextField).last, 'Home');
+    await app.settle(tester);
+    await tapShown(app, tester, find.text('Save'));
     expect(dashboards.single.title, 'Home');
     expect(find.text('This dashboard has no widgets yet.'), findsOneWidget);
 
-    await app.tap(tester, find.text('Add widget'));
-    await app.tap(tester, find.text('Pie'));
-    await app.enter(tester, find.byType(TextField).last, 'Home clicks');
+    await tapShown(app, tester, find.text('Add widget'));
+    await tapShown(app, tester, find.text('Pie'));
+    await tester.enterText(find.byType(TextField).last, 'Home clicks');
+    await app.settle(tester);
     await choose(app, tester, 'Any event', 'homeClicked (40)');
     // A pie counts events, split by a property: until one is chosen it
     // cannot be saved, and the count cannot be switched to people.
     expect(find.textContaining('A pie shows events split'), findsOneWidget);
-    await app.tap(tester, find.text('Save').last);
+    await tapShown(app, tester, find.text('Save').last);
     expect(dashboards.single.widgets, isEmpty);
     expect(
       tester
@@ -130,7 +139,7 @@ void main() {
     );
     await choose(app, tester, 'Nothing', 'Property “block_name”');
     expect(find.textContaining('A pie shows events split'), findsNothing);
-    await app.tap(tester, find.text('Save').last);
+    await tapShown(app, tester, find.text('Save').last);
 
     expect(
       dashboards.single.widgets.single,
@@ -195,15 +204,16 @@ void main() {
     expect(previous, shown.previous);
     expect(previous.to, shown.to.subtract(const Duration(days: 30)));
 
-    await app.tap(tester, find.byTooltip('Edit dashboard'));
-    await app.tap(tester, find.text('Add widget'));
-    await app.tap(tester, find.text('Bars'));
-    await app.enter(tester, find.byType(TextField).last, 'Quiz funnel');
+    await tapShown(app, tester, find.byTooltip('Edit dashboard'));
+    await tapShown(app, tester, find.text('Add widget'));
+    await tapShown(app, tester, find.text('Bars'));
+    await tester.enterText(find.byType(TextField).last, 'Quiz funnel');
+    await app.settle(tester);
     await choose(app, tester, 'Any event', 'quizStepSeen (90)');
     await choose(app, tester, 'Events', 'People (signed-in accounts)');
     await choose(app, tester, 'Nothing', 'Property “question_number”');
     await choose(app, tester, 'Largest first', 'By value: 1, 2, … 10');
-    await app.tap(tester, find.text('Save').last);
+    await tapShown(app, tester, find.text('Save').last);
 
     // A funnel: steps in their order, and room for a 15-question quiz.
     expect(
@@ -220,15 +230,15 @@ void main() {
     );
     expect(find.text('Quiz funnel'), findsOneWidget);
 
-    await app.tap(tester, find.byTooltip('Move back').last);
+    await tapShown(app, tester, find.byTooltip('Move back').last);
     expect(dashboards.single.widgets.map((w) => w.title), [
       'Quiz funnel',
       'Active devices',
     ]);
-    await app.tap(tester, find.byTooltip('Remove widget').last);
+    await tapShown(app, tester, find.byTooltip('Remove widget').last);
     expect(dashboards.single.widgets.map((w) => w.title), ['Quiz funnel']);
 
-    await app.tap(tester, find.text('7 days'));
+    await tapShown(app, tester, find.text('7 days'));
     final today = DateTime.now();
     expect(
       app.server.requestsOf<DwGetAnalyticsReport>().last.period.from,
@@ -255,7 +265,7 @@ void main() {
       ),
     );
     final app = await openDashboard(tester, fake);
-    await app.tap(tester, find.byTooltip('Edit dashboard'));
+    await tapShown(app, tester, find.byTooltip('Edit dashboard'));
 
     final remove = find.byTooltip('Remove widget');
     await tester.ensureVisible(remove.first);
@@ -270,7 +280,7 @@ void main() {
     expect(dashboards.single.widgets.map((w) => w.title), ['Second', 'Third']);
 
     // Once it has, the next removal starts from what was saved.
-    await app.tap(tester, find.byTooltip('Remove widget').first);
+    await tapShown(app, tester, find.byTooltip('Remove widget').first);
     expect(dashboards.single.widgets.map((w) => w.title), ['Third']);
 
     await app.stop(tester);
@@ -314,7 +324,7 @@ void main() {
       return DwCallOk(saved);
     });
     final app = await openDashboard(tester, fake);
-    await app.tap(tester, find.byTooltip('Edit dashboard'));
+    await tapShown(app, tester, find.byTooltip('Edit dashboard'));
 
     // Alpha loses its first widget; the save has not answered yet.
     await tester.ensureVisible(find.byTooltip('Remove widget').first);
@@ -322,8 +332,8 @@ void main() {
     await app.settle(tester);
     expect(dashboards.first.widgets.map((w) => w.title), ['A one', 'A two']);
 
-    await app.tap(tester, find.byType(DropdownButton<int>));
-    await app.tap(tester, find.text('Beta').last);
+    await tapShown(app, tester, find.byType(DropdownButton<int>));
+    await tapShown(app, tester, find.text('Beta').last);
     expect(find.text('B one'), findsOneWidget);
     expect(find.text('A two'), findsNothing);
 
@@ -338,7 +348,7 @@ void main() {
     );
 
     // The next change is Beta's, built on Beta's list.
-    await app.tap(tester, find.byTooltip('Remove widget').first);
+    await tapShown(app, tester, find.byTooltip('Remove widget').first);
     final last =
         app.server.callsOf<DwSaveAnalyticsDashboard>().last.call!
             as DwSaveAnalyticsDashboard;

@@ -6,7 +6,7 @@ import 'package:dartway_media_flutter/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/app_test_app.dart';
+import '../../support/app_test_app.dart';
 
 void main() {
   late DwFakeVideoPlayerPlatform video;

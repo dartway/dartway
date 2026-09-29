@@ -56,7 +56,6 @@
       "status": {"type": "String"}
     }
   },
-  "cancelBooking": "Cancel booking",
   "leaveReview": "Leave a review",
   "thanksForReview": "Thanks for your review!",
   "reviewSheetTitle": "How was your session?",

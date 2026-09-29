@@ -14,7 +14,7 @@ class AdminDashboardPage extends StatelessWidget implements DwFeatureWidget {
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'admin/dashboard',
+    id: 'dashboard/admin-dashboard',
     title: 'Admin dashboard',
     purpose:
         'The landing screen of the panel: how big the app is right now, and '
