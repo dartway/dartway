@@ -132,6 +132,7 @@ once per connection and reused.
 | `insert(row)` | the row as stored, with its id and every value read back |
 | `tryInsert(row, onConflict: …)` | the stored row, or `null` when it conflicted |
 | `upsert(row, conflictOn: (t) => [t.key])` | inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
+| `upsertAll(rows, conflictOn: (t) => [t.slug])` | every row inserted, or written over the row with the same key — unless that row already holds exactly these values — in one statement; the count of rows inserted or changed, `0` for a second run with the same rows. What `DwSeedRows` runs |
 | `insertAll(rows)` | the rows as stored, in order, in one statement; either every row has an id or none has |
 | `update(row)` | writes every column by id; throws `DwRowNotFound` when no row has that id — an update that changed nothing is a failure, not a quiet success |
 | `updateWhere({where, set})` | sets columns on every matching row; returns the count |
@@ -281,6 +282,46 @@ project namespaces clear of it. A string key must be hashed to a 32-bit integer 
 
 `advisoryLock` waits and holds a pooled connection while it waits; `tryAdvisoryLock` answers at
 once, for work where "someone else is doing it" is itself the answer.
+
+## Settings
+
+**The app's settings are one data object, read and written through `ctx.settings`** — a table of
+string keys and values is refused by `dart run dartway_cli:dartway check` (`settingsKeyValueTable`). Every reader of such
+a table parses text and supplies its own default (`== 'true'`), every first save of a key races
+another, and a value nobody reads is never noticed.
+
+A settings object is a data object of the shared package with a default for every field and a
+fixed `id` (`template/dartway_starter_shared/lib/src/settings.dart`):
+
+```dart
+final class AppSettings extends DwDataObject with _$AppSettings {
+  const AppSettings({this.appName = 'DartwayStarter', this.signUpEnabled = true});
+
+  @override
+  String get id => 'app';
+
+  final String appName;
+  final bool signUpEnabled;
+}
+```
+
+| Call | What it does |
+|---|---|
+| `ctx.settings.read<AppSettings>()` | the stored value, or the defaults while nothing is stored — never `null`; a read writes nothing |
+| `ctx.settings.save(value)` | stores the whole value in one upsert and returns it: two first saves at once both succeed |
+| `ctx.settings.update<AppSettings>((current) => …)` | reads, applies the change and stores the result with the row locked in between, so two edits of different fields both land; a change that leaves the value equal writes nothing |
+
+The value is stored in the framework's `dw_setting` table under the object's wire name, as the JSON
+the wire carries — which holds only what differs from the defaults. A default changed in the code
+reaches every value nobody changed, and a field added later reads as its default; renaming the
+class orphans what was stored under the old name. A settings object is published like any data
+object (`ctx.publish(AppChannels.settings, saved)`) and read by the app with a `DwSingleRequest`.
+The type argument names the object: left to inference it is `DwDataObject`, and the call throws
+`StateError`.
+
+A preference **per member** is not a settings object: it stays a row of the member's own table,
+which a job can query across members, and a reader without the row maps to the data object's own
+defaults.
 
 ## Raw SQL
 

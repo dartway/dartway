@@ -9,38 +9,52 @@ mixin _$ChatChannelRow on DwTableRow {
       identical(this, other) ||
       other is ChatChannelRow &&
           other.id == _self.id &&
+          other.slug == _self.slug &&
           other.title == _self.title;
 
   @override
-  int get hashCode => Object.hash(_self.id, _self.title);
+  int get hashCode => Object.hash(_self.id, _self.slug, _self.title);
 
   @override
-  String toString() => 'ChatChannelRow(id: ${_self.id}, title: ${_self.title})';
+  String toString() =>
+      'ChatChannelRow(id: ${_self.id}, slug: ${_self.slug}, title: ${_self.title})';
 }
 
 extension ChatChannelRowCopyWith on ChatChannelRow {
   ChatChannelRow copyWith({
     DwFieldPatch<int> id = const DwFieldPatch.keep(),
+    String? slug,
     String? title,
-  }) => ChatChannelRow(id: id.apply(this.id), title: title ?? this.title);
+  }) => ChatChannelRow(
+    id: id.apply(this.id),
+    slug: slug ?? this.slug,
+    title: title ?? this.title,
+  );
 }
 
 final class ChatChannelTable extends DwTableDef<ChatChannelRow> {
   const ChatChannelTable() : super('chat_channel');
 
+  DwTableColumn<String> get slug =>
+      const DwTableColumn('slug', DwColumnType.text, unique: true);
+
   DwTableColumn<String> get title =>
       const DwTableColumn('title', DwColumnType.text);
 
   @override
-  List<DwTableColumn<Object?>> get tableColumns => [id, title];
+  List<DwTableColumn<Object?>> get tableColumns => [id, slug, title];
 
   @override
-  ChatChannelRow fromRow(DwResultRow row) =>
-      ChatChannelRow(id: row.decode(id), title: row.decode(title));
+  ChatChannelRow fromRow(DwResultRow row) => ChatChannelRow(
+    id: row.decode(id),
+    slug: row.decode(slug),
+    title: row.decode(title),
+  );
 
   @override
   Map<String, Object?> toRow(ChatChannelRow row) => {
     if (row.id != null) 'id': row.id,
+    'slug': row.slug,
     'title': row.title,
   };
 }

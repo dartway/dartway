@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dartway_core_shared/dartway_core_shared.dart';
+import 'package:dartway_orm/dartway_orm.dart';
 
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_auth_config.dart';
@@ -26,10 +27,14 @@ import '../context/dw_call_context.dart';
 ///   left behind.
 ///
 /// The first administrator is the case every project has ([DwFirstAdministrator]);
-/// rows that must agree with the code — notification templates, the reasons a
-/// project refuses something — are the other: declare them in a step and the
-/// next start of every environment converges on the declaration, with no
-/// migration to edit afterwards.
+/// rows that must agree with the code — a catalogue, a questionnaire, the
+/// reasons a project refuses something — are the other, and have a step of
+/// their own, [DwSeedRows]: the next start of every environment converges on
+/// the declaration, with no migration to edit afterwards.
+///
+/// A step is declared on the server (`DwAppServer(startup: …)`) or on the
+/// feature it belongs to (`DwServerFeature(startup: …)`); the server's run
+/// first, then each feature's, in the order the features are listed.
 abstract class DwStartupStep {
   const DwStartupStep();
 
@@ -135,5 +140,69 @@ final class DwFirstAdministrator extends DwStartupStep {
       'administrator: $declared (account $accountId'
       '${created ? ', created' : ''})',
     );
+  }
+}
+
+/// Rows the code declares, which every start writes into the table by their
+/// key: a catalogue, a questionnaire, the reasons a project refuses something.
+///
+/// This is how a project seeds, and the only way: a migration runs once per
+/// database, so content put there never reaches a database that applied it
+/// before the content changed, and code after `server.start()` runs while
+/// calls are already being answered. A seed step runs before the port opens,
+/// in the start's transaction, at every start:
+///
+/// - a declared row missing from the table is inserted;
+/// - a stored row with the same [key] values and other values is written over
+///   — an edit of the declaration reaches every environment on its next start;
+/// - a stored row that already holds the declared values is not touched, so
+///   a start with nothing new writes nothing;
+/// - a stored row the declaration does not name is left alone. Retiring a
+///   row is a column of its own (`isPublished: false`), declared like any
+///   other value, since rows elsewhere may point at it.
+///
+/// ```dart
+/// DwSeedRows(
+///   'exercise catalogue',
+///   table: (db) => db.exercises,
+///   key: (t) => [t.slug],
+///   rows: exerciseCatalogue,
+/// )
+/// ```
+///
+/// [key] names unique columns — the natural key a person would use, never
+/// the `id`, which differs between databases. The rows are the rows as
+/// declared, without ids. Steps run in the order they are listed, so a seed
+/// whose rows point at another seed's comes after it.
+///
+/// Rows an administrator edits afterwards are not a seed: the next start
+/// would write the declaration back over the edit.
+final class DwSeedRows<R extends DwTableRow, T extends DwTableDef<R>>
+    extends DwStartupStep {
+  const DwSeedRows(
+    this.name, {
+    required this.table,
+    required this.key,
+    required this.rows,
+  });
+
+  @override
+  final String name;
+
+  /// The table, as the project's generated repository: `(db) => db.exercises`.
+  final DwTableRepository<R, T> Function(DwDatabaseHandle db) table;
+
+  /// The unique columns a declared row is found by.
+  final List<DwTableColumn<Object?>> Function(T t) key;
+
+  final Iterable<R> rows;
+
+  @override
+  Future<void> run(DwCallContext ctx) async {
+    final declared = rows.toList(growable: false);
+    final written = await table(ctx.db).upsertAll(declared, conflictOn: key);
+    if (written > 0) {
+      ctx.log.info('seed $name: $written of ${declared.length} rows written');
+    }
   }
 }

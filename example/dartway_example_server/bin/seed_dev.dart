@@ -195,11 +195,13 @@ Future<({int channels, int messages})> _seedChat(
   final members = [admin, ...staff];
   final now = DateTime.now();
 
-  final channels = await db.chatChannels.insertAll(const [
-    ChatChannelRow(title: 'Front desk'),
-    ChatChannelRow(title: 'Coaches'),
-    ChatChannelRow(title: 'Maintenance'),
-  ]);
+  // The channels themselves are the chat feature's seed, already there.
+  final channelBySlug = {
+    for (final channel in await db.chatChannels.find()) channel.slug: channel,
+  };
+  final channels = [
+    for (final declared in staffChannels) channelBySlug[declared.slug]!,
+  ];
   final [desk, coaches, maintenance] = channels;
 
   /// [count] instants over the last [days], in working hours (8:00–22:00),

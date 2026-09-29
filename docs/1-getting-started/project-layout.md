@@ -131,8 +131,7 @@ my_app_flutter/lib/
 
   LAYERS — everything that is not a feature
   core/                  app-wide wiring: dw_core.dart, router/ (with the zones' shells),
-                         refusal_text.dart, update_required_page.dart, profile/,
-                         app_settings/, dev/
+                         refusal_text.dart, update_required_page.dart, profile/, dev/
   shared/                non-visual helpers several features use: extensions, formatters
   ui_kit/                your design system, as source — styles and every visual building block
   l10n/                  ARB files and their generated output

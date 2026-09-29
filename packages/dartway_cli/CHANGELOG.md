@@ -2,6 +2,13 @@
 
 ## 0.13.0
 
+- **Four new errors: a project's data has one pattern per problem** (dartway/dartway#388).
+  `migrationChangesData` — an `INSERT`, `UPDATE` or `DELETE` in `lib/src/migrations/m*.dart` outside
+  `m.backfill(…)`; `workAfterServerStart` — `bin/server.dart` awaiting, or reaching `.db`,
+  `.accounts` or `runInContext`, after `start()`; `settingsKeyValueTable` — a row class with a unique
+  `String key` beside a `String value`; `fieldPatchMatched` — `DwSetField`, `DwClearField` or
+  `DwKeepField` named in the server, shared or Flutter package (`lib/`, `bin/`, `test/`). Migration
+  note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
   `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature
   law says (dartway/dartway#380). Wording only; no check changed.

@@ -178,7 +178,48 @@ enum DwCheckType {
   /// other by the server, and nothing makes them agree. Changing one produces
   /// a server that cannot log in to the database on the next machine — or,
   /// worse, on this one after the volume is recreated.
-  devComposeDrifted;
+  devComposeDrifted,
+
+  /// An `INSERT`, `UPDATE` or `DELETE` in a project migration
+  /// (`lib/src/migrations/m*.dart`) that is not an argument of `m.backfill(…)`
+  /// (dartway/dartway#388).
+  ///
+  /// A migration runs once per database, so content written there reaches
+  /// only the databases that had not applied it yet: an edit of it afterwards
+  /// changes the checksum and stops every server that has. Content is a
+  /// `DwSeedRows` step, which every start converges on; a rewrite of rows a
+  /// schema change strands — a renamed enum value, a split column — is what
+  /// `backfill` is for, and saying so is what makes the two tell apart.
+  migrationChangesData,
+
+  /// `bin/server.dart` doing work after `server.start()`: an `await`, or a
+  /// reach into the started server's database or accounts (#388).
+  ///
+  /// By then the port is open and calls are answered, so a seed that runs
+  /// there races the first requests, and one that fails leaves a server up
+  /// with half of it. Startup work is a `DwStartupStep`, run before the port
+  /// opens and stopping the start when it throws; after `start()` only
+  /// logging is left.
+  workAfterServerStart,
+
+  /// A row class that is a key/value store: a unique `String key` beside a
+  /// `String value` (#388).
+  ///
+  /// Every read of such a table parses a string and supplies its own default
+  /// (`== 'true'`), every write races the first insert of its key, and a
+  /// value nobody reads is never noticed. Settings are a data object with a
+  /// default for every field, read and written through `ctx.settings`.
+  settingsKeyValueTable,
+
+  /// `DwSetField`, `DwClearField` or `DwKeepField` named in the project's
+  /// code — a patch taken apart by hand (#388).
+  ///
+  /// The three are the wire's variants; code reads a patch through
+  /// `apply`, `newValue`, `isSet`/`isCleared` and `trimmedOrCleared`, and
+  /// builds one with `DwFieldPatch.set`/`.clear()`/`.keep()`. Hand matching
+  /// is how each handler grew its own idea of what a blank text or a kept
+  /// field on insert means.
+  fieldPatchMatched;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///

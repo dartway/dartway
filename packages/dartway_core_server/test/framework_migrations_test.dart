@@ -104,6 +104,7 @@ void main() {
     expect(run.migrations.map((ref) => ref.id), [
       bucket.id,
       '20260914_220000_dw_keys_and_identities',
+      '20260930_000000_dw_setting',
     ]);
     expect(
       (await opened.db.query(
@@ -153,6 +154,7 @@ void main() {
     final run = await runner(framework).apply();
     expect(run.migrations.map((ref) => ref.id), [
       '20260914_220000_dw_keys_and_identities',
+      '20260930_000000_dw_setting',
     ]);
     expect(
       (await runner(framework).status()).map((status) => status.state),

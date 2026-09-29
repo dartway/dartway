@@ -222,6 +222,119 @@ void main() {
     });
   });
 
+  group('upsertAll', () {
+    AppSettingRow setting(
+      String key,
+      String value, {
+      Map<String, int> limits = const {},
+    }) => AppSettingRow(
+      key: key,
+      value: value,
+      limits: limits,
+      updatedAt: DateTime.utc(2026, 9, 1),
+    );
+
+    Future<Map<String, String>> stored() async => {
+      for (final row in await db().appSettings.find()) row.key: row.value,
+    };
+
+    test('inserts what is missing and counts it', () async {
+      final written = await db().appSettings.upsertAll([
+        setting('appName', 'Club'),
+        setting('signUp', 'true', limits: {'max': 3}),
+      ], conflictOn: (t) => [t.key]);
+      expect(written, 2);
+      expect(await stored(), {'appName': 'Club', 'signUp': 'true'});
+    });
+
+    test('run again with the same rows, writes nothing', () async {
+      final rows = [
+        setting('appName', 'Club'),
+        setting('signUp', 'true', limits: {'max': 3}),
+      ];
+      await db().appSettings.upsertAll(rows, conflictOn: (t) => [t.key]);
+      final before = {
+        for (final row in await db().appSettings.find()) row.key: row,
+      };
+      expect(
+        await db().appSettings.upsertAll(rows, conflictOn: (t) => [t.key]),
+        0,
+      );
+      final after = {
+        for (final row in await db().appSettings.find()) row.key: row,
+      };
+      expect(after, before, reason: 'ids and values stay as they were');
+    });
+
+    test('an unchanged row is not rewritten', () async {
+      Future<Map<String, String>> versions() async => {
+        for (final row in await db().query(
+          'SELECT "key", xmin::text AS version FROM app_setting',
+        ))
+          row.get<String>('key'): row.get<String>('version'),
+      };
+      final rows = [setting('appName', 'Club'), setting('signUp', 'true')];
+      await db().appSettings.upsertAll(rows, conflictOn: (t) => [t.key]);
+      final first = await versions();
+      await db().appSettings.upsertAll(rows, conflictOn: (t) => [t.key]);
+      expect(await versions(), first);
+    });
+
+    test('writes a changed row over the stored one, by its key', () async {
+      await db().appSettings.upsertAll([
+        setting('appName', 'Club'),
+        setting('signUp', 'true'),
+      ], conflictOn: (t) => [t.key]);
+      final id = (await db().appSettings.findFirst(
+        where: (t) => t.key.equals('appName'),
+      ))!.id;
+      expect(
+        await db().appSettings.upsertAll([
+          setting('appName', 'Club Two'),
+          setting('signUp', 'true'),
+        ], conflictOn: (t) => [t.key]),
+        1,
+      );
+      final renamed = (await db().appSettings.findFirst(
+        where: (t) => t.key.equals('appName'),
+      ))!;
+      expect(renamed.id, id);
+      expect(renamed.value, 'Club Two');
+    });
+
+    test('leaves rows it does not name alone', () async {
+      await db().appSettings.insert(setting('theme', 'dark'));
+      await db().appSettings.upsertAll([
+        setting('appName', 'Club'),
+      ], conflictOn: (t) => [t.key]);
+      expect(await stored(), {'theme': 'dark', 'appName': 'Club'});
+    });
+
+    test('refuses two rows with one key, and a row with an id', () async {
+      await expectLater(
+        db().appSettings.upsertAll([
+          setting('appName', 'A'),
+          setting('appName', 'B'),
+        ], conflictOn: (t) => [t.key]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        db().appSettings.upsertAll([
+          setting('appName', 'A').copyWith(id: const DwFieldPatch.set(1)),
+        ], conflictOn: (t) => [t.key]),
+        throwsArgumentError,
+      );
+      expect(await db().appSettings.count(), 0);
+    });
+
+    test('nothing is sent for no rows', () async {
+      expect(
+        await db().appSettings.upsertAll(const [], conflictOn: (t) => [t.key]),
+        0,
+      );
+    });
+  });
+
   group('jsonb lists', () {
     setUp(() async {
       await db().clubServices.insertAll([

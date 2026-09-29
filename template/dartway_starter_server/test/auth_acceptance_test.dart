@@ -2,7 +2,6 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_server/dartway_starter_server.dart';
 import 'package:dartway_starter_server/src/profile/profile_rows.dart';
-import 'package:dartway_starter_server/src/settings/settings_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 
@@ -125,12 +124,12 @@ void main() {
   test('with sign-up switched off a new identifier is refused and an existing '
       'account still signs in', () async {
     final member = await app.signUp('79990000020', firstName: 'Oleg');
-    await app.db.appSettings.insert(
-      const AppSettingRow(key: AppSettingKeys.signUpEnabled, value: 'false'),
+    await app.server.runInContext(
+      (ctx) => ctx.settings.save(const AppSettings(signUpEnabled: false)),
     );
     addTearDown(
-      () => app.db.appSettings.deleteWhere(
-        where: (t) => t.key.equals(AppSettingKeys.signUpEnabled),
+      () => app.server.runInContext(
+        (ctx) => ctx.settings.save(const AppSettings()),
       ),
     );
 

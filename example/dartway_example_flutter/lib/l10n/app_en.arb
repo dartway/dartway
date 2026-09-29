@@ -245,7 +245,7 @@
   "refusalEditWindowClosed": "A message can no longer be edited a day after it was sent.",
   "refusalSearchQueryTooShort": "Type at least {min} characters to search.",
   "@refusalSearchQueryTooShort": {"placeholders": {"min": {"type": "int"}}},
-  "refusalSettingKeyUnknown": "This setting does not exist.",
+  "refusalClubNameRequired": "The club name cannot be blank.",
   "refusalFirstNameRequired": "Enter your name.",
   "refusalForbidden": "You are not allowed to do this.",
   "refusalNotFound": "It no longer exists.",

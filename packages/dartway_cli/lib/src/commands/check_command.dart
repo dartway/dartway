@@ -4,6 +4,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../checker/dw_contract_names.dart';
+import '../checker/dw_data_lifecycle.dart';
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_framework_lock.dart';
@@ -109,6 +110,13 @@ class CheckCommand extends Command<int> {
       ).run(tally: tally);
       errorCount += DwGeneratedCodeInspector(
         serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwDataLifecycleInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        sharedPackageDir: layout?.sharedPackageDir,
+        flutterPackageDir: layout?.flutterPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);

@@ -740,11 +740,11 @@ abstract class AppLocalizations {
   /// **'Enter your name.'**
   String get refusalFirstNameRequired;
 
-  /// No description provided for @refusalSettingKeyUnknown.
+  /// No description provided for @refusalAppNameRequired.
   ///
   /// In en, this message translates to:
-  /// **'This setting does not exist.'**
-  String get refusalSettingKeyUnknown;
+  /// **'The app name cannot be blank.'**
+  String get refusalAppNameRequired;
 
   /// No description provided for @refusalOwnRoleLocked.
   ///

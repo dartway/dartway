@@ -49,7 +49,7 @@ There is no client package: the shared package *is* the client contract, and bot
 
 **Law is what makes it DartWay** — the seven rules above; a project does not override a law. **Default is everything else** here and in the skills — the commit format, the base branch, how a decision is recorded, the language of the project's own texts — and a project may replace it. **Precedence:** a default yields to the project's own root `CLAUDE.md`; a law does not; where both are silent, this file stands. A project records an override in its root `CLAUDE.md`, under "Project conventions", **with the reason** — `.claude/CLAUDE.md` is overwritten on update, and a README beside the code is where an override goes to die.
 
-**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Fifteen checks fail today:
+**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Nineteen checks fail today:
 
 | What it holds | Checks that fail |
 |---|---|
@@ -61,6 +61,7 @@ There is no client package: the shared package *is* the client contract, and bot
 | The contract's names are its wire names (law 5) | `contractNameInvalid` |
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
 | Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
+| One pattern for data: seeds are startup steps, migrations change the schema, settings are typed, patches are read by their helpers | `migrationChangesData`, `workAfterServerStart`, `settingsKeyValueTable`, `fieldPatchMatched` |
 
 Ten further checks are warnings and one is a nudge. Anything this table and the types do not hold is a default. Not held yet: the naming law beyond the contract's DTO names, a `DwHttpRoute` the app calls instead of a request, and "done" (only the `featureSpecMissing` warning); `migrationsDrift` needs a Postgres and says when it did not run.
 

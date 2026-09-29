@@ -9,15 +9,15 @@ enum DartwayStarterRefusal with DwRefusalCodes {
   /// consent and verifies the same code again.
   consentsRequired,
 
-  /// Signing up is switched off in the app settings (`signUpEnabled`). An
-  /// existing account still signs in.
+  /// Signing up is switched off in the app settings
+  /// (`AppSettings.signUpEnabled`). An existing account still signs in.
   signUpClosed,
 
   /// A profile's name cannot be blank.
   firstNameRequired,
 
-  /// A setting key the app does not declare.
-  settingKeyUnknown,
+  /// The app's name cannot be blank.
+  appNameRequired,
 
   /// An admin changing their own role: the panel would lock its only way back
   /// out from under them. Another admin does it.

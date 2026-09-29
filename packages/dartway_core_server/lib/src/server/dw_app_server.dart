@@ -161,8 +161,14 @@ final class DwAppServer {
 
   /// Work done at every start, after the migrations and before the port
   /// opens: the first administrator, rows that must agree with the code.
-  /// A step that throws stops the start.
+  /// A step that throws stops the start. Features' own steps
+  /// (`DwServerFeature.startup`) run after these.
   final List<DwStartupStep> startup;
+
+  List<DwStartupStep> get _startupSteps => [
+    ...startup,
+    for (final feature in features) ...feature.startup,
+  ];
 
   /// File uploads: storage, a rule per purpose, who reads private files.
   /// Without it the framework's file calls fail as incidents and `ctx.files`
@@ -376,7 +382,7 @@ final class DwAppServer {
       // After the job runner, so a step may enqueue; before the front binds,
       // so nothing has been served when it runs. A throw leaves the start in
       // the catch below — in a deployment, with the previous server serving.
-      for (final step in startup) {
+      for (final step in _startupSteps) {
         try {
           await _runIn(runtime, 'startup:${step.name}', step.run);
         } catch (error, stackTrace) {
@@ -514,7 +520,7 @@ final class DwAppServer {
   @internal
   List<String> validate() {
     final problems = <String>[];
-    for (final step in startup) {
+    for (final step in _startupSteps) {
       problems.addAll(step.problems(auth));
     }
     final featureNames = <String>{};

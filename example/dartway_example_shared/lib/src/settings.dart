@@ -5,27 +5,33 @@ import 'dartway_example_refusal.dart';
 
 part 'settings.dw.dart';
 
-/// The setting keys the club has. A key outside this set is refused:
-/// settings are configuration the app reads, not a free-form store.
-const Set<String> exampleSettingKeys = {
-  'clubName',
-  'bookingEnabled',
-  'supportPhone',
-};
+/// The club's settings: one value, edited by admins, read live by every
+/// signed-in member. Every field has a default, which is the value while
+/// nobody has saved one — the server stores only what differs from it.
+final class ClubSettings extends DwDataObject with _$ClubSettings {
+  const ClubSettings({
+    this.clubName = 'DartWay Fitness',
+    this.bookingEnabled = true,
+    this.supportPhone = '',
+  });
 
-/// One app setting. Its key is its identity.
-final class AppSetting extends DwDataObject with _$AppSetting {
-  const AppSetting({required this.id, required this.value});
-
-  /// The setting key.
+  /// There is one: its identity is fixed.
   @override
-  final String id;
-  final String value;
+  String get id => 'club';
+
+  /// The club's name.
+  final String clubName;
+
+  /// Whether the schedule is open for booking.
+  final bool bookingEnabled;
+
+  /// The phone members call when something goes wrong; empty for none.
+  final String supportPhone;
 }
 
-final class ListAppSettings extends DwListRequest<AppSetting>
-    with _$ListAppSettings {
-  const ListAppSettings();
+final class GetClubSettings extends DwSingleRequest<ClubSettings>
+    with _$GetClubSettings {
+  const GetClubSettings();
 
   @override
   List<DwLiveChannel> get channels => const [
@@ -33,18 +39,23 @@ final class ListAppSettings extends DwListRequest<AppSetting>
   ];
 }
 
-/// Sets a setting. Admins only.
-final class SaveAppSetting extends DwActionCommand<AppSetting>
-    with _$SaveAppSetting
+/// Changes the settings it names and leaves the rest. Admins only.
+final class SaveClubSettings extends DwActionCommand<ClubSettings>
+    with _$SaveClubSettings
     implements DwSelfValidating {
-  const SaveAppSetting({required this.key, required this.value});
+  const SaveClubSettings({
+    this.clubName,
+    this.bookingEnabled,
+    this.supportPhone,
+  });
 
-  final String key;
-  final String value;
+  final String? clubName;
+  final bool? bookingEnabled;
+  final String? supportPhone;
 
   @override
   List<DwCallRefusal> validate() => [
-    if (!exampleSettingKeys.contains(key))
-      DwCallRefusal(DartwayExampleRefusal.settingKeyUnknown, field: 'key'),
+    if (clubName case final name? when name.trim().isEmpty)
+      DwCallRefusal(DartwayExampleRefusal.clubNameRequired, field: 'clubName'),
   ];
 }

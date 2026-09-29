@@ -205,6 +205,7 @@ One context per call. Everything a handler may touch is on it.
 | `jobs` | the `DwJobQueue`; an enqueue joins the current transaction ([jobs](jobs.md)) |
 | `accounts` | a `DwAccountService` bound to this call ([auth](auth-identity.md#dwaccountservice)) |
 | `files` | the `DwFileService` ([uploads](uploads.md#ctxfiles)) |
+| `settings` | the app's settings objects: `read<S>()`, `save(value)`, `update<S>(change)` ([database](database.md#settings)) |
 | `log` | a `DwServerLogger` scoped to the call (`command BookSession`) |
 | `memo(key, create)` | a per-call cache: `create` runs at most once per key per call |
 

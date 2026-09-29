@@ -11,7 +11,14 @@ final class M20260918062959MemberTombstone extends DwDatabaseMigration {
   String get id => '20260918_062959_member_tombstone';
 
   @override
-  String get checksum => '1df626ad307d5b1a1c231a1c8a870451';
+  String get checksum => '3d2c9e41b734698bebaed60b7c898330';
+
+  // The text before `m.sql` became `m.backfill` for the same statement
+  // (dartway/dartway#388): what it does did not change.
+  @override
+  Set<String> get supersededChecksums => const {
+    '1df626ad307d5b1a1c231a1c8a870451',
+  };
 
   @override
   Future<void> up(DwMigrationContext m) async {
@@ -37,7 +44,7 @@ final class M20260918062959MemberTombstone extends DwDatabaseMigration {
     await m.dropForeignKey('user_profile', 'account_id');
     // Going back is losing the tombstones: under the old shape a profile
     // without an account cannot exist, and there is no account to invent.
-    await m.sql('DELETE FROM user_profile WHERE account_id IS NULL');
+    await m.backfill('DELETE FROM user_profile WHERE account_id IS NULL');
     await m.alterColumnNullability(
       'user_profile',
       'account_id',

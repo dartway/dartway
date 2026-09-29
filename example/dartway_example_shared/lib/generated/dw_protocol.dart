@@ -12,7 +12,6 @@ import '../src/settings.dart';
 final DwWireProtocol dartwayExampleProtocol = DwWireProtocol(
   [
     DwProtocolEntry<AdminCounters>('AdminCounters', $AdminCountersFromJson),
-    DwProtocolEntry<AppSetting>('AppSetting', $AppSettingFromJson),
     DwProtocolEntry<BookSession>('BookSession', $BookSessionFromJson),
     DwProtocolEntry<CancelBooking>('CancelBooking', $CancelBookingFromJson),
     DwProtocolEntry<CancelSession>('CancelSession', $CancelSessionFromJson),
@@ -35,6 +34,7 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol(
     DwProtocolEntry<ChatReadState>('ChatReadState', $ChatReadStateFromJson),
     DwProtocolEntry<ClubService>('ClubService', $ClubServiceFromJson),
     DwProtocolEntry<ClubSession>('ClubSession', $ClubSessionFromJson),
+    DwProtocolEntry<ClubSettings>('ClubSettings', $ClubSettingsFromJson),
     DwProtocolEntry<DeleteChatMessage>(
       'DeleteChatMessage',
       $DeleteChatMessageFromJson,
@@ -47,11 +47,11 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol(
       'GetAdminCounters',
       $GetAdminCountersFromJson,
     ),
-    DwProtocolEntry<GetMyProfile>('GetMyProfile', $GetMyProfileFromJson),
-    DwProtocolEntry<ListAppSettings>(
-      'ListAppSettings',
-      $ListAppSettingsFromJson,
+    DwProtocolEntry<GetClubSettings>(
+      'GetClubSettings',
+      $GetClubSettingsFromJson,
     ),
+    DwProtocolEntry<GetMyProfile>('GetMyProfile', $GetMyProfileFromJson),
     DwProtocolEntry<ListChatChannels>(
       'ListChatChannels',
       $ListChatChannelsFromJson,
@@ -99,10 +99,13 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol(
     ),
     DwProtocolEntry<RemoveNews>('RemoveNews', $RemoveNewsFromJson),
     DwProtocolEntry<ReviewVisit>('ReviewVisit', $ReviewVisitFromJson),
-    DwProtocolEntry<SaveAppSetting>('SaveAppSetting', $SaveAppSettingFromJson),
     DwProtocolEntry<SaveClubService>(
       'SaveClubService',
       $SaveClubServiceFromJson,
+    ),
+    DwProtocolEntry<SaveClubSettings>(
+      'SaveClubSettings',
+      $SaveClubSettingsFromJson,
     ),
     DwProtocolEntry<ScheduleSession>(
       'ScheduleSession',

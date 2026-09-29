@@ -98,6 +98,11 @@ void main() {
       13: 'thirteen',
       14: 'fourteen',
       15: 'fifteen',
+      16: 'sixteen',
+      17: 'seventeen',
+      18: 'eighteen',
+      19: 'nineteen',
+      20: 'twenty',
     };
 
     int countOf(DwCheckSeverity severity) =>

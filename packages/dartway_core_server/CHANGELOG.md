@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- **Seeds are startup steps: `DwSeedRows(name, table:, key:, rows:)`** (dartway/dartway#388). At every
+  start, before the port opens, a declared row missing from its table is inserted, a changed one is
+  written over the stored row with the same key (keeping its id), an unchanged one is not touched and
+  a row the declaration drops is left alone. **`DwServerFeature(startup: [...])`**: a feature
+  declares its own steps, run after the server's.
+- **`ctx.settings` (`DwSettingsStore`): the app's settings as one typed data object** (#388, #394).
+  `read<S>()` answers the stored value or the object's defaults, never `null`; `save(value)` is one
+  upsert; `update<S>(change)` locks the one row between the read and the write. Stored in the new
+  framework table `dw_setting` as the wire JSON — only what differs from the defaults. **New
+  framework migration `20260930_000000_dw_setting`**, applied at the next start.
+- Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
+
 ## 0.21.0-dev.8
 
 - **`DwAppServer.handlers` and `.jobs` now include modules' calls and jobs, not just features'**

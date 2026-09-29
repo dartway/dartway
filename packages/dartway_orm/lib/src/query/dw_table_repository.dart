@@ -330,6 +330,76 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     return _decode(result).first;
   }
 
+  /// Writes [rows] in one statement: each is inserted, or — when a row with
+  /// the same [conflictOn] values exists — written over it, unless that row
+  /// already holds exactly these values. Returns how many rows were inserted
+  /// or changed, so a second run with the same rows writes nothing and
+  /// answers `0`.
+  ///
+  /// Rows the table holds that [rows] does not name are left alone. The
+  /// rows the code declares and a database converges on at every start — a
+  /// catalogue, the reasons a project refuses something — which is what
+  /// `DwSeedRows` runs it for.
+  ///
+  /// Throws [ArgumentError] for a row that has an id, and for two rows with
+  /// the same [conflictOn] values: one statement cannot write a row twice.
+  Future<int> upsertAll(
+    Iterable<R> rows, {
+    required List<DwTableColumn<Object?>> Function(T t) conflictOn,
+  }) async {
+    final list = rows.toList(growable: false);
+    if (list.isEmpty) return 0;
+    final target = conflictOn(table);
+    if (target.isEmpty) throw ArgumentError('upsertAll: no conflict columns');
+    if (list.any((row) => row.id != null)) {
+      throw ArgumentError(
+        'upsertAll: a row has an id; its key is its identity',
+      );
+    }
+    final columns = _sql.insertColumns(withId: false);
+    final arrays = [for (final _ in columns) <Object?>[]];
+    final seen = <String>{};
+    for (final row in list) {
+      final values = _valuesOf(row);
+      final key = [for (final column in target) values[column.name]];
+      if (!seen.add(key.toString())) {
+        throw ArgumentError(
+          'upsertAll: two rows share ${target.map((c) => c.name).join(', ')} '
+          '= ${key.join(', ')}',
+        );
+      }
+      for (final (position, column) in columns.indexed) {
+        final value = values[column.name];
+        arrays[position].add(
+          value == null ? null : column.type.encodeArrayElement(value),
+        );
+      }
+    }
+    final names = {for (final column in target) column.name};
+    final written = [
+      for (final column in columns)
+        if (!names.contains(column.name)) column,
+    ];
+    // Only a row whose values differ is written: an unchanged one would
+    // still be rewritten by `DO UPDATE`, and a start that converges on what
+    // is already there must leave the table as it found it.
+    final onConflict = written.isEmpty
+        ? 'DO NOTHING'
+        : 'DO UPDATE SET '
+              '${[for (final column in written) '${column.sql} = EXCLUDED.${column.sql}'].join(', ')} '
+              'WHERE ROW(${[for (final column in written) '${_sql.table}.${column.sql}'].join(', ')}) '
+              'IS DISTINCT FROM '
+              'ROW(${[for (final column in written) 'EXCLUDED.${column.sql}'].join(', ')})';
+    final result = await _db.run(
+      '${_sql.insertAllSelect} '
+      'ON CONFLICT (${target.map((column) => column.sql).join(', ')}) '
+      '$onConflict',
+      [for (final column in columns) column.type.arrayParameterType],
+      arrays,
+    );
+    return result.affectedRows;
+  }
+
   /// Deletes the row with [id]; returns 1, or 0 when there was none.
   Future<int> delete(int id) async => (await _db.run(
     _sql.deleteById,
@@ -522,11 +592,16 @@ final class _DwTableSql {
       'INSERT INTO $table (${columns.map((column) => column.sql).join(', ')}) '
       'VALUES (${[for (var i = 1; i <= columns.length; i++) '\$$i'].join(', ')})';
 
-  late final String _insertAllWithId = _insertAllInto(columns);
-  late final String _insertAllWithoutId = _insertAllInto(_withoutId);
+  late final String _insertAllWithId = _insertAllInto(columns) + returning;
+  late final String _insertAllWithoutId =
+      _insertAllInto(_withoutId) + returning;
 
   String insertAll({required bool withId}) =>
       withId ? _insertAllWithId : _insertAllWithoutId;
+
+  /// The insert of every row without an id, from one array per column, with
+  /// no `RETURNING`: what `upsertAll` completes with its conflict clause.
+  late final String insertAllSelect = _insertAllInto(_withoutId);
 
   /// One array per column, zipped by `unnest` and kept in input order by
   /// its ordinality, so the returned rows line up with the rows given.
@@ -544,6 +619,6 @@ final class _DwTableSql {
     return 'INSERT INTO $table ($names) '
         'SELECT ${selected.join(', ')} FROM unnest(${arrays.join(', ')}) '
         'WITH ORDINALITY AS input(${aliases.join(', ')}, position) '
-        'ORDER BY position$returning';
+        'ORDER BY position';
   }
 }

@@ -213,32 +213,80 @@ A script with no server running builds `DwAccountService(db, auth)` over a bare 
 see [auth and identity](auth-identity.md#dwaccountservice). A script that has a server (the seed
 starts one on port `0`) uses `ctx.accounts` and needs no such thing.
 
-## Startup steps
+## Startup steps and seeds
 
-**`DwAppServer(startup: [...])` is work done at every start, after the migrations and before the
-port opens.** The lifecycle is the concept: a step is idempotent by construction — it states what
-must be true and makes it so — and nothing has been served when it runs, so a step that throws
-stops the start with the previous version still serving.
+**`DwAppServer(startup: [...])` and `DwServerFeature(startup: [...])` are work done at every start,
+after the migrations and before the port opens** — the server's steps first, then each feature's, in
+the order the features are listed. The lifecycle is the concept: a step is idempotent by
+construction — it states what must be true and makes it so — and nothing has been served when it
+runs, so a step that throws stops the start with the previous version still serving.
 
-It runs in a background context, in one transaction, so `ctx.db`, `ctx.accounts`, `ctx.publish`
+Each runs in a background context, in one transaction, so `ctx.db`, `ctx.accounts`, `ctx.publish`
 and `ctx.jobs` are the ones a handler has. `DwStartupStep.problems(auth)` is judged with the
 server's own, before the database is even opened: a value read from the environment is checked
 there.
 
+**Nothing but logging comes after `server.start()` in `bin/server.dart`.** By then the port is open:
+work there races the first calls, and when it fails the server is up with half of it. `dartway
+check` fails an `await`, or a reach into `server.db`, `server.accounts` or `runInContext`, after
+`start()` (`workAfterServerStart`).
+
 What goes where, and this is the whole of it:
 
-| Lifecycle | Where |
+| What | Where |
 |---|---|
-| once per database, recorded, in every environment | a **migration** |
-| at every start, in every environment, idempotent | a **startup step** |
-| whenever a developer feels like it, never in production | a **script** (`bin/seed_dev.dart`) |
+| the schema, once per database | a **migration** ([migrations](migrations.md)) |
+| existing rows carried across a schema change | `m.backfill` in that migration |
+| rows the code declares — a catalogue, a questionnaire, the reasons a project refuses something | a **seed**: `DwSeedRows` |
+| one value per app, with a default for every field | a **settings object**: `ctx.settings` ([database](database.md#settings)) |
+| anything else that must be true before the first call | a **startup step** |
+| development data, whenever a developer feels like it, never in production | a **script** (`bin/seed_dev.dart`) |
 
-The rule for data that is neither obviously one nor the other is **who owns the row afterwards**.
-Rows the operators own from the moment they exist — the first settings, a starting price list —
-are seeded once by a migration and never touched by code again. Rows that must agree with the code
-— notification templates, the reasons a project refuses something — are a startup step: change the
-declaration and the next start of every environment converges on it, with no applied migration to
-edit and no `down` that would delete rows somebody has since corrected.
+Rows the operators own once they exist are none of these: a seed would write the declaration back
+over their edit at the next start. Their starting values are defaults in the code, and the rows are
+made in the admin panel.
+
+### `DwSeedRows`
+
+Rows the code declares, written into their table by a key at every start. The example's staff chat
+declares its channels (`example/dartway_example_server/lib/src/chat/`):
+
+```dart
+// chat_rows.dart
+const staffChannels = [
+  ChatChannelRow(slug: 'front-desk', title: 'Front desk'),
+  ChatChannelRow(slug: 'coaches', title: 'Coaches'),
+  ChatChannelRow(slug: 'maintenance', title: 'Maintenance'),
+];
+
+// chat_feature.dart
+final chatFeature = DwServerFeature(
+  'chat',
+  handlers: chatHandlers,
+  startup: [
+    DwSeedRows(
+      'staff channels',
+      table: (db) => db.chatChannels,
+      key: (t) => [t.slug],
+      rows: staffChannels,
+    ),
+  ],
+);
+```
+
+At every start, in one statement (`DwTableRepository.upsertAll`):
+
+- a declared row that is missing is inserted;
+- a stored row with the same key and other values is written over, keeping its id — an edit of the
+  declaration reaches every environment on its next start;
+- a stored row that already holds the declared values is not touched, so a start with nothing new
+  writes nothing and logs nothing;
+- a stored row the declaration does not name is left alone. Retiring one is a column of its own
+  (`isPublished: false`), declared like any other value, since other rows may point at it.
+
+The key names unique columns — a natural key, never the `id`, which differs between databases. Two
+declared rows with one key stop the start. A seed whose rows point at another seed's is listed after
+it.
 
 ### `DwFirstAdministrator`
 

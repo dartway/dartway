@@ -420,7 +420,7 @@ Three ways to get one, by where the code runs:
 - `ctx.accounts` in a handler, job or route — writes join the call's transaction, and revoked
   sessions close after it commits;
 - `ctx.accounts` in a **startup step** — the first administrator, in the step's transaction
-  ([app server](app-server.md#startup-steps));
+  ([app server](app-server.md#startup-steps-and-seeds));
 - `server.accounts` next to a running server;
 - `DwAccountService(db, auth)` over a bare database, where no server runs in the process. Its hooks
   get a context whose `publish`, `revoke` and `jobs` throw rather than drop what they are given
