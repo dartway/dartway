@@ -24,7 +24,7 @@ A project command then references the file **by id** — the template's avatar i
 configuration decides it.
 
 The purpose is an enum in the project's shared package, `with DwUploadPurpose` — the example's
-`ExampleUpload { avatar, chatAttachment }`, a public and a private one. Picking a
+`DartwayExampleUpload { avatar, chatAttachment }`, a public and a private one. Picking a
 file is the app's business: the framework carries no picker plugin, and takes bytes or a stream.
 
 ## `dw.files`: the client
@@ -33,7 +33,7 @@ file is the app's business: the framework carries no picker plugin, and takes by
 
 ```dart
 final result = await dw.files.upload(
-  ExampleUpload.chatAttachment,
+  DartwayExampleUpload.chatAttachment,
   DwUploadSource.bytes(bytes),
   fileName: name,
   contentType: contentType,
@@ -113,15 +113,20 @@ the state for the screen to show. A refused avatar is the user's problem to fix;
 
 ### The skeleton's avatar picker
 
-`template/dartway_starter_flutter/lib/app/profile/profile_page/widgets/avatar_picker.dart`, in full
-shape:
+`template/dartway_starter_flutter/lib/app/profile/profile_page/widgets/avatar_picker.dart` holds the
+slot, and the feature's `logic/profile_page_commands.dart` the upload and the command its button's
+`dw.action` runs:
 
 ```dart
+// avatar_picker.dart
 final uploader = useMemoized(dw.uploader);
 useEffect(() => uploader.dispose, [uploader]);
 final upload = useValueListenable(uploader);
 
-Future<DwCallResult<UserProfile>?> pickAndUpload() async {
+// logic/profile_page_commands.dart
+static Future<DwCallResult<UserProfile>?> changePhoto(
+  DwUploadNotifier uploader,
+) async {
   final picked = await ImagePicker().pickImage(source: ImageSource.gallery, /* ... */);
   if (picked == null) return null; // dismissed: not a failure
   final bytes = await picked.readAsBytes();

@@ -6,8 +6,8 @@ description: >-
   loadMore), dw.table (numbered pages), dw.window (chats, DwWindowListView) — keyed by the request
   value itself; errors as typed AsyncValue errors (DwRefusalException, DwFailedException,
   DwNotAuthenticatedException, DwTimeoutException) rendered with an explicit error branch; refreshing
-  with the notifier's refetch (never ref.invalidate); commands through dw.action((_) =>
-  dw.command(...)) with refusals shown by DwFlutterConfig.refusalText; form validation with DwSelfValidating;
+  with the notifier's refetch (never ref.invalidate); commands sent from the feature's logic/
+  (dw.command in <feature>_commands.dart) inside dw.action, with refusals shown by DwFlutterConfig.refusalText; form validation with DwSelfValidating;
   the session (dw.accountId, dw.signIn, dw.signOut), dw.liveStatus and dw.incompatibility;
   hand-written providers (no riverpod_generator) that answer one question each; notifications via
   dw.notify; local screen state via dw.plugins.prefs. No data/ layer, no repository classes. Use when
@@ -67,7 +67,7 @@ error branch is `SizedBox.shrink()`** — right for a decoration, wrong for the 
 for, where a failed read would look exactly like an empty one. So the section a screen exists for
 always renders its error.
 
-The skeleton ships this as one shared extension over `AsyncValue` in `lib/shared/widgets/`: a
+The skeleton ships this as one extension over `AsyncValue` in the UI kit (`ui_kit/2_frequent/`): a
 section with a stand-in loading value, a load-failed message (a sentence from `context.l10n` and a
 retry) and nothing for `DwNotAuthenticatedException`. Use it; do not write a second one.
 
@@ -112,19 +112,37 @@ Nest the builders — each read answers for its own failure — or combine in a 
 
 ## 4. Commands and actions
 
-A change is a command, sent inside `dw.action` from the widget that owns the button:
+A change is a command. **`dw.command` is called in the feature's `logic/` only**, and runs inside
+the `dw.action` that the widget owning the button builds — so one feature sends one command one
+way, and `widgets/` lays out what it is handed:
 
 ```dart
+// lib/app/invoices/invoice_card/logic/invoice_card_commands.dart
+/// The commands an invoice card sends.
+abstract final class InvoiceCardCommands {
+  /// Pays [invoice]. The answer carries it paid, and every watched list takes
+  /// it before the command completes.
+  static Future<DwCallResult<CustomerInvoice>> pay(CustomerInvoice invoice) =>
+      dw.command(PayInvoice(invoiceId: invoice.id));
+}
+
+// lib/app/invoices/invoice_card/invoice_card.dart
 AppButton.primary(
   context.l10n.payInvoice,
   onTap: dw.action(
-    (_) => dw.command(PayInvoice(invoiceId: invoice.id)),
+    (_) => InvoiceCardCommands.pay(invoice),
     label: 'payInvoice',
     confirmation: DwUiConfirmation(context.l10n.confirmPayInvoice),
     onSuccessNotification: context.l10n.invoicePaid,
   ),
 ),
 ```
+
+The logic function answers `dw.command`'s result as it is — no `try`, no unwrapping: `dw.action`
+reads it. A flow with state of its own (sign-in, a wizard) sends its commands from its notifier in
+`logic/`, and the widget wraps the notifier's method the same way:
+`dw.action((_) => notifier.verifyCode())`. A command two features send is one more feature — its
+button and its `logic/` — not a copy in each.
 
 What `dw.action` does with the `DwCallResult` the callback returns:
 
@@ -135,8 +153,8 @@ What `dw.action` does with the `DwCallResult` the callback returns:
 - **failed / timed out** → `onErrorNotification` if given, and the app's error report.
 
 Declining the confirmation cancels everything. Need the value? `followUpIfMountedAction: (context,
-result)`, or inside the callback `final invoice = (await dw.command(c)).valueOrThrow;` — a non-ok
-result thrown there is handled the same way.
+result)`, or inside the callback `final invoice = (await InvoiceCardCommands.pay(i)).valueOrThrow;` —
+a non-ok result thrown there is handled the same way.
 
 - **`dw.action(...)` is a `DwUiAction`, not a `VoidCallback`.** Give it to the kit's buttons, or to any
   tappable widget through `DwActionBuilder(action:, builder: (context, onPressed, busy) => …)`, which
@@ -173,7 +191,7 @@ In the app's `DwFlutterConfig.onErrorReport`, step over `DwRefusalException` and
 message text.
 
 A rule that lives only on the client throws the same type, and `dw.action` renders it the same way:
-`throw DwRefusalException(DwCallRefusal(AppRefusal.amountNotPositive, field: 'amountCents'));`.
+`throw DwRefusalException(DwCallRefusal(AcmeRefusal.amountNotPositive, field: 'amountCents'));`.
 
 ## 6. Form validation
 
@@ -254,8 +272,10 @@ final invoiceEditableProvider = Provider.family<AsyncValue<bool>, int>(
   data object in `lib/shared/`, not a provider.
 - **The decision goes into a factory on the state type**, the provider says where the data comes
   from — so the decision is testable without a container, with time passed in rather than read.
-- **No shims over the framework**: a `ref.payInvoice(...)` that forwards to `dw.command` hides the real
-  API and adds nothing.
+- **No shims over the framework**: a repository, a service or a `ref.payInvoice(...)` extension that
+  wraps `dw` hides the real API and adds nothing. A feature's `<feature>_commands.dart` is not one:
+  each function sends one named command and answers its result untouched, so the feature's changes
+  are listed in one file.
 - **A provider does not reach into another feature's internals.** When a neighbour needs it, it is
   that feature's public surface, or it belongs in `lib/core/` (`dartway-feature-scaffold`).
 - **`ProviderScope` is written by `DwAppRunner` and by tests only.** A nested scope's override is seen
@@ -302,8 +322,8 @@ text comes from `context.l10n` (or the app's `appL10n` outside the tree).
 - [ ] The section a screen exists for renders its error (the skeleton's section extension); a detail
       page handles `dw.notFound`; no `.value ?? fallback` over reads.
 - [ ] No refetch after commands; retries use the notifier's `refetch()`, never `ref.invalidate`.
-- [ ] Changes go through `dw.action((_) => dw.command(...))` in the widget that owns the button; no
-      manual refusal handling.
+- [ ] `dw.command` is called in the feature's `logic/` only, inside the `dw.action` of the widget that
+      owns the button; no manual refusal handling.
 - [ ] A new refusal code has a string in every `.arb` and a case in the refusal texts.
 - [ ] Input rules live in the command's `validate()`; forms use `requireValidation`.
 - [ ] Sign-in state from `dw.accountId`; sign-out is `dw.signOut()`.

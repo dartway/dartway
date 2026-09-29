@@ -58,7 +58,7 @@ abstract final class AppAccess {
       DwAccessRule.check<ListCustomerInvoices>((ctx, request) async {
         if (await ctx.isManager) return true;
         final customer = await ctx.db.customers.findById(request.customerId);
-        return customer?.accountManagerProfileId == (await ctx.callerProfile).id;
+        return customer?.accountManagerProfileId == (await ctx.profile).id;
       });
 }
 ```
@@ -66,12 +66,12 @@ abstract final class AppAccess {
 ## 2. Roles are the project's
 
 The framework knows that an account signed in, not who that person is to the project. A role is a
-column of the project's profile row, and the context extension turns it into words handlers read,
-cached per call:
+column of the project's profile row, and the context extension — `AppCallContext` in
+`core/call_context.dart` — turns it into words handlers read, cached per call:
 
 ```dart
-extension CallerContext on DwCallContext {
-  Future<MemberProfileRow> get callerProfile => memo(#callerProfile, () async {
+extension AppCallContext on DwCallContext {
+  Future<MemberProfileRow> get profile => memo(#profile, () async {
     final accountId = requireAccountId;
     final profile = await db.memberProfiles.findFirst(
       where: (t) => t.accountId.equals(accountId),
@@ -80,7 +80,7 @@ extension CallerContext on DwCallContext {
   });
 
   Future<bool> get isManager async =>
-      (await callerProfile).role == MemberRole.manager;
+      (await profile).role == MemberRole.manager;
 }
 ```
 
@@ -110,6 +110,7 @@ the handler — never `signedIn` with the same check written inline, where every
 little differently:
 
 ```dart
+/// Pays one of the caller's invoices.
 DwCallHandler.command<PayInvoice, Invoice>(
   access: DwAccessRule.resource<PayInvoice, InvoiceRow>(
     // Locked: the rule runs inside the command's transaction.
@@ -117,7 +118,7 @@ DwCallHandler.command<PayInvoice, Invoice>(
         ctx.db.invoices.findById(command.invoiceId, lock: DwRowLock.forUpdate),
     // Someone else's invoice does not exist for the caller.
     allows: (ctx, command, invoice) async =>
-        invoice.ownerProfileId == (await ctx.callerProfile).id,
+        invoice.ownerProfileId == (await ctx.profile).id,
   ),
   handle: (ctx, command) async {
     final invoice = ctx.accessed<InvoiceRow>();
@@ -137,7 +138,7 @@ write).
 ## 4. "My" calls carry no account id
 
 A request or command about the caller's own data names nothing about the caller: the handler reads
-`ctx.callerProfile` / `ctx.requireAccountId`. A field holding "my" id is a field anyone can change
+`ctx.profile` / `ctx.requireAccountId`. A field holding "my" id is a field anyone can change
 to someone else's, and the handler that trusts it serves them. The same goes for every value the
 server decides — owner, author, timestamps, status (`dartway-contract`).
 

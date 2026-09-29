@@ -19,8 +19,9 @@ const dwFlutterZones = {'admin', 'app', 'auth', 'common'};
 /// The layers of a Flutter app: everything that is not a feature.
 ///
 /// `core/` is the app-wide wiring — the router, the `dw` core, app settings,
-/// the refusal texts. `shared/` holds building blocks: widgets and helpers
-/// with no story of their own, extensions on data objects included. There is
+/// the refusal texts, the zones' shells. `shared/` holds non-visual helpers
+/// several features use, extensions on data objects included; a visual
+/// building block lives in `ui_kit/`. There is
 /// deliberately no `data/` (the data layer is `dw.request` and `dw.command`
 /// over the shared contract) and no `domain/` (the rules live in the shared
 /// package, where both sides apply them, and in the server's handlers).

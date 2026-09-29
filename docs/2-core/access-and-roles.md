@@ -9,8 +9,8 @@ the rule of every upload purpose.
 
 ```dart
 DwCallHandler.single<GetAdminCounters, AdminCounters>(
-  access: ExampleAccess.admin,
-  handle: (ctx, request) => ctx.countAdminCounters(),
+  access: AppAccess.admin,
+  handle: (ctx, request) => AdminPublications.countCounters(ctx.db),
 ),
 ```
 
@@ -77,10 +77,10 @@ problem. A missing handler is found at deploy, not by the first user to press th
 ## Roles are the project's
 
 A role is a column of the project's profile row, and the project names it in its own words with an
-extension on the context (`example/dartway_example_server/lib/src/core/example_context.dart`):
+extension on the context (`example/dartway_example_server/lib/src/core/call_context.dart`):
 
 ```dart
-extension ExampleCallContext on DwCallContext {
+extension AppCallContext on DwCallContext {
   /// The caller's profile, read once per call.
   Future<UserProfileRow> get profile => memo(#profile, () async {
     final accountId = requireAccountId;
@@ -98,7 +98,7 @@ extension ExampleCallContext on DwCallContext {
 }
 
 /// Access rules of the example, in the words handlers read.
-abstract final class ExampleAccess {
+abstract final class AppAccess {
   static final DwAccessRule staff = DwAccessRule.check<DwServerCall<Object?>>(
     (ctx, _) => ctx.isStaff,
   );
@@ -121,7 +121,7 @@ accident.
 ## "My" requests carry no account id
 
 `ListMyBookings` has no `accountId` field. Its handler reads the caller's bookings, and its channel is
-`DwLiveChannel.ofCaller(ExampleChannel.bookings)`. A request that took the account as a field would be
+`DwLiveChannel.ofCaller(DartwayExampleChannel.bookings)`. A request that took the account as a field would be
 a request anyone could send with someone else's id, and every handler would have to remember to
 compare it with the caller. Commands follow the same rule: the input never carries the owner
 ([commands-and-idempotency.md](commands-and-idempotency.md)).

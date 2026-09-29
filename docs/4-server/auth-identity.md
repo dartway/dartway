@@ -124,7 +124,7 @@ verified e-mail match (`linkByVerifiedEmail`, below) rather than a confirmed cod
 
 The framework publishes nothing about identifiers. The skeleton republishes the profile, which
 shows identifiers read from the framework; the example mirrors the phone into its profile row in
-the same transaction (`example/dartway_example_server/lib/src/core/example_auth.dart`).
+the same transaction (`example/dartway_example_server/lib/src/core/auth.dart`).
 
 ## Built-in commands
 

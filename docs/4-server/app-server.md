@@ -8,7 +8,7 @@ who presses the button.
 ## The constructor
 
 ```dart
-abstract final class ExampleServer {
+abstract final class DartwayExampleServer {
   static DwAppServer build({
     required DwDatabaseConfig database,
     DwFileStorageConfig? storage,
@@ -17,12 +17,12 @@ abstract final class ExampleServer {
     DwServerSettings settings = const DwServerSettings(),
     DwPushModule? push,
   }) => DwAppServer(
-    protocol: exampleProtocol,
+    protocol: appProtocol,
     schema: dartwayExampleSchema,
     migrations: appMigrations,
     migrationsDirectory: 'lib/src/migrations',
     database: database,
-    auth: auth ?? ExampleAuth.config,
+    auth: auth ?? AppAuth.config,
     features: [
       profileFeature,
       clubFeature,
@@ -30,8 +30,8 @@ abstract final class ExampleServer {
       chatFeature,
       adminFeature,
     ],
-    files: storage == null ? null : ExampleFiles.storage(storage),
-    modules: [push ?? ExamplePush.module()],
+    files: storage == null ? null : AppFiles.storage(storage),
+    modules: [push ?? AppPush.module()],
     port: port,
     settings: settings,
   );

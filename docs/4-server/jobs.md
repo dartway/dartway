@@ -9,9 +9,11 @@ and are claimed by exactly one worker even when several processes run.
 
 A job has two halves. **What it is** — its name and how its payload travels as JSON — is a
 `DwJobKind<P>`, a constant the places that enqueue it import. **How it runs** is a `DwQueuedJob<P>`
-in the server's job list, often built from a service instance the enqueuing code never sees:
+in the job list of the feature it belongs to, often built from a service instance the enqueuing code
+never sees. Both live in the feature's `<feature>_jobs.dart`:
 
 ```dart
+// lib/src/invoices/invoices_jobs.dart
 abstract final class InvoiceJobs {
   static const send = DwJobKind<({int invoiceId})>(
     'invoice.send',
@@ -32,15 +34,18 @@ final invoiceJobs = <DwJobDefinition>[
   DwRecurringJob(
     'invoice.markOverdue',
     every: const Duration(hours: 1),
-    handle: (ctx) => ctx.db.execute(
-      'UPDATE invoice SET overdue = true '
-      'WHERE due_at < now() AND paid_at IS NULL AND NOT overdue',
+    handle: (ctx) => ctx.db.invoices.updateWhere(
+      where: (t) =>
+          t.dueAt.lt(DateTime.now()) & t.paidAt.isNull() & t.overdue.equals(false),
+      set: (t) => [t.overdue.set(true)],
     ),
   ),
 ];
 ```
 
-passed as a feature's `DwServerFeature(jobs: invoiceJobs)`.
+passed as that feature's `DwServerFeature(jobs: invoiceJobs)` — there is no app-wide job list. The
+example's `bookings/bookings_jobs.dart` is a worked one: `BookSession` enqueues a reminder two hours
+before the session, and the job decides when it runs whether the booking is still active.
 
 **`DwJobKind<P>(name, {encode, decode})`** — the one place a payload is spelled as a map: `encode`
 runs at the enqueue, `decode` before the handler, and both sides see `P` (a record, a class, `int`).

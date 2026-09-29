@@ -10,13 +10,13 @@ into and nothing an ORM hides behind a getter.
 
 A table is declared by a row class in the server package, in the rows file of the feature that owns
 it (`lib/src/<feature>/<feature>_rows.dart`). From
-`example/dartway_example_server/lib/src/club/club_rows.dart`:
+`example/dartway_example_server/lib/src/bookings/bookings_rows.dart`:
 
 ```dart
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
-part 'club.dw.dart';
+part 'bookings_rows.dw.dart';
 
 @DwSqlTable(
   'session_booking',
@@ -183,7 +183,7 @@ final inserted = await ctx.db.sessionReviews.tryInsert(
   ),
   onConflict: DwOnConflict.doNothing((t) => [t.bookingId]),
 );
-if (inserted == null) ctx.refuse(ExampleRefusal.alreadyReviewed);
+if (inserted == null) ctx.refuse(DartwayExampleRefusal.alreadyReviewed);
 ```
 
 The target columns name the unique constraint the conflict is expected on; an empty list accepts a
@@ -193,7 +193,7 @@ nothing and both insert, or the second fails on the constraint.
 ### `updateWhere`
 
 A conditional update is a compare-and-set in one statement. The example's read positions
-(`example/dartway_example_server/lib/src/chat/chat_reads.dart`) move forward only:
+(`example/dartway_example_server/lib/src/chat/chat_handlers.dart`) move forward only:
 
 ```dart
 await db.chatReadPositions.updateWhere(

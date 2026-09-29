@@ -24,7 +24,7 @@ shipping a refusal as a failure pages someone about a full class.
 
 ```dart
 DwCallRefusal(
-  ExampleRefusal.messageTooLong,
+  DartwayExampleRefusal.messageTooLong,
   field: 'text',
   params: {'max': ChatMessage.maxTextLength},
 )
@@ -36,10 +36,10 @@ DwCallRefusal(
 - **`field`** — the input field a validation refusal points at, so a form marks the right one.
 
 The project declares its codes as one enum in its shared package
-(`example/dartway_example_shared/lib/src/example_refusal.dart`):
+(`example/dartway_example_shared/lib/src/dartway_example_refusal.dart`):
 
 ```dart
-enum ExampleRefusal with DwRefusalCodes {
+enum DartwayExampleRefusal with DwRefusalCodes {
   titleRequired,
   noSpotsLeft,
   alreadyBooked,
@@ -84,11 +84,11 @@ Two more enums share the `dw.` namespace, kept separate so a project switching e
 ## Refusing on the server
 
 A handler refuses with `ctx.refuse`, which never returns
-(`example/dartway_example_server/lib/src/club/booking_handlers.dart`):
+(`example/dartway_example_server/lib/src/bookings/bookings_handlers.dart`):
 
 ```dart
 if (session.bookedCount >= session.capacity) {
-  ctx.refuse(ExampleRefusal.noSpotsLeft);
+  ctx.refuse(DartwayExampleRefusal.noSpotsLeft);
 }
 ```
 

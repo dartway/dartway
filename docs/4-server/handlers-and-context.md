@@ -110,7 +110,7 @@ From `example/dartway_example_server/lib/src/admin/admin_handlers.dart`:
 
 ```dart
 DwCallHandler.table<ListUserProfiles, UserProfile>(
-  access: ExampleAccess.admin,
+  access: AppAccess.admin,
   rows: (ctx, request, table) async => [
     for (final row in await ctx.db.userProfiles.find(
       where: _membersFilter(request),
@@ -118,7 +118,7 @@ DwCallHandler.table<ListUserProfiles, UserProfile>(
       limit: table.fetchLimit,
       offset: table.offset,
     ))
-      ClubObjects.profile(row),
+      ProfileObjects.profile(row),
   ],
   count: (ctx, request) =>
       ctx.db.userProfiles.count(where: _membersFilter(request)),
@@ -260,8 +260,8 @@ A row never leaves the server; handlers map rows to the data objects clients see
 for a list at a time, with one query per relation — never one per row. The ORM has no joins by
 design (D-011); `findByIds` is the join.
 
-`example/dartway_example_server/lib/src/club/club_objects.dart` maps sessions with their services and
-coaches:
+`example/dartway_example_server/lib/src/schedule/schedule_objects.dart` maps sessions with their
+services and coaches:
 
 ```dart
 static Future<List<ClubSession>> sessions(
@@ -275,14 +275,17 @@ static Future<List<ClubSession>> sessions(
     ))
       row.id!: service(row),
   };
-  final coaches = await _profiles(db, rows.map((s) => s.coachProfileId));
+  final coaches = await ProfileObjects.rowsById(
+    db,
+    rows.map((s) => s.coachProfileId),
+  );
   return [
     for (final row in rows)
       ClubSession(
         id: row.id!,
         service: services[row.serviceId]!,
         coach: switch (coaches[row.coachProfileId]) {
-          final coach? => person(coach),
+          final coach? => ProfileObjects.person(coach),
           null => null,
         },
         startsAt: row.startsAt,
@@ -293,18 +296,19 @@ static Future<List<ClubSession>> sessions(
 }
 ```
 
-Its `bookings` also takes the related objects the caller already holds (`client:`, `session:`), so
-a command that has just loaded the session does not load it again. The skeleton's
+`BookingsObjects.bookings` beside it (`bookings/bookings_objects.dart`) also takes the related
+objects the caller already holds (`client:`, `session:`), so a command that has just loaded the
+session does not load it again. The skeleton's
 `template/dartway_starter_server/lib/src/profile/profile_objects.dart` does the same with framework data: the
 identifiers of every profile in one `ctx.accounts.listIdentitiesOf` call, and avatar URLs in one
 `ctx.files.publicUrls` call.
 
-Mapping one row is the list of one: `(await ClubObjects.sessions(ctx.db, [row])).single`. Then a
+Mapping one row is the list of one: `(await ScheduleObjects.sessions(ctx.db, [row])).single`. Then a
 handler that answers one object and a handler that answers a hundred build it the same way.
 
 **Publishing is mapping too.** A changed row often goes to several channels, as several objects;
 the skeleton keeps that in one function per change
-(`template/dartway_starter_server/lib/src/profile/profile_publications.dart`, `AppPublications.profile`), so every command
+(`template/dartway_starter_server/lib/src/profile/profile_publications.dart`, `ProfilePublications.profile`), so every command
 that changes a profile publishes the same set.
 
 ## Related

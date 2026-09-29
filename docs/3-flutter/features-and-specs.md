@@ -11,17 +11,19 @@ it, in the same file, so the description cannot drift away from the code.
 
 ```
 lib/app/bookings/
-  my_bookings_page.dart        ← the entry point: the only public file
-  widgets/
+  my_bookings_page.dart        ← the entry point: the only public file, the only DwFeatureSpec
+  widgets/                     ← the feature's private layout
     booking_card.dart
     review_bottom_sheet.dart
-  logic/                       ← optional
-    booking_filter.dart
+  logic/                       ← its state and its commands
+    bookings_commands.dart     ← every dw.command the feature sends
 ```
 
-- **A feature is a folder with a root `.dart` file.** That single file is its entire public surface.
+- **A feature is a folder with a root `.dart` file.** That single file is its entire public surface,
+  and the only file of the feature that declares a `DwFeatureSpec`.
 - **`widgets/` and `logic/` are internals.** Nothing outside the feature may import them, at any
-  nesting depth.
+  nesting depth. `widgets/` lays out what it is handed; the feature's changes are sent from
+  `logic/` — `dw.command` there, run inside the `dw.action` of the widget that owns the button.
 - **A group is a folder with no root `.dart` file at all.** It only groups features: it encapsulates
   nothing, owns no `widgets/` or `logic/`, and does not affect visibility. A router importing
   `app/learning/lesson/lesson_page.dart` is fine, because `learning` is a group and `lesson` is a
@@ -35,14 +37,14 @@ Two rules follow, and the checker enforces both:
 - **more than one root file is an error** (`invalidFeatureStructure`). A second public entity means
   the feature became a *group of features* — a screen plus an embeddable block, a card two screens
   both draw. Behaviour two features share is one more feature — but a widget with no story of its
-  own is not a feature at all: that is a building block, it belongs in `lib/shared/`, and the
+  own is not a feature at all: that is a building block, it belongs in `lib/ui_kit/`, and the
   checker asks it for no spec;
 - **importing another feature's `widgets/` or `logic/` is an error** (`forbiddenFeatureImport`). If
   a file in one feature's `logic/` is wanted by three others, it was never that feature's internal.
 
 Not everything is a feature. App-wide infrastructure (the `dw` core, the router, the refusal
-catalogue) lives in `lib/core/`; a widget or helper features draw with — extensions on models
-included — lives in `lib/shared/`. And a feature always sits in one of the four zones, never
+catalogue, the zones' shells) lives in `lib/core/`; a visual block features draw with lives in
+`lib/ui_kit/`; a non-visual helper — an extension on a model, a formatter — lives in `lib/shared/`. And a feature always sits in one of the four zones, never
 outside them: see [the project layout](../1-getting-started/project-layout.md).
 
 ## The spec lives in the code

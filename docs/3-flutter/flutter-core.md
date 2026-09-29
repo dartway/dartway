@@ -97,7 +97,7 @@ void run() {
   DwAppRunner(
     appInitializers: [dw.init],
     supportedLocales: AppLocalizations.supportedLocales,
-    child: const ExampleApp(),
+    child: const DartwayExampleApp(),
   ).run();
 }
 ```

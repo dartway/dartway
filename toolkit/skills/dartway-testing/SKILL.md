@@ -159,8 +159,12 @@ tearDownAll(() async {
 a signed-up member by identifier and delivered code, an administrator promoted in the database, a
 watch that waits until it is live, a matcher for a refusal code. The counting HTTP transport, the
 recording live connector and the polling wait are the framework's (`DwCountingTransport`,
-`DwRecordingConnector`, `dwWaitUntil` in `testing.dart`), not copies to keep. Use it and extend it; a new test file is `setUpAll` → harness start,
-`tearDownAll` → harness stop.
+`DwRecordingConnector`, `dwWaitUntil` in `testing.dart`), not copies to keep. **One harness per
+side, extended and never replaced:** `AppHarness` in `test/support/app_harness.dart` keeps its name,
+its file and its methods (`start`, `stop`, `client`, `signUp`, `admin`); a project adds what its
+domain needs to the same class or an extension on it (a staff member, a chat channel), never a
+second harness beside it. A new test file is `setUpAll` → harness start, `tearDownAll` → harness
+stop.
 
 ### Three ways to talk to the server
 
@@ -244,7 +248,7 @@ memory.
     ..onRequest<ListMyInvoices>((request, call) => DwCallOk(<Invoice>[...invoices]))
     ..onCommand<PayInvoice>((command, call) {
       final paid = invoices.first.copyWith(status: InvoiceStatus.paid);
-      call.publish(DwLiveChannel.forAccount(AppChannel.invoices, 42), [paid]);
+      call.publish(DwLiveChannel.forAccount(AcmeChannel.invoices, 42), [paid]);
       return DwCallOk(paid);
     });
   ```
@@ -304,7 +308,14 @@ the reads every screen makes on its way (the signed-in profile, the settings) th
 handlers do, and a running app that builds the core, pumps the app at phone size, settles, taps,
 waits out notifications, and on stop unmounts, disposes the core and asserts the fake server met no
 surprise. It can also mount the app under `DwAppBootstrapper`, as `DwAppRunner` does, for what covers
-the whole app (the update-required screen). A new widget test starts from it.
+the whole app (the update-required screen). A new widget test starts from it — `FakeApp` and
+`TestApp` in `test/support/app_test_app.dart`, extended with what the project's screens read, never
+replaced.
+
+**A widget test mirrors the path of what it tests:** `test/<zone>/<feature>/<entry>_test.dart` for a
+feature (`lib/admin/users/admin_users_page.dart` → `test/admin/users/admin_users_page_test.dart`),
+the same path under `test/core/` and `test/ui_kit/` for those layers. A test that walks through two
+features is split by feature, with what they share moved into the harness.
 
 The signed-in user is the session in the token store and the profile the fake answers — not a
 provider override. There is no session to fake beyond that.

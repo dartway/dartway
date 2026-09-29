@@ -13,7 +13,7 @@ sides read), and the app half — [Push notifications](../3-flutter/push-notific
 
 ```dart
 // app_shared — the project's categories, and the protocol both sides speak
-enum AppPushCategory with DwPushCategory { news, bookings }
+enum AcmePushCategory with DwPushCategory { news, bookings }
 
 final appProtocol = DwWireProtocol(dwPushProtocolEntries, include: appGeneratedProtocol);
 ```
@@ -43,7 +43,7 @@ DwAppServer(
 `dw.push.deliver` and the recurring job `dw.push.cleanup`. The server refuses to start when the
 protocol does not register the push calls, when a project answers them itself, or when a setting
 cannot work. The example reads its providers from the environment
-(`example/dartway_example_server/lib/src/core/example_push.dart`). A project's migration CLI replays the
+(`example/dartway_example_server/lib/src/core/push.dart`). A project's migration CLI replays the
 namespace beside the framework's:
 
 ```dart
@@ -66,7 +66,7 @@ await ctx.push.send(
     data: NewsAlert(id: post.id),       // a data object of the protocol: the app receives it typed
     link: '/news',                      // the in-app path a tap opens; the web opens it too
   ),
-  category: AppPushCategory.news,
+  category: AcmePushCategory.news,
   dedupKey: 'news:${post.id}',
   scheduledAt: tomorrowAtNine,          // optional: now
   lifetime: const Duration(hours: 6),   // optional: DwPushSettings.messageLifetime
@@ -102,7 +102,7 @@ Future<Map<int, DwPushDecision>> appPushEligibility(
   final settings = await ctx.db.notificationSettings.find(where: (t) => t.accountId.inList(accountIds));
   return {
     for (final s in settings)
-      if (!s.allows(notice.categoryIn(AppPushCategory.values)))
+      if (!s.allows(notice.categoryIn(AcmePushCategory.values)))
         s.accountId: DwPushDecision.skip
       else if (s.quietUntil(DateTime.now()) case final end?)
         s.accountId: DwPushDecision.delayUntil(end),
@@ -216,7 +216,7 @@ and RuStore's send API, records what it was sent and answers what the test says.
 
 ```dart
 final fcm = await DwFakePushService.start();
-final server = await DwTestServer.start(buildServer(push: ExamplePush.module(providers: [fcm.fcmProvider()])));
+final server = await DwTestServer.start(buildServer(push: AppPush.module(providers: [fcm.fcmProvider()])));
 // ...
 fcm.answer = (send) => DwFakePushAnswer.fcmError(404, 'NOT_FOUND', 'Requested entity was not found.', fcmCode: 'UNREGISTERED');
 ```

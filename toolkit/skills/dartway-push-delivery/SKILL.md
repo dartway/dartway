@@ -21,11 +21,12 @@ description: >-
 framework's job queue delivers it later and records every outcome in the provider's words. The
 project writes four things: **the category, the payload, who is eligible, and where a tap leads.**
 
-The example does all of it for news: `example/dartway_example_shared/lib/src/example_push.dart`
-(category, protocol), `NewsAlert` in `news.dart` (payload), `example_push.dart` on the server
-(eligibility by marketing consent, providers from the environment), `PublishNews` in
-`content_handlers.dart` (the send), `lib/core/push/push_opened_listener.dart` in the app (the tap),
-and `test/push_acceptance_test.dart` / `test/app/push_test.dart`. Read them first.
+The example does all of it for news: `dartway_example_push_category.dart` and `app_protocol.dart` in
+`example/dartway_example_shared/lib/src/` (category, protocol), `NewsAlert` in `news.dart` (payload),
+`core/push.dart` on the server (eligibility by marketing consent, providers from the environment),
+`PublishNews` in `content_handlers.dart` (the send), `lib/core/push/push_opened_listener.dart` in the
+app (the tap), and `test/push_acceptance_test.dart` / `test/core/push/push_opened_listener_test.dart`.
+Its bookings reminder is a push sent from a job (`bookings/bookings_jobs.dart`). Read them first.
 
 The framework's pages: *Push delivery* (server) and *Push notifications* (app) in the DartWay
 documentation.
@@ -42,7 +43,7 @@ final class NewsAlert extends DwDataObject with _$NewsAlert {
   final int id;
 }
 
-enum AppPushCategory with DwPushCategory { news }
+enum AcmePushCategory with DwPushCategory { news }
 
 final appProtocol = DwWireProtocol(dwPushProtocolEntries, include: appGeneratedProtocol);
 ```
@@ -81,7 +82,7 @@ and in `bin/migrate.dart`: `modules: {'dw': DwAppServer.frameworkMigrations, dwP
 await ctx.push.send(
   recipientAccountIds,
   message: DwPushMessage(title: post.title, body: excerpt, data: NewsAlert(id: post.id), link: '/news'),
-  category: AppPushCategory.news,
+  category: AcmePushCategory.news,
   dedupKey: 'news:${post.id}',
 );
 ```
@@ -98,8 +99,8 @@ with one query:
 
 ```dart
 Future<Map<int, DwPushDecision>> appPushEligibility(DwCallContext ctx, DwPushNotice notice, List<int> accountIds) async {
-  switch (notice.categoryIn(AppPushCategory.values)) {
-    case AppPushCategory.news:
+  switch (notice.categoryIn(AcmePushCategory.values)) {
+    case AcmePushCategory.news:
       final agreed = {
         for (final p in await ctx.db.userProfiles.find(
           where: (t) => t.accountId.inList(accountIds) & t.agreedForMarketing.equals(true),

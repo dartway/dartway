@@ -12,8 +12,10 @@ another:
 The skeleton ships a worked example of each, and the reference application in `example/` another:
 `template/dartway_starter_shared/test/contract_test.dart`, `template/dartway_starter_server/test/`
 with its harness `test/support/app_harness.dart`, and `template/dartway_starter_flutter/test/` with
-`test/support/app_test_app.dart` (`example/dartway_example_flutter/test/support/example_test_app.dart`
-in the example).
+`test/support/app_test_app.dart`. The example keeps both harnesses at the same paths, under the same
+names, extended with what the club needs — one harness per side, extended and never replaced. A
+widget test sits at the path of what it tests: `lib/admin/users/admin_users_page.dart` is tested in
+`test/admin/users/admin_users_page_test.dart`.
 
 **Why the split is not negotiable.** A rule the server enforces — who may read a row, what a command
 refuses, which channel hears a change — runs inside a call, against the database. No widget test can

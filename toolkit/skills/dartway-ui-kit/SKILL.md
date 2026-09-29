@@ -62,10 +62,12 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
    colours, not the absence of `of(context)`.
 4. **Isolated visual layer.** The kit does not depend on business logic or state. A component =
    pure visuals + minimal props.
-5. **The kit is the app's design system, not a library of shared widgets.** A composite needed by a
-   single feature (an event card, a card feed, a section header) is also the kit: the `3_special/` zone
-   exists for exactly this. What stays in the feature is **mapping the domain** to the kit's parameters,
-   not layout.
+5. **Every visual building block lives here, and nowhere else.** A block many screens draw (a
+   load-failed message, an avatar) goes to `2_frequent/`; a composite one area needs (an event card, a
+   card feed, a section header) to `3_special/`. `lib/shared/` holds no widgets — only non-visual
+   helpers several features use (an extension on a data object, a formatter) — and a feature's
+   `widgets/` is its private layout. What stays in the feature is **mapping the domain** to the kit's
+   parameters, not layout.
 
 6. **The public API of a kit widget takes no visual types.** No `Color`, `TextStyle`,
    `EdgeInsets`, `BorderRadius`, `BoxDecoration` in the constructor — the look is chosen by **named
@@ -276,7 +278,7 @@ and hands back a ready `onPressed` (`null` while the action runs) and `busy`.
 AppButton.primary(
   l10n.saveAction,
   onTap: dw.action(
-    (context) => dw.command(PayInvoice(invoiceId: invoice.id)),
+    (_) => InvoiceCardCommands.pay(invoice), // dw.command, in the feature's logic/
     onSuccessNotification: l10n.invoicePaid,
   ),
 )

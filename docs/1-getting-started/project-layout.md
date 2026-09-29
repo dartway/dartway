@@ -128,10 +128,11 @@ my_app_flutter/lib/
   common/                features more than one zone draws on (create it when that happens)
 
   LAYERS — everything that is not a feature
-  core/                  app-wide wiring: dw_core.dart, router/, refusal_text.dart,
-                         update_required_page.dart, profile/, app_settings/, dev/
-  shared/                building blocks: widgets and helpers with no story of their own
-  ui_kit/                your design system, as source
+  core/                  app-wide wiring: dw_core.dart, router/ (with the zones' shells),
+                         refusal_text.dart, update_required_page.dart, profile/,
+                         app_settings/, dev/
+  shared/                non-visual helpers several features use: extensions, formatters
+  ui_kit/                your design system, as source — styles and every visual building block
   l10n/                  ARB files and their generated output
 ```
 
@@ -171,8 +172,9 @@ internals; any other subfolder is read as a nested feature.
 
 A feature has exactly one root file, and no feature imports another feature's `widgets/` or `logic/`.
 Behaviour two features share is one more feature; a widget with no story of its own is a building
-block in `lib/shared/`. The entry point declares what it is in a `DwFeatureSpec` beside its code —
-see [features and specs](../3-flutter/features-and-specs.md).
+block in `lib/ui_kit/`. The entry point — and no other file of the feature — declares what it is in a
+`DwFeatureSpec` beside its code, and a feature sends its commands from its `logic/` — see [features
+and specs](../3-flutter/features-and-specs.md).
 
 ### Why the kit is source in your app, not a dependency
 

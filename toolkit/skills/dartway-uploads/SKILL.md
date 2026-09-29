@@ -44,7 +44,7 @@ contract because both sides name it: the app uploads *for* it, the server has a 
 
 ```dart
 /// What an uploaded file is for. The server declares one rule per purpose.
-enum AppUpload with DwUploadPurpose {
+enum AcmeUpload with DwUploadPurpose {
   /// A scanned invoice. Private: read only by its owner, through a link.
   invoiceScan;
 
@@ -76,11 +76,11 @@ there.
 
 ```dart
 DwUploadRule(
-  AppUpload.invoiceScan,
+  AcmeUpload.invoiceScan,
   // Private: the private bucket, read only through a link after canRead.
   visibility: DwFileVisibility.private,
-  maxBytes: AppUpload.invoiceScanMaxBytes,
-  contentTypes: AppUpload.invoiceScanContentTypes,
+  maxBytes: AcmeUpload.invoiceScanMaxBytes,
+  contentTypes: AcmeUpload.invoiceScanContentTypes,
   // Who may upload at all. Whether the file may go onto a particular invoice
   // is the command's check, not this one.
   canUpload: (ctx) async => true,
@@ -120,14 +120,14 @@ DwFileStorage(config, rules: uploadRules, canRead: canReadFile);
 
 - **Without `canRead`, only the account that uploaded a file may read it.** Often that is exactly
   right; write a rule only when others must read it (a manager, the other side of a conversation).
-- **One function answers for every private purpose**, so branch on `file.isFor(AppUpload.…)` and
+- **One function answers for every private purpose**, so branch on `file.isFor(AcmeUpload.…)` and
   end with the default for purposes it does not know:
 
 ```dart
 /// A scanned invoice is readable by its owner while the invoice exists;
 /// every other private file only by its uploader.
 Future<bool> canReadFile(DwCallContext ctx, DwFileRecord file) async {
-  if (file.isFor(AppUpload.invoiceScan)) {
+  if (file.isFor(AcmeUpload.invoiceScan)) {
     final accountId = ctx.accountId;
     if (accountId == null) return false;
     final invoice = await ctx.db.invoices.findFirst(
@@ -169,7 +169,7 @@ it is the caller's own confirmed file of the expected purpose:
 ```dart
 await ctx.files.requireOwned(
   command.scanFileId,
-  AppUpload.invoiceScan,
+  AcmeUpload.invoiceScan,
   field: 'scanFileId',
 );
 ```
@@ -259,9 +259,9 @@ final uploader = useMemoized(dw.uploader);
 useEffect(() => uploader.dispose, [uploader]);
 final upload = useValueListenable(uploader);
 
-// in the action:
+// in the feature's logic/ function the button's dw.action runs:
 final file = await uploader.upload(
-  AppUpload.invoiceScan,
+  AcmeUpload.invoiceScan,
   DwUploadSource.bytes(bytes),
   fileName: pickedName,
   contentType: pickedContentType,

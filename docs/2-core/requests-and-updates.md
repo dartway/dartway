@@ -61,7 +61,7 @@ final class ListUpcomingSessions extends DwListRequest<ClubSession>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.schedule),
+    DwLiveChannel(DartwayExampleChannel.schedule),
   ];
 
   @override

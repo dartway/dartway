@@ -155,7 +155,7 @@ and where an opened notification leads:
 
 ```dart
 final transport = DwFakePushTransport(issuedToken: 'device-token');
-final app = await ExampleTestApp.start(tester, FakeClub(), pushTransports: [transport]);
+final app = await TestApp.start(tester, FakeClub(), pushTransports: [transport]);
 expect(app.server.callsOf<DwRegisterPushToken>(), hasLength(1));
 
 transport.open(const DwPushData(payload: NewsAlert(id: 1)));

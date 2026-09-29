@@ -38,16 +38,21 @@ __SERVER_PKG__/
                            creates the accounts
   lib/__SERVER_PKG__.dart  the library: builds the DwAppServer
   lib/generated/           written by `dart run dartway_cli:dartway generate` — never edited
-  lib/src/core/            fixed: auth hooks, the caller and access rules, channel
-                           addresses, upload rules, startup steps
+  lib/src/core/            fixed names, no project prefix, classes App*:
+    auth.dart                  AppAuth — the DwAuthConfig and its hooks
+    call_context.dart          AppCallContext (ctx.profile, roles) and AppAccess
+    channels.dart              AppChannels — the channel addresses handlers publish to
+    files.dart                 AppFiles — every upload rule and who reads a file
+    bootstrap.dart             AppBootstrap — startup steps
+    push.dart                  AppPush — with push only
   lib/src/migrations/      fixed: migration files and migrations.dart
-  lib/src/<feature>/       one folder per area of the app:
+  lib/src/<feature>/       one folder per area of the app, every file <feature>_*.dart:
     <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes
     <feature>_rows.dart        its row classes
     <feature>_handlers.dart    one handler per request and command
     <feature>_objects.dart     rows → data objects, in batch
     <feature>_publications.dart  what a change publishes, and to whom
-    …                          anything else the area needs, subfolders when it grows
+    <feature>_jobs.dart        its job kinds and job definitions
   test/
 ```
 
@@ -59,7 +64,10 @@ the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`,
 `dart run dartway_cli:dartway check`. A feature split across layers ends up in four places, with a
 `chat/` beside a `domain/chat/` and two rules for who is in a chat: the whole area lives in its
 folder, and what two features share lives in the one that owns it (the profile's objects in
-`profile/`) or in `core/`.
+`profile/`) or in `core/`. A feature imports another's `_rows`, `_objects` and `_publications` —
+never its `_handlers`: a handler file is where a feature ends. A number several features move,
+like an admin dashboard's counters, is a publication of the feature that owns it
+(`admin/admin_publications.dart`), and every command that moves it calls that one function.
 
 ## 2. Row classes
 
@@ -149,7 +157,7 @@ After changing a row class: `dart run dartway_cli:dartway generate`, then `dart 
 repositories are generated extension getters (`lib/generated/dw_schema.dart`):
 
 ```dart
-final me = await ctx.callerProfile;
+final me = await ctx.profile;
 final rows = await ctx.db.invoices.find(
   where: (t) =>
       t.ownerProfileId.equals(me.id!) & t.status.notEquals(InvoiceStatus.draft),
@@ -199,13 +207,15 @@ final paid = await ctx.db.invoicePayments.tryInsert(
   InvoicePaymentRow(invoiceId: invoice.id!, paidAt: DateTime.now()),
   onConflict: DwOnConflict.doNothing((t) => [t.invoiceId]),
 );
-if (paid == null) ctx.refuse(AppRefusal.invoiceAlreadyPaid);
+if (paid == null) ctx.refuse(AcmeRefusal.invoiceAlreadyPaid);
 ```
 
-**Raw SQL** (`ctx.db.query(sql, params: {...})` → `DwResultRow`, `ctx.db.execute`) is for what the
-repository cannot say — an aggregate, a window function — over the project's own tables. Never over
-the framework's `dw_*` tables: accounts, identities and keys go through `DwAccountService`
-(section 9).
+**Raw SQL** (`ctx.db.query(sql, params: {...})` → `DwResultRow`, `ctx.db.execute`) is only for what
+the repository cannot say — a window function, a CTE, a correlated subquery across tables — over
+the project's own tables. Aggregates (`count`, `countBy`, `sumBy`, `maxBy`), "the latest per group"
+(`findFirstPer`), "insert or overwrite" (`upsert`) and conditions on a list column are the
+repository's, as above: written as SQL they break silently on a rename. Never over the framework's
+`dw_*` tables: accounts, identities and keys go through `DwAccountService` (section 9).
 
 ## 4. Handlers — one per call
 
@@ -232,11 +242,12 @@ the cursors with the request's `positionOf`.
 
 ```dart
 final invoiceHandlers = <DwCallHandler>[
+  /// The caller's invoices, newest first. "My" invoices name no account: the
+  /// caller's are the only ones read.
   DwCallHandler.list<ListMyInvoices, CustomerInvoice>(
-    // "My" invoices name no account: the caller's are the only ones read.
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async {
-      final me = await ctx.callerProfile;
+      final me = await ctx.profile;
       return InvoiceObjects.invoices(
         ctx,
         await ctx.db.invoices.find(
@@ -247,29 +258,32 @@ final invoiceHandlers = <DwCallHandler>[
     },
   ),
 
+  /// One of the caller's invoices. Someone else's does not exist for the
+  /// caller: `dw.notFound`.
   DwCallHandler.single<GetInvoice, CustomerInvoice>(
-    // Someone else's invoice does not exist for the caller: `dw.notFound`.
     access: DwAccessRule.resource<GetInvoice, InvoiceRow>(
       load: (ctx, request) => ctx.db.invoices.findById(request.invoiceId),
       allows: (ctx, request, row) async =>
-          row.ownerProfileId == (await ctx.callerProfile).id,
+          row.ownerProfileId == (await ctx.profile).id,
     ),
     handle: (ctx, request) =>
         InvoiceObjects.invoice(ctx, ctx.accessed<InvoiceRow>()),
   ),
 
+  /// Pays one of the caller's invoices, once (`invoiceAlreadyPaid`).
+  /// Publishes the invoice to every channel that shows it.
   DwCallHandler.command<PayInvoice, CustomerInvoice>(
     access: DwAccessRule.resource<PayInvoice, InvoiceRow>(
       // Locked: the rule runs inside the command's transaction.
       load: (ctx, command) =>
           ctx.db.invoices.findById(command.invoiceId, lock: DwRowLock.forUpdate),
       allows: (ctx, command, row) async =>
-          row.ownerProfileId == (await ctx.callerProfile).id,
+          row.ownerProfileId == (await ctx.profile).id,
     ),
     handle: (ctx, command) async {
       final row = ctx.accessed<InvoiceRow>();
       if (row.status == InvoiceStatus.paid) {
-        ctx.refuse(AppRefusal.invoiceAlreadyPaid);
+        ctx.refuse(AcmeRefusal.invoiceAlreadyPaid);
       }
       final paid = await ctx.db.invoices.update(
         row.copyWith(
@@ -279,11 +293,14 @@ final invoiceHandlers = <DwCallHandler>[
       );
       // Publishes the invoice to every channel that shows it and answers it
       // as clients see it — `dartway-realtime`.
-      return publishInvoice(ctx, paid);
+      return InvoicePublications.invoice(ctx, paid);
     },
   ),
 ];
 ```
+
+**Every handler carries a `///` doc comment above it** (law 7): who may call it, what it changes and
+what it publishes — the server's description lives there, not in a separate doc.
 
 What the framework has done before your function runs: decoded the body, checked sign-in, run
 `validate()`, run the access check — in that order. Don't repeat them.
@@ -355,12 +372,13 @@ exit of the server shows the object the same way.
 `transaction`, `publish`, `revoke`, `refuse`, `jobs`, `accounts`, `files`, `log`, `memo`.
 
 **The project's notions of "the caller" are an extension, cached per call with `memo`** — the
-framework knows an account, the profile and the role are the project's:
+framework knows an account, the profile and the role are the project's. It is `AppCallContext` in
+`core/call_context.dart`, and the caller's profile is `ctx.profile`:
 
 ```dart
-extension CallerContext on DwCallContext {
+extension AppCallContext on DwCallContext {
   /// The caller's profile, read once per call.
-  Future<MemberProfileRow> get callerProfile => memo(#callerProfile, () async {
+  Future<MemberProfileRow> get profile => memo(#profile, () async {
     final accountId = requireAccountId;
     final profile = await db.memberProfiles.findFirst(
       where: (t) => t.accountId.equals(accountId),
@@ -371,11 +389,11 @@ extension CallerContext on DwCallContext {
   });
 
   Future<bool> get isManager async =>
-      (await callerProfile).role == MemberRole.manager;
+      (await profile).role == MemberRole.manager;
 }
 ```
 
-The skeleton ships one such extension with the admin role; extend it rather than reading the profile
+The skeleton ships this extension with the admin role; extend it rather than reading the profile
 again in every handler. Access rules built on it — `dartway-access`.
 
 - `ctx.refuse(code, field:, params:)` returns `Never`: a guard reads `if (row == null) ctx.refuse(…);`
@@ -386,13 +404,19 @@ again in every handler. Access rules built on it — `dartway-access`.
 
 ## 7. Jobs
 
-Work that runs later or on a timer is a job, declared in its feature's `DwServerFeature(jobs: [...])`:
+Work that runs later or on a timer is a job, and a job belongs to a feature: its kinds and
+definitions live in `<feature>_jobs.dart`, and the feature declares them —
+`DwServerFeature(jobs: invoicesJobs)`. There is no app-wide job list.
 
 ```dart
-/// What a job is — name and payload codec — imported by whatever enqueues it.
-abstract final class InvoiceJobs {
+// lib/src/invoices/invoices_jobs.dart
+
+/// What the invoices feature's jobs are — name and payload codec — imported by
+/// the commands that enqueue them.
+abstract final class InvoicesJobs {
+  /// Reminds the owner of an unpaid invoice.
   static const remind = DwJobKind<({int invoiceId})>(
-    'invoice.remind',
+    'invoices.remind',
     encode: _encode,
     decode: _decode,
   );
@@ -402,22 +426,27 @@ abstract final class InvoiceJobs {
       (invoiceId: json['invoiceId']! as int);
 }
 
-final appJobs = <DwJobDefinition>[
+/// The jobs the invoices feature runs.
+final invoicesJobs = <DwJobDefinition>[
   DwQueuedJob(
-    InvoiceJobs.remind,
+    InvoicesJobs.remind,
     handle: (ctx, p) async {
+      // Decided when the job runs, not when it was queued.
       final invoice = await ctx.db.invoices.findById(p.invoiceId);
       if (invoice == null || invoice.status == InvoiceStatus.paid) return;
       // … send the reminder, publish what changed
     },
   ),
   DwRecurringJob(
-    'invoice.mark_overdue',
+    'invoices.mark_overdue',
     every: const Duration(hours: 1),
     handle: (ctx) async { /* … */ },
   ),
 ];
 ```
+
+The worked example is `example/`'s bookings reminder: `BookSession` enqueues it, the job checks the
+booking is still active when it runs.
 
 Enqueue from a command by the kind, never by a string:
 `await ctx.jobs.enqueue(InvoiceJobs.remind, (invoiceId: id), runAt: …, key: …)`. The payload is

@@ -111,7 +111,7 @@ A new shape is recorded without a bump; a framework DTO without a recorded shape
 
 | Tier | What | Where it runs |
 |---|---|---|
-| 1 | `tool/checks.sh` — `dart analyze` over every resolution root and every suite that needs no services; `tool/checks.sh services` — the ORM, server and push suites against a Postgres and a storage | both locally before a PR, and `checks.yml` on every PR (one job per mode) |
+| 1 | `tool/checks.sh` — `dart analyze` over every resolution root, `dartway check` over `template/` and `example/`, and every suite that needs no services; `tool/checks.sh services` — the ORM, server and push suites against a Postgres and a storage | both locally before a PR, and `checks.yml` on every PR (one job per mode) |
 | 2 | Pure-Dart packages on node: `dart test -p vm,node` in `dartway_core_shared` and `dartway_client` — dart2js rejects what the VM accepts | by hand when the wire or the client changes |
 | 3 | Database and storage suites of the projects: `dartway test` in `example/` and `template/` (a Postgres and a storage per run, on ports Docker picks, removed afterwards) | `database.yml` nightly, and on a PR touching `packages/`, `template/` or `example/`; locally when a change reaches a project's server |
 | 4 | Docker proofs in the CLI: `dart test -t docker --run-skipped test/deploy_local_stack_test.dart` — builds the images and runs the rendered stack | by hand, when deploy changes; `images.yml` builds the template's images from what `dartway create` produces |

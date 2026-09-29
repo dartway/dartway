@@ -24,8 +24,8 @@ const dwFileTooLongThreshold = 350;
 /// level is a closed list, so a prefix match would only let an undeclared
 /// folder in through the side door.
 ///
-/// `shared/` is deliberately absent: it holds building blocks, and a block has
-/// no product behaviour to describe. Asking it for a spec is what produced
+/// `shared/` is deliberately absent: it holds helpers with no story of their
+/// own, and a helper has no product behaviour to describe. Asking it for a spec is what produced
 /// passports that only restate the class name, and a spec nobody believes is
 /// worse than none.
 bool _isFeatureArea(String name) => dwFlutterZones.contains(name);
@@ -226,8 +226,8 @@ class DwFlutterInspector {
         DwCheckType.notAFeature,
         '$rel — a zone holds features, and this entry point declares no '
         'widget. State that several features watch is wiring and belongs in '
-        'lib/core/; a helper with no story of its own is a building block and '
-        'belongs in lib/shared/',
+        'lib/core/; a helper with no story of its own belongs in lib/shared/, '
+        'or in lib/ui_kit/ when it draws something',
         rel,
       );
       return;
@@ -261,7 +261,8 @@ class DwFlutterInspector {
           '$owner (${unused.declaredNames.join(', ')}) — nobody outside the '
           'feature may import it, so this is dead code the compiler cannot '
           'see. Delete it, or move it to where its caller can reach it: a '
-          'building block with no story of its own to lib/shared/, wiring '
+          'helper with no story of its own to lib/shared/ (lib/ui_kit/ when '
+          'it draws something), wiring '
           'several features share to lib/core/, a platform trio '
           '(x.dart + x_stub.dart + x_web.dart) to lib/core/platform/',
           owner,
