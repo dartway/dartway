@@ -7,12 +7,13 @@ export 'package:dartway_push_shared/dartway_push_shared.dart';
 
 export 'generated/dw_protocol.dart';
 export 'src/admin.dart';
+export 'src/app_protocol.dart';
 export 'src/bookings.dart';
 export 'src/chat.dart';
-export 'src/example_channel.dart';
-export 'src/example_push.dart';
-export 'src/example_refusal.dart';
-export 'src/example_upload.dart';
+export 'src/dartway_example_channel.dart';
+export 'src/dartway_example_push_category.dart';
+export 'src/dartway_example_refusal.dart';
+export 'src/dartway_example_upload.dart';
 export 'src/news.dart';
 export 'src/people.dart';
 export 'src/schedule.dart';

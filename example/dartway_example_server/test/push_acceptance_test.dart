@@ -1,19 +1,20 @@
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
+import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/testing.dart';
 import 'package:test/test.dart';
 
-import 'support/club_harness.dart';
+import 'support/app_harness.dart';
 
 void main() {
-  late ClubHarness club;
+  late AppHarness club;
   late DwFakePushService fcm;
 
   setUpAll(() async {
     fcm = await DwFakePushService.start();
-    club = await ClubHarness.start(
-      push: ExamplePush.module(
+    club = await AppHarness.start(
+      push: AppPush.module(
         providers: [
           fcm.fcmProvider(webLinkBase: Uri.parse('https://app.example.com')),
         ],
@@ -26,7 +27,7 @@ void main() {
     await fcm.close();
   });
 
-  Future<void> registerDevice(ClubMember member, String token) async {
+  Future<void> registerDevice(AppMember member, String token) async {
     final result = await member.client.command(
       DwRegisterPushToken(
         transport: DwPushTransport.fcm,
@@ -39,18 +40,18 @@ void main() {
 
   test('a published post notifies the members who agreed to marketing, once, '
       'with the post and a link to the news', () async {
-    final coach = await club.memberWithRole(
+    final coach = await club.withRole(
       '+7 999 100 00 01',
       'Boris',
       UserRole.staff,
       marketing: true,
     );
-    final agreed = await club.member(
+    final agreed = await club.signUp(
       '+7 999 100 00 02',
-      'Vera',
+      firstName: 'Vera',
       marketing: true,
     );
-    final declined = await club.member('+7 999 100 00 03', 'Oleg');
+    final declined = await club.signUp('+7 999 100 00 03', firstName: 'Oleg');
     await registerDevice(coach, 'coach-device');
     await registerDevice(agreed, 'agreed-device');
     await registerDevice(declined, 'declined-device');
@@ -77,10 +78,7 @@ void main() {
     final send = fcm.sends.single;
     expect(send.token, 'agreed-device');
     expect((send.message['notification']! as Map)['title'], 'Pool closed');
-    final data = DwPushData.fromWire(
-      send.message['data']! as Map,
-      exampleProtocol,
-    );
+    final data = DwPushData.fromWire(send.message['data']! as Map, appProtocol);
     expect(data.payload, NewsAlert(id: post.id));
     expect(data.link, '/news');
     expect(
@@ -90,9 +88,9 @@ void main() {
   });
 
   test('a refused publication notifies nobody', () async {
-    final member = await club.member(
+    final member = await club.signUp(
       '+7 999 100 00 04',
-      'Anna',
+      firstName: 'Anna',
       marketing: true,
     );
     await registerDevice(member, 'refused-device');
@@ -103,5 +101,69 @@ void main() {
     expect(result, isA<DwCallRefused<NewsPost>>());
     await Future<void>.delayed(const Duration(milliseconds: 300));
     expect(fcm.sends, hasLength(before));
+  });
+  test('a booked session reminds its member two hours before it starts; a '
+      'booking cancelled by then reminds nobody', () async {
+    final service = await club.db.clubServices.insert(
+      const ClubServiceRow(
+        title: 'Morning yoga',
+        description: 'Mats provided',
+        durationMinutes: 60,
+        price: 1500,
+      ),
+    );
+    final session = await club.db.clubSessions.insert(
+      ClubSessionRow(
+        serviceId: service.id!,
+        startsAt: DateTime.now().add(const Duration(days: 1)),
+        capacity: 5,
+      ),
+    );
+    final keeps = await club.signUp('+7 999 100 00 05', firstName: 'Ivan');
+    final cancels = await club.signUp('+7 999 100 00 06', firstName: 'Olga');
+    await registerDevice(keeps, 'keeps-device');
+    await registerDevice(cancels, 'cancels-device');
+    final kept = (await keeps.client.command(
+      BookSession(sessionId: session.id!),
+    )).valueOrThrow;
+    final cancelled = (await cancels.client.command(
+      BookSession(sessionId: session.id!),
+    )).valueOrThrow;
+    (await cancels.client.command(
+      CancelBooking(bookingId: cancelled.id),
+    )).valueOrThrow;
+
+    // One reminder queued per booking, due two hours before the session.
+    Future<List<Map<String, Object?>>> reminders() async => [
+      for (final row in await club.db.query(
+        "SELECT key, run_at FROM dw_job WHERE name = 'bookings.remind' "
+        'ORDER BY id',
+      ))
+        {'key': row['key'], 'runAt': row['run_at']},
+    ];
+    final queued = await reminders();
+    expect(
+      [for (final job in queued) job['key']],
+      ['bookings.remind:${kept.id}', 'bookings.remind:${cancelled.id}'],
+    );
+    expect(
+      (queued.first['runAt']! as DateTime).isAtSameMomentAs(
+        session.startsAt.subtract(const Duration(hours: 2)),
+      ),
+      isTrue,
+    );
+
+    // The time comes: both jobs run, and only the active booking reminds.
+    final before = fcm.sends.length;
+    await club.db.execute(
+      "UPDATE dw_job SET run_at = now() WHERE name = 'bookings.remind'",
+    );
+    await club.db.query("SELECT pg_notify('dw_jobs', '')");
+    await dwWaitUntil(() async => (await reminders()).isEmpty);
+    await dwWaitUntil(() => fcm.sends.length > before);
+    await Future<void>.delayed(const Duration(milliseconds: 300));
+    final reminder = fcm.sends.skip(before).single;
+    expect(reminder.token, 'keeps-device');
+    expect((reminder.message['notification']! as Map)['title'], 'Morning yoga');
   });
 }

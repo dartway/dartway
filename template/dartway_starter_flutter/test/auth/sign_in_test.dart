@@ -1,7 +1,6 @@
-import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';
 import 'package:dartway_starter_flutter/dartway_starter_app.dart';
-import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';

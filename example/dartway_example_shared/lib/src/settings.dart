@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'example_channel.dart';
-import 'example_refusal.dart';
+import 'dartway_example_channel.dart';
+import 'dartway_example_refusal.dart';
 
 part 'settings.dw.dart';
 
@@ -29,7 +29,7 @@ final class ListAppSettings extends DwListRequest<AppSetting>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.settings),
+    DwLiveChannel(DartwayExampleChannel.settings),
   ];
 }
 
@@ -45,6 +45,6 @@ final class SaveAppSetting extends DwActionCommand<AppSetting>
   @override
   List<DwCallRefusal> validate() => [
     if (!exampleSettingKeys.contains(key))
-      DwCallRefusal(ExampleRefusal.settingKeyUnknown, field: 'key'),
+      DwCallRefusal(DartwayExampleRefusal.settingKeyUnknown, field: 'key'),
   ];
 }

@@ -1,5 +1,5 @@
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
-import 'package:dartway_starter_flutter/shared/widgets/admin_scaffold.dart';
+import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';

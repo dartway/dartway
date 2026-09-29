@@ -1,0 +1,26 @@
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+
+/// Why the example server refuses. Codes only: the app renders every one of
+/// them through its string catalogue.
+enum DartwayExampleRefusal with DwRefusalCodes {
+  titleRequired,
+  textRequired,
+  durationNotPositive,
+  priceNegative,
+  capacityTooSmall,
+  sessionInPast,
+  sessionStarted,
+  noSpotsLeft,
+  alreadyBooked,
+  bookingNotActive,
+  ratingOutOfRange,
+  reviewNeedsAttendance,
+  alreadyReviewed,
+  messageEmpty,
+  messageTooLong,
+  tooManyAttachments,
+  editWindowClosed,
+  searchQueryTooShort,
+  settingKeyUnknown,
+  firstNameRequired,
+}

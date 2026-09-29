@@ -1,10 +1,8 @@
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';
-import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
-import 'package:dartway_starter_flutter/shared/widgets/role_picker.dart';
-import 'package:dartway_starter_flutter/shared/widgets/user_avatar.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_flutter/admin/role_picker/role_picker.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';

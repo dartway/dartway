@@ -1,7 +1,7 @@
 import 'package:dartway_starter_flutter/admin/settings/widgets/admin_setting_row.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
-import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';

@@ -1,8 +1,7 @@
 import 'package:dartway_example_flutter/auth/profile_name_page.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
-import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';

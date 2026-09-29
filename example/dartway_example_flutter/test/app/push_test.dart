@@ -1,16 +1,16 @@
 import 'package:dartway_example_flutter/app/news/news_page.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/example_test_app.dart';
+import '../support/app_test_app.dart';
 
 void main() {
   testWidgets('a signed-in member\'s device is registered once', (
     tester,
   ) async {
     final transport = DwFakePushTransport(issuedToken: 'device-token');
-    final app = await ExampleTestApp.start(
+    final app = await TestApp.start(
       tester,
-      FakeClub(),
+      FakeApp(),
       pushTransports: [transport],
     );
 
@@ -33,9 +33,9 @@ void main() {
 
   testWidgets('opening a news notification opens the news', (tester) async {
     final transport = DwFakePushTransport(issuedToken: 'device-token');
-    final app = await ExampleTestApp.start(
+    final app = await TestApp.start(
       tester,
-      FakeClub(),
+      FakeApp(),
       pushTransports: [transport],
     );
     expect(find.byType(NewsPage), findsNothing);
@@ -54,9 +54,9 @@ void main() {
       issuedToken: 'device-token',
       initialOpen: const DwPushData(payload: NewsAlert(id: 1)).toWire(),
     );
-    final app = await ExampleTestApp.start(
+    final app = await TestApp.start(
       tester,
-      FakeClub(),
+      FakeApp(),
       pushTransports: [transport],
     );
 

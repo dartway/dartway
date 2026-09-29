@@ -2,7 +2,7 @@ import 'package:dartway_example_flutter/app/news/widgets/news_post_card.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/example_test_app.dart';
+import '../support/app_test_app.dart';
 
 const coach = PersonCard(id: 2, firstName: 'Boris');
 
@@ -18,9 +18,9 @@ void main() {
   testWidgets(
     'a post published anywhere appears at the top, without a refetch',
     (tester) async {
-      final club = FakeClub()
+      final club = FakeApp()
         ..news.add(post(1, 'Pool closed on Monday', DateTime.utc(2026, 9, 1)));
-      final app = await ExampleTestApp.start(tester, club);
+      final app = await TestApp.start(tester, club);
 
       await app.tap(tester, find.text('News'));
       expect(find.text('Pool closed on Monday'), findsOneWidget);
@@ -47,12 +47,12 @@ void main() {
   testWidgets('a refused post is explained in the user\'s language', (
     tester,
   ) async {
-    final club = FakeClub(role: UserRole.staff);
+    final club = FakeApp(role: UserRole.staff);
     club.server.onCommand<PublishNews>(
       (command, call) =>
           DwCallRefused<NewsPost>(DwCallRefusal(DwCoreRefusal.forbidden)),
     );
-    final app = await ExampleTestApp.start(tester, club);
+    final app = await TestApp.start(tester, club);
 
     await app.tap(tester, find.text('News'));
     await app.tap(tester, find.byType(FloatingActionButton));

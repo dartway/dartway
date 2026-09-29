@@ -75,26 +75,10 @@ final class ChatComposerFile {
 ///
 /// The sent message is not added here: it arrives in the command's answer and
 /// on the channel. After sending, the list goes to the newest message.
-class ChatComposer extends HookConsumerWidget implements DwFeatureWidget {
+class ChatComposer extends HookConsumerWidget {
   const ChatComposer({required this.session, super.key});
 
   final ChatSession session;
-
-  @override
-  DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'chat/composer',
-    title: 'Message composer',
-    behaviors: [
-      'Enter sends, Shift+Enter starts a new line; the field grows to six '
-          'lines, then scrolls.',
-      'Attached files upload as soon as they are picked; send waits until '
-          'every one has arrived. At most ten, each up to 20 MB.',
-      'Replying shows the quoted message over the field; editing puts the '
-          'message text in the field and saves it on send.',
-      'What was typed survives leaving the channel for this app session.',
-      'After sending, the chat shows the newest messages.',
-    ],
-  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -381,7 +365,7 @@ class ChatComposer extends HookConsumerWidget implements DwFeatureWidget {
 
     final result = await dw.files
         .upload(
-          ExampleUpload.chatAttachment,
+          DartwayExampleUpload.chatAttachment,
           DwUploadSource.bytes(bytes),
           fileName: name,
           contentType: contentType,

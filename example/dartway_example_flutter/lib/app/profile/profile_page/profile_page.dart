@@ -4,7 +4,7 @@ import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 import 'package:dartway_example_flutter/core/profile/profile_roles.dart';
 import 'package:dartway_example_flutter/core/router/router.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';

@@ -7,35 +7,36 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
 import 'generated/dw_schema.dart';
-import 'src/core/example_auth.dart';
-import 'src/core/example_bootstrap.dart';
-import 'src/core/example_context.dart';
-import 'src/core/example_files.dart';
-import 'src/core/example_push.dart';
+import 'src/core/auth.dart';
+import 'src/core/bootstrap.dart';
+import 'src/core/call_context.dart';
+import 'src/core/files.dart';
+import 'src/core/push.dart';
 import 'src/admin/admin_feature.dart';
+import 'src/bookings/bookings_feature.dart';
 import 'src/chat/chat_feature.dart';
-import 'src/club/club_feature.dart';
 import 'src/content/content_feature.dart';
 import 'src/migrations/migrations.dart';
 import 'src/profile/profile_feature.dart';
+import 'src/schedule/schedule_feature.dart';
 
 export 'generated/dw_schema.dart';
-export 'src/core/example_auth.dart' show ExampleAuth;
-export 'src/core/example_bootstrap.dart' show ExampleBootstrap;
-export 'src/core/example_files.dart' show ExampleFiles;
-export 'src/core/example_push.dart' show ExamplePush;
+export 'src/core/auth.dart' show AppAuth;
+export 'src/core/bootstrap.dart' show AppBootstrap;
+export 'src/core/files.dart' show AppFiles;
+export 'src/core/push.dart' show AppPush;
 export 'src/migrations/migrations.dart' show appMigrations;
 
 /// The club's server, as `bin/server.dart` and the tests build it.
-abstract final class ExampleServer {
+abstract final class DartwayExampleServer {
   /// Builds the example server. `bin/server.dart` starts it; tests start it on a
   /// free port against their own database.
   ///
-  /// With [storage] the server takes uploads by [ExampleFiles.uploadRules] — public
+  /// With [storage] the server takes uploads by [AppFiles.uploadRules] — public
   /// purposes into its public bucket, private ones into its private bucket —
   /// and checks both buckets as it starts; without it, it has no files.
   ///
-  /// [push] sends notifications (`ExamplePush.module`); by default it has no providers
+  /// [push] sends notifications (`AppPush.module`); by default it has no providers
   /// and records deliveries it has nobody to send through.
   static DwAppServer build({
     required DwDatabaseConfig database,
@@ -45,26 +46,27 @@ abstract final class ExampleServer {
     DwServerSettings settings = const DwServerSettings(),
     DwPushModule? push,
   }) => DwAppServer(
-    protocol: exampleProtocol,
+    protocol: appProtocol,
     schema: dartwayExampleSchema,
     migrations: appMigrations,
     migrationsDirectory: 'lib/src/migrations',
     database: database,
-    auth: auth ?? ExampleAuth.config,
+    auth: auth ?? AppAuth.config,
     features: [
       profileFeature,
-      clubFeature,
+      scheduleFeature,
+      bookingsFeature,
       contentFeature,
       chatFeature,
       adminFeature,
     ],
-    startup: [DwFirstAdministrator(grant: ExampleBootstrap.grantAdmin)],
-    files: storage == null ? null : ExampleFiles.storage(storage),
+    startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+    files: storage == null ? null : AppFiles.storage(storage),
     modules: [
-      push ?? ExamplePush.module(),
+      push ?? AppPush.module(),
       // The admin panel's dashboards: admins read and edit, staff and
       // members do not.
-      DwAnalyticsModule(readAccess: ExampleAccess.admin),
+      DwAnalyticsModule(readAccess: AppAccess.admin),
     ],
     port: port,
     settings: settings,

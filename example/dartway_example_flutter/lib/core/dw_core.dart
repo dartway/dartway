@@ -13,14 +13,14 @@ import 'update_required_page.dart';
 /// The app's DartWay core: `dw.request`, `dw.table`, `dw.window`,
 /// `dw.command`, `dw.action`, `dw.notify` — reachable from anywhere in the app.
 ///
-/// Assigned by [ExampleDwCore.create]: once by the app bootstrap, and once per
+/// Assigned by [AppDwCore.create]: once by the app bootstrap, and once per
 /// test by a widget test, which disposes it in `tearDown`. It is not `final`
 /// for exactly that reason — the core holds no static state, so a test builds
 /// a fresh one against its own fake server rather than sharing the app's.
 late DwFlutterCore dw;
 
 /// Building the app's core.
-abstract final class ExampleDwCore {
+abstract final class AppDwCore {
   /// Builds the core and makes it [dw]. Nothing connects until `dw.init()`.
   ///
   /// The app passes [baseUrl] and keeps the session through the
@@ -49,7 +49,7 @@ abstract final class ExampleDwCore {
           UpdateRequiredPage(refusal: refusal),
       onErrorReport: _onErrorReport,
     ),
-    protocol: exampleProtocol,
+    protocol: appProtocol,
     baseUrl: baseUrl,
     httpTransport: httpTransport,
     liveConnector: liveConnector,

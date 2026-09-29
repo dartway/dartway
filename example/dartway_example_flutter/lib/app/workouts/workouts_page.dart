@@ -1,7 +1,7 @@
 import 'package:dartway_example_flutter/app/workouts/logic/workout_catalog.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
 import 'package:flutter/material.dart';
@@ -9,7 +9,7 @@ import 'package:flutter/material.dart';
 /// The club's recorded workouts, played in one queue.
 ///
 /// The session belongs to `dw.plugins.media`, not to this page: leaving the
-/// page minimizes it into the mini-player (mounted in `ExampleApp`), coming
+/// page minimizes it into the mini-player (mounted in `AppRoot`), coming
 /// back restores it here.
 class WorkoutsPage extends StatefulWidget implements DwFeatureWidget {
   const WorkoutsPage({super.key});

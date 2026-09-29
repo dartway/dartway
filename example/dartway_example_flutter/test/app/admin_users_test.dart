@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/example_test_app.dart';
+import '../support/app_test_app.dart';
 
 UserProfile member(int n) => UserProfile(
   id: 100 + n,
@@ -15,7 +15,7 @@ void main() {
   testWidgets('the members table switches pages, and a member signing up '
       'updates the page and its total', (tester) async {
     final members = [for (var n = 1; n <= 23; n++) member(n)];
-    final club = FakeClub(role: UserRole.admin, firstName: 'Anna');
+    final club = FakeApp(role: UserRole.admin, firstName: 'Anna');
     club.server
       ..onRequest<GetAdminCounters>(
         (request, call) => DwCallOk(
@@ -33,7 +33,7 @@ void main() {
       ..onRequest<DwListAnalyticsDashboards>(
         (request, call) => const DwCallOk(<DwAnalyticsDashboard>[]),
       );
-    final app = await ExampleTestApp.start(tester, club);
+    final app = await TestApp.start(tester, club);
 
     await app.tap(tester, find.text('Profile'));
     await app.tap(tester, find.text('Admin panel'));

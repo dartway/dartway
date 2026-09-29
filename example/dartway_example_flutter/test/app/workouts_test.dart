@@ -6,7 +6,7 @@ import 'package:dartway_media_flutter/testing.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/example_test_app.dart';
+import '../support/app_test_app.dart';
 
 void main() {
   late DwFakeVideoPlayerPlatform video;
@@ -29,14 +29,14 @@ void main() {
 
   /// Ends every session before the app stops: a playing video polls its
   /// position on a timer that would outlive the test.
-  Future<void> stop(WidgetTester tester, ExampleTestApp app) async {
+  Future<void> stop(WidgetTester tester, TestApp app) async {
     await app.run(tester, dw.plugins.media.dispose());
     await app.stop(tester);
   }
 
   testWidgets('a workout plays at the top of the page, its controls hide '
       'while it plays and come back on a tap', (tester) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final app = await TestApp.start(tester, FakeApp());
     await app.tap(tester, find.text('Workouts').last);
     expect(find.byType(AppMediaPlayer), findsNothing);
 
@@ -59,7 +59,7 @@ void main() {
   testWidgets('a longer controlsAutoHideDelay keeps the controls up longer', (
     tester,
   ) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final app = await TestApp.start(tester, FakeApp());
     dw.plugins.media.open(
       items: [workoutVideo('slow-hide')],
       options: const DwMediaOpenOptions(
@@ -79,7 +79,7 @@ void main() {
   testWidgets('the speed menu offers the speeds the app configured', (
     tester,
   ) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final app = await TestApp.start(tester, FakeApp());
     await app.tap(tester, find.text('Workouts').last);
     await app.tap(tester, find.text('Morning mobility'));
     await tester.tap(find.byTooltip('Speed'));
@@ -91,7 +91,7 @@ void main() {
 
   testWidgets('with no speeds configured the control bar has no speed menu, '
       'and with fullscreen off no fullscreen button', (tester) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final app = await TestApp.start(tester, FakeApp());
     final session = dw.plugins.media.open(
       items: [workoutVideo('plain')],
       options: const DwMediaOpenOptions(speeds: [], fullscreen: false),
@@ -111,7 +111,7 @@ void main() {
 
   testWidgets('a failed workout shows the error inside the player, and retry '
       'asks for the link again', (tester) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final app = await TestApp.start(tester, FakeApp());
     var asked = 0;
     dw.plugins.media.open(
       items: [
@@ -144,7 +144,7 @@ void main() {
   });
 
   testWidgets('near the end the next workout is announced', (tester) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final app = await TestApp.start(tester, FakeApp());
     await app.tap(tester, find.text('Workouts').last);
     await app.tap(tester, find.text('Morning mobility'));
     await playTo(tester, const Duration(seconds: 1));
@@ -156,7 +156,7 @@ void main() {
 
   testWidgets('leaving the page keeps the workout in the mini-player; a tap '
       'on it comes back, close ends it', (tester) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final app = await TestApp.start(tester, FakeApp());
     await app.tap(tester, find.text('Workouts').last);
     await app.tap(tester, find.text('Morning mobility'));
     await playTo(tester, const Duration(seconds: 1));

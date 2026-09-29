@@ -9,6 +9,6 @@ final profileFeature = DwServerFeature(
   handlers: profileHandlers,
   channels: [
     // "My" channel: a member subscribes to their own account's only.
-    DwChannelRule.ofCaller(ExampleChannel.profile),
+    DwChannelRule.ofCaller(DartwayExampleChannel.profile),
   ],
 );

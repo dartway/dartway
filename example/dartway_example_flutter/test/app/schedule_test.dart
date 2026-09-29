@@ -1,6 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/example_test_app.dart';
+import '../support/app_test_app.dart';
 
 void main() {
   testWidgets('booking a session flips its card and its spots from the answer '
@@ -20,7 +20,7 @@ void main() {
       capacity: 10,
       bookedCount: 3,
     );
-    final club = FakeClub()..sessions.add(session);
+    final club = FakeApp()..sessions.add(session);
 
     // What the real handler does: the session, with one place fewer, goes to
     // everyone on the schedule and the booking to the member's channel — and
@@ -40,7 +40,7 @@ void main() {
       return DwCallOk(booking);
     });
 
-    final app = await ExampleTestApp.start(tester, club);
+    final app = await TestApp.start(tester, club);
     expect(find.text('Yoga'), findsOneWidget);
     expect(find.text('7 of 10 spots left'), findsOneWidget);
 
@@ -73,8 +73,8 @@ void main() {
 
   testWidgets('the schedule is asked from the start of today, once, with the '
       "member's own bookings", (tester) async {
-    final club = FakeClub();
-    final app = await ExampleTestApp.start(tester, club);
+    final club = FakeApp();
+    final app = await TestApp.start(tester, club);
 
     final now = DateTime.now();
     final request = app.server.requestsOf<ListUpcomingSessions>().single;

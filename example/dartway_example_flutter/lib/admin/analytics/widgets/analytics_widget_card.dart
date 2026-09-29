@@ -2,7 +2,6 @@ import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_example_flutter/admin/analytics/logic/analytics_report_labels.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';

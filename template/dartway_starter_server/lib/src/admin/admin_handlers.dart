@@ -7,16 +7,21 @@ import '../core/channels.dart';
 import '../profile/profile_rows.dart';
 import '../profile/profile_objects.dart';
 import '../profile/profile_publications.dart';
+import 'admin_publications.dart';
 
 final adminHandlers = <DwCallHandler>[
+  /// The dashboard numbers. Admins only; kept live by
+  /// [AdminPublications.counters] from every command that moves them.
   DwCallHandler.single<GetAdminCounters, AdminCounters>(
     access: AppAccess.admin,
-    handle: (ctx, request) => AppPublications.countAdminCounters(ctx.db),
+    handle: (ctx, request) => AdminPublications.countCounters(ctx.db),
   ),
 
+  /// The members table: a page of profiles by name, phone or e-mail, and by
+  /// role. Admins only.
   DwCallHandler.table<ListUserProfiles, UserProfile>(
     access: AppAccess.admin,
-    rows: (ctx, request, table) async => AppObjects.profiles(
+    rows: (ctx, request, table) async => ProfileObjects.profiles(
       ctx,
       await ctx.db.userProfiles.find(
         where: await request.membersFilter(ctx),
@@ -29,15 +34,20 @@ final adminHandlers = <DwCallHandler>[
         ctx.db.userProfiles.count(where: await request.membersFilter(ctx)),
   ),
 
+  /// One member's card: the profile, every identifier, when the terms were
+  /// accepted. Admins only.
   DwCallHandler.single<GetUserCard, UserCard>(
     access: AppAccess.admin,
     handle: (ctx, request) async {
       final row = await ctx.db.userProfiles.findById(request.profileId);
       if (row == null) ctx.refuse(DwCoreRefusal.notFound);
-      return AppObjects.card(ctx, row);
+      return ProfileObjects.card(ctx, row);
     },
   ),
 
+  /// Gives a member a role. Admins only; nobody changes their own
+  /// (`ownRoleLocked`). Publishes the profile and the counters, and closes the
+  /// admin channel for a role taken away.
   DwCallHandler.command<ChangeUserRole, UserProfile>(
     access: AppAccess.admin,
     handle: (ctx, command) async {
@@ -49,7 +59,7 @@ final adminHandlers = <DwCallHandler>[
         lock: DwRowLock.forUpdate,
       );
       if (row == null) ctx.refuse(DwCoreRefusal.notFound);
-      if (row.role == command.role) return AppObjects.profile(ctx, row);
+      if (row.role == command.role) return ProfileObjects.profile(ctx, row);
       final updated = await ctx.db.userProfiles.update(
         row.copyWith(role: command.role),
       );
@@ -58,8 +68,8 @@ final adminHandlers = <DwCallHandler>[
       if (row.role == UserRole.admin) {
         ctx.revoke(AppChannels.admin, updated.accountId);
       }
-      await AppPublications.adminCounters(ctx);
-      return AppPublications.profile(ctx, updated);
+      await AdminPublications.counters(ctx);
+      return ProfilePublications.profile(ctx, updated);
     },
   ),
 ];

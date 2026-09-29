@@ -3,7 +3,7 @@ import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';
-import 'package:dartway_starter_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_starter_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';

@@ -20,7 +20,7 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 ///   "Same origin"), as the deploy does it,
 ///   needs none; the server refuses to start on an entry that is not an
 ///   origin;
-/// - `DW_STORAGE_*` — file storage (see `ExampleFiles.storageConfig`): without
+/// - `DW_STORAGE_*` — file storage (see `AppFiles.storageConfig`): without
 ///   `DW_STORAGE_ENDPOINT` the server takes no uploads. `DW_STORAGE_ENDPOINT`,
 ///   `DW_STORAGE_ACCESS_KEY` and `DW_STORAGE_SECRET_KEY` are required with
 ///   it; the buckets default to `club-public` and `club-private`, and the
@@ -29,22 +29,22 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 ///   one does not (`DW_STORAGE_VERIFY_BUCKETS=false` skips it);
 /// - `FCM_SERVICE_ACCOUNT_FILE`, `FCM_WEB_LINK_BASE`,
 ///   `RUSTORE_PUSH_PROJECT_ID`, `RUSTORE_PUSH_SERVICE_TOKEN` — push providers
-///   (see `ExamplePush.providers`); without them the server queues and records
+///   (see `AppPush.providers`); without them the server queues and records
 ///   notifications but has nothing to send them through;
 /// - `DW_STORAGE_PROVISION=true` — creates both buckets and sets their access
 ///   before starting (`DwFileStorageSetup.provision`): for a development
 ///   storage the project owns, never for a storage somebody else administers.
 Future<void> main() async {
   final env = DwLocalEnvironment.overlay(Platform.environment);
-  final storage = ExampleFiles.storageConfig(env);
+  final storage = AppFiles.storageConfig(env);
   if (storage != null && env['DW_STORAGE_PROVISION'] == 'true') {
     await DwFileStorageSetup.provision(storage);
   }
-  final server = ExampleServer.build(
+  final server = DartwayExampleServer.build(
     database: DwDatabaseConfig.fromEnvironment(env),
     storage: storage,
     port: int.parse(env['PORT'] ?? '8080'),
-    push: ExamplePush.module(providers: ExamplePush.providers(env)),
+    push: AppPush.module(providers: AppPush.providers(env)),
     settings: DwServerSettings(
       allowedOrigins: {
         for (final entry in (env['DW_ALLOWED_ORIGINS'] ?? '').split(','))

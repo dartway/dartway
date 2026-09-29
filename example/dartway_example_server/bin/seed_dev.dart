@@ -4,7 +4,7 @@ import 'dart:math';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_server/src/chat/chat_rows.dart';
-import 'package:dartway_example_server/src/club/club_rows.dart';
+import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
 import 'package:dartway_example_server/src/content/content_rows.dart';
 import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
@@ -17,12 +17,12 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 /// the server has migrated it once.
 Future<void> main() async {
   final env = DwLocalEnvironment.overlay(Platform.environment);
-  final server = ExampleServer.build(
+  final server = DartwayExampleServer.build(
     database: DwDatabaseConfig.fromEnvironment(env),
     // The same storage the real server is configured with: a server built
     // without it declares no file jobs, and the job runner would drop the
     // recurring rows of the one that does.
-    storage: ExampleFiles.storageConfig(env),
+    storage: AppFiles.storageConfig(env),
     // Bound to whatever port is free: the seed serves nobody, it only needs
     // what a server has — a migrated database, the project's auth, a context.
     port: 0,

@@ -9,6 +9,6 @@ void main() {
       r'^version:\s*(\S+)\s*$',
       multiLine: true,
     ).firstMatch(File('pubspec.yaml').readAsStringSync())?.group(1);
-    expect(exampleAppVersion, version);
+    expect(appBuildVersion, version);
   });
 }

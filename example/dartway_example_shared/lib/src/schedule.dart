@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'example_channel.dart';
-import 'example_refusal.dart';
+import 'dartway_example_channel.dart';
+import 'dartway_example_refusal.dart';
 import 'people.dart';
 
 part 'schedule.dw.dart';
@@ -60,7 +60,7 @@ final class ListClubServices extends DwListRequest<ClubService>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.schedule),
+    DwLiveChannel(DartwayExampleChannel.schedule),
   ];
 }
 
@@ -73,7 +73,7 @@ final class ListUpcomingSessions extends DwListRequest<ClubSession>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.schedule),
+    DwLiveChannel(DartwayExampleChannel.schedule),
   ];
 
   @override
@@ -108,13 +108,13 @@ final class SaveClubService extends DwActionCommand<ClubService>
   @override
   List<DwCallRefusal> validate() => [
     if (title.trim().isEmpty)
-      DwCallRefusal(ExampleRefusal.titleRequired, field: 'title'),
+      DwCallRefusal(DartwayExampleRefusal.titleRequired, field: 'title'),
     if (durationMinutes <= 0)
       DwCallRefusal(
-        ExampleRefusal.durationNotPositive,
+        DartwayExampleRefusal.durationNotPositive,
         field: 'durationMinutes',
       ),
-    if (price < 0) DwCallRefusal(ExampleRefusal.priceNegative, field: 'price'),
+    if (price < 0) DwCallRefusal(DartwayExampleRefusal.priceNegative, field: 'price'),
   ];
 }
 
@@ -139,7 +139,7 @@ final class ScheduleSession extends DwActionCommand<ClubSession>
   @override
   List<DwCallRefusal> validate() => [
     if (capacity < 1)
-      DwCallRefusal(ExampleRefusal.capacityTooSmall, field: 'capacity'),
+      DwCallRefusal(DartwayExampleRefusal.capacityTooSmall, field: 'capacity'),
   ];
 }
 

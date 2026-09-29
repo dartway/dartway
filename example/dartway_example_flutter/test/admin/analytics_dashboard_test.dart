@@ -3,15 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/example_test_app.dart';
+import '../support/app_test_app.dart';
 
 /// Scrolls [finder] into view and taps it: the dashboards sit under the
 /// counters, below the fold of a phone.
-Future<void> tapShown(
-  ExampleTestApp app,
-  WidgetTester tester,
-  Finder finder,
-) async {
+Future<void> tapShown(TestApp app, WidgetTester tester, Finder finder) async {
   await tester.ensureVisible(finder);
   await app.tap(tester, finder);
 }
@@ -20,8 +16,8 @@ Future<void> tapShown(
 /// changed and read without code.
 void main() {
   /// An admin whose server keeps dashboards and answers reports.
-  ({FakeClub fake, List<DwAnalyticsDashboard> dashboards}) analyticsAdmin() {
-    final fake = FakeClub(role: UserRole.admin, firstName: 'Anna');
+  ({FakeApp fake, List<DwAnalyticsDashboard> dashboards}) analyticsAdmin() {
+    final fake = FakeApp(role: UserRole.admin, firstName: 'Anna');
     final dashboards = <DwAnalyticsDashboard>[];
     var nextId = 1;
     fake.server
@@ -91,15 +87,8 @@ void main() {
     return (fake: fake, dashboards: dashboards);
   }
 
-  Future<ExampleTestApp> openDashboard(
-    WidgetTester tester,
-    FakeClub fake,
-  ) async {
-    final app = await ExampleTestApp.start(
-      tester,
-      fake,
-      size: const Size(390, 900),
-    );
+  Future<TestApp> openDashboard(WidgetTester tester, FakeApp fake) async {
+    final app = await TestApp.start(tester, fake, size: const Size(390, 900));
     await tapShown(app, tester, find.text('Profile'));
     await tapShown(app, tester, find.text('Admin panel'));
     return app;
@@ -107,7 +96,7 @@ void main() {
 
   /// Picks [option] in the menu showing [current].
   Future<void> choose(
-    ExampleTestApp app,
+    TestApp app,
     WidgetTester tester,
     String current,
     String option,

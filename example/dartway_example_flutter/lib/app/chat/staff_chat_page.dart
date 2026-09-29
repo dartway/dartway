@@ -3,8 +3,7 @@ import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 import 'package:dartway_example_flutter/core/profile/profile_roles.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
-import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'dart:async';
@@ -36,11 +35,41 @@ class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
           'channel; closing it brings the composer back.',
       'The app bar shows the live connection status.',
       'With no channels at all the screen says so instead of failing.',
+      'Opens where the member stopped reading, the first unread message '
+          'under an "Unread messages" divider; a read channel opens at its '
+          'newest message.',
+      'The list is not reversed: newest at the bottom, older messages load '
+          'above as it is scrolled up and newer ones below, and neither moves '
+          'what is on screen.',
+      'At the bottom, new messages come into view; scrolled up, nothing '
+          'moves and the "↓" button counts them. The button goes to the '
+          'newest message, loading it when it is far away.',
+      'What comes on screen is marked read on the server, only forward, a '
+          'moment after the list stops.',
+      'While scrolling, the date of the topmost message floats over the list '
+          'and fades out soon after it stops.',
+      'Each day starts with its date; one author\'s messages in a row form a '
+          'run with their name on the first and their avatar on the last.',
+      'Enter sends, Shift+Enter starts a new line; the field grows to six '
+          'lines, then scrolls.',
+      'Attached files upload as soon as they are picked; send waits until '
+          'every one has arrived. At most ten, each up to 20 MB.',
+      'Replying shows the quoted message over the field; editing puts the '
+          'message text in the field and saves it on send.',
+      'What was typed survives leaving the channel for this app session.',
+      'After sending, the chat shows the newest messages.',
+      'Shows the newest pinned message first; the strip on the left tells '
+          'which of them is shown.',
+      'A tap scrolls the chat to the message shown and turns the bar to the '
+          'next one, round and round.',
+      'The cross unpins the message shown, for the whole team.',
+      'A message pinned or unpinned by anyone appears or leaves at once.',
     ],
     requirements: [
-      'Clients never receive staff messages. The hidden tab and the notice '
-          'above are convenience; the server refuses the reads and the '
-          'channel subscriptions to anyone but staff.',
+      'Clients never receive staff messages or their files. The hidden tab '
+          'and the notice above are convenience; the server refuses the '
+          'reads, the channel subscriptions and the file links to anyone but '
+          'staff.',
     ],
   );
 

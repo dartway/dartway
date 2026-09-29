@@ -3,7 +3,7 @@ import 'package:dartway_example_flutter/app/news/widgets/news_post_list.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 import 'package:dartway_example_flutter/core/profile/profile_roles.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:flutter/material.dart';

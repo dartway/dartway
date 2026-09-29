@@ -8,12 +8,17 @@ import 'profile_objects.dart';
 import 'profile_publications.dart';
 
 final profileHandlers = <DwCallHandler>[
+  /// The caller's own profile. "My" profile names no account: the caller's is
+  /// the only one it reads.
   DwCallHandler.single<GetMyProfile, UserProfile>(
-    // "My" profile names no account: the caller's is the only one it reads.
     access: DwAccessRule.signedIn,
-    handle: (ctx, request) async => AppObjects.profile(ctx, await ctx.profile),
+    handle: (ctx, request) async =>
+        ProfileObjects.profile(ctx, await ctx.profile),
   ),
 
+  /// Changes the caller's name, gender and photo — only their own finished
+  /// upload. Publishes the profile to its owner and the admins; a replaced photo
+  /// is deleted once the change commits.
   DwCallHandler.command<UpdateMyProfile, UserProfile>(
     access: DwAccessRule.signedIn,
     handle: (ctx, command) async {
@@ -50,7 +55,7 @@ final profileHandlers = <DwCallHandler>[
       if (previousAvatar != null && previousAvatar != updated.avatarFileId) {
         await ctx.files.delete(previousAvatar);
       }
-      return AppPublications.profile(ctx, updated);
+      return ProfilePublications.profile(ctx, updated);
     },
   ),
 ];

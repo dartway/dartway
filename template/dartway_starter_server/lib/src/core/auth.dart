@@ -4,6 +4,7 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 import '../../generated/dw_schema.dart';
+import '../admin/admin_publications.dart';
 import 'channels.dart';
 import '../profile/profile_rows.dart';
 import '../profile/profile_objects.dart';
@@ -67,9 +68,12 @@ abstract final class AppAuth {
       ctx
         ..publish(
           AppChannels.admin,
-          await AppPublications.countAdminCounters(ctx.db),
+          await AdminPublications.countCounters(ctx.db),
         )
-        ..publish(AppChannels.admin, await AppObjects.profile(ctx, profile));
+        ..publish(
+          AppChannels.admin,
+          await ProfileObjects.profile(ctx, profile),
+        );
     },
 
     // The profile shows the phone and the e-mail an account signs in with, read
@@ -81,7 +85,7 @@ abstract final class AppAuth {
       final profile = await ctx.db.userProfiles.findFirst(
         where: (t) => t.accountId.equals(change.accountId),
       );
-      if (profile != null) await AppPublications.profile(ctx, profile);
+      if (profile != null) await ProfilePublications.profile(ctx, profile);
     },
 
     // Deleting an account (`DwDeleteMyAccount`) takes the starter's profile

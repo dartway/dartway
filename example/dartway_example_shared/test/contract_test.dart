@@ -180,7 +180,7 @@ void main() {
     const bookings = ListMyBookings();
     expect(
       bookings.channels.single,
-      const DwLiveChannel.ofCaller(ExampleChannel.bookings),
+      const DwLiveChannel.ofCaller(DartwayExampleChannel.bookings),
     );
     expect(bookings.channels.single.resolvedFor(42).wireName, 'bookings:42');
     expect(

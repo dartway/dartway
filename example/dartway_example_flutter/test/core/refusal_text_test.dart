@@ -11,7 +11,7 @@ void main() {
 
     test('every refusal code has its own text in ${locale.languageCode}', () {
       final codes = <DwRefusalCode>[
-        ...ExampleRefusal.values,
+        ...DartwayExampleRefusal.values,
         ...DwCoreRefusal.values,
         ...DwAuthRefusal.values,
         ...DwUploadRefusal.values,

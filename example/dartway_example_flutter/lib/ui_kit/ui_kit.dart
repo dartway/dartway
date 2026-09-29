@@ -26,6 +26,7 @@ part '1_essentials/app_version_label.dart';
 part '1_essentials/multi_link_text.dart';
 part '2_frequent/app_card.dart';
 part '2_frequent/app_rating_stars.dart';
+part '2_frequent/load_failed_message.dart';
 part '2_frequent/phone_text_field.dart';
 part '2_frequent/show_app_bottom_sheet_extension.dart';
 part '3_special/auth/checkbox_form_field.dart';
@@ -58,7 +59,7 @@ part 'utils/date_labels.dart';
 part 'utils/formatters.dart';
 
 /// For links whose destination does not exist yet.
-extension ExampleWipAction on DwFlutterCore {
+extension AppWipAction on DwFlutterCore {
   /// A getter, not a stored action: an action is bound to the core it was
   /// built on, and a test builds a new core per test.
   DwUiAction<void> get notImplementedYet =>

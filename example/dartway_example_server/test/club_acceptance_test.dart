@@ -1,17 +1,17 @@
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
-import 'package:dartway_example_server/src/club/club_rows.dart';
+import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/club_harness.dart';
+import 'support/app_harness.dart';
 
 /// The example's acceptance: members of the club on real clients, over real
 /// HTTP and the real live socket, against the real server and database.
 void main() {
-  late ClubHarness club;
+  late AppHarness club;
 
-  setUpAll(() async => club = await ClubHarness.start());
+  setUpAll(() async => club = await AppHarness.start());
   tearDownAll(() => club.stop());
 
   Future<ClubSessionRow> sessionWithSpots(int capacity) async {
@@ -33,7 +33,7 @@ void main() {
   }
 
   test('signing up creates the profile, named at registration', () async {
-    final vera = await club.member('+7 999 000-00-10', 'Vera');
+    final vera = await club.signUp('+7 999 000-00-10', firstName: 'Vera');
     final profile = await vera.client.fetch(const GetMyProfile());
     expect(profile.valueOrThrow.firstName, 'Vera');
     expect(profile.valueOrThrow.role, UserRole.client);
@@ -43,7 +43,7 @@ void main() {
 
   test('a member changes the phone they sign in with by code, without signing '
       'in again; the profile on screen follows', () async {
-    final nina = await club.member('79990000070', 'Nina');
+    final nina = await club.signUp('79990000070', firstName: 'Nina');
     final profile = nina.client.watch(const GetMyProfile());
     addTearDown(profile.close);
     await dwWaitUntil(() => profile.isLive);
@@ -76,8 +76,8 @@ void main() {
   test('the last spot goes to one member: the other schedule follows over the '
       "socket, the author's bookings follow from the response alone", () async {
     final session = await sessionWithSpots(1);
-    final vera = await club.member('79990000011', 'Vera');
-    final oleg = await club.member('79990000012', 'Oleg');
+    final vera = await club.signUp('79990000011', firstName: 'Vera');
+    final oleg = await club.signUp('79990000012', firstName: 'Oleg');
     final from = DateTime.now().subtract(const Duration(hours: 1));
 
     final olegSchedule = oleg.client.watch(ListUpcomingSessions(from: from));
@@ -109,7 +109,7 @@ void main() {
 
     await dwWaitUntil(() => spotsLeft(olegSchedule) == 0);
     expect(
-      oleg.live.updatesOn(const DwLiveChannel(ExampleChannel.schedule)),
+      oleg.live.updatesOn(const DwLiveChannel(DartwayExampleChannel.schedule)),
       isNotEmpty,
       reason: "Oleg's schedule changed over the socket",
     );
@@ -120,7 +120,7 @@ void main() {
     expect(
       refused,
       isA<DwCallRefused<SessionBooking>>().having(
-        (r) => r.refusal.isCode(ExampleRefusal.noSpotsLeft),
+        (r) => r.refusal.isCode(DartwayExampleRefusal.noSpotsLeft),
         'noSpotsLeft',
         isTrue,
       ),
@@ -141,19 +141,19 @@ void main() {
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(
       vera.live.updatesOn(
-        DwLiveChannel(ExampleChannel.bookings, vera.accountId),
+        DwLiveChannel(DartwayExampleChannel.bookings, vera.accountId),
       ),
       isEmpty,
     );
     expect(
-      vera.live.updatesOn(const DwLiveChannel(ExampleChannel.schedule)),
+      vera.live.updatesOn(const DwLiveChannel(DartwayExampleChannel.schedule)),
       isEmpty,
     );
   });
 
   test('refusals travel as codes with honest HTTP statuses', () async {
     final session = await sessionWithSpots(1);
-    final vera = await club.member('79990000013', 'Vera');
+    final vera = await club.signUp('79990000013', firstName: 'Vera');
     final caller = club.server.caller(token: vera.session.token);
     addTearDown(caller.close);
 
@@ -163,14 +163,17 @@ void main() {
     );
     final noSpots = await caller.call(BookSession(sessionId: full.id!));
     expect(noSpots.status, 422);
-    expect(noSpots.refusal.isCode(ExampleRefusal.noSpotsLeft), isTrue);
+    expect(noSpots.refusal.isCode(DartwayExampleRefusal.noSpotsLeft), isTrue);
 
     // Validation, on the server as on the client: 422 naming the field.
     final invalid = await caller.call(
       const ReviewVisit(bookingId: 1, rating: 9),
     );
     expect(invalid.status, 422);
-    expect(invalid.refusal.isCode(ExampleRefusal.ratingOutOfRange), isTrue);
+    expect(
+      invalid.refusal.isCode(DartwayExampleRefusal.ratingOutOfRange),
+      isTrue,
+    );
     expect(invalid.refusal.field, 'rating');
     final local = await vera.client.command(
       const ReviewVisit(bookingId: 1, rating: 9),
@@ -201,8 +204,8 @@ void main() {
   test(
     "closed access: a member subscribes to their own bookings only",
     () async {
-      final vera = await club.member('79990000014', 'Vera');
-      final oleg = await club.member('79990000015', 'Oleg');
+      final vera = await club.signUp('79990000014', firstName: 'Vera');
+      final oleg = await club.signUp('79990000015', firstName: 'Oleg');
 
       // Oleg's bookings: no request names them, and his channel is his alone.
       final socket = await club.server.openLive();
@@ -221,12 +224,8 @@ void main() {
 
   test("an admin changing a member's role: the member's own profile follows "
       "live, and the admin's own profile is not touched by it", () async {
-    final admin = await club.memberWithRole(
-      '79990000023',
-      'Anna',
-      UserRole.admin,
-    );
-    final member = await club.member('79990000024', 'Pavel');
+    final admin = await club.withRole('79990000023', 'Anna', UserRole.admin);
+    final member = await club.signUp('79990000024', firstName: 'Pavel');
     final adminProfile = admin.client.watch(const GetMyProfile());
     final memberProfile = member.client.watch(const GetMyProfile());
     addTearDown(() {
@@ -244,7 +243,9 @@ void main() {
       ),
     );
     expect(changed.valueOrThrow.accountId, member.accountId);
-    await dwWaitUntil(() => dataOf(memberProfile.state)?.role == UserRole.staff);
+    await dwWaitUntil(
+      () => dataOf(memberProfile.state)?.role == UserRole.staff,
+    );
     await Future<void>.delayed(const Duration(milliseconds: 200));
     expect(
       dataOf(adminProfile.state),
@@ -256,13 +257,9 @@ void main() {
   });
 
   test('the members table pages with its total', () async {
-    final admin = await club.memberWithRole(
-      '79990000016',
-      'Admin',
-      UserRole.admin,
-    );
+    final admin = await club.withRole('79990000016', 'Admin', UserRole.admin);
     for (var i = 1; i <= 5; i++) {
-      await club.member('7999002000$i', 'Pager $i');
+      await club.signUp('7999002000$i', firstName: 'Pager $i');
     }
     Future<DwTablePage<UserProfile>> page(int number) async =>
         (await admin.client.fetch(
@@ -277,11 +274,7 @@ void main() {
     expect(last.items.map((p) => p.firstName), ['Pager 5']);
     expect(last.total, 5);
 
-    final staff = await club.memberWithRole(
-      '79990000017',
-      'Staff',
-      UserRole.staff,
-    );
+    final staff = await club.withRole('79990000017', 'Staff', UserRole.staff);
     final refused = await staff.client.fetch(const ListUserProfiles());
     expect(
       refused,
@@ -295,12 +288,8 @@ void main() {
 
   test('a new member reaches the admin table live; a role change updates its '
       'row in place', () async {
-    final admin = await club.memberWithRole(
-      '79990000018',
-      'Admin',
-      UserRole.admin,
-    );
-    await club.member('79990000019', 'Newcomer A');
+    final admin = await club.withRole('79990000018', 'Admin', UserRole.admin);
+    await club.signUp('79990000019', firstName: 'Newcomer A');
     const request = ListUserProfiles(search: 'newcomer');
     final table = admin.client.watchTable(request);
     addTearDown(table.close);
@@ -308,7 +297,7 @@ void main() {
     expect(dataOf(table.state)!.total, 1);
     expect(admin.http.posts('ListUserProfiles'), 1);
 
-    await club.member('79990000020', 'Newcomer B');
+    await club.signUp('79990000020', firstName: 'Newcomer B');
     await dwWaitUntil(() => dataOf(table.state)?.total == 2);
     expect(dataOf(table.state)!.items.map((p) => p.firstName), [
       'Newcomer A',

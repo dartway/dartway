@@ -124,7 +124,10 @@ class ChatMessageRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isMine) ...[
-                ChatAuthorAvatar(name: message.authorNameIn(l10n), visible: last),
+                ChatAuthorAvatar(
+                  name: message.authorNameIn(l10n),
+                  visible: last,
+                ),
                 const SizedBox(width: 6),
               ],
               Flexible(

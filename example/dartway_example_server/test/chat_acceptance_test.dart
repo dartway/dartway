@@ -8,21 +8,21 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
 import 'support/chat_support.dart';
-import 'support/club_harness.dart';
+import 'support/app_harness.dart';
 
 /// The staff chat on real clients, over real HTTP and the live socket, against
 /// the real server and database — and, for attachments, real storage.
 void main() {
   group('without storage', () {
-    late ClubHarness club;
+    late AppHarness club;
 
-    setUpAll(() async => club = await ClubHarness.start());
+    setUpAll(() async => club = await AppHarness.start());
     tearDownAll(() => club.stop());
 
     test(
       'a client is refused every chat call and every chat channel',
       () async {
-        final vera = await club.member('79993000001', 'Vera');
+        final vera = await club.signUp('79993000001', firstName: 'Vera');
         final boris = await club.staff('79993000002', 'Boris');
         final channel = await club.chatChannel('Staff only');
         final message = await boris.send(channel.id!, 'Shift starts at eight');
@@ -95,10 +95,13 @@ void main() {
         addTearDown(socket.close);
         await socket.authenticate(vera.session.token);
         for (final channelOfChat in [
-          DwLiveChannel(ExampleChannel.staffChat, channel.id),
-          const DwLiveChannel(ExampleChannel.staffChannels),
+          DwLiveChannel(DartwayExampleChannel.staffChat, channel.id),
+          const DwLiveChannel(DartwayExampleChannel.staffChannels),
           // Her own account's key, and still no: she is not staff.
-          DwLiveChannel.forAccount(ExampleChannel.chatReads, vera.accountId),
+          DwLiveChannel.forAccount(
+            DartwayExampleChannel.chatReads,
+            vera.accountId,
+          ),
         ]) {
           final answer =
               await socket.subscribe(channelOfChat.wireName)
@@ -117,7 +120,7 @@ void main() {
         expect(
           await staffSocket.subscribe(
             DwLiveChannel.forAccount(
-              ExampleChannel.chatReads,
+              DartwayExampleChannel.chatReads,
               boris.accountId,
             ).wireName,
           ),
@@ -126,7 +129,7 @@ void main() {
         expect(
           await staffSocket.subscribe(
             DwLiveChannel.forAccount(
-              ExampleChannel.chatReads,
+              DartwayExampleChannel.chatReads,
               vera.accountId,
             ).wireName,
           ),
@@ -139,7 +142,7 @@ void main() {
         'counts what arrives past it', () async {
       final boris = await club.staff('79993000011', 'Boris');
       final galina = await club.staff('79993000012', 'Galina');
-      final authorId = await club.profileIdOf(boris);
+      final authorId = await boris.profileId;
       final channel = await club.chatChannel('Front desk');
       // 70 messages in 35 instants: every read boundary falls on a tie.
       final base = DateTime.utc(2026, 9, 14, 9);
@@ -291,7 +294,7 @@ void main() {
         await boris.client.command(
           EditChatMessage(messageId: question.id, text: '   '),
         ),
-        refusedWith(ExampleRefusal.messageEmpty),
+        refusedWith(DartwayExampleRefusal.messageEmpty),
       );
 
       final old = await boris.send(channel.id!, 'Yesterday I wrote this');
@@ -307,7 +310,7 @@ void main() {
         await boris.client.command(
           EditChatMessage(messageId: old.id, text: 'Too late'),
         ),
-        refusedWith(ExampleRefusal.editWindowClosed),
+        refusedWith(DartwayExampleRefusal.editWindowClosed),
       );
 
       // Deleting: not someone else's, unless an admin's.
@@ -503,10 +506,10 @@ void main() {
         await boris.client.fetch(
           ListChatMessagesMatching(channelId: channel.id!, query: ' l '),
         ),
-        refusedWith(ExampleRefusal.searchQueryTooShort),
+        refusedWith(DartwayExampleRefusal.searchQueryTooShort),
       );
 
-      final authorId = await club.profileIdOf(boris);
+      final authorId = await boris.profileId;
       final base = DateTime.utc(2026, 9, 1);
       await club.db.chatMessages.insertAll([
         for (var i = 0; i < ListChatMessagesMatching.maxResults + 20; i++)
@@ -519,7 +522,10 @@ void main() {
       ]);
       final bulk = await search('bulk note');
       expect(bulk, hasLength(ListChatMessagesMatching.maxResults));
-      expect(bulk.first, 'bulk note ${ListChatMessagesMatching.maxResults + 19}');
+      expect(
+        bulk.first,
+        'bulk note ${ListChatMessagesMatching.maxResults + 19}',
+      );
     });
 
     test('one reaction per member: set, replaced, taken back — and a double '
@@ -527,8 +533,8 @@ void main() {
       final boris = await club.staff('79993000061', 'Boris');
       final galina = await club.staff('79993000062', 'Galina');
       final anna = await club.admin('79993000063', 'Anna');
-      final galinaId = await club.profileIdOf(galina);
-      final annaId = await club.profileIdOf(anna);
+      final galinaId = await galina.profileId;
+      final annaId = await anna.profileId;
       final channel = await club.chatChannel('Front desk');
       final message = await boris.send(channel.id!, 'New mats arrived');
 
@@ -539,7 +545,7 @@ void main() {
       await dwWaitUntil(() => window.isLive);
 
       Future<ChatMessage> react(
-        ClubMember member,
+        AppMember member,
         ChatReaction? reaction,
       ) async => (await member.client.command(
         ReactToChatMessage(messageId: message.id, reaction: reaction),
@@ -589,7 +595,7 @@ void main() {
       final boris = await club.staff('79993000091', 'Boris');
       final galina = await club.staff('79993000092', 'Galina');
       final channel = await club.chatChannel('Front desk');
-      final borisProfileId = await club.profileIdOf(boris);
+      final borisProfileId = await boris.profileId;
       final mine = await boris.send(channel.id!, 'I am off to another club');
       final hers = await galina.send(channel.id!, 'Good luck!');
 
@@ -602,7 +608,11 @@ void main() {
       await dwWaitUntil(() => itemsOf(window).length == 2);
       final left = itemsOf(window).firstWhere((m) => m.id == mine.id);
       expect(left.text, 'I am off to another club');
-      expect(left.author.id, borisProfileId, reason: 'the author is the same row');
+      expect(
+        left.author.id,
+        borisProfileId,
+        reason: 'the author is the same row',
+      );
       expect(left.author.isDeleted, isTrue);
       expect(left.author.firstName, isEmpty);
       expect(
@@ -626,16 +636,15 @@ void main() {
         reason: 'the account itself is gone, only the tombstone stays',
       );
     });
-
   });
 
   group('attachments on real storage', () {
     late DwTestStorage storage;
-    late ClubHarness club;
+    late AppHarness club;
 
     setUpAll(() async {
       storage = await DwTestStorage.create(prefix: 'chat-test');
-      club = await ClubHarness.start(storage: storage.config);
+      club = await AppHarness.start(storage: storage.config);
     });
     tearDownAll(() async {
       await club.stop();
@@ -643,12 +652,12 @@ void main() {
     });
 
     Future<DwStoredFile> upload(
-      ClubMember member,
+      AppMember member,
       List<int> bytes, {
       String fileName = 'plan.png',
       String contentType = 'image/png',
     }) async => (await member.client.files.upload(
-      ExampleUpload.chatAttachment,
+      DartwayExampleUpload.chatAttachment,
       DwUploadSource.bytes(Uint8List.fromList(bytes)),
       fileName: fileName,
       contentType: contentType,
@@ -669,7 +678,7 @@ void main() {
         'a client never does', () async {
       final boris = await club.staff('79993000071', 'Boris');
       final galina = await club.staff('79993000072', 'Galina');
-      final vera = await club.member('79993000073', 'Vera');
+      final vera = await club.signUp('79993000073', firstName: 'Vera');
       final channel = await club.chatChannel('Front desk');
       final bytes = List.generate(256, (i) => i % 251);
 
@@ -731,7 +740,7 @@ void main() {
         'refused', () async {
       final boris = await club.staff('79993000081', 'Boris');
       final galina = await club.staff('79993000082', 'Galina');
-      final vera = await club.member('79993000083', 'Vera');
+      final vera = await club.signUp('79993000083', firstName: 'Vera');
       final channel = await club.chatChannel('Front desk');
 
       final file = await upload(
@@ -768,7 +777,7 @@ void main() {
       );
 
       final byClient = await vera.client.files.upload(
-        ExampleUpload.chatAttachment,
+        DartwayExampleUpload.chatAttachment,
         DwUploadSource.bytes(Uint8List(8)),
         fileName: 'x.png',
         contentType: 'image/png',

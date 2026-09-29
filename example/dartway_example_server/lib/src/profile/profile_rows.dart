@@ -7,7 +7,7 @@ part 'profile_rows.dw.dart';
 ///
 /// The framework owns the account and its identifiers; this row is what the
 /// club knows about the person, and it exists from the moment the account does
-/// (created in the same transaction, see `ExampleAuth.config`).
+/// (created in the same transaction, see `AppAuth.config`).
 @DwSqlTable(
   'user_profile',
   indexes: [

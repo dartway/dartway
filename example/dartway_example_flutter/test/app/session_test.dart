@@ -1,14 +1,14 @@
-import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/example_test_app.dart';
+import '../support/app_test_app.dart';
 
 void main() {
   testWidgets('signing out returns to the sign-in screen, quietly', (
     tester,
   ) async {
-    final app = await ExampleTestApp.start(tester, FakeClub());
+    final app = await TestApp.start(tester, FakeApp());
     expect(find.text('Hello, Vera'), findsOneWidget);
 
     await app.tap(tester, find.text('Profile'));
@@ -31,7 +31,7 @@ void main() {
   });
 
   testWidgets('signing in by phone and code opens the app', (tester) async {
-    final club = FakeClub();
+    final club = FakeApp();
     final ticket = DwCodeTicket(
       id: 'ticket-1',
       expiresAt: DateTime.now().add(const Duration(minutes: 5)),
@@ -50,7 +50,7 @@ void main() {
                 ),
               ),
       );
-    final app = await ExampleTestApp.start(tester, club, session: null);
+    final app = await TestApp.start(tester, club, session: null);
     expect(find.text('Welcome!'), findsOneWidget);
     expect(app.server.requestsOf<GetMyProfile>(), isEmpty);
 
@@ -94,13 +94,13 @@ void main() {
   testWidgets('an account without a name is asked for one before the app', (
     tester,
   ) async {
-    final club = FakeClub(firstName: '');
+    final club = FakeApp(firstName: '');
     club.server.onCommand<UpdateMyProfile>((command, call) {
       club.profile = club.profile.copyWith(firstName: command.firstName);
       call.publish(club.profileChannel, [club.profile]);
       return DwCallOk(club.profile);
     });
-    final app = await ExampleTestApp.start(tester, club);
+    final app = await TestApp.start(tester, club);
 
     expect(find.text('What is your name?'), findsOneWidget);
     expect(app.server.requestsOf<ListUpcomingSessions>(), isEmpty);

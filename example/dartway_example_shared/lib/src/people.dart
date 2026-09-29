@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'example_channel.dart';
-import 'example_refusal.dart';
+import 'dartway_example_channel.dart';
+import 'dartway_example_refusal.dart';
 
 part 'people.dw.dart';
 
@@ -79,7 +79,7 @@ final class GetMyProfile extends DwSingleRequest<UserProfile>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel.ofCaller(ExampleChannel.profile),
+    DwLiveChannel.ofCaller(DartwayExampleChannel.profile),
   ];
 }
 
@@ -102,6 +102,6 @@ final class UpdateMyProfile extends DwActionCommand<UserProfile>
   @override
   List<DwCallRefusal> validate() => [
     if (firstName case final name? when name.trim().isEmpty)
-      DwCallRefusal(ExampleRefusal.firstNameRequired, field: 'firstName'),
+      DwCallRefusal(DartwayExampleRefusal.firstNameRequired, field: 'firstName'),
   ];
 }

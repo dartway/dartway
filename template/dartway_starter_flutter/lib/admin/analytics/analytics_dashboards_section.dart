@@ -7,7 +7,6 @@ import 'package:dartway_starter_flutter/admin/analytics/widgets/analytics_period
 import 'package:dartway_starter_flutter/admin/analytics/widgets/analytics_title_sheet.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
-import 'package:dartway_starter_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';

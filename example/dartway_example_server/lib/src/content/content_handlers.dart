@@ -3,18 +3,18 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
 import '../../generated/dw_schema.dart';
-import '../club/club_objects.dart';
-import 'content_rows.dart';
+import '../admin/admin_publications.dart';
+import '../core/call_context.dart';
+import '../core/channels.dart';
 import '../profile/profile_rows.dart';
-import '../core/example_context.dart';
-import '../admin/admin_handlers.dart';
-
-const _news = DwLiveChannel(ExampleChannel.news);
+import 'content_objects.dart';
+import 'content_rows.dart';
 
 final contentHandlers = <DwCallHandler>[
+  /// The news feed, newest first. Every signed-in member.
   DwCallHandler.list<ListNews, NewsPost>(
     access: DwAccessRule.signedIn,
-    handle: (ctx, request) async => ClubObjects.news(
+    handle: (ctx, request) async => ContentObjects.news(
       ctx.db,
       await ctx.db.newsPosts.find(
         orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
@@ -22,8 +22,10 @@ final contentHandlers = <DwCallHandler>[
     ),
   ),
 
+  /// Publishes a news post by the caller. Staff only. The post goes to the
+  /// feed and the admin counters, and a push to every member but the author.
   DwCallHandler.command<PublishNews, NewsPost>(
-    access: ExampleAccess.staff,
+    access: AppAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final row = await ctx.db.newsPosts.insert(
@@ -34,9 +36,11 @@ final contentHandlers = <DwCallHandler>[
           createdAt: DateTime.now(),
         ),
       );
-      final post = (await ClubObjects.news(ctx.db, [row], author: me)).single;
-      ctx.publish(_news, post);
-      await ctx.publishAdminCounters();
+      final post = (await ContentObjects.news(ctx.db, [
+        row,
+      ], author: me)).single;
+      ctx.publish(AppChannels.news, post);
+      await AdminPublications.counters(ctx);
       // Queued in this transaction: a refused or failed publication notifies
       // nobody. Who of the members receives it is the push eligibility rule's
       // decision (marketing consent), taken when the delivery is due.
@@ -56,39 +60,42 @@ final contentHandlers = <DwCallHandler>[
           data: NewsAlert(id: post.id),
           link: '/news',
         ),
-        category: ExamplePushCategory.news,
+        category: DartwayExamplePushCategory.news,
         dedupKey: 'news:${post.id}',
       );
       return post;
     },
   ),
 
+  /// Removes a news post. Staff only; gone from the feed and the counters.
   DwCallHandler.command<RemoveNews, void>(
-    access: ExampleAccess.staff,
+    access: AppAccess.staff,
     handle: (ctx, command) async {
       if (await ctx.db.newsPosts.delete(command.postId) == 0) {
         ctx.refuse(DwCoreRefusal.notFound);
       }
       ctx.publish(
-        _news,
+        AppChannels.news,
         DwDeletedObject.of<NewsPost>(command.postId, ctx.protocol),
       );
-      await ctx.publishAdminCounters();
+      await AdminPublications.counters(ctx);
     },
   ),
 
+  /// Every app setting. Every signed-in member.
   DwCallHandler.list<ListAppSettings, AppSetting>(
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async => [
       for (final row in await ctx.db.appSettings.find(
         orderBy: (t) => [t.key.asc()],
       ))
-        AppSetting(id: row.key, value: row.value),
+        ContentObjects.setting(row),
     ],
   ),
 
+  /// Writes an app setting. Admins only; published to every member.
   DwCallHandler.command<SaveAppSetting, AppSetting>(
-    access: ExampleAccess.admin,
+    access: AppAccess.admin,
     handle: (ctx, command) async {
       final existing = await ctx.db.appSettings.findFirst(
         where: (t) => t.key.equals(command.key),
@@ -101,8 +108,8 @@ final contentHandlers = <DwCallHandler>[
           : await ctx.db.appSettings.update(
               existing.copyWith(value: command.value),
             );
-      final setting = AppSetting(id: saved.key, value: saved.value);
-      ctx.publish(const DwLiveChannel(ExampleChannel.settings), setting);
+      final setting = ContentObjects.setting(saved);
+      ctx.publish(AppChannels.settings, setting);
       return setting;
     },
   ),

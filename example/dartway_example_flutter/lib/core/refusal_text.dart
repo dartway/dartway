@@ -4,11 +4,11 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'app_l10n.dart';
 
 /// The words for a refusal the server answered with, in this language.
-extension ExampleRefusalText on AppLocalizations {
+extension AppRefusalText on AppLocalizations {
   /// Every refusal code the app can be answered with, by its wire code.
   static final Map<String, DwRefusalCode> _codes = {
     for (final code in <DwRefusalCode>[
-      ...ExampleRefusal.values,
+      ...DartwayExampleRefusal.values,
       ...DwCoreRefusal.values,
       ...DwAuthRefusal.values,
       ...DwUploadRefusal.values,
@@ -20,11 +20,11 @@ extension ExampleRefusalText on AppLocalizations {
   /// The sentence a refusal is shown as. A refusal carries a code and
   /// parameters, never text: this is where the app turns them into words.
   ///
-  /// Every switch below is exhaustive, so a code added to [ExampleRefusal] or
+  /// Every switch below is exhaustive, so a code added to [DartwayExampleRefusal] or
   /// to one of the framework's enums does not compile until it has a text. A
   /// code none of them knows — a newer server — still gets a sentence.
   String refusalText(DwCallRefusal refusal) => switch (_codes[refusal.code]) {
-    final ExampleRefusal code => _exampleText(code, refusal),
+    final DartwayExampleRefusal code => _exampleText(code, refusal),
     final DwCoreRefusal code => _coreText(code, refusal),
     final DwAuthRefusal code => _authText(code),
     final DwUploadRefusal code => _uploadText(code, refusal),
@@ -32,36 +32,37 @@ extension ExampleRefusalText on AppLocalizations {
     _ => refusalGeneric,
   };
 
-  String _exampleText(ExampleRefusal code, DwCallRefusal refusal) {
+  String _exampleText(DartwayExampleRefusal code, DwCallRefusal refusal) {
     int param(String name, int fallback) =>
         int.tryParse(refusal.params[name] ?? '') ?? fallback;
     return switch (code) {
-      ExampleRefusal.titleRequired => refusalTitleRequired,
-      ExampleRefusal.textRequired => refusalTextRequired,
-      ExampleRefusal.durationNotPositive => refusalDurationNotPositive,
-      ExampleRefusal.priceNegative => refusalPriceNegative,
-      ExampleRefusal.capacityTooSmall => refusalCapacityTooSmall,
-      ExampleRefusal.sessionInPast => refusalSessionInPast,
-      ExampleRefusal.sessionStarted => refusalSessionStarted,
-      ExampleRefusal.noSpotsLeft => refusalNoSpotsLeft,
-      ExampleRefusal.alreadyBooked => refusalAlreadyBooked,
-      ExampleRefusal.bookingNotActive => refusalBookingNotActive,
-      ExampleRefusal.ratingOutOfRange => refusalRatingOutOfRange,
-      ExampleRefusal.reviewNeedsAttendance => refusalReviewNeedsAttendance,
-      ExampleRefusal.alreadyReviewed => refusalAlreadyReviewed,
-      ExampleRefusal.messageEmpty => refusalMessageEmpty,
-      ExampleRefusal.messageTooLong => refusalMessageTooLong(
+      DartwayExampleRefusal.titleRequired => refusalTitleRequired,
+      DartwayExampleRefusal.textRequired => refusalTextRequired,
+      DartwayExampleRefusal.durationNotPositive => refusalDurationNotPositive,
+      DartwayExampleRefusal.priceNegative => refusalPriceNegative,
+      DartwayExampleRefusal.capacityTooSmall => refusalCapacityTooSmall,
+      DartwayExampleRefusal.sessionInPast => refusalSessionInPast,
+      DartwayExampleRefusal.sessionStarted => refusalSessionStarted,
+      DartwayExampleRefusal.noSpotsLeft => refusalNoSpotsLeft,
+      DartwayExampleRefusal.alreadyBooked => refusalAlreadyBooked,
+      DartwayExampleRefusal.bookingNotActive => refusalBookingNotActive,
+      DartwayExampleRefusal.ratingOutOfRange => refusalRatingOutOfRange,
+      DartwayExampleRefusal.reviewNeedsAttendance =>
+        refusalReviewNeedsAttendance,
+      DartwayExampleRefusal.alreadyReviewed => refusalAlreadyReviewed,
+      DartwayExampleRefusal.messageEmpty => refusalMessageEmpty,
+      DartwayExampleRefusal.messageTooLong => refusalMessageTooLong(
         param('max', ChatMessage.maxTextLength),
       ),
-      ExampleRefusal.tooManyAttachments => refusalTooManyAttachments(
+      DartwayExampleRefusal.tooManyAttachments => refusalTooManyAttachments(
         param('max', ChatMessage.maxAttachments),
       ),
-      ExampleRefusal.editWindowClosed => refusalEditWindowClosed,
-      ExampleRefusal.searchQueryTooShort => refusalSearchQueryTooShort(
+      DartwayExampleRefusal.editWindowClosed => refusalEditWindowClosed,
+      DartwayExampleRefusal.searchQueryTooShort => refusalSearchQueryTooShort(
         param('min', ListChatMessagesMatching.minQueryLength),
       ),
-      ExampleRefusal.settingKeyUnknown => refusalSettingKeyUnknown,
-      ExampleRefusal.firstNameRequired => refusalFirstNameRequired,
+      DartwayExampleRefusal.settingKeyUnknown => refusalSettingKeyUnknown,
+      DartwayExampleRefusal.firstNameRequired => refusalFirstNameRequired,
     };
   }
 

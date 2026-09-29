@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-import '../support/example_test_app.dart';
+import '../support/app_test_app.dart';
 
 const boris = PersonCard(id: 2, firstName: 'Boris');
 const desk = ChatChannel(id: 1, title: 'Front desk');
 const coaches = ChatChannel(id: 2, title: 'Coaches');
-const deskChannel = DwLiveChannel(ExampleChannel.staffChat, 1);
+const deskChannel = DwLiveChannel(DartwayExampleChannel.staffChat, 1);
 final start = DateTime.utc(2026, 9, 14, 9);
 
 ChatMessage message(int n, {String? text, DateTime? pinnedAt}) => ChatMessage(
@@ -92,7 +92,7 @@ final class ChatClub {
       });
   }
 
-  final club = FakeClub(role: UserRole.staff);
+  final club = FakeApp(role: UserRole.staff);
   final List<ChatMessage> chat;
   final int? readUpTo;
   final marks = <int>[];
@@ -109,7 +109,7 @@ void main() {
   testWidgets('the chat opens where the member stopped reading, under the '
       'unread divider, and marks read what comes on screen', (tester) async {
     final world = ChatClub(120, readUpTo: 80);
-    final app = await ExampleTestApp.start(tester, world.club);
+    final app = await TestApp.start(tester, world.club);
 
     await app.tap(tester, find.text('Team chat'));
     expect(world.windowQueries.first, containsPair('anchor', cursorOf(80)));
@@ -141,7 +141,7 @@ void main() {
   testWidgets('scrolled up, a new message moves nothing and is counted on the '
       'arrow, which goes to it', (tester) async {
     final world = ChatClub(60);
-    final app = await ExampleTestApp.start(tester, world.club);
+    final app = await TestApp.start(tester, world.club);
     await app.tap(tester, find.text('Team chat'));
     expect(world.windowQueries.first, isEmpty, reason: 'at the newest');
     expect(find.text('Note 60'), findsOneWidget);
@@ -171,7 +171,7 @@ void main() {
   testWidgets('the pinned bar goes to a pinned message far back in the '
       'history', (tester) async {
     final world = ChatClub(300, pinned: [5]);
-    final app = await ExampleTestApp.start(tester, world.club);
+    final app = await TestApp.start(tester, world.club);
     await app.tap(tester, find.text('Team chat'));
     expect(find.text('Pinned message'), findsOneWidget);
     expect(find.text('Note 5'), findsOneWidget, reason: 'on the bar');
@@ -187,7 +187,7 @@ void main() {
 
   testWidgets('a reply is sent with the message it answers', (tester) async {
     final world = ChatClub(20);
-    final app = await ExampleTestApp.start(tester, world.club);
+    final app = await TestApp.start(tester, world.club);
     await app.tap(tester, find.text('Team chat'));
 
     await tester.longPress(find.text('Note 19'));
@@ -211,7 +211,7 @@ void main() {
 
   testWidgets('a search goes to its match, however far back', (tester) async {
     final world = ChatClub(200);
-    final app = await ExampleTestApp.start(tester, world.club);
+    final app = await TestApp.start(tester, world.club);
     await app.tap(tester, find.text('Team chat'));
     expect(find.textContaining('are out at the pool'), findsNothing);
 

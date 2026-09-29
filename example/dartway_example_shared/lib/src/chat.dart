@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'example_channel.dart';
-import 'example_refusal.dart';
+import 'dartway_example_channel.dart';
+import 'dartway_example_refusal.dart';
 import 'people.dart';
 
 part 'chat.dw.dart';
@@ -174,7 +174,7 @@ final class ListChatChannels extends DwListRequest<ChatChannel>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.staffChannels),
+    DwLiveChannel(DartwayExampleChannel.staffChannels),
   ];
 }
 
@@ -187,7 +187,7 @@ final class ListMyChatReadStates extends DwListRequest<ChatReadState>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel.ofCaller(ExampleChannel.chatReads),
+    DwLiveChannel.ofCaller(DartwayExampleChannel.chatReads),
   ];
 }
 
@@ -206,7 +206,7 @@ final class ListChatMessages extends DwWindowRequest<ChatMessage, DateTime, int>
 
   @override
   List<DwLiveChannel> get channels => [
-    DwLiveChannel(ExampleChannel.staffChat, channelId),
+    DwLiveChannel(DartwayExampleChannel.staffChat, channelId),
   ];
 
   @override
@@ -228,7 +228,7 @@ final class ListPinnedChatMessages extends DwListRequest<ChatMessage>
 
   @override
   List<DwLiveChannel> get channels => [
-    DwLiveChannel(ExampleChannel.staffChat, channelId),
+    DwLiveChannel(DartwayExampleChannel.staffChat, channelId),
   ];
 
   @override
@@ -260,7 +260,7 @@ final class ListChatMessagesMatching extends DwListRequest<ChatMessage>
   List<DwCallRefusal> validate() => [
     if (query.trim().length < minQueryLength)
       DwCallRefusal(
-        ExampleRefusal.searchQueryTooShort,
+        DartwayExampleRefusal.searchQueryTooShort,
         field: 'query',
         params: {'min': minQueryLength},
       ),
@@ -301,16 +301,16 @@ final class SendChatMessage extends DwActionCommand<ChatMessage>
   @override
   List<DwCallRefusal> validate() => [
     if (text.trim().isEmpty && attachments.isEmpty)
-      DwCallRefusal(ExampleRefusal.messageEmpty, field: 'text'),
+      DwCallRefusal(DartwayExampleRefusal.messageEmpty, field: 'text'),
     if (text.length > ChatMessage.maxTextLength)
       DwCallRefusal(
-        ExampleRefusal.messageTooLong,
+        DartwayExampleRefusal.messageTooLong,
         field: 'text',
         params: {'max': ChatMessage.maxTextLength},
       ),
     if (attachments.length > ChatMessage.maxAttachments)
       DwCallRefusal(
-        ExampleRefusal.tooManyAttachments,
+        DartwayExampleRefusal.tooManyAttachments,
         field: 'attachments',
         params: {'max': ChatMessage.maxAttachments},
       ),
@@ -332,7 +332,7 @@ final class EditChatMessage extends DwActionCommand<ChatMessage>
   List<DwCallRefusal> validate() => [
     if (text.length > ChatMessage.maxTextLength)
       DwCallRefusal(
-        ExampleRefusal.messageTooLong,
+        DartwayExampleRefusal.messageTooLong,
         field: 'text',
         params: {'max': ChatMessage.maxTextLength},
       ),

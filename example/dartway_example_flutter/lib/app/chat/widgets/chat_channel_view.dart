@@ -7,7 +7,6 @@ import 'package:dartway_example_flutter/app/chat/widgets/chat_message_row.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_pinned_section.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
@@ -17,7 +16,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// One channel of the staff chat: its history, the pinned bar, the floating
 /// date, the "↓" button, and the composer — or, while searching, the way
 /// through the matches.
-class ChatChannelView extends HookConsumerWidget implements DwFeatureWidget {
+class ChatChannelView extends HookConsumerWidget {
   const ChatChannelView({
     required this.channel,
     required this.searchQuery,
@@ -28,36 +27,6 @@ class ChatChannelView extends HookConsumerWidget implements DwFeatureWidget {
 
   /// `null` while not searching.
   final String? searchQuery;
-
-  @override
-  DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'chat/channel',
-    title: 'Staff chat channel',
-    purpose:
-        'Coaches and admins keep one running conversation per topic, and pick '
-        'it up where they left it.',
-    behaviors: [
-      'Opens where the member stopped reading, the first unread message '
-          'under an "Unread messages" divider; a read channel opens at its '
-          'newest message.',
-      'The list is not reversed: newest at the bottom, older messages load '
-          'above as it is scrolled up and newer ones below, and neither moves '
-          'what is on screen.',
-      'At the bottom, new messages come into view; scrolled up, nothing '
-          'moves and the "↓" button counts them. The button goes to the '
-          'newest message, loading it when it is far away.',
-      'What comes on screen is marked read on the server, only forward, a '
-          'moment after the list stops.',
-      'While scrolling, the date of the topmost message floats over the list '
-          'and fades out soon after it stops.',
-      'Each day starts with its date; one author\'s messages in a row form a '
-          'run with their name on the first and their avatar on the last.',
-    ],
-    requirements: [
-      'Clients never receive staff messages or their files — the server '
-          'refuses them the reads, the channels and the file links.',
-    ],
-  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -258,7 +227,8 @@ class _SearchControls extends HookConsumerWidget {
       );
       return timer.cancel;
     }, [query]);
-    final active = debounced.value.length >= ListChatMessagesMatching.minQueryLength;
+    final active =
+        debounced.value.length >= ListChatMessagesMatching.minQueryLength;
     final results = active
         ? ref.watch(
             dw.request(

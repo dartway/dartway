@@ -2,29 +2,73 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 import '../../generated/dw_schema.dart';
-import '../club/club_objects.dart';
+import '../core/call_context.dart';
+import '../core/channels.dart';
+import '../profile/profile_objects.dart';
+import '../profile/profile_publications.dart';
 import '../profile/profile_rows.dart';
-import '../core/example_channels.dart';
-import '../core/example_context.dart';
+import 'admin_publications.dart';
 
-const adminChannel = DwLiveChannel(ExampleChannel.admin);
+final adminHandlers = <DwCallHandler>[
+  /// The dashboard numbers. Admins only; kept live by
+  /// [AdminPublications.counters] from every command that moves them.
+  DwCallHandler.single<GetAdminCounters, AdminCounters>(
+    access: AppAccess.admin,
+    handle: (ctx, request) => AdminPublications.countCounters(ctx.db),
+  ),
 
-/// The admin dashboard's numbers, as a handler counts and publishes them.
-extension AdminCounting on DwCallContext {
-  /// The dashboard numbers, counted now.
-  Future<AdminCounters> countAdminCounters() async => AdminCounters(
-    members: await db.userProfiles.count(),
-    upcomingSessions: await db.clubSessions.count(
-      where: (t) => t.startsAt.gte(DateTime.now()),
-    ),
-    newsPosts: await db.newsPosts.count(),
-  );
+  /// The members table: a page of profiles by name or phone, and by role.
+  /// Admins only.
+  DwCallHandler.table<ListUserProfiles, UserProfile>(
+    access: AppAccess.admin,
+    rows: (ctx, request, table) async => [
+      for (final row in await ctx.db.userProfiles.find(
+        where: request.membersFilter,
+        orderBy: (t) => [t.firstName.asc(), t.id.asc()],
+        limit: table.fetchLimit,
+        offset: table.offset,
+      ))
+        ProfileObjects.profile(row),
+    ],
+    count: (ctx, request) =>
+        ctx.db.userProfiles.count(where: request.membersFilter),
+  ),
 
-  /// Publishes fresh counters to the admin dashboard. Called by the commands
-  /// that change what they count, so a dashboard never reads again on its own.
-  Future<void> publishAdminCounters() async =>
-      publish(adminChannel, await countAdminCounters());
-}
+  /// Gives a member a role. Admins only; a member who left has none to give
+  /// (`dw.notFound`). Publishes the profile to the member and the admins, and
+  /// closes the channels a lost role opened.
+  DwCallHandler.command<ChangeRole, UserProfile>(
+    access: AppAccess.admin,
+    handle: (ctx, command) async {
+      final row = await ctx.db.userProfiles.findById(
+        command.profileId,
+        lock: DwRowLock.forUpdate,
+      );
+      // A member who left has no role to give: their profile is a tombstone
+      // the club keeps for what they wrote, not a person to promote.
+      if (row == null || row.deletedAt != null) {
+        ctx.refuse(DwCoreRefusal.notFound);
+      }
+      final updated = await ctx.db.userProfiles.update(
+        row.copyWith(role: command.role),
+      );
+      final profile = ProfilePublications.profile(ctx, updated);
+      // Access is checked once, at subscription: a role taken away closes
+      // what it opened.
+      final account = updated.ownerAccountId;
+      if (row.role == UserRole.admin && command.role != UserRole.admin) {
+        ctx.revoke(AppChannels.admin, account);
+      }
+      if (row.role != UserRole.client && command.role == UserRole.client) {
+        ctx.revoke(AppChannels.staffChannels, account);
+        for (final channel in await ctx.db.chatChannels.find()) {
+          ctx.revoke(AppChannels.chatOf(channel.id!), account);
+        }
+      }
+      return profile;
+    },
+  ),
+];
 
 extension on ListUserProfiles {
   /// The filter of a [ListUserProfiles] page — by name or phone, and by role —
@@ -47,65 +91,3 @@ extension on ListUserProfiles {
     };
   }
 }
-
-final adminHandlers = <DwCallHandler>[
-  DwCallHandler.single<GetAdminCounters, AdminCounters>(
-    access: ExampleAccess.admin,
-    handle: (ctx, request) => ctx.countAdminCounters(),
-  ),
-
-  DwCallHandler.table<ListUserProfiles, UserProfile>(
-    access: ExampleAccess.admin,
-    rows: (ctx, request, table) async => [
-      for (final row in await ctx.db.userProfiles.find(
-        where: request.membersFilter,
-        orderBy: (t) => [t.firstName.asc(), t.id.asc()],
-        limit: table.fetchLimit,
-        offset: table.offset,
-      ))
-        ClubObjects.profile(row),
-    ],
-    count: (ctx, request) =>
-        ctx.db.userProfiles.count(where: request.membersFilter),
-  ),
-
-  DwCallHandler.command<ChangeRole, UserProfile>(
-    access: ExampleAccess.admin,
-    handle: (ctx, command) async {
-      final row = await ctx.db.userProfiles.findById(
-        command.profileId,
-        lock: DwRowLock.forUpdate,
-      );
-      // A member who left has no role to give: their profile is a tombstone
-      // the club keeps for what they wrote, not a person to promote.
-      if (row == null || row.deletedAt != null) {
-        ctx.refuse(DwCoreRefusal.notFound);
-      }
-      final updated = await ctx.db.userProfiles.update(
-        row.copyWith(role: command.role),
-      );
-      final profile = ClubObjects.profile(updated);
-      ctx
-        ..publish(adminChannel, profile)
-        // To the admins' table, and to the member's own profile — not to the
-        // admin's, whose "my profile" does not declare that channel.
-        ..publish(ExampleChannels.profileOf(updated.ownerAccountId), profile);
-      // Access is checked once, at subscription: a role taken away closes
-      // what it opened.
-      final account = updated.ownerAccountId;
-      if (row.role == UserRole.admin && command.role != UserRole.admin) {
-        ctx.revoke(adminChannel, account);
-      }
-      if (row.role != UserRole.client && command.role == UserRole.client) {
-        ctx.revoke(const DwLiveChannel(ExampleChannel.staffChannels), account);
-        for (final channel in await ctx.db.chatChannels.find()) {
-          ctx.revoke(
-            DwLiveChannel(ExampleChannel.staffChat, channel.id),
-            account,
-          );
-        }
-      }
-      return profile;
-    },
-  ),
-];

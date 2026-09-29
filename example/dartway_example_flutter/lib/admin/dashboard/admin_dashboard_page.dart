@@ -4,7 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:dartway_example_flutter/admin/analytics/analytics_dashboards_section.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
-import 'package:dartway_example_flutter/shared/widgets/admin_scaffold.dart';
+import 'package:dartway_example_flutter/core/router/admin_scaffold.dart';
 import 'widgets/admin_counters.dart';
 
 /// Admin home: headline counters the server counts and keeps live, and under
