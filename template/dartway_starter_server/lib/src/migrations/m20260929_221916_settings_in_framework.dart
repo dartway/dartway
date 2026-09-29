@@ -10,20 +10,22 @@ final class M20260929221916SettingsInFramework extends DwDatabaseMigration {
   String get id => '20260929_221916_settings_in_framework';
 
   @override
-  String get checksum => '05b96c90a5acf692d16cba56e3701d11';
+  String get checksum => '3c4a747f3bb68668b3c2cb0841d21a22';
 
   @override
   Future<void> up(DwMigrationContext m) async {
     // The app's settings are a settings object in the framework's
     // `dw_setting` (`ctx.settings`), with their defaults in the contract.
-    // What was saved is carried over first, a toggle read the way the app
-    // read it.
+    // What was saved is carried over first, read exactly as the old code
+    // read it: the name trimmed, and sign-up off only for a stored `false`
+    // (`AppAuth.isSignUpEnabled` compared the trimmed, lower-cased text with
+    // it and treated anything else as on).
     await m.carrySettings('AppSettings', fromSql: r'''
 SELECT jsonb_strip_nulls(jsonb_build_object(
   'appName',
-    (SELECT nullif(trim(value), '') FROM app_setting WHERE key = 'appName'),
+    (SELECT trim(value) FROM app_setting WHERE key = 'appName'),
   'signUpEnabled',
-    (SELECT lower(trim(value)) NOT IN ('false', '0', 'no')
+    (SELECT lower(trim(value)) <> 'false'
      FROM app_setting WHERE key = 'signUpEnabled')))''');
     await m.dropTable('app_setting');
   }

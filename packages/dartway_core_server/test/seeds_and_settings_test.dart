@@ -317,8 +317,8 @@ void main() {
       );
     });
 
-    test('a changed type reads as its default, and an update writes the '
-        'value clean', () async {
+    test('a changed type reads as its default; an update of another field '
+        'keeps the unreadable and the undeclared value as stored', () async {
       await store({'name': 'Acme', 'signUpOpen': 'yes', 'gone': 1});
       expect(
         await inContext((ctx) => ctx.settings.read<ClubSettings>()),
@@ -330,7 +330,27 @@ void main() {
         ),
       );
       expect(updated, const ClubSettings(name: 'Acme', tone: Tone.warm));
-      expect((await rows()).single['value'], {'name': 'Acme', 'tone': 'warm'});
+      expect((await rows()).single['value'], {
+        'name': 'Acme',
+        'tone': 'warm',
+        'signUpOpen': 'yes',
+        'gone': 1,
+      });
+    });
+
+    test('an update that sets the unreadable field replaces it; save replaces '
+        'everything', () async {
+      await store({'tone': 'shouting', 'gone': 1});
+      await inContext(
+        (ctx) => ctx.settings.update<ClubSettings>(
+          (current) => current.copyWith(tone: Tone.warm),
+        ),
+      );
+      expect((await rows()).single['value'], {'tone': 'warm', 'gone': 1});
+      await inContext(
+        (ctx) => ctx.settings.save(const ClubSettings(name: 'Acme')),
+      );
+      expect((await rows()).single['value'], {'name': 'Acme'});
     });
 
     test('a migration carries values kept elsewhere, merged over the stored '

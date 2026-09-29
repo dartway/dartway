@@ -62,6 +62,45 @@ void main() {
     });
   });
 
+  group('migrationChangesData, more edges', () {
+    test('a braceless interpolated table is still a statement', () {
+      expect(
+        DwDataLifecycleInspector.dataChangesIn(
+          "Future<void> up(DwMigrationContext m) =>\n"
+          r"    m.sql('DELETE FROM $table WHERE x IS NULL');"
+          "\n",
+        ),
+        [(2, 'DELETE')],
+      );
+    });
+
+    test("a rule's action is a definition, not a statement", () {
+      expect(
+        DwDataLifecycleInspector.dataChangesIn(
+          "Future<void> up(DwMigrationContext m) => m.sql(\n"
+          "  'CREATE RULE keep AS ON DELETE TO item DO INSTEAD '\n"
+          "  'UPDATE item SET gone = true WHERE id = OLD.id');\n",
+        ),
+        isEmpty,
+      );
+    });
+
+    test("a write into the framework's tables is refused, even through "
+        'backfill; carrySettings reads', () {
+      expect(
+        DwDataLifecycleInspector.dataChangesIn(
+          "Future<void> up(DwMigrationContext m) async {\n"
+          "  await m.backfill(\"INSERT INTO dw_setting (area, value) \"\n"
+          "      \"VALUES ('AppSettings', '{}')\");\n"
+          "  await m.backfill('UPDATE \"dw_account\" SET created_at = now()');\n"
+          "  await m.carrySettings('AppSettings', fromSql: \"SELECT '{}'::jsonb\");\n"
+          "}\n",
+        ),
+        [(2, 'INSERT dw_setting'), (4, 'UPDATE dw_account')],
+      );
+    });
+  });
+
   group('workAfterServerStart anchors on the server', () {
     test('not on a stopwatch; a signal awaited before stop() passes', () {
       expect(
@@ -77,6 +116,21 @@ Future<void> main() async {
 }
 '''),
         isEmpty,
+      );
+    });
+
+    test('only awaiting a ProcessSignal watch passes, not anything that '
+        'mentions one', () {
+      expect(
+        DwDataLifecycleInspector.workAfterStartIn('''
+Future<void> main() async {
+  final server = AcmeServer.build(port: 8080);
+  await server.start();
+  await ProcessSignal.sigint.watch().first;
+  await seed(server, ProcessSignal.sigterm);
+}
+'''),
+        [(5, 'await seed(server, ProcessSignal.sigterm);')],
       );
     });
 

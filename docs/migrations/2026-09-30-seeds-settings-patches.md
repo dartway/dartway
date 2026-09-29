@@ -60,9 +60,9 @@ Rows the code declares — a questionnaire, a catalogue — leave the migration 
    Rows that point at another seed's rows (options of a question) are a second step after it, with
    the parent's id read in a `DwStartupStep` of your own — or keyed by the parent's slug if the table
    can hold it.
-4. Leave the old migration as it is. The seed, keyed by the natural key of step 1, finds the rows
-   the migration created and adopts them — from the next start on, the declaration is what they
-   hold, in every database, and a fresh database gets them from the seed alone. A row the old text
+4. Leave the old migration as it is. Every database — a fresh one too, which still runs the old
+   `INSERT`s — has the rows it created, and the seed, keyed by the natural key of step 1, adopts
+   them by that key: from the next start on, the declaration is what they hold, everywhere. A row the old text
    unpublished rather than deleted is declared with the same column (`isPublished: false`).
    Only rows nobody edits outside the code are a seed: the next start writes the declaration back
    over an edit.

@@ -88,9 +88,13 @@ class DwDataLifecycleInspector {
           )) {
             _add(
               DwCheckType.migrationChangesData,
-              '`$statement` — ${p.relative(file.path, from: root)}:$line; '
-              'rows the schema change strands go through `m.backfill(…)`, '
-              'content is a `DwSeedRows` step',
+              statement.contains(' dw_')
+                  ? '`$statement` — ${p.relative(file.path, from: root)}:$line; '
+                        'the framework\'s tables are written by the framework '
+                        '— a settings table is carried with `m.carrySettings`'
+                  : '`$statement` — ${p.relative(file.path, from: root)}:$line; '
+                        'rows the schema change strands go through '
+                        '`m.backfill(…)`, content is a `DwSeedRows` step',
             );
           }
         }
@@ -244,8 +248,27 @@ class DwDataLifecycleInspector {
   static String _statements(String sql) {
     var text = sql.replaceAll(_sqlLineComment, ' ');
     if (_routine.hasMatch(text)) text = text.replaceAll(_dollarQuoted, ' ');
+    // A rule's action is a definition too: what it does instead, later.
+    if (_rule.firstMatch(text) case final rule?) {
+      final action = RegExp(
+        r'\bdo\b',
+        caseSensitive: false,
+      ).allMatches(text, rule.end).firstOrNull;
+      if (action != null) text = text.substring(0, action.start);
+    }
     return text;
   }
+
+  static final _rule = RegExp(
+    r'\bcreate\s+(?:or\s+replace\s+)?rule\b',
+    caseSensitive: false,
+  );
+
+  /// A write into one of the framework's own tables.
+  static final _frameworkWrite = RegExp(
+    r'\b(insert\s+into|update(?:\s+only)?|delete\s+from)\s+"?(dw_\w+)',
+    caseSensitive: false,
+  );
 
   /// `INSERT`, `UPDATE` and `DELETE` statements in [content]'s strings that
   /// are not an argument of `backfill(…)`, as `(line, statement keyword)`.
@@ -257,8 +280,18 @@ class DwDataLifecycleInspector {
     final source = DwDartSource(content);
     final found = <(int, String)>[];
     for (final group in source.stringGroups()) {
-      final match = _dataChange.firstMatch(_statements(group.text));
+      final statements = _statements(group.text);
+      final match = _dataChange.firstMatch(statements);
       if (match == null) continue;
+      // The framework's tables are the framework's, `backfill` or not.
+      if (_frameworkWrite.firstMatch(statements) case final write?) {
+        found.add((
+          source.lineOf(group.start),
+          '${write.group(1)!.split(RegExp(r'\s+')).first.toUpperCase()} '
+              '${write.group(2)}',
+        ));
+        continue;
+      }
       if (source.enclosingCall(group.start) == 'backfill') continue;
       found.add((
         source.lineOf(group.start),
@@ -298,7 +331,8 @@ class DwDataLifecycleInspector {
   /// Shutdown, not work: awaiting the server's `stop()`/`close()`, or a
   /// signal to stop on.
   static final _shutdown = RegExp(
-    r'^await\s+(?:[\w.]+\.\s*(?:stop|close)\s*\(|[^;]*\bProcessSignal\b)',
+    r'^await\s+(?:[\w.]+\.\s*(?:stop|close)\s*\(|'
+    r'ProcessSignal\s*\.\s*\w+\s*\.\s*watch\s*\(\s*\))',
   );
 
   /// What [content] does after the server's `.start()` in the function that
@@ -502,8 +536,22 @@ final class DwDartSource {
             final end = k + 1 > content.length ? content.length : k + 1;
             inner.write(content.substring(j, end));
             // Read as a name, so `UPDATE ${table} SET` is still a statement.
-            value.write('dw_interpolated');
+            value.write('interpolated_name');
             j = end;
+            continue;
+          }
+          // `$table` is code too, read as a name like `${table}`.
+          if (!raw &&
+              content[j] == r'$' &&
+              j + 1 < content.length &&
+              RegExp(r'[A-Za-z_]').hasMatch(content[j + 1])) {
+            var k = j + 1;
+            while (k < content.length && RegExp(r'\w').hasMatch(content[k])) {
+              k++;
+            }
+            inner.write(content.substring(j, k));
+            value.write('interpolated_name');
+            j = k;
             continue;
           }
           final step = !raw && content[j] == r'\' ? 2 : 1;

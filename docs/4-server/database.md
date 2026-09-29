@@ -316,10 +316,12 @@ the wire carries — which holds only what differs from the defaults. How it sur
 changing under it:
 
 - **a field added** reads as its default;
-- **a field removed** is ignored, and dropped at the next write;
+- **a field removed** is ignored by reads, kept by `update`, dropped by `save`;
 - **a stored field that no longer decodes** — an enum value that was removed, a field whose type
   changed — reads as that field's default, the rest as stored, and the server logs it once. A read
-  never fails over what is stored, and the next `update` or `save` writes the value clean;
+  never fails over what is stored. `update` writes such a field back as it was unless the change
+  sets it — the version of the server that wrote it, the one a rollback returns to, still reads it
+  — and `save` replaces the whole value, such fields included;
 - **a default changed** changes every value that equalled the old default, since nothing of it was
   stored — say so in the change if that is not what is meant;
 - **the class renamed** resets it to its defaults: the area is its wire name.

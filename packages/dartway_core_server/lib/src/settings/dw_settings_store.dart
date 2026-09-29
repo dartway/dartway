@@ -38,8 +38,9 @@ import '../alerts/dw_server_logger.dart';
 /// field: a stored field that no longer decodes — an enum value that was
 /// removed, a field whose type changed — reads as that field's default, and
 /// the server logs it once; a field no longer declared is ignored. A read
-/// never fails over what is stored, and the next [update] or [save] writes the
-/// value clean. Two consequences follow from storing only what differs from
+/// never fails over what is stored. [update] writes back what it could not
+/// read, untouched — the version of the server that wrote it still can — and
+/// [save] replaces the whole value. Two consequences follow from storing only what differs from
 /// the defaults: **renaming the class resets it to its defaults** (the area is
 /// its wire name), and **changing a default changes every value that was
 /// equal to the old default**, since nothing of it was stored.
@@ -68,8 +69,9 @@ final class DwSettingsStore {
   }
 
   /// Stores [value] as the whole of its settings, in one statement, and
-  /// returns it. For a form that sends every field; an edit of some fields
-  /// is [update].
+  /// returns it: it replaces everything stored, including fields this code
+  /// does not declare or cannot read, which [update] keeps. For a form that
+  /// sends every field; an edit of some fields is [update].
   Future<S> save<S extends DwDataObject>(S value) async {
     await _db.execute(
       'INSERT INTO dw_setting (area, value) VALUES (@area, @value::jsonb) '
@@ -84,6 +86,10 @@ final class DwSettingsStore {
   /// in between: two changes of one settings object apply one after the
   /// other, and neither is lost. Returns the stored value; one that [change]
   /// left equal is not written.
+  ///
+  /// A stored field this code does not declare or cannot read is written
+  /// back as it was, unless [change] set that field: the version of the
+  /// server that wrote it — the one a rollback returns to — still reads it.
   Future<S> update<S extends DwDataObject>(S Function(S current) change) {
     final area = _areaOf(S);
     return _db.transaction((tx) async {
@@ -98,13 +104,26 @@ final class DwSettingsStore {
         'SELECT value FROM dw_setting WHERE area = @area FOR UPDATE',
         params: {'area': area},
       );
-      final current = _decode<S>(area, rows.single['value']);
+      final stored = rows.single['value'];
+      final current = _decode<S>(area, stored);
       final next = change(current);
       if (next == current) return current;
+      // What this code cannot read — a field it does not declare, a value
+      // it cannot decode — is somebody else's: an older or a newer version
+      // of the server wrote it, and rolling back to it must find it there.
+      // It is kept, unless the change set that very field.
+      final before = current.toJson();
+      final after = next.toJson();
+      final raw = _rawObject(stored);
+      final written = <String, Object?>{
+        for (final MapEntry(:key, :value) in raw.entries)
+          if (!before.containsKey(key) && !after.containsKey(key)) key: value,
+        ...after,
+      };
       await tx.execute(
         'UPDATE dw_setting SET value = @value::jsonb, updated_at = now() '
         'WHERE area = @area',
-        params: {'area': area, 'value': _encode(next)},
+        params: {'area': area, 'value': jsonEncode(written)},
       );
       return next;
     });
@@ -177,8 +196,19 @@ final class DwSettingsStore {
     _log.warning(
       'settings $area: stored ${fresh.join(', ')} no longer read as the '
       'settings object declares them, and read as the defaults instead '
-      '(stored: $stored); the next save writes them clean',
+      '(stored: $stored); an update keeps them as stored, a save replaces '
+      'them',
     );
+  }
+
+  /// The stored JSON object as it is, or an empty one when it is not one.
+  Map<String, Object?> _rawObject(Object? stored) {
+    try {
+      final json = stored is String ? jsonDecode(stored) : stored;
+      return json is Map<String, Object?> ? json : const {};
+    } on FormatException {
+      return const {};
+    }
   }
 
   String _encode(DwDataObject value) => jsonEncode(value.toJson());

@@ -10,20 +10,25 @@ final class M20260929222324SettingsInFramework extends DwDatabaseMigration {
   String get id => '20260929_222324_settings_in_framework';
 
   @override
-  String get checksum => '9fb0e842532280a0a20a83ff505f5f89';
+  String get checksum => 'de2d71edfaac76288329238348483d1f';
 
   @override
   Future<void> up(DwMigrationContext m) async {
     // The club's settings are a settings object in the framework's
     // `dw_setting` (`ctx.settings`), with their defaults in the contract.
-    // What was saved is carried over first: a text as it was (a blank phone
-    // is no phone), a toggle read the way the app read it.
+    // What was saved is carried over first, read exactly as the app read it
+    // (`AppSettingKey.parse`): a text trimmed — an empty phone was the
+    // default, no phone — and a toggle on for `true`/`1`/`yes`, off for
+    // `false`/`0`/`no`, and its default for anything else.
     await m.carrySettings('ClubSettings', fromSql: r'''
 SELECT jsonb_strip_nulls(jsonb_build_object(
   'clubName',
-    (SELECT nullif(trim(value), '') FROM app_setting WHERE key = 'clubName'),
+    (SELECT trim(value) FROM app_setting WHERE key = 'clubName'),
   'bookingEnabled',
-    (SELECT lower(trim(value)) IN ('true', '1', 'yes')
+    (SELECT CASE
+       WHEN lower(trim(value)) IN ('true', '1', 'yes') THEN true
+       WHEN lower(trim(value)) IN ('false', '0', 'no') THEN false
+     END
      FROM app_setting WHERE key = 'bookingEnabled'),
   'supportPhone',
     (SELECT nullif(trim(value), '') FROM app_setting WHERE key = 'supportPhone')))''');
