@@ -44,7 +44,6 @@ mixin _$UserProfileRow on DwTableRow {
 
 extension UserProfileRowCopyWith on UserProfileRow {
   UserProfileRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     DwFieldPatch<int> accountId = const DwFieldPatch.keep(),
     String? phone,
     String? firstName,
@@ -57,7 +56,7 @@ extension UserProfileRowCopyWith on UserProfileRow {
     DwFieldPatch<String> testVerificationCode = const DwFieldPatch.keep(),
     DwFieldPatch<DateTime> deletedAt = const DwFieldPatch.keep(),
   }) => UserProfileRow(
-    id: id.apply(this.id),
+    id: id,
     accountId: accountId.apply(this.accountId),
     phone: phone ?? this.phone,
     firstName: firstName ?? this.firstName,
@@ -69,6 +68,81 @@ extension UserProfileRowCopyWith on UserProfileRow {
     conditionsAcceptedAt: conditionsAcceptedAt ?? this.conditionsAcceptedAt,
     testVerificationCode: testVerificationCode.apply(this.testVerificationCode),
     deletedAt: deletedAt.apply(this.deletedAt),
+  );
+}
+
+/// A [UserProfileRow] before insert: every column but the id.
+final class NewUserProfileRow extends DwRowDraft<UserProfileRow> {
+  const NewUserProfileRow({
+    this.accountId,
+    required this.phone,
+    required this.firstName,
+    this.lastName,
+    this.imageUrl,
+    this.gender,
+    this.role = UserRole.client,
+    this.agreedForMarketing = false,
+    required this.conditionsAcceptedAt,
+    this.testVerificationCode,
+    this.deletedAt,
+  });
+
+  final int? accountId;
+  final String phone;
+  final String firstName;
+  final String? lastName;
+  final String? imageUrl;
+  final UserGender? gender;
+  final UserRole role;
+  final bool agreedForMarketing;
+  final DateTime conditionsAcceptedAt;
+  final String? testVerificationCode;
+  final DateTime? deletedAt;
+}
+
+extension NewUserProfileRowCopyWith on NewUserProfileRow {
+  NewUserProfileRow copyWith({
+    DwFieldPatch<int> accountId = const DwFieldPatch.keep(),
+    String? phone,
+    String? firstName,
+    DwFieldPatch<String> lastName = const DwFieldPatch.keep(),
+    DwFieldPatch<String> imageUrl = const DwFieldPatch.keep(),
+    DwFieldPatch<UserGender> gender = const DwFieldPatch.keep(),
+    UserRole? role,
+    bool? agreedForMarketing,
+    DateTime? conditionsAcceptedAt,
+    DwFieldPatch<String> testVerificationCode = const DwFieldPatch.keep(),
+    DwFieldPatch<DateTime> deletedAt = const DwFieldPatch.keep(),
+  }) => NewUserProfileRow(
+    accountId: accountId.apply(this.accountId),
+    phone: phone ?? this.phone,
+    firstName: firstName ?? this.firstName,
+    lastName: lastName.apply(this.lastName),
+    imageUrl: imageUrl.apply(this.imageUrl),
+    gender: gender.apply(this.gender),
+    role: role ?? this.role,
+    agreedForMarketing: agreedForMarketing ?? this.agreedForMarketing,
+    conditionsAcceptedAt: conditionsAcceptedAt ?? this.conditionsAcceptedAt,
+    testVerificationCode: testVerificationCode.apply(this.testVerificationCode),
+    deletedAt: deletedAt.apply(this.deletedAt),
+  );
+}
+
+extension NewUserProfileRowWithId on NewUserProfileRow {
+  /// The row stored under [id], for `update`.
+  UserProfileRow withId(int id) => UserProfileRow(
+    id: id,
+    accountId: accountId,
+    phone: phone,
+    firstName: firstName,
+    lastName: lastName,
+    imageUrl: imageUrl,
+    gender: gender,
+    role: role,
+    agreedForMarketing: agreedForMarketing,
+    conditionsAcceptedAt: conditionsAcceptedAt,
+    testVerificationCode: testVerificationCode,
+    deletedAt: deletedAt,
   );
 }
 
@@ -151,7 +225,6 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
 
   @override
   Map<String, Object?> toRow(UserProfileRow row) => {
-    if (row.id != null) 'id': row.id,
     'account_id': row.accountId,
     'phone': row.phone,
     'first_name': row.firstName,
@@ -163,5 +236,20 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
     'conditions_accepted_at': row.conditionsAcceptedAt,
     'test_verification_code': row.testVerificationCode,
     'deleted_at': row.deletedAt,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewUserProfileRow draft) => {
+    'account_id': draft.accountId,
+    'phone': draft.phone,
+    'first_name': draft.firstName,
+    'last_name': draft.lastName,
+    'image_url': draft.imageUrl,
+    'gender': draft.gender,
+    'role': draft.role,
+    'agreed_for_marketing': draft.agreedForMarketing,
+    'conditions_accepted_at': draft.conditionsAcceptedAt,
+    'test_verification_code': draft.testVerificationCode,
+    'deleted_at': draft.deletedAt,
   };
 }

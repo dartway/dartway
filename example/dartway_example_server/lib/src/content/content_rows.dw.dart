@@ -30,17 +30,56 @@ mixin _$NewsPostRow on DwTableRow {
 
 extension NewsPostRowCopyWith on NewsPostRow {
   NewsPostRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? authorProfileId,
     String? title,
     String? text,
     DateTime? createdAt,
   }) => NewsPostRow(
-    id: id.apply(this.id),
+    id: id,
     authorProfileId: authorProfileId ?? this.authorProfileId,
     title: title ?? this.title,
     text: text ?? this.text,
     createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+/// A [NewsPostRow] before insert: every column but the id.
+final class NewNewsPostRow extends DwRowDraft<NewsPostRow> {
+  const NewNewsPostRow({
+    required this.authorProfileId,
+    required this.title,
+    required this.text,
+    required this.createdAt,
+  });
+
+  final int authorProfileId;
+  final String title;
+  final String text;
+  final DateTime createdAt;
+}
+
+extension NewNewsPostRowCopyWith on NewNewsPostRow {
+  NewNewsPostRow copyWith({
+    int? authorProfileId,
+    String? title,
+    String? text,
+    DateTime? createdAt,
+  }) => NewNewsPostRow(
+    authorProfileId: authorProfileId ?? this.authorProfileId,
+    title: title ?? this.title,
+    text: text ?? this.text,
+    createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+extension NewNewsPostRowWithId on NewNewsPostRow {
+  /// The row stored under [id], for `update`.
+  NewsPostRow withId(int id) => NewsPostRow(
+    id: id,
+    authorProfileId: authorProfileId,
+    title: title,
+    text: text,
+    createdAt: createdAt,
   );
 }
 
@@ -87,11 +126,18 @@ final class NewsPostTable extends DwTableDef<NewsPostRow> {
 
   @override
   Map<String, Object?> toRow(NewsPostRow row) => {
-    if (row.id != null) 'id': row.id,
     'author_profile_id': row.authorProfileId,
     'title': row.title,
     'text': row.text,
     'created_at': row.createdAt,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewNewsPostRow draft) => {
+    'author_profile_id': draft.authorProfileId,
+    'title': draft.title,
+    'text': draft.text,
+    'created_at': draft.createdAt,
   };
 }
 
@@ -115,15 +161,26 @@ mixin _$AppSettingRow on DwTableRow {
 }
 
 extension AppSettingRowCopyWith on AppSettingRow {
-  AppSettingRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
-    String? key,
-    String? value,
-  }) => AppSettingRow(
-    id: id.apply(this.id),
-    key: key ?? this.key,
-    value: value ?? this.value,
-  );
+  AppSettingRow copyWith({String? key, String? value}) =>
+      AppSettingRow(id: id, key: key ?? this.key, value: value ?? this.value);
+}
+
+/// A [AppSettingRow] before insert: every column but the id.
+final class NewAppSettingRow extends DwRowDraft<AppSettingRow> {
+  const NewAppSettingRow({required this.key, required this.value});
+
+  final String key;
+  final String value;
+}
+
+extension NewAppSettingRowCopyWith on NewAppSettingRow {
+  NewAppSettingRow copyWith({String? key, String? value}) =>
+      NewAppSettingRow(key: key ?? this.key, value: value ?? this.value);
+}
+
+extension NewAppSettingRowWithId on NewAppSettingRow {
+  /// The row stored under [id], for `update`.
+  AppSettingRow withId(int id) => AppSettingRow(id: id, key: key, value: value);
 }
 
 final class AppSettingTable extends DwTableDef<AppSettingRow> {
@@ -147,8 +204,13 @@ final class AppSettingTable extends DwTableDef<AppSettingRow> {
 
   @override
   Map<String, Object?> toRow(AppSettingRow row) => {
-    if (row.id != null) 'id': row.id,
     'key': row.key,
     'value': row.value,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewAppSettingRow draft) => {
+    'key': draft.key,
+    'value': draft.value,
   };
 }

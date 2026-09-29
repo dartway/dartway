@@ -84,7 +84,7 @@ sealed class DwJobDefinition {
 /// static ({int messageId}) _decodeReply(Map<String, Object?> json) =>
 ///     (messageId: json['messageId']! as int);
 ///
-/// await ctx.jobs.enqueue(CoachReplies.reply, (messageId: message.id!));
+/// await ctx.jobs.enqueue(CoachReplies.reply, (messageId: message.id));
 /// ```
 final class DwJobKind<P> {
   const DwJobKind(this.name, {required this.encode, required this.decode});

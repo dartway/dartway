@@ -99,11 +99,16 @@ abstract final class ValueClassWriter {
   }
 
   /// `extension NameCopyWith on Name { Name copyWith(...) }`, or `null` when
-  /// there is nothing to copy.
-  static String? copyWith(String className, List<ValueField> fields) {
+  /// there is nothing to copy. The fields named in [kept] are passed through
+  /// unchanged rather than offered as parameters.
+  static String? copyWith(
+    String className,
+    List<ValueField> fields, {
+    List<String> kept = const [],
+  }) {
     if (fields.isEmpty) return null;
     final parameters = <String>[];
-    final arguments = <String>[];
+    final arguments = [for (final name in kept) '$name: $name'];
     for (final field in fields) {
       final name = field.name;
       if (field.type.nullable) {

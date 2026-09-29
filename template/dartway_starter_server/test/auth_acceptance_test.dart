@@ -126,7 +126,7 @@ void main() {
       'account still signs in', () async {
     final member = await app.signUp('79990000020', firstName: 'Oleg');
     await app.db.appSettings.insert(
-      const AppSettingRow(key: AppSettingKeys.signUpEnabled, value: 'false'),
+      const NewAppSettingRow(key: AppSettingKeys.signUpEnabled, value: 'false'),
     );
     addTearDown(
       () => app.db.appSettings.deleteWhere(
@@ -189,10 +189,9 @@ void main() {
 
     // A mistyped identifier is a server that does not start, judged before
     // anything opens.
-    expect(
-      declaring('not an identifier').problems(AppAuth.config()),
-      [contains(DwFirstAdministrator.defaultVariable)],
-    );
+    expect(declaring('not an identifier').problems(AppAuth.config()), [
+      contains(DwFirstAdministrator.defaultVariable),
+    ]);
     expect(declaring('Admin@Example.com').problems(AppAuth.config()), isEmpty);
 
     await start('Admin@Example.com');
@@ -215,7 +214,7 @@ void main() {
     await app.db.userProfiles.update(created.copyWith(role: UserRole.user));
     await start('admin@example.com');
     expect(
-      (await app.db.userProfiles.findById(created.id!))!.role,
+      (await app.db.userProfiles.findById(created.id))!.role,
       UserRole.admin,
     );
 

@@ -11,8 +11,8 @@ void main() {
   final database = useTestDatabase(maxConnections: 6);
   DwDatabaseHandle db() => database().db;
 
-  AppSettingRow setting(String key, [String value = 'v']) =>
-      AppSettingRow(key: key, value: value, updatedAt: DateTime.utc(2026));
+  NewAppSettingRow setting(String key, [String value = 'v']) =>
+      NewAppSettingRow(key: key, value: value, updatedAt: DateTime.utc(2026));
 
   Future<List<String>> keys() async => [
     for (final s in await db().appSettings.find(orderBy: (t) => [t.key.asc()]))
@@ -207,7 +207,7 @@ void main() {
       final release = Completer<void>();
 
       final first = db().transaction((tx) async {
-        await tx.appSettings.findById(row.id!, lock: DwRowLock.forUpdate);
+        await tx.appSettings.findById(row.id, lock: DwRowLock.forUpdate);
         events.add('first locked');
         held.complete();
         await release.future;
@@ -217,7 +217,7 @@ void main() {
       await held.future;
       final second = db().transaction((tx) async {
         final seen = await tx.appSettings.findById(
-          row.id!,
+          row.id,
           lock: DwRowLock.forUpdate,
         );
         events.add('second locked');

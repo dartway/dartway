@@ -159,7 +159,7 @@ abstract final class AppAuth {
           ctx.refuse(DartwayStarterRefusal.consentsRequired, field: 'consents');
         }
         return ctx.db.userProfiles.insert(
-          UserProfileRow(
+          NewUserProfileRow(
             accountId: accountId,
             firstName: registration[RegistrationKeys.firstName]?.trim() ?? '',
             agreedForMarketing:
@@ -170,7 +170,7 @@ abstract final class AppAuth {
         );
       case DwToolOrigin():
         return ctx.db.userProfiles.insert(
-          UserProfileRow(accountId: accountId, createdAt: now),
+          NewUserProfileRow(accountId: accountId, createdAt: now),
         );
     }
   }

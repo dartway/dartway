@@ -105,7 +105,7 @@ void main() {
   test('a booked session reminds its member two hours before it starts; a '
       'booking cancelled by then reminds nobody', () async {
     final service = await club.db.clubServices.insert(
-      const ClubServiceRow(
+      const NewClubServiceRow(
         title: 'Morning yoga',
         description: 'Mats provided',
         durationMinutes: 60,
@@ -113,8 +113,8 @@ void main() {
       ),
     );
     final session = await club.db.clubSessions.insert(
-      ClubSessionRow(
-        serviceId: service.id!,
+      NewClubSessionRow(
+        serviceId: service.id,
         startsAt: DateTime.now().add(const Duration(days: 1)),
         capacity: 5,
       ),
@@ -124,10 +124,10 @@ void main() {
     await registerDevice(keeps, 'keeps-device');
     await registerDevice(cancels, 'cancels-device');
     final kept = (await keeps.client.command(
-      BookSession(sessionId: session.id!),
+      BookSession(sessionId: session.id),
     )).valueOrThrow;
     final cancelled = (await cancels.client.command(
-      BookSession(sessionId: session.id!),
+      BookSession(sessionId: session.id),
     )).valueOrThrow;
     (await cancels.client.command(
       CancelBooking(bookingId: cancelled.id),
@@ -168,7 +168,7 @@ void main() {
   });
   test('a reminder that runs after its session started sends nothing', () async {
     final service = await club.db.clubServices.insert(
-      const ClubServiceRow(
+      const NewClubServiceRow(
         title: 'Evening stretch',
         description: 'Mats provided',
         durationMinutes: 45,
@@ -176,8 +176,8 @@ void main() {
       ),
     );
     final session = await club.db.clubSessions.insert(
-      ClubSessionRow(
-        serviceId: service.id!,
+      NewClubSessionRow(
+        serviceId: service.id,
         startsAt: DateTime.now().add(const Duration(days: 1)),
         capacity: 5,
       ),
@@ -185,7 +185,7 @@ void main() {
     final late = await club.signUp('+7 999 100 00 07', firstName: 'Igor');
     await registerDevice(late, 'late-device');
     final booking = (await late.client.command(
-      BookSession(sessionId: session.id!),
+      BookSession(sessionId: session.id),
     )).valueOrThrow;
 
     // The queue fell behind: by the time the job runs, the session is on.

@@ -15,7 +15,7 @@ enum ClubServiceKind { group, personal }
 @DwSqlTable('club_service')
 final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   const ClubServiceRow({
-    this.id,
+    required this.id,
     required this.title,
     required this.kind,
     this.price,
@@ -29,7 +29,7 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   final String title;
   final ClubServiceKind kind;

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- **BREAKING (re-exported from `dartway_orm`): a row's `id` is `int`; inserts take the generated
+  draft `New<Entity>Row`** (dartway/dartway#384). Nothing of the server's own changed: the
+  framework's `dw_*` tables are written in SQL, not through row classes.
+
 ## 0.21.0-dev.8
 
 - **`DwAppServer.handlers` and `.jobs` now include modules' calls and jobs, not just features'**

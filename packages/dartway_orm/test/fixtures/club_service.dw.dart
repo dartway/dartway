@@ -42,7 +42,6 @@ mixin _$ClubServiceRow on DwTableRow {
 
 extension ClubServiceRowCopyWith on ClubServiceRow {
   ClubServiceRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     String? title,
     ClubServiceKind? kind,
     DwFieldPatch<double> price = const DwFieldPatch.keep(),
@@ -54,7 +53,7 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
     DwFieldPatch<Uint8List> cover = const DwFieldPatch.keep(),
     bool? active,
   }) => ClubServiceRow(
-    id: id.apply(this.id),
+    id: id,
     title: title ?? this.title,
     kind: kind ?? this.kind,
     price: price.apply(this.price),
@@ -65,6 +64,76 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
     archivedAt: archivedAt.apply(this.archivedAt),
     cover: cover.apply(this.cover),
     active: active ?? this.active,
+  );
+}
+
+/// A [ClubServiceRow] before insert: every column but the id.
+final class NewClubServiceRow extends DwRowDraft<ClubServiceRow> {
+  const NewClubServiceRow({
+    required this.title,
+    required this.kind,
+    this.price,
+    required this.duration,
+    this.tags = const <String>[],
+    this.offeredAs = const <ClubServiceKind>[],
+    required this.createdAt,
+    this.archivedAt,
+    this.cover,
+    this.active = true,
+  });
+
+  final String title;
+  final ClubServiceKind kind;
+  final double? price;
+  final Duration duration;
+  final List<String> tags;
+  final List<ClubServiceKind> offeredAs;
+  final DateTime createdAt;
+  final DateTime? archivedAt;
+  final Uint8List? cover;
+  final bool active;
+}
+
+extension NewClubServiceRowCopyWith on NewClubServiceRow {
+  NewClubServiceRow copyWith({
+    String? title,
+    ClubServiceKind? kind,
+    DwFieldPatch<double> price = const DwFieldPatch.keep(),
+    Duration? duration,
+    List<String>? tags,
+    List<ClubServiceKind>? offeredAs,
+    DateTime? createdAt,
+    DwFieldPatch<DateTime> archivedAt = const DwFieldPatch.keep(),
+    DwFieldPatch<Uint8List> cover = const DwFieldPatch.keep(),
+    bool? active,
+  }) => NewClubServiceRow(
+    title: title ?? this.title,
+    kind: kind ?? this.kind,
+    price: price.apply(this.price),
+    duration: duration ?? this.duration,
+    tags: tags ?? this.tags,
+    offeredAs: offeredAs ?? this.offeredAs,
+    createdAt: createdAt ?? this.createdAt,
+    archivedAt: archivedAt.apply(this.archivedAt),
+    cover: cover.apply(this.cover),
+    active: active ?? this.active,
+  );
+}
+
+extension NewClubServiceRowWithId on NewClubServiceRow {
+  /// The row stored under [id], for `update`.
+  ClubServiceRow withId(int id) => ClubServiceRow(
+    id: id,
+    title: title,
+    kind: kind,
+    price: price,
+    duration: duration,
+    tags: tags,
+    offeredAs: offeredAs,
+    createdAt: createdAt,
+    archivedAt: archivedAt,
+    cover: cover,
+    active: active,
   );
 }
 
@@ -139,7 +208,6 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
 
   @override
   Map<String, Object?> toRow(ClubServiceRow row) => {
-    if (row.id != null) 'id': row.id,
     'title': row.title,
     'kind': row.kind,
     'price': row.price,
@@ -150,5 +218,19 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
     'archived_at': row.archivedAt,
     'cover': row.cover,
     'active': row.active,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewClubServiceRow draft) => {
+    'title': draft.title,
+    'kind': draft.kind,
+    'price': draft.price,
+    'duration': draft.duration,
+    'tags': draft.tags,
+    'offered_as': draft.offeredAs,
+    'created_at': draft.createdAt,
+    'archived_at': draft.archivedAt,
+    'cover': draft.cover,
+    'active': draft.active,
   };
 }

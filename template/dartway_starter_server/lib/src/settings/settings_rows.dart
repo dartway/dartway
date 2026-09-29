@@ -6,10 +6,14 @@ part 'settings_rows.dw.dart';
 /// admins editing different settings cannot overwrite each other.
 @DwSqlTable('app_setting')
 final class AppSettingRow extends DwTableRow with _$AppSettingRow {
-  const AppSettingRow({this.id, required this.key, required this.value});
+  const AppSettingRow({
+    required this.id,
+    required this.key,
+    required this.value,
+  });
 
   @override
-  final int? id;
+  final int id;
 
   @DwUniqueColumn()
   final String key;

@@ -29,8 +29,8 @@ final contentHandlers = <DwCallHandler>[
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final row = await ctx.db.newsPosts.insert(
-        NewsPostRow(
-          authorProfileId: me.id!,
+        NewNewsPostRow(
+          authorProfileId: me.id,
           title: command.title.trim(),
           text: command.text.trim(),
           createdAt: DateTime.now(),
@@ -103,7 +103,7 @@ final contentHandlers = <DwCallHandler>[
       );
       final saved = existing == null
           ? await ctx.db.appSettings.insert(
-              AppSettingRow(key: command.key, value: command.value),
+              NewAppSettingRow(key: command.key, value: command.value),
             )
           : await ctx.db.appSettings.update(
               existing.copyWith(value: command.value),

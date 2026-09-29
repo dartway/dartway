@@ -42,7 +42,6 @@ mixin _$UserProfileRow on DwTableRow {
 
 extension UserProfileRowCopyWith on UserProfileRow {
   UserProfileRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? accountId,
     String? firstName,
     DwFieldPatch<String> lastName = const DwFieldPatch.keep(),
@@ -54,7 +53,7 @@ extension UserProfileRowCopyWith on UserProfileRow {
     DwFieldPatch<String> testVerificationCode = const DwFieldPatch.keep(),
     DateTime? createdAt,
   }) => UserProfileRow(
-    id: id.apply(this.id),
+    id: id,
     accountId: accountId ?? this.accountId,
     firstName: firstName ?? this.firstName,
     lastName: lastName.apply(this.lastName),
@@ -65,6 +64,76 @@ extension UserProfileRowCopyWith on UserProfileRow {
     termsAcceptedAt: termsAcceptedAt.apply(this.termsAcceptedAt),
     testVerificationCode: testVerificationCode.apply(this.testVerificationCode),
     createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+/// A [UserProfileRow] before insert: every column but the id.
+final class NewUserProfileRow extends DwRowDraft<UserProfileRow> {
+  const NewUserProfileRow({
+    required this.accountId,
+    this.firstName = '',
+    this.lastName,
+    this.gender,
+    this.avatarFileId,
+    this.role = UserRole.user,
+    this.agreedForMarketing = false,
+    this.termsAcceptedAt,
+    this.testVerificationCode,
+    required this.createdAt,
+  });
+
+  final int accountId;
+  final String firstName;
+  final String? lastName;
+  final UserGender? gender;
+  final int? avatarFileId;
+  final UserRole role;
+  final bool agreedForMarketing;
+  final DateTime? termsAcceptedAt;
+  final String? testVerificationCode;
+  final DateTime createdAt;
+}
+
+extension NewUserProfileRowCopyWith on NewUserProfileRow {
+  NewUserProfileRow copyWith({
+    int? accountId,
+    String? firstName,
+    DwFieldPatch<String> lastName = const DwFieldPatch.keep(),
+    DwFieldPatch<UserGender> gender = const DwFieldPatch.keep(),
+    DwFieldPatch<int> avatarFileId = const DwFieldPatch.keep(),
+    UserRole? role,
+    bool? agreedForMarketing,
+    DwFieldPatch<DateTime> termsAcceptedAt = const DwFieldPatch.keep(),
+    DwFieldPatch<String> testVerificationCode = const DwFieldPatch.keep(),
+    DateTime? createdAt,
+  }) => NewUserProfileRow(
+    accountId: accountId ?? this.accountId,
+    firstName: firstName ?? this.firstName,
+    lastName: lastName.apply(this.lastName),
+    gender: gender.apply(this.gender),
+    avatarFileId: avatarFileId.apply(this.avatarFileId),
+    role: role ?? this.role,
+    agreedForMarketing: agreedForMarketing ?? this.agreedForMarketing,
+    termsAcceptedAt: termsAcceptedAt.apply(this.termsAcceptedAt),
+    testVerificationCode: testVerificationCode.apply(this.testVerificationCode),
+    createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+extension NewUserProfileRowWithId on NewUserProfileRow {
+  /// The row stored under [id], for `update`.
+  UserProfileRow withId(int id) => UserProfileRow(
+    id: id,
+    accountId: accountId,
+    firstName: firstName,
+    lastName: lastName,
+    gender: gender,
+    avatarFileId: avatarFileId,
+    role: role,
+    agreedForMarketing: agreedForMarketing,
+    termsAcceptedAt: termsAcceptedAt,
+    testVerificationCode: testVerificationCode,
+    createdAt: createdAt,
   );
 }
 
@@ -145,7 +214,6 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
 
   @override
   Map<String, Object?> toRow(UserProfileRow row) => {
-    if (row.id != null) 'id': row.id,
     'account_id': row.accountId,
     'first_name': row.firstName,
     'last_name': row.lastName,
@@ -156,5 +224,19 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
     'terms_accepted_at': row.termsAcceptedAt,
     'test_verification_code': row.testVerificationCode,
     'created_at': row.createdAt,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewUserProfileRow draft) => {
+    'account_id': draft.accountId,
+    'first_name': draft.firstName,
+    'last_name': draft.lastName,
+    'gender': draft.gender,
+    'avatar_file_id': draft.avatarFileId,
+    'role': draft.role,
+    'agreed_for_marketing': draft.agreedForMarketing,
+    'terms_accepted_at': draft.termsAcceptedAt,
+    'test_verification_code': draft.testVerificationCode,
+    'created_at': draft.createdAt,
   };
 }

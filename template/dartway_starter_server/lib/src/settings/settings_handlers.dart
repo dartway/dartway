@@ -28,7 +28,7 @@ final settingsHandlers = <DwCallHandler>[
       );
       final saved = existing == null
           ? await ctx.db.appSettings.insert(
-              AppSettingRow(key: command.key, value: command.value),
+              NewAppSettingRow(key: command.key, value: command.value),
             )
           : await ctx.db.appSettings.update(
               existing.copyWith(value: command.value),

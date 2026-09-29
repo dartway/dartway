@@ -4,10 +4,10 @@ part 'misplaced.dw.dart';
 
 @DwSqlTable('misplaced')
 final class MisplacedRow extends DwTableRow with _$MisplacedRow {
-  const MisplacedRow({this.id});
+  const MisplacedRow({required this.id});
 
   @override
-  final int? id;
+  final int id;
 
   static const tableDef = MisplacedTable();
 }

@@ -9,7 +9,7 @@ import 'app_harness.dart';
 /// into the database, and the matchers the chat tests read in.
 extension ChatHarness on AppHarness {
   Future<ChatChannelRow> chatChannel(String title) =>
-      db.chatChannels.insert(ChatChannelRow(title: title));
+      db.chatChannels.insert(NewChatChannelRow(title: title));
 }
 
 extension ChatMemberCalls on AppMember {

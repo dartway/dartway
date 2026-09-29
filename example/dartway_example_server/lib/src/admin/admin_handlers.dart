@@ -62,7 +62,7 @@ final adminHandlers = <DwCallHandler>[
       if (row.role != UserRole.client && command.role == UserRole.client) {
         ctx.revoke(AppChannels.staffChannels, account);
         for (final channel in await ctx.db.chatChannels.find()) {
-          ctx.revoke(AppChannels.chatOf(channel.id!), account);
+          ctx.revoke(AppChannels.chatOf(channel.id), account);
         }
       }
       return profile;

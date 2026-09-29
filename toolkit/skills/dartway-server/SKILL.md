@@ -89,7 +89,7 @@ part 'invoices.dw.dart';
 )
 final class InvoiceRow extends DwTableRow with _$InvoiceRow {
   const InvoiceRow({
-    this.id,
+    required this.id,
     required this.ownerProfileId,
     required this.customerId,
     required this.amountCents,
@@ -100,7 +100,7 @@ final class InvoiceRow extends DwTableRow with _$InvoiceRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('member_profile', onDelete: DwOnDelete.cascade)
   final int ownerProfileId;
@@ -122,7 +122,9 @@ The generator holds you to:
 
 - the name `<Entity>Row`; its table class is `<Entity>Table`, its repository `db.<entities>`;
 - `@DwSqlTable('<snake_case>')`, and `static const tableDef = <Entity>Table();`;
-- `@override final int? id;` with `this.id` — a `bigserial` key, `null` until inserted;
+- `@override final int id;` with `required this.id` — the `bigserial` key the database assigned. A
+  row is what is stored, so `row.id` never needs a `!` (the analyzer flags one); a row
+  not stored yet is its generated draft `New<Entity>Row` — the same constructor without `id`;
 - column types: `int`, `double`, `String`, `bool`, `DateTime`, `Duration`, `Uint8List`, an enum
   (stored as its name in `text`), `List<T>`/`Map<String, T>` of scalars (`jsonb`), `List<E>` of an enum (`jsonb` of names — not a `List<String>` with a typed getter), or nullable ones.
   A DTO is not a column: store its fields, or the id of another row.
@@ -145,7 +147,10 @@ accepts input and nothing visible happens, which is worse than a disabled form. 
 state" revisions were wanted for already exists as an entity (a cycle, an order, a document version),
 and copying a few fields into it is cheaper than a history nobody reads.
 
-Rebuild a stored row with its generated `copyWith`, never by listing fields in the
+Insert a draft, `New<Entity>Row(...)`: `insert`, `tryInsert`, `insertAll` and `upsert` take drafts
+and answer stored rows. "Create or save" by an optional id is
+`switch (id) { null => insert(draft), final id => update(draft.withId(id)) }`. Rebuild a stored row
+with its generated `copyWith` (it keeps the id), never by listing fields in the
 constructor — a field added later silently takes its default in every row that path writes.
 
 After changing a row class: `dart run dartway_cli:dartway generate`, then `dart run bin/migrate.dart create <name>` from
@@ -160,7 +165,7 @@ repositories are generated extension getters (`lib/generated/dw_schema.dart`):
 final me = await ctx.profile;
 final rows = await ctx.db.invoices.find(
   where: (t) =>
-      t.ownerProfileId.equals(me.id!) & t.status.notEquals(InvoiceStatus.draft),
+      t.ownerProfileId.equals(me.id) & t.status.notEquals(InvoiceStatus.draft),
   orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
   limit: 50,
 );
@@ -177,7 +182,7 @@ final latest = await ctx.db.invoices.findFirstPer(                  // Map<int, 
   orderBy: (t) => [t.createdAt.desc()],
 );
 
-final created = await ctx.db.invoices.insert(InvoiceRow(/* … */));   // returns it with its id
+final created = await ctx.db.invoices.insert(NewInvoiceRow(/* … */)); // the stored row, id included
 final saved = await ctx.db.invoices.update(row.copyWith(status: InvoiceStatus.sent));
 await ctx.db.invoices.updateWhere(
   where: (t) => t.status.equals(InvoiceStatus.draft),
@@ -190,7 +195,7 @@ Conditions: `equals`, `notEquals`, `isNull`, `isNotNull`, `inList`, `notInList`,
 `between`, `like`, `ilike`, on a list column `isEmptyList`, `isNotEmptyList`, `contains`,
 `containsAny`, combined with `&`, `|`, `not()`. An aggregate or a condition on a list over one table
 is the repository's — raw SQL for it spells enum values as literals that break silently on a
-rename. `upsert(row, conflictOn: (t) => [t.key])` is "insert or overwrite" in one statement, and
+rename. `upsert(draft, conflictOn: (t) => [t.key])` is "insert or overwrite" in one statement, and
 `updateWhereReturning` answers the updated rows to publish. Values are always bound parameters. Escape
 `%`, `_` and `\` in text a user typed before putting it into a `like` pattern. `update` of a missing
 id throws `DwRowNotFound` — an update that changed nothing is a failure.
@@ -204,7 +209,7 @@ so the handler refuses cleanly instead of failing (here a payment row whose `inv
 
 ```dart
 final paid = await ctx.db.invoicePayments.tryInsert(
-  InvoicePaymentRow(invoiceId: invoice.id!, paidAt: DateTime.now()),
+  NewInvoicePaymentRow(invoiceId: invoice.id, paidAt: DateTime.now()),
   onConflict: DwOnConflict.doNothing((t) => [t.invoiceId]),
 );
 if (paid == null) ctx.refuse(AcmeRefusal.invoiceAlreadyPaid);
@@ -251,7 +256,7 @@ final invoiceHandlers = <DwCallHandler>[
       return InvoiceObjects.invoices(
         ctx,
         await ctx.db.invoices.find(
-          where: (t) => t.ownerProfileId.equals(me.id!),
+          where: (t) => t.ownerProfileId.equals(me.id),
           orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
         ),
       );
@@ -343,12 +348,12 @@ abstract final class InvoiceObjects {
       for (final customer in await ctx.db.customers.findByIds(
         rows.map((row) => row.customerId),
       ))
-        customer.id!: customer,
+        customer.id: customer,
     };
     return [
       for (final row in rows)
         CustomerInvoice(
-          id: row.id!,
+          id: row.id,
           customerName: customers[row.customerId]!.name,
           amountCents: row.amountCents,
           status: row.status,
