@@ -13,7 +13,7 @@ final class ListNews extends DwListRequest<NewsPost> with _$ListNews {
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.news),
+    DwLiveChannel(DartwayExampleChannel.news),
   ];
 }
 
@@ -30,7 +30,7 @@ The server — who may call it, what it does, who hears about it
 
 ```dart
 DwCallHandler.command<PublishNews, NewsPost>(
-  access: ExampleAccess.staff,
+  access: AppAccess.staff,
   handle: (ctx, command) async {
     final me = await ctx.profile;
     final row = await ctx.db.newsPosts.insert(
@@ -41,8 +41,8 @@ DwCallHandler.command<PublishNews, NewsPost>(
         createdAt: DateTime.now(),
       ),
     );
-    final post = (await ClubObjects.news(ctx.db, [row], author: me)).single;
-    ctx.publish(_news, post);
+    final post = (await ContentObjects.news(ctx.db, [row], author: me)).single;
+    ctx.publish(AppChannels.news, post);
     return post;
   },
 ),

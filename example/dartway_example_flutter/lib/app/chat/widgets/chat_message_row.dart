@@ -9,6 +9,7 @@ import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_commands.dart';
 
 /// One message of the list with what stands above it: the day it starts, the
 /// unread divider, the author's name and avatar for the first and last of a
@@ -94,7 +95,7 @@ class ChatMessageRow extends StatelessWidget {
             spacing: 4,
             runSpacing: 4,
             children: [
-              ..._reactions(message, me.id),
+              ..._reactions(context, message, me.id),
               ChatMessageMeta(
                 time: message.sentAt.timeLabel,
                 editedLabel: message.editedAt == null ? null : l10n.chatEdited,
@@ -124,7 +125,10 @@ class ChatMessageRow extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.end,
             children: [
               if (!isMine) ...[
-                ChatAuthorAvatar(name: message.authorNameIn(l10n), visible: last),
+                ChatAuthorAvatar(
+                  name: message.authorNameIn(l10n),
+                  visible: last,
+                ),
                 const SizedBox(width: 6),
               ],
               Flexible(
@@ -152,7 +156,7 @@ class ChatMessageRow extends StatelessWidget {
     );
   }
 
-  List<Widget> _reactions(ChatMessage message, int myId) {
+  List<Widget> _reactions(BuildContext context, ChatMessage message, int myId) {
     if (message.reactions.isEmpty) return const [];
     final mine = message.reactions
         .firstWhereOrNull((reaction) => reaction.id == myId)
@@ -169,12 +173,9 @@ class ChatMessageRow extends StatelessWidget {
             sign: chatReactionSigns[kind]!,
             count: count,
             isMine: mine == kind,
-            onTap: () => dw.command(
-              ReactToChatMessage(
-                messageId: message.id,
-                reaction: mine == kind ? null : kind,
-              ),
-            ),
+            onTap: () => dw.action(
+              (_) => ChatCommands.react(message, kind, mine: mine),
+            )(context),
           ),
     ];
   }

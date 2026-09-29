@@ -9,11 +9,11 @@ final contentFeature = DwServerFeature(
   handlers: contentHandlers,
   channels: [
     DwChannelRule.single(
-      ExampleChannel.news,
+      DartwayExampleChannel.news,
       canSubscribe: (ctx) async => true,
     ),
     DwChannelRule.single(
-      ExampleChannel.settings,
+      DartwayExampleChannel.settings,
       canSubscribe: (ctx) async => true,
     ),
   ],

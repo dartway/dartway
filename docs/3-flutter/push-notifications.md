@@ -155,7 +155,7 @@ and where an opened notification leads:
 
 ```dart
 final transport = DwFakePushTransport(issuedToken: 'device-token');
-final app = await ExampleTestApp.start(tester, FakeClub(), pushTransports: [transport]);
+final app = await TestApp.start(tester, FakeClub(), pushTransports: [transport]);
 expect(app.server.callsOf<DwRegisterPushToken>(), hasLength(1));
 
 transport.open(const DwPushData(payload: NewsAlert(id: 1)));
@@ -163,7 +163,7 @@ await app.settle(tester);
 expect(find.byType(NewsPage), findsOneWidget);
 ```
 
-The example's `test/app/push_test.dart` holds these, and a cold start that lands on the news.
+The example's `test/core/push/push_opened_listener_test.dart` holds these, and a cold start that lands on the news.
 
 ## See also
 

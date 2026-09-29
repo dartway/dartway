@@ -8,28 +8,15 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_commands.dart';
 
 /// The pinned messages of the channel over its list, newest first: a tap
 /// scrolls to the one shown — reopening the history around it when it is
 /// far back — and turns the bar to the next. Live: a pin anywhere joins it.
-class ChatPinnedSection extends HookConsumerWidget implements DwFeatureWidget {
+class ChatPinnedSection extends HookConsumerWidget {
   const ChatPinnedSection({required this.session, super.key});
 
   final ChatSession session;
-
-  @override
-  DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'chat/pinned-bar',
-    title: 'Pinned messages',
-    behaviors: [
-      'Shows the newest pinned message first; the strip on the left tells '
-          'which of them is shown.',
-      'A tap scrolls the chat to the message shown and turns the bar to the '
-          'next one, round and round.',
-      'The cross unpins the message shown, for the whole team.',
-      'A message pinned or unpinned by anyone appears or leaves at once.',
-    ],
-  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -63,7 +50,7 @@ class ChatPinnedSection extends HookConsumerWidget implements DwFeatureWidget {
         unawaited(session.showMessage(message.id, message.sentAt));
       },
       onUnpin: () =>
-          dw.command(PinChatMessage(messageId: message.id, pinned: false)),
+          dw.action((_) => ChatCommands.pin(message, pinned: false))(context),
     );
   }
 }

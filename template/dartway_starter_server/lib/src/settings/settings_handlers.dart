@@ -7,6 +7,7 @@ import '../core/channels.dart';
 import 'settings_rows.dart';
 
 final settingsHandlers = <DwCallHandler>[
+  /// Every app setting. Every signed-in member.
   DwCallHandler.list<ListAppSettings, AppSetting>(
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async => [
@@ -17,6 +18,7 @@ final settingsHandlers = <DwCallHandler>[
     ],
   ),
 
+  /// Writes an app setting. Admins only; published to every member.
   DwCallHandler.command<SaveAppSetting, AppSetting>(
     access: AppAccess.admin,
     handle: (ctx, command) async {

@@ -1,3 +1,4 @@
+import 'package:dartway_starter_flutter/app/profile/identity/logic/identity_commands.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
@@ -6,13 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 
-/// Adds or changes one identifier: the new value, then the code sent to it.
-///
-/// `DwRequestIdentifierCode` asks for the code; `DwConfirmIdentifier` confirms
-/// it — with `replace` when the member already has one of this kind, so the
-/// new value takes the old one's place instead of signing in beside it. The
-/// profile is not read again: the server republishes it in the confirming
-/// transaction, and the answer already carries it.
+/// Adds or changes one identifier: the new value, then the code sent to it
+/// ([IdentityCommands]).
 class IdentityChangeSheet extends HookWidget {
   const IdentityChangeSheet({
     required this.kind,
@@ -34,13 +30,7 @@ class IdentityChangeSheet extends HookWidget {
     final sent = ticket.value;
 
     Future<DwCallResult<DwCodeTicket>> requestCode() async {
-      final result = await dw.command(
-        DwRequestIdentifierCode(
-          kind: kind,
-          identifier:
-              AuthIdentifier.normalize(kind, draft.value) ?? draft.value,
-        ),
-      );
+      final result = await IdentityCommands.requestCode(kind, draft.value);
       if (result case DwCallOk(:final value)) {
         code.value = '';
         ticket.value = value;
@@ -49,12 +39,10 @@ class IdentityChangeSheet extends HookWidget {
     }
 
     Future<DwCallResult<DwIdentityInfo>> confirm() async {
-      final result = await dw.command(
-        DwConfirmIdentifier(
-          ticketId: sent!.id,
-          code: code.value,
-          replace: current != null,
-        ),
+      final result = await IdentityCommands.confirm(
+        sent!,
+        code.value,
+        replace: current != null,
       );
       // Taken by another account: the ticket is used up, and the way on is
       // another value.

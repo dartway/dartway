@@ -9,12 +9,14 @@ and are claimed by exactly one worker even when several processes run.
 
 A job has two halves. **What it is** — its name and how its payload travels as JSON — is a
 `DwJobKind<P>`, a constant the places that enqueue it import. **How it runs** is a `DwQueuedJob<P>`
-in the server's job list, often built from a service instance the enqueuing code never sees:
+in the job list of the feature it belongs to, often built from a service instance the enqueuing code
+never sees. Both live in the feature's `<feature>_jobs.dart`:
 
 ```dart
-abstract final class InvoiceJobs {
+// lib/src/invoices/invoices_jobs.dart
+abstract final class InvoicesJobs {
   static const send = DwJobKind<({int invoiceId})>(
-    'invoice.send',
+    'invoices.send',
     encode: _encode,
     decode: _decode,
   );
@@ -24,23 +26,28 @@ abstract final class InvoiceJobs {
       (invoiceId: json['invoiceId']! as int);
 }
 
-final invoiceJobs = <DwJobDefinition>[
+final invoicesJobs = <DwJobDefinition>[
   DwQueuedJob(
-    InvoiceJobs.send,
+    InvoicesJobs.send,
     handle: (ctx, p) async => ctx.log.info('sending invoice ${p.invoiceId}'),
   ),
   DwRecurringJob(
-    'invoice.markOverdue',
+    'invoices.mark_overdue',
     every: const Duration(hours: 1),
-    handle: (ctx) => ctx.db.execute(
-      'UPDATE invoice SET overdue = true '
-      'WHERE due_at < now() AND paid_at IS NULL AND NOT overdue',
+    handle: (ctx) => ctx.db.invoices.updateWhere(
+      where: (t) =>
+          t.dueAt.lt(DateTime.now()) & t.paidAt.isNull() & t.overdue.equals(false),
+      set: (t) => [t.overdue.set(true)],
     ),
   ),
 ];
 ```
 
-passed as a feature's `DwServerFeature(jobs: invoiceJobs)`.
+passed as that feature's `DwServerFeature(jobs: invoicesJobs)` — there is no app-wide job list. The
+kinds' class is `<Feature>Jobs`, the list `<feature>Jobs`, and a job's name
+`'<feature>.<snake_case>'`. The
+example's `bookings/bookings_jobs.dart` is a worked one: `BookSession` enqueues a reminder two hours
+before the session, and the job decides when it runs whether the booking is still active.
 
 **`DwJobKind<P>(name, {encode, decode})`** — the one place a payload is spelled as a map: `encode`
 runs at the enqueue, `decode` before the handler, and both sides see `P` (a record, a class, `int`).
@@ -74,7 +81,7 @@ Future<bool> enqueue<P>(
   String? key,
 });
 
-await ctx.jobs.enqueue(InvoiceJobs.send, (invoiceId: invoice.id!));
+await ctx.jobs.enqueue(InvoicesJobs.send, (invoiceId: invoice.id!));
 ```
 
 - The row is written through `ctx.db`, so **an enqueue joins the enclosing transaction**: inside a

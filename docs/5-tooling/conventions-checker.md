@@ -178,8 +178,8 @@ Generated files (`.g.dart`, `.gen.dart`, `.freezed.dart`) are nobody's code and 
 
 Scope is two scopes rather than one. The **feature-shaped** areas are the four zones, which must be
 built of features and are asked for a `DwFeatureSpec`. The **checked** areas add `shared/`: its files
-are read for the cleanliness and kit rules, but no spec is expected, because a building block has no
-product behaviour to describe. `ui_kit/` has its own pass. `core/` is skipped entirely — a known gap,
+are read for the cleanliness and kit rules, but no spec is expected, because a helper has no product
+behaviour to describe. `ui_kit/` has its own pass. `core/` is skipped entirely — a known gap,
 left open as a decision rather than an oversight.
 
 The report is organised **per feature**, so a large project reads as a list of features to fix rather
@@ -241,7 +241,7 @@ provider-only folder passed *because* it was not a widget — a real project acc
 every one graded A.
 
 Where they go instead: state that several features watch is wiring, so `lib/core/`; a helper with no
-story of its own is a building block, so `lib/shared/`.
+story of its own goes to `lib/shared/`, or to `lib/ui_kit/` when it draws something.
 
 The widget test asks whether a **public class extends anything named `*Widget`**, not whether it
 matches a list of base classes. A list of remembered names once missed `ConsumerStatefulWidget` —
@@ -269,7 +269,8 @@ Four things it does *not* get wrong, because each once cost a real false positiv
 - **dead code keeps dead code alive** — the sweep repeats until a pass buries nothing.
 
 What it cannot see: a reference made through a string, and a file whose halves only reference each
-other. The finding names where the file should go instead — `lib/shared/`, `lib/core/`, or
+other. The finding names where the file should go instead — `lib/shared/` (`lib/ui_kit/` for a
+widget), `lib/core/`, or
 `lib/core/platform/` for a platform trio — because "dead code" is half an answer: a file its own
 feature stopped using is often a file somebody else needs.
 

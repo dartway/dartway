@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'example_channel.dart';
-import 'example_refusal.dart';
+import 'dartway_example_channel.dart';
+import 'dartway_example_refusal.dart';
 import 'schedule.dart';
 
 part 'bookings.dw.dart';
@@ -60,7 +60,7 @@ final class ListMyBookings extends DwListRequest<SessionBooking>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel.ofCaller(ExampleChannel.bookings),
+    DwLiveChannel.ofCaller(DartwayExampleChannel.bookings),
   ];
 
   @override
@@ -105,6 +105,6 @@ final class ReviewVisit extends DwActionCommand<SessionBooking>
   @override
   List<DwCallRefusal> validate() => [
     if (rating < 1 || rating > 5)
-      DwCallRefusal(ExampleRefusal.ratingOutOfRange, field: 'rating'),
+      DwCallRefusal(DartwayExampleRefusal.ratingOutOfRange, field: 'rating'),
   ];
 }

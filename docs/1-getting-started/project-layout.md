@@ -56,8 +56,9 @@ my_app_shared/
 server and into the app alike, so it cannot reach for Flutter, a database or IO. A rule that needs the
 database is not a shared rule — it is a handler's.
 
-The three enums are named after the project — `<Project>Channel`, `<Project>Refusal`,
-`<Project>Upload` — so a project's own codes never read as the framework's.
+The three enums are named after the shared package — `my_app_shared` declares `MyAppChannel`,
+`MyAppRefusal`, `MyAppUpload`, the prefix taken mechanically from the package's name — so a project's
+own codes never read as the framework's, and no two projects spell the rule differently.
 
 ## `my_app_server` — where the rules live
 
@@ -71,7 +72,7 @@ my_app_server/
   lib/generated/
     dw_schema.dart         the schema and the db.<table> getters — generated
   lib/src/
-    core/                  the server-wide wiring
+    core/                  the server-wide wiring: fixed names, App* classes
       auth.dart            DwAuthConfig: code delivery, the profile made with each account
       call_context.dart    what "the caller" means to this app: ctx.profile, the access rules
       channels.dart        the channels handlers publish to
@@ -85,6 +86,7 @@ my_app_server/
       profile_handlers.dart one DwCallHandler per request and command
       profile_objects.dart rows → the data objects clients see, related data in batches
       profile_publications.dart what a change publishes, and to whom
+      profile_jobs.dart    its job kinds and definitions, when it has jobs
     admin/, settings/      the skeleton's other features, the same shape
   test/                    acceptance tests on a real server, database and storage
   docker-compose.yaml      development Postgres and RustFS
@@ -93,8 +95,8 @@ my_app_server/
 
 **`lib/src/` is folders: `core/`, `migrations/`, and one per feature** — a law, held by `dartway
 check` as the Flutter package's top level is. A feature's folder holds everything of its area — its
-rows, handlers, objects, publications, jobs and rules, in files named after it, and in subfolders
-when it grows — and declares itself in `<feature>_feature.dart` as a `DwServerFeature` the server
+rows, handlers, objects, publications and jobs, each in a file named `<feature>_*.dart` — and
+declares itself in `<feature>_feature.dart` as a `DwServerFeature` the server
 lists. No file sits at the top of `src/`, and no folder there is named for a layer (`handlers/`,
 `rows/`, `entities/`, `domain/`, `objects/`, `services/`): a feature split across layers lives in
 four places, and a project that grew that way ended with a `chat/` beside a `domain/chat/` and two
@@ -128,10 +130,11 @@ my_app_flutter/lib/
   common/                features more than one zone draws on (create it when that happens)
 
   LAYERS — everything that is not a feature
-  core/                  app-wide wiring: dw_core.dart, router/, refusal_text.dart,
-                         update_required_page.dart, profile/, app_settings/, dev/
-  shared/                building blocks: widgets and helpers with no story of their own
-  ui_kit/                your design system, as source
+  core/                  app-wide wiring: dw_core.dart, router/ (with the zones' shells),
+                         refusal_text.dart, update_required_page.dart, profile/,
+                         app_settings/, dev/
+  shared/                non-visual helpers several features use: extensions, formatters
+  ui_kit/                your design system, as source — styles and every visual building block
   l10n/                  ARB files and their generated output
 ```
 
@@ -171,8 +174,9 @@ internals; any other subfolder is read as a nested feature.
 
 A feature has exactly one root file, and no feature imports another feature's `widgets/` or `logic/`.
 Behaviour two features share is one more feature; a widget with no story of its own is a building
-block in `lib/shared/`. The entry point declares what it is in a `DwFeatureSpec` beside its code —
-see [features and specs](../3-flutter/features-and-specs.md).
+block in `lib/ui_kit/`. The entry point — and no other file of the feature — declares what it is in a
+`DwFeatureSpec` beside its code, and a feature sends its commands from its `logic/` — see [features
+and specs](../3-flutter/features-and-specs.md).
 
 ### Why the kit is source in your app, not a dependency
 

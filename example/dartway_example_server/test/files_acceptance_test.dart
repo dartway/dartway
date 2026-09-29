@@ -7,7 +7,7 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/club_harness.dart';
+import 'support/app_harness.dart';
 
 /// The club's uploads on real storage: a member's avatar goes to the public
 /// bucket and opens for anyone by its URL. Needs `DW_STORAGE_ENDPOINT`,
@@ -21,9 +21,9 @@ void main() {
     };
 
     test('without an endpoint there is no storage', () {
-      expect(ExampleFiles.storageConfig(const {}), isNull);
+      expect(AppFiles.storageConfig(const {}), isNull);
       expect(
-        ExampleFiles.storageConfig(const {
+        AppFiles.storageConfig(const {
           'DW_STORAGE_ENDPOINT': '',
           ...credentials,
         }),
@@ -32,7 +32,7 @@ void main() {
     });
 
     test('a development storage needs only its endpoint and keys', () {
-      final config = ExampleFiles.storageConfig(const {
+      final config = AppFiles.storageConfig(const {
         'DW_STORAGE_ENDPOINT': 'http://127.0.0.1:9000',
         ...credentials,
       })!;
@@ -46,7 +46,7 @@ void main() {
     });
 
     test('what the environment names wins over every default', () {
-      final config = ExampleFiles.storageConfig(const {
+      final config = AppFiles.storageConfig(const {
         'DW_STORAGE_ENDPOINT': 'https://storage.yandexcloud.net',
         'DW_STORAGE_PUBLIC_BUCKET': 'club-files',
         'DW_STORAGE_PUBLIC_BASE_URL': 'https://cdn.club.example',
@@ -63,11 +63,11 @@ void main() {
 
   group('on real storage', () {
     late DwTestStorage storage;
-    late ClubHarness club;
+    late AppHarness club;
 
     setUpAll(() async {
       storage = await DwTestStorage.create(prefix: 'club-test');
-      club = await ClubHarness.start(storage: storage.config);
+      club = await AppHarness.start(storage: storage.config);
     });
     tearDownAll(() async {
       await club.stop();
@@ -76,10 +76,10 @@ void main() {
 
     test('an avatar lands in the public bucket and opens for anyone by its '
         'URL', () async {
-      final vera = await club.member('+7 999 000-00-90', 'Vera');
+      final vera = await club.signUp('+7 999 000-00-90', firstName: 'Vera');
       final photo = Uint8List.fromList(List.generate(128, (i) => i));
       final uploaded = await vera.client.files.upload(
-        ExampleUpload.avatar,
+        DartwayExampleUpload.avatar,
         DwUploadSource.bytes(photo),
         fileName: 'vera.png',
         contentType: 'image/png',
@@ -111,13 +111,13 @@ void main() {
           protocol: DwWireProtocol(const []),
           migrations: appMigrations,
           database: club.database.config,
-          auth: ExampleAuth.config,
+          auth: AppAuth.config,
           features: const [],
           files: DwFileStorage(
             storage.config,
             // The club's own rules hold a private purpose (chat
             // attachments), and nothing else is needed for it.
-            rules: ExampleFiles.uploadRules,
+            rules: AppFiles.uploadRules,
           ),
         ),
       );
@@ -126,9 +126,9 @@ void main() {
 
     test('an avatar of a type the rule does not take is refused before '
         'storage sees it', () async {
-      final ivan = await club.member('+7 999 000-00-91', 'Ivan');
+      final ivan = await club.signUp('+7 999 000-00-91', firstName: 'Ivan');
       final uploaded = await ivan.client.files.upload(
-        ExampleUpload.avatar,
+        DartwayExampleUpload.avatar,
         DwUploadSource.bytes(Uint8List(16)),
         fileName: 'ivan.gif',
         contentType: 'image/gif',

@@ -78,7 +78,8 @@ enum DwCheckType {
 
   /// A folder in a zone whose entry point declares no widget. A zone holds
   /// features; a provider several features watch is wiring (`core/`), and a
-  /// helper with no story of its own is a building block (`shared/`).
+  /// helper with no story of its own is `shared/`, or `ui_kit/` when it
+  /// draws something.
   ///
   /// The twin of [featureSpecMissing], and neither works without the other:
   /// while only widgets were asked for a spec, a folder that was not a widget

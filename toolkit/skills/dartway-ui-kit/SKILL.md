@@ -62,10 +62,12 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
    colours, not the absence of `of(context)`.
 4. **Isolated visual layer.** The kit does not depend on business logic or state. A component =
    pure visuals + minimal props.
-5. **The kit is the app's design system, not a library of shared widgets.** A composite needed by a
-   single feature (an event card, a card feed, a section header) is also the kit: the `3_special/` zone
-   exists for exactly this. What stays in the feature is **mapping the domain** to the kit's parameters,
-   not layout.
+5. **Every visual building block lives here, and nowhere else.** A block many screens draw (a
+   load-failed message, an avatar) goes to `2_frequent/`; a composite one area needs (an event card, a
+   card feed, a section header) to `3_special/`. `lib/shared/` holds no widgets — only non-visual
+   helpers several features use (an extension on a data object, a formatter) — and a feature's
+   `widgets/` is its private layout. What stays in the feature is **mapping the domain** to the kit's
+   parameters, not layout.
 
 6. **The public API of a kit widget takes no visual types.** No `Color`, `TextStyle`,
    `EdgeInsets`, `BorderRadius`, `BoxDecoration` in the constructor — the look is chosen by **named
@@ -256,7 +258,7 @@ Need a new style — **add a value to `AppTextStyle` and a constructor to `AppTe
 
 **Every project is localized, and user-visible text is never written in code.** This is a requirement on the project, not a report on how it began. What has to be present: `flutter_localizations` and `generate: true` in the Flutter pubspec, `l10n.yaml` and `lib/l10n/*.arb` with its generated output committed beside them, `appLocaleProvider` (the system locale when supported, the first supported one otherwise), `context.l10n` in widgets and `appL10n` for code outside the tree — an error toast, a refusal text. `dart run dartway_cli:dartway check` reports a missing piece as `l10nNotWired`, an error.
 
-**Refusals are texts of the app.** The server sends codes with parameters; `lib/core/` maps every code — the project's `<Project>Refusal`, the framework's `dw.*` codes — to a localized string, and `DwFlutterConfig.refusalText` hands that mapping to the core. A code without a text is a user staring at a code.
+**Refusals are texts of the app.** The server sends codes with parameters; `lib/core/` maps every code — the project's `<Package>Refusal`, the framework's `dw.*` codes — to a localized string, and `DwFlutterConfig.refusalText` hands that mapping to the core. A code without a text is a user staring at a code.
 
 **The law reaches as far as the app does, and no further.** Text composed on the *server* — a sign-in code message, an e-mail — is outside it: there is no `appL10n` there. That text has no rule yet, which is a gap named rather than covered; a project sending server-composed text in more than one language decides for itself how, and says so where its next reader will look.
 
@@ -276,7 +278,7 @@ and hands back a ready `onPressed` (`null` while the action runs) and `busy`.
 AppButton.primary(
   l10n.saveAction,
   onTap: dw.action(
-    (context) => dw.command(PayInvoice(invoiceId: invoice.id)),
+    (_) => InvoiceCardCommands.pay(invoice), // dw.command, in the feature's logic/
     onSuccessNotification: l10n.invoicePaid,
   ),
 )

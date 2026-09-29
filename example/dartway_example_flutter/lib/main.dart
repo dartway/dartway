@@ -51,7 +51,7 @@ Future<void> main() async {
 
   DartwayExampleApp(
     baseUrl: Uri.parse(backendUrl),
-    appVersion: exampleAppVersion,
+    appVersion: appBuildVersion,
     pushTransports: [
       if (await firebaseConfigured())
         DwFirebasePush(

@@ -30,8 +30,9 @@ Related skills: `dartway-server` (the handler of every call declared here), `dar
 (channels, `matches`, `sort`, update actions), `dartway-access` (who may call), `dartway-data-layer`
 (how the app watches and sends these), `dartway-uploads`, `dartway-testing`.
 
-In the samples below `AppChannel` and `AppRefusal` stand for the project's own
-`<Project>Channel` and `<Project>Refusal`; the domain (`CustomerInvoice`) is invented.
+In the samples below the shared package is `acme_shared`, so its enums are `AcmeChannel`,
+`AcmeRefusal` and `AcmeUpload` — a project's are named after `__SHARED_PKG__` the same way (toolkit
+`CLAUDE.md`, law 5); the domain (`CustomerInvoice`) is invented.
 
 ## 1. Three kinds of DTO, nothing else
 
@@ -104,9 +105,9 @@ Every public class name has two or more words (`Dw` is not a word).
 | Read | `Get…` (one object), `List…` (many) | `GetInvoice`, `ListMyInvoices`, `ListOverdueInvoices` |
 | Change | verb + object | `CreateInvoice`, `PayInvoice`, `CancelInvoice` |
 | Caller-scoped call | `My` in the name, no account id in the fields | `ListMyInvoices`, `UpdateMyProfile` |
-| Channel kinds | `<Project>Channel` enum `with DwChannelKind` | |
-| Refusal codes | `<Project>Refusal` enum `with DwRefusalCodes` | |
-| Upload purposes | `<Project>Upload` enum `with DwUploadPurpose` | |
+| Channel kinds | `<Package>Channel` enum `with DwChannelKind` | |
+| Refusal codes | `<Package>Refusal` enum `with DwRefusalCodes` | |
+| Upload purposes | `<Package>Upload` enum `with DwUploadPurpose` | |
 
 **The class name is the wire name** — the call path is `POST /dw/<ClassName>` and updates are grouped
 by it. Renaming a DTO class is a wire change (section 9).
@@ -143,7 +144,7 @@ final class ListMyInvoices extends DwListRequest<CustomerInvoice>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel.ofCaller(AppChannel.invoices),
+    DwLiveChannel.ofCaller(AcmeChannel.invoices),
   ];
 
   @override
@@ -167,7 +168,7 @@ final class ListInvoicesPage extends DwTableRequest<CustomerInvoice>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(AppChannel.billing),
+    DwLiveChannel(AcmeChannel.billing),
   ];
 
   /// The server's filter, on one object: a row that leaves it leaves the page.
@@ -249,7 +250,7 @@ final class EditInvoice extends DwActionCommand<CustomerInvoice>
   @override
   List<DwCallRefusal> validate() => [
     if (amountCents case final amount? when amount <= 0)
-      DwCallRefusal(AppRefusal.amountNotPositive, field: 'amountCents'),
+      DwCallRefusal(AcmeRefusal.amountNotPositive, field: 'amountCents'),
   ];
 }
 ```
@@ -284,7 +285,7 @@ code.
 ```dart
 /// Why the server refuses. Codes only: the app renders each through its
 /// refusal texts, and a code added here needs a text there.
-enum AppRefusal with DwRefusalCodes {
+enum AcmeRefusal with DwRefusalCodes {
   /// An invoice that is paid cannot be edited or paid again.
   invoiceAlreadyPaid,
 
@@ -293,7 +294,7 @@ enum AppRefusal with DwRefusalCodes {
 }
 
 /// The app's live channels. The server declares who may subscribe to each.
-enum AppChannel with DwChannelKind {
+enum AcmeChannel with DwChannelKind {
   /// One member's own invoices: a caller channel. Its owner only.
   invoices,
 
@@ -302,7 +303,7 @@ enum AppChannel with DwChannelKind {
 }
 
 /// What an uploaded file is for. The server declares one rule per purpose.
-enum AppUpload with DwUploadPurpose {
+enum AcmeUpload with DwUploadPurpose {
   invoiceScan;
 
   /// Read by the server's rule and by the app's picker alike.

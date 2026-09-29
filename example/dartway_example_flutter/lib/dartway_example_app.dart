@@ -34,7 +34,7 @@ class DartwayExampleApp {
     // Built here, started by the runner: `dw.init()` starts the plugins and
     // reads the stored session, without waiting for the server — a start
     // offline is a start.
-    ExampleDwCore.create(
+    AppDwCore.create(
       baseUrl: baseUrl,
       appVersion: appVersion,
       pushTransports: pushTransports,
@@ -45,7 +45,7 @@ class DartwayExampleApp {
       // `onErrorReport` sorts them out.
       appInitializers: [dw.init],
       supportedLocales: AppLocalizations.supportedLocales,
-      child: const ExampleApp(),
+      child: const AppRoot(),
     ).run();
   }
 }
@@ -53,8 +53,8 @@ class DartwayExampleApp {
 /// The application widget: router, localizations, theme, notifications and
 /// the profile gate. A widget test pumps it inside its own `ProviderScope`
 /// once it has built a core.
-class ExampleApp extends ConsumerWidget {
-  const ExampleApp({super.key});
+class AppRoot extends ConsumerWidget {
+  const AppRoot({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {

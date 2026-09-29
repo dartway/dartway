@@ -2,12 +2,12 @@ import 'package:dartway_example_flutter/app/services/widgets/service_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
-import 'package:dartway_example_flutter/shared/widgets/app_scaffold.dart';
-import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
+import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/async_section.dart';
 
 class ServicesPage extends ConsumerWidget implements DwFeatureWidget {
   const ServicesPage({super.key});

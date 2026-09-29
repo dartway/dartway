@@ -5,4 +5,4 @@
 /// question, not the build's. Written out here
 /// because a build cannot read its own pubspec, and kept equal to it by
 /// `test/app_version_test.dart`.
-const String exampleAppVersion = '1.0.0+1';
+const String appBuildVersion = '1.0.0+1';

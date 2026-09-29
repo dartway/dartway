@@ -11,7 +11,8 @@
 # that failed belonged to a package they had no reason to open.
 #
 #   tool/checks.sh             analyze + test: needs no Docker
-#   tool/checks.sh analyze     dart analyze over every resolution root
+#   tool/checks.sh analyze     dart analyze over every resolution root, and
+#                              dartway check over template/ and example/
 #   tool/checks.sh test        every suite that needs no services, plus every
 #                              `js/*` npm package (typecheck, node --test, build)
 #   tool/checks.sh services    the suites of the packages named in SERVICES,
@@ -216,6 +217,26 @@ test_suites() {
   done
 }
 
+# `dartway check` over the two projects this repository hands out and shows:
+# the skeleton `dartway create` copies, and the reference application agents
+# read. Both are what a project's code is written after, so a convention they
+# break is a convention every new project breaks — and nothing else runs the
+# checker over them. Errors fail the gate; warnings and infos are printed and
+# pass, as they do in a project.
+#
+# `migrationsDrift` needs a Postgres the analyze mode does not have: the check
+# reports it as not checked and moves on. The migrations themselves are proved
+# against a real database by `dartway test` in database.yml.
+CHECKED_PROJECTS="template/dartway_starter_flutter example/dartway_example_flutter"
+
+project_checks() {
+  echo "══ dartway check"
+  for project in $CHECKED_PROJECTS; do
+    run "dartway check: $project" \
+      bash -c "cd '$project' && dart run dartway_cli:dartway check"
+  done
+}
+
 # The JavaScript half of the monorepo: each `js/*` package is its own npm
 # project (no workspace, no shared `resolve`), checked by its own `npm run
 # check` — typecheck, `node --test`, and the build that would ship to npm.
@@ -325,6 +346,7 @@ service_suites() {
 [ "$MODE" = services ] && require_services
 resolve
 [ "$MODE" = all ] || [ "$MODE" = analyze ] && analyze
+[ "$MODE" = all ] || [ "$MODE" = analyze ] && project_checks
 [ "$MODE" = all ] || [ "$MODE" = test ] && test_suites
 [ "$MODE" = all ] || [ "$MODE" = test ] && js_checks
 [ "$MODE" = services ] && service_suites

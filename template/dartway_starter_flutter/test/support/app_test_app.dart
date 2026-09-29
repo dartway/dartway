@@ -263,3 +263,62 @@ final class TestApp {
     expect(server.errors, isEmpty, reason: 'the fake server met a surprise');
   }
 }
+
+/// A member of the admin panel's tables: the [n]th, with [role].
+UserProfile member(int n, {UserRole role = UserRole.user}) => UserProfile(
+  id: 100 + n,
+  accountId: 1000 + n,
+  phone: '7999100${n.toString().padLeft(4, '0')}',
+  firstName: 'Member ${n.toString().padLeft(2, '0')}',
+  role: role,
+  joinedAt: DateTime.utc(2026, 9, 1),
+);
+
+/// An admin whose server knows [members] and answers the admin panel's
+/// reads.
+FakeApp adminWith(List<UserProfile> members) {
+  final fake = FakeApp(role: UserRole.admin, firstName: 'Anna');
+  fake.server
+    ..onRequest<GetAdminCounters>(
+      (request, call) => DwCallOk(
+        AdminCounters(
+          members: members.length,
+          admins: members.where((m) => m.isAdmin).length,
+          marketingOptIns: 0,
+        ),
+      ),
+    )
+    ..onRequest<ListUserProfiles>(
+      (request, call) => DwCallOk(dwFakeTablePage(members, request)),
+    )
+    // The panel opens on the dashboard, analytics under the counters.
+    ..onRequest<DwListAnalyticsDashboards>(
+      (request, call) => const DwCallOk(<DwAnalyticsDashboard>[]),
+    );
+  return fake;
+}
+
+/// The admin panel's members table, opened the way an admin gets there.
+Future<TestApp> openAdminUsers(WidgetTester tester, FakeApp fake) async {
+  final app = await TestApp.start(tester, fake, size: const Size(390, 900));
+  await app.tap(tester, find.text('Profile'));
+  await app.tap(tester, find.text('Admin panel'));
+  await app.tap(tester, find.text('Users'));
+  return app;
+}
+
+/// The signed-in member's profile, opened from the tab bar.
+Future<TestApp> openProfile(
+  WidgetTester tester,
+  FakeApp fake, {
+  DwStorageTransport? storageTransport,
+}) async {
+  final app = await TestApp.start(
+    tester,
+    fake,
+    size: const Size(390, 1400),
+    storageTransport: storageTransport,
+  );
+  await app.tap(tester, find.text('Profile'));
+  return app;
+}

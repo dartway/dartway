@@ -6,8 +6,8 @@ description: >-
   codes; (2) the server in __SERVER_PKG__ — row class, `dart run dartway_cli:dartway generate`, a reviewed migration
   draft, one handler per call with its access rule, rows mapped to data objects in batch, publishing
   what a command changed; (3) the Flutter feature in __FLUTTER_PKG__ — a folder with one public file
-  declaring its DwFeatureSpec, widgets/ and logic/, ref.watch(dw.request(...)),
-  dw.action((_) => dw.command(...)), texts in l10n including refusal texts; (4) tests and checks.
+  declaring its DwFeatureSpec, widgets/ and logic/, ref.watch(dw.request(...)), commands sent from
+  logic/ inside dw.action, texts in l10n including refusal texts; (4) tests and checks.
   Also the Flutter feature law: what a feature, a group and a building block are, isolation (import
   the public file only), where logic lives, and that a feature must be constructible from its address
   (identifiers and data objects), never from lists and callbacks its parent assembled. Use when
@@ -72,8 +72,9 @@ it declares itself in `<feature>_feature.dart`. Never a file at the top of `src/
    then on it is an ordinary migration and yours: a new non-null column on a table with rows needs a
    default or a backfill, a rename is not a drop and an add (`dartway-migrations`).
 4. **Handlers — one per request and command**, each with its access rule (`dartway-access`):
-   ownership checked in the handler, someone else's row answering `dw.notFound`; commands locking the
-   row they change (`DwRowLock.forUpdate`); refusals with `ctx.refuse`.
+   ownership checked by `DwAccessRule.resource`, someone else's row answering `dw.notFound`; commands
+   locking the row they change (`DwRowLock.forUpdate`); refusals with `ctx.refuse`; a `///` doc
+   comment above each handler — who may call it, what it changes and publishes.
 5. **Rows → data objects in batch** — one mapping function per area, relations loaded with
    `findByIds` once per relation; every handler and every publication goes through it.
 6. **Publish what a command changed** to every channel that shows it, after commit
@@ -96,19 +97,23 @@ is not the admin panel, it is a group that has quietly left every check written 
 
 ```
 lib/app/<feature>/
-  <feature>_page.dart        // the only public file — a widget
-  widgets/                   // the feature's building blocks
+  <feature>_page.dart        // the only public file — a widget, the only DwFeatureSpec
+  widgets/                   // the feature's private layout
     <feature>_row.dart
-  logic/                     // optional: providers, enums, helpers of this feature only
+  logic/                     // state, rules and commands of this feature only
+    <feature>_commands.dart  // every dw.command the feature sends
     <feature>_filter.dart
 ```
 
 - **The public file** is the only file imported from outside, at any nesting depth, and it is a
-  widget: a page, or a widget that carries its own way of being shown.
-- **`widgets/`** holds blocks only — what lays out what it was handed.
-- **`logic/`** holds what only this feature uses.
-- Cross-feature helpers (an extension on a data object, a formatter) → `lib/shared/`. Styles →
-  `ui_kit.dart` only. Imports: relative inside the feature and to a sibling feature (at most two
+  widget: a page, or a widget that carries its own way of being shown. It alone declares a
+  `DwFeatureSpec`.
+- **`widgets/`** holds the feature's private layout — what lays out what it was handed. No spec, and
+  no command.
+- **`logic/`** holds what only this feature uses: its providers and notifiers, and every
+  `dw.command` it sends (`<feature>_commands.dart`, or the notifier of a flow).
+- Non-visual cross-feature helpers (an extension on a data object, a formatter) → `lib/shared/`. A
+  visual building block → `lib/ui_kit/` (`2_frequent/`, `3_special/`). Styles → `ui_kit.dart` only. Imports: relative inside the feature and to a sibling feature (at most two
   `../`, `deep_relative_import` warns past that), `package:` for everything further away.
 
 ### Feature, group, building block
@@ -122,7 +127,7 @@ group of features, each with its one public file. **Behaviour two features share
 | | Where | Described by |
 |---|---|---|
 | **Feature** — it reads a data object and **decides** something by it: shows different things in different states, picks a label, hides a button, opens a dialog, sends a command | a zone | `DwFeatureSpec` |
-| **Building block** — it **arranges what it was handed**: a row, an inset, a form field, a badge | `lib/shared/` | a doc comment |
+| **Building block** — it **arranges what it was handed**: a row, an inset, a form field, a badge | `lib/ui_kit/` (or the feature's own `widgets/`) | a doc comment |
 | **Layer** — presentation, wiring, localisation | `ui_kit/`, `core/`, `l10n/` | — |
 
 The criterion is read off the file: **does this widget decide anything by the data, or lay out what it
@@ -132,8 +137,8 @@ a feature standing in the wrong place — move it up beside its neighbours and g
 small**: every feature brings its own `behaviors` and `knownIssues`, so the finer the cut, the denser the
 description.
 
-**Not a feature:** state several features watch and app-wide registries → `lib/core/`; a helper with no
-story → `lib/shared/`. A folder in a zone whose public file is not a widget is `notAFeature` (error);
+**Not a feature:** state several features watch and app-wide registries → `lib/core/`; a non-visual
+helper with no story → `lib/shared/`; a visual one → `lib/ui_kit/`. A folder in a zone whose public file is not a widget is `notAFeature` (error);
 the tell is that you cannot write `purpose` and `behaviors` for it without restating the type name.
 
 ### Where a feature's logic lives — bottom up
@@ -157,9 +162,10 @@ provider in one file — provider first.
 2. **The public widget**, `implements DwFeatureWidget` with its `DwFeatureSpec` (below). Without it
    `dart run dartway_cli:dartway check` warns `featureSpecMissing`.
 3. **Reads:** `ref.watch(dw.request(...))` (or `dw.pages` / `dw.table` / `dw.window`), with the section
-   it exists for rendering its error — the skeleton's shared section extension (`dartway-data-layer`).
-4. **Changes:** `dw.action((_) => dw.command(...))` on the button, in the widget that owns it; a
-   refusal is shown by itself.
+   it exists for rendering its error — the skeleton's section extension in `lib/core/` (`dartway-data-layer`).
+4. **Changes:** `dw.command` in the feature's `logic/<feature>_commands.dart`, run by
+   `dw.action((_) => <Feature>Commands.x(...))` on the button of the widget that owns it; a refusal is
+   shown by itself (`dartway-data-layer`).
 5. **Texts:** every user-visible string in **every** `lib/l10n/*.arb`, then `flutter gen-l10n`; widgets
    read `context.l10n`. **Each new refusal code gets its text** and its case in the app's refusal
    texts in `lib/core/` — the exhaustive switch does not compile until it has one.
@@ -226,6 +232,8 @@ class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
       body: ref.watch(request).dwBuildAsync(
         loadingWidget: const Center(child: CircularProgressIndicator()),
         errorBuilder: (_, _) => LoadFailedMessage(
+          message: l10n.loadFailed,
+          retryLabel: l10n.retry,
           onRetry: dw.action((_) => ref.read(request.notifier).refetch()),
         ),
         childBuilder: (invoices) => invoices.isEmpty
@@ -243,8 +251,8 @@ class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
 
 `InvoiceCard` decides by the invoice (a pay button only while it is unpaid) — so it is a feature of
 its own (`lib/app/invoices/invoice_card/invoice_card.dart`), constructible from the invoice alone, and
-it sends `PayInvoice` from its own button. `AppText` and `LoadFailedMessage` stand for the project's kit
-and shared widgets; in a real screen the skeleton's section extension replaces the manual
+it sends `PayInvoice` from its own button through `logic/invoice_card_commands.dart`. `AppText` and
+`LoadFailedMessage` stand for the project's kit; in a real screen the skeleton's section extension replaces the manual
 `dwBuildAsync` call.
 
 ## The feature spec — `DwFeatureSpec`

@@ -116,8 +116,9 @@ Run the detectors **over the changed files only** (not over the whole repo). For
   endless spinner.
 - Server data copied into widget `State` or a hand-written notifier — it stops following updates.
   Reads are `ref.watch(dw.request(...))`, `dw.pages`, `dw.table`, `dw.window` (`dartway-data-layer`).
-- A raw `onPressed: () async { await dw.command(...) }` instead of `dw.action`; a refusal turned into
-  words anywhere but the app's refusal text (the function `DwFlutterConfig.refusalText` is given).
+- A raw `onPressed: () async { await dw.command(...) }` instead of `dw.action`; a `dw.command` outside
+  the feature's `logic/`; a `DwFeatureSpec` on a file that is not the feature's entry; a refusal turned
+  into words anywhere but the app's refusal text (the function `DwFlutterConfig.refusalText` is given).
 - `GlobalKey().currentState/currentContext` used to look things up in the tree.
 - Outer `padding`/`margin` at the top level of a widget's `build`; a widget that sizes itself.
 - A private widget class inside a feature's public file that **has a `State` or takes a callback** — a

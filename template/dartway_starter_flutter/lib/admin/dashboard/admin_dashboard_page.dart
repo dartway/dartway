@@ -4,7 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:dartway_starter_flutter/admin/analytics/analytics_dashboards_section.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
-import 'package:dartway_starter_flutter/shared/widgets/admin_scaffold.dart';
+import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
 import 'widgets/admin_counter_tiles.dart';
 
 /// Admin home: headline counters the server counts and keeps live, and under
@@ -14,7 +14,7 @@ class AdminDashboardPage extends StatelessWidget implements DwFeatureWidget {
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'admin/dashboard',
+    id: 'dashboard/admin-dashboard',
     title: 'Admin dashboard',
     purpose:
         'The landing screen of the panel: how big the app is right now, and '

@@ -7,10 +7,10 @@ it, on the caller's device and on everyone else's. Nobody polls, and no screen r
 ## Channel kinds and channels
 
 The project declares its kinds as one enum in its shared package
-(`example/dartway_example_shared/lib/src/example_channel.dart`):
+(`example/dartway_example_shared/lib/src/dartway_example_channel.dart`):
 
 ```dart
-enum ExampleChannel with DwChannelKind {
+enum DartwayExampleChannel with DwChannelKind {
   schedule,
   bookings,
   staffChat,
@@ -23,13 +23,13 @@ one instance of a kind:
 
 | Channel | Wire name | Used for |
 |---|---|---|
-| `DwLiveChannel(ExampleChannel.schedule)` | `schedule` | one instance for everyone allowed |
-| `DwLiveChannel(ExampleChannel.staffChat, 7)` | `staffChat:7` | one instance per key, an `int` or a `String` |
-| `DwLiveChannel.ofCaller(ExampleChannel.bookings)` | none until resolved | declared by a "my …" request |
-| `DwLiveChannel.forAccount(ExampleChannel.bookings, 7)` | `bookings:7` | what the server publishes to for account 7 |
+| `DwLiveChannel(DartwayExampleChannel.schedule)` | `schedule` | one instance for everyone allowed |
+| `DwLiveChannel(DartwayExampleChannel.staffChat, 7)` | `staffChat:7` | one instance per key, an `int` or a `String` |
+| `DwLiveChannel.ofCaller(DartwayExampleChannel.bookings)` | none until resolved | declared by a "my …" request |
+| `DwLiveChannel.forAccount(DartwayExampleChannel.bookings, 7)` | `bookings:7` | what the server publishes to for account 7 |
 
 **"My" requests carry no account id (D-037).** `ListMyBookings` declares
-`DwLiveChannel.ofCaller(ExampleChannel.bookings)`; the client resolves it for whoever is signed in
+`DwLiveChannel.ofCaller(DartwayExampleChannel.bookings)`; the client resolves it for whoever is signed in
 when it subscribes, and a handler publishing a booking names whose it is with
 `DwLiveChannel.forAccount(kind, accountId)`. Publishing an unresolved `ofCaller` channel on the server
 throws `ArgumentError`: there it could only mean "the caller", and a staff member marking someone
@@ -38,26 +38,34 @@ else's visit is exactly where that reading goes wrong.
 ## Who may subscribe
 
 The server declares one rule per kind, each with the feature that owns the kind —
-`DwServerFeature(channels: …)` (`example/dartway_example_server/lib/src/club/club_feature.dart` and
-`chat/chat_feature.dart`):
+`DwServerFeature(channels: …)` (`example/dartway_example_server/lib/src/schedule/schedule_feature.dart`,
+`bookings/bookings_feature.dart` and `chat/chat_feature.dart`):
 
 ```dart
-final clubFeature = DwServerFeature(
-  'club',
-  handlers: [...scheduleHandlers, ...bookingHandlers],
+final scheduleFeature = DwServerFeature(
+  'schedule',
+  handlers: scheduleHandlers,
   channels: [
     DwChannelRule.single(
-      ExampleChannel.schedule,
+      DartwayExampleChannel.schedule,
       canSubscribe: (ctx) async => true,
     ),
-    // "My" channel: a member subscribes to their own account's only.
-    DwChannelRule.ofCaller(ExampleChannel.bookings),
   ],
+);
+
+final bookingsFeature = DwServerFeature(
+  'bookings',
+  handlers: bookingsHandlers,
+  channels: [
+    // "My" channel: a member subscribes to their own account's only.
+    DwChannelRule.ofCaller(DartwayExampleChannel.bookings),
+  ],
+  jobs: bookingsJobs,
 );
 
 // in chatFeature
 DwChannelRule.keyed<int>(
-  ExampleChannel.staffChat,
+  DartwayExampleChannel.staffChat,
   parseKey: int.parse,
   canSubscribe: (ctx, channelId) => ctx.isStaff,
 ),
@@ -84,17 +92,17 @@ own bookings channel. Publish a member's booking to `schedule` and every member'
 ## Publishing
 
 A command publishes with `ctx.publish(channel, object)`; the object is a data object of the protocol
-or a deletion notice (`example/dartway_example_server/lib/src/club/schedule_handlers.dart`):
+or a deletion notice (`example/dartway_example_server/lib/src/schedule/schedule_handlers.dart`):
 
 ```dart
 await ctx.db.clubSessions.delete(command.sessionId);
 ctx.publish(
-  scheduleChannel,
+  AppChannels.schedule,
   DwDeletedObject.of<ClubSession>(command.sessionId, ctx.protocol),
 );
 for (final booking in affected) {
   ctx.publish(
-    ExampleChannels.bookingsOf(clients[booking.clientProfileId]!),
+    AppChannels.bookingsOf(clients[booking.clientProfileId]!),
     DwDeletedObject.of<SessionBooking>(booking.id!, ctx.protocol),
   );
 }
@@ -136,7 +144,7 @@ Because access is checked once, a command that takes access away closes what it 
 
 ```dart
 if (row.role == UserRole.admin && command.role != UserRole.admin) {
-  ctx.revoke(adminChannel, account);
+  ctx.revoke(AppChannels.admin, account);
 }
 ```
 

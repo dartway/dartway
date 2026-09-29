@@ -4,6 +4,7 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 import '../../generated/dw_schema.dart';
+import '../admin/admin_publications.dart';
 import 'channels.dart';
 import '../profile/profile_rows.dart';
 import '../profile/profile_objects.dart';
@@ -64,12 +65,11 @@ abstract final class AppAuth {
       // The newcomer goes to the admins: the dashboard counts them, and a
       // members table page reads itself again — a new row moves the paging and
       // the total, which only the server can compute.
-      ctx
-        ..publish(
-          AppChannels.admin,
-          await AppPublications.countAdminCounters(ctx.db),
-        )
-        ..publish(AppChannels.admin, await AppObjects.profile(ctx, profile));
+      ctx.publish(
+        AppChannels.admin,
+        await ProfileObjects.profile(ctx, profile),
+      );
+      await AdminPublications.counters(ctx);
     },
 
     // The profile shows the phone and the e-mail an account signs in with, read
@@ -81,7 +81,7 @@ abstract final class AppAuth {
       final profile = await ctx.db.userProfiles.findFirst(
         where: (t) => t.accountId.equals(change.accountId),
       );
-      if (profile != null) await AppPublications.profile(ctx, profile);
+      if (profile != null) await ProfilePublications.profile(ctx, profile);
     },
 
     // Deleting an account (`DwDeleteMyAccount`) takes the starter's profile
@@ -108,7 +108,7 @@ abstract final class AppAuth {
     //    with a `deleted_at` and no name, phone or photo, `account_id` nulled by
     //    `ON DELETE SET NULL`, so other people's content keeps an author and the
     //    screens say "member who left". The example does exactly this, in
-    //    `example/dartway_example_server/lib/src/example_auth.dart`.
+    //    `example/dartway_example_server/lib/src/core/auth.dart`.
     //
     // What may not be done is hiding the person behind a flag and keeping their
     // name and phone: that is a deletion the law does not accept and the member

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:ui' as ui;
 
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_commands.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_session.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -75,26 +76,10 @@ final class ChatComposerFile {
 ///
 /// The sent message is not added here: it arrives in the command's answer and
 /// on the channel. After sending, the list goes to the newest message.
-class ChatComposer extends HookConsumerWidget implements DwFeatureWidget {
+class ChatComposer extends HookConsumerWidget {
   const ChatComposer({required this.session, super.key});
 
   final ChatSession session;
-
-  @override
-  DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'chat/composer',
-    title: 'Message composer',
-    behaviors: [
-      'Enter sends, Shift+Enter starts a new line; the field grows to six '
-          'lines, then scrolls.',
-      'Attached files upload as soon as they are picked; send waits until '
-          'every one has arrived. At most ten, each up to 20 MB.',
-      'Replying shows the quoted message over the field; editing puts the '
-          'message text in the field and saves it on send.',
-      'What was typed survives leaving the channel for this app session.',
-      'After sending, the chat shows the newest messages.',
-    ],
-  );
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -148,45 +133,37 @@ class ChatComposer extends HookConsumerWidget implements DwFeatureWidget {
       if (!canSend) return;
       sending.value = true;
       try {
-        final DwCallResult<ChatMessage> result;
+        // A refusal or a failure is shown by the action; the draft stays.
+        final result = await dw.action(
+          (_) => editing != null
+              ? ChatCommands.edit(editing, controller.text)
+              : ChatCommands.send(
+                  channelId,
+                  controller.text,
+                  replyTo: replyTo,
+                  attachments: [
+                    for (final file in files.value)
+                      ChatAttachmentDraft(
+                        id: file.stored!.id,
+                        width: file.width,
+                        height: file.height,
+                      ),
+                  ],
+                ),
+          label: editing != null ? 'editChatMessage' : 'sendChatMessage',
+          onErrorNotification: l10n.actionFailed,
+        )(context);
+        if (result == null || !context.mounted) return;
         if (editing != null) {
-          result = await dw.command(
-            EditChatMessage(messageId: editing.id, text: controller.text),
-          );
+          draftBeforeEdit.value = null;
+          session.editing.value = null;
+          controller.clear();
         } else {
-          result = await dw.command(
-            SendChatMessage(
-              channelId: channelId,
-              text: controller.text,
-              replyToMessageId: replyTo?.id,
-              attachments: [
-                for (final file in files.value)
-                  ChatAttachmentDraft(
-                    id: file.stored!.id,
-                    width: file.width,
-                    height: file.height,
-                  ),
-              ],
-            ),
-          );
-        }
-        switch (result) {
-          case DwCallOk():
-            if (editing != null) {
-              draftBeforeEdit.value = null;
-              session.editing.value = null;
-              controller.clear();
-            } else {
-              controller.clear();
-              drafts.remove(channelId);
-              files.value = const [];
-              session.replyTo.value = null;
-              unawaited(session.list.jumpToNewest());
-            }
-          case DwCallRefused(:final refusal):
-            dw.notify.error(dw.config.refusalText!(refusal));
-          case DwNotAuthenticated() || DwCallFailed():
-            dw.notify.error(l10n.actionFailed);
+          controller.clear();
+          drafts.remove(channelId);
+          files.value = const [];
+          session.replyTo.value = null;
+          unawaited(session.list.jumpToNewest());
         }
       } finally {
         if (context.mounted) sending.value = false;
@@ -381,7 +358,7 @@ class ChatComposer extends HookConsumerWidget implements DwFeatureWidget {
 
     final result = await dw.files
         .upload(
-          ExampleUpload.chatAttachment,
+          DartwayExampleUpload.chatAttachment,
           DwUploadSource.bytes(bytes),
           fileName: name,
           contentType: contentType,

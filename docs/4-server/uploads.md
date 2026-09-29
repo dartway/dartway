@@ -98,10 +98,10 @@ prefix's.
 Who reads a private file is `DwFileStorage.canRead(ctx, DwFileRecord file)`. Without it, only the
 uploader. A `false` answers `dw.forbidden` to a signed-in caller and `401` to an anonymous one, who
 may be allowed after signing in. The example lets chat members read chat attachments
-(`example/dartway_example_server/lib/src/core/example_files.dart`):
+(`example/dartway_example_server/lib/src/core/files.dart`):
 
 ```dart
-// ExampleFiles
+// AppFiles
 static Future<bool> canRead(DwCallContext ctx, DwFileRecord file) async =>
     await ChatAttachments.canRead(ctx, file) ?? file.accountId == ctx.accountId;
 ```
@@ -236,7 +236,7 @@ DwCallHandler.command<UpdateMyProfile, UserProfile>(
     if (previousAvatar != null && previousAvatar != updated.avatarFileId) {
       await ctx.files.delete(previousAvatar);
     }
-    return AppPublications.profile(ctx, updated);
+    return ProfilePublications.profile(ctx, updated);
   },
 ),
 ```
@@ -255,7 +255,7 @@ authority rather than the caller's — **no `canRead` or `canUpload` is asked**:
 final bytes = await ctx.files.read(fileId);               // null: no confirmed file
 final link = await ctx.files.readLink(fileId);            // a short link another service can fetch
 final made = await ctx.files.store(
-  AppUpload.progressCard,
+  AcmeUpload.progressCard,
   accountId: profile.accountId,
   bytes: png,
   contentType: 'image/png',

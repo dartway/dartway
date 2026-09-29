@@ -37,7 +37,7 @@ final class ListNews extends DwListRequest<NewsPost> with _$ListNews {
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.news),
+    DwLiveChannel(DartwayExampleChannel.news),
   ];
 
   @override
@@ -56,7 +56,7 @@ final class PublishNews extends DwActionCommand<NewsPost>
   @override
   List<DwCallRefusal> validate() => [
     if (title.trim().isEmpty)
-      DwCallRefusal(ExampleRefusal.titleRequired, field: 'title'),
+      DwCallRefusal(DartwayExampleRefusal.titleRequired, field: 'title'),
   ];
 }
 ```
@@ -67,7 +67,7 @@ registry both sides share. The server answers each call with one handler. Abridg
 
 ```dart
 DwCallHandler.command<PublishNews, NewsPost>(
-  access: ExampleAccess.staff,
+  access: AppAccess.staff,
   handle: (ctx, command) async {
     final me = await ctx.profile;
     final row = await ctx.db.newsPosts.insert(
@@ -78,16 +78,16 @@ DwCallHandler.command<PublishNews, NewsPost>(
         createdAt: DateTime.now(),
       ),
     );
-    final post = (await ClubObjects.news(ctx.db, [row], author: me)).single;
-    ctx.publish(_news, post);
+    final post = (await ContentObjects.news(ctx.db, [row], author: me)).single;
+    ctx.publish(AppChannels.news, post);
     return post;
   },
 ),
 ```
 
 The app speaks the same classes — from
-`example/dartway_example_flutter/lib/app/news/widgets/news_post_list.dart` and
-`create_news_post_sheet.dart` next to it:
+`example/dartway_example_flutter/lib/app/news/widgets/news_post_list.dart`,
+`create_news_post_sheet.dart` next to it, and the feature's `logic/news_commands.dart`:
 
 ```dart
 ref.watch(dw.request(const ListNews()))   // AsyncValue<List<NewsPost>>, live
@@ -95,7 +95,7 @@ ref.watch(dw.request(const ListNews()))   // AsyncValue<List<NewsPost>>, live
 AppButton.primary(
   l10n.publish,
   onTap: dw.action(
-    (_) => dw.command(PublishNews(title: title.value, text: text.value)),
+    (_) => NewsCommands.publish(title: title.value, text: text.value),
     onSuccessNotification: l10n.postPublished,
   ),
 )

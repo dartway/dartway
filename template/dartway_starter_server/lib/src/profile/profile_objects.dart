@@ -5,7 +5,7 @@ import 'profile_rows.dart';
 
 /// Rows → the data objects clients see. Related data is loaded in one query
 /// per relation for the whole batch, never per row.
-abstract final class AppObjects {
+abstract final class ProfileObjects {
   static Future<List<UserProfile>> profiles(
     DwCallContext ctx,
     List<UserProfileRow> rows,

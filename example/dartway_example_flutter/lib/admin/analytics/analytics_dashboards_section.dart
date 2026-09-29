@@ -7,12 +7,12 @@ import 'package:dartway_example_flutter/admin/analytics/widgets/analytics_period
 import 'package:dartway_example_flutter/admin/analytics/widgets/analytics_title_sheet.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/shared/widgets/load_failed_message.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// The project's analytics dashboards: one shown at a time, every widget of
 /// it over the period chosen on top, and — in edit mode — widgets added,
@@ -23,7 +23,7 @@ class AnalyticsDashboardsSection extends HookConsumerWidget
 
   @override
   DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'admin/analytics',
+    id: 'analytics/dashboards',
     title: 'Analytics dashboards',
     purpose:
         'What people do in the app, as the numbers the team watches — built '

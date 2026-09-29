@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/app/profile/profile_page/logic/profile_page_commands.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/profile/my_profile.dart';
@@ -36,9 +37,11 @@ class _ProfileForm extends HookWidget {
     final firstName = useState(profile.firstName);
     final gender = useState(profile.gender);
 
-    final trimmedName = firstName.value.trim();
-    final nameChanged = trimmedName != profile.firstName;
-    final genderChanged = gender.value != profile.gender;
+    final change = ProfilePageCommands.changeOf(
+      profile,
+      firstName: firstName.value,
+      gender: gender.value,
+    );
     final imageUrl = profile.imageUrl;
 
     return Padding(
@@ -91,24 +94,12 @@ class _ProfileForm extends HookWidget {
 
             const Gap(24),
 
-            if (nameChanged || genderChanged) ...[
+            if (change != null) ...[
               AppButton.primary(
                 l10n.saveChanges,
                 requireValidation: true,
-                // Only what changed is sent: an unchanged field is kept, and
-                // "not specified" clears the gender rather than being
-                // indistinguishable from leaving it alone.
                 onTap: dw.action(
-                  (_) => dw.command(
-                    UpdateMyProfile(
-                      firstName: nameChanged ? trimmedName : null,
-                      gender: switch (gender.value) {
-                        _ when !genderChanged => const DwFieldPatch.keep(),
-                        final UserGender value => DwFieldPatch.set(value),
-                        null => const DwFieldPatch.clear(),
-                      },
-                    ),
-                  ),
+                  (_) => ProfilePageCommands.save(change),
                   onSuccessNotification: l10n.profileUpdated,
                 ),
               ),

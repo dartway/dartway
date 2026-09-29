@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'example_channel.dart';
-import 'example_refusal.dart';
+import 'dartway_example_channel.dart';
+import 'dartway_example_refusal.dart';
 import 'people.dart';
 
 part 'news.dw.dart';
@@ -30,7 +30,7 @@ final class ListNews extends DwListRequest<NewsPost> with _$ListNews {
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.news),
+    DwLiveChannel(DartwayExampleChannel.news),
   ];
 
   @override
@@ -50,9 +50,9 @@ final class PublishNews extends DwActionCommand<NewsPost>
   @override
   List<DwCallRefusal> validate() => [
     if (title.trim().isEmpty)
-      DwCallRefusal(ExampleRefusal.titleRequired, field: 'title'),
+      DwCallRefusal(DartwayExampleRefusal.titleRequired, field: 'title'),
     if (text.trim().isEmpty)
-      DwCallRefusal(ExampleRefusal.textRequired, field: 'text'),
+      DwCallRefusal(DartwayExampleRefusal.textRequired, field: 'text'),
   ];
 }
 

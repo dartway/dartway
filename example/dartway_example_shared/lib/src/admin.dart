@@ -1,6 +1,6 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'example_channel.dart';
+import 'dartway_example_channel.dart';
 import 'people.dart';
 
 part 'admin.dw.dart';
@@ -28,7 +28,7 @@ final class GetAdminCounters extends DwSingleRequest<AdminCounters>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.admin),
+    DwLiveChannel(DartwayExampleChannel.admin),
   ];
 }
 
@@ -60,7 +60,7 @@ final class ListUserProfiles extends DwTableRequest<UserProfile>
 
   @override
   List<DwLiveChannel> get channels => const [
-    DwLiveChannel(ExampleChannel.admin),
+    DwLiveChannel(DartwayExampleChannel.admin),
   ];
 
   /// The server's filter, on one profile: a row on the page that leaves it

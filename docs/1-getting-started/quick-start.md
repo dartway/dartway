@@ -199,8 +199,9 @@ whole stack — Postgres, a handler, a channel, a widget — the write end inclu
 3. `dart run dartway_cli:dartway generate` — codecs, the protocol registry, tables and the schema.
 4. `dart run bin/migrate.dart create <name>` in the server package, with `DW_DATABASE_*` set — a
    migration drafted from the row classes. Review it: it is yours.
-5. **App**: a widget reading `ref.watch(dw.request(MyRequest()))` and a button running
-   `dw.action((_) => dw.command(MyCommand()))`, the texts in `lib/l10n/`.
+5. **App**: a widget reading `ref.watch(dw.request(MyRequest()))`, the command sent from the
+   feature's `logic/` (`dw.command(MyCommand())`) and run by a button's `dw.action`, the texts in
+   `lib/l10n/`.
 
 A request or command without a handler stops the server from starting, deliberately. The steps in
 full: [data objects and generation](../2-core/data-objects-and-generation.md),

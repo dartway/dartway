@@ -1,7 +1,7 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
-import '../core/example_context.dart';
+import '../core/call_context.dart';
 import 'chat_handlers.dart';
 
 /// The staff chat: its channels, messages and read positions.
@@ -10,11 +10,11 @@ final chatFeature = DwServerFeature(
   handlers: chatHandlers,
   channels: [
     DwChannelRule.single(
-      ExampleChannel.staffChannels,
+      DartwayExampleChannel.staffChannels,
       canSubscribe: (ctx) => ctx.isStaff,
     ),
     DwChannelRule.keyed<int>(
-      ExampleChannel.staffChat,
+      DartwayExampleChannel.staffChat,
       parseKey: int.parse,
       canSubscribe: (ctx, channelId) => ctx.isStaff,
     ),
@@ -22,7 +22,7 @@ final chatFeature = DwServerFeature(
     // only — and staff only besides: nothing is ever published to a client's,
     // and a subscription that can never hear anything is a mistake to refuse.
     DwChannelRule.keyed<int>(
-      ExampleChannel.chatReads,
+      DartwayExampleChannel.chatReads,
       parseKey: int.parse,
       canSubscribe: (ctx, accountId) async =>
           ctx.accountId == accountId && await ctx.isStaff,

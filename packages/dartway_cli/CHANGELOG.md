@@ -2,6 +2,9 @@
 
 ## 0.13.0
 
+- **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
+  `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature
+  law says (dartway/dartway#380). Wording only; no check changed.
 - **BREAKING: the bundled storage is RustFS, not MinIO — `storage: minio` in `deploy/config.yaml`
   becomes `storage: bundled`** (dartway/dartway#331, D-094). MinIO's community edition stopped
   publishing images, and every registry that used to serve them (Docker Hub, quay.io) now answers an

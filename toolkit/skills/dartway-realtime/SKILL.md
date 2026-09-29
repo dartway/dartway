@@ -1,7 +1,7 @@
 ---
 name: dartway-realtime
 description: >-
-  Live updates in a DartWay project: channel kinds (`<Project>Channel with DwChannelKind`), the
+  Live updates in a DartWay project: channel kinds (`<Package>Channel with DwChannelKind`), the
   channels a request declares (DwLiveChannel, keyed channels, DwLiveChannel.ofCaller for "my"
   requests), the server's DwChannelRule per kind (single / keyed / ofCaller) — who may read
   everything on a channel — publishing from commands, jobs and auth hooks after commit to every
@@ -27,7 +27,7 @@ The three halves, and a missing one fails silently:
 3. **every command that changes the object publishes it** to every channel that shows it.
 
 Related skills: `dartway-contract`, `dartway-server`, `dartway-access`, `dartway-data-layer`,
-`dartway-testing`. In the samples `AppChannel` stands for the project's `<Project>Channel`.
+`dartway-testing`. In the samples `AcmeChannel` stands for the project's `<Package>Channel`.
 
 ## 1. A channel is an audience
 
@@ -38,10 +38,10 @@ subscription** — nothing re-checks each object. So the rule that decides the c
 
 | Who may see the change | Channel | Server rule |
 |---|---|---|
-| every signed-in member (a catalogue, app settings, news) | `DwLiveChannel(AppChannel.news)` | `DwChannelRule.single(kind, canSubscribe: …)` |
-| one group (a project's board, a chat room) | `DwLiveChannel(AppChannel.board, boardId)` | `DwChannelRule.keyed<int>(kind, parseKey: int.parse, canSubscribe: (ctx, boardId) …)` |
-| one person — "my invoices", "my profile" | request: `DwLiveChannel.ofCaller(AppChannel.invoices)`; publish: `DwLiveChannel.forAccount(AppChannel.invoices, accountId)` | `DwChannelRule.ofCaller(kind)` |
-| a role (managers, admins) | `DwLiveChannel(AppChannel.billing)` | `DwChannelRule.single(kind, canSubscribe: (ctx) => ctx.isManager)` |
+| every signed-in member (a catalogue, app settings, news) | `DwLiveChannel(AcmeChannel.news)` | `DwChannelRule.single(kind, canSubscribe: …)` |
+| one group (a project's board, a chat room) | `DwLiveChannel(AcmeChannel.board, boardId)` | `DwChannelRule.keyed<int>(kind, parseKey: int.parse, canSubscribe: (ctx, boardId) …)` |
+| one person — "my invoices", "my profile" | request: `DwLiveChannel.ofCaller(AcmeChannel.invoices)`; publish: `DwLiveChannel.forAccount(AcmeChannel.invoices, accountId)` | `DwChannelRule.ofCaller(kind)` |
+| a role (managers, admins) | `DwLiveChannel(AcmeChannel.billing)` | `DwChannelRule.single(kind, canSubscribe: (ctx) => ctx.isManager)` |
 
 Every subscription requires a signed-in connection. Signed out, a request with channels is fetched
 and simply not live; it becomes live after sign-in.
@@ -54,7 +54,7 @@ have shown it to them, and the channel does not care. A private object goes to i
 ## 2. Declare the kind and the request's channels (shared)
 
 ```dart
-enum AppChannel with DwChannelKind {
+enum AcmeChannel with DwChannelKind {
   /// One member's own invoices: a caller channel, keyed by the account.
   invoices,
 
@@ -71,12 +71,12 @@ A request lists the channels its state absorbs:
 ```dart
 @override
 List<DwLiveChannel> get channels => const [
-  DwLiveChannel.ofCaller(AppChannel.invoices),
+  DwLiveChannel.ofCaller(AcmeChannel.invoices),
 ];
 ```
 
 A keyed channel built from a field is not `const`:
-`List<DwLiveChannel> get channels => [DwLiveChannel(AppChannel.invoiceEvents, invoiceId)];`.
+`List<DwLiveChannel> get channels => [DwLiveChannel(AcmeChannel.invoiceEvents, invoiceId)];`.
 
 - **A "my" request carries no account id** and declares `DwLiveChannel.ofCaller(kind)`; the client
   resolves it to the signed-in account when it subscribes (`invoices:42`).
@@ -96,18 +96,18 @@ final invoicesFeature = DwServerFeature(
   handlers: invoiceHandlers,
   channels: [
   // "My" channel: a member subscribes to their own account's key only.
-  DwChannelRule.ofCaller(AppChannel.invoices),
+  DwChannelRule.ofCaller(AcmeChannel.invoices),
   DwChannelRule.single(
-    AppChannel.billing,
+    AcmeChannel.billing,
     canSubscribe: (ctx) => ctx.isManager,
   ),
   DwChannelRule.keyed<int>(
-    AppChannel.invoiceEvents,
+    AcmeChannel.invoiceEvents,
     parseKey: int.parse,
     canSubscribe: (ctx, invoiceId) async {
       final invoice = await ctx.db.invoices.findById(invoiceId);
       if (invoice == null) return false;
-      return invoice.ownerProfileId == (await ctx.callerProfile).id ||
+      return invoice.ownerProfileId == (await ctx.profile).id ||
           await ctx.isManager;
     },
   ),
@@ -115,11 +115,13 @@ final invoicesFeature = DwServerFeature(
 );
 
 // lib/src/core/channels.dart — the addresses handlers publish to.
-/// Where [accountId]'s own invoices hear a change, whoever made it.
-DwLiveChannel invoicesOf(int accountId) =>
-    DwLiveChannel.forAccount(AppChannel.invoices, accountId);
+abstract final class AppChannels {
+  static const billing = DwLiveChannel(AcmeChannel.billing);
 
-const billingChannel = DwLiveChannel(AppChannel.billing);
+  /// Where [accountId]'s own invoices hear a change, whoever made it.
+  static DwLiveChannel invoicesOf(int accountId) =>
+      DwLiveChannel.forAccount(AcmeChannel.invoices, accountId);
+}
 ```
 
 - `canSubscribe` runs with the subscriber's context (`ctx.accountId` is set) and **must be as strict
@@ -136,19 +138,22 @@ const billingChannel = DwLiveChannel(AppChannel.billing);
 sign-in). Delivery happens **after the transaction commits** — nothing from a rolled-back or refused
 attempt is sent. Publishing from a request handler throws: reads have no side effects.
 
-**Publish the object to every channel that shows it.** One helper per data object that knows them
-all, used by every command that changes it:
+**Publish the object to every channel that shows it.** One function per data object that knows them
+all, in the owning feature's `<feature>_publications.dart`, used by every command that changes it:
 
 ```dart
-/// A changed invoice to everyone who shows it: its owner's "my invoices"
-/// and the billing screens. Answers the invoice as clients see it.
-Future<CustomerInvoice> publishInvoice(DwCallContext ctx, InvoiceRow row) async {
-  final owner = (await ctx.db.memberProfiles.findById(row.ownerProfileId))!;
-  final invoice = await InvoiceObjects.invoice(ctx, row);
-  ctx
-    ..publish(invoicesOf(owner.accountId), invoice)
-    ..publish(billingChannel, invoice);
-  return invoice;
+// lib/src/invoices/invoices_publications.dart
+abstract final class InvoicePublications {
+  /// A changed invoice to everyone who shows it: its owner's "my invoices"
+  /// and the billing screens. Answers the invoice as clients see it.
+  static Future<CustomerInvoice> invoice(DwCallContext ctx, InvoiceRow row) async {
+    final owner = (await ctx.db.memberProfiles.findById(row.ownerProfileId))!;
+    final invoice = await InvoiceObjects.invoice(ctx, row);
+    ctx
+      ..publish(AppChannels.invoicesOf(owner.accountId), invoice)
+      ..publish(AppChannels.billing, invoice);
+    return invoice;
+  }
 }
 ```
 
@@ -159,7 +164,9 @@ Future<CustomerInvoice> publishInvoice(DwCallContext ctx, InvoiceRow row) async 
   reason.
 - **Publish what changed as it now is**, mapped through the same batch function the handlers use —
   so a published object and a fetched one never differ. A derived object that changed too (a
-  counter, a total) is published as well: `ctx.publish(billingChannel, await countTotals(ctx.db))`.
+  counter, a total) is published as well — by the feature that owns it, through its own
+  `_publications.dart` function (`BillingPublications.totals(ctx)`), which every command that moves
+  the number calls; never a second copy of the count in the caller.
 - **Deletions** travel as a notice, not as an object:
   `ctx.publish(channel, DwDeletedObject.of<CustomerInvoice>(invoiceId, ctx.protocol))`.
 - An object that quotes or embeds a changed one (a card showing its invoice) is republished too —
@@ -188,7 +195,7 @@ Access is checked at subscription, so a command that removes someone's right to 
 
 ```dart
 if (previousRole == MemberRole.manager && updated.role != MemberRole.manager) {
-  ctx.revoke(billingChannel, updated.accountId);
+  ctx.revoke(AppChannels.billing, updated.accountId);
 }
 ```
 
@@ -259,9 +266,9 @@ of the item and the fields.
 
 ## 6. The "my" pattern end to end
 
-1. shared: `ListMyInvoices` declares `DwLiveChannel.ofCaller(AppChannel.invoices)` and no account id;
-2. server: `DwChannelRule.ofCaller(AppChannel.invoices)`; the handler reads the caller from `ctx`;
-3. every command changing an invoice publishes to `DwLiveChannel.forAccount(AppChannel.invoices,
+1. shared: `ListMyInvoices` declares `DwLiveChannel.ofCaller(AcmeChannel.invoices)` and no account id;
+2. server: `DwChannelRule.ofCaller(AcmeChannel.invoices)`; the handler reads the caller from `ctx`;
+3. every command changing an invoice publishes to `DwLiveChannel.forAccount(AcmeChannel.invoices,
    ownerAccountId)` — whoever made the change;
 4. app: `ref.watch(dw.request(const ListMyInvoices()))` — state is kept per signed-in account, so
    switching accounts never shows the previous account's invoices.

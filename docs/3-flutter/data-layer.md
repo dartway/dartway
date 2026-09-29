@@ -41,11 +41,15 @@ or re-fetched, as the request declares. How a request declares it is
 [channels and realtime](../2-core/channels-and-realtime.md). The screen contains no refresh code:
 
 ```dart
+// example/dartway_example_flutter/lib/app/schedule/logic/schedule_commands.dart
+static Future<DwCallResult<SessionBooking>> book(ClubSession session) =>
+    dw.command(BookSession(sessionId: session.id));
+
 // example/dartway_example_flutter/lib/app/schedule/widgets/session_card.dart
 AppButton.primary(
   l10n.book,
   onTap: dw.action(
-    (_) => dw.command(BookSession(sessionId: session.id)),
+    (_) => ScheduleCommands.book(session),
     onSuccessNotification: l10n.youAreBooked,
   ),
 )
@@ -241,7 +245,7 @@ send rows nobody shows.
 final state = ref.watch(dw.request(const GetMyFeedReaderState()));
 
 // The posts that follow are only heard.
-final subscription = dw.listen(const [DwLiveChannel(AppChannel.feed)]).listen((
+final subscription = dw.listen(const [DwLiveChannel(AcmeChannel.feed)]).listen((
   object,
 ) {
   if (object is FeedPost) newPosts.value++;
@@ -311,7 +315,8 @@ ref.watch(dw.request(const ListNews())).dwBuildListAsync(
 screen exists for may not — an empty page reads as "nothing here yet", not "the read failed". The
 example and the skeleton wrap this in one app extension, `section(...)`, which always renders a
 message with a retry and skips the not-authenticated case, where the sign-in screen is already the
-message (`lib/shared/widgets/load_failed_message.dart` in both).
+message (`lib/core/async_section.dart` in both, drawing the kit's
+`ui_kit/2_frequent/load_failed_message.dart` with the app's texts).
 
 A refusal or a not-authenticated answer rendered this way still reaches `DwFlutterConfig.onErrorReport`; the
 app's policy is what keeps it out of the incident log — see [error reporting](error-reporting.md).

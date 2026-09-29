@@ -1,11 +1,11 @@
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
-import 'package:dartway_starter_flutter/shared/widgets/app_scaffold.dart';
+import 'package:dartway_starter_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
-import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
+import 'package:dartway_starter_flutter/auth/logic/profile_name_commands.dart';
 
 /// Asks a signed-in user without a name for one.
 ///
@@ -56,10 +56,7 @@ class ProfileNamePage extends HookWidget implements DwFeatureWidget {
               requireValidation: true,
               // The gate lets the app through once the updated profile
               // arrives with the answer; nothing to do on success.
-              onTap: dw.action(
-                (_) =>
-                    dw.command(UpdateMyProfile(firstName: name.value.trim())),
-              ),
+              onTap: dw.action((_) => ProfileNameCommands.saveName(name.value)),
             ),
           ],
         ),

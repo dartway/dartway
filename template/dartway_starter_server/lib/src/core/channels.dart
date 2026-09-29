@@ -1,4 +1,3 @@
-import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 /// The app's live channels, as handlers publish to them.
