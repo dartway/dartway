@@ -87,8 +87,7 @@ final class DwJobRunner {
     required this.workers,
     required this.pollInterval,
   }) : queued = {
-         for (final d in definitions.whereType<DwQueuedJob<Object?>>())
-           d.name: d,
+         for (final d in definitions.whereType<DwQueuedJob<Object?>>()) d.name: d,
        },
        recurring = {
          for (final d in definitions.whereType<DwRecurringJob>()) d.name: d,
@@ -221,6 +220,12 @@ final class DwJobRunner {
     }
   }
 
+  /// How long until the next job is due. Both sides of the subtraction are
+  /// the server's clock: `run_at`, `locked_until` and `next_run_at` were
+  /// written from it, and `@now` is it. Never mix in the database's `now()`
+  /// here — against a clock that is set (a test) or skewed (another host),
+  /// the wait would be computed on one clock and the claim decided on the
+  /// other.
   Future<Duration> _untilNextDue() async {
     final row = (await _db.query(
       'SELECT EXTRACT(EPOCH FROM (LEAST('

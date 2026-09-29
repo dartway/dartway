@@ -312,7 +312,7 @@ extension on DwAppClient {
     // Read at every send: a device that crossed a zone, or a clock that moved
     // to or from daylight saving time, says so on its next call.
     DwHttpContract.utcOffsetHeader: DwHttpContract.utcOffsetValue(
-      DateTime.now().timeZoneOffset,
+      utcOffset ?? DateTime.now().timeZoneOffset,
     ),
   };
 

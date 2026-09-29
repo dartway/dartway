@@ -598,7 +598,7 @@ final class Ping extends DwActionCommand<String> {
 }
 
 /// What the command's context says about time: `ctx.now`, the caller's
-/// offset in minutes and `ctx.callerLocalNow`, joined by `|` (`-` for null).
+/// offset in minutes and `ctx.callerLocalTime`, joined by `|` (`-` for null).
 final class ReadClock extends DwActionCommand<String> {
   const ReadClock();
 

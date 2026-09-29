@@ -54,7 +54,11 @@ void main() {
 
     test('resource loads once and hands the row to the handler; absent and '
         "someone else's are the same notFound", () async {
-      final note = await TestApp.insertNote(harness().db, 'mine', session.id);
+      final note = await TestApp.insertNote(
+        harness().db,
+        'mine',
+        session.id,
+      );
       final loads = harness().app.noteLoads;
       expect(
         (await signed.call(GetMyNote(note.id))).value(GetMyNote(note.id)),

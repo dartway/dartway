@@ -13,6 +13,7 @@ import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../server/dw_server_clock.dart';
 import '../server/dw_server_module.dart';
+import 'dw_caller_local_time.dart';
 
 /// Thrown when a call needs a signed-in account and has none. The framework
 /// answers `unauthenticated` (HTTP 401).
@@ -78,16 +79,14 @@ abstract class DwCallContext {
   /// project stored itself; the framework keeps none.
   Duration? get callerUtcOffset;
 
-  /// The caller's wall clock now: [now] shifted by [callerUtcOffset], or
-  /// `null` when the offset is unknown.
+  /// The caller's wall clock now — [now] read on a clock [callerUtcOffset]
+  /// east of UTC: their date, hour, weekday and the instant their day began
+  /// ([DwCallerLocalTime.startOfDayUtc]). `null` when the offset is unknown.
   ///
-  /// A UTC `DateTime` whose fields read as the caller's clock — `year`,
-  /// `month` and `day` are the caller's date, `hour` their hour. It is not an
-  /// instant: never store it or compare it with one. The caller's local
-  /// midnight as an instant is
-  /// `DateTime.utc(local.year, local.month, local.day).subtract(offset)`.
-  DateTime? get callerLocalNow => switch (callerUtcOffset) {
-    final offset? => now.add(offset),
+  /// A reading, not an instant: it has no way to be stored or compared as
+  /// one.
+  DwCallerLocalTime? get callerLocalTime => switch (callerUtcOffset) {
+    final offset? => DwCallerLocalTime(now, offset),
     null => null,
   };
 
@@ -316,8 +315,7 @@ final class DwRuntimeContext extends DwCallContext {
     required String key,
     required int? accountId,
     required String typeName,
-  }) =>
-      _idempotencyTarget = (key: key, accountId: accountId, typeName: typeName);
+  }) => _idempotencyTarget = (key: key, accountId: accountId, typeName: typeName);
 
   /// Whether [recordProvisionalOutcome] wrote a row during this call —
   /// `DwCallEndpoint` reads this once the handler returns or throws, to

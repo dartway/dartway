@@ -128,10 +128,7 @@ final class DwCallEndpoint {
         await _runRequest(
           handler,
           request,
-          handler.prepare(
-            request,
-            page ?? DwPageQuery.parse(request, const {}),
-          ),
+          handler.prepare(request, page ?? DwPageQuery.parse(request, const {})),
           session,
           name,
           null,
@@ -405,14 +402,7 @@ final class DwCallEndpoint {
     _requireSignIn(handler.access, ctx);
     _validate(command);
     if (!handler.transactional) {
-      return _runNonTransactional(
-        handler,
-        command,
-        key,
-        accountId,
-        ctx,
-        typeName,
-      );
+      return _runNonTransactional(handler, command, key, accountId, ctx, typeName);
     }
     try {
       for (var attempt = 1; ; attempt++) {
@@ -713,6 +703,7 @@ final class DwCallEndpoint {
       DwApiResponse.failed(incident, failure: DwFailureKind.malformedCall),
     );
   }
+
 }
 
 final class _Rejected implements Exception {

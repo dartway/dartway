@@ -789,7 +789,7 @@ final class TestApp {
   static String clockText(DwCallContext ctx) => [
     ctx.now.toIso8601String(),
     ctx.callerUtcOffset?.inMinutes ?? '-',
-    ctx.callerLocalNow?.toIso8601String() ?? '-',
+    ctx.callerLocalTime?.toString() ?? '-',
   ].join('|');
 
   /// A test job's kind: its payload is one tag.

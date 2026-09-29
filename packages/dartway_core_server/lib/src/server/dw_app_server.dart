@@ -27,7 +27,6 @@ import '../live/dw_live_hub.dart';
 import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
 import '../routes/dw_http_route.dart';
-import '../testing/dw_test_clock.dart';
 import 'dw_server_clock.dart';
 import 'dw_server_feature.dart';
 import 'dw_runtime.dart';
@@ -113,7 +112,6 @@ final class DwAppServer {
   final String? migrationsDirectory;
   final DwDatabaseConfig database;
   final DwAuthConfig auth;
-
   /// The project's areas: every call, channel rule, job and route it has
   /// comes from one of them. See [DwServerFeature].
   final List<DwServerFeature> features;
@@ -187,7 +185,8 @@ final class DwAppServer {
   /// and the job queue's due times — a job's default `runAt`, when it is
   /// due, its retries and leases, the schedule of recurring jobs. The
   /// system's clock by default; a `DwTestClock` in a test that pins or moves
-  /// time, which also wakes the job executor when it moves.
+  /// time. The server wakes its job executor on every
+  /// [DwServerClock.jumps].
   final DwServerClock clock;
 
   _DwRunning? _running;
@@ -325,6 +324,7 @@ final class DwAppServer {
 
     DwPostgresDatabase? openedDatabase;
     DwJobRunner? jobRunner;
+    StreamSubscription<void>? clockJumps;
     DwHttpFront? front;
     final fileStore = switch (files) {
       final storage? => DwFileStore(storage),
@@ -374,15 +374,17 @@ final class DwAppServer {
       final authService = DwAuthService(runtime);
       runner = jobRunner = DwJobRunner(
         runtime: runtime,
-        definitions: [...jobs, _cleanupJob(), ...?fileStore?.jobs()],
+        definitions: [
+          ...jobs,
+          _cleanupJob(),
+          ...?fileStore?.jobs(),
+        ],
         listen: openedDatabase.listen,
         workers: settings.jobWorkers,
         pollInterval: settings.jobPollInterval,
       );
       await runner.start();
-      if (clock case final DwTestClock testClock) {
-        testClock.addListener(runner.wake);
-      }
+      clockJumps = clock.jumps.listen((_) => runner.wake());
 
       // After the job runner, so a step may enqueue; before the front binds,
       // so nothing has been served when it runs. A throw leaves the start in
@@ -430,6 +432,7 @@ final class DwAppServer {
         jobRunner: runner,
         front: front,
         files: fileStore,
+        clockJumps: clockJumps,
       );
       _running = running;
       if (handleSignals) {
@@ -443,9 +446,7 @@ final class DwAppServer {
       }
       logger.info('DartWay server listening on port ${front.port}');
     } catch (_) {
-      if (clock case final DwTestClock testClock) {
-        if (jobRunner != null) testClock.removeListener(jobRunner.wake);
-      }
+      await clockJumps?.cancel();
       await front?.close();
       await jobRunner?.stop();
       await openedDatabase?.close();
@@ -475,9 +476,7 @@ final class DwAppServer {
         for (final connection in connections)
           connection.close(DwCloseCode.serverStopping, 'dw.serverStopping'),
       ]);
-      if (clock case final DwTestClock testClock) {
-        testClock.removeListener(running.jobRunner.wake);
-      }
+      await running.clockJumps.cancel();
       await running.jobRunner.stop().timeout(
         settings.stopTimeout,
         onTimeout: () => logger.warning('jobs still running at stop timeout'),
@@ -740,10 +739,14 @@ final class DwAppServer {
           'WHERE created_at < now() - @age::int8 * interval \'1 microsecond\'',
           params: {'age': ticketRetention.inMicroseconds},
         );
+        // `failed_at` is stamped by the server's clock, so it is aged by it.
         await ctx.db.execute(
-          'DELETE FROM dw_job '
-          'WHERE failed_at < now() - @age::int8 * interval \'1 microsecond\'',
-          params: {'age': settings.failedJobRetention.inMicroseconds},
+          'DELETE FROM dw_job WHERE failed_at < '
+          '@now::timestamptz - @age::int8 * interval \'1 microsecond\'',
+          params: {
+            'age': settings.failedJobRetention.inMicroseconds,
+            'now': ctx.now,
+          },
         );
         // A revoked key has no use once its revocation has been delivered and
         // every cache has forgotten it.
@@ -763,6 +766,7 @@ final class _DwRunning {
     required this.jobRunner,
     required this.front,
     required this.files,
+    required this.clockJumps,
   });
 
   final DwPostgresDatabase database;
@@ -770,5 +774,8 @@ final class _DwRunning {
   final DwJobRunner jobRunner;
   final DwHttpFront front;
   final DwFileStore? files;
+
+  /// The job executor's wake on every jump of the server's clock.
+  final StreamSubscription<void> clockJumps;
   List<StreamSubscription<ProcessSignal>> signals = const [];
 }

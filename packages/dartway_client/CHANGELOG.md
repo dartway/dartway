@@ -4,7 +4,8 @@
 
 - **Every call carries the device's UTC offset** (`Dw-Utc-Offset`), read at each send, so a change
   of zone or of daylight saving time reaches the server with the next call; the server reads it as
-  `ctx.callerUtcOffset` (dartway/dartway#385).
+  `ctx.callerUtcOffset` (dartway/dartway#385). `DwAppClient(utcOffset:)` reports a fixed offset
+  instead — for tests; `DwFakeServer.newClient` pins zero unless told otherwise.
 
 ## 0.21.0-dev.8
 

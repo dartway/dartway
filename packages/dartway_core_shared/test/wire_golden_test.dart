@@ -307,7 +307,7 @@ List<_WireShape> _wireShapes() {
       () => DwContractVersion('0.7.2').toString(),
       readBack: (json) => DwContractVersion.parse(json! as String).toString(),
     ),
-    // Recorded apart from `http.contract` (D-109): an optional header an
+    // Recorded apart from `http.contract` (D-110): an optional header an
     // older client simply does not send, so the envelope is unchanged.
     _WireShape(
       'http.utcOffset',

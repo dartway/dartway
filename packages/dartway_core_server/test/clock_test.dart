@@ -4,7 +4,7 @@ import 'package:test/test.dart';
 import 'support/test_app.dart';
 
 /// `ctx.now` from the server's clock, and the caller's UTC offset carried by
-/// the framework (D-109).
+/// the framework (D-110).
 void main() {
   final start = DateTime.utc(2026, 9, 29, 21, 30);
   final clock = DwTestClock(start);
@@ -80,14 +80,14 @@ void main() {
 
   group("the caller's UTC offset", () {
     test('travels from the header to ctx.callerUtcOffset and '
-        'ctx.callerLocalNow, on commands and requests', () async {
+        'ctx.callerLocalTime, on commands and requests', () async {
       final answer = await caller.call(
         const ReadClock(),
         headers: {DwHttpContract.utcOffsetHeader: '180'},
       );
       expect(
         answer.value(const ReadClock()),
-        '${start.toIso8601String()}|180|2026-09-30T00:30:00.000Z',
+        '${start.toIso8601String()}|180|2026-09-30 00:30 (UTC+03:00)',
         reason: 'past midnight in Moscow while it is 21:30 in London',
       );
       final note = (await caller.call(
@@ -96,7 +96,23 @@ void main() {
       )).value(const GetClockNote());
       expect(
         note.text,
-        '${start.toIso8601String()}|-300|2026-09-29T16:30:00.000Z',
+        '${start.toIso8601String()}|-300|2026-09-29 16:30 (UTC-05:00)',
+      );
+    });
+
+    test('a test caller reports a pinned offset, zero unless set', () async {
+      expect(
+        (await caller.call(const ReadClock())).value(const ReadClock()),
+        '${start.toIso8601String()}|0|2026-09-29 21:30 (UTC+00:00)',
+      );
+      final server = harness().server;
+      server.utcOffset = const Duration(hours: 5, minutes: 45);
+      addTearDown(() => server.utcOffset = Duration.zero);
+      final pinned = server.caller();
+      addTearDown(pinned.close);
+      expect(
+        (await pinned.call(const ReadClock())).value(const ReadClock()),
+        contains('|345|2026-09-30 03:15 (UTC+05:45)'),
       );
     });
 
@@ -118,10 +134,20 @@ void main() {
       }
     });
 
-    test('the real client sends the device offset on every call', () async {
+    test('the real client reports the offset it is given: the test '
+        "server's by default, or its own", () async {
       final client = await harness().server.connectClient();
-      final text = (await client.command(const ReadClock())).valueOrThrow;
-      expect(text.split('|')[1], '${DateTime.now().timeZoneOffset.inMinutes}');
+      expect(
+        (await client.command(const ReadClock())).valueOrThrow.split('|')[1],
+        '0',
+      );
+      final east = await harness().server.connectClient(
+        utcOffset: const Duration(hours: 3),
+      );
+      expect(
+        (await east.command(const ReadClock())).valueOrThrow.split('|')[1],
+        '180',
+      );
     });
   });
 }

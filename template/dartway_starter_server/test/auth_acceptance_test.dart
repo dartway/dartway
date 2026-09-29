@@ -190,9 +190,10 @@ void main() {
 
     // A mistyped identifier is a server that does not start, judged before
     // anything opens.
-    expect(declaring('not an identifier').problems(AppAuth.config()), [
-      contains(DwFirstAdministrator.defaultVariable),
-    ]);
+    expect(
+      declaring('not an identifier').problems(AppAuth.config()),
+      [contains(DwFirstAdministrator.defaultVariable)],
+    );
     expect(declaring('Admin@Example.com').problems(AppAuth.config()), isEmpty);
 
     await start('Admin@Example.com');
