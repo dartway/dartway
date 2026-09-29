@@ -9,9 +9,10 @@
   package's `lib/` but generated code. A class marked `// dw:allow-stateful <reason>` on the line
   above is passed over and listed after the tally (`🔓 Allowed by dw:allow-stateful`); a marker
   with no reason, or on no class, is a finding. `forbiddenCommandCall`: `dw.command` outside a
-  feature's `logic/` or inside a `try` that catches; a widget running `<Feature>Commands` outside
+  feature's `logic/` and `core/` (app-wide wiring) or inside a `try` that catches; a widget running `<Feature>Commands` outside
   `dw.action`, or reading `DwCallOk`/`DwCallRefused`/`DwCallFailed`/`valueOrThrow` outside
-  `logic/` and `core/`. Both read the source with comments and strings blanked. The skeleton
+  `logic/` and `core/`. Both read the source with comments and strings blanked; refusal text
+  built outside the catalogue is stated in the toolkit, not checked. The skeleton
   follows: its kit fields are hooks, the identifier change is an `IdentityChangeController`, the
   sign-in notifier is `AuthController`, the analytics saves are `AnalyticsDashboardCommands`, and
   the router state carries the one marker. Migration note:

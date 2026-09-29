@@ -130,7 +130,7 @@ Seventeen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
 | `forbiddenStateHolder` | error | A `StatefulWidget` (its `State`, `setState`, a `StatefulBuilder`), a `ChangeNotifier` or a `ValueNotifier` held as state, anywhere in the app's `lib/` but generated code — local state is hooks, shared state a `Notifier`. A class marked `// dw:allow-stateful <reason>` is passed over and listed |
-| `forbiddenCommandCall` | error | `dw.command` outside a feature's `logic/`, or inside a `try` that catches; a widget running `<Feature>Commands` outside `dw.action`, or reading a result (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) outside `logic/` and `core/` |
+| `forbiddenCommandCall` | error | `dw.command` outside a feature's `logic/` and `core/`, or inside a `try` that catches; a widget running `<Feature>Commands` outside `dw.action`, or reading a result (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) outside `logic/` and `core/` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |
@@ -259,17 +259,24 @@ The class — and, for a widget, its `State` — is passed over, and every run p
 `🔓 Allowed by dw:allow-stateful` with the reason. A marker with no reason, or on no class, is a
 finding itself. The exception stays in sight rather than spreading.
 
-**`forbiddenCommandCall`** holds the command canon: `dw.command` sent from `logic/` only
-(`<feature>_commands.dart`, or a flow's controller), never inside a `try` that catches; a widget
+**`forbiddenCommandCall`** holds the command canon: `dw.command` sent from a feature's `logic/`
+(`<feature>_commands.dart`, or a flow's controller) — or from `core/`, the app-wide wiring no button
+starts (a push token, a bootstrap step) — never inside a `try` that catches; a widget
 runs `<Feature>Commands.x(…)` only inside `dw.action(…)` and reads no result. A value the widget
 needs is unwrapped in `logic/` (`valueOrThrow`) and arrives in `followUpIfMountedAction`; a refusal
-becomes words only through `DwFlutterConfig.refusalText`, the app's catalogue in `lib/core/`.
+becomes words only through `DwFlutterConfig.refusalText`, the app's catalogue in `lib/core/`. That
+last rule is **stated, not held**: nothing tells a sentence built from a refusal code in a
+controller from any other string, and a guess would flag the wrong ones.
 
 Both are read from the source with comments and strings blanked, so they see what a text can show:
 a flow controller's method run outside `dw.action` is not caught (its name says nothing), nor a
 state holder reached through a subclass of the project's own, nor a `Notifier` not named
-`<Thing>Controller`. A `<Feature>Commands` class holds command senders only — a pure helper on it
-reads as a command sent outside `dw.action`.
+`<Thing>Controller`, nor a command sent under another spelling than `dw.command` or
+`<Feature>Commands.x(…)` — a plugin's method (`dw.plugins.analytics.saveDashboard`) or
+`dw.files.getLink` from a widget — nor refusal text built outside the catalogue. A `<Feature>Commands`
+class holds command senders only — a pure helper on it reads as a command sent outside `dw.action`.
+Only the first argument of `dw.action(…)` counts as inside it: a command in
+`followUpIfMountedAction` runs after the action's refusal handling is over.
 
 ## Why `notAFeature` and `featureSpecMissing` are one rule
 

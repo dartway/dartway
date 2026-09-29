@@ -191,8 +191,8 @@ The answer is a `DwCallResult<R>`, sealed:
 refusal shown through `DwFlutterConfig.refusalText`, a not-authenticated answer signing out, a failure
 reported. That is the one way to send a command; see
 [actions and refusal texts](actions-and-refusal-texts.md). `dw.command` is called in a feature's
-`logic/` — `<feature>_commands.dart`, or the `<Thing>Controller` of a flow — and only there is a
-result read: a controller switches over it to move the flow on, a command function reads
+`logic/` — `<feature>_commands.dart`, or the `<Thing>Controller` of a flow — or, for app-wide
+wiring no button starts (a push token), in `lib/core/`; only there is a result read: a controller switches over it to move the flow on, a command function reads
 `result.valueOrThrow` to hand a value to the action's `followUpIfMountedAction`. A widget reads none,
 and nothing wraps a command in `try`/`catch`: `dart run dartway_cli:dartway check` fails all of it
 as `forbiddenCommandCall`.

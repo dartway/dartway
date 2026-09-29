@@ -182,13 +182,12 @@ class AuthController extends Notifier<AuthFlow> {
     });
 
     test('dw.command anywhere else fails: widgets/, the entry file, shared/, '
-        'core/', () {
+        'the kit', () {
       const body = 'final a = dw.command(PayInvoice(invoiceId: 1));\n';
       for (final rel in [
         'app/invoices/invoice_card/widgets/pay_button.dart',
         'app/invoices/invoice_card/invoice_card.dart',
         'shared/invoices/invoice_commands.dart',
-        'core/push.dart',
         'ui_kit/2_frequent/pay_button.dart',
       ]) {
         expect(judge(rel, body), [(command, 1)], reason: rel);
@@ -249,6 +248,136 @@ Widget build(BuildContext context) => Column(children: [
 ]);
 '''),
         [(command, 9)],
+      );
+    });
+  });
+
+  group('review cases', () {
+    test('a State apart from its widget is a finding of its own', () {
+      expect(
+        judge('app/map/widgets/map_view_state.dart', '''
+part of '../map_page.dart';
+
+class _MapViewState extends State<MapView> {
+  void move() => setState(() {});
+}
+'''),
+        [(holder, 3)],
+      );
+    });
+
+    test('a marker on a State in a part file passes it over', () {
+      final judged = DwFlutterStateInspector.judge('app/map/map_state.dart', '''
+// dw:allow-stateful the map SDK calls into a State subclass
+class _MapViewState extends State<MapView> {
+  void move() => setState(() {});
+}
+''');
+      expect(judged.findings, isEmpty);
+      expect(judged.allowances.single, contains('_MapViewState'));
+    });
+
+    test('the marker reaches past abstract and other modifiers', () {
+      final judged = DwFlutterStateInspector.judge('core/a.dart', '''
+// dw:allow-stateful a base the router extends
+abstract class RouterBase extends ChangeNotifier {}
+''');
+      expect(judged.findings, isEmpty);
+      expect(judged.allowances.single, contains('RouterBase'));
+    });
+
+    test('the marker is a real line comment, not text in a string or a '
+        'block comment', () {
+      final judged = DwFlutterStateInspector.judge(
+        'core/a.dart',
+        "const doc = '''\n"
+            '// dw:allow-stateful not a marker\n'
+            "''';\n"
+            '/*\n'
+            '// dw:allow-stateful not a marker either\n'
+            '*/\n'
+            'class RouterState extends ChangeNotifier {}\n',
+      );
+      expect([for (final f in judged.findings) f.line], [7]);
+      expect(judged.allowances, isEmpty);
+    });
+
+    test("setState inside a flutter_hooks HookState is the hook's own", () {
+      expect(
+        judge('shared/use_ticker.dart', '''
+class _TickerHookState extends HookState<int, _TickerHook> {
+  void tick() => setState(() {});
+}
+'''),
+        isEmpty,
+      );
+    });
+
+    test("a State with no type argument is not Flutter's", () {
+      expect(
+        judge('app/a/logic/a_flow.dart', '''
+class DraftState extends State {}
+class OtherState extends ConsumerState {}
+'''),
+        isEmpty,
+      );
+    });
+
+    test(
+      'core/ may send a command and read a result: wiring with no button',
+      () {
+        expect(
+          judge('core/push/push_token.dart', '''
+Future<void> registerToken(String token) async {
+  final result = await dw.command(RegisterPushToken(token: token));
+  if (result case DwCallFailed()) report(result);
+}
+'''),
+          isEmpty,
+        );
+      },
+    );
+
+    test('DwCallFailed read in a widget fails', () {
+      expect(
+        judge('app/a/widgets/a_row.dart', '''
+void show(DwCallResult<int> result) {
+  if (result is DwCallFailed) retry();
+}
+'''),
+        [(command, 2)],
+      );
+    });
+
+    test('only the first argument of dw.action is inside it', () {
+      expect(
+        judge('app/a/a_page.dart', '''
+final a = dw.action(
+  (_) => ACommands.save(),
+  followUpIfMountedAction: (_, _) => ACommands.log(),
+);
+'''),
+        [(command, 3)],
+      );
+    });
+
+    test('lookalikes of holders pass: TextEditingValue, '
+        'ValueListenableBuilder, a ValueNotifier parameter', () {
+      expect(
+        judge('ui_kit/1_essentials/app_field.dart', '''
+class AppField extends HookWidget {
+  const AppField({required this.source});
+  final ValueNotifier<String> source;
+  static void set(TextEditingController c, String text) =>
+      c.value = TextEditingValue(text: text);
+  @override
+  Widget build(BuildContext context) => ValueListenableBuilder<String>(
+    valueListenable: source,
+    builder: (context, value, _) => Text(value),
+  );
+}
+'''),
+        isEmpty,
       );
     });
   });

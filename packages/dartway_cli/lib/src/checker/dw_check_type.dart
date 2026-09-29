@@ -193,7 +193,8 @@ enum DwCheckType {
   /// the class as `// dw:allow-stateful <reason>`, and every run lists it.
   forbiddenStateHolder,
 
-  /// `dw.command` outside a feature's `logic/` or inside a `try`; a widget
+  /// `dw.command` outside a feature's `logic/` and `core/` (app-wide wiring
+  /// with no button), or inside a `try` that catches; a widget
   /// running `<Feature>Commands` outside `dw.action`, or reading a result
   /// (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) itself
   /// (dartway/dartway#389).

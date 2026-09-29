@@ -146,7 +146,8 @@ reads it. A flow with state of its own (sign-in, a wizard) sends its commands fr
 `<Thing>Controller` in `logic/` (`dartway-feature-scaffold`), which may read a result to move the
 flow on and returns it; the widget wraps the controller's method the same way:
 `dw.action((_) => controller.verifyCode())`. A command two features send is one more feature — its
-button and its `logic/` — not a copy in each. `<Feature>Commands` holds command senders only: the
+button and its `logic/` — not a copy in each. App-wide wiring that no button starts — registering a
+push token, a bootstrap step — sends from `lib/core/`, the one other place `dw.command` may stand. `<Feature>Commands` holds command senders only: the
 checker reads any call to it from a widget as a command, and outside `dw.action` fails it
 (`forbiddenCommandCall`, like `dw.command` outside `logic/`, a `try`/`catch` around one, or a widget
 reading `DwCallOk`, `DwCallRefused` or `valueOrThrow`).

@@ -212,7 +212,7 @@ static Future<String> scanLinkOf(Invoice invoice) async =>
 // the widget opens it inside dw.action, which shows a refusal
 onTap: () => dw.action(
   (_) => InvoiceFiles.scanLinkOf(invoice),
-  followUpIfMountedAction: (context, url) => /* open url */,
+  followUpIfMountedAction: (_, url) => launchUrl(Uri.parse(url)), // url_launcher
 )(context),
 ```
 

@@ -143,10 +143,15 @@ class DwFlutterStateInspector {
     }
     final exempt = <(int, int)>[];
     for (final declaration in classes) {
+      // flutter_hooks' own API for a custom hook: its setState is the hook's.
+      if (declaration.base == 'HookState') {
+        exempt.add((declaration.start, declaration.end));
+        continue;
+      }
       final allowedWidget = marked.reasons.containsKey(declaration.name);
       final allowedState =
           declaration.typeArgument != null &&
-          _stateBases.contains(declaration.base) &&
+          _isStateClass(declaration) &&
           marked.reasons.containsKey(declaration.typeArgument);
       if (allowedWidget || allowedState) {
         exempt.add((declaration.start, declaration.end));
@@ -171,7 +176,7 @@ class DwFlutterStateInspector {
             'useFocusNode, useAnimationController, useEffect (cleanup '
             'returned), useState; didUpdateWidget is a useEffect keyed on '
             'the prop';
-      } else if (_stateBases.contains(base) &&
+      } else if (_isStateClass(declaration) &&
           classes.any(
             (c) =>
                 c.name == declaration.typeArgument &&
@@ -180,7 +185,7 @@ class DwFlutterStateInspector {
         // Its widget, declared here, carries the finding for both.
         reported.add((declaration.start, declaration.end));
         continue;
-      } else if (_stateBases.contains(base)) {
+      } else if (_isStateClass(declaration)) {
         why =
             '${declaration.name} is a $base — local state is hooks '
             '(HookWidget/HookConsumerWidget), not a State class';
@@ -226,12 +231,15 @@ class DwFlutterStateInspector {
         segments.length > 2 &&
         segments.sublist(1, segments.length - 1).contains('logic');
 
+    // `core/` is app-wide wiring with no button — a push token, a bootstrap
+    // step — and may send what no feature owns.
+    final inCore = segments.first == 'core';
     for (final match in _dwCommand.allMatches(code)) {
-      if (!inLogic) {
+      if (!inLogic && !inCore) {
         add(
           DwCheckType.forbiddenCommandCall,
           match.start,
-          'dw.command outside a feature\'s logic/ — send it from '
+          'dw.command outside a feature\'s logic/ (or core/) — send it from '
           'logic/<feature>_commands.dart (or the flow\'s controller) and '
           'run it inside the dw.action of the widget that owns the button',
         );
@@ -251,7 +259,7 @@ class DwFlutterStateInspector {
       );
     }
 
-    if (!inLogic && segments.first != 'core') {
+    if (!inLogic && !inCore) {
       for (final match in _resultRead.allMatches(code)) {
         add(
           DwCheckType.forbiddenCommandCall,
@@ -262,7 +270,7 @@ class DwFlutterStateInspector {
           'followUpIfMountedAction',
         );
       }
-      final actions = _callSpans(code, _dwAction);
+      final actions = _firstArgumentSpans(code, _dwAction);
       for (final match in _commandsCall.allMatches(code)) {
         if (actions.any((s) => match.start >= s.$1 && match.start < s.$2)) {
           continue;
@@ -287,6 +295,12 @@ class DwFlutterStateInspector {
     'StatefulHookConsumerWidget',
   };
   static const _stateBases = {'State', 'ConsumerState'};
+
+  /// `extends State<W>` — the type argument is what makes it Flutter's: a
+  /// project's own `State` enum or class is not.
+  static bool _isStateClass(_ClassDeclaration declaration) =>
+      _stateBases.contains(declaration.base) &&
+      declaration.typeArgument != null;
   static const _notifierBases = {'ChangeNotifier', 'ValueNotifier'};
 
   /// `setState(`, `StatefulBuilder(`, and a `ValueNotifier`/`ChangeNotifier`
@@ -339,11 +353,15 @@ class DwFlutterStateInspector {
     final reasons = <String, (int, String)>{};
     final problems = <(int, String)>[];
     final marker = RegExp(
-      '^[ \\t]*//[ \\t]*${RegExp.escape(allowMarker)}\\b[ \\t:—-]*(.*)\$',
+      '^([ \\t]*)//[ \\t]*${RegExp.escape(allowMarker)}\\b[ \\t:—-]*(.*)\$',
       multiLine: true,
     );
+    final comments = lineCommentStarts(content);
     for (final match in marker.allMatches(content)) {
-      final reason = match.group(1)!.trim();
+      // Text that only looks like the marker — inside a string or a block
+      // comment — is not one.
+      if (!comments.contains(match.start + match.group(1)!.length)) continue;
+      final reason = match.group(2)!.trim();
       // The class this marker sits on: the first declaration after it with
       // only comments, annotations and blank lines between.
       final after = content.substring(match.end);
@@ -392,11 +410,28 @@ class DwFlutterStateInspector {
 
   static final _catchClause = RegExp(r'\s*(?:catch\s*\(|on\s+[A-Za-z_])');
 
-  /// The argument spans of every call [opening] matches (ending in `(`).
-  static List<(int, int)> _callSpans(String code, RegExp opening) => [
+  /// The span of the first argument of every call [opening] matches (ending
+  /// in `(`) — the work `dw.action` runs, not `followUpIfMountedAction` or the
+  /// other named arguments after it.
+  static List<(int, int)> _firstArgumentSpans(String code, RegExp opening) => [
     for (final match in opening.allMatches(code))
-      (match.end - 1, _closing(code, match.end - 1)),
+      (match.end, _firstArgumentEnd(code, match.end - 1)),
   ];
+
+  /// Where the first argument of the call whose `(` is at [open] ends: the
+  /// first comma at its own depth, or the closing parenthesis.
+  static int _firstArgumentEnd(String code, int open) {
+    var depth = 0;
+    for (var i = open; i < code.length; i++) {
+      final char = code[i];
+      if (char == '(' || char == '[' || char == '{') depth++;
+      if (char == ')' || char == ']' || char == '}') {
+        if (--depth == 0) return i;
+      }
+      if (char == ',' && depth == 1) return i;
+    }
+    return code.length;
+  }
 
   /// The offset just past the bracket closing the one at [open].
   static int _closing(String code, int open) {
@@ -421,6 +456,11 @@ class DwFlutterStateInspector {
   /// Interpolations are blanked with the string around them.
   static String blankCommentsAndStrings(String content) =>
       _DwSourceBlanker(content).run();
+
+  /// Where each real `//` comment of [content] starts — not one inside a
+  /// string or a block comment.
+  static Set<int> lineCommentStarts(String content) =>
+      (_DwSourceBlanker(content)..run()).lineCommentStarts;
 }
 
 /// A finding of [DwFlutterStateInspector]: the check, where, and what to do.
@@ -472,11 +512,13 @@ final class _DwSourceBlanker {
 
   final String content;
   final List<String> out;
+  final lineCommentStarts = <int>{};
 
   String run() {
     var i = 0;
     while (i < content.length) {
       if (content.startsWith('//', i)) {
+        lineCommentStarts.add(i);
         final end = content.indexOf('\n', i);
         final stop = end < 0 ? content.length : end;
         _blank(i, stop);

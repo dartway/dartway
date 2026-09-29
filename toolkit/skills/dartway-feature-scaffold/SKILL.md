@@ -167,6 +167,8 @@ as state:
 | a `Timer`, a `StreamSubscription`, a `WidgetsBindingObserver` | `useEffect` returning its cleanup; `useOnAppLifecycleStateChange` |
 | `didUpdateWidget` resyncing from a prop | `useEffect(…, [prop])`, or `useValueChanged(prop, …)` for the old value |
 | an object built once and disposed | `useMemoized` plus a `useEffect` cleanup |
+| a `StatefulBuilder` around part of a tree | `HookBuilder` (`HookConsumer` with a `ref`) |
+| a mixin or extension `on State` that calls `setState` | a `use…` function of your own that calls hooks and returns what the widget needs |
 
 A callback registered once that must see the widget's latest props reads them through
 `final latest = useRef(this)..value = this;`. A shared controller the provider owns lives exactly as
