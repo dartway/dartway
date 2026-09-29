@@ -8,11 +8,11 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// own cache key: a `from` computed from `DateTime.now()` in `build` would be
 /// a different request on every rebuild — a new fetch and a new subscription
 /// each time. The day changes once a day, and so does the request.
-final todayProvider = NotifierProvider<TodayNotifier, DateTime>(
-  TodayNotifier.new,
+final todayControllerProvider = NotifierProvider<TodayController, DateTime>(
+  TodayController.new,
 );
 
-class TodayNotifier extends Notifier<DateTime> {
+class TodayController extends Notifier<DateTime> {
   @override
   DateTime build() {
     final now = DateTime.now();

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
+  state and command checks of `dartway check` (dartway/dartway#389).
+
 ## 0.21.0-dev.8
 
 - **BREAKING: `DwIdentityInfo.kind` is `DwIdentifierKind?` now, and `provider: String?` joined it —

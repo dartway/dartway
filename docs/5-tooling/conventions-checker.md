@@ -76,9 +76,12 @@ From the project root or from inside the `*_flutter` package, in this order:
    development containers' credentials against what the server is told to reach them by
    (`devComposeDrifted`);
 7. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
-   in the zones and `shared/` — the other sixteen checks.
+   in the zones and `shared/` — sixteen more checks;
+8. **state and commands** over every file of the Flutter package's `lib/` but generated code
+   (`forbiddenStateHolder`, `forbiddenCommandCall`), and the classes a `dw:allow-stateful` marker
+   passes over, listed after the tally.
 
-`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 7 and skips
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of steps 7–8 and skips
 steps 1–6 and the UI kit pass: each of those judges a whole package or the whole project, and has
 nothing to say about one folder. `--type <check>` runs one check by name; `--level
 info|warning|error` runs the checks of one severity.
@@ -106,7 +109,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
+Seventeen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -126,6 +129,8 @@ Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
+| `forbiddenStateHolder` | error | A `StatefulWidget` (its `State`, `setState`, a `StatefulBuilder`), a `ChangeNotifier` or a `ValueNotifier` held as state, anywhere in the app's `lib/` but generated code — local state is hooks, shared state a `Notifier`. A class marked `// dw:allow-stateful <reason>` is passed over and listed |
+| `forbiddenCommandCall` | error | `dw.command` outside a feature's `logic/`, or inside a `try` that catches; a widget running `<Feature>Commands` outside `dw.action`, or reading a result (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) outside `logic/` and `core/` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |
@@ -231,6 +236,40 @@ drifting. What they end is the silent case — a developer who does not know a k
 only place it was written down was a deployment's configuration, and two files stating the same
 password with nothing making them agree. `dartway secret list --env local` is the same answer on
 demand.
+
+## State and commands: one way each, and one visible way out
+
+A widget's own state — a controller, a focus node, an animation, a timer, a subscription, a toggle —
+is held by hooks (`HookWidget`/`HookConsumerWidget`: `useTextEditingController`, `useFocusNode`,
+`useAnimationController`, `useEffect` returning its cleanup, `useState`); what `didUpdateWidget` did
+is a `useEffect` keyed on the prop. State two widgets share, or a flow with logic, is a Riverpod
+`Notifier` named `<Thing>Controller` in the feature's `logic/`. `forbiddenStateHolder` reads every
+file of `lib/`, `core/` and `ui_kit/` included — a kit field is where a `StatefulWidget` hides best.
+
+**The way out is written on the class and counted.** An API that needs a `State` subclass or a
+`Listenable` of its own (the router's refresh listenable is the skeleton's one case) takes one
+comment on the line above the class, doc comments and annotations allowed between:
+
+```dart
+// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable
+class AppRouterState extends ChangeNotifier { … }
+```
+
+The class — and, for a widget, its `State` — is passed over, and every run prints it under
+`🔓 Allowed by dw:allow-stateful` with the reason. A marker with no reason, or on no class, is a
+finding itself. The exception stays in sight rather than spreading.
+
+**`forbiddenCommandCall`** holds the command canon: `dw.command` sent from `logic/` only
+(`<feature>_commands.dart`, or a flow's controller), never inside a `try` that catches; a widget
+runs `<Feature>Commands.x(…)` only inside `dw.action(…)` and reads no result. A value the widget
+needs is unwrapped in `logic/` (`valueOrThrow`) and arrives in `followUpIfMountedAction`; a refusal
+becomes words only through `DwFlutterConfig.refusalText`, the app's catalogue in `lib/core/`.
+
+Both are read from the source with comments and strings blanked, so they see what a text can show:
+a flow controller's method run outside `dw.action` is not caught (its name says nothing), nor a
+state holder reached through a subclass of the project's own, nor a `Notifier` not named
+`<Thing>Controller`. A `<Feature>Commands` class holds command senders only — a pure helper on it
+reads as a command sent outside `dw.action`.
 
 ## Why `notAFeature` and `featureSpecMissing` are one rule
 

@@ -7,65 +7,49 @@ part of '../../ui_kit.dart';
 ///
 /// Copied into a project's own `ui_kit/` and restyled — see the
 /// `dartway-media` toolkit skill.
-class AppMediaTimeline extends StatefulWidget {
+class AppMediaTimeline extends HookWidget {
   const AppMediaTimeline({super.key, required this.session});
 
   final DwMediaSession session;
 
   @override
-  State<AppMediaTimeline> createState() => _AppMediaTimelineState();
-}
-
-class _AppMediaTimelineState extends State<AppMediaTimeline> {
-  double? _dragging;
-
-  @override
-  Widget build(BuildContext context) =>
-      ValueListenableBuilder<DwMediaPlaybackState>(
-        valueListenable: widget.session.playback,
-        builder: (context, playback, _) {
-          final total = playback.duration.inMilliseconds.toDouble();
-          final known = total > 0;
-          final position =
-              _dragging ??
-              playback.position.inMilliseconds
-                  .clamp(0, max(total, 0))
-                  .toDouble();
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Row(
-              children: [
-                _label(Duration(milliseconds: position.round())),
-                Expanded(
-                  child: Slider(
-                    value: known ? position : 0,
-                    max: known ? total : 1,
-                    secondaryTrackValue: known
-                        ? playback.buffered.inMilliseconds
-                              .clamp(0, total)
-                              .toDouble()
-                        : null,
-                    onChanged: known
-                        ? (value) => setState(() => _dragging = value)
-                        : null,
-                    onChangeEnd: known
-                        ? (value) {
-                            setState(() => _dragging = null);
-                            widget.session.seek(
-                              Duration(milliseconds: value.round()),
-                            );
-                          }
-                        : null,
-                  ),
-                ),
-                _label(playback.duration),
-              ],
+  Widget build(BuildContext context) {
+    final playback = useValueListenable(session.playback);
+    // Where the thumb is while it is dragged; `null` follows playback.
+    final dragging = useState<double?>(null);
+    final total = playback.duration.inMilliseconds.toDouble();
+    final known = total > 0;
+    final position =
+        dragging.value ??
+        playback.position.inMilliseconds.clamp(0, max(total, 0)).toDouble();
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Row(
+        children: [
+          _label(Duration(milliseconds: position.round())),
+          Expanded(
+            child: Slider(
+              value: known ? position : 0,
+              max: known ? total : 1,
+              secondaryTrackValue: known
+                  ? playback.buffered.inMilliseconds.clamp(0, total).toDouble()
+                  : null,
+              onChanged: known ? (value) => dragging.value = value : null,
+              onChangeEnd: known
+                  ? (value) {
+                      dragging.value = null;
+                      session.seek(Duration(milliseconds: value.round()));
+                    }
+                  : null,
             ),
-          );
-        },
-      );
+          ),
+          _label(playback.duration),
+        ],
+      ),
+    );
+  }
 
-  Widget _label(Duration duration) => Text(
+  static Widget _label(Duration duration) => Text(
     _format(duration),
     style: const TextStyle(color: Colors.white, fontSize: 12),
   );

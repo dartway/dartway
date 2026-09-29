@@ -116,11 +116,12 @@ costs a screen, not a leak.
 
 ## Router state
 
-`AppRouterState` is a `ChangeNotifier` the guards watch: it listens to providers and calls `notifyListeners()`, which makes the guards re-run. There is no other link between authorization and navigation.
+`AppRouterState` is a `ChangeNotifier` the guards watch: it listens to providers and calls `notifyListeners()`, which makes the guards re-run. There is no other link between authorization and navigation. `DwAppRouter` needs a `Listenable`, so it is the skeleton's one `// dw:allow-stateful` class — keep the marker, and do not grow a second (`dartway-feature-scaffold`).
 
 The skeleton's listens to two things: `dw.accountId` — known from the stored session at start, before the server has answered, so a signed-in user opens straight into the app — and the role on the signed-in profile (`myProfileProvider` in `core/profile/`), which is a live request, so a role an admin changes re-runs the guards without a reload.
 
 ```dart
+// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable (go_router's refreshListenable), and this is the one it listens to
 class AppRouterState extends ChangeNotifier {
   AppRouterState(Ref ref) {
     ref.listen<int?>(dw.accountId, (_, accountId) {

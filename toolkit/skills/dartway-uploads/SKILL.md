@@ -205,10 +205,15 @@ network image.
 the app asks for a link **when the file is about to be opened**:
 
 ```dart
-final link = await dw.files.getLink(invoice.scanFileId!);
-if (link case DwCallOk(:final value)) {
-  // value.url, valid until value.expiresAt
-}
+// logic/<feature>_files.dart — valid until the link's expiresAt
+static Future<String> scanLinkOf(Invoice invoice) async =>
+    (await dw.files.getLink(invoice.scanFileId!)).valueOrThrow.url;
+
+// the widget opens it inside dw.action, which shows a refusal
+onTap: () => dw.action(
+  (_) => InvoiceFiles.scanLinkOf(invoice),
+  followUpIfMountedAction: (context, url) => /* open url */,
+)(context),
 ```
 
 A private link is short-lived (`DwFileStorage.linkLifetime`, ten minutes by default). Do not store

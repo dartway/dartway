@@ -19,7 +19,7 @@ import 'auth_step.dart';
 /// The commands' results are returned, so that `dw.action` shows a refusal (an
 /// invalid identifier, a wrong or expired code, too many attempts) in the
 /// user's language without any code here.
-class AuthState extends Notifier<AuthStateModel> {
+class AuthController extends Notifier<AuthStateModel> {
   DwCodeTicket? _ticket;
 
   @override
@@ -110,6 +110,6 @@ class AuthState extends Notifier<AuthStateModel> {
   }
 }
 
-final authStateProvider = NotifierProvider<AuthState, AuthStateModel>(
-  AuthState.new,
+final authControllerProvider = NotifierProvider<AuthController, AuthStateModel>(
+  AuthController.new,
 );

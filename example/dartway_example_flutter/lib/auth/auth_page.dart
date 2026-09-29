@@ -7,7 +7,7 @@ import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
 import '../core/router/app_scaffold.dart';
-import 'logic/auth_state.dart';
+import 'logic/auth_controller.dart';
 import 'widgets/greeting_block.dart';
 
 class AuthPage extends ConsumerWidget {
@@ -15,14 +15,14 @@ class AuthPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(authStateProvider);
+    final state = ref.watch(authControllerProvider);
 
     return AppScaffold.inner(
       appBar: AppBar(
         leading: state.currentStep.previousStep != null
             ? IconButton(
                 onPressed: () => ref
-                    .read(authStateProvider.notifier)
+                    .read(authControllerProvider.notifier)
                     .goTo(state.currentStep.previousStep!),
                 icon: const Icon(Icons.arrow_back),
               )

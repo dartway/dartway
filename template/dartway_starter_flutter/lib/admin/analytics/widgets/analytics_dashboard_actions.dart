@@ -1,4 +1,5 @@
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
+import 'package:dartway_starter_flutter/admin/analytics/logic/analytics_dashboard_commands.dart';
 import 'package:dartway_starter_flutter/admin/analytics/widgets/analytics_title_sheet.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
@@ -36,8 +37,8 @@ class AnalyticsDashboardActions extends StatelessWidget {
                     child: AnalyticsTitleSheet(initial: dashboard.title),
                   );
                   if (title == null) return null;
-                  return dw.plugins.analytics.saveDashboard(
-                    id: dashboard.id,
+                  return AnalyticsDashboardCommands.save(
+                    dashboard: dashboard,
                     title: title,
                     widgets: dashboard.widgets,
                   );
@@ -48,13 +49,12 @@ class AnalyticsDashboardActions extends StatelessWidget {
           onTap: !enabled
               ? null
               : dw.action(
-                  (_) => dw.plugins.analytics.deleteDashboard(dashboard.id),
+                  (_) => AnalyticsDashboardCommands.delete(dashboard),
                   confirmation: DwUiConfirmation(
                     l10n.analyticsDeleteDashboardConfirmation(dashboard.title),
                   ),
-                  followUpIfMountedAction: (_, result) {
-                    if (result is DwCallOk) onDeleted();
-                  },
+                  // Run on success only: a refusal is shown instead.
+                  followUpIfMountedAction: (_, _) => onDeleted(),
                 ),
         ),
       ],

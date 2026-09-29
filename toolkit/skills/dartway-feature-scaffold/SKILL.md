@@ -6,8 +6,9 @@ description: >-
   codes; (2) the server in __SERVER_PKG__ — row class, `dart run dartway_cli:dartway generate`, a reviewed migration
   draft, one handler per call with its access rule, rows mapped to data objects in batch, publishing
   what a command changed; (3) the Flutter feature in __FLUTTER_PKG__ — a folder with one public file
-  declaring its DwFeatureSpec, widgets/ and logic/, ref.watch(dw.request(...)), commands sent from
-  logic/ inside dw.action, texts in l10n including refusal texts; (4) tests and checks.
+  declaring its DwFeatureSpec, widgets/ and logic/, ref.watch(dw.request(...)), local state in
+  hooks and shared state in a <Thing>Controller Notifier, commands sent from logic/ inside
+  dw.action, texts in l10n including refusal texts; (4) tests and checks.
   Also the Flutter feature law: what a feature, a group and a building block are, isolation (import
   the public file only), where logic lives, and that a feature must be constructible from its address
   (identifiers and data objects), never from lists and callbacks its parent assembled. Use when
@@ -101,7 +102,7 @@ lib/app/<feature>/
   widgets/                   // the feature's private layout
     <feature>_row.dart
   logic/                     // state, rules and commands of this feature only
-    <feature>_commands.dart  // every dw.command the feature sends
+    <feature>_commands.dart  // <Feature>Commands: every dw.command the feature sends, and nothing else
     <feature>_filter.dart
 ```
 
@@ -148,9 +149,37 @@ the tell is that you cannot write `purpose` and `behaviors` for it without resta
 2. **A provider plus a decision on the state type** — when state is derived from several sources or
    carries a rule. The provider says where the data comes from, a factory on the state type decides
    what follows (time passed in, not read). Written by hand (`dartway-data-layer`).
-3. **A `Notifier`** — when the feature owns mutable state: a draft, a multi-select, a step-by-step
-   flow. First check it does not duplicate what the server already holds: a command's result is in
-   the watched requests without any local copy.
+3. **A `Notifier` named `<Thing>Controller`** in `logic/` — when state is shared between widgets or
+   a flow has logic: a draft two widgets edit, a multi-select, a multi-step sign-in, a form with an
+   async submit. First check it does not duplicate what the server already holds: a command's result
+   is in the watched requests without any local copy.
+
+**State is held one way** (law, `forbiddenStateHolder`, anywhere in `lib/` — `core/` and `ui_kit/`
+included). A widget's own state is a hook in a `HookWidget`/`HookConsumerWidget`; there is no
+`StatefulWidget`, no `setState`, no `StatefulBuilder`, and no `ChangeNotifier`/`ValueNotifier` held
+as state:
+
+| What `State` held | The hook |
+|---|---|
+| a `TextEditingController`, `ScrollController`, `FocusNode`, `TabController` | `useTextEditingController`, `useScrollController`, `useFocusNode`, `useTabController` |
+| an `AnimationController` with its ticker mixin | `useAnimationController` |
+| a flag, a selection, a draft | `useState` |
+| a `Timer`, a `StreamSubscription`, a `WidgetsBindingObserver` | `useEffect` returning its cleanup; `useOnAppLifecycleStateChange` |
+| `didUpdateWidget` resyncing from a prop | `useEffect(…, [prop])`, or `useValueChanged(prop, …)` for the old value |
+| an object built once and disposed | `useMemoized` plus a `useEffect` cleanup |
+
+A callback registered once that must see the widget's latest props reads them through
+`final latest = useRef(this)..value = this;`. A shared controller the provider owns lives exactly as
+long as someone watches it (`NotifierProvider.autoDispose`, `.family` keyed by what it is about).
+
+**The one way out** is an API that needs a `State` subclass or a `Listenable` of its own — the
+skeleton's router refresh listenable is the case. It takes one line on the class, with the reason,
+and `dart run dartway_cli:dartway check` lists it on every run:
+
+```dart
+// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable
+class AppRouterState extends ChangeNotifier { … }
+```
 
 State used by two features is a feature whose public surface is a provider: the provider in the root
 file, the state class and the notifier in `logic/`. State only one feature uses may keep notifier and

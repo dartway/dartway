@@ -142,10 +142,14 @@ AppButton.primary(
 ```
 
 The logic function answers `dw.command`'s result as it is — no `try`, no unwrapping: `dw.action`
-reads it. A flow with state of its own (sign-in, a wizard) sends its commands from its notifier in
-`logic/`, and the widget wraps the notifier's method the same way:
-`dw.action((_) => notifier.verifyCode())`. A command two features send is one more feature — its
-button and its `logic/` — not a copy in each.
+reads it. A flow with state of its own (sign-in, a wizard) sends its commands from its
+`<Thing>Controller` in `logic/` (`dartway-feature-scaffold`), which may read a result to move the
+flow on and returns it; the widget wraps the controller's method the same way:
+`dw.action((_) => controller.verifyCode())`. A command two features send is one more feature — its
+button and its `logic/` — not a copy in each. `<Feature>Commands` holds command senders only: the
+checker reads any call to it from a widget as a command, and outside `dw.action` fails it
+(`forbiddenCommandCall`, like `dw.command` outside `logic/`, a `try`/`catch` around one, or a widget
+reading `DwCallOk`, `DwCallRefused` or `valueOrThrow`).
 
 What `dw.action` does with the `DwCallResult` the callback returns:
 
@@ -155,9 +159,10 @@ What `dw.action` does with the `DwCallResult` the callback returns:
 - **not authenticated** → signs out, shows nothing;
 - **failed / timed out** → `onErrorNotification` if given, and the app's error report.
 
-Declining the confirmation cancels everything. Need the value? `followUpIfMountedAction: (context,
-result)`, or inside the callback `final invoice = (await InvoiceCardCommands.pay(i)).valueOrThrow;` —
-a non-ok result thrown there is handled the same way.
+Declining the confirmation cancels everything. Need the value? The logic function unwraps it —
+`static Future<CustomerInvoice> pay(…) async => (await dw.command(…)).valueOrThrow;`, a non-ok
+result thrown there handled by `dw.action` the same way — and the widget receives it in
+`followUpIfMountedAction: (context, invoice) => …`, which runs on success only.
 
 - **`dw.action(...)` is a `DwUiAction`, not a `VoidCallback`.** Give it to the kit's buttons, or to any
   tappable widget through `DwActionBuilder(action:, builder: (context, onPressed, busy) => …)`, which
@@ -294,7 +299,8 @@ fake through its constructor. The server itself is faked below the core, not by 
 
 Two questions, in order:
 
-1. **Does it survive a restart?** No → an ordinary `Notifier` or a hook. Yes → `dw.plugins.prefs` (the
+1. **Does it survive a restart?** No → a hook, or a `<Thing>Controller` when widgets share it
+   (`dartway-feature-scaffold`, "Where a feature's logic lives"). Yes → `dw.plugins.prefs` (the
    `dartway_shared_preferences` plugin; its library import brings the `prefs` getter): it gives back a
    provider, so reads stay `ref.watch`.
 2. **Does it belong to an entity?** No → `dw.plugins.prefs.provider(key:, defaultValue:)`. Yes → the
@@ -326,7 +332,7 @@ text comes from `context.l10n` (or the app's `appL10n` outside the tree).
       page handles `dw.notFound`; no `.value ?? fallback` over reads.
 - [ ] No refetch after commands; retries use the notifier's `refetch()`, never `ref.invalidate`.
 - [ ] `dw.command` is called in the feature's `logic/` only, inside the `dw.action` of the widget that
-      owns the button; no manual refusal handling.
+      owns the button; no `try`/`catch`, no `DwCallOk`/`valueOrThrow` in a widget.
 - [ ] A new refusal code has a string in every `.arb` and a case in the refusal texts.
 - [ ] Input rules live in the command's `validate()`; forms use `requireValidation`.
 - [ ] Sign-in state from `dw.accountId`; sign-out is `dw.signOut()`.
