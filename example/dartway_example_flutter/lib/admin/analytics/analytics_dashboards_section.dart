@@ -12,7 +12,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// The project's analytics dashboards: one shown at a time, every widget of
 /// it over the period chosen on top, and — in edit mode — widgets added,
@@ -83,84 +82,82 @@ class AnalyticsDashboardsSection extends HookConsumerWidget
     }
 
     const request = DwListAnalyticsDashboards();
-    return ref
-        .watch(dw.request(request))
-        .section(
-          loadingValue: const <DwAnalyticsDashboard>[],
-          onRetry: () => ref.read(dw.request(request).notifier).refetch(),
-          builder: (dashboards) {
-            final dashboard =
-                dashboards.firstWhereOrNull((d) => d.id == selectedId.value) ??
-                dashboards.firstOrNull;
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+    return DwReadBuilder(
+      dw.request(request),
+      placeholder: const <DwAnalyticsDashboard>[],
+      builder: (context, dashboards) {
+        final dashboard =
+            dashboards.firstWhereOrNull((d) => d.id == selectedId.value) ??
+            dashboards.firstOrNull;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Row(
               children: [
-                Row(
-                  children: [
-                    Expanded(child: AppText.title(l10n.analyticsTitle)),
-                    if (dashboards.length > 1 && dashboard != null)
-                      DropdownButton<int>(
-                        value: dashboard.id,
-                        underline: const SizedBox.shrink(),
-                        items: [
-                          for (final d in dashboards)
-                            DropdownMenuItem(value: d.id, child: Text(d.title)),
-                        ],
-                        onChanged: (id) => selectedId.value = id,
-                      ),
-                    if (dashboard != null)
-                      IconButton(
-                        tooltip: editing.value
-                            ? l10n.analyticsDoneEditing
-                            : l10n.analyticsEditDashboard,
-                        icon: Icon(editing.value ? Icons.check : Icons.edit),
-                        onPressed: () => editing.value = !editing.value,
-                      ),
-                    IconButton(
-                      tooltip: l10n.analyticsNewDashboard,
-                      icon: const Icon(Icons.add),
-                      onPressed: createDashboard,
-                    ),
-                  ],
+                Expanded(child: AppText.title(l10n.analyticsTitle)),
+                if (dashboards.length > 1 && dashboard != null)
+                  DropdownButton<int>(
+                    value: dashboard.id,
+                    underline: const SizedBox.shrink(),
+                    items: [
+                      for (final d in dashboards)
+                        DropdownMenuItem(value: d.id, child: Text(d.title)),
+                    ],
+                    onChanged: (id) => selectedId.value = id,
+                  ),
+                if (dashboard != null)
+                  IconButton(
+                    tooltip: editing.value
+                        ? l10n.analyticsDoneEditing
+                        : l10n.analyticsEditDashboard,
+                    icon: Icon(editing.value ? Icons.check : Icons.edit),
+                    onPressed: () => editing.value = !editing.value,
+                  ),
+                IconButton(
+                  tooltip: l10n.analyticsNewDashboard,
+                  icon: const Icon(Icons.add),
+                  onPressed: createDashboard,
                 ),
-                const Gap(8),
-                if (dashboard == null)
-                  AppText.body(l10n.analyticsNoDashboards)
-                else ...[
-                  if (dashboards.length == 1 || editing.value)
-                    AppText.body(dashboard.title),
-                  const Gap(8),
-                  AnalyticsPeriodBar(
-                    choice: choice.value,
-                    onChanged: (next) => choice.value = next,
-                  ),
-                  const Gap(16),
-                  // Keyed by the dashboard: what the grid keeps of a save
-                  // belongs to that dashboard, and a switch — even with a save
-                  // under way — starts the next one's grid afresh.
-                  AnalyticsDashboardGrid(
-                    key: ValueKey(dashboard.id),
-                    dashboard: dashboard,
-                    period: choice.value.period,
-                    editing: editing.value,
-                    saving: saving.value,
-                    onSaving: (value) => saving.value = value,
-                  ),
-                  if (editing.value) ...[
-                    const Gap(16),
-                    AnalyticsDashboardActions(
-                      dashboard: dashboard,
-                      enabled: !saving.value,
-                      onDeleted: () {
-                        selectedId.value = null;
-                        editing.value = false;
-                      },
-                    ),
-                  ],
-                ],
               ],
-            );
-          },
+            ),
+            const Gap(8),
+            if (dashboard == null)
+              AppText.body(l10n.analyticsNoDashboards)
+            else ...[
+              if (dashboards.length == 1 || editing.value)
+                AppText.body(dashboard.title),
+              const Gap(8),
+              AnalyticsPeriodBar(
+                choice: choice.value,
+                onChanged: (next) => choice.value = next,
+              ),
+              const Gap(16),
+              // Keyed by the dashboard: what the grid keeps of a save
+              // belongs to that dashboard, and a switch — even with a save
+              // under way — starts the next one's grid afresh.
+              AnalyticsDashboardGrid(
+                key: ValueKey(dashboard.id),
+                dashboard: dashboard,
+                period: choice.value.period,
+                editing: editing.value,
+                saving: saving.value,
+                onSaving: (value) => saving.value = value,
+              ),
+              if (editing.value) ...[
+                const Gap(16),
+                AnalyticsDashboardActions(
+                  dashboard: dashboard,
+                  enabled: !saving.value,
+                  onDeleted: () {
+                    selectedId.value = null;
+                    editing.value = false;
+                  },
+                ),
+              ],
+            ],
+          ],
         );
+      },
+    );
   }
 }

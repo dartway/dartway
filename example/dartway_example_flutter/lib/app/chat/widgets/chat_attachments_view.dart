@@ -41,12 +41,8 @@ class ChatAttachmentsView extends StatelessWidget {
                 ),
                 _ => 4 / 3,
               },
-              onTap: () => showDialog<void>(
-                context: context,
-                builder: (context) => Dialog(
-                  clipBehavior: Clip.antiAlias,
-                  child: InteractiveViewer(child: ChatLinkedImage(image.id)),
-                ),
+              onTap: () => context.showAppDialog<void>(
+                child: InteractiveViewer(child: ChatLinkedImage(image.id)),
               ),
               child: ChatLinkedImage(image.id),
             ),
@@ -71,12 +67,20 @@ class ChatLinkedImage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = dw.request(DwGetFileLink(fileId: fileId));
-    final link = ref.watch(provider);
     final retried = useRef(false);
-    return switch (link) {
-      AsyncData(:final value) => Image.network(
-        value.url,
-        key: ValueKey(value.url),
+    // A picture this member may not see, or one that is gone, is a lock
+    // rather than a failure to retry.
+    Widget locked(BuildContext context, DwCallRefusal _) =>
+        const Center(child: Icon(Icons.lock_outline));
+    return DwReadBuilder(
+      provider,
+      onRefused: {
+        DwCoreRefusal.forbidden: locked,
+        DwCoreRefusal.notFound: locked,
+      },
+      builder: (context, link) => Image.network(
+        link.url,
+        key: ValueKey(link.url),
         fit: BoxFit.cover,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) {
@@ -90,9 +94,7 @@ class ChatLinkedImage extends HookConsumerWidget {
           return const Center(child: Icon(Icons.broken_image_outlined));
         },
       ),
-      AsyncError() => const Center(child: Icon(Icons.lock_outline)),
-      _ => const SizedBox.expand(),
-    };
+    );
   }
 }
 

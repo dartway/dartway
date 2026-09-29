@@ -13,7 +13,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// Staff-only chat. The UI hides the tab for clients; the real protection is
 /// the server: the requests refuse a client, and so do the channels and the
@@ -83,13 +82,6 @@ class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
       );
     }
 
-    final channels = ref.watch(dw.request(const ListChatChannels()));
-    final unread = {
-      for (final state
-          in ref.watch(dw.request(const ListMyChatReadStates())).value ??
-              const <ChatReadState>[])
-        state.id: state.unreadCount,
-    };
     // A right click opens a message's menu; on the web the browser's own
     // menu would open over it.
     useEffect(() {
@@ -109,11 +101,6 @@ class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
       return () => searchText.removeListener(listen);
     }, [searchText]);
 
-    final list = channels.value ?? const <ChatChannel>[];
-    final channel =
-        list.where((c) => c.id == selectedId.value).firstOrNull ??
-        list.firstOrNull;
-
     return AppScaffold.main(
       appBar: AppBar(
         title: search.value != null
@@ -128,67 +115,75 @@ class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
             tooltip: search.value == null
                 ? l10n.chatSearch
                 : l10n.chatCloseSearch,
-            onPressed: channel == null
-                ? null
-                : () {
-                    if (search.value == null) {
-                      searchText.clear();
-                      search.value = '';
-                    } else {
-                      search.value = null;
-                    }
-                  },
+            onPressed: () {
+              if (search.value == null) {
+                searchText.clear();
+                search.value = '';
+              } else {
+                search.value = null;
+              }
+            },
             icon: Icon(search.value == null ? Icons.search : Icons.close),
           ),
           const ConnectionStatusIndicator(),
         ],
       ),
       bodyInsets: EdgeInsets.zero,
-      body: channels.section(
-        loadingWidget: const Center(child: CircularProgressIndicator()),
-        onRetry: () =>
-            ref.read(dw.request(const ListChatChannels()).notifier).refetch(),
-        builder: (channels) => channels.isEmpty || channel == null
-            ? Center(child: AppText.body(l10n.noChatChannels))
-            : Column(
-                children: [
-                  SizedBox(
-                    height: 52,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      children: [
-                        for (final item in channels)
-                          Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: ChatChannelChip(
-                              key: ValueKey('chat-channel-${item.id}'),
-                              title: item.title,
-                              selected: item.id == channel.id,
-                              unread: item.id == channel.id
-                                  ? 0
-                                  : unread[item.id] ?? 0,
-                              onTap: () {
-                                search.value = null;
-                                selectedId.value = item.id;
-                              },
-                            ),
+      body: DwReadBuilder(
+        dw.request(const ListChatChannels()),
+        builder: (context, channels) => DwReadBuilder(
+          dw.request(const ListMyChatReadStates()),
+          placeholder: const <ChatReadState>[],
+          builder: (context, readStates) {
+            final unread = {
+              for (final state in readStates) state.id: state.unreadCount,
+            };
+            final channel =
+                channels.where((c) => c.id == selectedId.value).firstOrNull ??
+                channels.firstOrNull;
+            return channel == null
+                ? Center(child: AppText.body(l10n.noChatChannels))
+                : Column(
+                    children: [
+                      SizedBox(
+                        height: 52,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
                           ),
-                      ],
-                    ),
-                  ),
-                  Expanded(
-                    child: ChatChannelView(
-                      key: ValueKey(channel.id),
-                      channel: channel,
-                      searchQuery: search.value,
-                    ),
-                  ),
-                ],
-              ),
+                          children: [
+                            for (final item in channels)
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: ChatChannelChip(
+                                  key: ValueKey('chat-channel-${item.id}'),
+                                  title: item.title,
+                                  selected: item.id == channel.id,
+                                  unread: item.id == channel.id
+                                      ? 0
+                                      : unread[item.id] ?? 0,
+                                  onTap: () {
+                                    search.value = null;
+                                    selectedId.value = item.id;
+                                  },
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: ChatChannelView(
+                          key: ValueKey(channel.id),
+                          channel: channel,
+                          searchQuery: search.value,
+                        ),
+                      ),
+                    ],
+                  );
+          },
+        ),
       ),
     );
   }

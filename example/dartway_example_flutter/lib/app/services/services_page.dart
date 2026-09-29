@@ -7,7 +7,6 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/core/async_section.dart';
 
 class ServicesPage extends ConsumerWidget implements DwFeatureWidget {
   const ServicesPage({super.key});
@@ -33,32 +32,25 @@ class ServicesPage extends ConsumerWidget implements DwFeatureWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     return AppScaffold.inner(
       appBar: AppBar(title: AppText.title(context.l10n.ourServices)),
-      body: ref
-          .watch(dw.request(const ListClubServices()))
-          .section(
-            loadingValue: PlaceholderObjects.listOf(
-              PlaceholderObjects.service,
-              4,
-            ),
-            onRetry: () => ref
-                .read(dw.request(const ListClubServices()).notifier)
-                .refetch(),
-            builder: (services) {
-              if (services.isEmpty) {
-                return Center(
-                  child: AppText.body(context.l10n.priceListComingSoon),
-                );
-              }
+      body: DwReadBuilder(
+        dw.request(const ListClubServices()),
+        placeholder: PlaceholderObjects.listOf(PlaceholderObjects.service, 4),
+        builder: (context, services) {
+          if (services.isEmpty) {
+            return Center(
+              child: AppText.body(context.l10n.priceListComingSoon),
+            );
+          }
 
-              return ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: services.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, index) =>
-                    ServiceCard(service: services[index]),
-              );
-            },
-          ),
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: services.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) =>
+                ServiceCard(service: services[index]),
+          );
+        },
+      ),
     );
   }
 }

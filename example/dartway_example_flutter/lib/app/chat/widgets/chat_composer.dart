@@ -303,10 +303,7 @@ class ChatComposer extends HookConsumerWidget {
                 tooltip: l10n.sendMessage,
                 onPressed: canSend ? send : null,
                 icon: sending.value
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const AppProgressIndicator(size: 18)
                     : Icon(editing == null ? Icons.send : Icons.check),
               ),
             ],

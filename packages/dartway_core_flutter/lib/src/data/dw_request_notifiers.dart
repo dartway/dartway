@@ -19,9 +19,27 @@ typedef DwTableProvider<T extends DwDataObject> =
 typedef DwWindowProvider<T extends DwDataObject> =
     NotifierProvider<DwWindowNotifier<T>, AsyncValue<DwWindowData<T>>>;
 
+/// Any of the four above, as `DwReadBuilder` takes it: a watched read whose
+/// states are `AsyncValue`s and which can be asked again.
+typedef DwWatchProvider<S> =
+    NotifierProvider<DwWatchNotifier<S>, AsyncValue<S>>;
+
 /// What `dw.accountId`, `dw.liveStatus` and `dw.incompatibility` return: a
 /// value to watch, with nothing to call.
 typedef DwValueProvider<T> = NotifierProvider<Notifier<T>, T>;
+
+/// What every read of the data layer holds — `dw.request`, `dw.pages`,
+/// `dw.table` and `dw.window` alike: the read's states as `AsyncValue`s, and a
+/// way to ask it again. `DwReadBuilder` needs nothing more of a read, so it
+/// renders any of the four.
+abstract base class DwWatchNotifier<S> extends Notifier<AsyncValue<S>> {
+  /// Runs the read again (pull to refresh, a retry after a failure);
+  /// completes when answered.
+  Future<void> refetch();
+
+  /// Whether the data shown follows the server live.
+  bool get isLive;
+}
 
 /// The Riverpod face of a client watch: one watch for as long as the provider
 /// is listened to, its states as `AsyncValue`s.
@@ -32,7 +50,7 @@ typedef DwValueProvider<T> = NotifierProvider<Notifier<T>, T>;
 /// subscription. An account switch needs nothing here: the client moves the
 /// watch to the next account's entry, and the value goes through loading
 /// rather than ever showing the previous account's data.
-abstract base class _DwWatchNotifier<S, W> extends Notifier<AsyncValue<S>> {
+abstract base class _DwWatchNotifier<S, W> extends DwWatchNotifier<S> {
   _DwWatchNotifier(this._client, this._call, this._onDispose);
 
   final DwAppClient _client;
@@ -89,9 +107,11 @@ final class DwRequestNotifier<R>
   void _close(DwRequestWatch<R> watch) => watch.close();
 
   /// Runs the request again (pull to refresh); completes when answered.
+  @override
   Future<void> refetch() => _watch?.refetch() ?? Future.value();
 
   /// Whether the data shown follows the server live.
+  @override
   bool get isLive => _watch?.isLive ?? false;
 }
 
@@ -123,8 +143,10 @@ final class DwTableNotifier<T extends DwDataObject>
   void _close(DwRequestWatch<DwTablePage<T>> watch) => watch.close();
 
   /// Reads the page again.
+  @override
   Future<void> refetch() => _watch?.refetch() ?? Future.value();
 
+  @override
   bool get isLive => _watch?.isLive ?? false;
 }
 
@@ -157,10 +179,12 @@ final class DwPagesNotifier<T extends DwDataObject>
   Future<void> loadMore() => _watch?.loadMore() ?? Future.value();
 
   /// Loads from the top again, as many rows as are loaded.
+  @override
   Future<void> refetch() => _watch?.refetch() ?? Future.value();
 
   bool get hasMore => _watch?.hasMore ?? false;
 
+  @override
   bool get isLive => _watch?.isLive ?? false;
 }
 
@@ -205,8 +229,10 @@ final class DwWindowNotifier<T extends DwDataObject>
   Future<void> loadNewer() => _watch?.loadNewer() ?? Future.value();
 
   /// Reloads the window where it stands.
+  @override
   Future<void> refetch() => _watch?.refetch() ?? Future.value();
 
+  @override
   bool get isLive => _watch?.isLive ?? false;
 }
 

@@ -1,3 +1,6 @@
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
+import 'package:dartway_starter_flutter/admin/users/admin_users_page.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_test_app.dart';
@@ -52,6 +55,28 @@ void main() {
     await app.settle(tester);
     expect(find.text('m@x.io'), findsOneWidget);
     expect(find.text('never confirmed'), findsOneWidget);
+
+    await app.stop(tester);
+  });
+
+  testWidgets('an address naming no member says so, and is no incident', (
+    tester,
+  ) async {
+    final fake = adminWith([member(1)]);
+    fake.server.onRequest<GetUserCard>(
+      (request, call) =>
+          DwCallRefused<UserCard>(DwCallRefusal(DwCoreRefusal.notFound)),
+    );
+    final app = await openAdminUsers(tester, fake);
+
+    GoRouter.of(tester.element(find.byType(AdminUsersPage))).goNamed(
+      AdminNavigationZone.userCard.name,
+      pathParameters: AdminParams.profileId.set(999),
+    );
+    await app.settle(tester);
+    expect(app.server.requestsOf<GetUserCard>().single.profileId, 999);
+    expect(find.text('There is no such user.'), findsOneWidget);
+    expect(find.text('Try again'), findsNothing);
 
     await app.stop(tester);
   });

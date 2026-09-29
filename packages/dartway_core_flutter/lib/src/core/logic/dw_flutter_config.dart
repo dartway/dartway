@@ -11,6 +11,8 @@ class DwFlutterConfig {
     this.confirmDialogBuilder,
     this.refusalText,
     this.updateRequiredScreen,
+    this.readLoadingBuilder,
+    this.readFailedBuilder,
   });
 
   /// Renders a refusal for the user: the project's catalogue, from the code
@@ -21,6 +23,28 @@ class DwFlutterConfig {
   /// talk to a server whose refusals it cannot show; optional for the toolbox
   /// alone.
   final String Function(DwCallRefusal refusal)? refusalText;
+
+  /// What a read shows while it loads and has no placeholder to draw a
+  /// skeleton from — `DwReadBuilder`, `DwPagedListView`, `DwWindowListView`.
+  /// The app's kit supplies it once (a skeleton block, an indicator), so no
+  /// screen spells its own spinner. Required by `DwFlutterCore`.
+  final WidgetBuilder? readLoadingBuilder;
+
+  /// What a read shows when it did not answer with data and no branch of its
+  /// own took the answer: the app's kit view, with a way to ask again.
+  ///
+  /// [error] is a `DwRefusalException` without an `onRefused` branch, a
+  /// `DwFailedException` or a `DwTimeoutException`; `retry` runs the same
+  /// read again and completes when it is answered. A signed-out read never
+  /// reaches it — the sign-in screen is the message. Required by
+  /// `DwFlutterCore`: a read that fails into nothing reads as "there is
+  /// nothing here", which is a lie.
+  final Widget Function(
+    BuildContext context,
+    Object error,
+    Future<void> Function() retry,
+  )?
+  readFailedBuilder;
 
   /// The full-screen page shown over the app once this build can no longer
   /// talk to its server — `dw.updateRequired` (the build is below the

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
+  (dartway/dartway#390).
+
 ## 0.21.0-dev.8
 
 - **`DwAppServer.handlers` and `.jobs` now include modules' calls and jobs, not just features'**

@@ -6,7 +6,10 @@ description: >-
   DwNavigationRouteDescriptor.zoneRoot/.simple/.parameterized; zone guards in
   zoneGuards; type-safe parameters via an enum with DwNavigationParamsMixin
   (set/fromPath/fromQuery); the router is assembled with DwAppRouter<T>(routerState:,
-  navigationZones:, pageBuilder:, options:). Use when creating or editing routes,
+  navigationZones:, pageBuilder:, options:). A screen is a route — no Navigator.push or
+  MaterialPageRoute; dialogs and sheets through the kit; one pop spelling,
+  Navigator.of(context).pop; what a screen opens on is a route parameter, not a focus notifier;
+  "new" is its own route, never id 0. Use when creating or editing routes,
   screens, redirects and navigation between zones.
 ---
 
@@ -22,6 +25,13 @@ Navigation rules for DartWay projects. The router is a wrapper over go_router: `
 - **Guards live in the zone** (`zoneGuards`), not scattered across screens.
 - **Parameters are type-safe only**, via an enum with `DwNavigationParamsMixin`.
 - Do not mix navigation logic with UI.
+- **A screen is a route.** No `Navigator.push`, no `MaterialPageRoute`/`CupertinoPageRoute`/
+  `PageRouteBuilder` outside `ui_kit/` and `core/router/`: a pushed page has no address, no guard,
+  and nothing a link can reopen. Dialogs and sheets open through the kit (`context.showAppDialog`,
+  `context.showAppBottomSheet`). Both are `forbiddenNavigationCall` in `dart run dartway_cli:dartway check`.
+- **One pop spelling: `Navigator.of(context).pop(value)`** — for a page, a dialog and a sheet alike;
+  it closes the nearest route, which is what the tap means. `Navigator.pop(context)`,
+  `GoRouter.of(context).pop()` and `context.pop()` fail the same check.
 - **Transitions go through the context**, with one exception that is a fact rather than a
   preference — see [The one transition that has no context](#the-one-transition-that-has-no-context).
 
@@ -279,10 +289,27 @@ final userProfileId = AppParams.userProfileId.fromPath(context);
 
 Mixin methods: `set(value)` → the map for a transition; `fromPath(context)` / `fromQuery(context)` — throw if the parameter is missing; `fromPathOrNull` / `fromQueryOrNull` — return null.
 
+## What a screen opens on is its address
+
+**A screen's subject is a route parameter, never a one-shot notifier.** "Open the chat and scroll to
+this message", "open the plan on this day" — the thing to show goes in the address
+(`pathParameters: AppParams.messageId.set(id)`, or a query parameter), and the page reads it with
+`fromPath` / `fromQueryOrNull`. A provider set just before `goNamed` and cleared by the page once read
+("focus this") is lost on a reload, a link and a back gesture, races the page's first build, and has
+no shape a check can see — so it is written here.
+
+**"New" is a route of its own, never an id nobody has.** A create screen beside an edit screen is two
+descriptors — `.simple(pageWidget: CourseEditorPage(), parent: courses)` for the new one and
+`.parameterized(…, parameter: AdminParams.courseId)` for an existing one — not the edit route opened
+with `courseId.set(0)` and an `if (id == 0)` in the page. `0` and `-1` are not ids: a route parameter
+set to one, or an id compared with one, fails the check (`sentinelId`); "none" is `null`.
+
 ## Common mistakes
 
 - String route names and raw parameter maps instead of enums.
 - Checking authorization inside a screen instead of `zoneGuards`.
 - The same route name in two zones — the enums have separate namespaces, the router does not.
 - A forgotten `parent` on `.simple`/`.parameterized` — the route will not take its place in the zone tree.
+- `Navigator.push(MaterialPageRoute(…))` for a screen, `showDialog` from a feature, a pop spelled three ways.
+- A "focus" provider instead of a route parameter; id `0` for "new".
 - Changing state without `notifyListeners()` — the guards will not re-run.

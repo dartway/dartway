@@ -57,7 +57,9 @@ final class FakeApp {
       ..onRequest<ListMyBookings>(
         (request, call) => DwCallOk(<SessionBooking>[...bookings]),
       )
-      ..onRequest<ListNews>((request, call) => DwCallOk(<NewsPost>[...news]))
+      ..onRequest<ListNews>(
+        (request, call) => DwCallOk(dwFakeOffsetPage(news, request, call.page)),
+      )
       // The push plugin registers the device of a signed-in member.
       ..onCommand<DwRegisterPushToken>(
         (command, call) => const DwCallOk<void>(null),

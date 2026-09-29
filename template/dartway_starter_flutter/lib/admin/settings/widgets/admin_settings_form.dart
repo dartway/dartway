@@ -1,10 +1,10 @@
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_starter_flutter/admin/settings/widgets/admin_setting_row.dart';
 import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_flutter/core/async_section.dart';
 
 /// Every setting the app declares, one row each.
 ///
@@ -16,25 +16,22 @@ class AdminSettingsForm extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return ref
-        .watch(dw.request(const ListAppSettings()))
-        .section(
-          loadingValue: const <AppSetting>[],
-          onRetry: () =>
-              ref.read(dw.request(const ListAppSettings()).notifier).refetch(),
-          builder: (stored) {
-            final storedValues = {for (final s in stored) s.id: s.value};
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final setting in AppSettingKey.values)
-                  AdminSettingRow(
-                    setting: setting,
-                    storedValue: storedValues[setting.key],
-                  ),
-              ],
-            );
-          },
+    return DwReadBuilder(
+      dw.request(const ListAppSettings()),
+      placeholder: const <AppSetting>[],
+      builder: (context, stored) {
+        final storedValues = {for (final s in stored) s.id: s.value};
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            for (final setting in AppSettingKey.values)
+              AdminSettingRow(
+                setting: setting,
+                storedValue: storedValues[setting.key],
+              ),
+          ],
         );
+      },
+    );
   }
 }

@@ -6,7 +6,8 @@ enum DwErrorSource {
   /// The catch inside a `DwUiAction`.
   uiAction,
 
-  /// An AsyncValue error branch (`dwBuildAsync` family).
+  /// A read's failed branch: `DwReadBuilder`, `DwPagedListView`,
+  /// `DwWindowListView`.
   asyncBuild,
 
   /// A failed server call (the request or command name attached).

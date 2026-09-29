@@ -10,6 +10,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../data/dw_flutter_core.dart';
 import '../../data/dw_request_notifiers.dart';
 import '../../private/dw_singleton.dart';
+import '../read/dw_read_states.dart';
 
 part 'dw_window_list_controller.dart';
 part 'dw_window_list_render.dart';
@@ -82,8 +83,9 @@ enum DwWindowListEdge {
 ///
 /// Reads the app core `dw` for the window: the provider is
 /// `dw.window(request, anchor: …)`, shared with any other widget watching it.
-/// Ships no design: every row is [itemBuilder]'s, and the slots default to a
-/// plain progress indicator.
+/// Ships no design: every row is [itemBuilder]'s, loading and a failed first
+/// answer are the app's `readLoadingBuilder` and `readFailedBuilder`, and
+/// only the edge slots default to a plain indicator.
 class DwWindowListView<T extends DwDataObject> extends ConsumerStatefulWidget {
   const DwWindowListView({
     super.key,
@@ -93,9 +95,8 @@ class DwWindowListView<T extends DwDataObject> extends ConsumerStatefulWidget {
     this.anchorAlignment = 0.35,
     this.controller,
     this.padding = EdgeInsets.zero,
-    this.loadingBuilder,
-    this.errorBuilder,
-    this.emptyBuilder,
+    this.onRefused = const {},
+    required this.emptyBuilder,
     this.edgeBuilder,
     this.onVisibleItemsChanged,
     this.visibleItemsDebounce = const Duration(milliseconds: 300),
@@ -132,23 +133,20 @@ class DwWindowListView<T extends DwDataObject> extends ConsumerStatefulWidget {
   /// under them is not visible.
   final EdgeInsets padding;
 
-  /// Before the first answer. Default: a centred progress indicator.
-  final WidgetBuilder? loadingBuilder;
-
-  /// When the first answer is not data: the error is a `DwRefusalException`,
-  /// `DwFailedException`, `DwNotAuthenticatedException` or
-  /// `DwTimeoutException`. Default: the error's text.
-  final Widget Function(BuildContext context, Object error, VoidCallback retry)?
-  errorBuilder;
+  /// A branch per refusal code of the first answer, as in `DwReadBuilder`.
+  /// Before the first answer the list shows the app's
+  /// `DwFlutterConfig.readLoadingBuilder`; a first answer that is not data
+  /// and has no branch here, its `readFailedBuilder`.
+  final Map<DwRefusalCode, DwRefusedBuilder> onRefused;
 
   /// While the window has no items. New items arriving live replace it with
   /// the list, at its newest end.
-  final WidgetBuilder? emptyBuilder;
+  final WidgetBuilder emptyBuilder;
 
   /// The slot past the loaded items at an end that has more: loading, idle
   /// (a load starts as it comes near), or [error] with [retry] when the last
   /// load failed. Default: 48 pixels holding a small progress indicator while
-  /// loading, or a retry button. Keep its height constant: it stands between
+  /// loading, or a retry button — the same slot as `DwPagedListView`'s. Keep its height constant: it stands between
   /// the rows on screen and the rows a load brings.
   final Widget Function(
     BuildContext context,
@@ -718,23 +716,21 @@ class _DwWindowListViewState<T extends DwDataObject>
     switch (value) {
       case AsyncData(:final value):
         _accept(value);
-      case AsyncError(:final error) when _data == null:
-        return widget.errorBuilder?.call(
-              context,
-              error,
-              () => unawaited(ref.read(_provider.notifier).refetch()),
-            ) ??
-            Center(child: Text('$error'));
+      case AsyncError(:final error, :final stackTrace) when _data == null:
+        return DwReadStates.failed(
+          context,
+          error,
+          stackTrace,
+          retry: () => ref.read(_provider.notifier).refetch(),
+          onRefused: widget.onRefused,
+        );
       default:
-        if (_data == null) {
-          return widget.loadingBuilder?.call(context) ??
-              const Center(child: CircularProgressIndicator());
-        }
+        if (_data == null) return DwReadStates.loading(context);
     }
     final data = _data!;
     _scheduleCompute();
     if (data.items.isEmpty && _opening == null) {
-      return widget.emptyBuilder?.call(context) ?? const SizedBox.expand();
+      return widget.emptyBuilder(context);
     }
     return LayoutBuilder(
       key: _listKey,
@@ -792,21 +788,7 @@ class _DwWindowListViewState<T extends DwDataObject>
           : data.loadingNewer;
       final custom = widget.edgeBuilder;
       if (custom != null) return custom(context, side, error, retry);
-      // One height whatever it shows, so the slot changing moves nothing;
-      // no indicator while nothing loads, so nothing animates off screen.
-      return SizedBox(
-        height: 48,
-        child: Center(
-          child: error != null
-              ? IconButton(onPressed: retry, icon: const Icon(Icons.refresh))
-              : loading
-              ? const SizedBox.square(
-                  dimension: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : null,
-        ),
-      );
+      return DwReadStates.edge(loading: loading, error: error, retry: retry);
     }
 
     return CustomScrollView(

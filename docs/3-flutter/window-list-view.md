@@ -60,9 +60,12 @@ the loaded ones. The slot past an end that has more is `edgeBuilder(context, edg
 indicator, or a retry button after a failed load. **Keep its height constant**: it stands between the
 rows on screen and the rows a load brings.
 
-Before the first answer `loadingBuilder` is shown, when the first answer is not data `errorBuilder`
-(with a `retry`), and while the window has no items `emptyBuilder` — replaced by the list, at its
-newest end, when an item arrives live.
+The first answer is shown as [`DwReadBuilder`](data-layer.md#showing-a-read-dwreadbuilder) shows a
+read: the app's `readLoadingBuilder` before it, an `onRefused` branch for a refusal code it names,
+the app's `readFailedBuilder` (with a retry) for anything else short of data. While the window has
+no items the required `emptyBuilder` is shown — replaced by the list, at its newest end, when an
+item arrives live. The edge slot's default is the same as
+[`DwPagedListView`](data-layer.md#feeds-dwpages)'s.
 
 ## New items arriving live
 

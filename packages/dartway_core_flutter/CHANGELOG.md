@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- **BREAKING: one way to show a read — `DwReadBuilder` — and a paged list, `DwPagedListView`**
+  (dartway/dartway#390, D-116). `DwReadBuilder(read, builder:, placeholder:, onRefused:)` takes
+  any read (`dw.request`, `dw.table`, `dw.pages`, `dw.window` — a `DwWatchProvider<T>`) and renders
+  loading (a skeleton of `builder` over `placeholder`, or the app's loading view), a branch per
+  refusal code (`onRefused: {DwCoreRefusal.notFound: (context, refusal) => …}`), the app's failed
+  view with a retry that refetches, nothing for a signed-out read, and data. A failure is reported
+  to the error pipeline once per failure, not on every rebuild; a refusal and an unreachable server
+  are not reported. `DwPagedListView(request:, itemBuilder:, emptyBuilder:)` shows a
+  `DwPageRequest` feed and asks for the next page when the slot after the last row is built — as
+  the end comes into the cache extent — with a retry in that slot after a failed page; `header`,
+  `placeholder`/`placeholderCount`, `onRefused`, `edgeBuilder`, `controller`, `padding`.
+- **BREAKING: `DwFlutterConfig.readLoadingBuilder` and `readFailedBuilder`**, required by
+  `DwFlutterCore` (an `ArgumentError` naming them otherwise): the app's loading and failed views,
+  supplied once from its kit and shown by `DwReadBuilder`, `DwPagedListView` and `DwWindowListView`.
+- **BREAKING: `dwBuildAsync` and `dwBuildListAsync` are removed** — their silent default on error
+  is what three projects each patched with an extension of their own. `DwReadBuilder` replaces
+  both.
+- **BREAKING: `DwWindowListView` loses `loadingBuilder` and `errorBuilder`** — its first answer is
+  shown as `DwReadBuilder` shows a read, with an `onRefused` of its own — and **`emptyBuilder` is
+  required**, as it is on `DwPagedListView`: an empty list says what empty means.
+- **`DwWatchNotifier<S>`** — the public base of the four read notifiers (`refetch()`, `isLive`) —
+  and **`DwWatchProvider<S>`**, what `DwReadBuilder` takes. **`DwRefusedBuilder`**, the type of an
+  `onRefused` branch.
+
 ## 0.21.0-dev.8
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#355, #356).

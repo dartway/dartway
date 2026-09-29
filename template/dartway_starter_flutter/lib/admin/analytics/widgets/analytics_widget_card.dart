@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
-import 'package:dartway_starter_flutter/core/async_section.dart';
 
 /// One widget of a dashboard: its title and its report over [period], drawn
 /// as its type says. [actions], while the dashboard is edited, sit under it.
@@ -36,17 +35,15 @@ class AnalyticsWidgetCard extends ConsumerWidget {
             overflow: TextOverflow.ellipsis,
           ),
           const Gap(12),
-          ref
-              .watch(dw.request(request))
-              .section(
-                loadingValue: const DwAnalyticsReport(total: 0),
-                onRetry: () => ref.read(dw.request(request).notifier).refetch(),
-                builder: (report) => _AnalyticsReportView(
-                  spec: spec,
-                  period: period,
-                  report: report,
-                ),
-              ),
+          DwReadBuilder(
+            dw.request(request),
+            placeholder: const DwAnalyticsReport(total: 0),
+            builder: (context, report) => _AnalyticsReportView(
+              spec: spec,
+              period: period,
+              report: report,
+            ),
+          ),
           if (actions.isNotEmpty) ...[
             const Gap(8),
             Row(mainAxisAlignment: MainAxisAlignment.end, children: actions),

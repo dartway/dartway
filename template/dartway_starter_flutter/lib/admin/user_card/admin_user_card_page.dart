@@ -5,14 +5,12 @@ import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 import 'widgets/user_card_view.dart';
-import 'package:dartway_starter_flutter/core/async_section.dart';
 
 /// One member's card: everything the app knows about the person, and the
 /// actions on their account.
-class AdminUserCardPage extends ConsumerWidget implements DwFeatureWidget {
+class AdminUserCardPage extends StatelessWidget implements DwFeatureWidget {
   const AdminUserCardPage({super.key, this.profileId});
 
   /// Whose card to show. Usually `null`: the id comes from the address, as on
@@ -40,7 +38,7 @@ class AdminUserCardPage extends ConsumerWidget implements DwFeatureWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final id = profileId ?? AdminParams.profileId.fromPathOrNull(context);
     if (id == null) {
@@ -49,26 +47,17 @@ class AdminUserCardPage extends ConsumerWidget implements DwFeatureWidget {
         body: AppText.body(l10n.userCardNotFound),
       );
     }
-    final request = dw.request(GetUserCard(profileId: id));
-    final card = ref.watch(request);
-
-    if (card case AsyncError(
-      error: DwRefusalException(:final refusal),
-    ) when refusal.isCode(DwCoreRefusal.notFound)) {
-      return AdminScaffold(
-        title: l10n.adminUsers,
-        body: AppText.body(l10n.userCardNotFound),
-      );
-    }
-
     return AdminScaffold(
-      title: card.value?.profile.displayName ?? l10n.adminUsers,
-      body: card.section(
-        // Not a skeleton of the card: drawn over stand-in data it would show
-        // a stranger's identifiers for a moment.
-        loadingWidget: const Center(child: CircularProgressIndicator()),
-        onRetry: () => ref.read(request.notifier).refetch(),
-        builder: (card) => UserCardView(card: card),
+      title: l10n.adminUsers,
+      body: DwReadBuilder(
+        dw.request(GetUserCard(profileId: id)),
+        // No placeholder: a skeleton of the card drawn over stand-in data
+        // would show a stranger's identifiers for a moment.
+        onRefused: {
+          DwCoreRefusal.notFound: (context, _) =>
+              AppText.body(l10n.userCardNotFound),
+        },
+        builder: (context, card) => UserCardView(card: card),
       ),
     );
   }

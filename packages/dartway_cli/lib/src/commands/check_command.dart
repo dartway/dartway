@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../checker/dw_contract_names.dart';
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
+import '../checker/dw_flutter_ui_rules.dart';
 import '../checker/dw_framework_lock.dart';
 import '../checker/dw_framework_overrides.dart';
 import '../checker/dw_l10n_wiring.dart';
@@ -146,6 +147,12 @@ class CheckCommand extends Command<int> {
 
     errorCount += await DwFlutterInspector(
       packageDir: flutterPackageDir,
+      filterType: filterType,
+      filterSeverity: filterSeverity,
+      targetDirPath: results.option('dir'),
+    ).run(tally: tally);
+    errorCount += DwFlutterUiInspector(
+      flutterPackageDir: flutterPackageDir,
       filterType: filterType,
       filterSeverity: filterSeverity,
       targetDirPath: results.option('dir'),

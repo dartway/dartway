@@ -76,9 +76,12 @@ From the project root or from inside the `*_flutter` package, in this order:
    development containers' credentials against what the server is told to reach them by
    (`devComposeDrifted`);
 7. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
-   in the zones and `shared/` — the other sixteen checks.
+   in the zones and `shared/` — sixteen more checks;
+8. **reads, loading, dialogs and routes** over every file of the Flutter package's `lib/` but
+   generated code (`forbiddenRequestRead`, `forbiddenProgressIndicator`, `forbiddenNavigationCall`,
+   `sentinelId`).
 
-`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 7 and skips
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of steps 7–8 and skips
 steps 1–6 and the UI kit pass: each of those judges a whole package or the whole project, and has
 nothing to say about one folder. `--type <check>` runs one check by name; `--level
 info|warning|error` runs the checks of one severity.
@@ -106,7 +109,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
+Nineteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -126,6 +129,10 @@ Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
+| `forbiddenRequestRead` | error | The `AsyncValue` of `ref.watch(dw.request/pages/table/window(…))` taken apart outside `logic/` and `core/` — a member (`.value`, `.when(`, `.hasError`, …), a `switch` or `case` over it, a `.select` of the read. A screen shows a read through `DwReadBuilder`, `DwPagedListView` or `DwWindowListView` |
+| `forbiddenProgressIndicator` | error | `CircularProgressIndicator` or `CupertinoActivityIndicator` outside `ui_kit/` |
+| `forbiddenNavigationCall` | error | `showDialog`, `showModalBottomSheet`, `showCupertino…` and their siblings, `Navigator.push…` or a page route (`MaterialPageRoute`, …) outside `ui_kit/` and `core/router/`; a pop spelled other than `Navigator.of(context).pop(…)` anywhere |
+| `sentinelId` | error | `0` or `-1` standing for "no id": a route parameter `.set(0)`, an id compared with `0`/`-1` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |
@@ -142,6 +149,33 @@ Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 `context.theme`, `context.textTheme`, `context.colorScheme`. The long spelling is on the list on
 purpose: `Theme.of(context).textTheme.bodySmall` reads as ordinary Flutter and means exactly what
 `context.textTheme` means — a screen deciding how it looks.
+
+## Reads, loading, dialogs and routes: one way each
+
+A screen shows a read through **`DwReadBuilder`** — loading as a skeleton or the app's loading view,
+a branch per refusal code (`onRefused`), the app's failed view with a retry, data — or, for a feed
+read page by page, **`DwPagedListView`**, and for a chat, `DwWindowListView`. What
+`forbiddenRequestRead` refuses is the `AsyncValue` of a read taken apart by hand in a widget: a
+member of `ref.watch(dw.request(…))`, chained or through the name it is bound to (`.value`, `.when(`,
+`.hasError`, `.section(` of a project's own extension), a `switch` or a `case` over it
+(`AsyncError(…)`), and a `.select` of the read. `logic/` and `core/` are passed over: a controller
+may watch a read to derive its own state, and the widget watches the controller.
+
+Loading is the kit's: `forbiddenProgressIndicator` refuses Flutter's spinners outside `ui_kit/`.
+A dialog or a sheet is opened through the kit and a screen is a route of a zone:
+`forbiddenNavigationCall` refuses the raw `show…` functions, `Navigator.push…` and the page routes
+outside `ui_kit/` and `core/router/`, and one spelling closes a page, a dialog or a sheet —
+`Navigator.of(context).pop(…)`; `Navigator.pop(context)`, `GoRouter.of(context).pop()` and
+`context.pop()` are findings everywhere. `sentinelId` refuses `0` and `-1` as ids: a route
+parameter set to one (`.set(0)`) and an id compared with one (`id == 0`) — a new thing is a route
+of its own, "none" is `null`.
+
+All four read the source with comments and strings blanked, so they see what a text can show. Left
+out on purpose: a read reached through a provider of the project's own (`myProfileProvider` over
+`dw.request`) or handed to a function before it is taken apart; a closure parameter named like the
+read is not the read; an id in a command's constructor (`SaveCourse(id: 0)`) reads the same as the
+stand-in data a skeleton is drawn from, so it is prose, not a check; and a one-shot "focus"
+notifier standing in for a route parameter has no shape a text can tell.
 
 ## The declared top level
 

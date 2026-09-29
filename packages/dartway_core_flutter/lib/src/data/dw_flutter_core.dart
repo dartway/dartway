@@ -22,6 +22,8 @@ import 'dw_upload_notifier.dart';
 ///   config: DwFlutterConfig(
 ///     appVersion: '1.4.2+57',
 ///     refusalText: (refusal) => t.refusal(refusal),
+///     readLoadingBuilder: (context) => const AppLoadingBlock(),
+///     readFailedBuilder: (context, error, retry) => LoadFailedMessage(onRetry: retry),
 ///     updateRequiredScreen: (context, refusal) => const UpdateTheAppPage(),
 ///   ),
 ///   protocol: appProtocol,
@@ -30,6 +32,8 @@ import 'dw_upload_notifier.dart';
 /// );
 /// DwAppRunner(appInitializers: [dw.init], child: const App()).run();
 ///
+/// DwReadBuilder(dw.request(const ListUpcomingSessions()), builder: …);
+/// DwPagedListView(request: const FeedPosts(), itemBuilder: …, emptyBuilder: …);
 /// ref.watch(dw.request(const ListUpcomingSessions()));  // AsyncValue<List<ClubSession>>
 /// ref.watch(dw.pages(const FeedPosts()));               // AsyncValue<DwPagedData<FeedPost>>
 /// ref.watch(dw.table(const ListClients(page: 2)));      // AsyncValue<DwTablePage<ClientCard>>
@@ -42,8 +46,8 @@ import 'dw_upload_notifier.dart';
 /// plugins, then the client. [dispose] stops the client and releases the
 /// core, after which another can be built — nothing here is static.
 class DwFlutterCore extends DwFlutterToolbox {
-  /// Throws [ArgumentError] for a config without `refusalText` or
-  /// `appVersion`, and whatever [DwAppClient] throws for a malformed app
+  /// Throws [ArgumentError] for a config without `refusalText`,
+  /// `appVersion`, `readLoadingBuilder` or `readFailedBuilder`, and whatever [DwAppClient] throws for a malformed app
   /// version or base URL — in every case before the core holds the live slot.
   DwFlutterCore({
     required super.config,
@@ -117,7 +121,9 @@ class DwFlutterCore extends DwFlutterToolbox {
   }
 
   /// The live state of a single, maybe or list request, shared by every
-  /// widget watching an equal request: `ref.watch(dw.request(request))`.
+  /// widget watching an equal request. A screen renders it through
+  /// `DwReadBuilder(dw.request(request), builder: …)`; a controller in
+  /// `logic/` may `ref.watch(dw.request(request))` itself.
   ///
   /// A refusal, a failure, a signed-out answer and an unreachable server are
   /// errors of the `AsyncValue`, typed: [DwRefusalException],
@@ -133,8 +139,9 @@ class DwFlutterCore extends DwFlutterToolbox {
             ),
       );
 
-  /// The loaded pages of a feed: `ref.watch(dw.pages(request))`, and
-  /// `ref.read(dw.pages(request).notifier).loadMore()` for the next page.
+  /// The loaded pages of a feed. A screen shows it as
+  /// `DwPagedListView(request: …)`, which loads the next page as its end
+  /// comes near; underneath, `ref.read(dw.pages(request).notifier).loadMore()`.
   DwPagesProvider<T> pages<T extends DwDataObject>(DwPageRequest<T> request) =>
       _provider<DwPagesProvider<T>>(
         ('pages', request),
@@ -284,6 +291,14 @@ class DwFlutterCore extends DwFlutterToolbox {
       throw ArgumentError(
         'DwFlutterConfig.refusalText is required by DwFlutterCore: every refusal the '
         'server sends is a code, and the app is what turns it into words.',
+      );
+    }
+    if (config.readLoadingBuilder == null ||
+        config.readFailedBuilder == null) {
+      throw ArgumentError(
+        'DwFlutterConfig.readLoadingBuilder and readFailedBuilder are required by '
+        'DwFlutterCore: every read on screen goes through DwReadBuilder, and the '
+        'app is what says how a read looks while it loads and when it fails.',
       );
     }
     if (config.appVersion == null) {

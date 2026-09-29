@@ -36,6 +36,16 @@ dw = DwFlutterCore(
     updateRequiredScreen: (context, refusal) =>
         UpdateRequiredPage(refusal: refusal),
     onErrorReport: _onErrorReport,
+    readLoadingBuilder: (context) =>
+        const Center(child: AppProgressIndicator()),
+    readFailedBuilder: (context, error, retry) => LoadFailedMessage(
+      message: switch (error) {
+        DwRefusalException(:final refusal) => appL10n.refusalText(refusal),
+        _ => appL10n.loadFailed,
+      },
+      retryLabel: appL10n.retry,
+      onRetry: dw.action((_) => retry()),
+    ),
   ),
   protocol: dartwayExampleProtocol,
   baseUrl: baseUrl,
@@ -62,13 +72,16 @@ dw = DwFlutterCore(
 |---|---|---|
 | `appVersion` | yes | The build, `<semver>+<build>` (`1.4.2+57`). Sent on every call as `Dw-App-Version`; the server refuses a build below its minimum. Shown in error reports. |
 | `refusalText` | yes | Turns a `DwCallRefusal` — a code with parameters, never a sentence — into words. `dw.action` shows it. See [actions and refusal texts](actions-and-refusal-texts.md). |
+| `readLoadingBuilder` | yes | What a read shows while it loads with no placeholder to draw a skeleton from — in `DwReadBuilder`, `DwPagedListView`, `DwWindowListView`. The kit's, once. See [the data layer](data-layer.md#showing-a-read-dwreadbuilder). |
+| `readFailedBuilder` | yes | What a read shows when it was refused with no `onRefused` branch, failed, or could not reach the server: the kit's view, given a `retry`. |
 | `updateRequiredScreen` | no | The page put over the whole app once this build can no longer talk to its server. See [update required](update-required.md). |
 | `onErrorReport` | no | Receives every `DwErrorReport`. Without it a report is only `debugPrint`ed. See [error reporting](error-reporting.md). |
 | `confirmDialogBuilder` | no | Replaces the built-in `DwConfirmDialog` for `dw.action(confirmation: ...)`. |
 
-**Why two fields are required.** A server answers "no" with a code, and an app that cannot render
+**Why four fields are required.** A server answers "no" with a code, and an app that cannot render
 the code shows the user nothing at all. A server that stops supporting old builds needs to know
-which build is calling. Both failures are silent at runtime, so the constructor refuses a config
+which build is calling. A read that fails into nothing reads as "there is nothing here". All of
+these failures are silent at runtime, so the constructor refuses a config
 without them — with an `ArgumentError` naming the field, before the core exists. A malformed
 `appVersion` (not `<semver>+<build>`) throws `FormatException` at the same moment.
 
@@ -153,7 +166,7 @@ store of its own the core needs no storage plugin at all, which is why the examp
 ## One core at a time, and nothing static
 
 The framework keeps exactly one process-wide pointer: the live core, for code that has no other way
-to reach it (the zone error handler, `dwBuildAsync`'s error branch). It is bound to the core's
+to reach it (the zone error handler, `DwReadBuilder`'s failed branch). It is bound to the core's
 lifetime, not to the process:
 
 - constructing a core claims it; constructing a second while the first is alive throws `StateError`

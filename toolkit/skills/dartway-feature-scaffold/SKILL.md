@@ -161,8 +161,9 @@ provider in one file — provider first.
 1. **Navigation** — the entry and exit points; a route if needed (`dartway-navigation`).
 2. **The public widget**, `implements DwFeatureWidget` with its `DwFeatureSpec` (below). Without it
    `dart run dartway_cli:dartway check` warns `featureSpecMissing`.
-3. **Reads:** `ref.watch(dw.request(...))` (or `dw.pages` / `dw.table` / `dw.window`), with the section
-   it exists for rendering its error — the skeleton's section extension in `lib/core/` (`dartway-data-layer`).
+3. **Reads:** `DwReadBuilder(dw.request(...), builder: …)` (or `dw.table`), `DwPagedListView` for a
+   feed, `DwWindowListView` for a chat — loading, refusal branches and the failed view in one place;
+   the `AsyncValue` is never taken apart in a widget (`dartway-data-layer`).
 4. **Changes:** `dw.command` in the feature's `logic/<feature>_commands.dart`, run by
    `dw.action((_) => <Feature>Commands.x(...))` on the button of the widget that owns it; a refusal is
    shown by itself (`dartway-data-layer`).
@@ -190,7 +191,7 @@ public entities, hides the widget, and leaves the spec nowhere to live.
 ### A feature is constructible from its address
 
 **The test, one attempt:** write the call. Can the widget be constructed in the router, in a
-`showDialog`, in a `ListView.builder` — with nothing in hand but identifiers and data objects?
+kit dialog, in a `ListView.builder` — with nothing in hand but identifiers and data objects?
 
 - yes → a feature; it reads the rest itself;
 - no → it is part of its parent's layout; fold it back, or take the assembled data out of its
@@ -204,7 +205,7 @@ list the parent had to compute is.
 
 ```dart
 // lib/app/invoices/my_invoices/my_invoices_page.dart
-class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
+class MyInvoicesPage extends StatelessWidget implements DwFeatureWidget {
   const MyInvoicesPage({super.key});
 
   @override
@@ -224,19 +225,14 @@ class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final request = dw.request(const ListMyInvoices());
 
     return Scaffold(
-      body: ref.watch(request).dwBuildAsync(
-        loadingWidget: const Center(child: CircularProgressIndicator()),
-        errorBuilder: (_, _) => LoadFailedMessage(
-          message: l10n.loadFailed,
-          retryLabel: l10n.retry,
-          onRetry: dw.action((_) => ref.read(request.notifier).refetch()),
-        ),
-        childBuilder: (invoices) => invoices.isEmpty
+      body: DwReadBuilder(
+        dw.request(const ListMyInvoices()),
+        placeholder: List.filled(4, placeholderInvoice),
+        builder: (context, invoices) => invoices.isEmpty
             ? AppText.body(l10n.noInvoicesYet)
             : ListView(
                 children: [
@@ -251,9 +247,9 @@ class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
 
 `InvoiceCard` decides by the invoice (a pay button only while it is unpaid) — so it is a feature of
 its own (`lib/app/invoices/invoice_card/invoice_card.dart`), constructible from the invoice alone, and
-it sends `PayInvoice` from its own button through `logic/invoice_card_commands.dart`. `AppText` and
-`LoadFailedMessage` stand for the project's kit; in a real screen the skeleton's section extension replaces the manual
-`dwBuildAsync` call.
+it sends `PayInvoice` from its own button through `logic/invoice_card_commands.dart`. `AppText`
+stands for the project's kit; the loading and failed views are the app's, configured once in
+`lib/core/dw_core.dart`.
 
 ## The feature spec — `DwFeatureSpec`
 

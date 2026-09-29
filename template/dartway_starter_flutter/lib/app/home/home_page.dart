@@ -10,7 +10,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_flutter/core/async_section.dart';
 
 /// The first home screen — replace it once your domain has its own.
 ///
@@ -60,17 +59,13 @@ class HomePage extends ConsumerWidget implements DwFeatureWidget {
                 children: [
                   AppText.title(l10n.helloUser(context.profile.firstName)),
                   const Gap(8),
-                  ref
-                      .watch(settings)
-                      .section(
-                        loadingValue: const <AppSetting>[],
-                        onRetry: () => ref.read(settings.notifier).refetch(),
-                        builder: (stored) => AppText.body(
-                          l10n.homeAppName(
-                            stored.valueOf(AppSettingKey.appName),
-                          ),
-                        ),
-                      ),
+                  DwReadBuilder(
+                    settings,
+                    placeholder: const <AppSetting>[],
+                    builder: (context, stored) => AppText.body(
+                      l10n.homeAppName(stored.valueOf(AppSettingKey.appName)),
+                    ),
+                  ),
                   const Gap(8),
                   AppText.caption(l10n.homeLiveHint),
                 ],

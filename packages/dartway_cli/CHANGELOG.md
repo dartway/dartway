@@ -2,6 +2,21 @@
 
 ## 0.13.0
 
+- **BREAKING: four new errors in `dartway check` — one way to show a read, wait, open a dialog and
+  go to a screen** (dartway/dartway#390, D-116), in their own inspector
+  (`dw_flutter_ui_rules.dart`) over every file of the Flutter package's `lib/` but generated code.
+  `forbiddenRequestRead`: the `AsyncValue` of `ref.watch(dw.request|pages|table|window(…))` taken
+  apart outside `logic/` and `core/` — a member of it, chained or through its bound name (`.value`,
+  `.when(`, `.hasError`, a project's own `.section(`), a `switch` or `case` over it, a `.select` of
+  the read. `forbiddenProgressIndicator`: `CircularProgressIndicator` or
+  `CupertinoActivityIndicator` outside `ui_kit/`. `forbiddenNavigationCall`: `showDialog`,
+  `showModalBottomSheet`, `showCupertino…` and siblings, `Navigator.push…` and page routes outside
+  `ui_kit/` and `core/router/`, and a pop spelled other than `Navigator.of(context).pop(…)`
+  anywhere. `sentinelId`: `0`/`-1` as an id — a route parameter `.set(0)`, an id compared with it.
+  Read on the source with comments and strings blanked. The skeleton follows: its reads are
+  `DwReadBuilder`, its kit has `AppProgressIndicator` and `showAppDialog`, and the core hands the
+  kit's loading and failed views to `DwFlutterConfig`. Migration note:
+  `docs/migrations/2026-09-30-reads-lists-dialogs-routes.md`.
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
   `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature
   law says (dartway/dartway#380). Wording only; no check changed.
