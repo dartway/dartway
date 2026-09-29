@@ -2,6 +2,12 @@
 
 ## 0.13.0
 
+- **A new warning in `dartway check`: `inlineOwnershipCheck`** (dartway/dartway#387, D-112). In a
+  server `*_handlers.dart`, a `signedIn` handler — or a helper of the same file it calls — that
+  compares a row's owner field (`…ProfileId`, `authorId`, `ownerId`, `senderId`, `accountId`, …)
+  with the caller and refuses `notFound`/`forbidden` (or answers `null` from a `single` handler) is
+  the check `DwAccessRule.resource` makes once. A warning: it reads the shape of the code, and does
+  not fail the run.
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
   `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature
   law says (dartway/dartway#380). Wording only; no check changed.

@@ -178,7 +178,17 @@ enum DwCheckType {
   /// other by the server, and nothing makes them agree. Changing one produces
   /// a server that cannot log in to the database on the next machine — or,
   /// worse, on this one after the volume is recreated.
-  devComposeDrifted;
+  devComposeDrifted,
+
+  /// A `signedIn` handler in a `*_handlers.dart` that compares a row's owner
+  /// field with the caller and refuses `notFound`/`forbidden` — in its body
+  /// or in a helper of the same file it calls. Whether a row is the caller's
+  /// is `DwAccessRule.resource`'s question, answered once, with the row
+  /// handed to the handler (D-090, D-112).
+  ///
+  /// A warning: it reads the shape of the code, not its meaning, and a
+  /// comparison it matches may be something else.
+  inlineOwnershipCheck;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -201,6 +211,7 @@ enum DwCheckType {
     DwCheckType.frameworkOverrideOutlived ||
     DwCheckType.localSecretMissing ||
     DwCheckType.devComposeDrifted ||
+    DwCheckType.inlineOwnershipCheck ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

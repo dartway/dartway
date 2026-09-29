@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- **`DwAccessRule.resource` takes `visible:` — a row the caller may see but not act on is refused
+  `dw.forbidden`** (dartway/dartway#387, D-112). When `allows` answers `false` and `visible` answers
+  `true`, the refusal is `dw.forbidden` instead of `dw.notFound`; a missing row, and one `visible`
+  does not admit, stay `dw.notFound`. Ends the second check a handler wrote in its body after the
+  rule for "a message of my chat that someone else wrote". Additive; nothing to change. The rule's
+  resource may be a record (`(MessageRow, ConversationMemberRow)`) for a row reached through its
+  parent — documented, and now tested.
+
 ## 0.21.0-dev.8
 
 - **`DwAppServer.handlers` and `.jobs` now include modules' calls and jobs, not just features'**

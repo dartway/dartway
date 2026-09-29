@@ -12,6 +12,7 @@ import '../checker/dw_l10n_wiring.dart';
 import '../checker/dw_local_environment.dart';
 import '../checker/dw_layout.dart';
 import '../checker/dw_server_contract.dart';
+import '../checker/dw_inline_ownership.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
 import '../checker/dw_check_tally.dart';
@@ -138,6 +139,11 @@ class CheckCommand extends Command<int> {
       ).run(tally: tally);
       errorCount += DwLocalEnvironmentInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwInlineOwnershipInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

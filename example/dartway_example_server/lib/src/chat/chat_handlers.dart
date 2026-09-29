@@ -198,15 +198,19 @@ final chatHandlers = <DwCallHandler>[
     },
   ),
 
-  /// Rewrites a message within its edit window. Staff only, and only its
-  /// author (`dw.forbidden` for anyone else: the message is visible to them).
-  /// Published with every message quoting it.
+  /// Rewrites a message within its edit window. Only its author; other staff
+  /// are refused `dw.forbidden` (the message is visible to them), anyone else
+  /// `dw.notFound`. Published with every message quoting it.
   DwCallHandler.command<EditChatMessage, ChatMessage>(
-    access: AppAccess.staff,
+    access: DwAccessRule.resource<EditChatMessage, ChatMessageRow>(
+      load: (ctx, command) => ctx._liveMessage(command.messageId, lock: true),
+      allows: (ctx, command, row) async =>
+          row.authorProfileId == (await ctx.profile).id,
+      visible: (ctx, command, row) => ctx.isStaff,
+    ),
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      final row = await ctx._requireMessage(command.messageId, lock: true);
-      if (row.authorProfileId != me.id) ctx.refuse(DwCoreRefusal.forbidden);
+      final row = ctx.accessed<ChatMessageRow>();
       if (DateTime.now().isAfter(row.sentAt.add(ChatMessage.editWindow))) {
         ctx.refuse(DartwayExampleRefusal.editWindowClosed);
       }
@@ -229,16 +233,18 @@ final chatHandlers = <DwCallHandler>[
     },
   ),
 
-  /// Deletes a message. Its author or an admin. Gone from its channel; the
+  /// Deletes a message. Its author or an admin; other staff are refused
+  /// `dw.forbidden`, anyone else `dw.notFound`. Gone from its channel; the
   /// messages quoting it and the unread counts follow.
   DwCallHandler.command<DeleteChatMessage, void>(
-    access: AppAccess.staff,
+    access: DwAccessRule.resource<DeleteChatMessage, ChatMessageRow>(
+      load: (ctx, command) => ctx._liveMessage(command.messageId, lock: true),
+      allows: (ctx, command, row) async =>
+          row.authorProfileId == (await ctx.profile).id || await ctx.isAdmin,
+      visible: (ctx, command, row) => ctx.isStaff,
+    ),
     handle: (ctx, command) async {
-      final me = await ctx.profile;
-      final row = await ctx._requireMessage(command.messageId, lock: true);
-      if (row.authorProfileId != me.id && !await ctx.isAdmin) {
-        ctx.refuse(DwCoreRefusal.forbidden);
-      }
+      final row = ctx.accessed<ChatMessageRow>();
       final deleted = await ctx.db.chatMessages.update(
         row.copyWith(deletedAt: DwFieldPatch.set(DateTime.now())),
       );
@@ -339,9 +345,17 @@ extension on DwCallContext {
   }
 
   /// The message [messageId] unless it is deleted; otherwise `dw.notFound`.
+  Future<ChatMessageRow> _requireMessage(
+    int messageId, {
+    bool lock = false,
+  }) async =>
+      await _liveMessage(messageId, lock: lock) ??
+      refuse(DwCoreRefusal.notFound);
+
+  /// The message [messageId], or `null` when there is none or it is deleted.
   /// With [lock], held until the command commits: edits, deletions and pins of
   /// one message queue instead of overwriting each other's row.
-  Future<ChatMessageRow> _requireMessage(
+  Future<ChatMessageRow?> _liveMessage(
     int messageId, {
     bool lock = false,
   }) async {
@@ -349,8 +363,7 @@ extension on DwCallContext {
       messageId,
       lock: lock ? DwRowLock.forUpdate : null,
     );
-    if (row == null || row.isDeleted) refuse(DwCoreRefusal.notFound);
-    return row;
+    return row == null || row.isDeleted ? null : row;
   }
 
   /// Moves [profileId]'s position in [message]'s channel forward to

@@ -23,7 +23,7 @@ DwCallHandler.single<GetAdminCounters, AdminCounters>(
 | `DwAccessRule.anonymous` | Anyone, including a caller without a session |
 | `DwAccessRule.signedIn` | Any signed-in account |
 | `DwAccessRule.check<C>((ctx, call) async => …)` | A signed-in account for which the check answers `true`; otherwise `dw.forbidden` |
-| `DwAccessRule.resource<C, R>(load: …, allows: …)` | A signed-in account that may reach the row the call names: `load` reads it, `allows` decides on it, and the handler gets it as `ctx.accessed<R>()`. Absent and not theirs are the same `dw.notFound` |
+| `DwAccessRule.resource<C, R>(load: …, allows: …)` | A signed-in account that may reach the row the call names: `load` reads it, `allows` decides on it, and the handler gets it as `ctx.accessed<R>()`. Absent and not theirs are the same `dw.notFound`; with `visible:`, a row the caller may see but not act on is `dw.forbidden` |
 
 **A `check` rule requires sign-in first.** An anonymous caller never reaches the check: the call is
 answered `unauthenticated` (401), and the app goes to sign-in instead of showing "forbidden".
@@ -34,28 +34,9 @@ handler of another fails the server's startup; a rule meant for any call is type
 `DwServerCall<Object?>`. The check runs in the handler's context — inside the transaction of a
 transactional command — so a row it reads is the row the handler sees.
 
-**A `resource` rule is "is this mine" said once.** A handler that names a row by id used to be
-`signedIn` with the ownership check written inline — and three such checks of one membership, in
-one project, gave three different answers. The rule reads the row once, and the handler receives it
-rather than reading it again:
-
-```dart
-DwCallHandler.command<ReviewVisit, SessionBooking>(
-  access: DwAccessRule.resource<ReviewVisit, SessionBookingRow>(
-    load: (ctx, command) => ctx.db.sessionBookings.findById(command.bookingId),
-    allows: (ctx, command, booking) async =>
-        booking.clientProfileId == (await ctx.profile).id,
-  ),
-  handle: (ctx, command) async {
-    final booking = ctx.accessed<SessionBookingRow>();
-    // …
-  },
-),
-```
-
-A command that writes the row locks it in `load` (`lock: DwRowLock.forUpdate`): the rule runs inside
-the command's transaction. `ctx.accessed<R>()` in a handler whose rule loaded something else throws —
-that is a bug in the declaration, not a refusal.
+**A `resource` rule is "is this mine" said once**: the rule reads the row, and the handler receives
+it rather than reading it again. Which shape of ownership takes which form is below, in
+[Whose row is it](#whose-row-is-it-one-rule-per-shape).
 
 A call runs its steps in this order:
 
@@ -63,7 +44,7 @@ A call runs its steps in this order:
    dead token must learn it on any call;
 2. a rule other than `anonymous` and no account — `unauthenticated` (401);
 3. validation — `DwSelfValidating.validate()`, and `checkPage()` of a table request — refused (422);
-4. the `check` — `dw.forbidden` (403) when it answers `false`, or the `resource` — `dw.notFound` (404) when it is absent or not allowed; an exception in either is a failure (500);
+4. the `check` — `dw.forbidden` (403) when it answers `false`, or the `resource` — `dw.notFound` (404) when it is absent or not allowed, `dw.forbidden` when not allowed but `visible`; an exception in either is a failure (500);
 5. the handler.
 
 Sign-in comes before validation, so an anonymous caller is told to sign in rather than which field is
@@ -117,6 +98,140 @@ The framework ships no roles because every project's are different — a club ha
 sellers — and a role enum in the framework would be a second one beside the project's. What it
 guarantees is the part each project would otherwise get wrong on its own: no handler is open by
 accident.
+
+## Whose row is it: one rule per shape
+
+Ownership is decided in the access rule, never in the handler's body after `signedIn`: an inline
+check is written a little differently every time, and one project that did so answered one question
+— "is the caller in this chat" — four different ways. `dart run dartway_cli:dartway check` warns on the
+inline form (`inlineOwnershipCheck`). Each shape below has one form.
+
+**A row the caller owns** — a field of the row names the caller's profile. `load` reads the row,
+`allows` compares the field:
+
+```dart
+DwCallHandler.command<CancelBooking, SessionBooking>(
+  access: DwAccessRule.resource<CancelBooking, SessionBookingRow>(
+    // Locked: the rule runs inside the command's transaction.
+    load: (ctx, command) => ctx.db.sessionBookings.findById(
+      command.bookingId,
+      lock: DwRowLock.forUpdate,
+    ),
+    allows: (ctx, command, booking) async =>
+        booking.clientProfileId == (await ctx.profile).id,
+  ),
+  handle: (ctx, command) async {
+    final booking = ctx.accessed<SessionBookingRow>();
+    // …
+  },
+),
+```
+
+(`example/dartway_example_server/lib/src/bookings/bookings_handlers.dart`)
+
+A command that writes the row locks it in `load` (`lock: DwRowLock.forUpdate`). `ctx.accessed<R>()`
+in a handler whose rule loaded something else throws — that is a bug in the declaration, not a
+refusal.
+
+**A row owned through its parent** — a lesson is the teacher's because its course is. `load` reads
+the row and the parent that decides, and hands both over as a record, so the handler reads neither
+again:
+
+```dart
+DwCallHandler.command<RenameLesson, Lesson>(
+  access: DwAccessRule.resource<RenameLesson, (LessonRow, CourseRow)>(
+    load: (ctx, command) async {
+      final lesson = await ctx.db.lessons.findById(
+        command.lessonId,
+        lock: DwRowLock.forUpdate,
+      );
+      if (lesson == null) return null;
+      final course = await ctx.db.courses.findById(lesson.courseId);
+      return course == null ? null : (lesson, course);
+    },
+    allows: (ctx, command, found) async =>
+        found.$2.teacherProfileId == (await ctx.profile).id,
+  ),
+  handle: (ctx, command) async {
+    final (lesson, course) = ctx.accessed<(LessonRow, CourseRow)>();
+    // …
+  },
+),
+```
+
+**Membership of a parent** — the caller is in the conversation, the project, the circle the call
+names. The row that proves it is the caller's membership, so that is what `load` reads, and the
+rule is written **once**, as a function next to the project's other rules; every handler of that
+parent names it:
+
+```dart
+abstract final class AppAccess {
+  /// A member of the conversation the call names; the handler reads the
+  /// membership as `ctx.accessed<ConversationMemberRow>()`.
+  static DwAccessRule conversationMember<C extends DwServerCall<Object?>>(
+    int Function(C call) conversationId,
+  ) => DwAccessRule.resource<C, ConversationMemberRow>(
+    load: (ctx, call) async => ctx.db.conversationMembers.findFirst(
+      where: (t) =>
+          t.conversationId.equals(conversationId(call)) &
+          t.profileId.equals((await ctx.profile).id!),
+    ),
+    allows: (ctx, call, membership) => membership.isActive,
+  );
+}
+
+DwCallHandler.command<LeaveConversation, void>(
+  access: AppAccess.conversationMember<LeaveConversation>(
+    (command) => command.conversationId,
+  ),
+  handle: (ctx, command) async {
+    final membership = ctx.accessed<ConversationMemberRow>();
+    // …
+  },
+),
+```
+
+A row inside the parent — a message of that conversation — is the second shape over the third:
+`load` reads the message and the caller's membership of its conversation, as a record.
+
+**A row the caller may see but not change** — a message someone else wrote, in a chat the caller
+reads. `visible` answers whether the caller may know it exists; when `allows` refuses and `visible`
+agrees, the answer is `dw.forbidden`, otherwise still `dw.notFound`:
+
+```dart
+DwCallHandler.command<EditChatMessage, ChatMessage>(
+  access: DwAccessRule.resource<EditChatMessage, ChatMessageRow>(
+    load: (ctx, command) => ctx._liveMessage(command.messageId, lock: true),
+    allows: (ctx, command, row) async =>
+        row.authorProfileId == (await ctx.profile).id,
+    visible: (ctx, command, row) => ctx.isStaff,
+  ),
+  handle: (ctx, command) async {
+    final row = ctx.accessed<ChatMessageRow>();
+    // …
+  },
+),
+```
+
+(`example/dartway_example_server/lib/src/chat/chat_handlers.dart`)
+
+**The caller's rows, as a list** — there is no row to check, so there is no rule beyond `signedIn`:
+the query names the caller in its `where`, and the request names nothing about them (next
+section). A list under a parent — the messages of a conversation — takes the parent's membership
+rule and filters by the parent's id.
+
+```dart
+DwCallHandler.list<ListMyBookings, SessionBooking>(
+  access: DwAccessRule.signedIn,
+  handle: (ctx, request) async {
+    final me = await ctx.profile;
+    final rows = await ctx.db.sessionBookings.find(
+      where: (t) => t.clientProfileId.equals(me.id!),
+    );
+    // …
+  },
+),
+```
 
 ## "My" requests carry no account id
 

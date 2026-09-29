@@ -106,7 +106,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
+Fifteen errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -136,6 +136,7 @@ Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
+| `inlineOwnershipCheck` | warning | A `signedIn` handler in a `*_handlers.dart` that compares a row's owner field with the caller and refuses `notFound`/`forbidden` (or answers `null` from a `single`), in its body or a helper of the file it calls — the check `DwAccessRule.resource` makes once |
 | `fileLong` | info | Over 200 lines |
 
 "Raw styles" means `Color(`, `TextStyle(`, `BorderRadius.`/`BorderRadius(`, `Theme.of(`,
@@ -231,6 +232,18 @@ drifting. What they end is the silent case — a developer who does not know a k
 only place it was written down was a deployment's configuration, and two files stating the same
 password with nothing making them agree. `dartway secret list --env local` is the same answer on
 demand.
+
+**`inlineOwnershipCheck`** looks for "is this row mine" written by hand after `DwAccessRule.signedIn`
+— the check `DwAccessRule.resource` makes once, before the handler, with the row handed over as
+`ctx.accessed<R>()` (D-090). It reads `*_handlers.dart` files of the server's `lib/`: an `if` whose
+condition compares a row's field named for an owner (`…ProfileId`, `authorId`, `ownerId`,
+`senderId`, `accountId`, …) with the caller (`me`, `profile`, `ctx.accountId`, …) with `!=`, and
+whose branch refuses `notFound` or `forbidden` — or answers `null` from a `single` handler, which the
+framework refuses `notFound`. A helper counts when a `signedIn` handler of the same file calls it. A
+warning, because it reads the shape of the code rather than its meaning; it stays quiet on a list
+filtered by the caller in its `where` (the canonical "my rows"), on handlers under any other rule,
+and on a membership read from a table of its own. The one pattern per shape is in
+[Access and roles](../2-core/access-and-roles.md#whose-row-is-it-one-rule-per-shape).
 
 ## Why `notAFeature` and `featureSpecMissing` are one rule
 

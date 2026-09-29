@@ -62,7 +62,7 @@ There is no client package: the shared package *is* the client contract, and bot
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
 | Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
 
-Ten further checks are warnings and one is a nudge. Anything this table and the types do not hold is a default. Not held yet: the naming law beyond the contract's DTO names, a `DwHttpRoute` the app calls instead of a request, and "done" (only the `featureSpecMissing` warning); `migrationsDrift` needs a Postgres and says when it did not run.
+Eleven further checks are warnings and one is a nudge. Anything this table and the types do not hold is a default. Not held yet: the naming law beyond the contract's DTO names, a `DwHttpRoute` the app calls instead of a request, and "done" (only the `featureSpecMissing` warning); `migrationsDrift` needs a Postgres and says when it did not run.
 
 ## The project's `dartway` is `dart run dartway_cli:dartway`
 

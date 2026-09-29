@@ -47,15 +47,18 @@ void main() {
           ),
           forbidden,
         );
+        // A message is guarded by its resource rule: to someone who cannot
+        // read the chat it does not exist.
+        final notFound = refusedWith(DwCoreRefusal.notFound);
         expect(
           await client.command(
             EditChatMessage(messageId: message.id, text: 'mine now'),
           ),
-          forbidden,
+          notFound,
         );
         expect(
           await client.command(DeleteChatMessage(messageId: message.id)),
-          forbidden,
+          notFound,
         );
         expect(
           await client.command(

@@ -3,7 +3,7 @@ name: dartway-access
 description: >-
   Who may do what in a DartWay project, and the tests that prove it: the DwAccessRule every handler
   declares (anonymous only for sign-in-like calls, signedIn, check with the call for rules on its
-  real parameters), roles as the project's own (a profile row plus a DwCallContext extension cached
+  real parameters, resource for whose row it is — owned, through a parent, by membership), roles as the project's own (a profile row plus a DwCallContext extension cached
   with memo), "someone else's row does not exist" (dw.notFound rather than dw.forbidden), "my" calls
   that carry no account id, channel rules (DwChannelRule) as the second access point and upload
   rules / DwFileStorage.canRead as the third, what a command's publications reveal to its caller,
@@ -19,7 +19,7 @@ The server is the only place access is decided. A hidden button, a route guard, 
 "never sends" are conveniences; the server's rules are the access. There are exactly three access
 points, and each must be as strict as the others:
 
-1. **the call** — the `DwAccessRule` of every handler, then the handler's own ownership checks;
+1. **the call** — the `DwAccessRule` of every handler, ownership included (`DwAccessRule.resource`);
 2. **the channel** — the `DwChannelRule` of every channel kind, checked once at subscription;
 3. **the file** — the upload rule of every purpose and `DwFileStorage.canRead` for private files.
 
@@ -36,7 +36,7 @@ omission.
 | `DwAccessRule.anonymous` | anyone, with or without a session | calls that must work before sign-in: a public landing read, a sign-up-like flow of the project's own. The framework's sign-in commands are built in — you do not declare them |
 | `DwAccessRule.signedIn` | any signed-in account | "my" calls, and anything every member may do; a call naming a row by id is `resource` |
 | `DwAccessRule.check<C>((ctx, call) async => …)` | a signed-in account for which the check is true; otherwise `dw.forbidden` | roles, and rules on the call's real parameters |
-| `DwAccessRule.resource<C, R>(load: …, allows: …)` | a signed-in account that may reach the row the call names; otherwise `dw.notFound` | "is this mine", "am I in this project" — the handler reads the row as `ctx.accessed<R>()` |
+| `DwAccessRule.resource<C, R>(load: …, allows: …, visible: …)` | a signed-in account that may reach the row the call names; otherwise `dw.notFound` (`dw.forbidden` when `visible`) | "is this mine", "am I in this project" — the handler reads the row as `ctx.accessed<R>()` |
 
 Order on the server: the sign-in requirement (anonymous caller → `unauthenticated`, `401`), then
 `validate()`, then the check, then the handler. The check runs in the handler's context — inside the
@@ -105,18 +105,18 @@ the role could subscribe to (`dartway-realtime`).
 ## 3. Someone else's row does not exist
 
 Whether the row a call names is the caller's is answered **once, in the rule**, and its answer is
-`dw.notFound`, not `dw.forbidden`. `DwAccessRule.resource` loads the row, decides, and hands it to
-the handler — never `signedIn` with the same check written inline, where every handler writes it a
-little differently:
+`dw.notFound`, not `dw.forbidden`. Never `signedIn` with the check written in the body or in a
+private `_requireOwn…` helper — every copy answers a little differently, and `dart run dartway_cli:dartway check` warns on
+it (`inlineOwnershipCheck`). One form per shape:
+
+**Owned by the caller** — a field of the row names the caller's profile:
 
 ```dart
-/// Pays one of the caller's invoices.
 DwCallHandler.command<PayInvoice, Invoice>(
   access: DwAccessRule.resource<PayInvoice, InvoiceRow>(
     // Locked: the rule runs inside the command's transaction.
     load: (ctx, command) =>
         ctx.db.invoices.findById(command.invoiceId, lock: DwRowLock.forUpdate),
-    // Someone else's invoice does not exist for the caller.
     allows: (ctx, command, invoice) async =>
         invoice.ownerProfileId == (await ctx.profile).id,
   ),
@@ -127,13 +127,59 @@ DwCallHandler.command<PayInvoice, Invoice>(
 ),
 ```
 
-A rule shared by many calls of one kind of row is a function returning the rule, next to the
-project's other rules.
+**Owned through a parent** — `load` reads the row and the parent that decides, as a record; the
+handler reads neither again:
 
-Why: `forbidden` for someone else's id and `notFound` for a free id tell a caller which ids exist —
-typing ids one by one enumerates other people's data. `dw.forbidden` is right when the caller may
-know the row exists and may not do this to it (a member of a board editing a message they did not
-write).
+```dart
+access: DwAccessRule.resource<RenameLesson, (LessonRow, CourseRow)>(
+  load: (ctx, command) async {
+    final lesson = await ctx.db.lessons.findById(command.lessonId);
+    if (lesson == null) return null;
+    final course = await ctx.db.courses.findById(lesson.courseId);
+    return course == null ? null : (lesson, course);
+  },
+  allows: (ctx, command, found) async =>
+      found.$2.teacherProfileId == (await ctx.profile).id,
+),
+// handle: final (lesson, course) = ctx.accessed<(LessonRow, CourseRow)>();
+```
+
+**Membership of a parent** — `load` reads the caller's membership row, and the rule is written
+**once**, a function in `AppAccess` that every handler of that parent names. Two definitions of one
+membership drift into two answers:
+
+```dart
+static DwAccessRule teamMember<C extends DwServerCall<Object?>>(
+  int Function(C call) teamId,
+) => DwAccessRule.resource<C, TeamMemberRow>(
+  load: (ctx, call) async => ctx.db.teamMembers.findFirst(
+    where: (t) =>
+        t.teamId.equals(teamId(call)) &
+        t.profileId.equals((await ctx.profile).id!),
+  ),
+  allows: (ctx, call, membership) => membership.isActive,
+);
+```
+
+A row inside that parent (a message of the team's chat) loads the row and the membership as a
+record, with the same membership query.
+
+**Visible, not yours to change** — a note someone else wrote on a board every manager reads.
+`visible` says the caller may know it exists; the refusal becomes `dw.forbidden`, and anyone who may
+not see it still gets `dw.notFound`:
+
+```dart
+allows: (ctx, command, note) async =>
+    note.authorProfileId == (await ctx.profile).id,
+visible: (ctx, command, note) => ctx.isManager,
+```
+
+**The caller's rows as a list** is not a rule: `signedIn`, and the query names the caller in its
+`where` (`t.ownerProfileId.equals(me.id!)`). A list under a parent takes the parent's membership
+rule and filters by the parent's id.
+
+Why `notFound`: `forbidden` for someone else's id and `notFound` for a free id tell a caller which ids
+exist — typing ids one by one enumerates other people's data.
 
 ## 4. "My" calls carry no account id
 
@@ -261,7 +307,8 @@ harness (`refusedWith`, signed-in members, a promoted admin) — `dartway-testin
 
 - [ ] Every handler's rule is the narrowest that works; `anonymous` only where sign-in cannot exist yet.
 - [ ] Role rules read the cached profile through the context extension.
-- [ ] Handlers check ownership of every row an id names; someone else's is `dw.notFound`.
+- [ ] Every row an id names is guarded by `DwAccessRule.resource` (membership rules once, in
+      `AppAccess`); someone else's is `dw.notFound`, `dw.forbidden` only through `visible`.
 - [ ] "My" calls carry no account or profile id; no command carries what the server decides.
 - [ ] Each channel kind's `canSubscribe` is as strict as every request on it; lost rights are revoked.
 - [ ] A command publishes nothing its caller may not read.

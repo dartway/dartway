@@ -167,6 +167,12 @@ final class TestApp {
   /// How many times the access rule of `GetMyNote` loaded its note.
   int noteLoads = 0;
 
+  /// Room → the accounts that are its members (`GetRoomMessage`).
+  final Map<String, Set<int>> roomMembers = {};
+
+  /// How many times a handler guarded by a resource rule that refuses ran.
+  int guardedRuns = 0;
+
   /// How many times the access check of `NotesOfOwner` ran.
   int ownerChecks = 0;
 
@@ -399,6 +405,58 @@ final class TestApp {
         allows: (ctx, request, note) => note.ownerId == ctx.accountId,
       ),
       handle: (ctx, request) async => ctx.accessed<NoteView>(),
+    ),
+    DwCallHandler.single<GetRoomMessage, MessageView>(
+      // Reached through its parent: the rule reads the message and its room,
+      // decides on the room's members, and hands both to the handler.
+      access: DwAccessRule.resource<GetRoomMessage, (MessageView, String)>(
+        load: (ctx, request) async {
+          final row = (await ctx.db.query(
+            'SELECT id, room, text, sent_at FROM message WHERE id = @id',
+            params: {'id': request.messageId},
+          )).firstOrNull;
+          if (row == null) return null;
+          return (
+            MessageView(
+              id: row.get<int>('id'),
+              text: row.get<String>('text'),
+              sentAt: row.get<DateTime>('sent_at'),
+            ),
+            row.get<String>('room'),
+          );
+        },
+        allows: (ctx, request, found) =>
+            roomMembers[found.$2]?.contains(ctx.accountId) ?? false,
+      ),
+      handle: (ctx, request) async {
+        guardedRuns++;
+        final (message, room) = ctx.accessed<(MessageView, String)>();
+        return MessageView(
+          id: message.id,
+          text: '$room: ${message.text}',
+          sentAt: message.sentAt,
+        );
+      },
+    ),
+    DwCallHandler.command<RenameNote, NoteView>(
+      access: DwAccessRule.resource<RenameNote, NoteView>(
+        load: (ctx, command) async => (await _notes(
+          ctx.db,
+          'SELECT * FROM note WHERE id = @id FOR UPDATE',
+          {'id': command.noteId},
+        )).firstOrNull,
+        allows: (ctx, command, note) => note.ownerId == ctx.accountId,
+        visible: (ctx, command, note) => staff.contains(ctx.accountId),
+      ),
+      handle: (ctx, command) async {
+        guardedRuns++;
+        final note = ctx.accessed<NoteView>();
+        await ctx.db.query(
+          'UPDATE note SET text = @text WHERE id = @id',
+          params: {'text': command.text, 'id': note.id},
+        );
+        return NoteView(id: note.id, text: command.text, ownerId: note.ownerId);
+      },
     ),
     DwCallHandler.single<GetNote, NoteView>(
       access: DwAccessRule.anonymous,

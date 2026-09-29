@@ -54,11 +54,7 @@ void main() {
 
     test('resource loads once and hands the row to the handler; absent and '
         "someone else's are the same notFound", () async {
-      final note = await TestApp.insertNote(
-        harness().db,
-        'mine',
-        session.id,
-      );
+      final note = await TestApp.insertNote(harness().db, 'mine', session.id);
       final loads = harness().app.noteLoads;
       expect(
         (await signed.call(GetMyNote(note.id))).value(GetMyNote(note.id)),
@@ -73,6 +69,55 @@ void main() {
       expect(theirs.refusal, absent.refusal);
 
       expect((await anonymous.call(GetMyNote(note.id))).status, 401);
+    });
+
+    test('resource reached through a parent: the rule decides on the parent '
+        'and hands the handler both; a non-member and a missing row are the '
+        'same notFound, and the handler does not run', () async {
+      final row = (await harness().db.query(
+        'INSERT INTO message (room, text, sent_at) '
+        "VALUES ('garden', 'hello', now()) RETURNING id",
+      )).single;
+      final id = row.get<int>('id');
+      harness().app.roomMembers['garden'] = {session.id};
+
+      final mine = await signed.call(GetRoomMessage(id));
+      expect(mine.value(GetRoomMessage(id)).text, 'garden: hello');
+
+      final (outsider, _) = await harness().signedIn('calls-room@example.com');
+      final runs = harness().app.guardedRuns;
+      final theirs = await outsider.call(GetRoomMessage(id));
+      final absent = await outsider.call(const GetRoomMessage(-7));
+      expect(theirs.status, 404);
+      expect(theirs.refusal, absent.refusal);
+      expect(harness().app.guardedRuns, runs, reason: 'refused before');
+    });
+
+    test('resource with visible: the owner acts, someone who may see the row '
+        'is forbidden, anyone else notFound like a missing row', () async {
+      final note = await TestApp.insertNote(harness().db, 'draft', session.id);
+      final renamed = await signed.call(RenameNote(note.id, 'final'));
+      expect(renamed.value(RenameNote(note.id, 'final')).text, 'final');
+
+      final (viewer, viewerSession) = await harness().signedIn(
+        'calls-viewer@example.com',
+      );
+      final (stranger, _) = await harness().signedIn(
+        'calls-stranger@example.com',
+      );
+      harness().app.staff.add(viewerSession.id);
+      final runs = harness().app.guardedRuns;
+
+      final seen = await viewer.call(RenameNote(note.id, 'x'));
+      expect(seen.status, 403);
+      expect(seen.refusal.code, DwCoreRefusal.forbidden.code);
+
+      final unseen = await stranger.call(RenameNote(note.id, 'x'));
+      final absent = await viewer.call(const RenameNote(-7, 'x'));
+      expect(unseen.status, 404);
+      expect(absent.status, 404, reason: 'visible never reveals a missing row');
+      expect(unseen.refusal, absent.refusal);
+      expect(harness().app.guardedRuns, runs);
     });
 
     test('requireAccountId in a handler answers unauthenticated', () async {
