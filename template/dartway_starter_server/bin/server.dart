@@ -8,25 +8,28 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 /// `DwLocalEnvironment.overlay` puts `deploy/config.yaml > local` and
 /// `deploy/secrets.yaml > local` into that environment before it is read. A
 /// real environment variable beats both, and a deployed server has neither
-/// file. The variables:
+/// file.
 ///
-/// - `DW_DATABASE_*` — the database (`DwDatabaseConfig.fromEnvironment`:
-///   `HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`, `SSL`, `MAX_CONNECTIONS`).
-///   The server applies its migrations as it starts and exits non-zero when
-///   one fails;
+/// `AppEnvironment.read` (`lib/src/core/environment.dart`) reads every
+/// variable at once and stops the start with the whole list of what is
+/// missing. The framework's own, in `DwServerEnvironment`:
+///
+/// - `DW_DATABASE_*` — the database (`HOST`, `PORT`, `NAME`, `USER`,
+///   `PASSWORD`, `SSL`, `CA_FILE`, `MAX_CONNECTIONS`). The server applies its
+///   migrations as it starts and exits non-zero when one fails;
 /// - `DW_MIGRATE_ONLY=true` — applies the migrations and exits without
 ///   serving: how `dartway deploy` migrates between the old server and the
 ///   new one;
 /// - `PORT` — the port to listen on, 8080 by default;
-/// - `DW_STORAGE_*` — the S3-compatible storage for uploads
-///   (`AppFiles.storageConfig`): `ENDPOINT`, `ACCESS_KEY` and `SECRET_KEY` together;
-///   `PUBLIC_BUCKET` and `PRIVATE_BUCKET` (named after the project),
-///   `PUBLIC_BASE_URL` (the public bucket on the endpoint), `REGION`,
-///   `PATH_STYLE`, `VERIFY_BUCKETS`. Without `DW_STORAGE_ENDPOINT` the server
-///   runs without uploads;
+/// - `DW_STORAGE_*` — the S3-compatible storage for uploads: `ENDPOINT`,
+///   `ACCESS_KEY` and `SECRET_KEY` together; `PUBLIC_BUCKET` and
+///   `PRIVATE_BUCKET` (named after the project by default), `PUBLIC_BASE_URL`
+///   (the public bucket on the endpoint), `REGION`, `PATH_STYLE`,
+///   `VERIFY_BUCKETS`. Without `DW_STORAGE_ENDPOINT` the server runs without
+///   uploads;
 /// - `DW_STORAGE_PROVISION=true` — creates both buckets and sets their access
-///   before starting (`DwFileStorageSetup.provision`): for a development storage
-///   the project owns, never for a storage somebody else administers;
+///   before starting (`DwFileStorageSetup.provision`): for a development
+///   storage the project owns, never for a storage somebody else administers;
 /// - `DW_ALLOWED_ORIGINS` — browser origins, besides the one the live socket
 ///   is served on, that may open it: comma-separated full origins
 ///   (`https://app.example.com,http://localhost:5000`). A web app served
@@ -36,21 +39,18 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 ///   made one on every start by the framework's `DwFirstAdministrator` step
 ///   (declared in `DartwayStarterServer.build`); unset for none.
 Future<void> main() async {
-  final env = DwLocalEnvironment.overlay(Platform.environment);
-  final storage = AppFiles.storageConfig(env);
-  if (storage != null && env['DW_STORAGE_PROVISION'] == 'true') {
+  final env = AppEnvironment.read(
+    DwLocalEnvironment.overlay(Platform.environment),
+  );
+  final storage = env.server.storage;
+  if (storage != null && env.server.provisionStorage) {
     await DwFileStorageSetup.provision(storage);
   }
   final server = DartwayStarterServer.build(
-    database: DwDatabaseConfig.fromEnvironment(env),
+    database: env.server.database,
     storage: storage,
-    port: int.parse(env['PORT'] ?? '8080'),
-    settings: DwServerSettings(
-      allowedOrigins: {
-        for (final entry in (env['DW_ALLOWED_ORIGINS'] ?? '').split(','))
-          if (entry.trim() case final origin when origin.isNotEmpty) origin,
-      },
-    ),
+    port: env.server.port,
+    settings: DwServerSettings(allowedOrigins: env.server.allowedOrigins),
   );
   await server.start();
 

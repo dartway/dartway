@@ -69,17 +69,20 @@ From the project root or from inside the `*_flutter` package, in this order:
 2. **localization wiring** (`l10nNotWired`);
 3. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
    (`generatedCodeStale`);
-4. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
-5. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
+4. **the environment and outbound HTTP** in the server package: `Platform.environment` outside
+   `lib/src/core/environment.dart` (`forbiddenEnvironmentRead`), an `HttpClient(` or `package:http`
+   import in `lib/src/` (`forbiddenHttpClient`);
+5. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
+6. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
    and **framework overrides** that the framework has caught up with (`frameworkOverrideOutlived`);
-6. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
+7. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
    development containers' credentials against what the server is told to reach them by
    (`devComposeDrifted`);
-7. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
+8. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
    in the zones and `shared/` — the other sixteen checks.
 
-`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 7 and skips
-steps 1–6 and the UI kit pass: each of those judges a whole package or the whole project, and has
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 8 and skips
+steps 1–7 and the UI kit pass: each of those judges a whole package or the whole project, and has
 nothing to say about one folder. `--type <check>` runs one check by name; `--level
 info|warning|error` runs the checks of one severity.
 
@@ -106,7 +109,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
+Seventeen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -134,6 +137,8 @@ Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
+| `forbiddenEnvironmentRead` | error | `Platform.environment` in the server's `lib/` outside `lib/src/core/environment.dart`, where `AppEnvironment` reads every variable at start |
+| `forbiddenHttpClient` | error | `HttpClient(` or an import of `package:http/…` in the server's `lib/src/` — an outbound request is `ctx.http` |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
 | `fileLong` | info | Over 200 lines |
@@ -223,6 +228,16 @@ that does not undo its up. The fixes it prints: a schema change the migrations m
 `dart run bin/migrate.dart create <name>`; an edited migration applied nowhere yet is
 `dart run bin/migrate.dart rehash <id>`. An error, because a schema the migrations do not produce is a
 server that refuses to start in the next environment. See [Migrations](../4-server/migrations.md).
+
+**`forbiddenEnvironmentRead` and `forbiddenHttpClient`** hold one way to each of two things a server
+reaches outside itself. The environment is read in `lib/src/core/environment.dart`, into a typed
+`AppEnvironment` at start: a variable read anywhere else is read on first use — a missing one surfaces
+hours after a deploy that looked fine — and past the local overlay, so `deploy/config.yaml > local`
+never reaches it. `bin/` is not judged: it is what hands the environment in. An outbound request is
+`ctx.http`, bounded by a timeout, logged and answered by the test server's fake; a client of a project's
+own has none of that unless it is written again, with a test seam of its own threaded through the
+server's factory. See [The app server](../4-server/app-server.md#configuration-comes-from-the-environment)
+and [Handlers and the call context](../4-server/handlers-and-context.md#outbound-http).
 
 **`localSecretMissing` and `devComposeDrifted`** judge the environment this machine starts a server
 with (D-078). Both are warnings: a key the server only reaches on a path nobody runs locally is a

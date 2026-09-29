@@ -11,6 +11,7 @@ import '../calls/dw_idempotency_ledger.dart';
 import '../channels/dw_channel_rules.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
+import '../outbound/dw_outbound_http.dart';
 import '../server/dw_server_module.dart';
 
 /// Thrown when a call needs a signed-in account and has none. The framework
@@ -125,6 +126,11 @@ abstract class DwCallContext {
 
   DwServerLogger get log;
 
+  /// Requests to other services' HTTP APIs: bounded by a timeout, logged,
+  /// and answered by the test's `DwFakeOutboundHttp` under a `DwTestServer`.
+  /// See [DwOutboundHttp].
+  DwOutboundHttp get http;
+
   /// The server's module of class [M] — how a module's context extension
   /// (`ctx.push`) reaches its runtime. Throws [StateError] when the server
   /// was built without one.
@@ -195,6 +201,7 @@ final class DwRuntimeContext extends DwCallContext {
     required this.protocol,
     required this.log,
     required DwJobQueue Function(DwRuntimeContext ctx) jobs,
+    required DwOutboundHttp Function(DwRuntimeContext ctx) http,
     required DwAccountService Function(DwRuntimeContext ctx) accounts,
     DwFileService Function(DwRuntimeContext ctx)? files,
     Map<Type, DwServerModule> modules = const {},
@@ -207,6 +214,7 @@ final class DwRuntimeContext extends DwCallContext {
   }) : _root = _Scope(db),
        _deliverOnCommit = deliverOnCommit,
        _jobs = jobs,
+       _http = http,
        _accounts = accounts,
        _clientAppVersion = clientAppVersion,
        _clientUserAgent = clientUserAgent,
@@ -218,6 +226,7 @@ final class DwRuntimeContext extends DwCallContext {
   final Object _zoneKey = Object();
   final Map<Object, Object?> _memo = {};
   final DwJobQueue Function(DwRuntimeContext ctx) _jobs;
+  final DwOutboundHttp Function(DwRuntimeContext ctx) _http;
   final DwAccountService Function(DwRuntimeContext ctx) _accounts;
   final DwFileService Function(DwRuntimeContext ctx) _files;
   final Map<Type, DwServerModule> _modules;
@@ -340,7 +349,10 @@ final class DwRuntimeContext extends DwCallContext {
   @override
   final DwServerLogger log;
 
-  // Both built on first use: most calls touch neither.
+  // Built on first use: most calls touch none of them.
+  @override
+  late final DwOutboundHttp http = _http(this);
+
   @override
   late final DwJobQueue jobs = _jobs(this);
 

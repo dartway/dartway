@@ -12,6 +12,7 @@ import '../checker/dw_l10n_wiring.dart';
 import '../checker/dw_local_environment.dart';
 import '../checker/dw_layout.dart';
 import '../checker/dw_server_contract.dart';
+import '../checker/dw_server_outside_world.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
 import '../checker/dw_check_tally.dart';
@@ -108,6 +109,11 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
       errorCount += DwGeneratedCodeInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwServerOutsideWorldInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

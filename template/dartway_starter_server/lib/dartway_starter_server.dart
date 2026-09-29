@@ -18,6 +18,7 @@ import 'src/migrations/migrations.dart';
 export 'generated/dw_schema.dart';
 export 'src/core/auth.dart' show AppAuth, CodeDelivery;
 export 'src/core/bootstrap.dart';
+export 'src/core/environment.dart' show AppEnvironment;
 export 'src/core/files.dart' show AppFiles;
 export 'src/migrations/migrations.dart' show appMigrations;
 

@@ -23,6 +23,7 @@ import 'src/schedule/schedule_feature.dart';
 export 'generated/dw_schema.dart';
 export 'src/core/auth.dart' show AppAuth;
 export 'src/core/bootstrap.dart' show AppBootstrap;
+export 'src/core/environment.dart' show AppEnvironment, AppPushEnvironment;
 export 'src/core/files.dart' show AppFiles;
 export 'src/core/push.dart' show AppPush;
 export 'src/migrations/migrations.dart' show appMigrations;

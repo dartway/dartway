@@ -4,8 +4,8 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import '../../generated/dw_schema.dart';
 import 'call_context.dart';
 
-/// File storage: the upload rules, who may read a file, and the storage
-/// configuration read from the environment.
+/// File storage: the upload rules, who may read a file, and the default names
+/// of its buckets.
 abstract final class AppFiles {
   /// The club's uploaded files: one rule per [DartwayExampleUpload], and the storage
   /// they are kept in.
@@ -39,37 +39,13 @@ abstract final class AppFiles {
   static DwFileStorage storage(DwFileStorageConfig config) =>
       DwFileStorage(config, rules: uploadRules, canRead: canRead);
 
-  /// The example's storage configuration from [environment]: `DW_STORAGE_*` as
-  /// [DwFileStorageConfig.fromEnvironment] reads it, with the defaults of a
-  /// development storage filled in — buckets `club-public` and `club-private`,
-  /// the public one served from itself on the endpoint
-  /// (`<DW_STORAGE_ENDPOINT>/club-public`). `null` when `DW_STORAGE_ENDPOINT`
-  /// is not set: the server then runs without uploads.
-  ///
-  /// A default that is wrong for a real storage does not pass silently: the
-  /// server checks at startup that the public bucket reads anonymously at its
-  /// base URL and the private one does not.
-  static DwFileStorageConfig? storageConfig(Map<String, String> environment) {
-    String? set(String key) => switch (environment[key]) {
-      final value? when value.isNotEmpty => value,
-      _ => null,
-    };
-    final endpoint = set('DW_STORAGE_ENDPOINT');
-    if (endpoint == null) return null;
-    final publicBucket = set('DW_STORAGE_PUBLIC_BUCKET') ?? 'club-public';
-    final pathStyle = set('DW_STORAGE_PATH_STYLE')?.toLowerCase() != 'false';
-    return DwFileStorageConfig.fromEnvironment({
-      ...environment,
-      'DW_STORAGE_PUBLIC_BUCKET': publicBucket,
-      'DW_STORAGE_PRIVATE_BUCKET':
-          set('DW_STORAGE_PRIVATE_BUCKET') ?? 'club-private',
-      // Path-style only: a virtual-hosted base depends on DNS nobody set up for
-      // a development storage.
-      if (set('DW_STORAGE_PUBLIC_BASE_URL') == null && pathStyle)
-        'DW_STORAGE_PUBLIC_BASE_URL':
-            '${endpoint.endsWith('/') ? endpoint.substring(0, endpoint.length - 1) : endpoint}/$publicBucket',
-    });
-  }
+  /// The default bucket names, read by `AppEnvironment` when
+  /// `DW_STORAGE_PUBLIC_BUCKET` / `_PRIVATE_BUCKET` are not set. A default
+  /// that is wrong for a real storage does not pass silently: the server
+  /// checks at startup that the public bucket reads anonymously at its base
+  /// URL and the private one does not.
+  static const defaultPublicBucket = 'club-public';
+  static const defaultPrivateBucket = 'club-private';
 }
 
 /// Files attached to chat messages: who may upload them, and who may read one.

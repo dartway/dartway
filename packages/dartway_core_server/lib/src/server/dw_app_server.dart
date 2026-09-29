@@ -26,6 +26,7 @@ import '../live/dw_live_endpoint.dart';
 import '../live/dw_live_hub.dart';
 import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
+import '../outbound/dw_outbound_http.dart';
 import '../routes/dw_http_route.dart';
 import 'dw_server_feature.dart';
 import 'dw_runtime.dart';
@@ -305,6 +306,7 @@ final class DwAppServer {
     required int port,
     required InternetAddress address,
     required bool handleSignals,
+    DwOutboundTransport? outbound,
   }) async {
     if (_running != null || _stopping) {
       throw StateError('The server is already running');
@@ -315,6 +317,9 @@ final class DwAppServer {
     DwPostgresDatabase? openedDatabase;
     DwJobRunner? jobRunner;
     DwHttpFront? front;
+    final transport =
+        outbound ??
+        DwNetworkTransport(connectionTimeout: settings.outboundTimeout);
     final fileStore = switch (files) {
       final storage? => DwFileStore(storage),
       null => null,
@@ -356,6 +361,8 @@ final class DwAppServer {
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),
         channelRules: DwChannelRules(channels),
+        outbound: transport,
+        outboundTimeout: settings.outboundTimeout,
         files: fileStore,
         modules: modules,
       );
@@ -419,6 +426,7 @@ final class DwAppServer {
         jobRunner: runner,
         front: front,
         files: fileStore,
+        outbound: transport,
       );
       _running = running;
       if (handleSignals) {
@@ -436,6 +444,7 @@ final class DwAppServer {
       await jobRunner?.stop();
       await openedDatabase?.close();
       fileStore?.close();
+      transport.close();
       for (final module in modules) {
         await module.close();
       }
@@ -471,6 +480,7 @@ final class DwAppServer {
       }
       await running.database.close();
       running.files?.close();
+      running.outbound.close();
       logger.info('DartWay server stopped');
     } finally {
       _running = null;
@@ -746,6 +756,7 @@ final class _DwRunning {
     required this.jobRunner,
     required this.front,
     required this.files,
+    required this.outbound,
   });
 
   final DwPostgresDatabase database;
@@ -753,5 +764,6 @@ final class _DwRunning {
   final DwJobRunner jobRunner;
   final DwHttpFront front;
   final DwFileStore? files;
+  final DwOutboundTransport outbound;
   List<StreamSubscription<ProcessSignal>> signals = const [];
 }

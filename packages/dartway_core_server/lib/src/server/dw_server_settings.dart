@@ -20,6 +20,7 @@ final class DwServerSettings {
     this.alertsPerSignature = 5,
     this.alertWindow = const Duration(hours: 1),
     this.alertsPerMinute = 10,
+    this.outboundTimeout = const Duration(seconds: 30),
   }) : assert(maxBodyBytes > 0),
        assert(outboundLimitBytes > 0),
        assert(maxLiveMessageBytes > 0),
@@ -109,4 +110,10 @@ final class DwServerSettings {
   /// and the next alert says how many were held back. Below the channel's own
   /// limit (Telegram: 20 a minute per group), so its refusals never drop one.
   final int alertsPerMinute;
+
+  /// How long one outbound request (`ctx.http`) may take, from connecting to
+  /// the answer's last byte, unless the call names its own. A provider that
+  /// stops answering otherwise holds the handler, the job worker and the
+  /// connection for as long as TCP lets it.
+  final Duration outboundTimeout;
 }

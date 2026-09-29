@@ -178,7 +178,29 @@ enum DwCheckType {
   /// other by the server, and nothing makes them agree. Changing one produces
   /// a server that cannot log in to the database on the next machine — or,
   /// worse, on this one after the volume is recreated.
-  devComposeDrifted;
+  devComposeDrifted,
+
+  /// `Platform.environment` in the server package's `lib/` outside
+  /// `lib/src/core/environment.dart` (dartway/dartway#386).
+  ///
+  /// The project's variables are read in that one file, into a typed
+  /// `AppEnvironment` at start (`DwEnvironmentReader`), and the framework's
+  /// with it (`DwServerEnvironment`). A variable read anywhere else is read
+  /// on first use — a missing one surfaces as a failure hours after a deploy
+  /// that looked fine — and past the local overlay, so a value in
+  /// `deploy/config.yaml > local` never reaches it. `bin/` is not judged: it
+  /// is what hands the environment in.
+  forbiddenEnvironmentRead,
+
+  /// `dart:io`'s `HttpClient(` or an import of `package:http/…` in the
+  /// server package's `lib/src/` (dartway/dartway#386).
+  ///
+  /// An outbound request is `ctx.http`: bounded by a timeout, logged through
+  /// the server's log, and answered by the test server's fake. A client of a
+  /// project's own has none of the three unless someone writes them again —
+  /// and every project did, differently, with a test seam of its own
+  /// threaded through the server's factory.
+  forbiddenHttpClient;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///

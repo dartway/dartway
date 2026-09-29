@@ -3,7 +3,8 @@
 /// clients connected to it (`DwTestServer.connectClient`), and a provisioned
 /// pair of file storage buckets (`DwTestStorage`), and what a test watches
 /// the client with: `DwCountingTransport`, `DwRecordingConnector`,
-/// `dwWaitUntil`.
+/// `dwWaitUntil`; and what a test answers the server's outbound requests
+/// with, `DwFakeOutboundHttp`.
 library;
 
 // The client, so an end-to-end test imports this library and the server's and
@@ -13,6 +14,7 @@ library;
 export 'package:dartway_client/dartway_client.dart'
     hide DwNotAuthenticatedException;
 
+export 'src/testing/dw_fake_outbound_http.dart';
 export 'src/testing/dw_test_client_support.dart';
 export 'src/testing/dw_test_server.dart';
 export 'src/testing/dw_test_storage.dart';

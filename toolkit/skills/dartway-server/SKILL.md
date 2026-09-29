@@ -44,6 +44,7 @@ __SERVER_PKG__/
     channels.dart              AppChannels — the channel addresses handlers publish to
     files.dart                 AppFiles — every upload rule and who reads a file
     bootstrap.dart             AppBootstrap — startup steps
+    environment.dart           AppEnvironment — every variable, read once at start
     push.dart                  AppPush — with push only
   lib/src/migrations/      fixed: migration files and migrations.dart
   lib/src/<feature>/       one folder per area of the app, every file <feature>_*.dart:
@@ -369,7 +370,7 @@ exit of the server shows the object the same way.
 ## 6. The call context
 
 `DwCallContext` is one per call: `accountId` / `requireAccountId`, `sessionKey`, `db`, `protocol`,
-`transaction`, `publish`, `revoke`, `refuse`, `jobs`, `accounts`, `files`, `log`, `memo`.
+`transaction`, `publish`, `revoke`, `refuse`, `jobs`, `accounts`, `files`, `log`, `http`, `memo`.
 
 **The project's notions of "the caller" are an extension, cached per call with `memo`** — the
 framework knows an account, the profile and the role are the project's. It is `AppCallContext` in
@@ -635,12 +636,73 @@ corrected.
 a sender address, a provider key, a webhook URL, a bucket name — each is a credential of this
 environment, not a preference with a sensible starting point. A default turns an unfilled key into
 quiet work with somebody else's identity: mail sent from an address the project does not own, a
-webhook posted to a stranger's endpoint. Read it and fail loud, at the point of use or on boot —
-`Platform.environment['APP_SENDER_ADDRESS'] ?? (throw StateError('APP_SENDER_ADDRESS is not
-set'))` — never a plausible-looking fallback. A value the server cannot start without also belongs
+webhook posted to a stranger's endpoint. Read it with `read.required('APP_SENDER_ADDRESS')` in
+`AppEnvironment` (§9b), which stops the start while it is unset — never a plausible-looking fallback. A value the server cannot start without also belongs
 under `requires.secrets` in `deploy/config.yaml`, so a deployment missing it refuses to begin
 rather than failing on first use. This does not cover a preference with a genuine neutral value —
 a page size, a timeout — only a value that would point the system at somebody else if guessed wrong.
+
+## 9b. The environment and other services — one way each
+
+**Every variable is read once, at start, in `lib/src/core/environment.dart`.** `AppEnvironment` holds
+the framework's variables (`DwServerEnvironment`: database, storage, port, allowed origins, the
+provision flag) and one typed sub-config per concern of the project's, named after what it configures:
+
+```dart
+final class AppEnvironment {
+  const AppEnvironment({required this.server, required this.sms});
+
+  static AppEnvironment read(Map<String, String> variables) =>
+      DwEnvironmentReader.read(variables, (read) => AppEnvironment(
+        server: DwServerEnvironment.read(
+          read,
+          defaultPublicBucket: AppFiles.defaultPublicBucket,
+          defaultPrivateBucket: AppFiles.defaultPrivateBucket,
+        ),
+        sms: AppSmsEnvironment(
+          endpoint: Uri.parse(read.required('SMS_ENDPOINT')),
+          login: read.required('SMS_LOGIN'),
+          password: read.required('SMS_PASSWORD'),
+          sender: read.optional('SMS_SENDER'),
+        ),
+      ));
+
+  final DwServerEnvironment server;
+  final AppSmsEnvironment sms;
+}
+```
+
+- `read.required`, `optional`, `integer(…, fallback:)`, `flag`, `list`; `read.report('…')` for what
+  no single variable shows (two that go together). **Every problem is collected and thrown once**
+  (`DwEnvironmentException`) after the object is built — never a value checked on first use. A text
+  value is never repeated in a problem; a number or flag read with `secret: true` is not either.
+- `bin/server.dart` reads it — `AppEnvironment.read(DwLocalEnvironment.overlay(Platform.environment))`
+  — and hands the sub-configs to the server factory, which passes each to what uses it. `bin/` parses
+  nothing by hand.
+- `Platform.environment` anywhere else in `lib/` is `forbiddenEnvironmentRead`, an error of
+  `dart run dartway_cli:dartway check`: a variable read on first use fails hours after a deploy, and never sees the local overlay.
+
+**Another service's HTTP API is `ctx.http`** — in handlers, jobs, routes and startup steps:
+
+```dart
+final response = await ctx.http.post(
+  sms.endpoint,
+  body: {'login': sms.login, 'psw': sms.password, 'phones': phone, 'mes': text},
+);
+if (!response.isSuccess) throw SmsDeliveryException(response.statusCode);
+```
+
+- `get` / `post` / `put` / `patch` / `delete` / `send`; `json:` for a JSON body, `body:` for text,
+  bytes or a form map; `followRedirects: false` when a header carries a credential.
+- Bounded by `DwServerSettings.outboundTimeout` (30 s) or the call's `timeout:`; logged through
+  `ctx.log` by method, origin, status and time — never path, query, headers or body.
+- Any status is an answer (`DwOutboundResponse`: `statusCode`, `isSuccess`, `body`, `json`); no
+  answer throws `DwOutboundException` (`timedOut`).
+- **No call out inside a transaction**: commit first (`transactional: false`, or a job), then call.
+- `HttpClient(` or `package:http` in `lib/src/` is `forbiddenHttpClient`. A service class that talks
+  to a provider takes `ctx` (or `ctx.http`) per call — not a client of its own, and not a transport
+  parameter threaded through the server factory for tests: the test server fakes `ctx.http` itself
+  (`dartway-testing`).
 
 ## 10. Checks
 

@@ -8,6 +8,7 @@ import '../alerts/dw_server_logger.dart';
 import '../context/dw_call_context.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
+import '../outbound/dw_outbound_http.dart';
 import '../server/dw_runtime.dart';
 import '../server/dw_server_module.dart';
 import 'dw_auth_config.dart';
@@ -1015,6 +1016,9 @@ final class _DetachedContext extends DwCallContext {
 
   @override
   DwFileService get files => _noServer('files');
+
+  @override
+  DwOutboundHttp get http => _noServer('http');
 
   @override
   M module<M extends DwServerModule>() => _noServer('module<$M>()');

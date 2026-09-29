@@ -2,6 +2,13 @@
 
 ## 0.13.0
 
+- **Two new errors in `dartway check`: `forbiddenEnvironmentRead` and `forbiddenHttpClient`**
+  (dartway/dartway#386). `Platform.environment` in a server package's `lib/` outside
+  `lib/src/core/environment.dart`, and `HttpClient(` or an import of `package:http/…` in its
+  `lib/src/`, fail the check: the environment is read once into `AppEnvironment`
+  (`DwEnvironmentReader`), and an outbound request is `ctx.http`. Comments and strings are passed
+  over, interpolations are not; `bin/` and `test/` are not judged. A project with either fails
+  `dartway check` until it moves — see `docs/migrations/2026-09-29-environment-and-outbound-http.md`.
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
   `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature
   law says (dartway/dartway#380). Wording only; no check changed.

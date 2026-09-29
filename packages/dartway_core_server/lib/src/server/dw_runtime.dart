@@ -13,6 +13,7 @@ import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../live/dw_live_connection.dart';
 import '../live/dw_live_hub.dart';
+import '../outbound/dw_outbound_http.dart';
 import 'dw_server_module.dart';
 
 /// What the running parts of a server share: the database, the live hub, the
@@ -30,6 +31,8 @@ final class DwRuntime {
     required this.log,
     required this.jobsFor,
     required this.channelRules,
+    required this.outbound,
+    required this.outboundTimeout,
     this.files,
     List<DwServerModule> modules = const [],
   }) : modules = {for (final module in modules) module.runtimeType: module};
@@ -46,6 +49,12 @@ final class DwRuntime {
   /// Who may read which channel: for subscriptions, and for what a command's
   /// response carries.
   final DwChannelRules channelRules;
+
+  /// What `ctx.http` sends through: the network, or a test's fake.
+  final DwOutboundTransport outbound;
+
+  /// `DwServerSettings.outboundTimeout`.
+  final Duration outboundTimeout;
 
   /// The file storage; `null` when the server has none.
   final DwFileStore? files;
@@ -68,6 +77,8 @@ final class DwRuntime {
     protocol: protocol,
     log: log.scoped(scope),
     jobs: jobsFor,
+    http: (ctx) =>
+        DwOutboundHttp(outbound, log: ctx.log, timeout: outboundTimeout),
     accounts: (ctx) => DwAccountService.ofContext(ctx, this),
     files: (ctx) => files?.serviceFor(ctx) ?? const DwUnconfiguredFiles(),
     modules: modules,

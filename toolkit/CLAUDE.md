@@ -49,7 +49,7 @@ There is no client package: the shared package *is* the client contract, and bot
 
 **Law is what makes it DartWay** — the seven rules above; a project does not override a law. **Default is everything else** here and in the skills — the commit format, the base branch, how a decision is recorded, the language of the project's own texts — and a project may replace it. **Precedence:** a default yields to the project's own root `CLAUDE.md`; a law does not; where both are silent, this file stands. A project records an override in its root `CLAUDE.md`, under "Project conventions", **with the reason** — `.claude/CLAUDE.md` is overwritten on update, and a README beside the code is where an override goes to die.
 
-**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Fifteen checks fail today:
+**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Seventeen checks fail today:
 
 | What it holds | Checks that fail |
 |---|---|
@@ -61,6 +61,7 @@ There is no client package: the shared package *is* the client contract, and bot
 | The contract's names are its wire names (law 5) | `contractNameInvalid` |
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
 | Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
+| One way to the environment and to other services | `forbiddenEnvironmentRead`, `forbiddenHttpClient` |
 
 Ten further checks are warnings and one is a nudge. Anything this table and the types do not hold is a default. Not held yet: the naming law beyond the contract's DTO names, a `DwHttpRoute` the app calls instead of a request, and "done" (only the `featureSpecMissing` warning); `migrationsDrift` needs a Postgres and says when it did not run.
 
@@ -131,16 +132,17 @@ PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commi
 
 **The top level of `lib/` is a closed list:** `__SERVER_PKG__.dart`, `generated/` (**do not edit**) and `src/`. **`src/` is folders only: `core/`, `migrations/`, and one folder per feature** declaring its `DwServerFeature` in `<feature>_feature.dart`. No layer folders (`handlers/`, `rows/`, `domain/`) (`invalidTopLevelLayout`).
 
-- **`core/` has fixed file names, without the project's name:** `auth.dart` (`AppAuth`), `call_context.dart` (the caller and `AppAccess`), `channels.dart` (`AppChannels`), `files.dart` (`AppFiles`, every upload rule), `bootstrap.dart` (`AppBootstrap`), and `push.dart` with push.
+- **`core/` has fixed file names, without the project's name:** `auth.dart` (`AppAuth`), `call_context.dart` (the caller and `AppAccess`), `channels.dart` (`AppChannels`), `files.dart` (`AppFiles`, every upload rule), `bootstrap.dart` (`AppBootstrap`), `environment.dart` (`AppEnvironment`), and `push.dart` with push.
 - **Every file of a feature is `<feature>_*.dart`:** `_feature`, `_rows`, `_handlers`, `_objects` (rows → data objects), `_publications` (what a change is published as, and to whom), `_jobs`. A feature imports another's `_rows`, `_objects` and `_publications`, never its `_handlers`.
 
 - **Handlers:** one per request and command, each with an explicit `DwAccessRule`; commands are transactional — lock the rows a decision depends on before deciding; refuse with `ctx.refuse(<Package>Refusal.…)`; someone else's row does not exist for the caller. Playbook — `dartway-server`.
 - **Rows → data objects in batch**: one query per relation for the whole batch (`findByIds`), never per row; one mapping for reads and publications.
 - **The caller's notions are the project's**: `ctx.profile` and the role come from the `AppCallContext` extension in `core/call_context.dart`, cached with `memo`, read once per call.
 - **Publish what a command changed** to every channel that shows it (`ctx.publish`), through the owning feature's `<feature>_publications.dart`; close removed access with `ctx.revoke`; a request never publishes. A number several features move (the admin dashboard's counters) is published by the feature that owns it, and the others call that publication. Playbooks — `dartway-realtime`, `dartway-access`.
+- **Another service's HTTP API is `ctx.http`** — bounded, logged, faked by the test server (`server.http`); `HttpClient(` or `package:http` in `lib/src/` fails the check (`forbiddenHttpClient`). Playbook — `dartway-server`.
 - **Accounts, identities and session keys are the framework's**: the profile row is created in `onAccountCreated`; a project never queries `dw_*` tables — `ctx.accounts`, `ctx.files` are the surface.
 - **The schema moves by migrations**: row class → `generate` → `dart run bin/migrate.dart create <name>` → review → `check`; an applied migration is never edited. Playbook — `dartway-migrations`.
-- **Configuration is the environment**; secrets are never printed. Locally the entry points overlay `deploy/config.yaml > local` and `deploy/secrets.yaml > local` (git-ignored, never read by you); `dartway secret list --env local` says what is missing.
+- **Configuration is the environment, read once, in `core/environment.dart`**: `AppEnvironment` with `DwServerEnvironment` for the framework's variables and a typed sub-config per concern, read at start (`DwEnvironmentReader`) so a missing variable stops the start; `Platform.environment` anywhere else in `lib/` fails the check (`forbiddenEnvironmentRead`). Secrets are never printed. Locally the entry points overlay `deploy/config.yaml > local` and `deploy/secrets.yaml > local` (git-ignored, never read by you); `dartway secret list --env local` says what is missing.
 
 ## Flutter (`__FLUTTER_PKG__`)
 

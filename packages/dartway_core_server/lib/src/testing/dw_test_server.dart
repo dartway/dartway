@@ -10,6 +10,7 @@ import 'package:dartway_orm/dartway_orm.dart';
 
 import '../context/dw_call_context.dart';
 import '../server/dw_app_server.dart';
+import 'dw_fake_outbound_http.dart';
 
 /// A throwaway database for one test file: created empty, dropped after.
 final class DwTestDatabase {
@@ -65,21 +66,29 @@ final class DwTestDatabase {
 /// wire through [caller] and [openLive], or use the app's own client through
 /// [connectClient].
 final class DwTestServer {
-  DwTestServer._(this.server);
+  DwTestServer._(this.server, this.http);
 
   final DwAppServer server;
+
+  /// What the server's `ctx.http` talks to: records every request and
+  /// answers from the rules the test gives it, and refuses the rest — a test
+  /// server never reaches the network through `ctx.http`.
+  final DwFakeOutboundHttp http;
 
   final List<DwAppClient> _clients = [];
 
   /// Starts [server] on port 0 of the loopback interface, without signal
-  /// handling (the test runner owns the process).
+  /// handling (the test runner owns the process), its outbound requests
+  /// answered by [http].
   static Future<DwTestServer> start(DwAppServer server) async {
+    final http = DwFakeOutboundHttp();
     await server.startOn(
       port: 0,
       address: InternetAddress.loopbackIPv4,
       handleSignals: false,
+      outbound: http,
     );
-    return DwTestServer._(server);
+    return DwTestServer._(server, http);
   }
 
   int get port => server.boundPort;
