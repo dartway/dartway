@@ -80,10 +80,11 @@ final class DwPushService {
       final rows = await db.query(
         'WITH message AS ('
         'INSERT INTO dw_push_message '
-        '(category, title, body, image_url, data, expires_at) '
+        '(category, title, body, image_url, data, expires_at, created_at) '
         'VALUES (@category, @title, @body::text, @image::text, @data::jsonb, '
         '@run_at::timestamptz '
-        '+ @lifetime::int8 * interval \'1 microsecond\') RETURNING id) '
+        '+ @lifetime::int8 * interval \'1 microsecond\', @now::timestamptz) '
+        'RETURNING id) '
         'INSERT INTO dw_push_delivery (message_id, account_id, dedup_key, run_at) '
         'SELECT message.id, account, @dedup::text, @run_at::timestamptz '
         'FROM message, unnest(@accounts::int8[]) AS account '
@@ -97,6 +98,9 @@ final class DwPushService {
           'data': jsonEncode(message.wireData),
           // Due by the server's clock, the one the job covering it runs by.
           'run_at': runAt,
+          // When it was queued, as an eligibility rule reads it
+          // (`DwPushNotice.createdAt`) and compares it with `ctx.now`.
+          'now': _ctx.now,
           'lifetime': life.inMicroseconds,
           'dedup': dedupKey,
           'accounts': accounts,

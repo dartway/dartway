@@ -9,7 +9,9 @@ import 'support/push_harness.dart';
 /// job covering it runs by (D-110): moving a `DwTestClock` sends a scheduled
 /// push and runs a retry, and nothing is sent while it stands.
 void main() {
-  final clock = DwTestClock(DateTime.utc(2026, 9, 29, 8));
+  // Far in the real future: a delivery due by the database's `now()` would
+  // never be due here, so each test fails on two clocks.
+  final clock = DwTestClock(DateTime.utc(2100, 1, 1, 8));
   final harness = usePushHarness(
     clock: clock,
     // A poll far longer than any test: what runs was woken by the clock.
@@ -62,6 +64,24 @@ void main() {
       clock.now(),
       reason: 'finished on the server clock',
     );
+  });
+
+  test('an eligibility rule reads when a message was queued on the server '
+      'clock', () async {
+    final h = harness();
+    final member = await h.member('fcm-token-created');
+    final queuedAt = clock.now();
+    DateTime? seen;
+    h.eligibility = (ctx, notice, accountIds) async {
+      seen = notice.createdAt;
+      expect(ctx.now, queuedAt);
+      return const {};
+    };
+    await h.queue(QueueAlert(recipients: [member.id]));
+    await eventually(
+      () async => (await deliveryOf(member.id))['outcome'] == 'sent',
+    );
+    expect(seen, queuedAt);
   });
 
   test('a retry waits for the clock to pass its backoff, then runs', () async {
