@@ -14,9 +14,9 @@ never sees. Both live in the feature's `<feature>_jobs.dart`:
 
 ```dart
 // lib/src/invoices/invoices_jobs.dart
-abstract final class InvoiceJobs {
+abstract final class InvoicesJobs {
   static const send = DwJobKind<({int invoiceId})>(
-    'invoice.send',
+    'invoices.send',
     encode: _encode,
     decode: _decode,
   );
@@ -26,13 +26,13 @@ abstract final class InvoiceJobs {
       (invoiceId: json['invoiceId']! as int);
 }
 
-final invoiceJobs = <DwJobDefinition>[
+final invoicesJobs = <DwJobDefinition>[
   DwQueuedJob(
-    InvoiceJobs.send,
+    InvoicesJobs.send,
     handle: (ctx, p) async => ctx.log.info('sending invoice ${p.invoiceId}'),
   ),
   DwRecurringJob(
-    'invoice.markOverdue',
+    'invoices.mark_overdue',
     every: const Duration(hours: 1),
     handle: (ctx) => ctx.db.invoices.updateWhere(
       where: (t) =>
@@ -43,7 +43,9 @@ final invoiceJobs = <DwJobDefinition>[
 ];
 ```
 
-passed as that feature's `DwServerFeature(jobs: invoiceJobs)` — there is no app-wide job list. The
+passed as that feature's `DwServerFeature(jobs: invoicesJobs)` — there is no app-wide job list. The
+kinds' class is `<Feature>Jobs`, the list `<feature>Jobs`, and a job's name
+`'<feature>.<snake_case>'`. The
 example's `bookings/bookings_jobs.dart` is a worked one: `BookSession` enqueues a reminder two hours
 before the session, and the job decides when it runs whether the booking is still active.
 
@@ -79,7 +81,7 @@ Future<bool> enqueue<P>(
   String? key,
 });
 
-await ctx.jobs.enqueue(InvoiceJobs.send, (invoiceId: invoice.id!));
+await ctx.jobs.enqueue(InvoicesJobs.send, (invoiceId: invoice.id!));
 ```
 
 - The row is written through `ctx.db`, so **an enqueue joins the enclosing transaction**: inside a

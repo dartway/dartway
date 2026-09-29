@@ -21,12 +21,18 @@ description: >-
 framework's job queue delivers it later and records every outcome in the provider's words. The
 project writes four things: **the category, the payload, who is eligible, and where a tap leads.**
 
-The example does all of it for news: `dartway_example_push_category.dart` and `app_protocol.dart` in
-`example/dartway_example_shared/lib/src/` (category, protocol), `NewsAlert` in `news.dart` (payload),
-`core/push.dart` on the server (eligibility by marketing consent, providers from the environment),
-`PublishNews` in `content_handlers.dart` (the send), `lib/core/push/push_opened_listener.dart` in the
-app (the tap), and `test/push_acceptance_test.dart` / `test/core/push/push_opened_listener_test.dart`.
-Its bookings reminder is a push sent from a job (`bookings/bookings_jobs.dart`). Read them first.
+The framework's example does all of it for news — the category
+([`dartway_example_push_category.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/dartway_example_push_category.dart))
+and the protocol ([`app_protocol.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/app_protocol.dart)), the
+payload (`NewsAlert` in [`news.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/news.dart)), eligibility by
+marketing consent and providers from the environment
+([`core/push.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/core/push.dart)), the send (`PublishNews` in
+[`content_handlers.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/content/content_handlers.dart)), the tap
+([`push_opened_listener.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/core/push/push_opened_listener.dart)),
+and the tests ([`push_acceptance_test.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/push_acceptance_test.dart),
+[`push_opened_listener_test.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/test/core/push/push_opened_listener_test.dart)).
+Its bookings reminder is a push sent from a job
+([`bookings_jobs.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/bookings/bookings_jobs.dart)). Read them first.
 
 The framework's pages: *Push delivery* (server) and *Push notifications* (app) in the DartWay
 documentation.

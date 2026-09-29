@@ -9,7 +9,8 @@ import '../profile/profile_rows.dart';
 /// the commands that enqueue them.
 abstract final class BookingsJobs {
   /// Reminds a member of a session they booked, [reminderLead] before it
-  /// starts — if the booking is still active by then.
+  /// starts — if the booking is still active and the session has not started
+  /// by then.
   static const remind = DwJobKind<({int bookingId})>(
     'bookings.remind',
     encode: _encodeBooking,
@@ -42,6 +43,9 @@ final bookingsJobs = <DwJobDefinition>[
       final booking = await ctx.db.sessionBookings.findById(payload.bookingId);
       if (booking == null || booking.status != BookingStatus.booked) return;
       final session = (await ctx.db.clubSessions.findById(booking.sessionId))!;
+      // A job can run late — the server was down, the queue behind. A
+      // reminder of a session already under way is noise.
+      if (!session.startsAt.isAfter(DateTime.now().toUtc())) return;
       final service = (await ctx.db.clubServices.findById(session.serviceId))!;
       final client = (await ctx.db.userProfiles.findById(
         booking.clientProfileId,

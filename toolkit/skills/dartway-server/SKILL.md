@@ -406,7 +406,9 @@ again in every handler. Access rules built on it — `dartway-access`.
 
 Work that runs later or on a timer is a job, and a job belongs to a feature: its kinds and
 definitions live in `<feature>_jobs.dart`, and the feature declares them —
-`DwServerFeature(jobs: invoicesJobs)`. There is no app-wide job list.
+`DwServerFeature(jobs: invoicesJobs)`. There is no app-wide job list. One naming form everywhere: the class of
+kinds is `<Feature>Jobs` (`InvoicesJobs`), the list `<feature>Jobs` (`invoicesJobs`), and a job's
+name `'<feature>.<snake_case>'` (`'invoices.mark_overdue'`).
 
 ```dart
 // lib/src/invoices/invoices_jobs.dart
@@ -445,11 +447,12 @@ final invoicesJobs = <DwJobDefinition>[
 ];
 ```
 
-The worked example is `example/`'s bookings reminder: `BookSession` enqueues it, the job checks the
-booking is still active when it runs.
+The worked example is the framework example's bookings reminder
+([`bookings_jobs.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/bookings/bookings_jobs.dart)):
+`BookSession` enqueues it, and the job checks the booking is still active when it runs.
 
 Enqueue from a command by the kind, never by a string:
-`await ctx.jobs.enqueue(InvoiceJobs.remind, (invoiceId: id), runAt: …, key: …)`. The payload is
+`await ctx.jobs.enqueue(InvoicesJobs.remind, (invoiceId: id), runAt: …, key: …)`. The payload is
 spelled as a map once, in the kind's codec — never `payload['x']! as int` in a handler.
 The enqueue joins the command's transaction (no row if it rolls back); a `key` deduplicates pending
 jobs. A queued job is transactional by default (the job row disappears exactly when its work commits);
@@ -530,8 +533,9 @@ it. `DwAuthConfig` in `lib/src/`:
     nullable with `ON DELETE SET NULL`, the hook stamps `deletedAt` and clears every personal field
     (name, phone, photo, a test code), the data objects carry `isDeleted`, and the screens say
     "member who left". That is a **tombstone**: what others wrote keeps an author, and the author
-    carries nothing of the person. Worked out in full in `example/` — hook, migration, flag,
-    acceptance test.
+    carries nothing of the person. Worked out in full in the framework's example
+    ([`core/auth.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/core/auth.dart))
+    — hook, migration, flag, acceptance test.
 
   **The server checks this at startup and refuses to start when nobody has.** It follows every
   `ON DELETE CASCADE` from `dw_account` — transitively — and a project table among them with no

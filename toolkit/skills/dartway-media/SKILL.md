@@ -87,8 +87,8 @@ final session = dw.plugins.media.open(
 
 ## 3. The controls: copy, then restyle
 
-Read `example/dartway_example_flutter/lib/ui_kit/3_special/media/` in the framework repository end
-to end, copy what the feature needs into `__FLUTTER_PKG__/lib/ui_kit/3_special/media/`, add the
+Read [`ui_kit/3_special/media/`](https://github.com/dartway/dartway/tree/master/example/dartway_example_flutter/lib/ui_kit/3_special/media) in the framework repository
+end to end, copy what the feature needs into `__FLUTTER_PKG__/lib/ui_kit/3_special/media/`, add the
 `part` lines to `ui_kit.dart`, and restyle there. From then on they are the project's widgets.
 
 | Widget | What it reads and calls |

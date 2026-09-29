@@ -39,7 +39,7 @@ as a `DwUniqueViolation` ([database](database.md#errors)).
 | Field | |
 |---|---|
 | `id` | 12 characters, short enough to read aloud; what the client received as `incidentId` |
-| `where` | where it happened, without payload: `command BookSession`, `job invoice.send (attempt 5 of 5)`, `route POST /echo` |
+| `where` | where it happened, without payload: `command BookSession`, `job invoices.send (attempt 5 of 5)`, `route POST /echo` |
 | `error`, `stackTrace` | the exception |
 | `accountId` | the caller, when a call had one |
 | `at` | UTC |
@@ -114,7 +114,7 @@ abstract interface class DwServerLogger {
 timestamp, level and scope, to stdout below warning and to stderr from warning up, plus the stack
 trace when there is one. Pass another logger as `DwAppServer(logger: …)`.
 
-`ctx.log` is the server's logger scoped to the call — `command BookSession`, `job invoice.send #42`,
+`ctx.log` is the server's logger scoped to the call — `command BookSession`, `job invoices.send #42`,
 `route POST /echo` — so a handler's lines say where they come from without saying it.
 
 **Never log codes, tokens or DTO contents.** The framework logs type names and ids only. A handler
