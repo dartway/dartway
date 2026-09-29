@@ -369,20 +369,20 @@ exit of the server shows the object the same way.
 ## 6. The call context
 
 `DwCallContext` is one per call: `accountId` / `requireAccountId`, `sessionKey`, `db`, `protocol`,
-`now`, `callerUtcOffset` / `callerLocalNow`, `transaction`, `publish`, `revoke`, `refuse`, `jobs`,
+`now`, `callerUtcOffset` / `callerLocalTime`, `transaction`, `publish`, `revoke`, `refuse`, `jobs`,
 `accounts`, `files`, `log`, `memo`.
 
 **The time is `ctx.now`, and only `ctx.now`** — UTC, from the server's clock, in handlers, jobs,
-routes and startup steps alike. `DateTime.now()` in `lib/src/` fails `dart run dartway_cli:dartway check`
+routes and startup steps alike. `DateTime.now()` anywhere in `lib/` fails `dart run dartway_cli:dartway check`
 (`forbiddenDateTimeNow`): tests set the server's clock (`DwTestClock`, `dartway-testing`) and the job
 queue runs by it, so the system clock is a time no test can pin. **The caller's day is
-`ctx.callerLocalNow`**: the app sends its device's UTC offset with every call, so a command never
+`ctx.callerLocalTime`**: the app sends its device's UTC offset with every call, so a command never
 carries an offset field. `ctx.callerUtcOffset` is the `Duration`; both are `null` in jobs and when
-the app sent none. `callerLocalNow` is a UTC `DateTime` whose fields read as the caller's clock —
-take `year`/`month`/`day`/`hour` from it, never store it as an instant; the caller's midnight as an
-instant is `DateTime.utc(l.year, l.month, l.day).subtract(ctx.callerUtcOffset!)`. An offset is not
-a zone: work for a person later (a job at their 8 a.m.) uses an offset the project stored from one
-of their calls — the framework keeps none.
+the app sent none. `callerLocalTime` is a `DwCallerLocalTime` — a reading of the caller's clock
+(`year`, `month`, `day`, `hour`, `minute`, `weekday`), not an instant and not a `DateTime`; its one
+way back to an instant is `startOfDayUtc`, the caller's midnight, for a query over "their today".
+An offset is not a zone: work for a person later (a job at their 8 a.m.) uses an offset the project
+stored from one of their calls — the framework keeps none.
 
 **The project's notions of "the caller" are an extension, cached per call with `memo`** — the
 framework knows an account, the profile and the role are the project's. It is `AppCallContext` in
@@ -682,7 +682,7 @@ call per access rule — `dartway-testing`, `dartway-access`.
 - [ ] Every object a command changed is published to every channel that shows it (`dartway-realtime`).
 - [ ] No SQL on `dw_*` tables; accounts through `DwAccountService`.
 - [ ] A new profile is created in `onAccountCreated`, in the account's transaction.
-- [ ] Time is `ctx.now`; the caller's local day is `ctx.callerLocalNow`, never an offset field on a
-      command.
+- [ ] Time is `ctx.now`; the caller's local day is `ctx.callerLocalTime`, never an offset field on
+      a command.
 - [ ] Row class changed → `dart run dartway_cli:dartway generate`, migration drafted and reviewed.
 - [ ] `dart run dartway_cli:dartway test` and `dart run dartway_cli:dartway check` pass.

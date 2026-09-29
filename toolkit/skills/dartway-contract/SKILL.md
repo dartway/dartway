@@ -195,7 +195,7 @@ from the fields) and keeps it live. So:
 
 - **everything that changes the answer is a field.** A status filter, a search string, a page, a
   date. "Today" is a `DateTime day` field the widget fills in — not `ctx.now` or
-  `ctx.callerLocalNow` in the handler, which would answer differently for two equal requests;
+  `ctx.callerLocalTime` in the handler, which would answer differently for two equal requests;
 - **the caller is not a field.** "My" requests carry no account or profile id: the handler reads the
   caller from its context, and the client already keeps state per signed-in account. A field holding
   the caller's own id is a field anyone can change to someone else's (`dartway-access`);

@@ -124,9 +124,16 @@ clock.moveTo(DateTime.utc(2026, 9, 30, 10, 5)); // the queue fell behind
 // the reminder runs, sees the session already started, and sends nothing
 ```
 
-The example's `test/push_acceptance_test.dart` does exactly this. What the framework stamps in the
+The example's `test/push_acceptance_test.dart` does exactly this. A clock that stands still has a
+consequence: a retry after its backoff, a non-transactional job's expired lease and a recurring
+job's next run wait until the test moves the clock past them. What the framework stamps in the
 database itself — `created_at`, session keys and sign-in codes with their expiry, command outcomes —
-stays on the database's clock.
+stays on the database's clock and keeps real time.
+
+Modules that queue work of their own keep it on the same clock: push deliveries are due, leased,
+retried and finished by it ([push delivery](push-delivery.md)), so the job covering a delivery never
+runs before the delivery is due. A clock of a project's own is a `DwServerClock` — `now()`, and
+`jumps`, the event a server wakes its job executor on.
 
 ### Transactional jobs (the default)
 

@@ -201,7 +201,7 @@ One context per call. Everything a handler may touch is on it.
 | `protocol` | the `DwWireProtocol` (for `DwDeletedObject.of<T>(id, ctx.protocol)`) |
 | `now` | the current instant, UTC, from the server's clock — the one way server code reads the time ([below](#time-ctxnow-and-the-callers-offset)) |
 | `callerUtcOffset` | the caller's UTC offset as its app sent it, a `Duration`, or `null` when unknown |
-| `callerLocalNow` | `now` on the caller's wall clock, or `null` when the offset is unknown |
+| `callerLocalTime` | a `DwCallerLocalTime`: what the caller's clock reads now — date, hour, weekday, the instant their day began — or `null` when the offset is unknown |
 | `transaction(body)` | runs `body` in a transaction, a savepoint when already inside one; publications, revocations and jobs made inside take effect only if it commits |
 | `publish(channel, item)` | sends a data object or a `DwDeletedObject` to a channel after commit ([channels](../2-core/channels-and-realtime.md)) |
 | `revoke(channel, accountId)` | closes an account's subscriptions to a channel after commit |
@@ -218,27 +218,28 @@ One context per call. Everything a handler may touch is on it.
 default — on every access, in UTC, the same way in a handler, a job, a route, a channel rule and a
 startup step. A test gives the server a `DwTestClock` and sets or moves it; the job queue decides due
 times by the same clock, so a job enqueued for tomorrow runs when the test moves the clock to
-tomorrow ([jobs](jobs.md#time-is-the-servers-clock)). `DateTime.now()` in a server's `lib/src/` is
+tomorrow ([jobs](jobs.md#time-is-the-servers-clock)). `DateTime.now()` anywhere in a server's `lib/` is
 refused by `dart run dartway_cli:dartway check` (`forbiddenDateTimeNow`): a time no test can set, and one that disagrees
 with the job queue the moment a test moves the clock.
 
 **The caller's offset travels with every call.** The app reads its device's UTC offset at each call
 and sends it as `Dw-Utc-Offset`, whole minutes east of UTC
 ([the wire](../2-core/wire-and-versions.md#a-call)); the handler reads `ctx.callerUtcOffset`, and
-`ctx.callerLocalNow` for the caller's wall clock — `year`, `month`, `day` are the caller's date,
-`hour` their hour:
+`ctx.callerLocalTime` for what the caller's clock reads — `year`, `month`, `day`, `hour`, `minute`,
+`weekday`, and `startOfDayUtc`, the instant their day began:
 
 ```dart
-final local = ctx.callerLocalNow;
+final local = ctx.callerLocalTime;
 if (local == null) ctx.refuse(DwCoreRefusal.invalid);   // an app too old to send it
-final today = DateTime.utc(local.year, local.month, local.day);
-// The caller's midnight as an instant, for a query over "today":
-final dayStart = today.subtract(ctx.callerUtcOffset!);
+// "The caller's today" as instants, for a query:
+final from = local.startOfDayUtc;
+final to = from.add(const Duration(days: 1));
 ```
 
-`callerLocalNow` is a UTC `DateTime` whose fields read as the caller's clock, not an instant: never
-store it or compare it with one. A command does not carry the offset as a field of its own — the
-framework already does.
+`DwCallerLocalTime` is a reading, not an instant, and deliberately not a `DateTime`: a `DateTime`
+holding local fields would pass for an instant in a DTO field, a `timestamptz` column or `isBefore`
+and be wrong by the offset each time. `startOfDayUtc` is its one way back to an instant. A command
+does not carry the offset as a field of its own — the framework already does.
 
 It is `null` wherever no device stands behind the context: in jobs, routes, startup steps, channel
 subscription checks and `DwAppServer.callAs`, and on a call from an app that sent none. It is an

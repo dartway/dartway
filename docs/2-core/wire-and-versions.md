@@ -165,6 +165,6 @@ encoding while the version is still the one it was recorded at — it follows a 
 replace one.
 
 What an installed app may simply not send is not such a change. `Dw-Utc-Offset` was added without a
-bump (D-109): an older build sends no header and its caller's offset is unknown, a newer build's
+bump (D-110): an older build sends no header and its caller's offset is unknown, a newer build's
 header is ignored by an older server — neither side meets a body it cannot read. The header is
 recorded as a shape of its own (`http.utcOffset`), not by changing an existing one.

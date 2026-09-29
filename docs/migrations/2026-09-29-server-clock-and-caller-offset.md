@@ -8,7 +8,8 @@ affects:
 ## Who is affected
 
 Every project whose server reads `DateTime.now()` (or `DateTime.timestamp()`, or `clock.now()` of
-`package:clock`) in `lib/src/`: `dart run dartway_cli:dartway check` fails on it now (`forbiddenDateTimeNow`). And every
+`package:clock`) anywhere in `lib/` — the factory file beside `src/` included:
+`dart run dartway_cli:dartway check` fails on it now (`forbiddenDateTimeNow`). And every
 project whose commands carry the caller's UTC offset as a field of their own.
 
 ## What to change
@@ -45,6 +46,19 @@ keeping the clock on the harness. A test that rewrote `dw_job.run_at` or a row's
 due moves the clock instead: `harness.clock.moveTo(…)` wakes the job executor, and the job's handler
 sees the moved time. Times a test sets up (a session "tomorrow") read `harness.clock.now()`.
 
+**What a clock that stands still changes in a suite.** `ctx.now` answers the same instant until the
+test moves it, and the job queue runs by it. So a job's retry after its backoff, a push retry, a
+non-transactional job's expired lease and a recurring job's next run no longer happen by waiting:
+a test that waited for one (`eventually(…)` over a failed attempt) moves the clock past it —
+`harness.clock.advance(const Duration(minutes: 1))`. What the database stamps itself keeps real
+time: `created_at` columns, session keys, sign-in codes and their expiry. A test comparing one of
+those with `ctx.now` compares two clocks — assert on what the server's clock stamped instead.
+
+**The caller's offset in tests is pinned to zero.** The test server's callers and clients report
+`DwTestServer.utcOffset`, `Duration.zero` unless the test sets it (`server.utcOffset = …`, or
+`connectClient(utcOffset: …)`), not the zone of the machine the suite runs on. A test that relied
+on the machine's zone sets the offset it means.
+
 **Drop the hand-carried offset.** The app now sends the device's UTC offset with every call; the
 handler reads it:
 
@@ -55,7 +69,12 @@ handler reads it:
 
     - final offset = Duration(minutes: command.utcOffsetMinutes);
     + final offset = ctx.callerUtcOffset;           // Duration?, null when the app sent none
-    + final localNow = ctx.callerLocalNow;          // the caller's wall clock: year/month/day/hour
+    + final local = ctx.callerLocalTime;            // DwCallerLocalTime?: year/month/day/hour/weekday
+    + final dayStart = local?.startOfDayUtc;        // the instant the caller's day began
+
+A helper that shifted `DateTime.now()` by the offset to read the local date is replaced by
+`ctx.callerLocalTime`, which is a reading, not a `DateTime`: take its fields, and `startOfDayUtc`
+when a query needs the instant.
 
 Remove the field from the DTO and from the widget that filled it (a helper that stamped the device
 offset on each command goes with it), then `dart run dartway_cli:dartway generate`. Decide what a

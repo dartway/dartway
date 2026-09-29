@@ -157,7 +157,15 @@ tearDownAll(() async {
   every `ctx.now` answers it, and a job is due when it passes the job's `runAt` — a reminder due
   tomorrow is tested by moving the clock to tomorrow, never by rewriting `dw_job` or waiting. Times a
   test sets up (a session starting "tomorrow") are `harness.clock.now().add(…)`, not
-  `DateTime.now()`.
+  `DateTime.now()`. A clock that stands still also holds back a job retry, a push retry and a
+  recurring job until the test moves it; what the database stamps (`created_at`, session and code
+  expiry) keeps real time.
+- **The caller's offset is pinned, zero by default.** Every `server.caller()` and
+  `server.connectClient()` reports `DwTestServer.utcOffset` (`Duration.zero`) as the device's
+  offset, so `ctx.callerUtcOffset` and `ctx.callerLocalTime` do not depend on the zone of the machine
+  the suite runs on. A test about someone else's day sets `server.utcOffset = …`, or passes
+  `connectClient(utcOffset: …)`; `headers: {DwHttpContract.utcOffsetHeader: null}` on a raw call
+  sends none, as an app too old to send it would. `DwAppServer.callAs` never carries one.
 - **Tests in one file share the database**, so each test creates its own members with distinct
   identifiers and asserts on what it created — never on table-wide counts it did not set up.
 
