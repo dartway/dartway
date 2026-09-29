@@ -13,6 +13,7 @@ import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../live/dw_live_connection.dart';
 import '../live/dw_live_hub.dart';
+import 'dw_server_clock.dart';
 import 'dw_server_module.dart';
 
 /// What the running parts of a server share: the database, the live hub, the
@@ -30,6 +31,7 @@ final class DwRuntime {
     required this.log,
     required this.jobsFor,
     required this.channelRules,
+    this.clock = DwServerClock.system,
     this.files,
     List<DwServerModule> modules = const [],
   }) : modules = {for (final module in modules) module.runtimeType: module};
@@ -47,6 +49,9 @@ final class DwRuntime {
   /// response carries.
   final DwChannelRules channelRules;
 
+  /// The server's clock: `ctx.now`, and the job queue's due times.
+  final DwServerClock clock;
+
   /// The file storage; `null` when the server has none.
   final DwFileStore? files;
 
@@ -62,6 +67,7 @@ final class DwRuntime {
     void Function(DwRuntimeContext ctx)? deliverOnCommit,
     String? clientAppVersion,
     String? clientUserAgent,
+    Duration? callerUtcOffset,
   }) => DwRuntimeContext(
     db: db ?? this.db,
     kind: kind,
@@ -77,6 +83,8 @@ final class DwRuntime {
     deliverOnCommit: deliverOnCommit,
     clientAppVersion: clientAppVersion,
     clientUserAgent: clientUserAgent,
+    clock: clock,
+    callerUtcOffset: callerUtcOffset,
   );
 
   /// Delivers the committed effects of [ctx], whose caller hears them over

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- **Every call carries the device's UTC offset** (`Dw-Utc-Offset`), read at each send, so a change
+  of zone or of daylight saving time reaches the server with the next call; the server reads it as
+  `ctx.callerUtcOffset` (dartway/dartway#385).
+
 ## 0.21.0-dev.8
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#355, #356).

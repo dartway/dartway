@@ -104,7 +104,7 @@ Future<Map<int, DwPushDecision>> appPushEligibility(
     for (final s in settings)
       if (!s.allows(notice.categoryIn(AcmePushCategory.values)))
         s.accountId: DwPushDecision.skip
-      else if (s.quietUntil(DateTime.now()) case final end?)
+      else if (s.quietUntil(ctx.now) case final end?)
         s.accountId: DwPushDecision.delayUntil(end),
   };
 }

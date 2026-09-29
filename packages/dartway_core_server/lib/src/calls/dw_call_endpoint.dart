@@ -128,9 +128,13 @@ final class DwCallEndpoint {
         await _runRequest(
           handler,
           request,
-          handler.prepare(request, page ?? DwPageQuery.parse(request, const {})),
+          handler.prepare(
+            request,
+            page ?? DwPageQuery.parse(request, const {}),
+          ),
           session,
           name,
+          null,
         ),
       (DwActionCommand<Object?> command, DwCommandHandler handler) =>
         await _runCommand(
@@ -141,6 +145,7 @@ final class DwCallEndpoint {
           null,
           name,
           (null, null),
+          null,
         ),
       _ => throw StateError('$name is handled by $handler'),
     };
@@ -194,6 +199,24 @@ final class DwCallEndpoint {
           error,
         );
       }
+    }
+
+    // Optional: an app that does not send it has an unknown offset. One that
+    // sends something else has a bug worth hearing about now.
+    final Duration? callerUtcOffset;
+    switch (_header(http, DwHttpContract.utcOffsetHeader)) {
+      case null:
+        callerUtcOffset = null;
+      case final sent:
+        try {
+          callerUtcOffset = DwHttpContract.parseUtcOffset(sent);
+        } on FormatException catch (error) {
+          _malformed(
+            path,
+            'the ${DwHttpContract.utcOffsetHeader} header',
+            error,
+          );
+        }
     }
 
     // 2. Shape.
@@ -272,7 +295,14 @@ final class DwCallEndpoint {
     // 4 and 5.
     return switch ((call, handler)) {
       (DwDataRequest<Object?> request, DwRequestHandler handler) =>
-        await _runRequest(handler, request, prepared, session, name),
+        await _runRequest(
+          handler,
+          request,
+          prepared,
+          session,
+          name,
+          callerUtcOffset,
+        ),
       (DwActionCommand<Object?> command, DwCommandHandler handler) =>
         await _runCommand(
           handler,
@@ -282,6 +312,7 @@ final class DwCallEndpoint {
           liveConnectionId,
           name,
           (appVersion, _header(http, HttpHeaders.userAgentHeader)),
+          callerUtcOffset,
         ),
       _ => throw StateError('unreachable'),
     };
@@ -293,12 +324,14 @@ final class DwCallEndpoint {
     Object? prepared,
     DwSessionKeyInfo? session,
     String name,
+    Duration? callerUtcOffset,
   ) async {
     final where = 'request $name';
     final ctx = runtime.context(
       scope: where,
       kind: DwContextKind.request,
       sessionKey: session,
+      callerUtcOffset: callerUtcOffset,
     );
     try {
       _requireSignIn(handler.access, ctx);
@@ -318,6 +351,7 @@ final class DwCallEndpoint {
     String? liveConnectionId,
     String name,
     (String?, String?) client,
+    Duration? callerUtcOffset,
   ) async {
     final where = 'command $name';
     final accountId = session?.accountId;
@@ -327,6 +361,7 @@ final class DwCallEndpoint {
       sessionKey: session,
       clientAppVersion: client.$1,
       clientUserAgent: client.$2,
+      callerUtcOffset: callerUtcOffset,
     );
     DwApiResponse response;
     try {
@@ -370,7 +405,14 @@ final class DwCallEndpoint {
     _requireSignIn(handler.access, ctx);
     _validate(command);
     if (!handler.transactional) {
-      return _runNonTransactional(handler, command, key, accountId, ctx, typeName);
+      return _runNonTransactional(
+        handler,
+        command,
+        key,
+        accountId,
+        ctx,
+        typeName,
+      );
     }
     try {
       for (var attempt = 1; ; attempt++) {
@@ -671,7 +713,6 @@ final class DwCallEndpoint {
       DwApiResponse.failed(incident, failure: DwFailureKind.malformedCall),
     );
   }
-
 }
 
 final class _Rejected implements Exception {

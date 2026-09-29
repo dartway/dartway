@@ -28,12 +28,16 @@ abstract final class DartwayStarterServer {
   ///
   /// With [storage] the server takes uploads by [AppFiles.uploadRules] and checks both
   /// buckets as it starts; without it, it runs and has no files.
+  ///
+  /// [clock] is the time every handler and job reads as `ctx.now` — the
+  /// system's, unless a test sets its own (`DwTestClock`).
   static DwAppServer build({
     required DwDatabaseConfig database,
     DwFileStorageConfig? storage,
     int port = 8080,
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
+    DwServerClock clock = DwServerClock.system,
   }) => DwAppServer(
     protocol: appProtocol,
     schema: dartwayStarterSchema,
@@ -49,5 +53,6 @@ abstract final class DartwayStarterServer {
     files: storage == null ? null : AppFiles.storage(storage),
     port: port,
     settings: settings,
+    clock: clock,
   );
 }

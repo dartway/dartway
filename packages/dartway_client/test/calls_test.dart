@@ -24,6 +24,12 @@ void main() {
       expect(call.headers['dw-protocol'], '$dwProtocolVersion');
       expect(call.headers['dw-app-version'], '1.0.0+1');
       expect(call.headers['content-type'], DwHttpContract.jsonContentType);
+      // The device's offset now, as the server reads it for
+      // `ctx.callerUtcOffset`.
+      expect(
+        call.headers['dw-utc-offset'],
+        '${DateTime.now().timeZoneOffset.inMinutes}',
+      );
       expect(call.authorization, 'Bearer token-7');
       expect(call.idempotencyKey, isNull, reason: 'forbidden for requests');
       expect(call.query, isEmpty);

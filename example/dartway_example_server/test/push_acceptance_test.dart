@@ -115,7 +115,7 @@ void main() {
     final session = await club.db.clubSessions.insert(
       ClubSessionRow(
         serviceId: service.id!,
-        startsAt: DateTime.now().add(const Duration(days: 1)),
+        startsAt: club.clock.now().add(const Duration(days: 1)),
         capacity: 5,
       ),
     );
@@ -153,12 +153,10 @@ void main() {
       isTrue,
     );
 
-    // The time comes: both jobs run, and only the active booking reminds.
+    // The time comes — the server's clock reaches it, which wakes the jobs:
+    // both run, and only the active booking reminds.
     final before = fcm.sends.length;
-    await club.db.execute(
-      "UPDATE dw_job SET run_at = now() WHERE name = 'bookings.remind'",
-    );
-    await club.db.query("SELECT pg_notify('dw_jobs', '')");
+    club.clock.moveTo(queued.first['runAt']! as DateTime);
     await dwWaitUntil(() async => (await reminders()).isEmpty);
     await dwWaitUntil(() => fcm.sends.length > before);
     await Future<void>.delayed(const Duration(milliseconds: 300));
@@ -166,45 +164,41 @@ void main() {
     expect(reminder.token, 'keeps-device');
     expect((reminder.message['notification']! as Map)['title'], 'Morning yoga');
   });
-  test('a reminder that runs after its session started sends nothing', () async {
-    final service = await club.db.clubServices.insert(
-      const ClubServiceRow(
-        title: 'Evening stretch',
-        description: 'Mats provided',
-        durationMinutes: 45,
-        price: 1200,
-      ),
-    );
-    final session = await club.db.clubSessions.insert(
-      ClubSessionRow(
-        serviceId: service.id!,
-        startsAt: DateTime.now().add(const Duration(days: 1)),
-        capacity: 5,
-      ),
-    );
-    final late = await club.signUp('+7 999 100 00 07', firstName: 'Igor');
-    await registerDevice(late, 'late-device');
-    final booking = (await late.client.command(
-      BookSession(sessionId: session.id!),
-    )).valueOrThrow;
+  test(
+    'a reminder that runs after its session started sends nothing',
+    () async {
+      final service = await club.db.clubServices.insert(
+        const ClubServiceRow(
+          title: 'Evening stretch',
+          description: 'Mats provided',
+          durationMinutes: 45,
+          price: 1200,
+        ),
+      );
+      final session = await club.db.clubSessions.insert(
+        ClubSessionRow(
+          serviceId: service.id!,
+          startsAt: club.clock.now().add(const Duration(days: 1)),
+          capacity: 5,
+        ),
+      );
+      final late = await club.signUp('+7 999 100 00 07', firstName: 'Igor');
+      await registerDevice(late, 'late-device');
+      final booking = (await late.client.command(
+        BookSession(sessionId: session.id!),
+      )).valueOrThrow;
 
-    // The queue fell behind: by the time the job runs, the session is on.
-    await club.db.clubSessions.update(
-      session.copyWith(
-        startsAt: DateTime.now().subtract(const Duration(minutes: 5)),
-      ),
-    );
-    final before = fcm.sends.length;
-    await club.db.execute(
-      "UPDATE dw_job SET run_at = now() WHERE key = 'bookings.remind:${booking.id}'",
-    );
-    await club.db.query("SELECT pg_notify('dw_jobs', '')");
-    await dwWaitUntil(
-      () async => (await club.db.query(
-        "SELECT 1 FROM dw_job WHERE key = 'bookings.remind:${booking.id}'",
-      )).isEmpty,
-    );
-    await Future<void>.delayed(const Duration(milliseconds: 300));
-    expect(fcm.sends, hasLength(before));
-  });
+      // The queue fell behind — the server was down past the reminder's time:
+      // by the time the job runs, the session is on.
+      final before = fcm.sends.length;
+      club.clock.moveTo(session.startsAt.add(const Duration(minutes: 5)));
+      await dwWaitUntil(
+        () async => (await club.db.query(
+          "SELECT 1 FROM dw_job WHERE key = 'bookings.remind:${booking.id}'",
+        )).isEmpty,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(fcm.sends, hasLength(before));
+    },
+  );
 }

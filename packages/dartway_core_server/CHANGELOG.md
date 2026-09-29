@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- **BREAKING: `ctx.now` — the server's clock — is the time, and `DwTestClock` sets it in tests
+  (dartway/dartway#385, D-109).** `DwAppServer(clock:)` takes a `DwServerClock`
+  (`DwServerClock.system` by default); every context reads it as `ctx.now` (UTC, read anew on each
+  access) — handlers, jobs, routes, channel rules, startup steps, `runInContext`. The job queue runs
+  by the same clock rather than the database's `now()`: a job's default `runAt`, whether it is due,
+  its retry backoff, a non-transactional job's lease, `failed_at`, and a recurring job's schedule.
+  `DwTestClock(at)` (in `testing.dart`) stands still until the test calls `advance`/`moveTo`, and each
+  move wakes the job executor, so a job due tomorrow is tested by moving the clock to tomorrow.
+  `DwCallContext` gains abstract `now` and `callerUtcOffset`: a class implementing it (a test double)
+  has to add them. Migration note: `docs/migrations/2026-09-29-server-clock-and-caller-offset.md`.
+- **`ctx.callerUtcOffset` and `ctx.callerLocalNow`: the caller's UTC offset, carried by the
+  framework.** A call's `Dw-Utc-Offset` header (whole minutes, within 18 hours) becomes
+  `ctx.callerUtcOffset` on requests and commands; `callerLocalNow` is `now` on the caller's wall
+  clock. Both are `null` when the header is absent and in contexts with no device behind them (jobs,
+  routes, startup steps, subscription checks, `callAs`); a malformed header is a malformed call
+  (`400`). An offset, not a time zone: nothing is stored. `DwTestCaller` sends the machine's offset
+  like the client does; `headers: {DwHttpContract.utcOffsetHeader: null}` leaves it out.
+
 ## 0.21.0-dev.8
 
 - **`DwAppServer.handlers` and `.jobs` now include modules' calls and jobs, not just features'**

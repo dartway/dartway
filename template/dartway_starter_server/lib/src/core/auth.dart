@@ -149,7 +149,7 @@ abstract final class AppAuth {
     int accountId,
     DwAccountOrigin origin,
   ) async {
-    final now = DateTime.now().toUtc();
+    final now = ctx.now;
     switch (origin) {
       case DwSignInOrigin(:final registration):
         if (!await AppAuth.isSignUpEnabled(ctx.db)) {

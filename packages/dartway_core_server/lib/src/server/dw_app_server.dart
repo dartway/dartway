@@ -27,6 +27,8 @@ import '../live/dw_live_hub.dart';
 import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
 import '../routes/dw_http_route.dart';
+import '../testing/dw_test_clock.dart';
+import 'dw_server_clock.dart';
 import 'dw_server_feature.dart';
 import 'dw_runtime.dart';
 import 'dw_server_module.dart';
@@ -77,6 +79,7 @@ final class DwAppServer {
     DwAlertSink? alerts,
     this.logger = const DwConsoleLogger(),
     this.settings = const DwServerSettings(),
+    this.clock = DwServerClock.system,
   }) : address = address ?? InternetAddress.anyIPv4,
        alerts = alerts ?? DwLogAlertSink(logger);
 
@@ -110,6 +113,7 @@ final class DwAppServer {
   final String? migrationsDirectory;
   final DwDatabaseConfig database;
   final DwAuthConfig auth;
+
   /// The project's areas: every call, channel rule, job and route it has
   /// comes from one of them. See [DwServerFeature].
   final List<DwServerFeature> features;
@@ -178,6 +182,13 @@ final class DwAppServer {
   final DwAlertSink alerts;
   final DwServerLogger logger;
   final DwServerSettings settings;
+
+  /// Where the server reads the current instant: `ctx.now` in every context,
+  /// and the job queue's due times — a job's default `runAt`, when it is
+  /// due, its retries and leases, the schedule of recurring jobs. The
+  /// system's clock by default; a `DwTestClock` in a test that pins or moves
+  /// time, which also wakes the job executor when it moves.
+  final DwServerClock clock;
 
   _DwRunning? _running;
   bool _stopping = false;
@@ -356,22 +367,22 @@ final class DwAppServer {
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),
         channelRules: DwChannelRules(channels),
+        clock: clock,
         files: fileStore,
         modules: modules,
       );
       final authService = DwAuthService(runtime);
       runner = jobRunner = DwJobRunner(
         runtime: runtime,
-        definitions: [
-          ...jobs,
-          _cleanupJob(),
-          ...?fileStore?.jobs(),
-        ],
+        definitions: [...jobs, _cleanupJob(), ...?fileStore?.jobs()],
         listen: openedDatabase.listen,
         workers: settings.jobWorkers,
         pollInterval: settings.jobPollInterval,
       );
       await runner.start();
+      if (clock case final DwTestClock testClock) {
+        testClock.addListener(runner.wake);
+      }
 
       // After the job runner, so a step may enqueue; before the front binds,
       // so nothing has been served when it runs. A throw leaves the start in
@@ -432,6 +443,9 @@ final class DwAppServer {
       }
       logger.info('DartWay server listening on port ${front.port}');
     } catch (_) {
+      if (clock case final DwTestClock testClock) {
+        if (jobRunner != null) testClock.removeListener(jobRunner.wake);
+      }
       await front?.close();
       await jobRunner?.stop();
       await openedDatabase?.close();
@@ -461,6 +475,9 @@ final class DwAppServer {
         for (final connection in connections)
           connection.close(DwCloseCode.serverStopping, 'dw.serverStopping'),
       ]);
+      if (clock case final DwTestClock testClock) {
+        testClock.removeListener(running.jobRunner.wake);
+      }
       await running.jobRunner.stop().timeout(
         settings.stopTimeout,
         onTimeout: () => logger.warning('jobs still running at stop timeout'),

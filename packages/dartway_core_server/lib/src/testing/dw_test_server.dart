@@ -305,6 +305,9 @@ final class DwTestCaller {
       if (call is DwActionCommand<Object?>)
         DwHttpContract.idempotencyKeyHeader: key ?? newKey(),
       DwHttpContract.liveConnectionHeader: ?liveConnection,
+      DwHttpContract.utcOffsetHeader: DwHttpContract.utcOffsetValue(
+        DateTime.now().timeZoneOffset,
+      ),
       ...headers,
     },
     body: body ?? utf8.encode(jsonEncode(call.toJson())),

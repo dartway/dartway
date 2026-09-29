@@ -152,6 +152,12 @@ tearDownAll(() async {
   it with the **same factory `bin/server.dart` uses**, overriding only what a test must: the database,
   the storage, and the auth config's code delivery (capture the codes instead of printing them) and
   resend delay. A server assembled separately for tests drifts from the one that ships.
+- **Time is the harness's clock.** The factory takes `clock:`, and the harness passes a
+  `DwTestClock` that stands still until the test moves it (`harness.clock.advance(…)`, `moveTo(…)`):
+  every `ctx.now` answers it, and a job is due when it passes the job's `runAt` — a reminder due
+  tomorrow is tested by moving the clock to tomorrow, never by rewriting `dw_job` or waiting. Times a
+  test sets up (a session starting "tomorrow") are `harness.clock.now().add(…)`, not
+  `DateTime.now()`.
 - **Tests in one file share the database**, so each test creates its own members with distinct
   identifiers and asserts on what it created — never on table-wide counts it did not set up.
 

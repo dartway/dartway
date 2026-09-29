@@ -39,15 +39,16 @@ final class DwContextJobQueue implements DwJobQueue {
     // transaction is delivered at its commit, and not at all on rollback.
     final rows = await _ctx.db.query(
       "WITH inserted AS (INSERT INTO dw_job (name, payload, key, run_at) "
-      "VALUES (@name, @payload::jsonb, @key::text, "
-      "COALESCE(@run_at::timestamptz, now())) "
+      "VALUES (@name, @payload::jsonb, @key::text, @run_at::timestamptz) "
       "ON CONFLICT (key) WHERE failed_at IS NULL DO NOTHING RETURNING id) "
       "SELECT id, pg_notify('$dwJobNotifyChannel', '') FROM inserted",
       params: {
         'name': name,
         'payload': encoded,
         'key': key,
-        'run_at': runAt?.toUtc(),
+        // Due now by the server's clock, not the database's: a test that
+        // moves the clock moves when the job runs.
+        'run_at': runAt?.toUtc() ?? _ctx.now,
       },
     );
     return rows.isNotEmpty;
@@ -86,7 +87,8 @@ final class DwJobRunner {
     required this.workers,
     required this.pollInterval,
   }) : queued = {
-         for (final d in definitions.whereType<DwQueuedJob<Object?>>()) d.name: d,
+         for (final d in definitions.whereType<DwQueuedJob<Object?>>())
+           d.name: d,
        },
        recurring = {
          for (final d in definitions.whereType<DwRecurringJob>()) d.name: d,
@@ -104,6 +106,11 @@ final class DwJobRunner {
 
   DwServerLogger get _log => runtime.log;
   DwDatabaseHandle get _db => runtime.db;
+
+  /// Every due time of the queue is read against the server's clock rather
+  /// than the database's `now()`, so a job is due exactly when `ctx.now` —
+  /// what its handler decides by — says it is.
+  DateTime get _now => runtime.clock.now();
 
   static const _contendedRetry = Duration(milliseconds: 250);
 
@@ -164,11 +171,15 @@ final class DwJobRunner {
       // run already due.
       await _db.execute(
         'INSERT INTO dw_recurring_job (name, every_micros, next_run_at) '
-        'VALUES (@name, @every::int8, now()) '
+        'VALUES (@name, @every::int8, @now::timestamptz) '
         'ON CONFLICT (name) DO UPDATE SET every_micros = EXCLUDED.every_micros, '
         'next_run_at = LEAST(dw_recurring_job.next_run_at, '
-        'now() + EXCLUDED.every_micros * interval \'1 microsecond\')',
-        params: {'name': job.name, 'every': job.every.inMicroseconds},
+        '@now::timestamptz + EXCLUDED.every_micros * interval \'1 microsecond\')',
+        params: {
+          'name': job.name,
+          'every': job.every.inMicroseconds,
+          'now': _now,
+        },
       );
     }
     final removed = await _db.query(
@@ -216,9 +227,13 @@ final class DwJobRunner {
       '(SELECT min(GREATEST(run_at, COALESCE(locked_until, run_at))) '
       'FROM dw_job WHERE failed_at IS NULL AND name = ANY(@queued::text[])), '
       '(SELECT min(next_run_at) FROM dw_recurring_job '
-      'WHERE name = ANY(@recurring::text[]))) - now()))::float8 '
+      'WHERE name = ANY(@recurring::text[]))) - @now::timestamptz))::float8 '
       'AS seconds',
-      params: {'queued': _queuedNames, 'recurring': _recurringNames},
+      params: {
+        'queued': _queuedNames,
+        'recurring': _recurringNames,
+        'now': _now,
+      },
     )).single;
     final seconds = row['seconds'] as double?;
     if (seconds == null) return pollInterval;
@@ -231,13 +246,14 @@ final class DwJobRunner {
 
   Future<bool> _runRecurring() async {
     late DwRuntimeContext ctx;
+    final now = _now;
     final ran = await _db.transaction((tx) async {
       final rows = await tx.query(
-        'SELECT name, every_micros, next_run_at, now() AS now '
-        'FROM dw_recurring_job WHERE next_run_at <= now() '
+        'SELECT name, every_micros, next_run_at '
+        'FROM dw_recurring_job WHERE next_run_at <= @now::timestamptz '
         'AND name = ANY(@recurring::text[]) '
         'ORDER BY next_run_at LIMIT 1 FOR UPDATE SKIP LOCKED',
-        params: {'recurring': _recurringNames},
+        params: {'recurring': _recurringNames, 'now': now},
       );
       if (rows.isEmpty) return false;
       final row = rows.single;
@@ -245,7 +261,6 @@ final class DwJobRunner {
       final job = recurring[name]!;
       final every = Duration(microseconds: row.get<int>('every_micros'));
       final due = row.get<DateTime>('next_run_at');
-      final now = row.get<DateTime>('now');
       // The first slot of the schedule after now: a long outage runs the job
       // once, not once per missed slot.
       final missed = now.difference(due).inMicroseconds ~/ every.inMicroseconds;
@@ -260,8 +275,9 @@ final class DwJobRunner {
         await ctx.transaction((_) => job.handle(ctx));
         await tx.execute(
           'UPDATE dw_recurring_job SET next_run_at = @next, '
-          'last_run_at = now(), last_error = NULL WHERE name = @name',
-          params: {'name': name, 'next': next},
+          'last_run_at = @now::timestamptz, last_error = NULL '
+          'WHERE name = @name',
+          params: {'name': name, 'next': next, 'now': now},
         );
       } catch (error, stackTrace) {
         runtime.alerts.report(
@@ -284,14 +300,15 @@ final class DwJobRunner {
   Future<bool> _runQueued() async {
     DwRuntimeContext? committed;
     _Lease? lease;
+    final now = _now;
     final claimed = await _db.transaction((tx) async {
       final rows = await tx.query(
         'SELECT id, name, payload, attempts FROM dw_job '
-        'WHERE failed_at IS NULL AND run_at <= now() '
-        'AND (locked_until IS NULL OR locked_until <= now()) '
+        'WHERE failed_at IS NULL AND run_at <= @now::timestamptz '
+        'AND (locked_until IS NULL OR locked_until <= @now::timestamptz) '
         'AND name = ANY(@queued::text[]) '
         'ORDER BY run_at, id LIMIT 1 FOR UPDATE SKIP LOCKED',
-        params: {'queued': _queuedNames},
+        params: {'queued': _queuedNames, 'now': now},
       );
       if (rows.isEmpty) return false;
       final row = rows.single;
@@ -313,9 +330,10 @@ final class DwJobRunner {
       if (!job.transactional) {
         await tx.execute(
           'UPDATE dw_job SET attempts = attempts + 1, '
-          'locked_until = now() + @lease::int8 * interval \'1 microsecond\' '
+          'locked_until = @now::timestamptz + '
+          '@lease::int8 * interval \'1 microsecond\' '
           'WHERE id = @id',
-          params: {'id': id, 'lease': job.lease.inMicroseconds},
+          params: {'id': id, 'lease': job.lease.inMicroseconds, 'now': now},
         );
         lease = _Lease(id, job, payload, attempts + 1);
         return true;
@@ -412,8 +430,10 @@ final class DwJobRunner {
     await db.execute(
       'UPDATE dw_job SET attempts = @attempts, last_error = @error, '
       'locked_until = NULL, '
-      'run_at = now() + @delay::int8 * interval \'1 microsecond\' WHERE id = @id',
+      'run_at = @now::timestamptz + @delay::int8 * interval \'1 microsecond\' '
+      'WHERE id = @id',
       params: {
+        'now': _now,
         'id': id,
         'attempts': attempt,
         'error': '$error',
@@ -429,8 +449,8 @@ final class DwJobRunner {
     String error,
   ) => db.execute(
     'UPDATE dw_job SET attempts = @attempts, last_error = @error, '
-    'locked_until = NULL, failed_at = now() WHERE id = @id',
-    params: {'id': id, 'attempts': attempts, 'error': error},
+    'locked_until = NULL, failed_at = @now::timestamptz WHERE id = @id',
+    params: {'id': id, 'attempts': attempts, 'error': error, 'now': _now},
   );
 }
 

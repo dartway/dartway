@@ -178,7 +178,18 @@ enum DwCheckType {
   /// other by the server, and nothing makes them agree. Changing one produces
   /// a server that cannot log in to the database on the next machine — or,
   /// worse, on this one after the volume is recreated.
-  devComposeDrifted;
+  devComposeDrifted,
+
+  /// `DateTime.now()` (or `DateTime.timestamp()`, or `package:clock`'s
+  /// `clock.now()`) in the server package's `lib/src/` — the time is
+  /// `ctx.now`, read from the server's clock (dartway/dartway#385).
+  ///
+  /// An error, because the two are not interchangeable spellings: the
+  /// server's clock is the one a test sets (`DwTestClock`) and the one the job
+  /// queue decides due times by, so a handler that reads the system clock is
+  /// a handler no test can pin, and disagrees with its own jobs as soon as a
+  /// test moves time.
+  forbiddenDateTimeNow;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///

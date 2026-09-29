@@ -167,7 +167,7 @@ final chatHandlers = <DwCallHandler>[
           channelId: command.channelId,
           authorProfileId: me.id!,
           text: command.text.trim(),
-          sentAt: DateTime.now(),
+          sentAt: ctx.now,
           replyToMessageId: command.replyToMessageId,
         ),
       );
@@ -207,7 +207,7 @@ final chatHandlers = <DwCallHandler>[
       final me = await ctx.profile;
       final row = await ctx._requireMessage(command.messageId, lock: true);
       if (row.authorProfileId != me.id) ctx.refuse(DwCoreRefusal.forbidden);
-      if (DateTime.now().isAfter(row.sentAt.add(ChatMessage.editWindow))) {
+      if (ctx.now.isAfter(row.sentAt.add(ChatMessage.editWindow))) {
         ctx.refuse(DartwayExampleRefusal.editWindowClosed);
       }
       final text = command.text.trim();
@@ -218,7 +218,7 @@ final chatHandlers = <DwCallHandler>[
         ctx.refuse(DartwayExampleRefusal.messageEmpty, field: 'text');
       }
       final edited = await ctx.db.chatMessages.update(
-        row.copyWith(text: text, editedAt: DwFieldPatch.set(DateTime.now())),
+        row.copyWith(text: text, editedAt: DwFieldPatch.set(ctx.now)),
       );
       final message = (await ChatObjects.messages(ctx, [
         edited,
@@ -240,7 +240,7 @@ final chatHandlers = <DwCallHandler>[
         ctx.refuse(DwCoreRefusal.forbidden);
       }
       final deleted = await ctx.db.chatMessages.update(
-        row.copyWith(deletedAt: DwFieldPatch.set(DateTime.now())),
+        row.copyWith(deletedAt: DwFieldPatch.set(ctx.now)),
       );
       ctx.publish(
         AppChannels.chatOf(deleted.channelId),
@@ -264,7 +264,7 @@ final chatHandlers = <DwCallHandler>[
           : await ctx.db.chatMessages.update(
               command.pinned
                   ? row.copyWith(
-                      pinnedAt: DwFieldPatch.set(DateTime.now()),
+                      pinnedAt: DwFieldPatch.set(ctx.now),
                       pinnedByProfileId: DwFieldPatch.set(me.id!),
                     )
                   : row.copyWith(

@@ -38,6 +38,9 @@ abstract final class DartwayExampleServer {
   ///
   /// [push] sends notifications (`AppPush.module`); by default it has no providers
   /// and records deliveries it has nobody to send through.
+  ///
+  /// [clock] is the time every handler and job reads as `ctx.now` — the
+  /// system's, unless a test sets its own (`DwTestClock`).
   static DwAppServer build({
     required DwDatabaseConfig database,
     DwFileStorageConfig? storage,
@@ -45,6 +48,7 @@ abstract final class DartwayExampleServer {
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
     DwPushModule? push,
+    DwServerClock clock = DwServerClock.system,
   }) => DwAppServer(
     protocol: appProtocol,
     schema: dartwayExampleSchema,
@@ -70,5 +74,6 @@ abstract final class DartwayExampleServer {
     ],
     port: port,
     settings: settings,
+    clock: clock,
   );
 }
