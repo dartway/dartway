@@ -146,7 +146,7 @@ packages:
       path: "../dartway_push_server"
       relative: true
     source: path
-    version: "0.5.0"
+    version: "0.5.1"
   dartway_push_shared:
     dependency: "direct dev"
     description:

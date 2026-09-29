@@ -72,6 +72,8 @@ final class DwPushService {
     final accounts = recipientAccountIds.toSet().toList()..sort();
     if (accounts.isEmpty) return 0;
 
+    final runAt = scheduledAt?.toUtc() ?? _ctx.now;
+
     Future<int> queue(DwDatabaseHandle db) async {
       // The message and its deliveries in one statement; a recipient whose
       // dedup key is taken is left out by the unique index.
@@ -80,11 +82,10 @@ final class DwPushService {
         'INSERT INTO dw_push_message '
         '(category, title, body, image_url, data, expires_at) '
         'VALUES (@category, @title, @body::text, @image::text, @data::jsonb, '
-        'COALESCE(@run_at::timestamptz, now()) '
+        '@run_at::timestamptz '
         '+ @lifetime::int8 * interval \'1 microsecond\') RETURNING id) '
         'INSERT INTO dw_push_delivery (message_id, account_id, dedup_key, run_at) '
-        'SELECT message.id, account, @dedup::text, '
-        'COALESCE(@run_at::timestamptz, now()) '
+        'SELECT message.id, account, @dedup::text, @run_at::timestamptz '
         'FROM message, unnest(@accounts::int8[]) AS account '
         'ON CONFLICT (account_id, dedup_key) WHERE dedup_key IS NOT NULL '
         'DO NOTHING RETURNING id',
@@ -94,7 +95,8 @@ final class DwPushService {
           'body': message.body,
           'image': message.imageUrl,
           'data': jsonEncode(message.wireData),
-          'run_at': scheduledAt?.toUtc(),
+          // Due by the server's clock, the one the job covering it runs by.
+          'run_at': runAt,
           'lifetime': life.inMicroseconds,
           'dedup': dedupKey,
           'accounts': accounts,
@@ -102,11 +104,7 @@ final class DwPushService {
       );
       if (rows.isEmpty) return 0;
       // Every pending delivery is covered by a job due no later than it.
-      await _ctx.jobs.enqueue(
-        DwPushModule.deliverJob,
-        null,
-        runAt: scheduledAt,
-      );
+      await _ctx.jobs.enqueue(DwPushModule.deliverJob, null, runAt: runAt);
       return rows.length;
     }
 
