@@ -59,8 +59,9 @@ If the change alters a DTO that installed app builds already use, check the tabl
 ## Step 2 — the server (`__SERVER_PKG__/lib/src/<feature>/`)
 
 Everything of the feature goes into its own folder under `lib/src/` — rows, handlers, objects,
-publications, jobs — in files named after it (`invoices_rows.dart`, `invoices_handlers.dart`, …), and
-it declares itself in `<feature>_feature.dart`. Never a file at the top of `src/`, never a layer folder
+publications, jobs — in the closed set of files named after it (`invoices_rows.dart`,
+`invoices_handlers.dart`, …, anything else in its `logic/`), and it declares itself in
+`<feature>_feature.dart`. Never a file at the top of `src/`, never a layer folder
 (`handlers/`, `rows/`, `domain/`); `dart run dartway_cli:dartway check` refuses both. Details in `dartway-server`; the order:
 
 1. **Row class** (`InvoiceRow extends DwTableRow`, `@DwSqlTable`, foreign keys, indexes for the

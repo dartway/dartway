@@ -106,7 +106,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
+Seventeen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -122,6 +122,8 @@ Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `barrelFile` | error | A file that only re-exports |
 | `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone; in the server's `lib/src/`, a file, a layer folder (`handlers/`, `rows/`, `domain/`, …) or a feature folder without its `<feature>_feature.dart` |
+| `invalidServerFeatureFile` | error | Inside a server feature, a file that is not `<feature>_<kind>.dart` / `<feature>_<part>_<kind>.dart` (kind: `feature`, `rows`, `handlers`, `objects`, `publications`, `jobs`, `access`), a subfolder other than `logic/`, a kind-suffixed file inside `logic/`, or a layer-named folder (`domain/`, `services/`, `utils/`, …) at any depth of `lib/src/`. The rule: [project layout](../1-getting-started/project-layout.md) |
+| `misplacedServerCode` | error | Server code in a file of the wrong kind: handlers outside `*_handlers.dart`, row classes outside `*_rows.dart`, jobs outside `*_jobs.dart`, a `DwServerFeature` outside `<feature>_feature.dart`, a function that publishes outside `*_publications.dart`, a row → data object mapping outside `*_objects.dart` — and any of them in `core/` |
 | `generatedCodeStale` | error | A generated file that `dart run dartway_cli:dartway generate` would write differently, or whose source is gone |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
@@ -153,8 +155,10 @@ closed list:
 | `<project>_flutter/lib` | zones `admin/ app/ auth/ common/` · layers `core/ l10n/ shared/ ui_kit/` · `main.dart` · `<project>_app.dart` | `main.dart`, `<project>_app.dart` |
 | `<project>_server/lib` | `<project>_server.dart` · `generated/` · `src/` | `<project>_server.dart`, `src/`, and `src/migrations/migrations.dart` |
 
-Dot entries and the folders `generated/`, `gen/`, `l10n/` and `.dart_tool/` are passed over. Inside `src/` the server is the project's to arrange, except `migrations/`, which
-`bin/migrate.dart` writes and reads by that path.
+Dot entries and the folders `generated/`, `gen/`, `l10n/` and `.dart_tool/` are passed over. Inside
+the server's `src/`, `migrations/` is a fixed name (`bin/migrate.dart` writes and reads it by that
+path), every other folder but `core/` is a feature, and a feature's own files are a closed set held by
+`dw_server_features.dart` (`invalidServerFeatureFile`, `misplacedServerCode`).
 
 A zone name or a layer name one level down — `app/admin/` — is an error too, and it is the reason the
 check exists at all: a folder inside a zone is an ordinary group to every other rule, so a misplaced

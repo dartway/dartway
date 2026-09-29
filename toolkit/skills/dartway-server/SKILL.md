@@ -46,13 +46,17 @@ __SERVER_PKG__/
     bootstrap.dart             AppBootstrap — startup steps
     push.dart                  AppPush — with push only
   lib/src/migrations/      fixed: migration files and migrations.dart
-  lib/src/<feature>/       one folder per area of the app, every file <feature>_*.dart:
+  lib/src/<feature>/       one folder per area of the app; a closed set of files:
     <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes
     <feature>_rows.dart        its row classes
     <feature>_handlers.dart    one handler per request and command
     <feature>_objects.dart     rows → data objects, in batch
     <feature>_publications.dart  what a change publishes, and to whom
     <feature>_jobs.dart        its job kinds and job definitions
+    <feature>_access.dart      its access rules, when they outgrow the handlers
+    <feature>_<part>_<kind>.dart  a kind split in parts: the only way a feature splits
+    logic/                     everything that is none of the kinds — clients, calculators,
+                               domain rules; free names, never a kind's suffix
   test/
 ```
 
@@ -61,7 +65,12 @@ only — `core/`, `migrations/` and one per feature**, each declaring its `DwSer
 `<feature>_feature.dart`, and the server lists the features: `DwAppServer(features: [...])`. A file at
 the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`, `objects/`,
 `services/`) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
-`dart run dartway_cli:dartway check`. A feature split across layers ends up in four places, with a
+`dart run dartway_cli:dartway check`. **So is a feature**: the files above and nothing else, a layer
+name at no depth, and each kind declared only in its own file — handlers in `_handlers`, row classes
+in `_rows`, jobs in `_jobs`, a function that publishes in `_publications`, a row → data object
+mapping in `_objects`, and none of them in `core/` (`invalidServerFeatureFile`,
+`misplacedServerCode`; what counts as each —
+[project layout](https://dartway.dev/1-getting-started/project-layout)). A feature split across layers ends up in four places, with a
 `chat/` beside a `domain/chat/` and two rules for who is in a chat: the whole area lives in its
 folder, and what two features share lives in the one that owns it (the profile's objects in
 `profile/`) or in `core/`. A feature imports another's `_rows`, `_objects` and `_publications` —
