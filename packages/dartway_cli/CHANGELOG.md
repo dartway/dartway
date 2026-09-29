@@ -6,13 +6,15 @@
   go to a screen** (dartway/dartway#390, D-116), in their own inspector
   (`dw_flutter_ui_rules.dart`) over every file of the Flutter package's `lib/` but generated code.
   `forbiddenRequestRead`: the `AsyncValue` of `ref.watch(dw.request|pages|table|window(…))` taken
-  apart outside `logic/` and `core/` — a member of it, chained or through its bound name (`.value`,
-  `.when(`, `.hasError`, a project's own `.section(`), a `switch` or `case` over it, a `.select` of
-  the read. `forbiddenProgressIndicator`: `CircularProgressIndicator` or
+  apart outside `logic/` and the widget-free files of `core/` — a member of it, chained or through
+  its bound name (with or without `final`, typed or not, per block; `.value`, `.when(`,
+  `.hasError`, a project's own `.section(`), a `switch` or `case` over it, a `.select` of the read,
+  the values a `ref.listen` over it hands its callback. `forbiddenProgressIndicator`:
+  `CircularProgressIndicator`, `LinearProgressIndicator`, `RefreshProgressIndicator` or
   `CupertinoActivityIndicator` outside `ui_kit/`. `forbiddenNavigationCall`: `showDialog`,
   `showModalBottomSheet`, `showCupertino…` and siblings, `Navigator.push…` and page routes outside
-  `ui_kit/` and `core/router/`, and a pop spelled other than `Navigator.of(context).pop(…)`
-  anywhere. `sentinelId`: `0`/`-1` as an id — a route parameter `.set(0)`, an id compared with it.
+  `ui_kit/` and `core/router/`, and `Navigator.pop`, `GoRouter.of(…).pop`, `context.pop` anywhere.
+  `sentinelId`: a route parameter set to `0`/`-1` (`…Params.<name>.set(0)`).
   Read on the source with comments and strings blanked. The skeleton follows: its reads are
   `DwReadBuilder`, its kit has `AppProgressIndicator` and `showAppDialog`, and the core hands the
   kit's loading and failed views to `DwFlutterConfig`. Migration note:

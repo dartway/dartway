@@ -181,17 +181,20 @@ enum DwCheckType {
   devComposeDrifted,
 
   /// The `AsyncValue` of `ref.watch(dw.request|pages|table|window(…))` taken
-  /// apart by hand outside `logic/` and `core/` — a member of it (`.value`,
-  /// `.when(`, `.hasError`, …), a `switch` or `case` over it, a `.select` of
-  /// the read (dartway/dartway#390). A screen shows a read through
-  /// `DwReadBuilder`, `DwPagedListView` or `DwWindowListView`.
+  /// apart by hand outside `logic/` and the widget-free files of `core/` — a
+  /// member of it (`.value`, `.when(`, `.hasError`, …), a `switch` or `case`
+  /// over it, a `.select` of the read, the values of a `ref.listen` over it
+  /// (dartway/dartway#390). A screen shows a read through `DwReadBuilder`,
+  /// `DwPagedListView` or `DwWindowListView`, and its chrome through a
+  /// `logic/` provider answering a plain value.
   ///
   /// An error: every screen that took a read apart itself chose its own
   /// answer to "failed" — nothing, a bare `.value` that stays empty, a spinner
   /// that never ends — and the audit found all three in every project.
   forbiddenRequestRead,
 
-  /// `CircularProgressIndicator` or `CupertinoActivityIndicator` outside
+  /// `CircularProgressIndicator`, `LinearProgressIndicator`,
+  /// `RefreshProgressIndicator` or `CupertinoActivityIndicator` outside
   /// `ui_kit/` (dartway/dartway#390). A read loads through the app's
   /// `DwFlutterConfig.readLoadingBuilder` or a placeholder skeleton; any
   /// other wait is a kit widget.
@@ -199,16 +202,18 @@ enum DwCheckType {
 
   /// `showDialog`, `showModalBottomSheet`, `showCupertino…` and their
   /// siblings, `Navigator.push…` or a page route (`MaterialPageRoute`, …)
-  /// outside `ui_kit/` and `core/router/`; or a pop spelled other than
-  /// `Navigator.of(context).pop(…)` anywhere (dartway/dartway#390).
+  /// outside `ui_kit/` and `core/router/`; or `Navigator.pop`,
+  /// `GoRouter.of(…).pop`, `context.pop` anywhere — a page goes back through
+  /// the router, and `Navigator.of(context).pop` closes a dialog or a sheet
+  /// (dartway/dartway#390).
   ///
   /// An error: a screen pushed past the router has no address, no guard and
   /// no way back from a link, and a dialog opened raw carries its own look.
   forbiddenNavigationCall,
 
-  /// `0` or `-1` standing for "no id": a route parameter set to it
-  /// (`.set(0)`) or an id compared with it (`id == 0`) (dartway/dartway#390).
-  /// A new thing is a route of its own; "none" is `null`.
+  /// A route parameter set to `0` or `-1` standing for "no id" —
+  /// `…Params.<name>.set(0)` (dartway/dartway#390). A new thing is a route
+  /// of its own; "none" is `null`.
   sentinelId;
 
   /// Which severity a check carries, and the answer is read elsewhere.

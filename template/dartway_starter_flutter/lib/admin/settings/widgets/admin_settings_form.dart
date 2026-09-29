@@ -4,18 +4,17 @@ import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Every setting the app declares, one row each.
 ///
 /// The screen is a loop over the catalogue rather than a hand-written field per
 /// setting: adding an entry to `AppSettingKey` makes it appear here, and there
 /// is no second place to forget. Write access is admin-only on the server.
-class AdminSettingsForm extends ConsumerWidget {
+class AdminSettingsForm extends StatelessWidget {
   const AdminSettingsForm({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return DwReadBuilder(
       dw.request(const ListAppSettings()),
       placeholder: const <AppSetting>[],

@@ -121,10 +121,17 @@ DwPagedListView<NewsPost>(
 after the last loaded row is built lazily, like the rows — when it comes within the scroll view's
 cache extent — and building it asks for the next page. A first page too short to fill the screen
 fills it page by page; no scroll listener, pixel threshold or "more" button is written by hand.
-After a failed page the slot shows a retry (`edgeBuilder` to draw your own, at a constant height)
-and asks nothing by itself. The first answer is `DwReadBuilder`'s: a skeleton of `placeholder` rows
+While a page loads the slot shows the app's `readLoadingBuilder`; after a failed page it shows a
+retry (`edgeBuilder` to draw your own, at a constant height) and asks nothing by itself. A page
+that came back with no rows while more follow is not an empty feed: the list keeps loading. The first answer is `DwReadBuilder`'s: a skeleton of `placeholder` rows
 or the app's loading view, `onRefused` branches, the app's failed view with a retry. `header`
 scrolls with the rows.
+
+**Its own scroll view, or a sliver in yours.** `DwPagedListView` is a `CustomScrollView`. A feed that
+is one part of a page scrolling as a whole — a profile above it — is `DwPagedListView.sliver(…)`
+inside the page's own `CustomScrollView`, and pages as the end of the feed comes into that scroll
+view's cache extent. Inside a `Column` or a `ListView` of the page's own it would not scroll by
+itself, and its end — always built — would page to the end at once.
 
 Underneath, `DwPagedData<T>` carries `items` (every loaded object, updates applied), `hasMore`,
 `loadingMore` and `loadMoreError` — why the last `loadMore` did not load. A failed next page is
@@ -336,9 +343,33 @@ DwReadBuilder(
 spinner — `CircularProgressIndicator` outside `ui_kit/` is `forbiddenProgressIndicator`.
 
 **Several reads nest.** The inner builder stands in the outer one's `builder`; each loads, fails and
-retries on its own. A number the layout needs whatever the read answers — a badge, whether to leave
-room for a bar — is derived in `logic/` by a provider that watches the read, and the widget watches
-that provider.
+retries on its own.
+
+**The body comes from a builder; the chrome from `logic/`.** A value the screen's chrome needs
+whatever the read answers — a title, whether a button is enabled, a badge, whether to leave room for
+a bar — is a provider in the feature's `logic/` answering a plain value with a fallback (a `.select`
+of the read inside it), and the widget watches that provider. A `DwReadBuilder` never stands in an
+app bar, and a badge's read never gates or skeletonises the page it sits on. From
+`template/dartway_starter_flutter/lib/admin/user_card/`:
+
+```dart
+// logic/user_card_name.dart
+final userCardNameProvider = Provider.autoDispose.family<String?, int>(
+  (ref, profileId) => ref.watch(
+    dw.request(GetUserCard(profileId: profileId)).select((card) => card.value?.profile.displayName),
+  ),
+);
+
+// admin_user_card_page.dart
+AdminScaffold(
+  title: ref.watch(userCardNameProvider(id)) ?? l10n.adminUsers,
+  body: DwReadBuilder(dw.request(GetUserCard(profileId: id)), onRefused: {…}, builder: …),
+)
+```
+
+**A value derived from reads as an `AsyncValue`** — a `logic/` provider combining two reads into the
+body of a section — is shown with `DwReadBuilder.derived(provider, retry: (ref) => …)`: the same
+branches, the provider's errors being the reads', and a retry that names the reads to ask again.
 
 ## Where a rule lives
 

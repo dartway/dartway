@@ -9,7 +9,6 @@ import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// The first home screen — replace it once your domain has its own.
 ///
@@ -17,7 +16,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// from the server, live, so the very first screen proves the whole path —
 /// Postgres → handler → live request → widget. Change the name in the admin
 /// panel and every open copy of this screen follows without a reload.
-class HomePage extends ConsumerWidget implements DwFeatureWidget {
+class HomePage extends StatelessWidget implements DwFeatureWidget {
   const HomePage({super.key});
 
   @override
@@ -37,7 +36,7 @@ class HomePage extends ConsumerWidget implements DwFeatureWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final settings = dw.request(const ListAppSettings());
 

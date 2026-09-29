@@ -98,13 +98,13 @@ class ChatLinkedImage extends HookConsumerWidget {
   }
 }
 
-class _FileLinkTile extends ConsumerWidget {
+class _FileLinkTile extends StatelessWidget {
   const _FileLinkTile({required this.file});
 
   final ChatAttachment file;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => ChatFileTile(
+  Widget build(BuildContext context) => ChatFileTile(
     name: file.fileName,
     sizeLabel: file.byteSize.fileSizeLabel,
     onTap: () async {

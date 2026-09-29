@@ -1,6 +1,7 @@
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_starter_flutter/admin/users/admin_users_page.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_test_app.dart';
@@ -36,6 +37,14 @@ void main() {
     expect(app.server.requestsOf<GetUserCard>().single.profileId, 101);
     expect(find.text('79991000001'), findsWidgets);
     expect(find.text('Signs in with'), findsOneWidget);
+    // The title is the member's name, from the page's logic/ provider.
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('Member 01'),
+      ),
+      findsOneWidget,
+    );
     expect(find.textContaining('Terms accepted'), findsOneWidget);
 
     members[0] = members[0].copyWith(email: const DwFieldPatch.set('m@x.io'));

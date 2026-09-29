@@ -5,7 +5,6 @@ import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../data/dw_flutter_core.dart';
-import '../../data/dw_request_notifiers.dart';
 import '../../private/dw_singleton.dart';
 import 'dw_read_states.dart';
 
@@ -38,6 +37,15 @@ import 'dw_read_states.dart';
 ///
 /// Rows follow the server live, as the read does. Pull to refresh is the
 /// read's own: `ref.read(dw.pages(request).notifier).refetch()`.
+///
+/// **Its own scroll view, or a sliver in yours.** The default constructor is
+/// a `CustomScrollView`. Where the feed is one part of a page that scrolls as
+/// a whole — a profile above it, other sections beside it —
+/// [DwPagedListView.sliver] is the same list as a sliver for the page's own
+/// `CustomScrollView`; the next page is then asked for as the end of the
+/// feed comes into that scroll view's cache extent. A feed inside a
+/// `Column` or a `ListView` of the page's own is neither: it does not scroll
+/// by itself, and its end is always built.
 class DwPagedListView<T extends DwDataObject> extends ConsumerWidget {
   const DwPagedListView({
     super.key,
@@ -53,7 +61,30 @@ class DwPagedListView<T extends DwDataObject> extends ConsumerWidget {
     this.controller,
     this.primary,
     this.physics,
-  }) : assert(placeholderCount > 0, 'placeholderCount is a number of rows');
+  }) : _sliver = false,
+       assert(placeholderCount > 0, 'placeholderCount is a number of rows');
+
+  /// The same list as a sliver, for a `CustomScrollView` of the page's own:
+  /// [header] and the rows are slivers in it, and the scrolling is the
+  /// page's.
+  const DwPagedListView.sliver({
+    super.key,
+    required this.request,
+    required this.itemBuilder,
+    required this.emptyBuilder,
+    this.placeholder,
+    this.placeholderCount = 3,
+    this.onRefused = const {},
+    this.header,
+    this.edgeBuilder,
+    this.padding = EdgeInsets.zero,
+  }) : _sliver = true,
+       controller = null,
+       primary = null,
+       physics = null,
+       assert(placeholderCount > 0, 'placeholderCount is a number of rows');
+
+  final bool _sliver;
 
   final DwPageRequest<T> request;
 
@@ -78,14 +109,20 @@ class DwPagedListView<T extends DwDataObject> extends ConsumerWidget {
 
   /// The slot past the last loaded row while there is more: loading, idle,
   /// or [error] with [retry] when the last page failed. Default: 48 pixels
-  /// holding a small indicator while loading, or a retry button — the same
-  /// slot as `DwWindowListView`'s. Keep its height constant.
-  final Widget Function(BuildContext context, Object? error, VoidCallback retry)?
+  /// holding the app's `readLoadingBuilder` while loading, or a retry
+  /// button — the same slot as `DwWindowListView`'s. Keep its height
+  /// constant.
+  final Widget Function(
+    BuildContext context,
+    Object? error,
+    VoidCallback retry,
+  )?
   edgeBuilder;
 
   /// Space inside the scrollable around the rows.
   final EdgeInsets padding;
 
+  /// The scroll view's; `null` on [DwPagedListView.sliver].
   final ScrollController? controller;
   final bool? primary;
   final ScrollPhysics? physics;
@@ -96,7 +133,7 @@ class DwPagedListView<T extends DwDataObject> extends ConsumerWidget {
     final Widget body;
     switch (ref.watch(provider)) {
       case AsyncData(:final value):
-        body = _rows(context, ref, provider, value);
+        body = _rows(context, ref, value);
       case AsyncError(:final error, :final stackTrace):
         body = _fill(
           DwReadStates.failed(
@@ -119,40 +156,64 @@ class DwPagedListView<T extends DwDataObject> extends ConsumerWidget {
                 ),
               );
     }
+    final slivers = [
+      if (header case final header?) SliverToBoxAdapter(child: header),
+      SliverPadding(padding: padding, sliver: body),
+    ];
+    if (_sliver) return SliverMainAxisGroup(slivers: slivers);
     return CustomScrollView(
       controller: controller,
       primary: primary,
       physics: physics,
-      slivers: [
-        if (header case final header?) SliverToBoxAdapter(child: header),
-        SliverPadding(padding: padding, sliver: body),
-      ],
+      slivers: slivers,
     );
   }
 
-  Widget _rows(
-    BuildContext context,
-    WidgetRef ref,
-    DwPagesProvider<T> provider,
-    DwPagedData<T> data,
-  ) {
+  Widget _rows(BuildContext context, WidgetRef ref, DwPagedData<T> data) {
     final items = data.items;
-    if (items.isEmpty) return _fill(emptyBuilder(context));
-    void loadMore() => unawaited(ref.read(provider.notifier).loadMore());
+    // Asks for the next page of the list as it stands when the call runs: a
+    // call posted before the list was given another request asks for that
+    // one's, or for nothing when the list is gone.
+    final listContext = context;
+    void loadMore() {
+      if (!listContext.mounted) return;
+      final current = (listContext.widget as DwPagedListView<T>).request;
+      unawaited(
+        ref.read((dw as DwFlutterCore).pages(current).notifier).loadMore(),
+      );
+    }
+
+    void loadMoreAfterFrame() =>
+        WidgetsBinding.instance.addPostFrameCallback((_) => loadMore());
+
+    if (items.isEmpty) {
+      if (!data.hasMore) return _fill(emptyBuilder(context));
+      // A page that came back empty while more follow — rows the server
+      // filtered out of it — is not an empty feed: keep asking.
+      if (data.loadMoreError == null && !data.loadingMore) loadMoreAfterFrame();
+      return _fill(
+        data.loadMoreError == null
+            ? DwReadStates.loading(context)
+            : DwReadStates.failed(
+                context,
+                data.loadMoreError!,
+                StackTrace.empty,
+                retry: () async => loadMore(),
+                onRefused: onRefused,
+              ),
+      );
+    }
     return SliverList.builder(
       itemCount: items.length + (data.hasMore ? 1 : 0),
       itemBuilder: (context, index) {
         if (index < items.length) return itemBuilder(context, items[index]);
         final error = data.loadMoreError;
-        if (error == null && !data.loadingMore) {
-          // Built means near: the slot comes into the cache extent. The
-          // notifier is not changed while the tree is laid out.
-          WidgetsBinding.instance.addPostFrameCallback((_) {
-            if (context.mounted) loadMore();
-          });
-        }
+        // Built means near: the slot comes into the cache extent. The
+        // notifier is not changed while the tree is laid out.
+        if (error == null && !data.loadingMore) loadMoreAfterFrame();
         return edgeBuilder?.call(context, error, loadMore) ??
             DwReadStates.edge(
+              context,
               loading: data.loadingMore,
               error: error,
               retry: loadMore,

@@ -61,26 +61,27 @@ abstract final class DwReadStates {
     return _config.readFailedBuilder!(context, error, retry);
   }
 
-  /// The slot past the loaded rows of a list at an end that has more:
-  /// a small indicator while [loading], a retry after [error], empty while
-  /// idle. One height whatever it shows, so the slot changing moves no row;
-  /// no indicator while nothing loads, so nothing animates off screen.
-  static Widget edge({
+  /// The slot past the loaded rows of a list at an end that has more: the
+  /// app's `readLoadingBuilder` while [loading], a retry after [error], empty
+  /// while idle. One height whatever it shows, so the slot changing moves no
+  /// row; nothing while nothing loads, so nothing animates off screen.
+  static Widget edge(
+    BuildContext context, {
     required bool loading,
     required Object? error,
     required VoidCallback retry,
   }) => SizedBox(
     height: 48,
-    child: Center(
-      child: error != null
-          ? IconButton(onPressed: retry, icon: const Icon(Icons.refresh))
-          : loading
-          ? const SizedBox.square(
-              dimension: 20,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            )
-          : null,
-    ),
+    child: error != null
+        ? Center(
+            child: IconButton(
+              onPressed: retry,
+              icon: const Icon(Icons.refresh),
+            ),
+          )
+        : loading
+        ? _config.readLoadingBuilder!(context)
+        : null,
   );
 
   static DwFlutterConfig get _config => dw.config;

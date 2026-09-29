@@ -5,12 +5,14 @@ import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
+import 'logic/user_card_name.dart';
 import 'widgets/user_card_view.dart';
 
 /// One member's card: everything the app knows about the person, and the
 /// actions on their account.
-class AdminUserCardPage extends StatelessWidget implements DwFeatureWidget {
+class AdminUserCardPage extends ConsumerWidget implements DwFeatureWidget {
   const AdminUserCardPage({super.key, this.profileId});
 
   /// Whose card to show. Usually `null`: the id comes from the address, as on
@@ -38,7 +40,7 @@ class AdminUserCardPage extends StatelessWidget implements DwFeatureWidget {
   );
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final id = profileId ?? AdminParams.profileId.fromPathOrNull(context);
     if (id == null) {
@@ -48,7 +50,8 @@ class AdminUserCardPage extends StatelessWidget implements DwFeatureWidget {
       );
     }
     return AdminScaffold(
-      title: l10n.adminUsers,
+      // The chrome's value comes from logic/; the body is the builder's.
+      title: ref.watch(userCardNameProvider(id)) ?? l10n.adminUsers,
       body: DwReadBuilder(
         dw.request(GetUserCard(profileId: id)),
         // No placeholder: a skeleton of the card drawn over stand-in data

@@ -13,28 +13,30 @@ import 'dw_feature_tree.dart';
 ///   `DwReadBuilder` (or `DwPagedListView`, `DwWindowListView`), so the
 ///   result of `ref.watch(dw.request|pages|table|window(…))` taken apart by
 ///   hand — a member of it (`.value`, `.when(`, `.hasError`, …), a `switch`
-///   or `case` over it (`AsyncError(…)`), a `.select` of the read — is
-///   refused outside `logic/` and `core/`, where a controller may derive its
-///   own state from a read.
-/// - [DwCheckType.forbiddenProgressIndicator]: `CircularProgressIndicator`
-///   and `CupertinoActivityIndicator` outside `ui_kit/` — loading is the
-///   kit's, through `DwFlutterConfig.readLoadingBuilder` or a kit widget.
+///   or `case` over it (`AsyncError(…)`), a `.select` of the read, the values
+///   of a `ref.listen` over it — is refused outside `logic/` and the files of
+///   `core/` that declare no widget, where a provider may derive its own
+///   state from a read.
+/// - [DwCheckType.forbiddenProgressIndicator]: Flutter's progress
+///   indicators outside `ui_kit/` — loading is the kit's, through
+///   `DwFlutterConfig.readLoadingBuilder` or a kit widget.
 /// - [DwCheckType.forbiddenNavigationCall]: `showDialog`,
 ///   `showModalBottomSheet`, `showCupertino…` and their siblings,
 ///   `Navigator.push…`, `MaterialPageRoute` and the other page routes outside
-///   `ui_kit/` and `core/router/`; and a pop spelled other than
-///   `Navigator.of(context).pop(…)` anywhere.
-/// - [DwCheckType.sentinelId]: `0` or `-1` standing for "no id" — a route
-///   parameter set to it (`.set(0)`) or an id compared with it (`id == 0`).
-///   A new thing is its own route, not an id nobody has.
+///   `ui_kit/` and `core/router/`; and `Navigator.pop`, `GoRouter.pop`,
+///   `context.pop` anywhere.
+/// - [DwCheckType.sentinelId]: a route parameter set to `0` or `-1`
+///   (`AdminParams.courseId.set(0)`). A new thing is its own route, not an
+///   id nobody has.
 ///
 /// Read from the source with comments and strings blanked, so a word in a
 /// doc comment is not code. What a text scan cannot see is left out on
 /// purpose: a read reached through a provider of the project's own
 /// (`myProfileProvider` over `dw.request`) or handed to a function before it
 /// is taken apart; an id in a command's constructor (`SaveCourse(id: 0)` —
-/// the same text as the stand-in data a skeleton is drawn from); a
-/// focus-once notifier standing in for a route parameter.
+/// the same text as the stand-in data a skeleton is drawn from) or compared
+/// with `0` in a page; `Navigator.of(context).pop` on a page; a focus-once
+/// notifier standing in for a route parameter.
 class DwFlutterUiInspector {
   DwFlutterUiInspector({
     required this.flutterPackageDir,
@@ -139,15 +141,26 @@ class DwFlutterUiInspector {
     final inRouter = inCore && folders.length > 1 && folders[1] == 'router';
 
     // ------------------------------------------------------------- reads
-    if (!inCore && !folders.contains('logic')) {
+    // `core/` is wiring — a provider over a read, the router's state — but a
+    // widget in it is a screen like any other.
+    final wiring = inCore && !_widgetClass.hasMatch(code);
+    if (!wiring && !folders.contains('logic')) {
       for (final (offset, what) in _rawReads(code)) {
         add(
           DwCheckType.forbiddenRequestRead,
           offset,
-          '$what of a read taken apart by hand — show it with '
-          'DwReadBuilder(dw.request(…), builder: …): loading, refusal '
-          'branches (onRefused), failure and retry in one place; a list '
-          'read page by page is DwPagedListView',
+          what == '.select'
+              ? '.select of a read in a widget — a value the screen needs '
+                    'whatever the read answers (a title, an enabled button, '
+                    'a badge) is a provider in the feature\'s logic/ that '
+                    'selects from the read and answers a plain value with a '
+                    'fallback'
+              : '$what of a read taken apart by hand — show it with '
+                    'DwReadBuilder(dw.request(…), builder: …): loading, '
+                    'refusal branches (onRefused), failure and retry in one '
+                    'place; a list read page by page is DwPagedListView; a '
+                    'value the chrome needs is a logic/ provider answering a '
+                    'plain value',
         );
       }
     }
@@ -190,8 +203,10 @@ class DwFlutterUiInspector {
       add(
         DwCheckType.forbiddenNavigationCall,
         match.start,
-        '${match.group(0)!.replaceAll(RegExp(r'\s'), '')} — one spelling '
-        'closes a page, a dialog or a sheet: Navigator.of(context).pop(…)',
+        '${match.group(0)!.replaceAll(RegExp(r'\s'), '')} — a page goes '
+        'back with GoRouter.of(context).goNamed(<parent>.name) or the AppBar\'s '
+        'leading button; a dialog or a sheet closes with '
+        'Navigator.of(context).pop(…), the builder\'s own context',
       );
     }
 
@@ -253,7 +268,7 @@ class DwFlutterUiInspector {
     }
 
     // `ref.watch(<read>)` — what follows the call, and the name it is bound to.
-    final values = <String, int>{};
+    final values = <(String, int)>[];
     for (final match in _refLook.allMatches(code)) {
       final open = match.end - 1;
       final close = _closing(code, open);
@@ -268,16 +283,41 @@ class DwFlutterUiInspector {
         found.add((match.start, '.${after.group(2)}'));
         continue;
       }
-      final binding = RegExp(
-        r'(?:final|var)\s+(?:\w+(?:<[^=;]*>)?\s+)?(\w+)\s*=\s*$',
-      ).firstMatch(code.substring(0, match.start));
-      if (binding != null) values[binding.group(1)!] = match.start;
+      final binding = _binding.firstMatch(
+        code.substring(match.start < 200 ? 0 : match.start - 200, match.start),
+      );
+      if (binding != null) values.add((binding.group(1)!, match.start));
+    }
+
+    // `ref.listen(<read>, (previous, next) { … })` — the callback's values
+    // are the read's, taken apart the same way.
+    for (final match in RegExp(
+      r'(?<![\w$])ref\s*\.\s*listen(?:Manual)?\s*(?:<[^()]*>)?\s*\(',
+    ).allMatches(code)) {
+      final open = match.end - 1;
+      final firstEnd = _argumentEnd(code, open + 1);
+      final argument = code.substring(open + 1, firstEnd);
+      if (!isReadProvider(argument)) continue;
+      if (argument.contains('.select')) {
+        found.add((match.start, '.select'));
+        continue;
+      }
+      final callback = RegExp(
+        r'\s*,\s*\(\s*(?:[\w<>?]+\s+)?(\w+)\s*,\s*(?:[\w<>?]+\s+)?(\w+)\s*\)',
+      ).matchAsPrefix(code, firstEnd);
+      if (callback == null) continue;
+      final span = _closureSpan(code, callback.end - 2);
+      if (span == null) continue;
+      for (final name in [callback.group(1)!, callback.group(2)!]) {
+        if (name == '_') continue;
+        values.add((name, span.$1));
+      }
     }
 
     // Uses of a bound value within its block: a member, a switch, a case —
     // but not inside a closure whose parameter takes the same name
     // (`builder: (card) => card.profile`).
-    for (final MapEntry(key: name, value: at) in values.entries) {
+    for (final (name, at) in values) {
       final end = _blockEnd(code, at);
       final shadowed = <(int, int)>[
         for (final parameter in RegExp(
@@ -324,6 +364,12 @@ class DwFlutterUiInspector {
       }
     }
     if (open < 0) return null;
+    // `switch (x) {`, `if (x) {` — a statement, not a closure's parameters.
+    if (RegExp(
+      r'(?:^|[^\w$])(?:switch|if|while|for|catch)\s*$',
+    ).hasMatch(code.substring(open < 12 ? 0 : open - 12, open))) {
+      return null;
+    }
     final close = _closing(code, open);
     final arrow = RegExp(r'\s*(?:async\s*)?(=>|\{)').matchAsPrefix(code, close);
     if (arrow == null) return null;
@@ -344,6 +390,37 @@ class DwFlutterUiInspector {
     return (close, code.length);
   }
 
+  /// A binding right before a `ref.watch(`: `final x =`, `var x =`,
+  /// `AsyncValue<Invoice> x =`, `final AsyncValue<Invoice> x =`.
+  static final _binding = RegExp(
+    r'(?<![\w$.])(?:(?:final|var)\s+)?(?:[A-Za-z_]\w*(?:<[^=;{}]*>)?\??\s+)?'
+    r'(\w+)\s*=\s*$',
+  );
+
+  /// A class of the file is a widget or a widget's state.
+  static final _widgetClass = RegExp(
+    r'(?<![\w$])class\s+\w+[^{;]*?\bextends\s+(?:\w+\.)?'
+    r'(?:StatelessWidget|StatefulWidget|ConsumerWidget|ConsumerStatefulWidget'
+    r'|HookWidget|HookConsumerWidget|StatefulHookWidget'
+    r'|StatefulHookConsumerWidget|State\s*<|ConsumerState\s*<)',
+  );
+
+  /// Where the argument starting at [from] ends: the first comma at its own
+  /// depth, or the closing parenthesis of the call.
+  static int _argumentEnd(String code, int from) {
+    var depth = 0;
+    for (var i = from; i < code.length; i++) {
+      final char = code[i];
+      if (char == '(' || char == '[' || char == '{') depth++;
+      if (char == ')' || char == ']' || char == '}') {
+        if (depth == 0) return i;
+        depth--;
+      }
+      if (char == ',' && depth == 0) return i;
+    }
+    return code.length;
+  }
+
   /// Where the block enclosing [offset] closes.
   static int _blockEnd(String code, int offset) {
     var depth = 0;
@@ -361,7 +438,8 @@ class DwFlutterUiInspector {
   // ------------------------------------------------------- the other checks
 
   static final _spinner = RegExp(
-    r'(?<![\w$])(CircularProgressIndicator|CupertinoActivityIndicator)'
+    r'(?<![\w$])(CircularProgressIndicator|LinearProgressIndicator'
+    r'|RefreshProgressIndicator|CupertinoActivityIndicator)'
     r'\s*(?:\.\s*adaptive\s*)?\(',
   );
 
@@ -382,10 +460,11 @@ class DwFlutterUiInspector {
     r'|context\s*\.\s*pop)\s*(?:<[^()]*>)?\s*\(',
   );
 
+  /// A route parameter set to `0` or `-1`: `AdminParams.courseId.set(0)` —
+  /// the parameter enums are `…Params` (or `…Param`), which is what tells a route
+  /// parameter from `DwFieldPatch.set(0)` or any other `set`.
   static final _sentinel = RegExp(
-    r'\.\s*set\s*\(\s*(?:0|-\s*1)\s*\)'
-    r'|(?<![\w$])(?:id|\w+Id)\s*(?:==|!=)\s*(?:0|-\s*1)(?![\w.])'
-    r'|(?<![\w$.])(?:0|-\s*1)\s*(?:==|!=)\s*(?:\w+\s*\.\s*)*(?:id|\w+Id)(?![\w$])',
+    r'(?<![\w$])\w*Params?\s*\.\s*\w+\s*\.\s*set\s*\(\s*(?:0|-\s*1)\s*\)',
   );
 
   /// The offset just past the bracket closing the one at [open].

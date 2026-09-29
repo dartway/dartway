@@ -6,9 +6,8 @@ import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class MyBookingsPage extends ConsumerWidget implements DwFeatureWidget {
+class MyBookingsPage extends StatelessWidget implements DwFeatureWidget {
   const MyBookingsPage({super.key});
 
   @override
@@ -39,7 +38,7 @@ class MyBookingsPage extends ConsumerWidget implements DwFeatureWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     const request = ListMyBookings();
 
     return AppScaffold.main(

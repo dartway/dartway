@@ -9,10 +9,15 @@
   refusal code (`onRefused: {DwCoreRefusal.notFound: (context, refusal) => …}`), the app's failed
   view with a retry that refetches, nothing for a signed-out read, and data. A failure is reported
   to the error pipeline once per failure, not on every rebuild; a refusal and an unreachable server
-  are not reported. `DwPagedListView(request:, itemBuilder:, emptyBuilder:)` shows a
-  `DwPageRequest` feed and asks for the next page when the slot after the last row is built — as
-  the end comes into the cache extent — with a retry in that slot after a failed page; `header`,
-  `placeholder`/`placeholderCount`, `onRefused`, `edgeBuilder`, `controller`, `padding`.
+  are not reported. `DwReadBuilder.derived(provider, retry: (ref) => …)` renders any provider of
+  an `AsyncValue` derived from reads the same way, with the retry it names.
+  `DwPagedListView(request:, itemBuilder:, emptyBuilder:)` shows a `DwPageRequest` feed and asks
+  for the next page — of the request the list holds when the call runs — when the slot after the
+  last row is built, as the end comes into the cache extent; the slot shows the app's
+  `readLoadingBuilder` while a page loads and a retry after a failed one; a page with no rows while
+  more follow keeps loading rather than showing empty; `header`, `placeholder`/`placeholderCount`,
+  `onRefused`, `edgeBuilder`, `controller`, `padding`. `DwPagedListView.sliver` is the same list as
+  a sliver for a page's own `CustomScrollView`.
 - **BREAKING: `DwFlutterConfig.readLoadingBuilder` and `readFailedBuilder`**, required by
   `DwFlutterCore` (an `ArgumentError` naming them otherwise): the app's loading and failed views,
   supplied once from its kit and shown by `DwReadBuilder`, `DwPagedListView` and `DwWindowListView`.
@@ -21,7 +26,8 @@
   both.
 - **BREAKING: `DwWindowListView` loses `loadingBuilder` and `errorBuilder`** — its first answer is
   shown as `DwReadBuilder` shows a read, with an `onRefused` of its own — and **`emptyBuilder` is
-  required**, as it is on `DwPagedListView`: an empty list says what empty means.
+  required**, as it is on `DwPagedListView`: an empty list says what empty means. Its edge slots
+  show the app's `readLoadingBuilder` while loading; the framework draws no spinner of its own.
 - **`DwWatchNotifier<S>`** — the public base of the four read notifiers (`refetch()`, `isLive`) —
   and **`DwWatchProvider<S>`**, what `DwReadBuilder` takes. **`DwRefusedBuilder`**, the type of an
   `onRefused` branch.

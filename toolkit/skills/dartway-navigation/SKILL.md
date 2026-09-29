@@ -7,8 +7,9 @@ description: >-
   zoneGuards; type-safe parameters via an enum with DwNavigationParamsMixin
   (set/fromPath/fromQuery); the router is assembled with DwAppRouter<T>(routerState:,
   navigationZones:, pageBuilder:, options:). A screen is a route — no Navigator.push or
-  MaterialPageRoute; dialogs and sheets through the kit; one pop spelling,
-  Navigator.of(context).pop; what a screen opens on is a route parameter, not a focus notifier;
+  MaterialPageRoute; dialogs and sheets through the kit; back from a page is
+  goNamed(parent) or the AppBar's leading button, Navigator.of(context).pop only
+  closes a dialog or a sheet; what a screen opens on is a route parameter, not a focus notifier;
   "new" is its own route, never id 0. Use when creating or editing routes,
   screens, redirects and navigation between zones.
 ---
@@ -29,9 +30,13 @@ Navigation rules for DartWay projects. The router is a wrapper over go_router: `
   `PageRouteBuilder` outside `ui_kit/` and `core/router/`: a pushed page has no address, no guard,
   and nothing a link can reopen. Dialogs and sheets open through the kit (`context.showAppDialog`,
   `context.showAppBottomSheet`). Both are `forbiddenNavigationCall` in `dart run dartway_cli:dartway check`.
-- **One pop spelling: `Navigator.of(context).pop(value)`** — for a page, a dialog and a sheet alike;
-  it closes the nearest route, which is what the tap means. `Navigator.pop(context)`,
-  `GoRouter.of(context).pop()` and `context.pop()` fail the same check.
+- **Back from a page is the router's; `pop` is a dialog's or a sheet's.** A page goes back with
+  `GoRouter.of(context).goNamed(<parent>.name)` or the `AppBar`'s own leading button — both keep
+  the address true. `Navigator.of(context).pop(value)` closes a dialog or a sheet, called with
+  **the builder's own context** (the one the dialog or the sheet was built with), so it closes that
+  route and nothing under it. `Navigator.pop(context)`, `GoRouter.of(context).pop()` and
+  `context.pop()` fail the check; `Navigator.of(context).pop` on a page is not caught by it and is
+  still wrong.
 - **Transitions go through the context**, with one exception that is a fact rather than a
   preference — see [The one transition that has no context](#the-one-transition-that-has-no-context).
 
@@ -302,7 +307,8 @@ no shape a check can see — so it is written here.
 descriptors — `.simple(pageWidget: CourseEditorPage(), parent: courses)` for the new one and
 `.parameterized(…, parameter: AdminParams.courseId)` for an existing one — not the edit route opened
 with `courseId.set(0)` and an `if (id == 0)` in the page. `0` and `-1` are not ids: a route parameter
-set to one, or an id compared with one, fails the check (`sentinelId`); "none" is `null`.
+set to one (`…Params.<name>.set(0)`) fails the check (`sentinelId`); the comparison in the page and
+a command sent with id `0` for "create" are the same mistake, left to reading; "none" is `null`.
 
 ## Common mistakes
 
@@ -310,6 +316,6 @@ set to one, or an id compared with one, fails the check (`sentinelId`); "none" i
 - Checking authorization inside a screen instead of `zoneGuards`.
 - The same route name in two zones — the enums have separate namespaces, the router does not.
 - A forgotten `parent` on `.simple`/`.parameterized` — the route will not take its place in the zone tree.
-- `Navigator.push(MaterialPageRoute(…))` for a screen, `showDialog` from a feature, a pop spelled three ways.
+- `Navigator.push(MaterialPageRoute(…))` for a screen, `showDialog` from a feature, a page closed with `pop`.
 - A "focus" provider instead of a route parameter; id `0` for "new".
 - Changing state without `notifyListeners()` — the guards will not re-run.

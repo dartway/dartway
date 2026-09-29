@@ -191,7 +191,8 @@ Two consequences that are easy to get wrong:
 Four things every screen needs and none may draw for itself — each is decided once, here:
 
 - **`AppProgressIndicator`** (`1_essentials/`) is the one spinner: a read without a placeholder, an
-  upload, a busy button. `CircularProgressIndicator` or `CupertinoActivityIndicator` outside
+  upload, a busy button. `CircularProgressIndicator`, `LinearProgressIndicator`,
+  `RefreshProgressIndicator` or `CupertinoActivityIndicator` outside
   `ui_kit/` fails `dart run dartway_cli:dartway check` (`forbiddenProgressIndicator`).
 - **The read views.** `lib/core/dw_core.dart` hands the kit to the framework once:
   `DwFlutterConfig(readLoadingBuilder: (context) => const Center(child: AppProgressIndicator()),
@@ -202,7 +203,8 @@ Four things every screen needs and none may draw for itself — each is decided 
   (`2_frequent/`) are the frames of a dialog and a sheet. `showDialog`, `showModalBottomSheet`,
   `showCupertino…` outside `ui_kit/` fail the check (`forbiddenNavigationCall`). A yes/no before an
   action is not a dialog at all: `dw.action(…, confirmation: DwUiConfirmation(…))`.
-- **Closing** a dialog, a sheet or a page is spelled one way: `Navigator.of(context).pop(value)`.
+- **Closing** a dialog or a sheet is `Navigator.of(context).pop(value)` with the builder's own
+  context; a page goes back through the router (`dartway-navigation`).
 
 ## The kit does not know the domain
 

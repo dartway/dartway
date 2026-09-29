@@ -4,13 +4,12 @@ import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/admin/users/logic/users_commands.dart';
 
 /// One page of members, with the role editable inline and the pager under
 /// it. The page is live: rows change in place, and a new member reads it
 /// again.
-class AdminUsersTable extends ConsumerWidget {
+class AdminUsersTable extends StatelessWidget {
   const AdminUsersTable({
     required this.request,
     required this.onPage,
@@ -23,7 +22,7 @@ class AdminUsersTable extends ConsumerWidget {
   final void Function(int page) onPage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final table = dw.table(request);
 

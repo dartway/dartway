@@ -145,8 +145,8 @@ class DwWindowListView<T extends DwDataObject> extends ConsumerStatefulWidget {
 
   /// The slot past the loaded items at an end that has more: loading, idle
   /// (a load starts as it comes near), or [error] with [retry] when the last
-  /// load failed. Default: 48 pixels holding a small progress indicator while
-  /// loading, or a retry button — the same slot as `DwPagedListView`'s. Keep its height constant: it stands between
+  /// load failed. Default: 48 pixels holding the app's `readLoadingBuilder`
+  /// while loading, or a retry button — the same slot as `DwPagedListView`'s. Keep its height constant: it stands between
   /// the rows on screen and the rows a load brings.
   final Widget Function(
     BuildContext context,
@@ -788,7 +788,12 @@ class _DwWindowListViewState<T extends DwDataObject>
           : data.loadingNewer;
       final custom = widget.edgeBuilder;
       if (custom != null) return custom(context, side, error, retry);
-      return DwReadStates.edge(loading: loading, error: error, retry: retry);
+      return DwReadStates.edge(
+        context,
+        loading: loading,
+        error: error,
+        retry: retry,
+      );
     }
 
     return CustomScrollView(

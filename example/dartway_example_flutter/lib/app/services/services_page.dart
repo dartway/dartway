@@ -6,9 +6,8 @@ import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-class ServicesPage extends ConsumerWidget implements DwFeatureWidget {
+class ServicesPage extends StatelessWidget implements DwFeatureWidget {
   const ServicesPage({super.key});
 
   @override
@@ -29,7 +28,7 @@ class ServicesPage extends ConsumerWidget implements DwFeatureWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return AppScaffold.inner(
       appBar: AppBar(title: AppText.title(context.l10n.ourServices)),
       body: DwReadBuilder(

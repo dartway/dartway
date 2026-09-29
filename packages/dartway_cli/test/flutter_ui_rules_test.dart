@@ -94,6 +94,63 @@ AsyncValue<Profile?> build(Ref ref) {
       expect(typesIn('core/profile/my_profile.dart', source), isEmpty);
       expect(typesIn('app/profile/widgets/profile_view.dart', source), [read]);
     });
+
+    test('a widget in core/ is a screen like any other', () {
+      const source = '''
+class SignedInGate extends ConsumerWidget {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final profile = ref.watch(dw.request(const GetMyProfile()));
+    return profile.isLoading ? const Gap() : child;
+  }
+}
+''';
+      expect(linesOf('core/profile/signed_in_gate.dart', source, read), [4]);
+    });
+
+    test('a typed binding, and the same name bound in two methods', () {
+      const source = '''
+class A extends ConsumerWidget {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final AsyncValue<Course> course = ref.watch(dw.request(GetCourse(1)));
+    return Text(course.value!.title);
+  }
+}
+class B extends ConsumerWidget {
+  Widget build(BuildContext context, WidgetRef ref) {
+    AsyncValue<Course> course = ref.watch(dw.request(GetCourse(2)));
+    return Text(course.value!.title);
+  }
+}
+''';
+      expect(linesOf('app/course/course_page.dart', source, read), [4, 10]);
+    });
+
+    test('a switch over the read is not a closure hiding it', () {
+      const source = '''
+Widget build(BuildContext context, WidgetRef ref) {
+  final card = ref.watch(dw.request(GetCard(id)));
+  return switch (card) {
+    AsyncData(:final value) => Text(card.value.title),
+    _ => const SizedBox(),
+  };
+}
+''';
+      expect(linesOf('app/card/card_page.dart', source, read), [3, 4]);
+    });
+
+    test('ref.listen over a read takes it apart in its callback', () {
+      const source = '''
+Widget build(BuildContext context, WidgetRef ref) {
+  ref.listen(dw.request(const GetMyProfile()), (_, next) {
+    if (next.value?.isBlocked ?? false) leave(context);
+  });
+  ref.listen(dw.request(const GetMyProfile()).select((p) => p.value), (a, b) {});
+  ref.listen(someProvider, (_, next) => next.value);
+  return child;
+}
+''';
+      expect(linesOf('app/home/home_page.dart', source, read), [3, 5]);
+    });
   });
 
   group('forbiddenProgressIndicator', () {
@@ -103,18 +160,25 @@ Widget build(BuildContext context) => Column(children: [
   const CircularProgressIndicator(),
   CircularProgressIndicator.adaptive(),
   const CupertinoActivityIndicator(),
+  LinearProgressIndicator(value: 0.5),
+  const RefreshProgressIndicator(),
   // CircularProgressIndicator() in a comment is prose
   Text('CircularProgressIndicator()'),
 ]);
 ''';
 
     test('is refused outside ui_kit/, wherever else it stands', () {
-      expect(linesOf('app/home/home_page.dart', source, spinner), [2, 3, 4]);
-      expect(linesOf('core/profile/signed_in_gate.dart', source, spinner), [
+      expect(linesOf('app/home/home_page.dart', source, spinner), [
         2,
         3,
         4,
+        5,
+        6,
       ]);
+      expect(
+        linesOf('core/profile/signed_in_gate.dart', source, spinner),
+        hasLength(5),
+      );
     });
 
     test('is the kit\'s own', () {
@@ -179,34 +243,34 @@ void close(BuildContext context) {
   group('sentinelId', () {
     const sentinel = DwCheckType.sentinelId;
 
-    test('a route parameter set to 0 or -1, and an id compared with it, are '
-        'refused', () {
+    test('a route parameter set to 0 or -1 is refused', () {
       const source = '''
-void go(BuildContext context, int id, Course course) {
-  if (id == 0) return;
-  if (course.courseId != -1) return;
-  if (0 == course.id) return;
+void go(BuildContext context) {
   context.goNamed(AdminNavigationZone.course.name,
       pathParameters: AdminParams.courseId.set(0));
+  context.goNamed(AppNavigationZone.plan.name,
+      queryParameters: AppNavigationParam.dayId.set(-1));
 }
 ''';
       expect(
         linesOf('admin/courses/admin_courses_page.dart', source, sentinel),
-        [2, 3, 4, 6],
+        [3, 5],
       );
     });
 
-    test('stand-in data for a skeleton, a count and a real id are not '
-        'sentinels', () {
+    test('stand-in data, a field patch, a comparison and a real id are not '
+        'route parameters', () {
       const source = '''
 const placeholder = Course(id: 0, courseId: 0, title: 'Course');
 void go(BuildContext context, List<int> ids, int id) {
   if (ids.length == 0) return;
-  if (id == 10) return;
+  if (id == 0) return;
+  final patch = profile.copyWith(visits: const DwFieldPatch.set(0));
+  counter.set(0);
   AdminParams.courseId.set(id);
 }
 ''';
-      expect(typesIn('core/placeholder_objects.dart', source), isEmpty);
+      expect(typesIn('app/course/course_page.dart', source), isEmpty);
     });
   });
 

@@ -129,10 +129,10 @@ Nineteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
-| `forbiddenRequestRead` | error | The `AsyncValue` of `ref.watch(dw.request/pages/table/window(…))` taken apart outside `logic/` and `core/` — a member (`.value`, `.when(`, `.hasError`, …), a `switch` or `case` over it, a `.select` of the read. A screen shows a read through `DwReadBuilder`, `DwPagedListView` or `DwWindowListView` |
-| `forbiddenProgressIndicator` | error | `CircularProgressIndicator` or `CupertinoActivityIndicator` outside `ui_kit/` |
-| `forbiddenNavigationCall` | error | `showDialog`, `showModalBottomSheet`, `showCupertino…` and their siblings, `Navigator.push…` or a page route (`MaterialPageRoute`, …) outside `ui_kit/` and `core/router/`; a pop spelled other than `Navigator.of(context).pop(…)` anywhere |
-| `sentinelId` | error | `0` or `-1` standing for "no id": a route parameter `.set(0)`, an id compared with `0`/`-1` |
+| `forbiddenRequestRead` | error | The `AsyncValue` of `ref.watch/read(dw.request/pages/table/window(…))` taken apart outside `logic/` and widget-free files of `core/` — a member (`.value`, `.when(`, `.hasError`, …), a `switch` or `case` over it, a `.select` of the read, the values of a `ref.listen` over it. A screen shows a read through `DwReadBuilder`, `DwPagedListView` or `DwWindowListView`; its chrome through a `logic/` provider answering a plain value |
+| `forbiddenProgressIndicator` | error | `CircularProgressIndicator`, `LinearProgressIndicator`, `RefreshProgressIndicator` or `CupertinoActivityIndicator` outside `ui_kit/` |
+| `forbiddenNavigationCall` | error | `showDialog`, `showModalBottomSheet`, `showCupertino…` and their siblings, `Navigator.push…` or a page route (`MaterialPageRoute`, …) outside `ui_kit/` and `core/router/`; `Navigator.pop`, `GoRouter.of(…).pop` or `context.pop` anywhere |
+| `sentinelId` | error | A route parameter set to `0` or `-1` — `…Params.<name>.set(0)` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |
@@ -156,26 +156,32 @@ A screen shows a read through **`DwReadBuilder`** — loading as a skeleton or t
 a branch per refusal code (`onRefused`), the app's failed view with a retry, data — or, for a feed
 read page by page, **`DwPagedListView`**, and for a chat, `DwWindowListView`. What
 `forbiddenRequestRead` refuses is the `AsyncValue` of a read taken apart by hand in a widget: a
-member of `ref.watch(dw.request(…))`, chained or through the name it is bound to (`.value`, `.when(`,
-`.hasError`, `.section(` of a project's own extension), a `switch` or a `case` over it
-(`AsyncError(…)`), and a `.select` of the read. `logic/` and `core/` are passed over: a controller
-may watch a read to derive its own state, and the widget watches the controller.
+member of `ref.watch(dw.request(…))`, chained or through the name it is bound to — with or without
+`final`, typed or not, the same name in every block it is bound in (`.value`, `.when(`, `.hasError`,
+`.section(` of a project's own extension) — a `switch` or a `case` over it (`AsyncError(…)`), the
+values a `ref.listen` over it hands its callback, and a `.select` of the read. `logic/` is passed
+over, and so is a file of `core/` that declares no widget: a controller or a provider may watch a
+read to derive its own state — a plain value with a fallback for the chrome, an `AsyncValue` for
+`DwReadBuilder.derived` — and the widget watches that. A widget in `core/` is judged like any other.
 
-Loading is the kit's: `forbiddenProgressIndicator` refuses Flutter's spinners outside `ui_kit/`.
-A dialog or a sheet is opened through the kit and a screen is a route of a zone:
+Loading is the kit's: `forbiddenProgressIndicator` refuses Flutter's progress indicators outside
+`ui_kit/`. A dialog or a sheet is opened through the kit and a screen is a route of a zone:
 `forbiddenNavigationCall` refuses the raw `show…` functions, `Navigator.push…` and the page routes
-outside `ui_kit/` and `core/router/`, and one spelling closes a page, a dialog or a sheet —
-`Navigator.of(context).pop(…)`; `Navigator.pop(context)`, `GoRouter.of(context).pop()` and
-`context.pop()` are findings everywhere. `sentinelId` refuses `0` and `-1` as ids: a route
-parameter set to one (`.set(0)`) and an id compared with one (`id == 0`) — a new thing is a route
-of its own, "none" is `null`.
+outside `ui_kit/` and `core/router/`. A page goes back with `goNamed(<parent>)` or the `AppBar`'s
+leading button, and `Navigator.of(context).pop(…)` closes a dialog or a sheet with the builder's own
+context; `Navigator.pop(context)`, `GoRouter.of(context).pop()` and `context.pop()` are findings
+everywhere, while `Navigator.of(context).pop` on a page is not told apart from one in a dialog and
+is left to reading. `sentinelId` refuses a route parameter set to `0` or `-1`
+(`AdminParams.courseId.set(0)` — the parameter enums are `…Params`, which is what tells them from
+`DwFieldPatch.set(0)`): a new thing is a route of its own, "none" is `null`.
 
 All four read the source with comments and strings blanked, so they see what a text can show. Left
 out on purpose: a read reached through a provider of the project's own (`myProfileProvider` over
 `dw.request`) or handed to a function before it is taken apart; a closure parameter named like the
 read is not the read; an id in a command's constructor (`SaveCourse(id: 0)`) reads the same as the
-stand-in data a skeleton is drawn from, so it is prose, not a check; and a one-shot "focus"
-notifier standing in for a route parameter has no shape a text can tell.
+stand-in data a skeleton is drawn from, and an id compared with `0` in a page reads the same as a
+count, so both are prose, not checks; and a one-shot "focus" notifier standing in for a route
+parameter has no shape a text can tell.
 
 ## The declared top level
 

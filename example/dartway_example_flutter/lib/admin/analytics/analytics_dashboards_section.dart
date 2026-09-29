@@ -11,13 +11,11 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// The project's analytics dashboards: one shown at a time, every widget of
 /// it over the period chosen on top, and — in edit mode — widgets added,
 /// changed, moved and removed.
-class AnalyticsDashboardsSection extends HookConsumerWidget
-    implements DwFeatureWidget {
+class AnalyticsDashboardsSection extends HookWidget implements DwFeatureWidget {
   const AnalyticsDashboardsSection({super.key});
 
   @override
@@ -55,7 +53,7 @@ class AnalyticsDashboardsSection extends HookConsumerWidget
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final selectedId = useState<int?>(null);
     final editing = useState(false);

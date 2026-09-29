@@ -10,7 +10,7 @@ import 'package:intl/intl.dart';
 
 /// One widget of a dashboard: its title and its report over [period], drawn
 /// as its type says. [actions], while the dashboard is edited, sit under it.
-class AnalyticsWidgetCard extends ConsumerWidget {
+class AnalyticsWidgetCard extends StatelessWidget {
   const AnalyticsWidgetCard({
     super.key,
     required this.spec,
@@ -23,7 +23,7 @@ class AnalyticsWidgetCard extends ConsumerWidget {
   final List<Widget> actions;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final request = DwGetAnalyticsReport(spec: spec.report, period: period);
     return AppCard(
       child: Column(

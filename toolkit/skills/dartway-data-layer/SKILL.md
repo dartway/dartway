@@ -92,10 +92,31 @@ DwReadBuilder(
   keyed by the code (`DwCoreRefusal.notFound`, `<Package>Refusal.x`), never an `if` over the
   error before the builder.
 - **Several reads nest**: the inner `DwReadBuilder` stands in the outer one's `builder`, and each
-  answers for its own failure. **Never combine reads through `.value ?? fallback`** — it answers the
-  same for loading and for an error. A number the layout needs whatever the read answers (a badge,
-  whether to leave room for a bar) is a provider in `logic/` that watches the read (section 9), and
-  the widget watches the provider.
+  answers for its own failure. **Never combine reads through `.value ?? fallback` in a widget** — it
+  answers the same for loading and for an error.
+- **The body comes from a builder; the chrome from `logic/`.** What a screen or a section *is* — its
+  body — is a `DwReadBuilder`. What its chrome needs whatever the read answers — a title, whether a
+  button is enabled, a badge, whether to leave room for a bar — is a provider in the feature's
+  `logic/` answering a **plain value with a fallback** (a `.select` inside it when useful), and the
+  widget watches that provider. **A `DwReadBuilder` never stands in an app bar**, and a badge's read
+  never gates or skeletonises the page it sits on:
+
+```dart
+// logic/invoice_title.dart
+final invoiceTitleProvider = Provider.autoDispose.family<String?, int>(
+  (ref, invoiceId) => ref.watch(
+    dw.request(GetInvoice(invoiceId: invoiceId)).select((invoice) => invoice.value?.number),
+  ),
+);
+
+// the page
+AppBar(title: AppText.title(ref.watch(invoiceTitleProvider(id)) ?? context.l10n.invoice)),
+body: DwReadBuilder(dw.request(GetInvoice(invoiceId: id)), builder: …),
+```
+
+- **A value derived from reads as an `AsyncValue`** — a `logic/` provider combining two reads, or
+  deciding over one — is rendered by `DwReadBuilder.derived(provider, retry: (ref) => …)`: the same
+  branches, with the retry naming the reads to ask again.
 - **Something that is not a read** — a hook's future, a plugin's stream — is not a `DwReadBuilder`'s
   business; its waiting is still the kit's `AppProgressIndicator`, never Flutter's spinner
   (`forbiddenProgressIndicator`).
@@ -121,6 +142,9 @@ DwPagedListView<FeedPost>(
   itemBuilder: (context, post) => FeedPostCard(post: post),
 )
 ```
+  A feed that is one part of a page scrolling as a whole is `DwPagedListView.sliver(…)` in the
+  page's own `CustomScrollView` — never a `DwPagedListView` inside a `Column` or a `ListView`,
+  where its end is always built and it pages to the end at once.
 - **Tables:** the page number is a field — paging is watching `ListInvoicesPage(page: next)`. Keep the
   chosen page tied to the filter it was chosen under, so a new filter starts at page 1.
 
@@ -273,12 +297,20 @@ rule, so it is computed once and cached rather than reassembled on every build:
 
 ```dart
 /// Whether the caller may still edit [invoiceId]: a draft of their own.
-final invoiceEditableProvider = Provider.family<AsyncValue<bool>, int>(
-  (ref, invoiceId) => ref
-      .watch(dw.request(GetInvoice(invoiceId: invoiceId)))
-      .whenData((invoice) => invoice.status == InvoiceStatus.draft),
+/// `false` until the invoice is known — it enables a button, it is chrome.
+final invoiceEditableProvider = Provider.autoDispose.family<bool, int>(
+  (ref, invoiceId) => ref.watch(
+    dw
+        .request(GetInvoice(invoiceId: invoiceId))
+        .select((invoice) => invoice.value?.status == InvoiceStatus.draft),
+  ),
 );
 ```
+
+A provider that answers an `AsyncValue` instead — the body of a section derived from reads — is
+shown with `DwReadBuilder.derived(provider, retry: (ref) => ref.read(dw.request(r).notifier).refetch())`,
+never taken apart in the widget. Pick by what the value is for: chrome answers a plain value with
+a fallback, a body answers an `AsyncValue` for a builder.
 
 - **A family key is a value with meaningful equality**: a request, an id, or a record of them
   (`({int invoiceId, bool archived})`). A new object per build as a key is a new provider per build.
@@ -335,8 +367,9 @@ text comes from `context.l10n` (or the app's `appL10n` outside the tree).
 - [ ] A screen shows a read through `DwReadBuilder`, a feed through `DwPagedListView`; no
       `.value`/`.when`/`hasError` over `ref.watch(dw.request(…))` outside `logic/` and `core/`; no
       repositories, no `lib/data/`, no copies of server state.
-- [ ] A detail page's `dw.notFound` is an `onRefused` branch; no `.value ?? fallback` over reads; no
-      spinner outside the kit.
+- [ ] A detail page's `dw.notFound` is an `onRefused` branch; no `.value ?? fallback` over reads in
+      a widget; chrome (a title, an enabled button, a badge) from a `logic/` provider answering a
+      plain value; no spinner outside the kit.
 - [ ] No refetch after commands; retries use the notifier's `refetch()`, never `ref.invalidate`.
 - [ ] `dw.command` is called in the feature's `logic/` only, inside the `dw.action` of the widget that
       owns the button; no manual refusal handling.

@@ -47,8 +47,9 @@ import 'dw_upload_notifier.dart';
 /// core, after which another can be built — nothing here is static.
 class DwFlutterCore extends DwFlutterToolbox {
   /// Throws [ArgumentError] for a config without `refusalText`,
-  /// `appVersion`, `readLoadingBuilder` or `readFailedBuilder`, and whatever [DwAppClient] throws for a malformed app
-  /// version or base URL — in every case before the core holds the live slot.
+  /// `appVersion`, `readLoadingBuilder` or `readFailedBuilder`, and whatever
+  /// [DwAppClient] throws for a malformed app version or base URL — in every
+  /// case before the core holds the live slot.
   DwFlutterCore({
     required super.config,
     required DwWireProtocol protocol,
@@ -293,8 +294,7 @@ class DwFlutterCore extends DwFlutterToolbox {
         'server sends is a code, and the app is what turns it into words.',
       );
     }
-    if (config.readLoadingBuilder == null ||
-        config.readFailedBuilder == null) {
+    if (config.readLoadingBuilder == null || config.readFailedBuilder == null) {
       throw ArgumentError(
         'DwFlutterConfig.readLoadingBuilder and readFailedBuilder are required by '
         'DwFlutterCore: every read on screen goes through DwReadBuilder, and the '

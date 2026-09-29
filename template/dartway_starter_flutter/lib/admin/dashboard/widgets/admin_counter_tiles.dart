@@ -4,15 +4,14 @@ import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Headline counters: one live view the server counts, republished by every
 /// command that changes what it counts.
-class AdminCounterTiles extends ConsumerWidget {
+class AdminCounterTiles extends StatelessWidget {
   const AdminCounterTiles({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
 
     return DwReadBuilder(

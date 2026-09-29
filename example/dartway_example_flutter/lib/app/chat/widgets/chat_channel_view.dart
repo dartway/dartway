@@ -17,7 +17,7 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// One channel of the staff chat: its history, the pinned bar, the floating
 /// date, the "↓" button, and the composer — or, while searching, the way
 /// through the matches.
-class ChatChannelView extends HookConsumerWidget {
+class ChatChannelView extends HookWidget {
   const ChatChannelView({
     required this.channel,
     required this.searchQuery,
@@ -30,7 +30,7 @@ class ChatChannelView extends HookConsumerWidget {
   final String? searchQuery;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return DwReadBuilder(
       dw.request(const ListMyChatReadStates()),
       // Not a skeleton: the list opens at the read position, so it waits for

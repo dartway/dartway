@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/app/chat/logic/chat_counts.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_channel_view.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -115,14 +116,17 @@ class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
             tooltip: search.value == null
                 ? l10n.chatSearch
                 : l10n.chatCloseSearch,
-            onPressed: () {
-              if (search.value == null) {
-                searchText.clear();
-                search.value = '';
-              } else {
-                search.value = null;
-              }
-            },
+            // Chrome: a plain value from logic/, not a read taken apart.
+            onPressed: ref.watch(chatHasChannelsProvider)
+                ? () {
+                    if (search.value == null) {
+                      searchText.clear();
+                      search.value = '';
+                    } else {
+                      search.value = null;
+                    }
+                  }
+                : null,
             icon: Icon(search.value == null ? Icons.search : Icons.close),
           ),
           const ConnectionStatusIndicator(),
@@ -131,59 +135,56 @@ class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
       bodyInsets: EdgeInsets.zero,
       body: DwReadBuilder(
         dw.request(const ListChatChannels()),
-        builder: (context, channels) => DwReadBuilder(
-          dw.request(const ListMyChatReadStates()),
-          placeholder: const <ChatReadState>[],
-          builder: (context, readStates) {
-            final unread = {
-              for (final state in readStates) state.id: state.unreadCount,
-            };
-            final channel =
-                channels.where((c) => c.id == selectedId.value).firstOrNull ??
-                channels.firstOrNull;
-            return channel == null
-                ? Center(child: AppText.body(l10n.noChatChannels))
-                : Column(
-                    children: [
-                      SizedBox(
-                        height: 52,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          children: [
-                            for (final item in channels)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ChatChannelChip(
-                                  key: ValueKey('chat-channel-${item.id}'),
-                                  title: item.title,
-                                  selected: item.id == channel.id,
-                                  unread: item.id == channel.id
-                                      ? 0
-                                      : unread[item.id] ?? 0,
-                                  onTap: () {
-                                    search.value = null;
-                                    selectedId.value = item.id;
-                                  },
-                                ),
+        // The channels are the page. The unread badges are chrome — a plain
+        // count from logic/ — and neither hold nor skeletonise it.
+        builder: (context, channels) {
+          final channel =
+              channels.where((c) => c.id == selectedId.value).firstOrNull ??
+              channels.firstOrNull;
+          return channel == null
+              ? Center(child: AppText.body(l10n.noChatChannels))
+              : Column(
+                  children: [
+                    SizedBox(
+                      height: 52,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 6,
+                        ),
+                        children: [
+                          for (final item in channels)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 8),
+                              child: ChatChannelChip(
+                                key: ValueKey('chat-channel-${item.id}'),
+                                title: item.title,
+                                selected: item.id == channel.id,
+                                unread: item.id == channel.id
+                                    ? 0
+                                    : ref.watch(
+                                        chatUnreadCountProvider(item.id),
+                                      ),
+                                onTap: () {
+                                  search.value = null;
+                                  selectedId.value = item.id;
+                                },
                               ),
-                          ],
-                        ),
+                            ),
+                        ],
                       ),
-                      Expanded(
-                        child: ChatChannelView(
-                          key: ValueKey(channel.id),
-                          channel: channel,
-                          searchQuery: search.value,
-                        ),
+                    ),
+                    Expanded(
+                      child: ChatChannelView(
+                        key: ValueKey(channel.id),
+                        channel: channel,
+                        searchQuery: search.value,
                       ),
-                    ],
-                  );
-          },
-        ),
+                    ),
+                  ],
+                );
+        },
       ),
     );
   }
