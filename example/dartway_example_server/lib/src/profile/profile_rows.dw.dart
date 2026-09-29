@@ -71,8 +71,48 @@ extension UserProfileRowCopyWith on UserProfileRow {
   );
 }
 
+mixin _$NewUserProfileRow on DwRowDraft<UserProfileRow> {
+  NewUserProfileRow get _self => this as NewUserProfileRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewUserProfileRow &&
+          other.accountId == _self.accountId &&
+          other.phone == _self.phone &&
+          other.firstName == _self.firstName &&
+          other.lastName == _self.lastName &&
+          other.imageUrl == _self.imageUrl &&
+          other.gender == _self.gender &&
+          other.role == _self.role &&
+          other.agreedForMarketing == _self.agreedForMarketing &&
+          other.conditionsAcceptedAt == _self.conditionsAcceptedAt &&
+          other.testVerificationCode == _self.testVerificationCode &&
+          other.deletedAt == _self.deletedAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.accountId,
+    _self.phone,
+    _self.firstName,
+    _self.lastName,
+    _self.imageUrl,
+    _self.gender,
+    _self.role,
+    _self.agreedForMarketing,
+    _self.conditionsAcceptedAt,
+    _self.testVerificationCode,
+    _self.deletedAt,
+  );
+
+  @override
+  String toString() =>
+      'NewUserProfileRow(accountId: ${_self.accountId}, phone: ${_self.phone}, firstName: ${_self.firstName}, lastName: ${_self.lastName}, imageUrl: ${_self.imageUrl}, gender: ${_self.gender}, role: ${_self.role}, agreedForMarketing: ${_self.agreedForMarketing}, conditionsAcceptedAt: ${_self.conditionsAcceptedAt}, testVerificationCode: ${_self.testVerificationCode}, deletedAt: ${_self.deletedAt})';
+}
+
 /// A [UserProfileRow] before insert: every column but the id.
-final class NewUserProfileRow extends DwRowDraft<UserProfileRow> {
+final class NewUserProfileRow extends DwRowDraft<UserProfileRow>
+    with _$NewUserProfileRow {
   const NewUserProfileRow({
     this.accountId,
     required this.phone,

@@ -67,15 +67,17 @@ From the project root or from inside the `*_flutter` package, in this order:
 
 1. **the declared top level** of the Flutter package and the server package (`invalidTopLevelLayout`);
 2. **localization wiring** (`l10nNotWired`);
-3. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
+3. **analysis options**: the server and the shared package raise `unnecessary_non_null_assertion` to
+   an error (`redundantBangAllowed`);
+4. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
    (`generatedCodeStale`);
-4. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
-5. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
+5. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
+6. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
    and **framework overrides** that the framework has caught up with (`frameworkOverrideOutlived`);
-6. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
+7. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
    development containers' credentials against what the server is told to reach them by
    (`devComposeDrifted`);
-7. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
+8. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
    in the zones and `shared/` — the other sixteen checks.
 
 `--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 7 and skips
@@ -106,7 +108,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
+Sixteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -126,6 +128,7 @@ Fifteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
+| `redundantBangAllowed` | error | The server or the shared package's `analysis_options.yaml` (or a local file it includes) does not set `analyzer: errors: unnecessary_non_null_assertion: error` — a stored row's id is `int`, and `row.id!` hides the `!` that guards a real null (D-113) |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |

@@ -148,10 +148,13 @@ state" revisions were wanted for already exists as an entity (a cycle, an order,
 and copying a few fields into it is cheaper than a history nobody reads.
 
 Insert a draft, `New<Entity>Row(...)`: `insert`, `tryInsert`, `insertAll` and `upsert` take drafts
-and answer stored rows. "Create or save" by an optional id is
-`switch (id) { null => insert(draft), final id => update(draft.withId(id)) }`. Rebuild a stored row
-with its generated `copyWith` (it keeps the id), never by listing fields in the
-constructor — a field added later silently takes its default in every row that path writes.
+and answer stored rows; a draft compares by value like the row. "Create or save" by an optional id:
+`update(draft.withId(id))` **only when the command carries every column of the row**; otherwise —
+the usual case, a row with an owner, a creation time, columns other commands set — read it by id
+and owner (`findFirst(where: (t) => t.id.equals(id) & t.ownerProfileId.equals(me.id), lock:
+DwRowLock.forUpdate)`), then `update(current.copyWith(...))`; a row keyed by a unique column is
+`upsert(draft, conflictOn: …)`. Rebuild a stored row with its generated `copyWith` (it keeps the
+id), never by listing fields in the constructor — a field added later silently takes its default in every row that path writes.
 
 After changing a row class: `dart run dartway_cli:dartway generate`, then `dart run bin/migrate.dart create <name>` from
 `__SERVER_PKG__`, review the draft it writes, apply — `dartway-migrations`.

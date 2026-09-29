@@ -55,8 +55,40 @@ extension CatalogEntryRowCopyWith on CatalogEntryRow {
   );
 }
 
+mixin _$NewCatalogEntryRow on DwRowDraft<CatalogEntryRow> {
+  NewCatalogEntryRow get _self => this as NewCatalogEntryRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewCatalogEntryRow &&
+          other.name == _self.name &&
+          other.schema == _self.schema &&
+          other.columns == _self.columns &&
+          other.table == _self.table &&
+          other.row == _self.row &&
+          other.where == _self.where &&
+          other.order == _self.order;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.name,
+    _self.schema,
+    _self.columns,
+    _self.table,
+    _self.row,
+    _self.where,
+    _self.order,
+  );
+
+  @override
+  String toString() =>
+      'NewCatalogEntryRow(name: ${_self.name}, schema: ${_self.schema}, columns: ${_self.columns}, table: ${_self.table}, row: ${_self.row}, where: ${_self.where}, order: ${_self.order})';
+}
+
 /// A [CatalogEntryRow] before insert: every column but the id.
-final class NewCatalogEntryRow extends DwRowDraft<CatalogEntryRow> {
+final class NewCatalogEntryRow extends DwRowDraft<CatalogEntryRow>
+    with _$NewCatalogEntryRow {
   const NewCatalogEntryRow({
     required this.name,
     this.schema,

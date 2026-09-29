@@ -43,8 +43,34 @@ extension SessionBookingRowCopyWith on SessionBookingRow {
   );
 }
 
+mixin _$NewSessionBookingRow on DwRowDraft<SessionBookingRow> {
+  NewSessionBookingRow get _self => this as NewSessionBookingRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewSessionBookingRow &&
+          other.sessionId == _self.sessionId &&
+          other.clientProfileId == _self.clientProfileId &&
+          other.status == _self.status &&
+          other.createdAt == _self.createdAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.sessionId,
+    _self.clientProfileId,
+    _self.status,
+    _self.createdAt,
+  );
+
+  @override
+  String toString() =>
+      'NewSessionBookingRow(sessionId: ${_self.sessionId}, clientProfileId: ${_self.clientProfileId}, status: ${_self.status}, createdAt: ${_self.createdAt})';
+}
+
 /// A [SessionBookingRow] before insert: every column but the id.
-final class NewSessionBookingRow extends DwRowDraft<SessionBookingRow> {
+final class NewSessionBookingRow extends DwRowDraft<SessionBookingRow>
+    with _$NewSessionBookingRow {
   const NewSessionBookingRow({
     required this.sessionId,
     required this.clientProfileId,
@@ -193,8 +219,30 @@ extension SessionReviewRowCopyWith on SessionReviewRow {
   );
 }
 
+mixin _$NewSessionReviewRow on DwRowDraft<SessionReviewRow> {
+  NewSessionReviewRow get _self => this as NewSessionReviewRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewSessionReviewRow &&
+          other.bookingId == _self.bookingId &&
+          other.rating == _self.rating &&
+          other.text == _self.text &&
+          other.createdAt == _self.createdAt;
+
+  @override
+  int get hashCode =>
+      Object.hash(_self.bookingId, _self.rating, _self.text, _self.createdAt);
+
+  @override
+  String toString() =>
+      'NewSessionReviewRow(bookingId: ${_self.bookingId}, rating: ${_self.rating}, text: ${_self.text}, createdAt: ${_self.createdAt})';
+}
+
 /// A [SessionReviewRow] before insert: every column but the id.
-final class NewSessionReviewRow extends DwRowDraft<SessionReviewRow> {
+final class NewSessionReviewRow extends DwRowDraft<SessionReviewRow>
+    with _$NewSessionReviewRow {
   const NewSessionReviewRow({
     required this.bookingId,
     required this.rating,

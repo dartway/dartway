@@ -25,8 +25,27 @@ extension AppSettingRowCopyWith on AppSettingRow {
       AppSettingRow(id: id, key: key ?? this.key, value: value ?? this.value);
 }
 
+mixin _$NewAppSettingRow on DwRowDraft<AppSettingRow> {
+  NewAppSettingRow get _self => this as NewAppSettingRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewAppSettingRow &&
+          other.key == _self.key &&
+          other.value == _self.value;
+
+  @override
+  int get hashCode => Object.hash(_self.key, _self.value);
+
+  @override
+  String toString() =>
+      'NewAppSettingRow(key: ${_self.key}, value: ${_self.value})';
+}
+
 /// A [AppSettingRow] before insert: every column but the id.
-final class NewAppSettingRow extends DwRowDraft<AppSettingRow> {
+final class NewAppSettingRow extends DwRowDraft<AppSettingRow>
+    with _$NewAppSettingRow {
   const NewAppSettingRow({required this.key, required this.value});
 
   final String key;

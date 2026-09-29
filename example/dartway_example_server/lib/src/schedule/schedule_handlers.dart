@@ -36,6 +36,8 @@ final scheduleHandlers = <DwCallHandler>[
   DwCallHandler.command<SaveClubService, ClubService>(
     access: AppAccess.admin,
     handle: (ctx, command) async {
+      // The command carries every column of a service, which has no owner:
+      // the draft is the whole row, and `withId` saves it.
       final draft = NewClubServiceRow(
         title: command.title.trim(),
         description: command.description,

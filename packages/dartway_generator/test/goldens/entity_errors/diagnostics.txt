@@ -18,5 +18,6 @@ app_server/lib/src/declarations.dart:60:13: row class `ClubSession` must be name
 app_server/lib/src/declarations.dart:71:13: row class `Row` must be named `<Entity>Row` (`SomeRow`): its table class is `<Entity>Table` and its repository getter `db.<entities>`, and a row never shares a name with the data object clients see
 app_server/lib/src/declarations.dart:81:13: class name `NewPlanRow` of row class `PlanRow` is also used at declarations.dart:92:13
 app_server/lib/src/declarations.dart:92:13: class name `NewPlanRow` of row class `NewPlanRow` is also used at declarations.dart:81:13
+app_server/lib/src/defaults.dart:11:13: the id of row class `DefaultIdRow` must be `int`, a required named parameter (`required this.id`): a row is what the database stored, and a row before insert is its draft, `NewDefaultIdRow`; found `int` without `required`
 app_server/lib/src/prefixed.dart:6:13: the generated part uses `DwTableColumn`, `DwTableDef`, `DwRowDraft`, `DwResultRow`, which `prefixed.dart` does not import without a prefix; add `import 'package:dartway_orm/dartway_orm.dart';`
 app_shared/lib/misplaced.dart:6:13: row class `MisplacedRow` is declared in `app_shared`; row classes belong in the *_server package, whose schema lists them

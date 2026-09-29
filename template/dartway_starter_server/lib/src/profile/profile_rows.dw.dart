@@ -67,8 +67,46 @@ extension UserProfileRowCopyWith on UserProfileRow {
   );
 }
 
+mixin _$NewUserProfileRow on DwRowDraft<UserProfileRow> {
+  NewUserProfileRow get _self => this as NewUserProfileRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewUserProfileRow &&
+          other.accountId == _self.accountId &&
+          other.firstName == _self.firstName &&
+          other.lastName == _self.lastName &&
+          other.gender == _self.gender &&
+          other.avatarFileId == _self.avatarFileId &&
+          other.role == _self.role &&
+          other.agreedForMarketing == _self.agreedForMarketing &&
+          other.termsAcceptedAt == _self.termsAcceptedAt &&
+          other.testVerificationCode == _self.testVerificationCode &&
+          other.createdAt == _self.createdAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.accountId,
+    _self.firstName,
+    _self.lastName,
+    _self.gender,
+    _self.avatarFileId,
+    _self.role,
+    _self.agreedForMarketing,
+    _self.termsAcceptedAt,
+    _self.testVerificationCode,
+    _self.createdAt,
+  );
+
+  @override
+  String toString() =>
+      'NewUserProfileRow(accountId: ${_self.accountId}, firstName: ${_self.firstName}, lastName: ${_self.lastName}, gender: ${_self.gender}, avatarFileId: ${_self.avatarFileId}, role: ${_self.role}, agreedForMarketing: ${_self.agreedForMarketing}, termsAcceptedAt: ${_self.termsAcceptedAt}, testVerificationCode: ${_self.testVerificationCode}, createdAt: ${_self.createdAt})';
+}
+
 /// A [UserProfileRow] before insert: every column but the id.
-final class NewUserProfileRow extends DwRowDraft<UserProfileRow> {
+final class NewUserProfileRow extends DwRowDraft<UserProfileRow>
+    with _$NewUserProfileRow {
   const NewUserProfileRow({
     required this.accountId,
     this.firstName = '',

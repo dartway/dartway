@@ -126,16 +126,40 @@ final booking = await ctx.db.sessionBookings.insert(
 booking.id; // an int, assigned by the database
 ```
 
-A draft has a `copyWith` of its own, and `withId(id)` — the row stored under an id already known,
-for `update`. "Create or save" by an optional id reads:
+A draft is a value like the row: it compares, hashes and prints by its columns, and has a
+`copyWith` of its own. `withId(id)` turns it into the row stored under an id already known.
 
-```dart
-final draft = NewClubServiceRow(title: command.title.trim(), /* … */);
-final saved = switch (command.id) {
-  null => await ctx.db.clubServices.insert(draft),
-  final id => await ctx.db.clubServices.update(draft.withId(id)),
-};
-```
+"Create or save" by an optional id takes one of two shapes, decided by what the command carries:
+
+- **The command carries every column of the row** — an admin form over the whole of a table with no
+  owner, no creation time, no counter the command does not set. The draft is the whole row, and
+  `withId` saves it (`update` of an id that is gone throws `DwRowNotFound`):
+
+  ```dart
+  final draft = NewClubServiceRow(title: command.title.trim(), /* every column */);
+  final saved = switch (command.id) {
+    null => await ctx.db.clubServices.insert(draft),
+    final id => await ctx.db.clubServices.update(draft.withId(id)),
+  };
+  ```
+
+- **Otherwise — the usual case** — the row has columns the command does not own: its owner, when it
+  was created, what other commands set. Read the stored row, by its id *and* its owner, and change
+  what the command owns; `withId` would overwrite the rest with the draft's defaults:
+
+  ```dart
+  final current = await ctx.db.invoices.findFirst(
+    where: (t) => t.id.equals(id) & t.ownerProfileId.equals(me.id),
+    lock: DwRowLock.forUpdate,
+  );
+  if (current == null) ctx.refuse(DwCoreRefusal.notFound);
+  final saved = await ctx.db.invoices.update(
+    current.copyWith(note: DwFieldPatch.set(command.note)),
+  );
+  ```
+
+  A row keyed by a unique column rather than an id (one settings row per member) is
+  `upsert(draft, conflictOn: (t) => [t.profileId])`.
 
 Ids are always the database's: there is no insert with an id of one's own, which would also leave
 the `bigserial` sequence behind the rows and fail the next insert.

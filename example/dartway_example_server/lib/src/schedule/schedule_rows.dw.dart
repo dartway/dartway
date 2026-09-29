@@ -47,8 +47,36 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
   );
 }
 
+mixin _$NewClubServiceRow on DwRowDraft<ClubServiceRow> {
+  NewClubServiceRow get _self => this as NewClubServiceRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewClubServiceRow &&
+          other.title == _self.title &&
+          other.description == _self.description &&
+          other.durationMinutes == _self.durationMinutes &&
+          other.price == _self.price &&
+          other.imageUrl == _self.imageUrl;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.title,
+    _self.description,
+    _self.durationMinutes,
+    _self.price,
+    _self.imageUrl,
+  );
+
+  @override
+  String toString() =>
+      'NewClubServiceRow(title: ${_self.title}, description: ${_self.description}, durationMinutes: ${_self.durationMinutes}, price: ${_self.price}, imageUrl: ${_self.imageUrl})';
+}
+
 /// A [ClubServiceRow] before insert: every column but the id.
-final class NewClubServiceRow extends DwRowDraft<ClubServiceRow> {
+final class NewClubServiceRow extends DwRowDraft<ClubServiceRow>
+    with _$NewClubServiceRow {
   const NewClubServiceRow({
     required this.title,
     required this.description,
@@ -195,8 +223,36 @@ extension ClubSessionRowCopyWith on ClubSessionRow {
   );
 }
 
+mixin _$NewClubSessionRow on DwRowDraft<ClubSessionRow> {
+  NewClubSessionRow get _self => this as NewClubSessionRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewClubSessionRow &&
+          other.serviceId == _self.serviceId &&
+          other.coachProfileId == _self.coachProfileId &&
+          other.startsAt == _self.startsAt &&
+          other.capacity == _self.capacity &&
+          other.bookedCount == _self.bookedCount;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.serviceId,
+    _self.coachProfileId,
+    _self.startsAt,
+    _self.capacity,
+    _self.bookedCount,
+  );
+
+  @override
+  String toString() =>
+      'NewClubSessionRow(serviceId: ${_self.serviceId}, coachProfileId: ${_self.coachProfileId}, startsAt: ${_self.startsAt}, capacity: ${_self.capacity}, bookedCount: ${_self.bookedCount})';
+}
+
 /// A [ClubSessionRow] before insert: every column but the id.
-final class NewClubSessionRow extends DwRowDraft<ClubSessionRow> {
+final class NewClubSessionRow extends DwRowDraft<ClubSessionRow>
+    with _$NewClubSessionRow {
   const NewClubSessionRow({
     required this.serviceId,
     this.coachProfileId,

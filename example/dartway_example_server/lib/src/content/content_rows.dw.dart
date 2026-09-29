@@ -43,8 +43,34 @@ extension NewsPostRowCopyWith on NewsPostRow {
   );
 }
 
+mixin _$NewNewsPostRow on DwRowDraft<NewsPostRow> {
+  NewNewsPostRow get _self => this as NewNewsPostRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewNewsPostRow &&
+          other.authorProfileId == _self.authorProfileId &&
+          other.title == _self.title &&
+          other.text == _self.text &&
+          other.createdAt == _self.createdAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.authorProfileId,
+    _self.title,
+    _self.text,
+    _self.createdAt,
+  );
+
+  @override
+  String toString() =>
+      'NewNewsPostRow(authorProfileId: ${_self.authorProfileId}, title: ${_self.title}, text: ${_self.text}, createdAt: ${_self.createdAt})';
+}
+
 /// A [NewsPostRow] before insert: every column but the id.
-final class NewNewsPostRow extends DwRowDraft<NewsPostRow> {
+final class NewNewsPostRow extends DwRowDraft<NewsPostRow>
+    with _$NewNewsPostRow {
   const NewNewsPostRow({
     required this.authorProfileId,
     required this.title,
@@ -165,8 +191,27 @@ extension AppSettingRowCopyWith on AppSettingRow {
       AppSettingRow(id: id, key: key ?? this.key, value: value ?? this.value);
 }
 
+mixin _$NewAppSettingRow on DwRowDraft<AppSettingRow> {
+  NewAppSettingRow get _self => this as NewAppSettingRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewAppSettingRow &&
+          other.key == _self.key &&
+          other.value == _self.value;
+
+  @override
+  int get hashCode => Object.hash(_self.key, _self.value);
+
+  @override
+  String toString() =>
+      'NewAppSettingRow(key: ${_self.key}, value: ${_self.value})';
+}
+
 /// A [AppSettingRow] before insert: every column but the id.
-final class NewAppSettingRow extends DwRowDraft<AppSettingRow> {
+final class NewAppSettingRow extends DwRowDraft<AppSettingRow>
+    with _$NewAppSettingRow {
   const NewAppSettingRow({required this.key, required this.value});
 
   final String key;

@@ -23,8 +23,24 @@ extension ChatChannelRowCopyWith on ChatChannelRow {
       ChatChannelRow(id: id, title: title ?? this.title);
 }
 
+mixin _$NewChatChannelRow on DwRowDraft<ChatChannelRow> {
+  NewChatChannelRow get _self => this as NewChatChannelRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatChannelRow && other.title == _self.title;
+
+  @override
+  int get hashCode => _self.title.hashCode;
+
+  @override
+  String toString() => 'NewChatChannelRow(title: ${_self.title})';
+}
+
 /// A [ChatChannelRow] before insert: every column but the id.
-final class NewChatChannelRow extends DwRowDraft<ChatChannelRow> {
+final class NewChatChannelRow extends DwRowDraft<ChatChannelRow>
+    with _$NewChatChannelRow {
   const NewChatChannelRow({required this.title});
 
   final String title;
@@ -124,8 +140,44 @@ extension ChatMessageRowCopyWith on ChatMessageRow {
   );
 }
 
+mixin _$NewChatMessageRow on DwRowDraft<ChatMessageRow> {
+  NewChatMessageRow get _self => this as NewChatMessageRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatMessageRow &&
+          other.channelId == _self.channelId &&
+          other.authorProfileId == _self.authorProfileId &&
+          other.text == _self.text &&
+          other.sentAt == _self.sentAt &&
+          other.editedAt == _self.editedAt &&
+          other.pinnedAt == _self.pinnedAt &&
+          other.pinnedByProfileId == _self.pinnedByProfileId &&
+          other.replyToMessageId == _self.replyToMessageId &&
+          other.deletedAt == _self.deletedAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.channelId,
+    _self.authorProfileId,
+    _self.text,
+    _self.sentAt,
+    _self.editedAt,
+    _self.pinnedAt,
+    _self.pinnedByProfileId,
+    _self.replyToMessageId,
+    _self.deletedAt,
+  );
+
+  @override
+  String toString() =>
+      'NewChatMessageRow(channelId: ${_self.channelId}, authorProfileId: ${_self.authorProfileId}, text: ${_self.text}, sentAt: ${_self.sentAt}, editedAt: ${_self.editedAt}, pinnedAt: ${_self.pinnedAt}, pinnedByProfileId: ${_self.pinnedByProfileId}, replyToMessageId: ${_self.replyToMessageId}, deletedAt: ${_self.deletedAt})';
+}
+
 /// A [ChatMessageRow] before insert: every column but the id.
-final class NewChatMessageRow extends DwRowDraft<ChatMessageRow> {
+final class NewChatMessageRow extends DwRowDraft<ChatMessageRow>
+    with _$NewChatMessageRow {
   const NewChatMessageRow({
     required this.channelId,
     required this.authorProfileId,
@@ -341,9 +393,37 @@ extension ChatMessageAttachmentRowCopyWith on ChatMessageAttachmentRow {
   );
 }
 
+mixin _$NewChatMessageAttachmentRow on DwRowDraft<ChatMessageAttachmentRow> {
+  NewChatMessageAttachmentRow get _self => this as NewChatMessageAttachmentRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatMessageAttachmentRow &&
+          other.messageId == _self.messageId &&
+          other.fileId == _self.fileId &&
+          other.position == _self.position &&
+          other.width == _self.width &&
+          other.height == _self.height;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.messageId,
+    _self.fileId,
+    _self.position,
+    _self.width,
+    _self.height,
+  );
+
+  @override
+  String toString() =>
+      'NewChatMessageAttachmentRow(messageId: ${_self.messageId}, fileId: ${_self.fileId}, position: ${_self.position}, width: ${_self.width}, height: ${_self.height})';
+}
+
 /// A [ChatMessageAttachmentRow] before insert: every column but the id.
 final class NewChatMessageAttachmentRow
-    extends DwRowDraft<ChatMessageAttachmentRow> {
+    extends DwRowDraft<ChatMessageAttachmentRow>
+    with _$NewChatMessageAttachmentRow {
   const NewChatMessageAttachmentRow({
     required this.messageId,
     required this.fileId,
@@ -494,9 +574,29 @@ extension ChatMessageReactionRowCopyWith on ChatMessageReactionRow {
   );
 }
 
+mixin _$NewChatMessageReactionRow on DwRowDraft<ChatMessageReactionRow> {
+  NewChatMessageReactionRow get _self => this as NewChatMessageReactionRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatMessageReactionRow &&
+          other.messageId == _self.messageId &&
+          other.profileId == _self.profileId &&
+          other.reaction == _self.reaction;
+
+  @override
+  int get hashCode =>
+      Object.hash(_self.messageId, _self.profileId, _self.reaction);
+
+  @override
+  String toString() =>
+      'NewChatMessageReactionRow(messageId: ${_self.messageId}, profileId: ${_self.profileId}, reaction: ${_self.reaction})';
+}
+
 /// A [ChatMessageReactionRow] before insert: every column but the id.
-final class NewChatMessageReactionRow
-    extends DwRowDraft<ChatMessageReactionRow> {
+final class NewChatMessageReactionRow extends DwRowDraft<ChatMessageReactionRow>
+    with _$NewChatMessageReactionRow {
   const NewChatMessageReactionRow({
     required this.messageId,
     required this.profileId,
@@ -630,8 +730,34 @@ extension ChatReadPositionRowCopyWith on ChatReadPositionRow {
   );
 }
 
+mixin _$NewChatReadPositionRow on DwRowDraft<ChatReadPositionRow> {
+  NewChatReadPositionRow get _self => this as NewChatReadPositionRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatReadPositionRow &&
+          other.profileId == _self.profileId &&
+          other.channelId == _self.channelId &&
+          other.messageId == _self.messageId &&
+          other.sentAt == _self.sentAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.profileId,
+    _self.channelId,
+    _self.messageId,
+    _self.sentAt,
+  );
+
+  @override
+  String toString() =>
+      'NewChatReadPositionRow(profileId: ${_self.profileId}, channelId: ${_self.channelId}, messageId: ${_self.messageId}, sentAt: ${_self.sentAt})';
+}
+
 /// A [ChatReadPositionRow] before insert: every column but the id.
-final class NewChatReadPositionRow extends DwRowDraft<ChatReadPositionRow> {
+final class NewChatReadPositionRow extends DwRowDraft<ChatReadPositionRow>
+    with _$NewChatReadPositionRow {
   const NewChatReadPositionRow({
     required this.profileId,
     required this.channelId,

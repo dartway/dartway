@@ -2,6 +2,10 @@
 
 ## 0.13.0
 
+- **BREAKING: new error check `redundantBangAllowed`** — the server and the shared package's
+  `analysis_options.yaml` (or a local file it includes) must raise the analyzer's
+  `unnecessary_non_null_assertion` to an error. A stored row's id is `int` now, and `row.id!` hides
+  the `!` that guards a real null (dartway/dartway#384, D-113).
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
   `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature
   law says (dartway/dartway#380). Wording only; no check changed.

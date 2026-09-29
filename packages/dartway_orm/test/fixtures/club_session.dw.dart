@@ -51,8 +51,38 @@ extension ClubSessionRowCopyWith on ClubSessionRow {
   );
 }
 
+mixin _$NewClubSessionRow on DwRowDraft<ClubSessionRow> {
+  NewClubSessionRow get _self => this as NewClubSessionRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewClubSessionRow &&
+          other.serviceId == _self.serviceId &&
+          other.previousSessionId == _self.previousSessionId &&
+          other.startsAt == _self.startsAt &&
+          other.capacity == _self.capacity &&
+          other.note == _self.note &&
+          dwListEquals(other.labels, _self.labels);
+
+  @override
+  int get hashCode => Object.hash(
+    _self.serviceId,
+    _self.previousSessionId,
+    _self.startsAt,
+    _self.capacity,
+    _self.note,
+    _self.labels == null ? null : Object.hashAll(_self.labels!),
+  );
+
+  @override
+  String toString() =>
+      'NewClubSessionRow(serviceId: ${_self.serviceId}, previousSessionId: ${_self.previousSessionId}, startsAt: ${_self.startsAt}, capacity: ${_self.capacity}, note: ${_self.note}, labels: ${_self.labels})';
+}
+
 /// A [ClubSessionRow] before insert: every column but the id.
-final class NewClubSessionRow extends DwRowDraft<ClubSessionRow> {
+final class NewClubSessionRow extends DwRowDraft<ClubSessionRow>
+    with _$NewClubSessionRow {
   const NewClubSessionRow({
     required this.serviceId,
     this.previousSessionId,

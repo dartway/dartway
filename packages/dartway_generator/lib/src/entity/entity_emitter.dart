@@ -38,9 +38,22 @@ abstract final class EntityEmitter {
     final fields = [
       for (final field in values) 'final ${field.spelling} ${field.name};',
     ];
-    return '/// A [${entity.name}] before insert: every column but the id.\n'
-        'final class ${entity.draftClass} extends DwRowDraft<${entity.name}> {\n'
-        'const ${entity.draftClass}('
+    final draft = entity.draftClass;
+    final base = 'DwRowDraft<${entity.name}>';
+    // A value like the row: compared, hashed and printed by its columns, with
+    // the members the row's mixin has, written by the same writer.
+    final members = [
+      ?ValueClassWriter.self(draft, values),
+      ValueClassWriter.equalsMember(draft, values),
+      ValueClassWriter.hashCodeMember(draft, values, seedWithType: false),
+      ValueClassWriter.toStringMember(draft, values),
+    ];
+    return 'mixin _\$$draft on $base {\n'
+        '${members.join('\n\n')}\n'
+        '}\n\n'
+        '/// A [${entity.name}] before insert: every column but the id.\n'
+        'final class $draft extends $base with _\$$draft {\n'
+        'const $draft('
         '${parameters.isEmpty ? '' : '{${parameters.join(', ')}}'});\n\n'
         '${fields.join('\n')}\n'
         '}';

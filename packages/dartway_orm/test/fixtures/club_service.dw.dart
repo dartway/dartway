@@ -67,8 +67,46 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
   );
 }
 
+mixin _$NewClubServiceRow on DwRowDraft<ClubServiceRow> {
+  NewClubServiceRow get _self => this as NewClubServiceRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewClubServiceRow &&
+          other.title == _self.title &&
+          other.kind == _self.kind &&
+          other.price == _self.price &&
+          other.duration == _self.duration &&
+          dwListEquals(other.tags, _self.tags) &&
+          dwListEquals(other.offeredAs, _self.offeredAs) &&
+          other.createdAt == _self.createdAt &&
+          other.archivedAt == _self.archivedAt &&
+          dwListEquals(other.cover, _self.cover) &&
+          other.active == _self.active;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.title,
+    _self.kind,
+    _self.price,
+    _self.duration,
+    Object.hashAll(_self.tags),
+    Object.hashAll(_self.offeredAs),
+    _self.createdAt,
+    _self.archivedAt,
+    _self.cover == null ? null : Object.hashAll(_self.cover!),
+    _self.active,
+  );
+
+  @override
+  String toString() =>
+      'NewClubServiceRow(title: ${_self.title}, kind: ${_self.kind}, price: ${_self.price}, duration: ${_self.duration}, tags: ${_self.tags}, offeredAs: ${_self.offeredAs}, createdAt: ${_self.createdAt}, archivedAt: ${_self.archivedAt}, cover: ${_self.cover}, active: ${_self.active})';
+}
+
 /// A [ClubServiceRow] before insert: every column but the id.
-final class NewClubServiceRow extends DwRowDraft<ClubServiceRow> {
+final class NewClubServiceRow extends DwRowDraft<ClubServiceRow>
+    with _$NewClubServiceRow {
   const NewClubServiceRow({
     required this.title,
     required this.kind,
