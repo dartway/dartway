@@ -69,6 +69,20 @@ final b = session.clock.now();
     });
   });
 
+  test('through a prefixed package:clock import count too', () {
+    expect(
+      DwServerClockInspector.readsIn('''
+import 'package:clock/clock.dart' as c;
+
+final a = c.clock.now();
+final b = c . clock.now();
+final d = clock.now();
+'''),
+      [(3, 'c.clock.now'), (4, 'c.clock.now')],
+      reason: 'unprefixed `clock` is not that package here',
+    );
+  });
+
   group('over a server package', () {
     late Directory root;
     late Directory server;
@@ -83,7 +97,7 @@ final b = session.clock.now();
       ..createSync(recursive: true)
       ..writeAsStringSync(content);
 
-    test("fails on lib/src and names each file and line; bin/ and test/ "
+    test("fails on lib/ and names each file and line; bin/ and test/ "
         'decide their own time', () {
       write('lib/src/billing/billing_handlers.dart', '''
 Future<void> pay(DwCallContext ctx) async {
@@ -114,6 +128,19 @@ final due = ctx.now.add(const Duration(days: 1));
       );
       expect(inspector.findings.single, contains(':2;'));
       expect(tally.counts, {DwCheckType.forbiddenDateTimeNow: 1});
+    });
+
+    test('judges all of lib/, the factory file beside src/ included', () {
+      write('lib/shop_server.dart', '''
+DwAppServer build() => DwAppServer(startedAt: DateTime.now());
+''');
+      write('lib/src/billing/billing_handlers.dart', 'final a = ctx.now;\n');
+      final inspector = DwServerClockInspector(serverPackageDir: server);
+      expect(inspector.run(), 1);
+      expect(
+        inspector.findings.single,
+        contains('${p.join('shop_server', 'lib', 'shop_server.dart')}:1;'),
+      );
     });
 
     test('passes a server that reads ctx.now', () {

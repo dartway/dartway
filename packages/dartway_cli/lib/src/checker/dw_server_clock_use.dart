@@ -8,12 +8,13 @@ import 'dw_check_type.dart';
 /// The server reads the time from its clock, `ctx.now`
 /// ([DwCheckType.forbiddenDateTimeNow], dartway/dartway#385).
 ///
-/// `DateTime.now()` in a server's `lib/src/` is a time no test can set: the
+/// `DateTime.now()` in a server's `lib/` is a time no test can set: the
 /// server's clock (`DwAppServer(clock: …)`) is what a `DwTestClock` moves,
 /// and what the job queue decides due times by. So the system clock is
-/// refused there in every spelling that reads it — `DateTime.now`,
-/// `DateTime.timestamp`, called or torn off, and `clock.now()` of
-/// `package:clock` in a file that imports it. Comments and strings are not
+/// refused anywhere under `lib/` — the factory file beside `src/` included —
+/// in every spelling that reads it: `DateTime.now`, `DateTime.timestamp`,
+/// called or torn off, and `clock.now()` of `package:clock` in a file that
+/// imports it, under a prefix or without one. Comments and strings are not
 /// code. `bin/`, `test/` and `tool/` stay free: a seed or a test decides its
 /// own time.
 class DwServerClockInspector {
@@ -36,10 +37,17 @@ class DwServerClockInspector {
   static final _systemNow = RegExp(
     r'\bDateTime\s*\.\s*(now|timestamp)\b(?!\s*[\w$])',
   );
-  static final _clockNow = RegExp(r'(?<![\w$.])clock\s*\.\s*now\b');
+
+  /// `import 'package:clock/…'`, and its `as` prefix when it has one.
   static final _clockImport = RegExp(
-    r'''^\s*import\s+['"]package:clock/''',
+    r'''^\s*import\s+['"]package:clock/[^'"]*['"]\s*(?:as\s+(\w+))?''',
     multiLine: true,
+  );
+
+  /// `clock.now` reached through [prefix] (`c.clock.now`), or unprefixed.
+  static RegExp _clockNow(String? prefix) => RegExp(
+    '(?<![\\w\$.])${prefix == null ? '' : '${RegExp.escape(prefix)}\\s*\\.\\s*'}'
+    'clock\\s*\\.\\s*now\\b',
   );
 
   /// What reads the system clock in [content], as `(line, spelling)`.
@@ -47,7 +55,8 @@ class DwServerClockInspector {
     final code = withoutCommentsAndStrings(content);
     final matches = [
       ..._systemNow.allMatches(code),
-      if (_clockImport.hasMatch(content)) ..._clockNow.allMatches(code),
+      for (final import in _clockImport.allMatches(content))
+        ..._clockNow(import.group(1)).allMatches(code),
     ]..sort((a, b) => a.start.compareTo(b.start));
     return [
       for (final match in matches)
@@ -61,10 +70,10 @@ class DwServerClockInspector {
   int run({DwCheckTally? tally}) {
     final server = serverPackageDir;
     if (!_enabled || server == null) return 0;
-    final src = Directory(p.join(server.path, 'lib', 'src'));
-    if (!src.existsSync()) return 0;
+    final lib = Directory(p.join(server.path, 'lib'));
+    if (!lib.existsSync()) return 0;
     final files =
-        src
+        lib
             .listSync(recursive: true)
             .whereType<File>()
             .where((file) => file.path.endsWith('.dart'))

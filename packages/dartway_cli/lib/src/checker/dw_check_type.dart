@@ -181,7 +181,7 @@ enum DwCheckType {
   devComposeDrifted,
 
   /// `DateTime.now()` (or `DateTime.timestamp()`, or `package:clock`'s
-  /// `clock.now()`) in the server package's `lib/src/` — the time is
+  /// `clock.now()`) anywhere in the server package's `lib/` — the time is
   /// `ctx.now`, read from the server's clock (dartway/dartway#385).
   ///
   /// An error, because the two are not interchangeable spellings: the

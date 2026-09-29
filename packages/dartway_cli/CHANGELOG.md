@@ -2,10 +2,11 @@
 
 ## 0.13.0
 
-- **New error, `forbiddenDateTimeNow`: the server's `lib/src/` reads the time as `ctx.now`**
+- **New error, `forbiddenDateTimeNow`: the server's `lib/` reads the time as `ctx.now`**
   (dartway/dartway#385). `DateTime.now` and `DateTime.timestamp` — called, torn off or inside an
-  interpolation — and `package:clock`'s `clock.now()` where it is imported fail `dartway check`;
-  comments and strings are passed over, `bin/` and `test/` are not judged. The server's clock is the
+  interpolation — and `package:clock`'s `clock.now()` where it is imported, prefixed or not, fail
+  `dartway check` anywhere under `lib/`, the factory file included; comments and strings are passed
+  over, `bin/` and `test/` are not judged. The server's clock is the
   one tests set (`DwTestClock`) and the job queue runs by. Migration note:
   `docs/migrations/2026-09-29-server-clock-and-caller-offset.md`.
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
