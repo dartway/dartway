@@ -133,8 +133,8 @@ page is already the message.
 
 ## Proven by
 
-- `example/dartway_example_flutter/test/app/update_required_test.dart` and the last test of
-  `template/dartway_starter_flutter/test/auth/sign_in_test.dart`: a fake server whose contract moved
+- `example/dartway_example_flutter/test/core/update_required_page_test.dart` and the last test of
+  `template/dartway_starter_flutter/test/auth/auth_page_test.dart`: a fake server whose contract moved
   to a newer breaking line answers the app, which is mounted through `DwAppBootstrapper` exactly as the
   runner mounts it; the client reports `dw.updateRequired`, "Update the app" is on screen, and nothing
   of the app is.

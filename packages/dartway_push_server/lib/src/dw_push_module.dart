@@ -26,7 +26,7 @@ import 'providers/dw_push_provider.dart';
 /// // in a command, in its transaction:
 /// await ctx.push.send(memberIds,
 ///     message: DwPushMessage(title: post.title, data: NewsAlert(id: post.id), link: '/news'),
-///     category: ExamplePushCategory.news,
+///     category: AcmePushCategory.news,
 ///     dedupKey: 'news:${post.id}');
 /// ```
 ///

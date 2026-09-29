@@ -163,7 +163,7 @@ await app.settle(tester);
 expect(find.byType(NewsPage), findsOneWidget);
 ```
 
-The example's `test/app/push_test.dart` holds these, and a cold start that lands on the news.
+The example's `test/core/push/push_opened_listener_test.dart` holds these, and a cold start that lands on the news.
 
 ## See also
 

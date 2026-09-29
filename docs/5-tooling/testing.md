@@ -156,7 +156,7 @@ testWidgets('the app name comes from the server settings, and a name saved '
 });
 ```
 
-(`template/dartway_starter_flutter/test/app/home_page_test.dart`.) `stop` waits out notifications,
+(`template/dartway_starter_flutter/test/app/home/home_page_test.dart`.) `stop` waits out notifications,
 unmounts the app, disposes the core and asserts `server.errors` is empty.
 
 **Settle by short pumps, not `pumpAndSettle`.** A loading indicator animates for as long as it is on

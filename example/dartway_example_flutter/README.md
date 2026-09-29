@@ -24,4 +24,4 @@ The build it reports (`lib/core/app_version.dart`) is the `version` of
 
 Widget tests pump the whole app against `DwFakeServer` — an in-memory server
 speaking the real HTTP contract and live socket — with a core built per test
-(`test/support/example_test_app.dart`).
+(`test/support/app_test_app.dart`).

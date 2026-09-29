@@ -3,7 +3,7 @@
 /// show them:
 ///
 /// ```dart
-/// enum ExamplePushCategory with DwPushCategory { news, bookings }
+/// enum AcmePushCategory with DwPushCategory { news, bookings }
 /// ```
 ///
 /// The framework stores the name and hands it to the project's eligibility

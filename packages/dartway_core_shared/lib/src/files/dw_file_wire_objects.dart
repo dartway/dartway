@@ -9,7 +9,7 @@ import '../wire/dw_wire_object.dart';
 /// in its shared package:
 ///
 /// ```dart
-/// enum ExampleUpload with DwUploadPurpose { avatar, chatPhoto }
+/// enum AcmeUpload with DwUploadPurpose { avatar, chatPhoto }
 /// ```
 ///
 /// The server declares, once per purpose, who may upload, how large a file

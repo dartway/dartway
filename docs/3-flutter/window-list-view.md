@@ -132,7 +132,7 @@ command (`example/dartway_example_flutter/lib/app/chat/logic/chat_session.dart`)
 - `packages/dartway_core_flutter/test/dw_window_list_view_test.dart` — opens at the newest line without
   reversing; older lines loaded above keep the first visible line within a pixel; scrolled up, new lines
   move nothing and are counted; opening at an anchor; scrolling to an unloaded line reopens the window.
-- `example/dartway_example_flutter/test/app/chat_test.dart` — the chat opens under the unread divider and
+- `example/dartway_example_flutter/test/app/chat/staff_chat_page_test.dart` — the chat opens under the unread divider and
   marks read what comes on screen, a new message scrolled up is counted on the arrow, the pinned bar and
   a search reach a message far back in the history.
 

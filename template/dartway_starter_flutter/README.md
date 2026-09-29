@@ -6,10 +6,13 @@ browser: `../README.md`.
 - `lib/auth/` — signing in by phone or e-mail and code, the terms on sign-up
 - `lib/app/` — the signed-in app: home, profile (photo, name, identifiers)
 - `lib/admin/` — the admin panel: dashboard, members, user card, settings
-- `lib/core/` — the DartWay core (`dw`), the router, the profile gate, the
-  refusal texts, the "update the app" screen
-- `lib/shared/` — building blocks several features use
-- `lib/ui_kit/` — the design system, owned by this app
+- `lib/core/` — the DartWay core (`dw`), the router with the zones' shells,
+  the profile gate, the refusal texts, the "update the app" screen, the
+  section extension every screen renders its reads with
+- `lib/shared/` — non-visual helpers several features use (extensions,
+  formatters); the skeleton has none yet
+- `lib/ui_kit/` — the design system, owned by this app: styles and every
+  visual building block
 - `lib/l10n/` — the texts (English and Russian); `flutter gen-l10n` writes
   `lib/l10n/gen/`
 

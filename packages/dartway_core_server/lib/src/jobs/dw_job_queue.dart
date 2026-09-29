@@ -10,7 +10,8 @@ abstract interface class DwJobQueue {
   ///
   /// The payload is encoded here, by the kind's codec, so a payload that is
   /// not JSON fails at the call site; the server must declare a job of this
-  /// kind (`DwAppServer(jobs: …)` or a module's), or this throws.
+  /// kind (in a feature's `DwServerFeature(jobs: …)` or a module's), or this
+  /// throws.
   ///
   /// A [key] deduplicates: while a job with the same key is pending, another
   /// enqueue with it does nothing and returns `false`.
@@ -54,8 +55,9 @@ final class DwJobAttempt {
 }
 
 /// A background job the server knows how to run: [DwQueuedJob], run once per
-/// enqueue, or [DwRecurringJob]; both go into `DwAppServer(jobs: …)`. Names
-/// starting with `dw.` belong to the framework.
+/// enqueue, or [DwRecurringJob]; both are declared by the feature they belong
+/// to, `DwServerFeature(jobs: …)`, or by a module. Names starting with `dw.`
+/// belong to the framework.
 sealed class DwJobDefinition {
   const DwJobDefinition._(this.name);
 
