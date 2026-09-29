@@ -151,9 +151,16 @@ final class DwDeclaredFunction {
     required this.offset,
     this.enclosingType,
     this.extendedType,
+    this.isField = false,
   });
 
   final String name;
+
+  /// A field holding a closure — `static final announce = (ctx, row) {…}` —
+  /// rather than a function. The same declaration to every rule: rewriting a
+  /// function as a field does not move it anywhere. [returnType] is then the
+  /// field's type as written, empty when it is inferred.
+  final bool isField;
 
   /// As written before the name, modifiers such as `static` included.
   final String returnType;
@@ -186,6 +193,9 @@ final class DwDartOutline {
   final String code;
 
   final Map<int, int> _closing = {};
+
+  /// The bracket each bracket opens inside, if any.
+  final Map<int, int> _parent = {};
   final List<DwDeclaredFunction> functions = [];
 
   /// 1-based line of [offset].
@@ -200,6 +210,7 @@ final class DwDartOutline {
     for (var i = 0; i < code.length; i++) {
       final c = code[i];
       if (_open.containsKey(c)) {
+        if (stack.isNotEmpty) _parent[i] = stack.last;
         stack.add(i);
       } else if (c == ')' || c == ']' || c == '}') {
         if (stack.isEmpty) continue;
@@ -224,6 +235,13 @@ final class DwDartOutline {
     r'([A-Za-z_$][\w$]*)'
     r'\s*(?:<[^;=\n()]*?>)?\s*'
     r'(\()?',
+  );
+
+  static final _closureField = RegExp(
+    r'(?:@[\w.]+(?:\([^\n]*?\))?\s+)*'
+    r'(?:(?:static|late|final|var|const)\s+)*'
+    r'(?:([^;=\n]*?[\w>?)\]])\s+)?'
+    r'([A-Za-z_$][\w$]*)\s*=\s*\(',
   );
 
   static const _notNames = {
@@ -279,10 +297,6 @@ final class DwDartOutline {
         i = end + 1;
         continue;
       }
-      if (c == '(' || c == '[') {
-        i = closeOf(i) + 1;
-        continue;
-      }
       if (i == 0 || code[i - 1] == '\n') {
         final declared = _declarationAt(i);
         if (declared != null) {
@@ -290,6 +304,10 @@ final class DwDartOutline {
           i = declared.bodyEnd;
           continue;
         }
+      }
+      if (c == '(' || c == '[') {
+        i = closeOf(i) + 1;
+        continue;
       }
       i++;
     }
@@ -305,10 +323,6 @@ final class DwDartOutline {
     var i = from;
     while (i < to) {
       final c = code[i];
-      if (c == '{' || c == '(' || c == '[') {
-        i = closeOf(i) + 1;
-        continue;
-      }
       if (code[i - 1] == '\n') {
         final declared = _declarationAt(
           i,
@@ -320,6 +334,10 @@ final class DwDartOutline {
           i = declared.bodyEnd;
           continue;
         }
+      }
+      if (c == '{' || c == '(' || c == '[') {
+        i = closeOf(i) + 1;
+        continue;
       }
       i++;
     }
@@ -343,6 +361,29 @@ final class DwDartOutline {
     while (j < code.length && (code[j] == ' ' || code[j] == '\t')) {
       j++;
     }
+    final field = _closureField.matchAsPrefix(code, j);
+    if (field != null && !_notNames.contains(field.group(2))) {
+      final open = field.end - 1;
+      final body = _bodyAfter(closeOf(open) + 1);
+      if (body != null) {
+        return DwDeclaredFunction(
+          name: field.group(2)!,
+          returnType: (field.group(1) ?? '')
+              .replaceAll(
+                RegExp(r'^(?:(?:static|late|final|var|const)\s+)+'),
+                '',
+              )
+              .trim(),
+          parameters: code.substring(open + 1, closeOf(open)),
+          bodyStart: body.$1,
+          bodyEnd: body.$2,
+          offset: j,
+          enclosingType: enclosingType,
+          extendedType: extendedType,
+          isField: true,
+        );
+      }
+    }
     final match = _declarationHeader.matchAsPrefix(code, j);
     if (match == null) return null;
     final name = match.group(3)!;
@@ -358,6 +399,23 @@ final class DwDartOutline {
       parameters = code.substring(match.end, close);
       k = close + 1;
     }
+    final body = _bodyAfter(k);
+    if (body == null) return null;
+    return DwDeclaredFunction(
+      name: name,
+      returnType: (match.group(1) ?? '').trim(),
+      parameters: parameters,
+      bodyStart: body.$1,
+      bodyEnd: body.$2,
+      offset: j,
+      enclosingType: enclosingType,
+      extendedType: extendedType,
+    );
+  }
+
+  /// The body starting at [k] after an optional `async`/`async*`/`sync*`:
+  /// `{…}` or `=> …`, as its start and end; null when none starts there.
+  (int, int)? _bodyAfter(int k) {
     k = _skipSpace(k);
     for (final modifier in const ['async*', 'sync*', 'async']) {
       if (code.startsWith(modifier, k)) {
@@ -365,24 +423,9 @@ final class DwDartOutline {
         break;
       }
     }
-    final int bodyEnd;
-    if (k < code.length && code[k] == '{') {
-      bodyEnd = closeOf(k) + 1;
-    } else if (code.startsWith('=>', k)) {
-      bodyEnd = _expressionEnd(k + 2);
-    } else {
-      return null;
-    }
-    return DwDeclaredFunction(
-      name: name,
-      returnType: (match.group(1) ?? '').trim(),
-      parameters: parameters,
-      bodyStart: k,
-      bodyEnd: bodyEnd,
-      offset: j,
-      enclosingType: enclosingType,
-      extendedType: extendedType,
-    );
+    if (k < code.length && code[k] == '{') return (k, closeOf(k) + 1);
+    if (code.startsWith('=>', k)) return (k, _expressionEnd(k + 2));
+    return null;
   }
 
   int _skipSpace(int k) {
@@ -408,42 +451,67 @@ final class DwDartOutline {
     return code.length;
   }
 
-  /// The offsets in [function]'s body where [pattern] matches outside any
-  /// closure the body passes on — a callback's `(…) {…}` or `(…) => …`.
+  /// The offsets in [function]'s body where [pattern] matches — its own
+  /// code and every closure it runs, except a hook it hands to a
+  /// constructor by name: `DwAuthConfig(onAccountCreated: (ctx, …) {…})`.
   ///
-  /// A publish inside a hook handed to a config belongs to the hook, not to
-  /// the method that builds the config.
+  /// A publish inside such a hook belongs to the hook, not to the method that
+  /// builds the config; a publish inside `rows.forEach((r) => …)` or
+  /// `db.transaction((tx) async {…})` is the helper's own.
   List<int> ownMatches(DwDeclaredFunction function, RegExp pattern) {
     final start = function.bodyStart;
     final end = function.bodyEnd;
-    final closures = <(int, int)>[];
+    final hooks = <(int, int)>[];
     for (var k = start; k < end; k++) {
       if (code[k] != '(') continue;
       final close = closeOf(k);
       if (close >= end) continue;
-      if (!_isClosureParameters(k)) continue;
-      var after = _skipSpace(close + 1);
-      for (final modifier in const ['async*', 'sync*', 'async']) {
-        if (code.startsWith(modifier, after)) {
-          after = _skipSpace(after + modifier.length);
-          break;
-        }
-      }
-      if (after < end && code[after] == '{') {
-        closures.add((after, closeOf(after)));
-      } else if (code.startsWith('=>', after)) {
-        closures.add((after, _expressionEnd(after + 2)));
-      }
+      if (!_isClosureParameters(k) || !_isConstructorHook(k)) continue;
+      final body = _bodyAfter(close + 1);
+      if (body != null && body.$1 < end) hooks.add(body);
     }
-    final body = code.substring(start, end);
+    final text = code.substring(start, end);
     return [
-      for (final match in pattern.allMatches(body))
-        if (!closures.any(
+      for (final match in pattern.allMatches(text))
+        if (!hooks.any(
           (range) =>
               start + match.start > range.$1 && start + match.start < range.$2,
         ))
           start + match.start,
     ];
+  }
+
+  /// Whether the closure whose parameters open at [open] is a named argument
+  /// (`name: (…) …`) of a call whose callee starts with a capital — a
+  /// constructor or a type's static, `DwAuthConfig(` or `DwChannelRule.keyed(`.
+  bool _isConstructorHook(int open) {
+    var k = open - 1;
+    while (k >= 0 && code[k].trim().isEmpty) {
+      k--;
+    }
+    if (k < 0 || code[k] != ':') return false;
+    final call = _parent[open];
+    if (call == null || code[call] != '(') return false;
+    var c = call - 1;
+    while (c >= 0 && code[c].trim().isEmpty) {
+      c--;
+    }
+    // Past type arguments: `DwChannelRule.keyed<int>(`.
+    if (c >= 0 && code[c] == '>') {
+      var depth = 0;
+      while (c >= 0) {
+        if (code[c] == '>') depth++;
+        if (code[c] == '<') depth--;
+        c--;
+        if (depth == 0) break;
+      }
+    }
+    var from = c;
+    while (from >= 0 && RegExp(r'[\w$.]').hasMatch(code[from])) {
+      from--;
+    }
+    final callee = code.substring(from + 1, c + 1);
+    return RegExp(r'^[A-Z]').hasMatch(callee);
   }
 
   /// Whether the `(` at [open] opens a closure's parameters: what stands

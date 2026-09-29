@@ -64,8 +64,8 @@ __SERVER_PKG__/
 The top level of `lib/` is closed: the package library, `generated/`, `src/`. **So is `src/`: folders
 only — `core/`, `migrations/` and one per feature**, each declaring its `DwServerFeature` in
 `<feature>_feature.dart`, and the server lists the features: `DwAppServer(features: [...])`. A file at
-the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`, `objects/`,
-`services/`) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
+the top of `src/`, a layer-named folder (the list:
+[project layout](https://dartway.dev/1-getting-started/project-layout)) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
 `dart run dartway_cli:dartway check`. **So is a feature**: the files above and nothing else, a layer
 name at no depth, and each kind declared only in its own file — handlers in `_handlers`, row classes
 in `_rows`, jobs in `_jobs`, routes in `_routes`, a function that publishes in `_publications`, a row → data object

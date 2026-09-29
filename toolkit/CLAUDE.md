@@ -130,7 +130,7 @@ PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commi
 
 ## Server (`__SERVER_PKG__`)
 
-**The top level of `lib/` is a closed list:** `__SERVER_PKG__.dart`, `generated/` (**do not edit**) and `src/`. **`src/` is folders only: `core/`, `migrations/`, and one folder per feature** declaring its `DwServerFeature` in `<feature>_feature.dart`. No layer folders (`handlers/`, `rows/`, `domain/`) (`invalidTopLevelLayout`).
+**The top level of `lib/` is a closed list:** `__SERVER_PKG__.dart`, `generated/` (**do not edit**) and `src/`. **`src/` is folders only: `core/`, `migrations/`, and one folder per feature** declaring its `DwServerFeature` in `<feature>_feature.dart`. No layer-named folders at any depth — the list is `dartway-server` §1's (`invalidTopLevelLayout`, `invalidServerFeatureFile`).
 
 - **`core/` has fixed file names, without the project's name:** `auth.dart` (`AppAuth`), `call_context.dart` (the caller and `AppAccess`), `channels.dart` (`AppChannels`), `files.dart` (`AppFiles`, every upload rule), `bootstrap.dart` (`AppBootstrap`), and `push.dart` with push.
 - **A feature's file set is closed:** `<feature>_<kind>.dart` or `<feature>_<part>_<kind>.dart`, kind one of `feature`, `rows`, `handlers`, `objects` (rows → data objects), `publications` (what a change is published as, and to whom), `jobs`, `access`, `routes`, plus one flat `logic/` for everything else; what a file declares matches its kind, and `core/` holds none of them (`invalidServerFeatureFile`, `misplacedServerCode`; `dartway-server` §1). A feature imports another's `_rows`, `_objects` and `_publications`, never its `_handlers`.

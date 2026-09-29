@@ -100,8 +100,8 @@ my_app_server/
 check` as the Flutter package's top level is. A feature's folder holds everything of its area — its
 rows, handlers, objects, publications and jobs, each in a file of its kind (below) — and
 declares itself in `<feature>_feature.dart` as a `DwServerFeature` the server
-lists. No file sits at the top of `src/`, and no folder there is named for a layer (`handlers/`,
-`rows/`, `entities/`, `domain/`, `objects/`, `services/`): a feature split across layers lives in
+lists. No file sits at the top of `src/`, and no folder anywhere under it is named for a layer (the
+list is below): a feature split across layers lives in
 four places, and a project that grew that way ended with a `chat/` beside a `domain/chat/` and two
 rules for who is in a chat. `src/migrations/migrations.dart` is a fixed name — `bin/migrate.dart`
 writes and reads migrations by that path.
@@ -134,8 +134,8 @@ a layer: `domain`, `rows`, `handlers`, `services`, `models`, `objects`, `reposit
 | a job — `DwQueuedJob`, `DwRecurringJob`, a `DwJobKind` constructed | `*_jobs.dart` |
 | a route — `DwHttpRoute.…(`, a `<DwHttpRoute>[…]` list | `*_routes.dart` |
 | `DwServerFeature(` | `<feature>_feature.dart` |
-| a publication — a named function or method that calls `.publish(` itself, outside the closures it hands on | `*_publications.dart` |
-| a mapping — a named function or method that takes a row (a `…Row` parameter, or a member of a row class or of an extension on one), returns a data object of the shared package, and builds one | `*_objects.dart` |
+| a publication — a named function, method or closure-holding field that calls `ctx.publish(`, in closures it runs too (`forEach`, `transaction`) — but not in a hook it hands to a constructor by name (`DwAuthConfig(onAccountCreated: …)`) | `*_publications.dart` |
+| a mapping — a named function, method or closure-holding field that takes a row (a `…Row` parameter, or a member of a row class or of an extension on one), returns a data object of the shared package, and builds one | `*_objects.dart` |
 
 `core/` holds none of them. What is not a declaration is not judged: a handler or a sign-in hook
 publishing inline (`ctx.publish` inside its closure) is a call, not a publication, and a mapping

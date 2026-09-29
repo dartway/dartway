@@ -26,15 +26,66 @@ const dwServerFeatureLogicFolder = 'logic';
 
 /// The kind of a feature's file named [fileName], or null when the name is not
 /// `<feature>_<kind>.dart` / `<feature>_<part>_<kind>.dart`. A `feature` file
-/// has no part: a feature declares itself once.
+/// has no part: a feature declares itself once. A part is never a kind's name
+/// (`orders_jobs_handlers.dart` says two kinds at once).
 String? dwServerFeatureFileKind(String feature, String fileName) {
   final match = RegExp(
     '^${RegExp.escape(feature)}_(?:([a-z][a-z0-9_]*)_)?'
     '(${dwServerFeatureFileKinds.join('|')})\\.dart\$',
   ).firstMatch(fileName);
   if (match == null) return null;
-  if (match.group(2) == 'feature' && match.group(1) != null) return null;
+  final part = match.group(1);
+  if (match.group(2) == 'feature' && part != null) return null;
+  if (part != null && part.split('_').any(dwServerFeatureFileKinds.contains)) {
+    return null;
+  }
   return match.group(2);
+}
+
+/// What to do with a file named [fileName] that is not in [feature]'s closed
+/// set — the name it should have, spelled out, so the fix is the next step
+/// and not a second finding.
+String dwServerFeatureFileFix(String feature, String fileName) {
+  if (!fileName.endsWith('.dart')) {
+    return 'a feature holds Dart files only — move it out of lib/src/';
+  }
+  final kinds = dwServerFeatureFileKinds;
+  final stem = fileName.substring(0, fileName.length - '.dart'.length);
+  final kindMatch = RegExp('^(.*)_(${kinds.join('|')})\$').firstMatch(stem);
+  // What the file is about, without the feature's prefix (or a near miss of
+  // it: `course_` in `courses/`) and without any kind's name.
+  String topic(String base) {
+    var segments = base.split('_');
+    if (base.startsWith('${feature}_') || base == feature) {
+      segments = base == feature
+          ? const []
+          : base.substring(feature.length + 1).split('_');
+    } else if (segments.isNotEmpty &&
+        segments.first.isNotEmpty &&
+        (feature.startsWith(segments.first) ||
+            segments.first.startsWith(feature))) {
+      segments = segments.sublist(1);
+    }
+    return segments.where((s) => s.isNotEmpty && !kinds.contains(s)).join('_');
+  }
+
+  if (kindMatch == null) {
+    return 'move it to $feature/$dwServerFeatureLogicFolder/$fileName, '
+        'or into the kind file it is (${feature}_<kind>.dart, kind one of '
+        '${kinds.join(', ')})';
+  }
+  final kind = kindMatch.group(2)!;
+  if (kind == 'feature') {
+    return 'a feature declares itself once, in ${feature}_feature.dart — '
+        'fold this into it';
+  }
+  final about = topic(kindMatch.group(1)!);
+  final renamed = about.isEmpty
+      ? '${feature}_$kind.dart'
+      : '${feature}_${about}_$kind.dart';
+  final logicName = about.isEmpty ? kindMatch.group(1)! : about;
+  return 'rename it to $renamed; if it holds no $kind, it is logic: '
+      '$feature/$dwServerFeatureLogicFolder/$logicName.dart';
 }
 
 /// What a server feature's folder holds, and which file holds what
@@ -116,6 +167,14 @@ class DwServerFeatureInspector {
     }
 
     final count = _fileFindings.length + _codeFindings.length;
+    // Said rather than passed over: without the data objects, a mapper in the
+    // wrong file is invisible, and a clean run would claim otherwise.
+    if (_codeEnabled && _objects.isEmpty) {
+      print(
+        '\n  ℹ️ INFO: row → data object mapping not checked: '
+        '${_sharedLib == null ? 'no shared package found' : 'the shared package declares no data objects'}',
+      );
+    }
     if (count == 0) return 0;
     print('\n🧱 Server features:\n');
     for (final finding in _fileFindings) {
@@ -153,9 +212,9 @@ class DwServerFeatureInspector {
       if (name.endsWith('.dw.dart')) continue;
       if (dwServerFeatureFileKind(feature, name) != null) continue;
       _fileFindings.add(
-        '$label/$name — a feature holds ${feature}_<kind>.dart or '
-        '${feature}_<part>_<kind>.dart, kind one of $_kinds; '
-        'anything else goes to $feature/$dwServerFeatureLogicFolder/',
+        '$label/$name — not ${feature}_<kind>.dart or '
+        '${feature}_<part>_<kind>.dart (kind one of $_kinds, a part never a '
+        'kind): ${dwServerFeatureFileFix(feature, name)}',
       );
     }
   }
@@ -181,8 +240,8 @@ class DwServerFeatureInspector {
       if (kind == null) continue;
       _fileFindings.add(
         '$label/$name — $dwServerFeatureLogicFolder/ holds what is not one '
-        'of the kinds; a _$kind file sits beside the feature\'s others as '
-        '${feature}_$kind.dart or ${feature}_<part>_$kind.dart',
+        'of the kinds, and its names carry no kind\'s suffix: '
+        '${dwServerFeatureFileFix(feature, name).replaceFirst('rename it to ', 'move it beside the feature\'s others as ')}',
       );
     }
   }
@@ -230,19 +289,27 @@ class DwServerFeatureInspector {
 
   static final _serverFeature = RegExp(r'\bDwServerFeature\s*\(');
 
-  static final _publish = RegExp(r'\.publish\s*\(');
+  /// `ctx.publish(`, `ctx..publish(` — a publish on a context, not a static
+  /// of the project's own type that happens to share the name
+  /// (`PostPublisher.publish(`).
+  static final _publish = RegExp(r'(?<!\b[A-Z][\w$]*\s*)\.publish\s*\(');
 
   static final _rowType = RegExp(r'\b[A-Z]\w*Row\b');
 
   Set<String>? _dataObjects;
 
+  Directory? get _sharedLib {
+    final shared = sharedPackageDir;
+    if (shared == null) return null;
+    final lib = Directory(p.join(shared.path, 'lib'));
+    return lib.existsSync() ? lib : null;
+  }
+
   /// The data objects the shared package declares: classes extending
   /// `DwDataObject`, directly or through a base of the project's own.
   Set<String> get _objects => _dataObjects ??= () {
-    final shared = sharedPackageDir;
-    if (shared == null) return <String>{};
-    final lib = Directory(p.join(shared.path, 'lib'));
-    if (!lib.existsSync()) return <String>{};
+    final lib = _sharedLib;
+    if (lib == null) return <String>{};
     final extendsOf = <String, String>{};
     final declaration = RegExp(
       r'\bclass\s+(\w+)\s*(?:<[^{]*?>)?\s+extends\s+(\w+)',
@@ -331,9 +398,13 @@ class DwServerFeatureInspector {
             (function.enclosingType?.endsWith('Row') ?? false) ||
             (function.extendedType?.endsWith('Row') ?? false);
         if (!takesRow) continue;
-        final returnsObject = RegExp(
-          r'\b[A-Z]\w*',
-        ).allMatches(function.returnType).any((m) => objects.contains(m[0]));
+        // A closure field with an inferred type says nothing before its
+        // name; what it builds decides.
+        final returnsObject =
+            (function.isField && function.returnType.isEmpty) ||
+            RegExp(r'\b[A-Z]\w*')
+                .allMatches(function.returnType)
+                .any((m) => objects.contains(m[0]));
         if (!returnsObject) continue;
         // Built here, not handed on: a publication answering what another
         // one built maps nothing.

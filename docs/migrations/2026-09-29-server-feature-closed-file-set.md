@@ -23,8 +23,7 @@ Run `dart run dartway_cli:dartway check --type invalidServerFeatureFile`, then
   `chat/logic/`. `logic/` is **flat**: a `domain/activity/`, `domain/plan/` grouping means the
   feature is too big for one folder — split it into features (`activity/`, `plan/`, each with its
   own `<feature>_feature.dart`), or flatten it into `logic/` and `<feature>_<part>_<kind>.dart`
-  files. A layer name (`domain`, `services`, `models`, `utils`, `helpers`, …) is refused at any depth
-  of `lib/src/`. Moving a row class changes nothing in the database —
+  files. A layer name (the list is in project layout) is refused at any depth of `lib/src/`. Moving a row class changes nothing in the database —
   the table is named by `@DwSqlTable` — but rename its `part '….dw.dart'` to the new file and run
   `dart run dartway_cli:dartway generate`.
 - **Any other subfolder** (`chat/worker/`, `orders/refunds/`): into `logic/`, or, when it is a
