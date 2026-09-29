@@ -258,7 +258,7 @@ Need a new style — **add a value to `AppTextStyle` and a constructor to `AppTe
 
 **Every project is localized, and user-visible text is never written in code.** This is a requirement on the project, not a report on how it began. What has to be present: `flutter_localizations` and `generate: true` in the Flutter pubspec, `l10n.yaml` and `lib/l10n/*.arb` with its generated output committed beside them, `appLocaleProvider` (the system locale when supported, the first supported one otherwise), `context.l10n` in widgets and `appL10n` for code outside the tree — an error toast, a refusal text. `dart run dartway_cli:dartway check` reports a missing piece as `l10nNotWired`, an error.
 
-**Refusals are texts of the app.** The server sends codes with parameters; `lib/core/` maps every code — the project's `<Project>Refusal`, the framework's `dw.*` codes — to a localized string, and `DwFlutterConfig.refusalText` hands that mapping to the core. A code without a text is a user staring at a code.
+**Refusals are texts of the app.** The server sends codes with parameters; `lib/core/` maps every code — the project's `<Package>Refusal`, the framework's `dw.*` codes — to a localized string, and `DwFlutterConfig.refusalText` hands that mapping to the core. A code without a text is a user staring at a code.
 
 **The law reaches as far as the app does, and no further.** Text composed on the *server* — a sign-in code message, an e-mail — is outside it: there is no `appL10n` there. That text has no rule yet, which is a gap named rather than covered; a project sending server-composed text in more than one language decides for itself how, and says so where its next reader will look.
 

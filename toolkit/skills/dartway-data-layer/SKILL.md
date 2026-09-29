@@ -175,7 +175,7 @@ a non-ok result thrown there is handled the same way.
 
 `DwFlutterConfig.refusalText` is required: a refusal is a code with parameters, and the app turns it into
 words. The skeleton's `lib/core/` holds the function — a map from every known wire code to its enum
-value, and an **exhaustive `switch`** per enum: the project's `<Project>Refusal`, `DwCoreRefusal`,
+value, and an **exhaustive `switch`** per enum: the project's `<Package>Refusal`, `DwCoreRefusal`,
 `DwAuthRefusal`, `DwUploadRefusal`, and a generic sentence for a code none of them knows (a newer
 server).
 

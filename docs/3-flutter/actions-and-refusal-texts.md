@@ -187,7 +187,7 @@ refusalText: (refusal) => refusalText(appL10n, refusal),
 What this shape buys:
 
 - **every code has a sentence, checked by the compiler.** Each `_…Text` is an exhaustive `switch` over
-  its enum — the project's `<Project>Refusal` (an enum `with DwRefusalCodes`) and the framework's
+  its enum — the project's `<Package>Refusal` (an enum `with DwRefusalCodes`) and the framework's
   `DwCoreRefusal`, `DwAuthRefusal`, `DwUploadRefusal`. A code added on either side does not compile
   until it has a text;
 - **a code nobody knows still reads as a sentence.** A newer server can send a code this build has

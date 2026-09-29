@@ -1,7 +1,7 @@
 ---
 name: dartway-realtime
 description: >-
-  Live updates in a DartWay project: channel kinds (`<Project>Channel with DwChannelKind`), the
+  Live updates in a DartWay project: channel kinds (`<Package>Channel with DwChannelKind`), the
   channels a request declares (DwLiveChannel, keyed channels, DwLiveChannel.ofCaller for "my"
   requests), the server's DwChannelRule per kind (single / keyed / ofCaller) — who may read
   everything on a channel — publishing from commands, jobs and auth hooks after commit to every
@@ -27,7 +27,7 @@ The three halves, and a missing one fails silently:
 3. **every command that changes the object publishes it** to every channel that shows it.
 
 Related skills: `dartway-contract`, `dartway-server`, `dartway-access`, `dartway-data-layer`,
-`dartway-testing`. In the samples `AcmeChannel` stands for the project's `<Project>Channel`.
+`dartway-testing`. In the samples `AcmeChannel` stands for the project's `<Package>Channel`.
 
 ## 1. A channel is an audience
 

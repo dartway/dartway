@@ -105,9 +105,9 @@ Every public class name has two or more words (`Dw` is not a word).
 | Read | `Get…` (one object), `List…` (many) | `GetInvoice`, `ListMyInvoices`, `ListOverdueInvoices` |
 | Change | verb + object | `CreateInvoice`, `PayInvoice`, `CancelInvoice` |
 | Caller-scoped call | `My` in the name, no account id in the fields | `ListMyInvoices`, `UpdateMyProfile` |
-| Channel kinds | `<Project>Channel` enum `with DwChannelKind` | |
-| Refusal codes | `<Project>Refusal` enum `with DwRefusalCodes` | |
-| Upload purposes | `<Project>Upload` enum `with DwUploadPurpose` | |
+| Channel kinds | `<Package>Channel` enum `with DwChannelKind` | |
+| Refusal codes | `<Package>Refusal` enum `with DwRefusalCodes` | |
+| Upload purposes | `<Package>Upload` enum `with DwUploadPurpose` | |
 
 **The class name is the wire name** — the call path is `POST /dw/<ClassName>` and updates are grouped
 by it. Renaming a DTO class is a wire change (section 9).

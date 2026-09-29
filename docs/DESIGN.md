@@ -124,7 +124,7 @@ Every public class name is two or more words after the prefix: `DwAppServer`, `D
 whole concept — "the server", "the result" — that the framework will need again in another sense,
 and the second meaning then arrives with a worse name than the first. The owner's decision, and it binds projects
 too: `<Entity>Row` for table rows, data objects as nouns of two or more words, reads as `Get…` /
-`List…`, changes as a verb and its object, `<Project>Channel` and `<Project>Refusal`.
+`List…`, changes as a verb and its object, `<Package>Channel` and `<Package>Refusal`.
 
 The rule holds everywhere as of 2026-09-16. The last seven names that predated it — five in the
 Flutter core, one in the server, one in the router — were renamed under principle 4; D-058 in

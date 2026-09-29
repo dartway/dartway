@@ -56,8 +56,9 @@ my_app_shared/
 server and into the app alike, so it cannot reach for Flutter, a database or IO. A rule that needs the
 database is not a shared rule — it is a handler's.
 
-The three enums are named after the project — `<Project>Channel`, `<Project>Refusal`,
-`<Project>Upload` — so a project's own codes never read as the framework's.
+The three enums are named after the shared package — `my_app_shared` declares `MyAppChannel`,
+`MyAppRefusal`, `MyAppUpload`, the prefix taken mechanically from the package's name — so a project's
+own codes never read as the framework's, and no two projects spell the rule differently.
 
 ## `my_app_server` — where the rules live
 
@@ -71,7 +72,7 @@ my_app_server/
   lib/generated/
     dw_schema.dart         the schema and the db.<table> getters — generated
   lib/src/
-    core/                  the server-wide wiring
+    core/                  the server-wide wiring: fixed names, App* classes
       auth.dart            DwAuthConfig: code delivery, the profile made with each account
       call_context.dart    what "the caller" means to this app: ctx.profile, the access rules
       channels.dart        the channels handlers publish to
@@ -85,6 +86,7 @@ my_app_server/
       profile_handlers.dart one DwCallHandler per request and command
       profile_objects.dart rows → the data objects clients see, related data in batches
       profile_publications.dart what a change publishes, and to whom
+      profile_jobs.dart    its job kinds and definitions, when it has jobs
     admin/, settings/      the skeleton's other features, the same shape
   test/                    acceptance tests on a real server, database and storage
   docker-compose.yaml      development Postgres and RustFS
@@ -93,8 +95,8 @@ my_app_server/
 
 **`lib/src/` is folders: `core/`, `migrations/`, and one per feature** — a law, held by `dartway
 check` as the Flutter package's top level is. A feature's folder holds everything of its area — its
-rows, handlers, objects, publications, jobs and rules, in files named after it, and in subfolders
-when it grows — and declares itself in `<feature>_feature.dart` as a `DwServerFeature` the server
+rows, handlers, objects, publications and jobs, each in a file named `<feature>_*.dart` — and
+declares itself in `<feature>_feature.dart` as a `DwServerFeature` the server
 lists. No file sits at the top of `src/`, and no folder there is named for a layer (`handlers/`,
 `rows/`, `entities/`, `domain/`, `objects/`, `services/`): a feature split across layers lives in
 four places, and a project that grew that way ended with a `chat/` beside a `domain/chat/` and two
