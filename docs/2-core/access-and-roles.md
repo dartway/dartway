@@ -101,10 +101,11 @@ accident.
 
 ## Whose row is it: one rule per shape
 
-Ownership is decided in the access rule, never in the handler's body after `signedIn`: an inline
-check is written a little differently every time, and one project that did so answered one question
-— "is the caller in this chat" — four different ways. `dart run dartway_cli:dartway check` warns on the
-inline form (`inlineOwnershipCheck`). Each shape below has one form.
+Ownership is decided in the access rule, never in the handler's body after `signedIn` or a role
+rule: an inline check is written a little differently every time, and one project that did so
+answered one question — "is the caller in this chat" — four different ways.
+`dart run dartway_cli:dartway check` warns on the inline form (`inlineOwnershipCheck`). Each shape
+below has one form.
 
 **A row the caller owns** — a field of the row names the caller's profile. `load` reads the row,
 `allows` compares the field:
@@ -160,9 +161,29 @@ DwCallHandler.command<RenameLesson, Lesson>(
 ```
 
 **Membership of a parent** — the caller is in the conversation, the project, the circle the call
-names. The row that proves it is the caller's membership, so that is what `load` reads, and the
-rule is written **once**, as a function next to the project's other rules; every handler of that
-parent names it:
+names. What "a member" means (active, invitation accepted, not blocked) is decided by **one function
+that returns the caller's membership, or `null`**, beside `profile` in the context extension. Every
+access point that asks the question calls it — each resource rule's `load`, the channel rule of the
+parent's channel, and `DwFileStorage.canRead` for files attached inside it. A second definition,
+written inline somewhere, is how one of them ends up skipping the block check:
+
+```dart
+extension AppCallContext on DwCallContext {
+  /// The caller's membership of [conversationId], or `null` when they are
+  /// not a member — the one definition of "in this conversation".
+  Future<ConversationMemberRow?> membershipOf(int conversationId) async {
+    final me = await profile;
+    final row = await db.conversationMembers.findFirst(
+      where: (t) =>
+          t.conversationId.equals(conversationId) & t.profileId.equals(me.id!),
+    );
+    return row != null && row.isActive && !row.isBlocked ? row : null;
+  }
+}
+```
+
+A rule shared by many calls of one kind of row is a function returning the rule, next to the
+project's other rules; every handler of that parent names it:
 
 ```dart
 abstract final class AppAccess {
@@ -171,12 +192,9 @@ abstract final class AppAccess {
   static DwAccessRule conversationMember<C extends DwServerCall<Object?>>(
     int Function(C call) conversationId,
   ) => DwAccessRule.resource<C, ConversationMemberRow>(
-    load: (ctx, call) async => ctx.db.conversationMembers.findFirst(
-      where: (t) =>
-          t.conversationId.equals(conversationId(call)) &
-          t.profileId.equals((await ctx.profile).id!),
-    ),
-    allows: (ctx, call, membership) => membership.isActive,
+    load: (ctx, call) => ctx.membershipOf(conversationId(call)),
+    // membershipOf has decided: a membership it returns is one that counts.
+    allows: (ctx, call, membership) => true,
   );
 }
 
@@ -191,19 +209,79 @@ DwCallHandler.command<LeaveConversation, void>(
 ),
 ```
 
-A row inside the parent — a message of that conversation — is the second shape over the third:
-`load` reads the message and the caller's membership of its conversation, as a record.
+The conversation's channel and its attachments ask the same function:
 
-**A row the caller may see but not change** — a message someone else wrote, in a chat the caller
-reads. `visible` answers whether the caller may know it exists; when `allows` refuses and `visible`
-agrees, the answer is `dw.forbidden`, otherwise still `dw.notFound`:
+```dart
+DwChannelRule.keyed<int>(
+  AppChannel.conversation,
+  parseKey: int.parse,
+  canSubscribe: (ctx, conversationId) async =>
+      await ctx.membershipOf(conversationId) != null,
+),
+
+DwFileStorage(
+  config,
+  rules: uploadRules,
+  canRead: (ctx, file) async {
+    if (!file.isFor(AppUpload.messageAttachment)) {
+      return file.accountId == ctx.accountId;
+    }
+    final attachment = await ctx.db.messageAttachments.findFirst(
+      where: (t) => t.fileId.equals(file.id),
+    );
+    final message = attachment == null
+        ? null
+        : await ctx.db.messages.findById(attachment.messageId);
+    return message != null &&
+        await ctx.membershipOf(message.conversationId) != null;
+  },
+),
+```
+
+**A row the caller may see but not change** — a message someone else wrote, in a conversation the
+caller is in. `allows` carries **the whole permission**; `visible` is not a gate, it only picks the
+refusal: when `allows` refuses and `visible` agrees, the answer is `dw.forbidden`, otherwise
+`dw.notFound`. A row inside a parent is loaded with the caller's membership, as a record — and
+locked only once the membership is known, so a caller outside the conversation takes no lock:
+
+```dart
+DwCallHandler.command<EditMessage, Message>(
+  access: DwAccessRule.resource<EditMessage, (MessageRow, ConversationMemberRow)>(
+    load: (ctx, command) async {
+      final seen = await ctx.db.messages.findById(command.messageId);
+      if (seen == null) return null;
+      final membership = await ctx.membershipOf(seen.conversationId);
+      if (membership == null) return null;
+      final message = await ctx.db.messages.findById(
+        command.messageId,
+        lock: DwRowLock.forUpdate,
+      );
+      return message == null ? null : (message, membership);
+    },
+    allows: (ctx, command, found) =>
+        found.$1.senderProfileId == found.$2.profileId,
+    // Every member reads every message of the conversation.
+    visible: (ctx, command, found) => true,
+  ),
+  handle: (ctx, command) async {
+    final (message, membership) =
+        ctx.accessed<(MessageRow, ConversationMemberRow)>();
+    // …
+  },
+),
+```
+
+A permission that rests on a role as well puts the role in `allows` too, and checks it before
+`load` locks anything — the example's staff chat, where a staff member edits only their own message
+and a demoted author edits nothing:
 
 ```dart
 DwCallHandler.command<EditChatMessage, ChatMessage>(
   access: DwAccessRule.resource<EditChatMessage, ChatMessageRow>(
-    load: (ctx, command) => ctx._liveMessage(command.messageId, lock: true),
+    // `null` — and no lock — for anyone who is not staff.
+    load: (ctx, command) => ctx._staffMessage(command.messageId),
     allows: (ctx, command, row) async =>
-        row.authorProfileId == (await ctx.profile).id,
+        await ctx.isStaff && row.authorProfileId == (await ctx.profile).id,
     visible: (ctx, command, row) => ctx.isStaff,
   ),
   handle: (ctx, command) async {

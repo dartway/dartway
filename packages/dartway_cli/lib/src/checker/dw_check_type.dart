@@ -180,9 +180,10 @@ enum DwCheckType {
   /// worse, on this one after the volume is recreated.
   devComposeDrifted,
 
-  /// A `signedIn` handler in a `*_handlers.dart` that compares a row's owner
-  /// field with the caller and refuses `notFound`/`forbidden` — in its body
-  /// or in a helper of the same file it calls. Whether a row is the caller's
+  /// A handler in a `*_handlers.dart` under any rule but a resource rule
+  /// (`signedIn`, a role check, …) that compares a row's owner field with the
+  /// caller and refuses `notFound`/`forbidden` — in its body or in a helper of
+  /// the same file it calls. Whether a row is the caller's
   /// is `DwAccessRule.resource`'s question, answered once, with the row
   /// handed to the handler (D-090, D-112).
   ///

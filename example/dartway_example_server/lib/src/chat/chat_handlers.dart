@@ -198,14 +198,16 @@ final chatHandlers = <DwCallHandler>[
     },
   ),
 
-  /// Rewrites a message within its edit window. Only its author; other staff
-  /// are refused `dw.forbidden` (the message is visible to them), anyone else
-  /// `dw.notFound`. Published with every message quoting it.
+  /// Rewrites a message within its edit window. Staff only, and only its
+  /// author: other staff are refused `dw.forbidden` (the message is visible to
+  /// them), anyone else — a demoted author too — `dw.notFound`. Published with
+  /// every message quoting it.
   DwCallHandler.command<EditChatMessage, ChatMessage>(
     access: DwAccessRule.resource<EditChatMessage, ChatMessageRow>(
-      load: (ctx, command) => ctx._liveMessage(command.messageId, lock: true),
+      load: (ctx, command) => ctx._staffMessage(command.messageId),
+      // The whole permission: `visible` only picks the refusal.
       allows: (ctx, command, row) async =>
-          row.authorProfileId == (await ctx.profile).id,
+          await ctx.isStaff && row.authorProfileId == (await ctx.profile).id,
       visible: (ctx, command, row) => ctx.isStaff,
     ),
     handle: (ctx, command) async {
@@ -233,14 +235,15 @@ final chatHandlers = <DwCallHandler>[
     },
   ),
 
-  /// Deletes a message. Its author or an admin; other staff are refused
-  /// `dw.forbidden`, anyone else `dw.notFound`. Gone from its channel; the
-  /// messages quoting it and the unread counts follow.
+  /// Deletes a message. Staff only: its author or an admin; other staff are
+  /// refused `dw.forbidden`, anyone else `dw.notFound`. Gone from its channel;
+  /// the messages quoting it and the unread counts follow.
   DwCallHandler.command<DeleteChatMessage, void>(
     access: DwAccessRule.resource<DeleteChatMessage, ChatMessageRow>(
-      load: (ctx, command) => ctx._liveMessage(command.messageId, lock: true),
+      load: (ctx, command) => ctx._staffMessage(command.messageId),
       allows: (ctx, command, row) async =>
-          row.authorProfileId == (await ctx.profile).id || await ctx.isAdmin,
+          await ctx.isStaff &&
+          (row.authorProfileId == (await ctx.profile).id || await ctx.isAdmin),
       visible: (ctx, command, row) => ctx.isStaff,
     ),
     handle: (ctx, command) async {
@@ -351,6 +354,11 @@ extension on DwCallContext {
   }) async =>
       await _liveMessage(messageId, lock: lock) ??
       refuse(DwCoreRefusal.notFound);
+
+  /// The message [messageId], locked for a change, to staff; `null` — and no
+  /// lock taken — for anyone else, or when there is none or it is deleted.
+  Future<ChatMessageRow?> _staffMessage(int messageId) async =>
+      await isStaff ? await _liveMessage(messageId, lock: true) : null;
 
   /// The message [messageId], or `null` when there is none or it is deleted.
   /// With [lock], held until the command commits: edits, deletions and pins of

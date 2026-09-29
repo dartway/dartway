@@ -6,7 +6,9 @@
   `dw.forbidden`** (dartway/dartway#387, D-112). When `allows` answers `false` and `visible` answers
   `true`, the refusal is `dw.forbidden` instead of `dw.notFound`; a missing row, and one `visible`
   does not admit, stay `dw.notFound`. Ends the second check a handler wrote in its body after the
-  rule for "a message of my chat that someone else wrote". Additive; nothing to change. The rule's
+  rule for "a message of my chat that someone else wrote". `allows` carries the whole permission;
+  `visible` is not a gate, it only picks the refusal code. Additive; the recipe for moving inline
+  owner checks into rules is `docs/migrations/2026-09-30-ownership-through-access-rules.md`. The rule's
   resource may be a record (`(MessageRow, ConversationMemberRow)`) for a row reached through its
   parent — documented, and now tested.
 

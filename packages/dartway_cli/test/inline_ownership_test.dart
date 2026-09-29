@@ -111,36 +111,9 @@ extension on DwCallContext {
       expect(lines(source), [14]);
       expect(helpers(source), ['_requireOwnTask']);
     });
-  });
-
-  group('passes', () {
-    test('the same check made by DwAccessRule.resource', () {
-      expect(
-        lines('''
-final handlers = <DwCallHandler>[
-  DwCallHandler.command<CancelBooking, Booking>(
-    access: DwAccessRule.resource<CancelBooking, BookingRow>(
-      load: (ctx, command) => ctx.db.bookings.findById(command.bookingId),
-      allows: (ctx, command, booking) async =>
-          booking.clientProfileId == (await ctx.profile).id,
-    ),
-    handle: (ctx, command) async {
-      final booking = ctx.accessed<BookingRow>();
-      if (booking.status != BookingStatus.booked) {
-        ctx.refuse(AppRefusal.bookingNotActive);
-      }
-      return Booking.of(booking);
-    },
-  ),
-];
-'''),
-        isEmpty,
-      );
-    });
-
-    test('a handler under a role rule, and a helper only it calls', () {
-      expect(
-        lines('''
+    test('a role rule with the owner compared in the body and in a helper '
+        'is the same smell', () {
+      const source = r"""
 final handlers = <DwCallHandler>[
   DwCallHandler.command<EditNote, Note>(
     access: AppAccess.staff,
@@ -166,6 +139,32 @@ extension on DwCallContext {
     return row;
   }
 }
+""";
+      expect(lines(source), [7, 20]);
+      expect(helpers(source), [null, '_requireNote']);
+    });
+  });
+
+  group('passes', () {
+    test('the same check made by DwAccessRule.resource', () {
+      expect(
+        lines('''
+final handlers = <DwCallHandler>[
+  DwCallHandler.command<CancelBooking, Booking>(
+    access: DwAccessRule.resource<CancelBooking, BookingRow>(
+      load: (ctx, command) => ctx.db.bookings.findById(command.bookingId),
+      allows: (ctx, command, booking) async =>
+          booking.clientProfileId == (await ctx.profile).id,
+    ),
+    handle: (ctx, command) async {
+      final booking = ctx.accessed<BookingRow>();
+      if (booking.status != BookingStatus.booked) {
+        ctx.refuse(AppRefusal.bookingNotActive);
+      }
+      return Booking.of(booking);
+    },
+  ),
+];
 '''),
         isEmpty,
       );
@@ -209,6 +208,44 @@ final handlers = <DwCallHandler>[
   ),
 ];
 '''),
+        isEmpty,
+      );
+    });
+
+    test('a project rule function that builds a resource rule', () {
+      const rules = r"""
+abstract final class AppAccess {
+  static DwAccessRule ownNote<C extends DwServerCall<Object?>>(
+    int Function(C call) noteId,
+  ) => DwAccessRule.resource<C, NoteRow>(
+    load: (ctx, call) => ctx.db.notes.findById(noteId(call)),
+    allows: (ctx, call, note) async =>
+        note.authorProfileId == (await ctx.profile).id,
+  );
+
+  static final DwAccessRule staff = DwAccessRule.check<DwServerCall<Object?>>(
+    (ctx, _) => ctx.isStaff,
+  );
+}
+""";
+      expect(DwInlineOwnershipInspector.resourceRulesIn(rules), {'ownNote'});
+      expect(
+        DwInlineOwnershipInspector.inlineOwnershipIn(
+          r"""
+final handlers = <DwCallHandler>[
+  DwCallHandler.command<ArchiveNote, Note>(
+    access: AppAccess.ownNote<ArchiveNote>((command) => command.noteId),
+    handle: (ctx, command) async {
+      final note = ctx.accessed<NoteRow>();
+      final me = await ctx.profile;
+      if (note.authorProfileId != me.id) ctx.refuse(DwCoreRefusal.notFound);
+      return Note.of(note);
+    },
+  ),
+];
+""",
+          resourceRules: {'ownNote'},
+        ),
         isEmpty,
       );
     });

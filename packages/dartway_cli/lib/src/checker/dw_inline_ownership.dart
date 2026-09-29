@@ -5,15 +5,15 @@ import 'package:path/path.dart' as p;
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
 
-/// Ownership checked inline after `DwAccessRule.signedIn`
+/// Ownership checked inline after a rule other than `DwAccessRule.resource`
 /// ([DwCheckType.inlineOwnershipCheck], dartway/dartway#387).
 ///
-/// In a server file named `*_handlers.dart`, a handler whose rule is
-/// `DwAccessRule.signedIn` and which compares an owner field of a row with
-/// the caller and refuses `dw.notFound` or `dw.forbidden` — in its own body,
-/// or in a helper of the same file it calls — is the check
-/// `DwAccessRule.resource` makes once. A heuristic, so a warning, and a
-/// conservative one:
+/// In a server file named `*_handlers.dart`, a handler whose rule is not a
+/// resource rule — `signedIn`, a role check, anything else — and which
+/// compares an owner field of a row with the caller and refuses `dw.notFound`
+/// or `dw.forbidden`, in its own body or in a helper of the same file it
+/// calls, is the check `DwAccessRule.resource` makes once. A heuristic, so a
+/// warning, and a conservative one:
 ///
 /// - the comparison is `!=` between a field whose name ends in `Id` and names
 ///   an owner (`owner`, `author`, `user`, `profile`, `account`, `sender`,
@@ -23,7 +23,10 @@ import 'dw_check_type.dart';
 /// - it is the condition of an `if` whose branch refuses `notFound` or
 ///   `forbidden` — or, in a `single` handler, answers `return null`, which the
 ///   framework refuses `notFound`;
-/// - a helper counts only when a `signedIn` handler of the same file calls it.
+/// - a helper counts only when such a handler of the same file calls it;
+/// - a rule is a resource rule when it is `DwAccessRule.resource` itself, or a
+///   project function or field (`AppAccess.ownTask(…)`) whose declaration in
+///   the server's `lib/` builds one.
 ///
 /// Comments and strings are not code.
 class DwInlineOwnershipInspector {
@@ -48,20 +51,28 @@ class DwInlineOwnershipInspector {
     if (!_enabled || server == null) return 0;
     final lib = Directory(p.join(server.path, 'lib'));
     if (!lib.existsSync()) return 0;
-    final files =
+    final sources =
         lib
             .listSync(recursive: true)
             .whereType<File>()
-            .where((file) => file.path.endsWith('_handlers.dart'))
+            .where((file) => file.path.endsWith('.dart'))
             .toList()
           ..sort((a, b) => a.path.compareTo(b.path));
-    for (final file in files) {
+    final resourceRules = {
+      for (final file in sources) ...resourceRulesIn(file.readAsStringSync()),
+    };
+    for (final file in sources.where(
+      (f) => f.path.endsWith('_handlers.dart'),
+    )) {
       final shown = p.relative(file.path, from: server.parent.path);
-      for (final site in inlineOwnershipIn(file.readAsStringSync())) {
+      for (final site in inlineOwnershipIn(
+        file.readAsStringSync(),
+        resourceRules: resourceRules,
+      )) {
         _findings.add(
-          '${site.helper == null ? 'a signedIn handler' : '`${site.helper}`, called by a signedIn handler,'} '
-          'checks ownership inline — $shown:${site.line}; guard the handler '
-          'with DwAccessRule.resource and read the row as ctx.accessed',
+          '${site.helper == null ? 'a handler' : '`${site.helper}`, called by a handler,'} '
+          'checks ownership inline — $shown:${site.line}; make it the '
+          "handler's DwAccessRule.resource and read the row as ctx.accessed",
         );
       }
     }
@@ -74,13 +85,46 @@ class DwInlineOwnershipInspector {
     return 0;
   }
 
+  /// The names of project rules that build a `DwAccessRule.resource` —
+  /// `static DwAccessRule ownTask<…>(…) => DwAccessRule.resource…` and
+  /// `static final DwAccessRule mine = DwAccessRule.resource…`.
+  static Set<String> resourceRulesIn(String content) {
+    final code = _withoutCommentsAndStrings(content);
+    final names = <String>{};
+    for (final match in _ruleDeclaration.allMatches(code)) {
+      // The declaration runs to its `;` where no bracket is open.
+      var depth = 0;
+      var end = code.length;
+      for (var i = match.end; i < code.length; i++) {
+        final char = code[i];
+        if ('([{'.contains(char)) depth++;
+        if (')]}'.contains(char)) depth--;
+        if (depth < 0 || (char == ';' && depth == 0)) {
+          end = i;
+          break;
+        }
+      }
+      if (_resourceRule.hasMatch(code.substring(match.end, end))) {
+        names.add(match.group(1)!);
+      }
+    }
+    return names;
+  }
+
+  static final _ruleDeclaration = RegExp(r'\bDwAccessRule\s+(\w+)\s*(?=[<(=])');
+  static final _resourceRule = RegExp(r'\bDwAccessRule\s*\.\s*resource\b');
+
   /// The inline ownership checks of one handlers file: the line of each, and
   /// the helper it sits in when it is not in a handler's own body.
-  static List<({int line, String? helper})> inlineOwnershipIn(String content) {
+  /// [resourceRules] names the project's rules that are resource rules.
+  static List<({int line, String? helper})> inlineOwnershipIn(
+    String content, {
+    Set<String> resourceRules = const {},
+  }) {
     final code = _withoutCommentsAndStrings(content);
-    final handlers = _handlers(code);
-    final signedIn = handlers.where((h) => h.signedIn).toList();
-    if (signedIn.isEmpty) return const [];
+    final handlers = _handlers(code, resourceRules);
+    final guarded = handlers.where((h) => !h.resource).toList();
+    if (guarded.isEmpty) return const [];
 
     final sites = <({int line, String? helper})>[];
     for (final (:start, :end, :refusesByNull) in _ownerRefusals(code)) {
@@ -89,7 +133,7 @@ class DwInlineOwnershipInspector {
           .firstOrNull;
       if (handler != null) {
         final nullCounts = handler.kind == 'single';
-        if (handler.signedIn && (!refusesByNull || nullCounts)) {
+        if (!handler.resource && (!refusesByNull || nullCounts)) {
           sites.add((line: _lineOf(code, start), helper: null));
         }
         continue;
@@ -98,7 +142,7 @@ class DwInlineOwnershipInspector {
       final helper = _enclosingFunction(code, start);
       if (helper == null) continue;
       final call = RegExp('\\b${RegExp.escape(helper)}\\s*(<[^>]*>)?\\s*\\(');
-      final called = signedIn.any(
+      final called = guarded.any(
         (h) => call.hasMatch(code.substring(h.start, h.end)),
       );
       if (called) sites.add((line: _lineOf(code, start), helper: helper));
@@ -109,14 +153,13 @@ class DwInlineOwnershipInspector {
   static final _handlerStart = RegExp(
     r'\bDwCallHandler\s*\.\s*(single|maybe|list|page|table|window|command)\b',
   );
-  static final _signedIn = RegExp(
-    r'\baccess\s*:\s*DwAccessRule\s*\.\s*signedIn\b',
-  );
+  static final _access = RegExp(r'\baccess\s*:');
 
-  static List<({int start, int end, String kind, bool signedIn})> _handlers(
+  static List<({int start, int end, String kind, bool resource})> _handlers(
     String code,
+    Set<String> resourceRules,
   ) {
-    final found = <({int start, int end, String kind, bool signedIn})>[];
+    final found = <({int start, int end, String kind, bool resource})>[];
     for (final match in _handlerStart.allMatches(code)) {
       final open = code.indexOf('(', match.end);
       if (open < 0) continue;
@@ -127,15 +170,42 @@ class DwInlineOwnershipInspector {
       if (close < 0) continue;
       final body = code.substring(open, close);
       // The rule is the handler's own `access:`, not one of a nested call.
-      final rule = _signedIn.firstMatch(body);
+      final rule = _access
+          .allMatches(body)
+          .where((m) => _depthAt(body, m.start) == 1)
+          .firstOrNull;
       found.add((
         start: open,
         end: close,
         kind: match.group(1)!,
-        signedIn: rule != null && _depthAt(body, rule.start) == 1,
+        resource:
+            rule != null &&
+            _isResource(_argument(body, rule.end), resourceRules),
       ));
     }
     return found;
+  }
+
+  /// The expression of an argument starting at [from], up to the `,` or `)`
+  /// that ends it.
+  static String _argument(String body, int from) {
+    var depth = 0;
+    for (var i = from; i < body.length; i++) {
+      final char = body[i];
+      if ('([{<'.contains(char)) depth++;
+      if (')]}>'.contains(char)) {
+        if (depth == 0) return body.substring(from, i);
+        depth--;
+      }
+      if (char == ',' && depth == 0) return body.substring(from, i);
+    }
+    return body.substring(from);
+  }
+
+  static bool _isResource(String rule, Set<String> resourceRules) {
+    if (_resourceRule.hasMatch(rule)) return true;
+    final named = RegExp(r'^\s*(?:\w+\s*\.\s*)*(\w+)').firstMatch(rule);
+    return named != null && resourceRules.contains(named.group(1));
   }
 
   static final _ifStart = RegExp(r'\bif\s*\(');
