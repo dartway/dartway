@@ -51,7 +51,7 @@ There is no client package: the shared package *is* the client contract, and bot
 
 **Law is what makes it DartWay** — the seven rules above; a project does not override a law. **Default is everything else** here and in the skills — the commit format, the base branch, how a decision is recorded, the language of the project's own texts — and a project may replace it. **Precedence:** a default yields to the project's own root `CLAUDE.md`; a law does not; where both are silent, this file stands. A project records an override in its root `CLAUDE.md`, under "Project conventions", **with the reason** — `.claude/CLAUDE.md` is overwritten on update, and a README beside the code is where an override goes to die.
 
-**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Thirty-six checks fail today:
+**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Thirty-seven checks fail today:
 
 | What it holds | Checks that fail |
 |---|---|
@@ -60,6 +60,7 @@ There is no client package: the shared package *is* the client contract, and bot
 | The widget's contract with its parent | `widgetSizesItself` |
 | The declared top-level layout | `invalidTopLevelLayout` |
 | The closed file set inside a server feature | `invalidServerFeatureFile`, `misplacedServerCode` |
+| The shared package mirrors the server's features | `invalidSharedLayout` |
 | What the router refuses on the first frame | `routeNameDuplicated` |
 | The contract's names are its wire names (law 5) | `contractNameInvalid` |
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
@@ -134,6 +135,7 @@ PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commi
 **The contract, and nothing but pure Dart** — no Flutter, server, IO or database: both sides import it.
 
 - **What goes here:** data objects, requests (`DwSingleRequest` … `DwWindowRequest`), commands, the enums of channel kinds, refusal codes and upload purposes, validation both sides run (`DwSelfValidating`). Playbook — `dartway-contract`.
+- **`lib/src/` mirrors the server's features:** `<feature>.dart`, or a flat `<feature>/` of `<feature>.dart` and `<feature>_<part>.dart` files once it grows, `<feature>` a folder of the server's `lib/src/`; beside them only `<prefix>_channel`, `_refusal`, `_upload`, `_protocol` and `_push_category.dart` (`invalidSharedLayout`). What belongs to no server feature goes with the one that owns it. `dartway-contract` §1.
 - **A request's fields are its complete filter**, and a request is a value: the client caches and shares its live state under the request itself. `channels`, `matches`, `sort` and `positionOf` are pure functions of the object and the fields — `DateTime.now()` inside them is a bug.
 - **A command never carries what the server decides** — the owner, timestamps, a status, a storage key. The handler derives them from the context.
 - **"My …" requests carry no account id**: the server reads the caller, and the channel is `DwLiveChannel.ofCaller(kind)`.

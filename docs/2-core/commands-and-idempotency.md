@@ -39,7 +39,7 @@ the booking's status and time are set by the handler
 ## Validation runs on both sides
 
 A command (or a request) that implements `DwSelfValidating` checks its own fields
-(`example/dartway_example_shared/lib/src/news.dart`):
+(`example/dartway_example_shared/lib/src/content.dart`):
 
 ```dart
 final class PublishNews extends DwActionCommand<NewsPost>

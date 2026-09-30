@@ -252,7 +252,7 @@ nothing and both insert, or the second fails on the constraint.
 ### `updateWhere`
 
 A conditional update is a compare-and-set in one statement. The example's read positions
-(`example/dartway_example_server/lib/src/chat/chat_handlers.dart`) move forward only:
+(`example/dartway_example_server/lib/src/chat/logic/chat_lookups.dart`) move forward only:
 
 ```dart
 await db.chatReadPositions.updateWhere(

@@ -82,6 +82,12 @@ never its `_handlers`: a handler file is where a feature ends. A number several 
 like an admin dashboard's counters, is a publication of the feature that owns it
 (`admin/admin_publications.dart`), and every command that moves it calls that one function.
 
+**A file is held to the app's length**: over 200 lines is `fileLong` (a nudge), over 350
+`fileTooLong` (a warning) — generated code, migrations and seed data (§9a) excepted. A kind that
+outgrows its file splits by what it is about into `<feature>_<part>_<kind>.dart`
+(`chat_messages_handlers.dart` beside `chat_handlers.dart`); a private helper both halves use moves
+to `logic/` as a named extension. The shared package follows the same features — `dartway-contract` §1.
+
 ## 2. Row classes
 
 A row is a table row as a Dart value. **It never leaves the server**: handlers map it to a data object.
@@ -658,7 +664,9 @@ it to `grant`, which is where the project gives its own admin role — the frame
 not roles.
 
 **Seeds are `DwSeedRows`, on the feature they belong to.** The rows sit beside the row class in
-`<feature>_rows.dart`:
+`<feature>_rows.dart`, or — a catalogue of hundreds — in a `<feature>_<part>_rows.dart` of their own
+(`catalog_exercises_rows.dart`) holding nothing but `const` lists of drafts, which the file length
+check recognises as data and passes over:
 
 ```dart
 final catalogFeature = DwServerFeature(

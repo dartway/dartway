@@ -42,15 +42,27 @@ my_app_shared/
   lib/my_app_shared.dart         the library: re-exports dartway_core_shared and everything below
   lib/generated/dw_protocol.dart the protocol registry — generated
   lib/src/
-    profile.dart, admin.dart,    data objects, requests and commands, grouped by area;
-    settings.dart                each with its generated *.dw.dart part
+    profile.dart, admin.dart,    one file per feature of the server, named after its folder:
+    settings.dart                data objects, requests and commands, and the rules both sides
+                                 apply (profile.dart: the identifier's one form, the sign-up
+                                 keys); each with its generated *.dw.dart part
     my_app_channel.dart          enum MyAppChannel with DwChannelKind — the live channels
     my_app_refusal.dart          enum MyAppRefusal with DwRefusalCodes — why the server says no
     my_app_upload.dart           enum MyAppUpload with DwUploadPurpose — what a file is for
-    auth_identifier.dart         rules both sides apply identically
-    registration_keys.dart       the keys a sign-up sends with its code
+    my_app_protocol.dart         the protocol both sides speak: the generated one and the modules'
   test/my_app_shared_test.dart
 ```
+
+**`lib/src/` mirrors the server's features** — a law, held by `dart run dartway_cli:dartway check`
+(`invalidSharedLayout`). The contract of the server's `profile/` is `src/profile.dart`; when it
+grows, it becomes a flat folder `src/profile/` of `profile.dart` and `profile_<part>.dart` files,
+the part a group of DTOs — a data object with the requests and commands that answer it
+(`chat_messages.dart`), never a layer (`chat_models.dart`). A name is a feature folder of the server,
+letter for letter, so "where is the contract of this feature" has one answer: what exists only in the
+contract goes with the feature that owns it, and a DTO goes where its handler is. Beside the
+features sit only the package-wide files named after the package: `_channel`, `_refusal`,
+`_upload`, `_protocol` and, with push, `_push_category`. `lib/` itself holds the library,
+`generated/` and `src/`.
 
 **It depends on `dartway_core_shared` and nothing else.** Whatever it declares is compiled into the
 server and into the app alike, so it cannot reach for Flutter, a database or IO. A rule that needs the
@@ -141,6 +153,12 @@ a layer: `domain`, `rows`, `handlers`, `services`, `models`, `objects`, `reposit
 publishing inline (`ctx.publish` inside its closure) is a call, not a publication, and a mapping
 written as a closure inside a handler is not seen — keep it in `_objects` anyway, since that is
 where the next reader looks for it.
+
+**A file is held to the app's length, in the server and the shared package alike**: over 200 lines
+is a nudge (`fileLong`), over 350 a warning (`fileTooLong`). Passed over: generated code, migrations,
+and seed data — a file of nothing but `const` lists of row drafts for a `DwSeedRows` step, so a
+catalogue of hundreds of rows sits in a `<feature>_<part>_rows.dart` of its own. Tests are not
+measured; a long one splits by scenario (`<feature>_<scenario>_acceptance_test.dart`).
 
 **A row is not a data object.** `UserProfileRow` is a table; `UserProfile` is what a client receives.
 The server builds one from the other in `profile_objects.dart` — the profile's phone and e-mail come from

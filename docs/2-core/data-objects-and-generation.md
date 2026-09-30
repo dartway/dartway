@@ -48,7 +48,7 @@ final class AdminCounters extends DwDataObject with _$AdminCounters {
 ## Declaring a class
 
 A library with generated classes names its part after itself and every class mixes in its
-generated code (`example/dartway_example_shared/lib/src/news.dart`):
+generated code (`example/dartway_example_shared/lib/src/content.dart`):
 
 ```dart
 import 'package:dartway_core_shared/dartway_core_shared.dart';
@@ -115,7 +115,7 @@ a `Duration`, a const list or map, or a const DTO; anything else is reported.
 
 A command that edits a value which may be cleared cannot use a nullable field: `null` would mean
 both "leave it" and "clear it". It declares `DwFieldPatch<T>` instead
-(`example/dartway_example_shared/lib/src/people.dart`):
+(`example/dartway_example_shared/lib/src/profile.dart`):
 
 ```dart
 final class UpdateMyProfile extends DwActionCommand<UserProfile>
