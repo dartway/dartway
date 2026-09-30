@@ -91,6 +91,16 @@ print(['PORT']);
       );
     });
 
+    test('a read inside an interpolation is a read', () {
+      expect(
+        DwServerOutsideWorldInspector.entryPointReadsIn(r"""
+final env = DwLocalEnvironment.overlay(Platform.environment);
+print('listening on ${env['PORT']}');
+"""),
+        [(2, "`['PORT']`")],
+      );
+    });
+
     test('are refused a read of their own', () {
       expect(
         DwServerOutsideWorldInspector.entryPointReadsIn(r'''

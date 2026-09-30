@@ -34,6 +34,16 @@ export 'widgets/body.dart' show Body;
       );
     });
 
+    test('a literal inside the condition is not a URI', () {
+      expect(
+        DwUniformityInspector.relativeImportsIn(
+          "import 'package:acme/a.dart' "
+          "if (dart.library.io == 'true') 'a_io.dart';",
+        ).map((finding) => finding.$2),
+        ['a_io.dart'],
+      );
+    });
+
     test('an import written in a comment or a string is not one', () {
       expect(
         DwUniformityInspector.relativeImportsIn('''

@@ -159,6 +159,19 @@ class MyFeature {
     expect(unusedNames(feature), ['save_button_bar.dart']);
   });
 
+  test('a name used inside an interpolation is a use', () {
+    final feature = featureWith({
+      'my_feature.dart': r'''
+class MyFeature {
+  String title(int n) => 'Tier ${TierLabels.of(n)}';
+}
+''',
+      'widgets/tier_labels.dart': 'class TierLabels {}',
+    });
+
+    expect(unusedNames(feature), isEmpty);
+  });
+
   test('a feature with no internals reports nothing', () {
     final feature = featureWith({'my_feature.dart': 'class MyFeature {}'});
 

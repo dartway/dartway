@@ -64,9 +64,13 @@ List<DwUnusedFeatureFile> findUnusedFeatureFiles(DwFeatureNode feature) {
   };
   // Comments and string literals are not references: a name inside them proves
   // nothing, and a doc comment naming the class it documents would keep every
-  // dead file alive.
+  // dead file alive. An interpolation is code: `'${Tier.label}'` uses `Tier`.
   final contents = {
-    for (final file in files) file.path: DwDartSource(sources[file.path]!).code,
+    for (final file in files)
+      file.path: DwDartSource(
+        sources[file.path]!,
+        interpolationsAsCode: true,
+      ).code,
   };
   final declarations = {
     for (final file in internalFiles)

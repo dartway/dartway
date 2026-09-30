@@ -173,6 +173,34 @@ void main() {
       expect(code, "f('''  \${g(\n' '\n)}  ''');");
     });
 
+    test(r'an escaped `\$` does not interpolate', () {
+      const source = r"f('\${a(b)}'); g();";
+      expect(blank(source, interpolationsAsCode: true), "f('        '); g();");
+      expect(DwDartSource(source).literals.single.interpolations, isEmpty);
+    });
+
+    test(r'`$name` in a raw string is text', () {
+      const source = r"f(r'$now');";
+      expect(blank(source, interpolationsAsCode: true), "f(r'    ');");
+      expect(DwDartSource(source).literals.single.interpolations, isEmpty);
+    });
+
+    test(r'a `${` left open at the end of the source', () {
+      const source = r"f('${a(";
+      final literal = DwDartSource(source).literals.single;
+      expect(literal.closed, isFalse);
+      expect(literal.end, source.length);
+      expect(blank(source, interpolationsAsCode: true), source);
+      expect(blank(source), "f('    ");
+    });
+
+    test(r'a `//` comment inside `${…}` is recorded and blanked', () {
+      const source = "f('''\${a( // b\n)}''');";
+      final scanned = DwDartSource(source, interpolationsAsCode: true);
+      expect(scanned.lineCommentStarts, {source.indexOf('//')});
+      expect(scanned.code, "f('''\${a(     \n)}''');");
+    });
+
     test('the interpolations are recorded as spans of the source', () {
       const source = r"f('a ${b} $c d');";
       final literal = DwDartSource(source).literals.single;
@@ -218,6 +246,15 @@ void main() {
       expect(
         blank("f('two words', 'a\$b');", keepWordsAndPaths: true),
         "f('         ', '   ');",
+      );
+    });
+
+    test('with interpolations as code: a kept word, a blanked sentence, '
+        'and the interpolation inside it', () {
+      const source = r"f('PORT', 'on ${env['PORT']} now', 'a b');";
+      expect(
+        blank(source, interpolationsAsCode: true, keepWordsAndPaths: true),
+        r"f('PORT', '   ${env['PORT']}    ', '   ');",
       );
     });
 

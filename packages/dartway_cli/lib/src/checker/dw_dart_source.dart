@@ -57,11 +57,28 @@ final class DwDartSource {
   final List<int> _out;
 
   /// 1-based line of [offset].
-  int lineOf(int offset) =>
-      '\n'
-          .allMatches(content.substring(0, offset.clamp(0, content.length)))
-          .length +
-      1;
+  int lineOf(int offset) {
+    final starts = _lineStarts;
+    // The last line start at or before [offset].
+    var low = 0;
+    var high = starts.length - 1;
+    while (low < high) {
+      final middle = (low + high + 1) >> 1;
+      if (starts[middle] <= offset) {
+        low = middle;
+      } else {
+        high = middle - 1;
+      }
+    }
+    return low + 1;
+  }
+
+  /// Where each line of [content] starts.
+  late final List<int> _lineStarts = [
+    0,
+    for (var i = 0; i < content.length; i++)
+      if (content.codeUnitAt(i) == _newline) i + 1,
+  ];
 
   static const _slash = 0x2F;
   static const _star = 0x2A;

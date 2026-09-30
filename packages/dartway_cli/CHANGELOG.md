@@ -42,9 +42,13 @@
   constants — uses `dw_dart_source.dart` instead of its own copy, and its edge cases (raw and
   triple-quoted strings, nested interpolation with quotes and braces, `$name`, nested block
   comments, `//` inside a string) are one fixture suite. No finding changes over the skeleton, the
-  example and the three projects on the framework; where the copies disagreed on source no project
-  holds, the unified reading is the correct one (a comment or a quote inside `${…}`, nested block
-  comments, `//` in a string before a name).
+  example and the three projects on the framework. Some source that no project holds is now read
+  correctly: a quote or brace inside `${…}` no longer ends the string, block comments nest, a `//`
+  inside a string no longer hides the rest of its line from `unusedFeatureFile`, a name used only
+  inside an interpolation keeps its file alive, an environment read inside an interpolation in
+  `bin/` is reported, a plain and a raw literal side by side are one SQL string, a literal inside a
+  block comment is not a UI kit text constant, and a literal in a conditional import's condition
+  is not a URI.
 
 ## 0.23.0
 

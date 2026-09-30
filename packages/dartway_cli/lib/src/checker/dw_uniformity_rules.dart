@@ -574,9 +574,9 @@ class DwUniformityInspector {
 
   /// `import`/`export` directives: found in the text with comments and
   /// strings blanked, so a directive quoted inside a multi-line string is not
-  /// one, and read, for their URIs, from the literals of the source.
-  /// Each directive's URI literals — the first, and those after `if (…)`.
-  /// `part` and `part of` are not directives this touches.
+  /// one. Each directive's URI literals — the first, and each one right after
+  /// an `if (…)`; a literal inside the condition (`dart.library.io == 'true'`)
+  /// is not a URI. `part` and `part of` are not directives this touches.
   static List<_Directive> _directivesIn(String content) {
     final source = DwDartSource(content);
     final bare = source.code;
@@ -584,17 +584,26 @@ class DwUniformityInspector {
     for (final match in _directiveStart.allMatches(bare)) {
       final end = bare.indexOf(';', match.end);
       if (end < 0) continue;
-      // The directive's URIs: the first literal, and each one following
-      // `if (…)`. `show`/`hide`/`as` name identifiers, not strings.
-      final uris = <_Literal>[
-        for (final literal in source.literals)
-          if (literal.start >= match.end && literal.end <= end)
-            _Literal(literal.contentStart, literal.contentEnd, literal.text),
-      ];
+      final uris = <_Literal>[];
+      for (final literal in source.literals) {
+        if (literal.start < match.end || literal.end > end) continue;
+        if (uris.isNotEmpty &&
+            !_afterCondition.hasMatch(
+              bare.substring(match.end, literal.start),
+            )) {
+          continue;
+        }
+        uris.add(
+          _Literal(literal.contentStart, literal.contentEnd, literal.text),
+        );
+      }
       directives.add(_Directive(uris));
     }
     return directives;
   }
+
+  /// The text before a conditional URI: it ends with `if (…)`.
+  static final _afterCondition = RegExp(r'\bif\s*\([^;]*\)\s*$');
 
   static final _directiveStart = RegExp(
     r'''^[ \t]*(?:import|export)\s+(?=['"])''',
