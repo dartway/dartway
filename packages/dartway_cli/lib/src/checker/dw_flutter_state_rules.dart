@@ -24,6 +24,10 @@ import 'dw_layout.dart';
 /// (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) — `dw.action`
 /// does, and shows a refusal through the app's catalogue.
 ///
+/// [DwCheckType.routerDisposedByApp]: `<x>.router.dispose` — the app disposing
+/// its `DwAppRouter`'s `GoRouter`, which disposes itself with its provider
+/// (dartway/dartway#407).
+///
 /// Read from the source with comments and strings blanked, so a word in a doc
 /// comment is not code. What a text scan cannot see is left out on purpose:
 /// a flow controller's method called outside `dw.action` (its name says
@@ -39,6 +43,7 @@ class DwFlutterStateInspector {
          for (final type in const [
            DwCheckType.forbiddenStateHolder,
            DwCheckType.forbiddenCommandCall,
+           DwCheckType.routerDisposedByApp,
          ])
            if ((filterType == null || filterType == type) &&
                (filterSeverity == null || filterSeverity == type.severity))
@@ -100,7 +105,7 @@ class DwFlutterStateInspector {
     }
 
     if (_findings.isEmpty && _allowances.isEmpty) return 0;
-    print('\n📌 State and commands:\n');
+    print('\n📌 State, commands and the router:\n');
     for (final finding in _findings) {
       print('  ${finding.type.reportLabel}: $finding');
     }
@@ -284,6 +289,17 @@ class DwFlutterStateInspector {
       }
     }
 
+    // ------------------------------------------------------ router lifetime
+    for (final match in _routerDispose.allMatches(code)) {
+      add(
+        DwCheckType.routerDisposedByApp,
+        match.start,
+        'the app disposes its router — DwAppRouter disposes itself with the '
+        'provider that built it (ref:), so delete this line; left in, it is a '
+        'second dispose that fails in debug',
+      );
+    }
+
     findings.sort((a, b) => a.line.compareTo(b.line));
     return DwJudgedFile(findings, allowances);
   }
@@ -319,6 +335,9 @@ class DwFlutterStateInspector {
   static final _commandsCall = RegExp(
     r'(?<![\w$.])([A-Z]\w*Commands)\s*\.\s*(\w+)\s*\(',
   );
+
+  /// `.router.dispose`, called or torn off: the `GoRouter` of a `DwAppRouter`.
+  static final _routerDispose = RegExp(r'\.\s*router\s*\.\s*dispose\b');
 
   static final _resultRead = RegExp(
     r'(?<![\w$])(?:DwCallOk|DwCallRefused|DwCallFailed)\b|\.\s*valueOrThrow\b',

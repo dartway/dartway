@@ -153,7 +153,7 @@ final appRouterStateProvider = Provider<AppRouterState>(
 ```dart
 final appRouterProvider = Provider<DwAppRouter<AppRouterState>>(
   (ref) => DwAppRouter<AppRouterState>(
-    ref: ref, // follows routerState through it, and is disposed with this provider
+    ref: ref, // follows routerState through it, and disposes itself with this provider — never dispose it yourself (`routerDisposedByApp`)
     routerState: appRouterStateProvider, // the provider, not ref.watch of it
     navigationZones: [
       AppNavigationZone.values,

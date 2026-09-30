@@ -17,6 +17,40 @@ void main() {
 
   const holder = DwCheckType.forbiddenStateHolder;
   const command = DwCheckType.forbiddenCommandCall;
+  const routerDispose = DwCheckType.routerDisposedByApp;
+
+  group('the router disposes itself (#407)', () {
+    test(
+      'a leftover dispose of the router is a finding, called or torn off',
+      () {
+        expect(
+          judge('core/router/router.dart', '''
+final appRouterProvider = Provider((ref) {
+  final router = DwAppRouter(ref: ref, routerState: appRouterStateProvider);
+  ref.onDispose(router.router.dispose);
+  ref.onDispose(() => router.router.dispose());
+  ref.onDispose(() => ref.read(appRouterProvider).router
+      .dispose());
+  return router;
+});
+'''),
+          [(routerDispose, 3), (routerDispose, 4), (routerDispose, 5)],
+        );
+      },
+    );
+
+    test('the router used, or the word in a comment or a string, is not', () {
+      expect(
+        judge('core/router/router.dart', '''
+// ref.onDispose(router.router.dispose) is gone: the router disposes itself.
+final text = 'router.router.dispose';
+final config = router.router.routerDelegate.currentConfiguration;
+void close(TextEditingController controller) => controller.dispose();
+'''),
+        isEmpty,
+      );
+    });
+  });
 
   group('state holders', () {
     test('a StatefulWidget is one finding, its State and setState with it', () {
@@ -109,11 +143,11 @@ class CartController extends Notifier<int> {
 
     test('the marker passes over the class it stands on, its State with it, '
         'and is counted', () {
-      final judged = DwFlutterStateInspector.judge('core/router/state.dart', '''
-/// The router's refresh listenable.
-// dw:allow-stateful go_router listens to a Listenable
+      final judged = DwFlutterStateInspector.judge('core/map/state.dart', '''
+/// What the map SDK listens to.
+// dw:allow-stateful the map SDK listens to a Listenable
 @immutable
-class RouterState extends ChangeNotifier {}
+class MapCamera extends ChangeNotifier {}
 
 // dw:allow-stateful a platform view needs a State subclass
 class MapView extends StatefulWidget {
@@ -132,8 +166,8 @@ class Other extends ChangeNotifier {}
         [(holder, 16)],
       );
       expect(judged.allowances, [
-        'core/router/state.dart:2 RouterState — go_router listens to a Listenable',
-        'core/router/state.dart:6 MapView — a platform view needs a State subclass',
+        'core/map/state.dart:2 MapCamera — the map SDK listens to a Listenable',
+        'core/map/state.dart:6 MapView — a platform view needs a State subclass',
       ]);
     });
 
@@ -404,9 +438,9 @@ class AppField extends HookWidget {
 class CartPage extends StatefulWidget {}
 final a = dw.command(ClearCart());
 ''');
-      write('core/router/app_router_state.dart', '''
-// dw:allow-stateful the router listens to a Listenable
-class AppRouterState extends ChangeNotifier {}
+      write('core/map/map_camera.dart', '''
+// dw:allow-stateful the map SDK listens to a Listenable
+class MapCamera extends ChangeNotifier {}
 ''');
       write(
         'l10n/app_localizations.dart',
@@ -422,7 +456,7 @@ class AppRouterState extends ChangeNotifier {}
       expect(inspector.run(tally: tally), 2);
       expect(tally.counts, {holder: 1, command: 1});
       expect(tally.errors, 2);
-      expect(inspector.allowances.single, contains('AppRouterState'));
+      expect(inspector.allowances.single, contains('MapCamera'));
       expect(
         tally.summary,
         containsAll([

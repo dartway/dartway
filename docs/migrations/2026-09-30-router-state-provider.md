@@ -3,6 +3,7 @@ title: The router follows a provider; AppRouterState is a record, not a ChangeNo
 affects:
   dartway_core_flutter: "0.21.0-dev.17"
   dartway_router: "3.0.0"
+  dartway_studio_binding: "0.2.1"
 ---
 
 ## Who is affected
@@ -64,7 +65,7 @@ moved into the file above), and build the router with `ref` and the provider its
       });
 
 The `ref.onDispose(router.router.dispose)` line has to go: the router disposes itself now, and a
-second dispose fails in debug. The zone files and their guards (`state.isSignedIn`, `state.role`)
+second dispose fails in debug — `dartway check` fails it as `routerDisposedByApp`. The zone files and their guards (`state.isSignedIn`, `state.role`)
 do not change.
 
 Keep `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)` a watch: Riverpod
@@ -74,6 +75,7 @@ A project with `DwStudioBinding` passes `router:` as before.
 
 ## How to check
 
-`flutter analyze` in the Flutter package is clean; `dart run dartway_cli:dartway check` prints no
+`flutter analyze` in the Flutter package is clean; `grep -rn "router\.dispose" lib/` finds nothing
+(`dart run dartway_cli:dartway check` fails a leftover as `routerDisposedByApp`); the check prints no
 `🔓 Allowed by dw:allow-stateful` for `AppRouterState`; signing out of the running app returns to the
 sign-in screen, and a link into the app opened signed out ends there after signing in.
