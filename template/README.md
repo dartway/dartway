@@ -80,7 +80,8 @@ its codes is the admin, so there is no default. A real delivery goes into
 
 ## Build a feature
 
-1. **Contract** — in `dartway_starter_shared/lib/src/`, a data object
+1. **Contract** — in `dartway_starter_shared/lib/src/<feature>.dart`, named
+   after the server's feature folder, a data object
    (`extends DwDataObject`), the requests that read it (`DwSingleRequest`,
    `DwListRequest`, `DwTableRequest`, …) with the channels they live on, and
    the commands that change it (`DwActionCommand`, `DwSelfValidating` for

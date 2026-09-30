@@ -5,7 +5,7 @@ between them.**
 
 A feature is a few classes in a package both sides compile, one handler per call on the server, and a
 widget that watches live state. The contract — abridged from
-`example/dartway_example_shared/lib/src/news.dart`:
+`example/dartway_example_shared/lib/src/content.dart`:
 
 ```dart
 final class ListNews extends DwListRequest<NewsPost> with _$ListNews {

@@ -23,8 +23,8 @@ project writes four things: **the category, the payload, who is eligible, and wh
 
 The framework's example does all of it for news — the category
 ([`dartway_example_push_category.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/dartway_example_push_category.dart))
-and the protocol ([`app_protocol.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/app_protocol.dart)), the
-payload (`NewsAlert` in [`news.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/news.dart)), eligibility by
+and the protocol ([`dartway_example_protocol.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/dartway_example_protocol.dart)), the
+payload (`NewsAlert` in [`content.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/content.dart)), eligibility by
 marketing consent and providers from the environment
 ([`core/push.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/core/push.dart)), the send (`PublishNews` in
 [`content_handlers.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/content/content_handlers.dart)), the tap

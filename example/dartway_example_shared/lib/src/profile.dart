@@ -2,7 +2,7 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:dartway_example_shared/src/dartway_example_channel.dart';
 import 'package:dartway_example_shared/src/dartway_example_refusal.dart';
 
-part 'people.dw.dart';
+part 'profile.dw.dart';
 
 enum UserRole { client, staff, admin }
 

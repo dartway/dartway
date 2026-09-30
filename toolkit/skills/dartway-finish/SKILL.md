@@ -67,6 +67,7 @@ Run the detectors **over the changed files only** (not over the whole repo). For
 - Naming: a public class name of one word; a data object that is not a two-word noun; a read not
   starting `Get…`/`List…`; a change that is not verb + object.
 - A DTO, field or refusal code whose meaning is not obvious, without a doc comment.
+- A DTO in a file of its own name rather than the file of its server feature (`dartway-contract` §1).
 
 **The server (`__SERVER_PKG__`, `dartway-server`, `dartway-access`, `dartway-realtime`):**
 - A handler whose `access:` is wider than the rule it serves — `DwAccessRule.anonymous` on something
@@ -91,6 +92,8 @@ Run the detectors **over the changed files only** (not over the whole repo). For
 - A row class change with no migration in the diff; a migration that imports a row class or anything
   from `lib/`; a migration file that existed on the base branch and is **modified** in the diff
   (`dartway-migrations` — a stop, see A.5).
+- Several responsibilities in one file — the same length signal as the app's below; a kind that
+  outgrew its file splits into `<feature>_<part>_<kind>.dart` (`dartway-server` §1).
 
 **The app (`__FLUTTER_PKG__`):**
 - Several responsibilities in one file (length is the weakest signal: >200 lines — take a look, >350 —

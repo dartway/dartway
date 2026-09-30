@@ -7,7 +7,7 @@ description: >-
   constructors) with channels, commands (DwActionCommand<R>, one result value), DwFieldPatch for
   clearable fields and its helpers, settings objects, defaults on the wire, DwSelfValidating, the project's refusal enum
   (DwRefusalCodes), channel kinds (DwChannelKind), upload purposes (DwUploadPurpose), naming
-  (two words, Get…/List…, verb+object), and generation (`dart run dartway_cli:dartway generate`, `*.dw.dart`,
+  (two words, Get…/List…, verb+object), where a DTO lives (lib/src/ mirrors the server's features), and generation (`dart run dartway_cli:dartway generate`, `*.dw.dart`,
   lib/generated/ — never edited). Also what a DTO change costs installed app builds and when to
   raise the contract's breaking line (the shared package's version). Use when adding or changing a data object, a request, a command, a refusal
   code, a channel kind or an upload purpose, or when choosing which request kind a screen needs.
@@ -45,13 +45,25 @@ In the samples below the shared package is `acme_shared`, so its enums are `Acme
 A project never extends `DwWireObject` or `DwServerCall` directly. Rows (`…Row`) are server-only and
 never appear here — the handler maps a row to a data object explicitly (`dartway-server`).
 
+**Where a DTO lives: `lib/src/` mirrors the server's features** (`invalidSharedLayout`). The DTOs
+of the server feature `invoices/` are in `lib/src/invoices.dart`; when that file grows (`fileLong`
+over 200 lines, `fileTooLong` over 350 — the same limits as the app's), it becomes a flat folder of
+parts only, `lib/src/invoices/invoices_<part>.dart`, each named for a group of DTOs — a data object
+with the requests and commands that answer it (`invoices_payments.dart`), never exactly a layer
+(`invoices_models.dart`); no `invoices/invoices.dart` beside them, and no deeper folders. The file
+or folder name is a folder of the server's `lib/src/`, letter for letter: what exists only in the
+contract — a rule both sides apply, the keys a sign-up sends — goes with the feature that owns it,
+and a DTO goes where its handler is. Beside the features, the top of `lib/src/` holds only the
+package-wide files named after the package (`acme_shared` → `acme_`): `acme_channel.dart`,
+`acme_refusal.dart`, `acme_upload.dart` (§8), `acme_protocol.dart` (the protocol both sides speak,
+when a module adds calls to the generated one) and `acme_push_category.dart` (with push).
+
 The shape every DTO file has:
 
 ```dart
+import 'package:acme_shared/src/acme_channel.dart';
+import 'package:acme_shared/src/acme_refusal.dart';
 import 'package:dartway_core_shared/dartway_core_shared.dart';
-
-import 'app_channel.dart';
-import 'app_refusal.dart';
 
 part 'invoices.dw.dart';
 
@@ -467,6 +479,8 @@ The skeleton's shared package ships such a test; extend it rather than starting 
 ## Checklist
 
 - [ ] Names: two words; `Get…`/`List…`; verb+object; `My…` without an account id.
+- [ ] The DTO sits in the file of its server feature (`src/<feature>.dart` or
+      `src/<feature>/<feature>_<part>.dart`), not in a file of its own name.
 - [ ] Request kind chosen by the table in section 3; `matches` on a maybe request; total order
       for page/table/window.
 - [ ] Every parameter that changes a request's answer is a field; nothing impure in `channels`,

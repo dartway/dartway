@@ -3,11 +3,11 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import '../src/admin.dart';
 import '../src/bookings.dart';
-import '../src/chat.dart';
-import '../src/news.dart';
-import '../src/people.dart';
+import '../src/chat/chat_channels.dart';
+import '../src/chat/chat_messages.dart';
+import '../src/content.dart';
+import '../src/profile.dart';
 import '../src/schedule.dart';
-import '../src/settings.dart';
 
 final DwWireProtocol dartwayExampleProtocol = DwWireProtocol(
   [

@@ -12,7 +12,7 @@ with no domain in it.
 ## The one idea: a contract, not endpoints
 
 A feature starts as classes in the shared package. Abridged from
-`example/dartway_example_shared/lib/src/news.dart`:
+`example/dartway_example_shared/lib/src/content.dart`:
 
 ```dart
 final class NewsPost extends DwDataObject with _$NewsPost {

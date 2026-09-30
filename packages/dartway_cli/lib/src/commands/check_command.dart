@@ -18,6 +18,8 @@ import '../checker/dw_layout.dart';
 import '../checker/dw_server_clock_use.dart';
 import '../checker/dw_server_contract.dart';
 import '../checker/dw_server_features.dart';
+import '../checker/dw_shared_layout.dart';
+import '../checker/dw_package_file_size.dart';
 import '../checker/dw_server_outside_world.dart';
 import '../checker/dw_inline_ownership.dart';
 import '../checker/dw_project_template.dart';
@@ -149,6 +151,21 @@ class CheckCommand extends Command<int> {
       // Inside the server's features: which files a feature may have, and
       // which of them declares what. The server's, like the layout above.
       errorCount += DwServerFeatureInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        sharedPackageDir: layout?.sharedPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+
+      // The shared package mirrors the server's features, and both packages
+      // are held to the Flutter package's file length (#383).
+      errorCount += DwSharedLayoutInspector(
+        sharedPackageDir: layout?.sharedPackageDir,
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwPackageFileSizeInspector(
         serverPackageDir: layout?.serverPackageDir,
         sharedPackageDir: layout?.sharedPackageDir,
         filterType: filterType,
