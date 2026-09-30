@@ -171,7 +171,7 @@ Thirty-seven errors, twelve warnings, one info — `DwCheckType` and its `severi
 | `testHarnessBypassed` | error | Outside `test/support/`: a `ProviderScope` or a `DwFakeServer` built by a widget test, a `DwTestServer.start` or a `DwAppServer` by a server test |
 | `rawSpacing` | error | Outside `ui_kit/`: a number instead of an `AppSpace` step in a spacer `SizedBox`, a `Gap`, an `EdgeInsets.*`, or a `spacing:`/`runSpacing:`/`mainAxisSpacing:`/`crossAxisSpacing:` — conditionals included. Zero passes; a `SizedBox` with a `child:` or both dimensions, and `SizedBox.square`, are sizes, not spacing |
 | `lintsPluginMissing` | error | The Flutter package's `analysis_options.yaml` does not enable the `dartway_lints` plugin; `dartway update` adds it |
-| `invalidSharedLayout` | error | The shared package's `lib/src/` holding anything but `<feature>.dart` or a flat `<feature>/` of `<feature>.dart` and `<feature>_<part>.dart` files — `<feature>` a feature folder of the server's `lib/src/`, a part never a layer name — and the package-named `_channel`, `_refusal`, `_upload`, `_protocol`, `_push_category.dart`; a feature both as a file and a folder; in `lib/`, anything but the library, `generated/` and `src/`. The finding names the owner of a near miss (`issue_process.dart` → `src/issues/issues_process.dart`) |
+| `invalidSharedLayout` | error | The shared package's `lib/src/` holding anything but `<feature>.dart` or a flat `<feature>/` of `<feature>_<part>.dart` parts only — `<feature>` a feature folder of the server's `lib/src/`, a part never exactly a layer name, no `<feature>/<feature>.dart` — and the package-named `_channel`, `_refusal`, `_upload`, `_protocol`, `_push_category.dart`; a feature both as a file and a folder; in `lib/`, anything but the library (directives only), `generated/` (generated files only) and `src/`; a file with a generated suffix (`.dw.dart`, `.g.dart`, `.freezed.dart`) and no generated header. The finding names the owner of a near miss (`issue_process.dart` → `src/issues/issues_process.dart`) |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines, in the Flutter package's zones and layers but `ui_kit/`, and in the server's and the shared package's `lib/` — generated code, migrations and seed data passed over |
@@ -242,9 +242,10 @@ path), every other folder but `core/` is a feature, and a feature's own files ar
 `dw_server_features.dart` (`invalidServerFeatureFile`, `misplacedServerCode`).
 
 The shared package's top level is `dw_shared_layout.dart`'s (`invalidSharedLayout`): `lib/` holds
-`<project>_shared.dart`, `generated/` and `src/`, and `src/` mirrors the server — a file or a flat
-folder per feature folder of the server's `lib/src/`, read from the server package in the same run,
-plus the files named after the package. Without a server package the names are not matched, and the
+`<project>_shared.dart` (directives only), `generated/` (only files with a generator's header) and
+`src/`, and `src/` mirrors the server — a file or a flat folder of parts per feature folder of the
+server's `lib/src/`, read from the server package in the same run, plus the files named after the
+package. There is no shared `core/`. Without a server package the names are not matched, and the
 run says so.
 
 A zone name or a layer name one level down — `app/admin/` — is an error too, and it is the reason the
@@ -475,11 +476,12 @@ responsibility, not by line count.
 The same two numbers hold in the server and the shared package (`dw_package_file_size.dart`), at the
 same levels — a handler file of 1900 lines is a warning, not a failed build. Three kinds of file are
 passed over, because none of them collects responsibilities: generated code (`lib/generated/`,
-`*.dw.dart`), the server's migrations (drafted, then sealed), and **seed data** — a file that
-declares nothing but top-level `const`s and builds row drafts (`New<Entity>Row(…)`) in them, which is
-what a `DwSeedRows` catalogue in its own `<feature>_<part>_rows.dart` looks like. It is recognised by
-what it declares, so one class, function, closure or `final` beside the rows and the file is
-measured. Tests are not measured on either side: a test file is a list of independent cases, and
+`*.dw.dart`, `*.g.dart`, `*.freezed.dart` — each only with its generated header), the server's
+migrations (drafted, then sealed), and, on the server, **seed data** — a file of directives and
+top-level `const`s each initialised with a row draft (`New<Entity>Row(…)`) or a collection of nothing
+but drafts, which is what a `DwSeedRows` catalogue in its own `<feature>_<part>_rows.dart` looks
+like. It is recognised by what it declares, so one class, function, `final`, other constant or
+helper call beside the rows and the file is measured. Tests are not measured on either side: a test file is a list of independent cases, and
 one that grows splits by scenario.
 
 ## Why `SizedBox(width: double.infinity)` is not in `widgetSizesItself`

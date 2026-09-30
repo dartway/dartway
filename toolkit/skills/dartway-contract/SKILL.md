@@ -47,10 +47,10 @@ never appear here — the handler maps a row to a data object explicitly (`dartw
 
 **Where a DTO lives: `lib/src/` mirrors the server's features** (`invalidSharedLayout`). The DTOs
 of the server feature `invoices/` are in `lib/src/invoices.dart`; when that file grows (`fileLong`
-over 200 lines, `fileTooLong` over 350 — the same limits as the app's), it becomes a flat folder,
-`lib/src/invoices/invoices.dart` and `lib/src/invoices/invoices_<part>.dart`, the part named for a
-group of DTOs — a data object with the requests and commands that answer it
-(`invoices_payments.dart`), never a layer (`invoices_models.dart`), and no deeper folders. The file
+over 200 lines, `fileTooLong` over 350 — the same limits as the app's), it becomes a flat folder of
+parts only, `lib/src/invoices/invoices_<part>.dart`, each named for a group of DTOs — a data object
+with the requests and commands that answer it (`invoices_payments.dart`), never exactly a layer
+(`invoices_models.dart`); no `invoices/invoices.dart` beside them, and no deeper folders. The file
 or folder name is a folder of the server's `lib/src/`, letter for letter: what exists only in the
 contract — a rule both sides apply, the keys a sign-up sends — goes with the feature that owns it,
 and a DTO goes where its handler is. Beside the features, the top of `lib/src/` holds only the

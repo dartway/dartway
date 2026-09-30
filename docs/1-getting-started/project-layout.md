@@ -55,14 +55,16 @@ my_app_shared/
 
 **`lib/src/` mirrors the server's features** — a law, held by `dart run dartway_cli:dartway check`
 (`invalidSharedLayout`). The contract of the server's `profile/` is `src/profile.dart`; when it
-grows, it becomes a flat folder `src/profile/` of `profile.dart` and `profile_<part>.dart` files,
-the part a group of DTOs — a data object with the requests and commands that answer it
-(`chat_messages.dart`), never a layer (`chat_models.dart`). A name is a feature folder of the server,
-letter for letter, so "where is the contract of this feature" has one answer: what exists only in the
-contract goes with the feature that owns it, and a DTO goes where its handler is. Beside the
-features sit only the package-wide files named after the package: `_channel`, `_refusal`,
-`_upload`, `_protocol` and, with push, `_push_category`. `lib/` itself holds the library,
-`generated/` and `src/`.
+grows, it becomes a flat folder `src/profile/` of parts only, `profile_<part>.dart`, each a group of
+DTOs — a data object with the requests and commands that answer it (`chat_messages.dart`), never
+exactly a layer (`chat_models.dart`) — and no `profile/profile.dart` beside them, where everything
+without a part would collect. A name is a feature folder of the server, letter for letter, so "where
+is the contract of this feature" has one answer, and a DTO goes where its handler is. **The shared
+package has no `core/`**: what exists only in the contract — a rule both sides apply, the keys a
+sign-up sends — goes with the feature that owns it. Beside the features sit only the package-wide
+files named after the package: `_channel`, `_refusal`, `_upload`, `_protocol` and, with push,
+`_push_category`. `lib/` itself holds the library, which re-exports and declares nothing,
+`generated/`, which holds only what the generator writes, and `src/`.
 
 **It depends on `dartway_core_shared` and nothing else.** Whatever it declares is compiled into the
 server and into the app alike, so it cannot reach for Flutter, a database or IO. A rule that needs the
@@ -155,9 +157,10 @@ written as a closure inside a handler is not seen — keep it in `_objects` anyw
 where the next reader looks for it.
 
 **A file is held to the app's length, in the server and the shared package alike**: over 200 lines
-is a nudge (`fileLong`), over 350 a warning (`fileTooLong`). Passed over: generated code, migrations,
-and seed data — a file of nothing but `const` lists of row drafts for a `DwSeedRows` step, so a
-catalogue of hundreds of rows sits in a `<feature>_<part>_rows.dart` of its own. Tests are not
+is a nudge (`fileLong`), over 350 a warning (`fileTooLong`). Passed over: generated code (named so
+and carrying the generator's header), migrations, and the server's seed data — a file of nothing
+but `const`s, each a row draft or a collection of drafts for a `DwSeedRows` step, so a catalogue of
+hundreds of rows sits in a `<feature>_<part>_rows.dart` of its own. Tests are not
 measured; a long one splits by scenario (`<feature>_<scenario>_acceptance_test.dart`).
 
 **A row is not a data object.** `UserProfileRow` is a table; `UserProfile` is what a client receives.

@@ -3,7 +3,7 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import '../src/admin.dart';
 import '../src/bookings.dart';
-import '../src/chat/chat.dart';
+import '../src/chat/chat_channels.dart';
 import '../src/chat/chat_messages.dart';
 import '../src/content.dart';
 import '../src/profile.dart';

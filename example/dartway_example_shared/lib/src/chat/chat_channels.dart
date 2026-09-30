@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:dartway_example_shared/src/dartway_example_channel.dart';
 
-part 'chat.dw.dart';
+part 'chat_channels.dw.dart';
 
 final class ChatChannel extends DwDataObject with _$ChatChannel {
   const ChatChannel({required this.id, required this.title});

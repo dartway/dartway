@@ -404,11 +404,14 @@ enum DwCheckType {
 
   /// The shared package's `lib/src/` does not mirror the server's features
   /// (dartway/dartway#383): it holds `<feature>.dart`, or a flat folder
-  /// `<feature>/` of `<feature>.dart` and `<feature>_<part>.dart` files, with
-  /// `<feature>` a feature folder of the server's `lib/src/`, and the
-  /// project-named `<prefix>_channel`, `_refusal`, `_upload`, `_protocol` and
-  /// `_push_category.dart` (the prefix the package's name without `_shared`)
-  /// — nothing else; `lib/` holds the library, `generated/` and `src/`.
+  /// `<feature>/` of `<feature>_<part>.dart` parts only (a part never exactly
+  /// a layer's name), with `<feature>` a feature folder of the server's
+  /// `lib/src/`, and the project-named `<prefix>_channel`, `_refusal`,
+  /// `_upload`, `_protocol` and `_push_category.dart` (the prefix the
+  /// package's name without `_shared`) — nothing else. `lib/` holds the
+  /// library (directives only), `generated/` (generated files only) and
+  /// `src/`; a file under a generated name without a generated header is a
+  /// finding too.
   ///
   /// Every project had grown a shared layout of its own — flat files beside
   /// folders named after nothing on the server, one feature's data objects

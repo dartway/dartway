@@ -9,7 +9,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 /// The staff chat's reads — channels, a window over each channel's messages,
 /// pins and search — and read positions. Every call is staff only; what
-/// changes a message is `chatMessageHandlers`.
+/// changes a message is `chatMessagesHandlers`.
 ///
 /// What changes a message is published as the message itself on its channel,
 /// so the window and the pinned list each decide by `matches` whether it is

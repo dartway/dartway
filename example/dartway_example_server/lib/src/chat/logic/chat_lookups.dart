@@ -17,18 +17,18 @@ extension ChatLookups on DwCallContext {
     int messageId, {
     bool lock = false,
   }) async =>
-      await liveChatMessage(messageId, lock: lock) ??
+      await _liveChatMessage(messageId, lock: lock) ??
       refuse(DwCoreRefusal.notFound);
 
   /// The message [messageId], locked for a change, to staff; `null` — and no
   /// lock taken — for anyone else, or when there is none or it is deleted.
   Future<ChatMessageRow?> staffChatMessage(int messageId) async =>
-      await isStaff ? await liveChatMessage(messageId, lock: true) : null;
+      await isStaff ? await _liveChatMessage(messageId, lock: true) : null;
 
   /// The message [messageId], or `null` when there is none or it is deleted.
   /// With [lock], held until the command commits: edits, deletions and pins of
   /// one message queue instead of overwriting each other's row.
-  Future<ChatMessageRow?> liveChatMessage(
+  Future<ChatMessageRow?> _liveChatMessage(
     int messageId, {
     bool lock = false,
   }) async {

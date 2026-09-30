@@ -15,7 +15,7 @@ const int _reactionLocks = 0x43480001;
 /// What changes a message of the staff chat: sending, editing, deleting,
 /// pinning and reacting. Every call is staff only; each change is published
 /// as the message itself on its channel, with every message quoting it.
-final chatMessageHandlers = <DwCallHandler>[
+final chatMessagesHandlers = <DwCallHandler>[
   /// Sends a message, with the caller's own unsent uploads attached. Staff
   /// only. Published on its channel; moves the sender's read position and
   /// everyone's unread counts.

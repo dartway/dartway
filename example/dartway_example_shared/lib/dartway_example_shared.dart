@@ -8,7 +8,7 @@ export 'package:dartway_push_shared/dartway_push_shared.dart';
 export 'package:dartway_example_shared/generated/dw_protocol.dart';
 export 'package:dartway_example_shared/src/admin.dart';
 export 'package:dartway_example_shared/src/bookings.dart';
-export 'package:dartway_example_shared/src/chat/chat.dart';
+export 'package:dartway_example_shared/src/chat/chat_channels.dart';
 export 'package:dartway_example_shared/src/chat/chat_messages.dart';
 export 'package:dartway_example_shared/src/content.dart';
 export 'package:dartway_example_shared/src/dartway_example_channel.dart';

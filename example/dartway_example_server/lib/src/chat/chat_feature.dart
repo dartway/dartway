@@ -8,7 +8,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 /// The staff chat: its channels, messages and read positions.
 final chatFeature = DwServerFeature(
   'chat',
-  handlers: [...chatHandlers, ...chatMessageHandlers],
+  handlers: [...chatHandlers, ...chatMessagesHandlers],
   startup: [
     DwSeedRows(
       'staff channels',

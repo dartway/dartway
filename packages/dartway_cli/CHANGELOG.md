@@ -5,22 +5,25 @@
 - **BREAKING: `dartway check` holds the shared package to the server's features, and file length
   to the server and the shared package** (dartway/dartway#383, D-119). New error
   `invalidSharedLayout` (`dw_shared_layout.dart`): the shared package's `lib/src/` holds
-  `<feature>.dart`, or a flat folder `<feature>/` of `<feature>.dart` and `<feature>_<part>.dart`
-  files (a part never a layer name), `<feature>` a feature folder of the server's `lib/src/` read in
-  the same run, plus `<prefix>_channel`, `_refusal`, `_upload`, `_protocol` and
+  `<feature>.dart`, or a flat folder `<feature>/` of `<feature>_<part>.dart` parts only (a part never
+  exactly a layer name, no `<feature>/<feature>.dart`), `<feature>` a feature folder of the server's
+  `lib/src/` read in the same run, plus `<prefix>_channel`, `_refusal`, `_upload`, `_protocol` and
   `_push_category.dart` (the prefix the package's name without `_shared`); a feature as a file and a
-  folder at once is a finding, and `lib/` holds the library, `generated/` and `src/`. A finding names
+  folder at once is a finding; `lib/` holds the library (directives only), `generated/` (files with
+  a generator's header only) and `src/`; a hand-written file named `*.dw.dart`, `*.g.dart` or
+  `*.freezed.dart` is a finding. A finding names
   the owner of a near miss (`issue_process.dart` → `src/issues/issues_process.dart`) and the name of
   a misnamed protocol file. Without a server package names are not matched, and the run says so.
   `fileLong` (over 200 lines, info) and `fileTooLong` (over 350, warning) now also judge every file of
   the server's and the shared package's `lib/` (`dw_package_file_size.dart`), passing over generated
-  code, the server's migrations and seed data — a file of top-level `const`s building
-  `New<Entity>Row(…)` drafts and nothing else. Tests are not measured. The template's shared package
+  code (by name and header), the server's migrations and, on the server, seed data — directives and
+  top-level `const`s each a `New<Entity>Row(…)` draft or a collection of drafts only. Tests are not
+  measured. The template's shared package
   moves `AuthIdentifier` and `RegistrationKeys` into `profile.dart` and `app_protocol.dart` to
   `dartway_starter_protocol.dart`; the example's `news.dart` and `settings.dart` become `content.dart`,
-  `people.dart` becomes `profile.dart`, `chat.dart` splits into `chat/chat.dart` and
+  `people.dart` becomes `profile.dart`, `chat.dart` splits into `chat/chat_channels.dart` and
   `chat/chat_messages.dart`, and its server's `chat_handlers.dart` into `chat_handlers.dart` and
-  `chat_messages_handlers.dart`. Migration note: `docs/migrations/2026-09-30-shared-mirrors-server-features.md`.
+  `chat_messages_handlers.dart` (`chatMessagesHandlers`). Migration note: `docs/migrations/2026-09-30-shared-mirrors-server-features.md`.
 
 ## 0.22.0
 
