@@ -36,7 +36,6 @@ mixin _$CatalogEntryRow on DwTableRow {
 
 extension CatalogEntryRowCopyWith on CatalogEntryRow {
   CatalogEntryRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     String? name,
     DwFieldPatch<String> schema = const DwFieldPatch.keep(),
     int? columns,
@@ -45,7 +44,7 @@ extension CatalogEntryRowCopyWith on CatalogEntryRow {
     String? where,
     int? order,
   }) => CatalogEntryRow(
-    id: id.apply(this.id),
+    id: id,
     name: name ?? this.name,
     schema: schema.apply(this.schema),
     columns: columns ?? this.columns,
@@ -53,6 +52,93 @@ extension CatalogEntryRowCopyWith on CatalogEntryRow {
     row: row ?? this.row,
     where: where ?? this.where,
     order: order ?? this.order,
+  );
+}
+
+mixin _$NewCatalogEntryRow on DwRowDraft<CatalogEntryRow> {
+  NewCatalogEntryRow get _self => this as NewCatalogEntryRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewCatalogEntryRow &&
+          other.name == _self.name &&
+          other.schema == _self.schema &&
+          other.columns == _self.columns &&
+          other.table == _self.table &&
+          other.row == _self.row &&
+          other.where == _self.where &&
+          other.order == _self.order;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.name,
+    _self.schema,
+    _self.columns,
+    _self.table,
+    _self.row,
+    _self.where,
+    _self.order,
+  );
+
+  @override
+  String toString() =>
+      'NewCatalogEntryRow(name: ${_self.name}, schema: ${_self.schema}, columns: ${_self.columns}, table: ${_self.table}, row: ${_self.row}, where: ${_self.where}, order: ${_self.order})';
+}
+
+/// A [CatalogEntryRow] before insert: every column but the id.
+final class NewCatalogEntryRow extends DwRowDraft<CatalogEntryRow>
+    with _$NewCatalogEntryRow {
+  const NewCatalogEntryRow({
+    required this.name,
+    this.schema,
+    required this.columns,
+    this.table,
+    required this.row,
+    required this.where,
+    this.order = 0,
+  });
+
+  final String name;
+  final String? schema;
+  final int columns;
+  final int? table;
+  final String row;
+  final String where;
+  final int order;
+}
+
+extension NewCatalogEntryRowCopyWith on NewCatalogEntryRow {
+  NewCatalogEntryRow copyWith({
+    String? name,
+    DwFieldPatch<String> schema = const DwFieldPatch.keep(),
+    int? columns,
+    DwFieldPatch<int> table = const DwFieldPatch.keep(),
+    String? row,
+    String? where,
+    int? order,
+  }) => NewCatalogEntryRow(
+    name: name ?? this.name,
+    schema: schema.apply(this.schema),
+    columns: columns ?? this.columns,
+    table: table.apply(this.table),
+    row: row ?? this.row,
+    where: where ?? this.where,
+    order: order ?? this.order,
+  );
+}
+
+extension NewCatalogEntryRowWithId on NewCatalogEntryRow {
+  /// The row stored under [id], for `update`.
+  CatalogEntryRow withId(int id) => CatalogEntryRow(
+    id: id,
+    name: name,
+    schema: schema,
+    columns: columns,
+    table: table,
+    row: row,
+    where: where,
+    order: order,
   );
 }
 
@@ -111,7 +197,6 @@ final class CatalogEntryTable extends DwTableDef<CatalogEntryRow> {
 
   @override
   Map<String, Object?> toRow(CatalogEntryRow row) => {
-    if (row.id != null) 'id': row.id,
     'name': row.name,
     'schema': row.schema,
     'columns': row.columns,
@@ -119,5 +204,16 @@ final class CatalogEntryTable extends DwTableDef<CatalogEntryRow> {
     'row': row.row,
     'where': row.where,
     'order': row.order,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewCatalogEntryRow draft) => {
+    'name': draft.name,
+    'schema': draft.schema,
+    'columns': draft.columns,
+    'table': draft.table,
+    'row': draft.row,
+    'where': draft.where,
+    'order': draft.order,
   };
 }

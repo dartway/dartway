@@ -41,7 +41,7 @@ one set of channel subscriptions; `dw.request(...)` returns the same provider fo
 calling it inside `build` is the intended use. The flip side: a field that changes on every build —
 `DateTime.now()` in a request — is a new request every frame. The example's schedule reads "from the
 start of today" out of a provider that changes once a day for exactly that reason
-(`example/dartway_example_flutter/lib/app/schedule/logic/today_provider.dart`).
+(`example/dartway_example_flutter/lib/app/schedule/logic/today_controller.dart`).
 
 **The value stays live on its own.** When a command's answer or another user's change carries an
 object the request is interested in, it is applied to what is on screen — inserted, replaced, removed
@@ -204,9 +204,13 @@ The answer is a `DwCallResult<R>`, sealed:
 
 **Inside `dw.action` there is nothing to unwrap:** a result that is not `DwCallOk` is handled — a
 refusal shown through `DwFlutterConfig.refusalText`, a not-authenticated answer signing out, a failure
-reported. That is the usual way to send a command; see
-[actions and refusal texts](actions-and-refusal-texts.md). Outside an action, switch over the result,
-or read `result.valueOrThrow` to meet it as the typed exceptions above.
+reported. That is the one way to send a command; see
+[actions and refusal texts](actions-and-refusal-texts.md). `dw.command` is called in a feature's
+`logic/` — `<feature>_commands.dart`, or the `<Thing>Controller` of a flow — or, for app-wide
+wiring no button starts (a push token), in `lib/core/`; only there is a result read: a controller switches over it to move the flow on, a command function reads
+`result.valueOrThrow` to hand a value to the action's `followUpIfMountedAction`. A widget reads none,
+and nothing wraps a command in `try`/`catch`: `dart run dartway_cli:dartway check` fails all of it
+as `forbiddenCommandCall`.
 
 Three things happen without code:
 
@@ -241,7 +245,7 @@ that follows "my" channel (`DwLiveChannel.ofCaller`) resolves it for the account
   pipeline as `DwSignOutException`; the session on the device is over either way.
 
 ```dart
-// example/dartway_example_flutter/lib/auth/logic/auth_state.dart
+// example/dartway_example_flutter/lib/auth/logic/auth_controller.dart
 if (result case DwCallOk(value: final session)) {
   await dw.signIn(session);
 }
@@ -373,6 +377,26 @@ AdminScaffold(
 **A value derived from reads as an `AsyncValue`** — a `logic/` provider combining two reads into the
 body of a section — is shown with `DwReadBuilder.derived(provider, retry: (ref) => …)`: the same
 branches, the provider's errors being the reads', and a retry that names the reads to ask again.
+
+## State beside the server's: hooks, or a controller
+
+What the server holds is watched, never copied. What is left is state of the screen itself, and it
+is held one way:
+
+- **a widget's own** — a text or scroll controller, a focus node, an animation, a timer, a
+  subscription, a toggle — is a hook in a `HookWidget`/`HookConsumerWidget`
+  (`useTextEditingController`, `useFocusNode`, `useAnimationController`, `useEffect` with its
+  cleanup, `useState`); a prop the widget resyncs from is a `useEffect` keyed on it;
+- **shared by several widgets, or a flow with logic** — a sign-in in steps, a form with an async
+  submit, the reply a chat composer is writing — is a Riverpod `Notifier` named `<Thing>Controller`
+  in the feature's `logic/`, usually `autoDispose` and a `family` of what it is about
+  (`example/dartway_example_flutter/lib/app/chat/logic/chat_composing_controller.dart`).
+
+`StatefulWidget`, `setState` and a `ChangeNotifier`/`ValueNotifier` held as state fail
+`dart run dartway_cli:dartway check` anywhere in `lib/` (`forbiddenStateHolder`). An API that needs a
+`State` or a `Listenable` of its own takes `// dw:allow-stateful <reason>` on the class, and every run
+lists it — the skeleton's router state is the one case
+([the checker](../5-tooling/conventions-checker.md)).
 
 ## Where a rule lives
 

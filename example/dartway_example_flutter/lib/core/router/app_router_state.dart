@@ -7,6 +7,7 @@ import '../profile/my_profile.dart';
 
 /// Refresh listenable for the DartWay router: what the zone guards decide by,
 /// notifying the router so the guards re-run whenever it changes.
+// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable (go_router's refreshListenable), and this is the one it listens to
 class AppRouterState extends ChangeNotifier {
   AppRouterState(Ref ref) {
     ref.listen<int?>(dw.accountId, (_, accountId) {

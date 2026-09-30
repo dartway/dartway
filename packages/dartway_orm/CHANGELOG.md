@@ -1,9 +1,47 @@
 # Changelog
 
-## 0.21.0-dev.9
+## 0.21.0-dev.15
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
   (dartway/dartway#390).
+
+## 0.21.0-dev.14
+
+- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
+  state and command checks of `dartway check` (dartway/dartway#389).
+
+## 0.21.0-dev.13
+
+- **`DwTableRepository.upsertAll(drafts, conflictOn:)`** (dartway/dartway#388): every draft
+  inserted, or written over the row with the same unique key unless that row already holds exactly
+  these values, in one statement; answers how many rows were inserted or changed, so a second run with
+  the same drafts writes nothing. Refuses two drafts with one key (compared by value) and a nullable
+  conflict column. What `DwSeedRows` runs.
+- **`DwMigrationContext.backfill(sql)`**: runs like `sql`, and is the one place `dartway check`
+  accepts an `INSERT`, `UPDATE` or `DELETE` in a project migration (`migrationChangesData`) — for
+  rows a schema change strands. Content is a seed step. Re-exports `DwTextFieldPatch`.
+
+## 0.21.0-dev.12
+
+- **BREAKING: a row's `id` is `int`, and a row not stored yet is its draft.** `DwTableRow.id` is
+  non-null — every row comes out of the database, which assigned it — so a stored row's id is read
+  without `!`. `insert`, `tryInsert`, `insertAll` and `upsert` take a `DwRowDraft<R>` (generated as
+  `New<Entity>Row`) and answer the stored row; `DwTableDef` gains `toDraftRow`, and `toRow` no
+  longer carries the id. An insert with an id of one's own is gone, with `insertAll`'s "every row
+  has an id or none has" (it also left the `bigserial` sequence behind the rows). `update(row)`
+  needs no id check: the type holds it (dartway/dartway#384).
+
+## 0.21.0-dev.11
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
+
+## 0.21.0-dev.10
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
+
+## 0.21.0-dev.9
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#385).
 
 ## 0.21.0-dev.8
 

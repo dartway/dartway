@@ -228,6 +228,7 @@ void main() {
         'dw/20260914_000000_dw_stored_file',
         'dw/20260914_180000_dw_stored_file_bucket',
         'dw/20260914_220000_dw_keys_and_identities',
+        'dw/20260930_000000_dw_setting',
         'app/20260913_120000_test_app',
       ]);
       await server.stop();
@@ -288,12 +289,13 @@ void main() {
           'dw_identity',
           'dw_job',
           'dw_recurring_job',
+          'dw_setting',
           'dw_stored_file',
         ]);
         await runner.rollback(batch: 1);
         expect(await tables(), isEmpty);
         await runner.apply();
-        expect(await tables(), hasLength(8));
+        expect(await tables(), hasLength(9));
       } finally {
         await opened.close();
       }

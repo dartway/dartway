@@ -1,9 +1,39 @@
 # Changelog
 
-## 0.21.0-dev.9
+## 0.21.0-dev.15
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
   (dartway/dartway#390).
+
+## 0.21.0-dev.14
+
+- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
+  state and command checks of `dartway check` (dartway/dartway#389).
+
+## 0.21.0-dev.13
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#388).
+
+## 0.21.0-dev.12
+
+- **BREAKING: a row class declares `required this.id` and `final int id;`**, and the generator
+  writes its draft beside it: `New<Entity>Row` — the same constructor without `id`, defaults
+  included — a value with `==`, `hashCode` and `toString` by its columns, a `copyWith` and
+  `withId(id)`, and the table's `toDraftRow`. The row's own `copyWith` keeps the id. Reported: a
+  row class named like another's draft (`NewPlanRow` beside `PlanRow`), an id with a default
+  (`this.id = 0`), and a constructor default the draft cannot repeat (dartway/dartway#384).
+
+## 0.21.0-dev.11
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
+
+## 0.21.0-dev.10
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
+
+## 0.21.0-dev.9
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#385).
 
 ## 0.21.0-dev.8
 

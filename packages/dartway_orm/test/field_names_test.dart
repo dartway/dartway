@@ -71,7 +71,7 @@ void main() {
       'insert, find by every framework-looking column, update, delete',
       () async {
         final stored = await entries().insert(
-          const CatalogEntryRow(
+          const NewCatalogEntryRow(
             name: 'Chair',
             schema: 'furniture',
             columns: 3,
@@ -96,8 +96,13 @@ void main() {
           ),
         );
         await entries().insertAll([
-          const CatalogEntryRow(name: 'Desk', columns: 1, row: 'A', where: 'x'),
-          const CatalogEntryRow(
+          const NewCatalogEntryRow(
+            name: 'Desk',
+            columns: 1,
+            row: 'A',
+            where: 'x',
+          ),
+          const NewCatalogEntryRow(
             name: 'Lamp',
             columns: 1,
             row: 'A',
@@ -150,19 +155,17 @@ void main() {
           await entries().deleteWhere(where: (t) => t.where.equals('x')),
           1,
         );
-        expect(
-          await entries().tryInsert(
-            const CatalogEntryRow(
-              id: 1,
-              name: 'Dup',
-              columns: 0,
-              row: '',
-              where: '',
-            ),
-            onConflict: DwOnConflict.doNothing((t) => [t.id]),
+        final tried = await entries().tryInsert(
+          const NewCatalogEntryRow(
+            name: 'Stool',
+            columns: 0,
+            row: '',
+            where: '',
           ),
-          isNull,
+          onConflict: DwOnConflict.doNothing((t) => []),
         );
+        expect(tried?.id, 4);
+        expect(await entries().findById(4), tried);
       },
     );
   });

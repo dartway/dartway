@@ -206,6 +206,14 @@ Four things every screen needs and none may draw for itself — each is decided 
 - **Closing** a dialog or a sheet is `Navigator.of(context).pop(value)` with the builder's own
   context; a page goes back through the router (`dartway-navigation`).
 
+## A kit widget's own state is hooks
+
+A field that owns its controller, a timeline that tracks a drag, rich text that owns its tap
+recognizers — each is a `HookWidget` holding them in hooks, never a `StatefulWidget`: the check
+reads `ui_kit/` like every other folder (`forbiddenStateHolder`). The hooks for what a `State` used
+to hold, and the one marked way out, are in `dartway-feature-scaffold`, "Where a feature's logic
+lives". The kit takes a value and an `onChanged`, not a caller's `ValueNotifier`.
+
 ## The kit does not know the domain
 
 The kit does not import app models and does not switch on domain enums. If a widget picks an image based

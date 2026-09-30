@@ -36,17 +36,19 @@ final scheduleHandlers = <DwCallHandler>[
   DwCallHandler.command<SaveClubService, ClubService>(
     access: AppAccess.admin,
     handle: (ctx, command) async {
-      final row = ClubServiceRow(
-        id: command.id,
+      // The command carries every column of a service, which has no owner:
+      // the draft is the whole row, and `withId` saves it.
+      final draft = NewClubServiceRow(
         title: command.title.trim(),
         description: command.description,
         durationMinutes: command.durationMinutes,
         price: command.price,
         imageUrl: command.imageUrl,
       );
-      final saved = command.id == null
-          ? await ctx.db.clubServices.insert(row)
-          : await ctx.db.clubServices.update(row);
+      final saved = switch (command.id) {
+        null => await ctx.db.clubServices.insert(draft),
+        final id => await ctx.db.clubServices.update(draft.withId(id)),
+      };
       final service = ScheduleObjects.service(saved);
       ctx.publish(AppChannels.schedule, service);
       return service;
@@ -59,13 +61,13 @@ final scheduleHandlers = <DwCallHandler>[
   DwCallHandler.command<ScheduleSession, ClubSession>(
     access: AppAccess.staff,
     handle: (ctx, command) async {
-      if (command.startsAt.isBefore(DateTime.now())) {
+      if (command.startsAt.isBefore(ctx.now)) {
         ctx.refuse(DartwayExampleRefusal.sessionInPast, field: 'startsAt');
       }
       final ClubSessionRow row;
       try {
         row = await ctx.db.clubSessions.insert(
-          ClubSessionRow(
+          NewClubSessionRow(
             serviceId: command.serviceId,
             coachProfileId: command.coachProfileId,
             startsAt: command.startsAt,
@@ -102,7 +104,7 @@ final scheduleHandlers = <DwCallHandler>[
         for (final profile in await ctx.db.userProfiles.findByIds(
           affected.map((b) => b.clientProfileId).toSet(),
         ))
-          profile.id!: profile.accountId,
+          profile.id: profile.accountId,
       };
       // The bookings go with the session (ON DELETE CASCADE).
       await ctx.db.clubSessions.delete(command.sessionId);
@@ -113,7 +115,7 @@ final scheduleHandlers = <DwCallHandler>[
       for (final booking in affected) {
         ctx.publish(
           AppChannels.bookingsOf(clients[booking.clientProfileId]!),
-          DwDeletedObject.of<SessionBooking>(booking.id!, ctx.protocol),
+          DwDeletedObject.of<SessionBooking>(booking.id, ctx.protocol),
         );
       }
       await AdminPublications.counters(ctx);

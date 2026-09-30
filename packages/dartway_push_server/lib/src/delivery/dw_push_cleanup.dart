@@ -17,12 +17,20 @@ final class DwPushCleanup {
   static const int batch = 5000;
 
   Future<void> run(DwCallContext ctx) async {
+    // Delivery times are stamped by the server's clock, so they are aged by
+    // it too.
+    final now = ctx.now;
     // Finished deliveries past retention; their dedup keys are free again.
     await ctx.db.execute(
       'DELETE FROM dw_push_delivery WHERE id IN (SELECT id FROM dw_push_delivery '
-      "WHERE finished_at < now() - @micros::int8 * interval '1 microsecond' "
+      'WHERE finished_at < @now::timestamptz - '
+      "@micros::int8 * interval '1 microsecond' "
       'LIMIT @batch)',
-      params: {'micros': settings.retention.inMicroseconds, 'batch': batch},
+      params: {
+        'micros': settings.retention.inMicroseconds,
+        'batch': batch,
+        'now': now,
+      },
     );
     // Messages without deliveries: every recipient was a duplicate, or their
     // deliveries were just removed. A message is written with its deliveries
@@ -38,9 +46,10 @@ final class DwPushCleanup {
     // run to take it again; the key keeps repeated cleanups to one.
     final overdue = (await ctx.db.query(
       'SELECT count(*) AS n FROM dw_push_delivery WHERE finished_at IS NULL '
-      "AND run_at < now() - @micros::int8 * interval '1 microsecond' "
-      'AND (locked_until IS NULL OR locked_until < now())',
-      params: {'micros': settings.lease.inMicroseconds},
+      'AND run_at < @now::timestamptz - '
+      "@micros::int8 * interval '1 microsecond' "
+      'AND (locked_until IS NULL OR locked_until < @now::timestamptz)',
+      params: {'micros': settings.lease.inMicroseconds, 'now': now},
     )).single.get<int>('n');
     if (overdue > 0) {
       ctx.log.warning(

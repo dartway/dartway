@@ -77,6 +77,38 @@ abstract final class DwHttpContract {
   /// ignored.
   static const String liveConnectionHeader = 'Dw-Live-Connection';
 
+  /// The caller's UTC offset at the moment of the call, in whole minutes east
+  /// of UTC: `180` in Moscow, `-300` in New York in winter, `345` in
+  /// Kathmandu. Optional: a server reads its absence as "unknown"
+  /// (`ctx.callerUtcOffset` is `null`). An offset, not a zone — the client
+  /// reads it from the device on every call, so a change of zone or of
+  /// daylight saving time travels with the next call.
+  static const String utcOffsetHeader = 'Dw-Utc-Offset';
+
+  /// The largest offset [parseUtcOffset] accepts either way: 18 hours, the
+  /// bound ISO 8601 gives an offset (real zones stay within −12 h and +14 h).
+  static const Duration maxUtcOffset = Duration(hours: 18);
+
+  /// The [utcOffsetHeader] value for [offset], truncated to whole minutes.
+  static String utcOffsetValue(Duration offset) => '${offset.inMinutes}';
+
+  /// Reads a [utcOffsetHeader] value. Throws [FormatException] for anything
+  /// but an integer number of minutes within [maxUtcOffset].
+  static Duration parseUtcOffset(String text) {
+    final minutes = int.tryParse(text);
+    if (minutes == null || '$minutes' != text) {
+      throw FormatException('A UTC offset is a whole number of minutes', text);
+    }
+    final offset = Duration(minutes: minutes);
+    if (offset.abs() > maxUtcOffset) {
+      throw FormatException(
+        'A UTC offset is within ${maxUtcOffset.inHours} hours of UTC',
+        text,
+      );
+    }
+    return offset;
+  }
+
   /// Whole seconds, on a `429` answer.
   static const String retryAfterHeader = 'Retry-After';
 

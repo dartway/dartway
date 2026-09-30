@@ -12,8 +12,10 @@ description: >-
   the caller's profile and role, ctx.refuse, ctx.publish after commit, ctx.transaction, jobs,
   accounts, files); background jobs (DwJobKind, DwQueuedJob, DwRecurringJob); DwHttpRoute for external doors
   only; auth hooks in DwAuthConfig (onAccountCreated creates the profile in the same transaction,
-  onIdentifierChanged); DwAccountService instead of SQL on dw_* tables; the fixed lib/ layout.
-  Use when writing or changing a handler, a row class, a query, a job, a route or sign-in hooks.
+  onIdentifierChanged); DwAccountService instead of SQL on dw_* tables; startup steps and seeds
+  (DwSeedRows), migrations as schema only (m.backfill), typed settings (ctx.settings); the fixed
+  lib/ layout. Use when writing or changing a handler, a row class, a query, a job, a route, a seed,
+  a setting or sign-in hooks.
 ---
 
 # DartWay — the server (`__SERVER_PKG__`)
@@ -44,24 +46,35 @@ __SERVER_PKG__/
     channels.dart              AppChannels — the channel addresses handlers publish to
     files.dart                 AppFiles — every upload rule and who reads a file
     bootstrap.dart             AppBootstrap — startup steps
+    environment.dart           AppEnvironment — every variable, read once at start
     push.dart                  AppPush — with push only
   lib/src/migrations/      fixed: migration files and migrations.dart
-  lib/src/<feature>/       one folder per area of the app, every file <feature>_*.dart:
-    <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes
+  lib/src/<feature>/       one folder per area of the app; a closed set of files:
+    <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes, seeds
     <feature>_rows.dart        its row classes
     <feature>_handlers.dart    one handler per request and command
     <feature>_objects.dart     rows → data objects, in batch
     <feature>_publications.dart  what a change publishes, and to whom
     <feature>_jobs.dart        its job kinds and job definitions
+    <feature>_access.dart      its access rules, when they outgrow the handlers
+    <feature>_routes.dart      its DwHttpRoute doors, when it has them
+    <feature>_<part>_<kind>.dart  a kind split in parts: the only way a feature splits
+    logic/                     everything that is none of the kinds — clients, calculators,
+                               domain rules; flat, free names, never a kind's suffix
   test/
 ```
 
 The top level of `lib/` is closed: the package library, `generated/`, `src/`. **So is `src/`: folders
 only — `core/`, `migrations/` and one per feature**, each declaring its `DwServerFeature` in
 `<feature>_feature.dart`, and the server lists the features: `DwAppServer(features: [...])`. A file at
-the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`, `objects/`,
-`services/`) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
-`dart run dartway_cli:dartway check`. A feature split across layers ends up in four places, with a
+the top of `src/`, a layer-named folder (the list:
+[project layout](https://dartway.dev/1-getting-started/project-layout)) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
+`dart run dartway_cli:dartway check`. **So is a feature**: the files above and nothing else, a layer
+name at no depth, and each kind declared only in its own file — handlers in `_handlers`, row classes
+in `_rows`, jobs in `_jobs`, routes in `_routes`, a function that publishes in `_publications`, a row → data object
+mapping in `_objects`, and none of them in `core/` (`invalidServerFeatureFile`,
+`misplacedServerCode`; what counts as each —
+[project layout](https://dartway.dev/1-getting-started/project-layout)). A feature split across layers ends up in four places, with a
 `chat/` beside a `domain/chat/` and two rules for who is in a chat: the whole area lives in its
 folder, and what two features share lives in the one that owns it (the profile's objects in
 `profile/`) or in `core/`. A feature imports another's `_rows`, `_objects` and `_publications` —
@@ -89,7 +102,7 @@ part 'invoices.dw.dart';
 )
 final class InvoiceRow extends DwTableRow with _$InvoiceRow {
   const InvoiceRow({
-    this.id,
+    required this.id,
     required this.ownerProfileId,
     required this.customerId,
     required this.amountCents,
@@ -100,7 +113,7 @@ final class InvoiceRow extends DwTableRow with _$InvoiceRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('member_profile', onDelete: DwOnDelete.cascade)
   final int ownerProfileId;
@@ -122,7 +135,9 @@ The generator holds you to:
 
 - the name `<Entity>Row`; its table class is `<Entity>Table`, its repository `db.<entities>`;
 - `@DwSqlTable('<snake_case>')`, and `static const tableDef = <Entity>Table();`;
-- `@override final int? id;` with `this.id` — a `bigserial` key, `null` until inserted;
+- `@override final int id;` with `required this.id` — the `bigserial` key the database assigned. A
+  row is what is stored, so `row.id` never needs a `!` (the analyzer flags one); a row
+  not stored yet is its generated draft `New<Entity>Row` — the same constructor without `id`;
 - column types: `int`, `double`, `String`, `bool`, `DateTime`, `Duration`, `Uint8List`, an enum
   (stored as its name in `text`), `List<T>`/`Map<String, T>` of scalars (`jsonb`), `List<E>` of an enum (`jsonb` of names — not a `List<String>` with a typed getter), or nullable ones.
   A DTO is not a column: store its fields, or the id of another row.
@@ -145,8 +160,14 @@ accepts input and nothing visible happens, which is worse than a disabled form. 
 state" revisions were wanted for already exists as an entity (a cycle, an order, a document version),
 and copying a few fields into it is cheaper than a history nobody reads.
 
-Rebuild a stored row with its generated `copyWith`, never by listing fields in the
-constructor — a field added later silently takes its default in every row that path writes.
+Insert a draft, `New<Entity>Row(...)`: `insert`, `tryInsert`, `insertAll`, `upsert` and `upsertAll` take drafts
+and answer stored rows; a draft compares by value like the row. "Create or save" by an optional id:
+`update(draft.withId(id))` **only when the command carries every column of the row**; otherwise —
+the usual case, a row with an owner, a creation time, columns other commands set — read it by id
+and owner (`findFirst(where: (t) => t.id.equals(id) & t.ownerProfileId.equals(me.id), lock:
+DwRowLock.forUpdate)`), then `update(current.copyWith(...))`; a row keyed by a unique column is
+`upsert(draft, conflictOn: …)`. Rebuild a stored row with its generated `copyWith` (it keeps the
+id), never by listing fields in the constructor — a field added later silently takes its default in every row that path writes.
 
 After changing a row class: `dart run dartway_cli:dartway generate`, then `dart run bin/migrate.dart create <name>` from
 `__SERVER_PKG__`, review the draft it writes, apply — `dartway-migrations`.
@@ -160,7 +181,7 @@ repositories are generated extension getters (`lib/generated/dw_schema.dart`):
 final me = await ctx.profile;
 final rows = await ctx.db.invoices.find(
   where: (t) =>
-      t.ownerProfileId.equals(me.id!) & t.status.notEquals(InvoiceStatus.draft),
+      t.ownerProfileId.equals(me.id) & t.status.notEquals(InvoiceStatus.draft),
   orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
   limit: 50,
 );
@@ -177,7 +198,7 @@ final latest = await ctx.db.invoices.findFirstPer(                  // Map<int, 
   orderBy: (t) => [t.createdAt.desc()],
 );
 
-final created = await ctx.db.invoices.insert(InvoiceRow(/* … */));   // returns it with its id
+final created = await ctx.db.invoices.insert(NewInvoiceRow(/* … */)); // the stored row, id included
 final saved = await ctx.db.invoices.update(row.copyWith(status: InvoiceStatus.sent));
 await ctx.db.invoices.updateWhere(
   where: (t) => t.status.equals(InvoiceStatus.draft),
@@ -190,7 +211,7 @@ Conditions: `equals`, `notEquals`, `isNull`, `isNotNull`, `inList`, `notInList`,
 `between`, `like`, `ilike`, on a list column `isEmptyList`, `isNotEmptyList`, `contains`,
 `containsAny`, combined with `&`, `|`, `not()`. An aggregate or a condition on a list over one table
 is the repository's — raw SQL for it spells enum values as literals that break silently on a
-rename. `upsert(row, conflictOn: (t) => [t.key])` is "insert or overwrite" in one statement, and
+rename. `upsert(draft, conflictOn: (t) => [t.key])` is "insert or overwrite" in one statement, and
 `updateWhereReturning` answers the updated rows to publish. Values are always bound parameters. Escape
 `%`, `_` and `\` in text a user typed before putting it into a `like` pattern. `update` of a missing
 id throws `DwRowNotFound` — an update that changed nothing is a failure.
@@ -204,7 +225,7 @@ so the handler refuses cleanly instead of failing (here a payment row whose `inv
 
 ```dart
 final paid = await ctx.db.invoicePayments.tryInsert(
-  InvoicePaymentRow(invoiceId: invoice.id!, paidAt: DateTime.now()),
+  NewInvoicePaymentRow(invoiceId: invoice.id, paidAt: ctx.now),
   onConflict: DwOnConflict.doNothing((t) => [t.invoiceId]),
 );
 if (paid == null) ctx.refuse(AcmeRefusal.invoiceAlreadyPaid);
@@ -251,7 +272,7 @@ final invoiceHandlers = <DwCallHandler>[
       return InvoiceObjects.invoices(
         ctx,
         await ctx.db.invoices.find(
-          where: (t) => t.ownerProfileId.equals(me.id!),
+          where: (t) => t.ownerProfileId.equals(me.id),
           orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
         ),
       );
@@ -288,7 +309,7 @@ final invoiceHandlers = <DwCallHandler>[
       final paid = await ctx.db.invoices.update(
         row.copyWith(
           status: InvoiceStatus.paid,
-          paidAt: DwFieldPatch.set(DateTime.now()),
+          paidAt: DwFieldPatch.set(ctx.now),
         ),
       );
       // Publishes the invoice to every channel that shows it and answers it
@@ -343,12 +364,12 @@ abstract final class InvoiceObjects {
       for (final customer in await ctx.db.customers.findByIds(
         rows.map((row) => row.customerId),
       ))
-        customer.id!: customer,
+        customer.id: customer,
     };
     return [
       for (final row in rows)
         CustomerInvoice(
-          id: row.id!,
+          id: row.id,
           customerName: customers[row.customerId]!.name,
           amountCents: row.amountCents,
           status: row.status,
@@ -369,7 +390,20 @@ exit of the server shows the object the same way.
 ## 6. The call context
 
 `DwCallContext` is one per call: `accountId` / `requireAccountId`, `sessionKey`, `db`, `protocol`,
-`transaction`, `publish`, `revoke`, `refuse`, `jobs`, `accounts`, `files`, `log`, `memo`.
+`now`, `callerUtcOffset` / `callerLocalTime`, `transaction`, `publish`, `revoke`, `refuse`, `jobs`,
+`accounts`, `files`, `log`, `http`, `memo`.
+
+**The time is `ctx.now`, and only `ctx.now`** — UTC, from the server's clock, in handlers, jobs,
+routes and startup steps alike. `DateTime.now()` anywhere in `lib/` fails `dart run dartway_cli:dartway check`
+(`forbiddenDateTimeNow`): tests set the server's clock (`DwTestClock`, `dartway-testing`) and the job
+queue runs by it, so the system clock is a time no test can pin. **The caller's day is
+`ctx.callerLocalTime`**: the app sends its device's UTC offset with every call, so a command never
+carries an offset field. `ctx.callerUtcOffset` is the `Duration`; both are `null` in jobs and when
+the app sent none. `callerLocalTime` is a `DwCallerLocalTime` — a reading of the caller's clock
+(`year`, `month`, `day`, `hour`, `minute`, `weekday`), not an instant and not a `DateTime`; its one
+way back to an instant is `startOfDayUtc`, the caller's midnight, for a query over "their today".
+An offset is not a zone: work for a person later (a job at their 8 a.m.) uses an offset the project
+stored from one of their calls — the framework keeps none.
 
 **The project's notions of "the caller" are an extension, cached per call with `memo`** — the
 framework knows an account, the profile and the role are the project's. It is `AppCallContext` in
@@ -452,13 +486,14 @@ The worked example is the framework example's bookings reminder
 `BookSession` enqueues it, and the job checks the booking is still active when it runs.
 
 Enqueue from a command by the kind, never by a string:
-`await ctx.jobs.enqueue(InvoicesJobs.remind, (invoiceId: id), runAt: …, key: …)`. The payload is
+`await ctx.jobs.enqueue(InvoicesJobs.remind, (invoiceId: id), runAt: ctx.now.add(…), key: …)`. The payload is
 spelled as a map once, in the kind's codec — never `payload['x']! as int` in a handler.
 The enqueue joins the command's transaction (no row if it rolls back); a `key` deduplicates pending
 jobs. A queued job is transactional by default (the job row disappears exactly when its work commits);
 `transactional: false` for jobs that call external services, which may then run twice after a crash.
-A job has no caller (`accountId` is `null`): it reads what it needs from its payload, and it may
-publish. Names starting with `dw.` are the framework's.
+A job has no caller (`accountId` and `callerUtcOffset` are `null`): it reads what it needs from its
+payload, and it may publish. It is due by the server's clock — the one `ctx.now` reads — so a test
+that moves a `DwTestClock` past its `runAt` runs it. Names starting with `dw.` are the framework's.
 
 ## 8. Routes — external doors only
 
@@ -473,7 +508,7 @@ DwHttpRoute.post('/webhooks/payments', (ctx, request) async {
 });
 ```
 
-Registered in a feature's `DwServerFeature(routes: [...])`, matched by exact path; `/dw/…` and `/health` are the
+Declared in the feature's `<feature>_routes.dart` and registered in its `DwServerFeature(routes: [...])`, matched by exact path; `/dw/…` and `/health` are the
 framework's. `auth:` is `DwRouteAuth.none` by default (the sender proves itself otherwise);
 `optional`/`required` read `Authorization: Bearer` like a call. A refusal thrown in a route is
 answered as JSON with its status; anything else as `500` with an incident id.
@@ -604,43 +639,174 @@ It offers `ensure`, `find`, `listIdentities`, `listIdentitiesOf` (batch), `accou
 search box), `moveIdentities`, `removeIdentities`, `issueKey`, `listKeys`, `revokeKey`, `revokeKeys`
 — keys and revocation in `dartway-access`.
 
-## 9a. Startup steps — what must be true before the first call
+## 9a. Startup steps and seeds — what must be true before the first call
 
-`DwAppServer(startup: [...])` runs after the migrations and before the port opens, in a background
-context and one transaction (`ctx.db`, `ctx.accounts`, `ctx.publish`, `ctx.jobs`). A step that
-throws stops the start — in a deployment, with the previous server still serving.
+`DwAppServer(startup: [...])` and `DwServerFeature(startup: [...])` run after the migrations and
+before the port opens — the server's steps first, then each feature's — in a background context and
+one transaction per step (`ctx.db`, `ctx.accounts`, `ctx.publish`, `ctx.jobs`). A step that throws
+stops the start — in a deployment, with the previous server still serving.
 
 ```dart
-startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+startup: [
+  DwFirstAdministrator(grant: AppBootstrap.grantAdmin, identifier: adminIdentifier),
+],
 ```
 
-`DwFirstAdministrator` brings the account named by `DW_ADMIN_IDENTIFIER` into existence and hands
+`adminIdentifier` is the factory's `required String? adminIdentifier`, from
+`env.server.adminIdentifier` (`DW_ADMIN_IDENTIFIER`). `DwFirstAdministrator` brings that account into existence and hands
 it to `grant`, which is where the project gives its own admin role — the framework knows accounts,
 not roles.
 
-**Where data goes, and it is decided by who owns the row afterwards:**
+**Seeds are `DwSeedRows`, on the feature they belong to.** The rows sit beside the row class in
+`<feature>_rows.dart`:
 
-| Lifecycle | Where |
+```dart
+final catalogFeature = DwServerFeature(
+  'catalog',
+  handlers: catalogHandlers,
+  startup: [
+    DwSeedRows(
+      'exercise catalogue',
+      table: ExerciseRow.tableDef,
+      key: (t) => [t.slug],
+      rows: exerciseCatalogue,
+    ),
+  ],
+);
+```
+
+Every start inserts a declared row that is missing, writes a changed one over the stored row with
+the same key (keeping its id), touches nothing unchanged, and leaves rows it does not declare alone —
+retire one with a column (`isPublished: false`), since other rows may point at it. **A seed owns its
+rows: only rows nobody edits outside the code are a seed** — the next start writes the declaration
+back over an edit. The key is a unique, `NOT NULL` natural key, never the `id` (a nullable or
+non-unique key refuses the start). The rows are constants — no `DateTime.now()`. A seed whose rows
+point at another seed's comes after it.
+
+**Where data goes:**
+
+| What | Where |
 |---|---|
-| once per database, in every environment | a migration (write it in SQL, never through row classes) |
-| at every start, in every environment, idempotent | a startup step |
-| whenever a developer wants it, never in production | `bin/seed_dev.dart` |
+| existing rows carried across a schema change (a renamed value, a split column) | `m.backfill(sql)` in that migration |
+| rows the code declares (a catalogue, a questionnaire, refusal reasons) | a `DwSeedRows` step |
+| one value per app with a default for every field | a settings object (section 9b) |
+| anything else that must be true before the first call | a `DwStartupStep` |
+| development data, never in production | `bin/seed_dev.dart` |
 
-Rows the operators own once they exist (the first settings) are a migration. Rows that must keep
-agreeing with the code (notification templates, a lookup a `switch` reads) are a **startup step**:
-an applied migration cannot be edited, and a `down` for data deletes what somebody has since
-corrected.
+A migration changes the schema: `dart run dartway_cli:dartway check` fails an `INSERT`, `UPDATE` or
+`DELETE` in one outside `m.backfill` (`migrationChangesData`), and anything but logging after
+`server.start()` in `bin/server.dart` (`workAfterServerStart`). Migrations older than
+`deploy/config.yaml` > `migrations` > `dataChecksAfter` are not judged — an applied migration is
+never edited. Rows operators own after they exist are not a seed: their starting values are
+defaults in the code, and the rows are made in the admin panel.
+
+## 9b. Settings — one typed value per app
+
+A settings object is a data object of `__SHARED_PKG__` with a default for every field and a fixed
+`id` (`dartway-contract`). The server reads and writes it through `ctx.settings`; the project
+declares no table, no row and no lock for it.
+
+```dart
+final settings = await ctx.settings.read<BillingSettings>();   // the defaults until saved; never null
+
+// An edit of some fields: the row is locked between the read and the write.
+// A nullable field arrives as a DwFieldPatch, so it can be cleared.
+final saved = await ctx.settings.update<BillingSettings>(
+  (current) => current.copyWith(
+    dueDays: command.dueDays,
+    invoiceFooter: command.invoiceFooter.trimmedOrCleared,
+  ),
+);
+ctx.publish(AppChannels.settings, saved);
+
+await ctx.settings.save(const BillingSettings(dueDays: 30));   // the whole value, one upsert
+```
+
+Stored is only what differs from the defaults: a field added later reads as its default, and a
+default changed in the code changes every value that equalled the old one. Renaming the class
+resets it to its defaults. A stored field that no longer decodes (an enum value removed, a type
+changed) reads as its default and is logged once; a read never fails over what is stored. A
+key/value table of strings is refused (`settingsKeyValueTable`); the migration that drops one
+carries its values with `m.carrySettings('BillingSettings', fromSql: …)` — a project never writes
+`dw_*` tables itself. A preference **per member** stays a row of the member's table;
+without the row, the reader maps to the data object's own defaults (`const NotificationPrefs()`).
 
 **A setting whose value belongs to this deployment has no default.** `DW_ADMIN_IDENTIFIER` above,
 a sender address, a provider key, a webhook URL, a bucket name — each is a credential of this
 environment, not a preference with a sensible starting point. A default turns an unfilled key into
 quiet work with somebody else's identity: mail sent from an address the project does not own, a
-webhook posted to a stranger's endpoint. Read it and fail loud, at the point of use or on boot —
-`Platform.environment['APP_SENDER_ADDRESS'] ?? (throw StateError('APP_SENDER_ADDRESS is not
-set'))` — never a plausible-looking fallback. A value the server cannot start without also belongs
+webhook posted to a stranger's endpoint. Read it with `read.required('APP_SENDER_ADDRESS')` in
+`AppEnvironment` (§9b), which stops the start while it is unset — never a plausible-looking fallback. A value the server cannot start without also belongs
 under `requires.secrets` in `deploy/config.yaml`, so a deployment missing it refuses to begin
 rather than failing on first use. This does not cover a preference with a genuine neutral value —
 a page size, a timeout — only a value that would point the system at somebody else if guessed wrong.
+
+## 9b. The environment and other services — one way each
+
+**Every variable is read once, at start, in `lib/src/core/environment.dart`.** `AppEnvironment` holds
+the framework's variables (`DwServerEnvironment`: database, storage, port, allowed origins, the
+provision flag) and one typed sub-config per concern of the project's, named after what it configures:
+
+```dart
+final class AppEnvironment {
+  const AppEnvironment({required this.server, required this.sms});
+
+  static AppEnvironment read(Map<String, String> variables) =>
+      DwEnvironmentReader.read(variables, (read) => AppEnvironment(
+        server: DwServerEnvironment.read(
+          read,
+          defaultPublicBucket: AppFiles.defaultPublicBucket,
+          defaultPrivateBucket: AppFiles.defaultPrivateBucket,
+        ),
+        sms: AppSmsEnvironment(
+          endpoint: Uri.parse(read.required('SMS_ENDPOINT')),
+          login: read.required('SMS_LOGIN'),
+          password: read.required('SMS_PASSWORD'),
+          sender: read.optional('SMS_SENDER'),
+        ),
+      ));
+
+  final DwServerEnvironment server;
+  final AppSmsEnvironment sms;
+}
+```
+
+- `read.required`, `optional`, `integer(…, fallback:)`, `flag`, `list`; `read.report('…')` for what
+  no single variable shows (two that go together). **Every problem is collected and thrown once**
+  (`DwEnvironmentException`) after the object is built — never a value checked on first use. A text
+  value is never repeated in a problem; a number or flag read with `secret: true` is not either.
+- `bin/server.dart` reads it — `AppEnvironment.read(DwLocalEnvironment.overlay(Platform.environment))`
+  — and hands the sub-configs (and `env.server.adminIdentifier`) to the server factory, which passes
+  each to what uses it, then `server.start(migrateOnly: env.server.migrateOnly)`. `bin/` parses
+  nothing by hand: `Platform.environment` there only inside `DwLocalEnvironment.overlay(…)`, and no
+  `env['NAME']`, or the check fails.
+- `Platform.environment` anywhere else in `lib/` is `forbiddenEnvironmentRead`, an error of
+  `dart run dartway_cli:dartway check`: a variable read on first use fails hours after a deploy, and never sees the local overlay.
+
+**Another service's HTTP API is `ctx.http`** — in handlers, jobs, routes and startup steps:
+
+```dart
+final response = await ctx.http.post(
+  sms.endpoint,
+  body: {'login': sms.login, 'psw': sms.password, 'phones': phone, 'mes': text},
+);
+if (!response.isSuccess) throw SmsDeliveryException(response.statusCode);
+```
+
+- `get` / `post` / `put` / `patch` / `delete` / `send`; `json:` for a JSON body, `body:` for text,
+  bytes or a form map; `followRedirects: false` when a header carries a credential.
+- Bounded by `DwServerSettings.outboundTimeout` (30 s) or the call's `timeout:`; logged through
+  `ctx.log` by method, origin, status and time — never path, query, headers or body.
+- Any status is an answer (`DwOutboundResponse`: `statusCode`, `isSuccess`, `body`, `json`); no
+  answer throws `DwOutboundException` (`timedOut`).
+- **No call out inside a transaction**: commit first (`transactional: false`, or a job), then call.
+- A response body is capped at `DwServerSettings.outboundMaxResponseBytes` (10 MiB) or the call's
+  `maxResponseBytes:`; only `http`/`https` URLs.
+- `HttpClient(` or `package:http` in `lib/` is `forbiddenHttpClient`. A service class that talks
+  to a provider takes `ctx.http` (a `DwOutboundHttp`) per call — not a client of its own, and not a
+  transport parameter threaded through the server factory for tests: the test server fakes
+  `ctx.http` itself, and a unit test hands the class `DwFakeOutboundHttp().client()`
+  (`dartway-testing`). A client only a command-line entry point uses, with no server, lives in `bin/`.
 
 ## 10. Checks
 
@@ -668,5 +834,7 @@ call per access rule — `dartway-testing`, `dartway-access`.
 - [ ] Every object a command changed is published to every channel that shows it (`dartway-realtime`).
 - [ ] No SQL on `dw_*` tables; accounts through `DwAccountService`.
 - [ ] A new profile is created in `onAccountCreated`, in the account's transaction.
+- [ ] Time is `ctx.now`; the caller's local day is `ctx.callerLocalTime`, never an offset field on
+      a command.
 - [ ] Row class changed → `dart run dartway_cli:dartway generate`, migration drafted and reviewed.
 - [ ] `dart run dartway_cli:dartway test` and `dart run dartway_cli:dartway check` pass.

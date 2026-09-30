@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../logic/auth_state.dart';
+import '../logic/auth_controller.dart';
 
 /// The code that was sent, and a new one once the server allows it.
 class CodeEntryBlock extends ConsumerWidget {
@@ -13,8 +13,8 @@ class CodeEntryBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(authStateProvider);
-    final notifier = ref.read(authStateProvider.notifier);
+    final state = ref.watch(authControllerProvider);
+    final notifier = ref.read(authControllerProvider.notifier);
     final l10n = context.l10n;
 
     return Column(

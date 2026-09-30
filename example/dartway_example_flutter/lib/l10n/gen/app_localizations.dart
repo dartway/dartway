@@ -1088,11 +1088,11 @@ abstract class AppLocalizations {
   /// **'Type at least {min} characters to search.'**
   String refusalSearchQueryTooShort(int min);
 
-  /// No description provided for @refusalSettingKeyUnknown.
+  /// No description provided for @refusalClubNameRequired.
   ///
   /// In en, this message translates to:
-  /// **'This setting does not exist.'**
-  String get refusalSettingKeyUnknown;
+  /// **'The club name cannot be blank.'**
+  String get refusalClubNameRequired;
 
   /// No description provided for @refusalFirstNameRequired.
   ///

@@ -21,6 +21,6 @@ enum DartwayExampleRefusal with DwRefusalCodes {
   tooManyAttachments,
   editWindowClosed,
   searchQueryTooShort,
-  settingKeyUnknown,
+  clubNameRequired,
   firstNameRequired,
 }

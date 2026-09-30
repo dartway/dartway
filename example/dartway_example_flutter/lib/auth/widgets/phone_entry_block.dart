@@ -6,14 +6,14 @@ import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-import '../logic/auth_state.dart';
+import '../logic/auth_controller.dart';
 
 class PhoneEntryBlock extends ConsumerWidget {
   const PhoneEntryBlock({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(authStateProvider);
+    final state = ref.watch(authControllerProvider);
 
     final isRegistration = switch (state.currentStep) {
       AuthStep.registration => true,
@@ -33,8 +33,9 @@ class PhoneEntryBlock extends ConsumerWidget {
             child: AppTextFormField(
               labelText: l10n.nameLabel,
               value: state.firstName,
-              onChanged: (value) =>
-                  ref.read(authStateProvider.notifier).update(firstName: value),
+              onChanged: (value) => ref
+                  .read(authControllerProvider.notifier)
+                  .update(firstName: value),
               validator: (p0) => p0 == null || p0.isEmpty || p0.length < 3
                   ? l10n.requiredField
                   : null,
@@ -44,7 +45,7 @@ class PhoneEntryBlock extends ConsumerWidget {
           labelText: l10n.phoneLabel,
           value: state.phoneRaw,
           onChanged: (value) =>
-              ref.read(authStateProvider.notifier).update(phoneRaw: value),
+              ref.read(authControllerProvider.notifier).update(phoneRaw: value),
         ),
         if (isRegistration)
           Padding(
@@ -52,7 +53,7 @@ class PhoneEntryBlock extends ConsumerWidget {
             child: CheckboxFormField(
               value: state.allDocumentsAccepted,
               onChanged: (value) => ref
-                  .read(authStateProvider.notifier)
+                  .read(authControllerProvider.notifier)
                   .update(allDocumentsAccepted: value),
               validator: (value) => value != true ? l10n.youMustAgree : null,
               titleWidget: MultiLinkText.multi(
@@ -83,7 +84,7 @@ class PhoneEntryBlock extends ConsumerWidget {
             child: CheckboxFormField(
               value: state.marketingAgreed,
               onChanged: (value) => ref
-                  .read(authStateProvider.notifier)
+                  .read(authControllerProvider.notifier)
                   .update(marketingAgreed: value),
               titleWidget: MultiLinkText.multi(
                 textAlign: TextAlign.start,
@@ -113,7 +114,7 @@ class PhoneEntryBlock extends ConsumerWidget {
           l10n.continueAction,
           requireValidation: true,
           onTap: dw.action(
-            (_) => ref.read(authStateProvider.notifier).requestCode(),
+            (_) => ref.read(authControllerProvider.notifier).requestCode(),
           ),
         ),
         const Gap(24),
@@ -122,8 +123,9 @@ class PhoneEntryBlock extends ConsumerWidget {
                 text: l10n.alreadyHaveAccount,
                 linkText: l10n.loginAction,
                 onLinkTap: dw.action(
-                  (_) =>
-                      ref.read(authStateProvider.notifier).goTo(AuthStep.login),
+                  (_) => ref
+                      .read(authControllerProvider.notifier)
+                      .goTo(AuthStep.login),
                 ),
               )
             : MultiLinkText.single(
@@ -131,7 +133,7 @@ class PhoneEntryBlock extends ConsumerWidget {
                 linkText: l10n.registrationAction,
                 onLinkTap: dw.action(
                   (_) => ref
-                      .read(authStateProvider.notifier)
+                      .read(authControllerProvider.notifier)
                       .goTo(AuthStep.registration),
                 ),
               ),

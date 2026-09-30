@@ -67,22 +67,33 @@ From the project root or from inside the `*_flutter` package, in this order:
 
 1. **the declared top level** of the Flutter package and the server package (`invalidTopLevelLayout`);
 2. **localization wiring** (`l10nNotWired`);
-3. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
+3. **analysis options**: the server and the shared package raise `unnecessary_non_null_assertion` to
+   an error (`redundantBangAllowed`);
+4. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
    (`generatedCodeStale`);
-4. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
-5. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
+5. **the environment and outbound HTTP** in the server package: `Platform.environment` outside
+   `lib/src/core/environment.dart`, and in `bin/` anything but `DwLocalEnvironment.overlay(Platform.environment)`
+   or a map read by a variable's name (`forbiddenEnvironmentRead`); an `HttpClient(` or a
+   `package:http` import in `lib/` (`forbiddenHttpClient`);
+6. **the data lifecycle** of the server, shared and Flutter packages (`migrationChangesData`,
+   `workAfterServerStart`, `settingsKeyValueTable`, `fieldPatchMatched`), and **migrations**:
+   `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
+7. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
    and **framework overrides** that the framework has caught up with (`frameworkOverrideOutlived`);
-6. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
+8. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
    development containers' credentials against what the server is told to reach them by
    (`devComposeDrifted`);
-7. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
+9. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
    in the zones and `shared/` — sixteen more checks;
-8. **reads, loading, dialogs and routes** over every file of the Flutter package's `lib/` but
+10. **state and commands** over every file of the Flutter package's `lib/` but generated code
+   (`forbiddenStateHolder`, `forbiddenCommandCall`), and the classes a `dw:allow-stateful` marker
+   passes over, listed after the tally;
+11. **reads, loading, dialogs and routes** over every file of the Flutter package's `lib/` but
    generated code (`forbiddenRequestRead`, `forbiddenProgressIndicator`, `forbiddenNavigationCall`,
    `sentinelId`).
 
-`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of steps 7–8 and skips
-steps 1–6 and the UI kit pass: each of those judges a whole package or the whole project, and has
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of steps 9–11 and skips
+steps 1–8 and the UI kit pass: each of those judges a whole package or the whole project, and has
 nothing to say about one folder. `--type <check>` runs one check by name; `--level
 info|warning|error` runs the checks of one severity.
 
@@ -109,7 +120,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Nineteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
+Thirty-one errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -124,11 +135,21 @@ Nineteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `assetPathMissing` | error | An `assets/...` string that names no file |
 | `barrelFile` | error | A file that only re-exports |
 | `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
-| `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone; in the server's `lib/src/`, a file, a layer folder (`handlers/`, `rows/`, `domain/`, …) or a feature folder without its `<feature>_feature.dart` |
+| `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone; in the server's `lib/src/`, a file, a layer-named folder (the list is in [project layout](../1-getting-started/project-layout.md)) or a feature folder without its `<feature>_feature.dart` |
+| `invalidServerFeatureFile` | error | Inside a server feature, a file that is not `<feature>_<kind>.dart` / `<feature>_<part>_<kind>.dart` (kind: `feature`, `rows`, `handlers`, `objects`, `publications`, `jobs`, `access`, `routes`), a subfolder other than `logic/`, a folder or a kind-suffixed file inside `logic/`, or a layer-named folder at any depth of `lib/src/`. The rule: [project layout](../1-getting-started/project-layout.md) |
+| `misplacedServerCode` | error | Server code in a file of the wrong kind: handlers outside `*_handlers.dart`, row classes outside `*_rows.dart`, jobs outside `*_jobs.dart`, a `DwHttpRoute` outside `*_routes.dart`, a `DwServerFeature` outside `<feature>_feature.dart`, a function that publishes outside `*_publications.dart`, a row → data object mapping outside `*_objects.dart` — and any of them in `core/` |
 | `generatedCodeStale` | error | A generated file that `dart run dartway_cli:dartway generate` would write differently, or whose source is gone |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
+| `forbiddenDateTimeNow` | error | `DateTime.now` or `DateTime.timestamp` (called or torn off, interpolations included), or `package:clock`'s `clock.now()` where it is imported (prefixed or not), anywhere in the server's `lib/` — the factory file included — the time there is `ctx.now`, the server's clock, which tests set and the job queue runs by. Comments and strings are passed over; `bin/` and `test/` are not judged |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
+| `redundantBangAllowed` | error | The server or the shared package's `analysis_options.yaml` (or a local file it includes) does not set `analyzer: errors: unnecessary_non_null_assertion: error` — a stored row's id is `int`, and `row.id!` hides the `!` that guards a real null (D-113) |
+| `migrationChangesData` | error | An `INSERT`, `UPDATE` or `DELETE` in a migration (`lib/src/migrations/m*.dart`) that is not an argument of `m.backfill(…)` — content is a seed step. Reads the SQL strings: adjacent literals as one string, `--` comments dropped, an interpolated table name still a table; only the dollar-quoted body of a function or procedure being defined passes. Migrations up to `deploy/config.yaml` > `migrations` > `dataChecksAfter` are not judged — and moving that key forward exempts whatever it passes, which no check can see: the agent's skills make a diff that moves it a stop for the human. A write into a `dw_*` table is refused even through `backfill`; `m.carrySettings` is the one way ([Migrations](../4-server/migrations.md#a-migration-changes-the-schema)) |
+| `workAfterServerStart` | error | `bin/server.dart` awaiting anything, or reaching `.db`, `.accounts` or `runInContext`, after the server's `start()` — the variable a `DwAppServer(…)` or `…Server.build(…)` was assigned to — in the same function; awaiting `stop()`/`close()` or a `ProcessSignal` passes ([Startup steps and seeds](../4-server/app-server.md#startup-steps-and-seeds)) |
+| `settingsKeyValueTable` | error | A row class whose own body has a unique `String key` beside a `String value`: settings are a data object read through `ctx.settings` ([Settings](../4-server/database.md#settings)) |
+| `fieldPatchMatched` | error | `DwSetField`, `DwClearField` or `DwKeepField` named in the code of the server, shared or Flutter package (`lib/`, `bin/`, `test/`; generated files exempt) — read a patch through its helpers ([Clearing a field](../2-core/data-objects-and-generation.md#clearing-a-field-dwfieldpatch)) |
+| `forbiddenStateHolder` | error | A `StatefulWidget` (its `State`, `setState`, a `StatefulBuilder`), a `ChangeNotifier` or a `ValueNotifier` held as state, anywhere in the app's `lib/` but generated code — local state is hooks, shared state a `Notifier`. A class marked `// dw:allow-stateful <reason>` is passed over and listed |
+| `forbiddenCommandCall` | error | `dw.command` outside a feature's `logic/` and `core/`, or inside a `try` that catches; a widget running `<Feature>Commands` outside `dw.action`, or reading a result (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) outside `logic/` and `core/` |
 | `forbiddenRequestRead` | error | The `AsyncValue` of `ref.watch/read(dw.request/pages/table/window(…))` taken apart outside `logic/` and widget-free files of `core/` — a member (`.value`, `.when(`, `.hasError`, …), a `switch` or `case` over it, a `.select` of the read, the values of a `ref.listen` over it. A screen shows a read through `DwReadBuilder`, `DwPagedListView` or `DwWindowListView`; its chrome through a `logic/` provider answering a plain value |
 | `forbiddenProgressIndicator` | error | `CircularProgressIndicator`, `LinearProgressIndicator`, `RefreshProgressIndicator` or `CupertinoActivityIndicator` outside `ui_kit/` |
 | `forbiddenNavigationCall` | error | `showDialog`, `showModalBottomSheet`, `showCupertino…` and their siblings, `Navigator.push…` or a page route (`MaterialPageRoute`, …) outside `ui_kit/` and `core/router/`; `Navigator.pop`, `GoRouter.of(…).pop` or `context.pop` anywhere |
@@ -141,8 +162,11 @@ Nineteen errors, ten warnings, one info — `DwCheckType` and its `severity` in
 | `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
+| `forbiddenEnvironmentRead` | error | `Platform.environment` in the server's `lib/` outside `lib/src/core/environment.dart`, where `AppEnvironment` reads every variable at start; in `bin/`, `Platform.environment` outside `DwLocalEnvironment.overlay(…)` or a map read by a variable's name (`env['PORT']`) |
+| `forbiddenHttpClient` | error | `HttpClient(` or an import of `package:http/…` in the server's `lib/` — an outbound request is `ctx.http` |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
+| `inlineOwnershipCheck` | warning | A handler in a `*_handlers.dart` under any rule but a resource rule (`signedIn`, a role check) that compares a row's owner field with the caller and refuses `notFound`/`forbidden` (or answers `null` from a `single`), in its body or a helper of the file it calls — the check `DwAccessRule.resource` makes once |
 | `fileLong` | info | Over 200 lines |
 
 "Raw styles" means `Color(`, `TextStyle(`, `BorderRadius.`/`BorderRadius(`, `Theme.of(`,
@@ -193,8 +217,10 @@ closed list:
 | `<project>_flutter/lib` | zones `admin/ app/ auth/ common/` · layers `core/ l10n/ shared/ ui_kit/` · `main.dart` · `<project>_app.dart` | `main.dart`, `<project>_app.dart` |
 | `<project>_server/lib` | `<project>_server.dart` · `generated/` · `src/` | `<project>_server.dart`, `src/`, and `src/migrations/migrations.dart` |
 
-Dot entries and the folders `generated/`, `gen/`, `l10n/` and `.dart_tool/` are passed over. Inside `src/` the server is the project's to arrange, except `migrations/`, which
-`bin/migrate.dart` writes and reads by that path.
+Dot entries and the folders `generated/`, `gen/`, `l10n/` and `.dart_tool/` are passed over. Inside
+the server's `src/`, `migrations/` is a fixed name (`bin/migrate.dart` writes and reads it by that
+path), every other folder but `core/` is a feature, and a feature's own files are a closed set held by
+`dw_server_features.dart` (`invalidServerFeatureFile`, `misplacedServerCode`).
 
 A zone name or a layer name one level down — `app/admin/` — is an error too, and it is the reason the
 check exists at all: a folder inside a zone is an ordinary group to every other rule, so a misplaced
@@ -264,6 +290,22 @@ that does not undo its up. The fixes it prints: a schema change the migrations m
 `dart run bin/migrate.dart rehash <id>`. An error, because a schema the migrations do not produce is a
 server that refuses to start in the next environment. See [Migrations](../4-server/migrations.md).
 
+**`forbiddenEnvironmentRead` and `forbiddenHttpClient`** hold one way to each of two things a server
+reaches outside itself. The environment is read in `lib/src/core/environment.dart`, into a typed
+`AppEnvironment` at start: a variable read anywhere else is read on first use — a missing one surfaces
+hours after a deploy that looked fine — and past the local overlay, so `deploy/config.yaml > local`
+never reaches it. An entry point in `bin/` hands the environment in and reads nothing itself:
+`Platform.environment` there only as the argument of `DwLocalEnvironment.overlay(…)`, and no map
+read by a variable's name — `bin/server.dart` reads through `AppEnvironment.read`. An outbound request is
+`ctx.http`, bounded by a timeout, logged and answered by the test server's fake; a client of a project's
+own has none of that unless it is written again, with a test seam of its own threaded through the
+server's factory; a client a command-line entry point uses with no server behind it lives in `bin/`,
+which this check does not judge. **Known limits:** another client package (`dio`, or `package:http`
+reached through a package that re-exports it), `WebSocket.connect`, a conditional import naming
+`package:http`, and an environment read through a helper in `bin/` that does not subscript a literal
+name are not seen. See [The app server](../4-server/app-server.md#configuration-comes-from-the-environment)
+and [Handlers and the call context](../4-server/handlers-and-context.md#outbound-http).
+
 **`localSecretMissing` and `devComposeDrifted`** judge the environment this machine starts a server
 with (D-078). Both are warnings: a key the server only reaches on a path nobody runs locally is a
 legitimate thing to leave unset, and a project that points `local` at a database of its own is not
@@ -271,6 +313,61 @@ drifting. What they end is the silent case — a developer who does not know a k
 only place it was written down was a deployment's configuration, and two files stating the same
 password with nothing making them agree. `dartway secret list --env local` is the same answer on
 demand.
+
+**`inlineOwnershipCheck`** looks for "is this row mine" written by hand after any rule that is not a
+resource rule — `DwAccessRule.signedIn`, a role check — the check `DwAccessRule.resource` makes once, before the handler, with the row handed over as
+`ctx.accessed<R>()` (D-090). It reads `*_handlers.dart` files of the server's `lib/`: an `if` whose
+condition compares a row's field named for an owner (`…ProfileId`, `authorId`, `ownerId`,
+`senderId`, `accountId`, …) with the caller (`me`, `profile`, `ctx.accountId`, …) with `!=`, and
+whose branch refuses `notFound` or `forbidden` — or answers `null` from a `single` handler, which the
+framework refuses `notFound`. A helper counts when such a handler of the same file calls it. A rule
+is a resource rule when it is `DwAccessRule.resource` itself or a project rule (`AppAccess.ownTask(…)`)
+whose declaration in the server's `lib/` builds one. A warning, because it reads the shape of the code
+rather than its meaning; it stays quiet on a list filtered by the caller in its `where` (the
+canonical "my rows"), on handlers under a resource rule, and on a membership read from a table of its
+own. The one pattern per shape is in
+[Access and roles](../2-core/access-and-roles.md#whose-row-is-it-one-rule-per-shape).
+
+## State and commands: one way each, and one visible way out
+
+A widget's own state — a controller, a focus node, an animation, a timer, a subscription, a toggle —
+is held by hooks (`HookWidget`/`HookConsumerWidget`: `useTextEditingController`, `useFocusNode`,
+`useAnimationController`, `useEffect` returning its cleanup, `useState`); what `didUpdateWidget` did
+is a `useEffect` keyed on the prop. State two widgets share, or a flow with logic, is a Riverpod
+`Notifier` named `<Thing>Controller` in the feature's `logic/`. `forbiddenStateHolder` reads every
+file of `lib/`, `core/` and `ui_kit/` included — a kit field is where a `StatefulWidget` hides best.
+
+**The way out is written on the class and counted.** An API that needs a `State` subclass or a
+`Listenable` of its own (the router's refresh listenable is the skeleton's one case) takes one
+comment on the line above the class, doc comments and annotations allowed between:
+
+```dart
+// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable
+class AppRouterState extends ChangeNotifier { … }
+```
+
+The class — and, for a widget, its `State` — is passed over, and every run prints it under
+`🔓 Allowed by dw:allow-stateful` with the reason. A marker with no reason, or on no class, is a
+finding itself. The exception stays in sight rather than spreading.
+
+**`forbiddenCommandCall`** holds the command canon: `dw.command` sent from a feature's `logic/`
+(`<feature>_commands.dart`, or a flow's controller) — or from `core/`, the app-wide wiring no button
+starts (a push token, a bootstrap step) — never inside a `try` that catches; a widget
+runs `<Feature>Commands.x(…)` only inside `dw.action(…)` and reads no result. A value the widget
+needs is unwrapped in `logic/` (`valueOrThrow`) and arrives in `followUpIfMountedAction`; a refusal
+becomes words only through `DwFlutterConfig.refusalText`, the app's catalogue in `lib/core/`. That
+last rule is **stated, not held**: nothing tells a sentence built from a refusal code in a
+controller from any other string, and a guess would flag the wrong ones.
+
+Both are read from the source with comments and strings blanked, so they see what a text can show:
+a flow controller's method run outside `dw.action` is not caught (its name says nothing), nor a
+state holder reached through a subclass of the project's own, nor a `Notifier` not named
+`<Thing>Controller`, nor a command sent under another spelling than `dw.command` or
+`<Feature>Commands.x(…)` — a plugin's method (`dw.plugins.analytics.saveDashboard`) or
+`dw.files.getLink` from a widget — nor refusal text built outside the catalogue. A `<Feature>Commands`
+class holds command senders only — a pure helper on it reads as a command sent outside `dw.action`.
+Only the first argument of `dw.action(…)` counts as inside it: a command in
+`followUpIfMountedAction` runs after the action's refusal handling is over.
 
 ## Why `notAFeature` and `featureSpecMissing` are one rule
 

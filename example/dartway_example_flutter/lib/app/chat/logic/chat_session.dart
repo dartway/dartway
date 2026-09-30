@@ -1,12 +1,13 @@
 import 'dart:async';
 
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_composing_controller.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:flutter/foundation.dart';
 
 /// One open channel of the staff chat: what its parts share — the list's
-/// controller, the message being replied to or edited, the search.
+/// controller and where it opened. The reply or edit under way is the
+/// channel's [ChatComposingController].
 ///
 /// Lives as long as the channel is on screen; the screen disposes it.
 final class ChatSession {
@@ -39,32 +40,12 @@ final class ChatSession {
 
   final list = DwWindowListController<ChatMessage>();
 
-  /// The message the composer answers; `null` when not replying.
-  final replyTo = ValueNotifier<ChatMessage?>(null);
-
-  /// The message the composer edits; `null` when writing a new one.
-  final editing = ValueNotifier<ChatMessage?>(null);
-
   /// Opens the window around [quote] and highlights it — a reply's quote, a
   /// pinned message, a search result.
   Future<bool> showMessage(int id, DateTime sentAt) =>
       list.scrollToCursor(DwWindowCursor.encode(sentAt, id));
 
-  void startReply(ChatMessage message) {
-    editing.value = null;
-    replyTo.value = message;
-  }
-
-  void startEdit(ChatMessage message) {
-    replyTo.value = null;
-    editing.value = message;
-  }
-
-  void dispose() {
-    list.dispose();
-    replyTo.dispose();
-    editing.dispose();
-  }
+  void dispose() => list.dispose();
 }
 
 /// Moves the caller's read position forward as messages come on screen:

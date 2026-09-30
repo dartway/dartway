@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.21.0-dev.9
+## 0.21.0-dev.15
 
 - **BREAKING: one way to show a read — `DwReadBuilder` — and a paged list, `DwPagedListView`**
   (dartway/dartway#390, D-116). `DwReadBuilder(read, builder:, placeholder:, onRefused:)` takes
@@ -31,6 +31,33 @@
 - **`DwWatchNotifier<S>`** — the public base of the four read notifiers (`refetch()`, `isLive`) —
   and **`DwWatchProvider<S>`**, what `DwReadBuilder` takes. **`DwRefusedBuilder`**, the type of an
   `onRefused` branch.
+
+## 0.21.0-dev.14
+
+- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
+  state and command checks of `dartway check` (dartway/dartway#389).
+
+## 0.21.0-dev.13
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#388).
+
+## 0.21.0-dev.12
+
+- Nothing changed here; the family moves in lockstep with `dartway_orm` (dartway/dartway#384).
+
+## 0.21.0-dev.11
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
+
+## 0.21.0-dev.10
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
+
+## 0.21.0-dev.9
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` and
+  `dartway_client` (dartway/dartway#385). An app on `dartway_core_flutter` sends its UTC offset with
+  every call through the client.
 
 ## 0.21.0-dev.8
 

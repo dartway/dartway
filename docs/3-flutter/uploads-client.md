@@ -67,12 +67,18 @@ final result = await dw.files.upload(
 ### Reading a file: `getLink`
 
 ```dart
-// example/dartway_example_flutter/lib/app/chat/widgets/chat_attachments_view.dart
-final link = await dw.files.getLink(file.id);
-if (link case DwCallOk(:final value)) {
-  // value.url
-}
+// example/dartway_example_flutter/lib/app/chat/logic/chat_files.dart
+static Future<String> linkOf(ChatAttachment attachment) async =>
+    (await dw.files.getLink(attachment.id)).valueOrThrow.url;
+
+// …and the tile that opens it, in the feature's widgets/
+onTap: () => dw.action(
+  (_) => ChatFiles.linkOf(file),
+  followUpIfMountedAction: (context, url) => Clipboard.setData(ClipboardData(text: url)),
+)(context),
 ```
+
+A refused link is shown by `dw.action` like any refusal; the widget reads no result.
 
 `getLink(fileId)` answers a `DwFileLink`: the permanent URL of a public file (no `expiresAt`), or a
 short-lived presigned one for a private file. **Fetch it when the file is about to be shown**, do not

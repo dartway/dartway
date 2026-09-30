@@ -1,6 +1,6 @@
 part of '../ui_kit.dart';
 
-class AppTextFormField extends StatefulWidget {
+class AppTextFormField extends HookWidget {
   const AppTextFormField({
     super.key,
     // main contract: controlled value + onChanged
@@ -48,165 +48,116 @@ class AppTextFormField extends StatefulWidget {
   final bool cursorToEndOnExternalUpdate;
 
   @override
-  State<AppTextFormField> createState() => _AppTextFormFieldState();
+  Widget build(BuildContext context) {
+    final controller = useTextEditingController(text: value);
+    // This widget as last built, for the callbacks below that run after the
+    // build that registered them.
+    final latest = useRef(this)..value = this;
 
-  /// Convenient adapter if there is still a `ValueNotifier<String>` somewhere.
-  factory AppTextFormField.fromStringNotifier({
-    Key? key,
-    required ValueNotifier<String> valueNotifier,
-    bool? enabled,
-    FocusNode? focusNode,
-    int? maxLength,
-    String? labelText,
-    String? hintText,
-    List<TextInputFormatter>? inputFormatters,
-    String? Function(String?)? validator,
-    TextAlign? textAlign,
-    TextInputType? keyboardType,
-    int minLines = 1,
-    int maxLines = 1,
-    TextInputAction? textInputAction,
-    Iterable<String>? autofillHints,
-    bool obscureText = false,
-    bool readOnly = false,
-    bool cursorToEndOnExternalUpdate = true,
-  }) {
-    return AppTextFormField(
-      key: key,
-      value: valueNotifier.value,
-      onChanged: (v) => valueNotifier.value = v,
+    // True only while the parent's value is being written into the
+    // controller, so the resulting notification is not echoed straight back.
+    final adoptingExternalValue = useRef(false);
+
+    // Adopt the parent's value **only when the parent actually changed it** —
+    // the comparison is against the value of the previous build, not against
+    // a value this widget tracked for itself.
+    //
+    // The difference is the whole bug this replaced. `onChanged` is delivered
+    // a frame late (see below), so between a keystroke and the parent catching
+    // up there is a window in which [value] is stale. Any rebuild landing in
+    // that window — a network response, a neighbouring provider, a theme
+    // change — used to look like "the parent set a new value" and overwrote
+    // the field with the stale text, cursor to the end. Typing then continued
+    // on a truncated prefix: "Fitness Club" was saved as "Fitne".
+    //
+    // The previous value cannot be stale in that way: it is what the parent
+    // held on the previous build, so a difference means a real external
+    // change.
+    //
+    // The adoption itself waits for the end of the frame. Writing the
+    // controller here, during a build, makes the `TextFormField` report the
+    // change to its enclosing `Form`, which rebuilds — and a `Form` above the
+    // widget being built may not be marked dirty mid-build: the phone field,
+    // putting its prefix in on focus, asserted on exactly that.
+    useValueChanged<String, void>(value, (_, _) {
+      final adopted = value;
+      if (adopted == controller.text) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        // Superseded by a newer parent value, or already typed in.
+        if (!context.mounted ||
+            latest.value.value != adopted ||
+            controller.text == adopted) {
+          return;
+        }
+        adoptingExternalValue.value = true;
+        _syncControllerText(
+          controller,
+          adopted,
+          placeCursorAtEnd: latest.value.cursorToEndOnExternalUpdate,
+        );
+        adoptingExternalValue.value = false;
+      });
+    });
+
+    useEffect(() {
+      void onControllerChanged() {
+        if (adoptingExternalValue.value) return;
+
+        final text = controller.text;
+        if (text == latest.value.value) return;
+
+        // Defer: notifying during a build would rebuild the parent mid-frame.
+        // Every keystroke schedules one of these, and they all run in the
+        // same post-frame batch — the guard lets only the one still matching
+        // the field through, so the parent hears the latest text instead of a
+        // replay.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!context.mounted || controller.text != text) return;
+          latest.value.onChanged(text);
+        });
+      }
+
+      controller.addListener(onControllerChanged);
+      return () => controller.removeListener(onControllerChanged);
+    }, [controller]);
+
+    return TextFormField(
+      controller: controller,
       enabled: enabled,
+      readOnly: readOnly,
       focusNode: focusNode,
-      maxLength: maxLength,
-      labelText: labelText,
-      hintText: hintText,
-      inputFormatters: inputFormatters,
-      validator: validator,
-      textAlign: textAlign,
       keyboardType: keyboardType,
+      textAlign: textAlign ?? TextAlign.start,
       minLines: minLines,
       maxLines: maxLines,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
+      validator: validator,
       textInputAction: textInputAction,
       autofillHints: autofillHints,
       obscureText: obscureText,
-      readOnly: readOnly,
-      cursorToEndOnExternalUpdate: cursorToEndOnExternalUpdate,
+      decoration: InputDecoration(
+        labelText: labelText,
+        hintText: hintText,
+        counterText: '',
+      ),
     );
   }
-}
 
-class _AppTextFormFieldState extends State<AppTextFormField> {
-  late final TextEditingController _controller;
-
-  /// True only while this state is writing the parent's value into the
-  /// controller, so the resulting notification is not echoed straight back.
-  bool _adoptingExternalValue = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = TextEditingController(text: widget.value);
-    _controller.addListener(_onControllerChanged);
-  }
-
-  /// Adopt the parent's value **only when the parent actually changed it** —
-  /// the comparison is against the previous widget, not against a value this
-  /// state tracked for itself.
-  ///
-  /// The difference is the whole bug this replaced. `onChanged` is delivered a
-  /// frame late (see below), so between a keystroke and the parent catching up
-  /// there is a window in which `widget.value` is stale. Any rebuild landing in
-  /// that window — a network response, a neighbouring provider, a theme change —
-  /// used to look like "the parent set a new value" and overwrote the field with
-  /// the stale text, cursor to the end. Typing then continued on a truncated
-  /// prefix: "Fitness Club" was saved as "Fitne".
-  ///
-  /// `oldWidget.value` cannot be stale in that way: it is what the parent held
-  /// on the previous build, so a difference means a real external change.
-  ///
-  /// The adoption itself waits for the end of the frame. Writing the controller
-  /// here, during a build, makes the `TextFormField` report the change to its
-  /// enclosing `Form`, which rebuilds — and a `Form` above the widget being
-  /// built may not be marked dirty mid-build: the phone field, putting its
-  /// prefix in on focus, asserted on exactly that.
-  @override
-  void didUpdateWidget(covariant AppTextFormField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-
-    final adopted = widget.value;
-    if (adopted == oldWidget.value || adopted == _controller.text) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // Superseded by a newer parent value, or already typed in.
-      if (!mounted || widget.value != adopted || _controller.text == adopted) {
-        return;
-      }
-      _adoptingExternalValue = true;
-      _syncControllerText(
-        adopted,
-        placeCursorAtEnd: widget.cursorToEndOnExternalUpdate,
-      );
-      _adoptingExternalValue = false;
-    });
-  }
-
-  void _onControllerChanged() {
-    if (_adoptingExternalValue) return;
-
-    final text = _controller.text;
-    if (text == widget.value) return;
-
-    // Defer: notifying during a build would rebuild the parent mid-frame.
-    // Every keystroke schedules one of these, and they all run in the same
-    // post-frame batch — the guard lets only the one still matching the field
-    // through, so the parent hears the latest text instead of a replay.
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted || _controller.text != text) return;
-      widget.onChanged(text);
-    });
-  }
-
-  void _syncControllerText(String newText, {required bool placeCursorAtEnd}) {
+  static void _syncControllerText(
+    TextEditingController controller,
+    String newText, {
+    required bool placeCursorAtEnd,
+  }) {
     final newSelection = placeCursorAtEnd
         ? TextSelection.collapsed(offset: newText.length)
-        : _controller.selection;
+        : controller.selection;
 
     // Reset composing needed to prevent IME session from hanging
-    _controller.value = TextEditingValue(
+    controller.value = TextEditingValue(
       text: newText,
       selection: newSelection,
       composing: TextRange.empty,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.removeListener(_onControllerChanged);
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return TextFormField(
-      controller: _controller,
-      enabled: widget.enabled,
-      readOnly: widget.readOnly,
-      focusNode: widget.focusNode,
-      keyboardType: widget.keyboardType,
-      textAlign: widget.textAlign ?? TextAlign.start,
-      minLines: widget.minLines,
-      maxLines: widget.maxLines,
-      maxLength: widget.maxLength,
-      inputFormatters: widget.inputFormatters,
-      validator: widget.validator,
-      textInputAction: widget.textInputAction,
-      autofillHints: widget.autofillHints,
-      obscureText: widget.obscureText,
-      decoration: InputDecoration(
-        labelText: widget.labelText,
-        hintText: widget.hintText,
-        counterText: '',
-      ),
     );
   }
 }

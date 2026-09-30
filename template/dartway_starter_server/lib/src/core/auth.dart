@@ -149,17 +149,17 @@ abstract final class AppAuth {
     int accountId,
     DwAccountOrigin origin,
   ) async {
-    final now = DateTime.now().toUtc();
+    final now = ctx.now;
     switch (origin) {
       case DwSignInOrigin(:final registration):
-        if (!await AppAuth.isSignUpEnabled(ctx.db)) {
+        if (!(await ctx.settings.read<AppSettings>()).signUpEnabled) {
           ctx.refuse(DartwayStarterRefusal.signUpClosed, field: 'identifier');
         }
         if (registration[RegistrationKeys.terms] != 'true') {
           ctx.refuse(DartwayStarterRefusal.consentsRequired, field: 'consents');
         }
         return ctx.db.userProfiles.insert(
-          UserProfileRow(
+          NewUserProfileRow(
             accountId: accountId,
             firstName: registration[RegistrationKeys.firstName]?.trim() ?? '',
             agreedForMarketing:
@@ -170,17 +170,8 @@ abstract final class AppAuth {
         );
       case DwToolOrigin():
         return ctx.db.userProfiles.insert(
-          UserProfileRow(accountId: accountId, createdAt: now),
+          NewUserProfileRow(accountId: accountId, createdAt: now),
         );
     }
-  }
-
-  /// Whether a new visitor may create an account: the `signUpEnabled` setting,
-  /// on while nobody has stored it.
-  static Future<bool> isSignUpEnabled(DwDatabaseHandle db) async {
-    final row = await db.appSettings.findFirst(
-      where: (t) => t.key.equals(AppSettingKeys.signUpEnabled),
-    );
-    return row?.value.trim().toLowerCase() != 'false';
   }
 }

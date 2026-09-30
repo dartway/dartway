@@ -6,8 +6,8 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_flutter/core/router/admin_scaffold.dart';
 import 'widgets/admin_settings_form.dart';
 
-/// Application settings, one row per key the app declares — write access is
-/// admin-only on the server. A key added to `AppSettingKey` appears here.
+/// The club's settings, one row per field of `ClubSettings` — write access is
+/// admin-only on the server.
 class AdminSettingsPage extends StatelessWidget implements DwFeatureWidget {
   const AdminSettingsPage({super.key});
 
@@ -19,8 +19,8 @@ class AdminSettingsPage extends StatelessWidget implements DwFeatureWidget {
         'An admin changes what the app says about the club without waiting '
         'for a release.',
     behaviors: [
-      'Every setting the app declares has a row, stored or not: an unstored '
-          'one shows its default.',
+      'Every setting the club has is a row, saved or not: an unsaved one shows '
+          'its default.',
       'A text setting offers saving only once its value has actually changed '
           'and is not blank; a toggle saves as it is flipped.',
       'A setting another admin saves changes here live.',

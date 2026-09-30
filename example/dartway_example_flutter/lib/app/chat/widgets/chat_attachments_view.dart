@@ -1,4 +1,5 @@
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_files.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -107,13 +108,13 @@ class _FileLinkTile extends StatelessWidget {
   Widget build(BuildContext context) => ChatFileTile(
     name: file.fileName,
     sizeLabel: file.byteSize.fileSizeLabel,
-    onTap: () async {
-      // No browser or viewer plugin in the example: the link is handed over.
-      final link = await dw.files.getLink(file.id);
-      if (link case DwCallOk(:final value)) {
-        await Clipboard.setData(ClipboardData(text: value.url));
+    // No browser or viewer plugin in the example: the link is handed over.
+    onTap: () => dw.action(
+      (_) => ChatFiles.linkOf(file),
+      followUpIfMountedAction: (context, url) async {
+        await Clipboard.setData(ClipboardData(text: url));
         if (context.mounted) dw.notify.info(context.l10n.chatCopied);
-      }
-    },
+      },
+    )(context),
   );
 }

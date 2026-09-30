@@ -16,7 +16,7 @@ void main() {
 
   Future<ClubSessionRow> sessionWithSpots(int capacity) async {
     final service = await club.db.clubServices.insert(
-      const ClubServiceRow(
+      const NewClubServiceRow(
         title: 'Personal training',
         description: 'One on one',
         durationMinutes: 60,
@@ -24,9 +24,9 @@ void main() {
       ),
     );
     return club.db.clubSessions.insert(
-      ClubSessionRow(
-        serviceId: service.id!,
-        startsAt: DateTime.now().add(const Duration(days: 1)),
+      NewClubSessionRow(
+        serviceId: service.id,
+        startsAt: club.clock.now().add(const Duration(days: 1)),
         capacity: capacity,
       ),
     );
@@ -37,7 +37,7 @@ void main() {
     final session = await sessionWithSpots(1);
     final vera = await club.signUp('79990000011', firstName: 'Vera');
     final oleg = await club.signUp('79990000012', firstName: 'Oleg');
-    final from = DateTime.now().subtract(const Duration(hours: 1));
+    final from = club.clock.now().subtract(const Duration(hours: 1));
 
     final olegSchedule = oleg.client.watch(ListUpcomingSessions(from: from));
     final veraBookings = vera.client.watch(const ListMyBookings());
@@ -56,7 +56,7 @@ void main() {
     expect(dataOf(veraBookings.state), isEmpty);
 
     final booked = await vera.client.command(
-      BookSession(sessionId: session.id!),
+      BookSession(sessionId: session.id),
     );
     expect(booked.valueOrThrow.status, BookingStatus.booked);
     expect(booked.valueOrThrow.accountId, vera.accountId);
@@ -74,7 +74,7 @@ void main() {
     );
 
     final refused = await oleg.client.command(
-      BookSession(sessionId: session.id!),
+      BookSession(sessionId: session.id),
     );
     expect(
       refused,
@@ -120,7 +120,7 @@ void main() {
     final full = await club.db.clubSessions.update(
       session.copyWith(bookedCount: 1),
     );
-    final noSpots = await caller.call(BookSession(sessionId: full.id!));
+    final noSpots = await caller.call(BookSession(sessionId: full.id));
     expect(noSpots.status, 422);
     expect(noSpots.refusal.isCode(DartwayExampleRefusal.noSpotsLeft), isTrue);
 

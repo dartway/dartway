@@ -8,7 +8,9 @@ description: >-
   on a table with rows — `addColumn(..., backfill:)`, a NOT NULL change, a type change) → `rehash`
   after any hand edit, before the migration is applied anywhere → `status` / `apply` / `rollback`
   → `check` (and `dart run dartway_cli:dartway check`'s `migrationsDrift`). Never edit an applied migration, never
-  import row classes into one, data work in SQL through `m.sql` / `m.query`. The server applies
+  import row classes into one; a migration changes the schema, and rewrites existing rows only
+  through `m.backfill` (content is a `DwSeedRows` step, never a migration); `dataChecksAfter` is
+  never moved without the human. The server applies
   pending migrations as it starts and refuses to start when the ledger and the code disagree
   (missing, changed, dirty). Use when a row class, a column, an index or a foreign key changes,
   when a migration refuses, or when the server will not start over one.
@@ -136,8 +138,14 @@ up/down/up round trip in `check` at that point (a note, not a failure).
   change; a migration must still run the same way in six months against a database that has
   never seen today's code. The draft already describes tables with schema literals
   (`DwTableSchema`, `DwColumnSchema`, `DwForeignKey`, `DwIndexSchema`) — keep it that way.
-- **Data work is SQL**: `m.sql('UPDATE …', params: {...})`, `m.query('SELECT …')`. Not a repository,
-  not `db.<plural>` — those are generated from today's row classes.
+- **A migration changes the schema; it writes rows only to carry existing ones across that change**,
+  and says so: `m.backfill('UPDATE …', params: {...})` — a renamed value, a split column, rows a new
+  constraint forbids. Reads are `m.query('SELECT …')`. Not a repository, not `db.<plural>` — those
+  are generated from today's row classes. Rows the code declares (a catalogue, a questionnaire) are
+  a `DwSeedRows` step (`dartway-server`), never an `INSERT` here. The framework's `dw_*` tables are
+  never written here, not even by `backfill`: a project's own settings table is carried into a
+  settings object with `m.carrySettings(…)`. `dart run dartway_cli:dartway check` holds all of it
+  (`migrationChangesData`).
 - **A migration is transactional by default**: everything in `up` commits or nothing does. Only for
   statements Postgres refuses inside a transaction (`CREATE INDEX CONCURRENTLY`,
   `ALTER TYPE … ADD VALUE`) override `bool get transactional => false`. Such a migration is
@@ -234,6 +242,11 @@ migration. (`supersededChecksums` is not a way around this: it exists for a migr
 *failed* on some databases and is corrected with the same outcome where it did apply — ask the
 human before reaching for it.)
 
+**Never move `deploy/config.yaml` > `migrations` > `dataChecksAfter` on your own.** It names the
+last migration `migrationChangesData` does not judge — set once, when the project adopted the rule,
+to the migration that was latest then. Moving it forward exempts new migrations from the check;
+a diff that changes it is a stop: ask the human.
+
 **Never delete or rename an applied migration's file or id.** The ledger then holds a migration
 the code does not know (`missing`), and the server refuses for the same reason.
 
@@ -288,7 +301,8 @@ branch meets code from another. Name that to the human rather than "fixing" eith
 
 - [ ] Row class changed → `dart run dartway_cli:dartway generate` → `create <name>`.
 - [ ] Every `decisionRequired` resolved, in `up` and in `down`; drop + add pairs checked for renames.
-- [ ] No imports of row classes or `lib/` in the migration; data work in `m.sql` / `m.query`.
+- [ ] No imports of row classes or `lib/` in the migration; rows rewritten only through `m.backfill`, no `dw_*` table written.
+- [ ] `dataChecksAfter` in `deploy/config.yaml` unchanged, or its change confirmed by the human.
 - [ ] `rehash` after the last edit, before the first apply.
 - [ ] `status` → `apply` (or a server start) → `status` shows it applied.
 - [ ] `check` green: files, parity, up/down/up.

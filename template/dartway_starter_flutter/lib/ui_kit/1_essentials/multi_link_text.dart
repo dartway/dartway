@@ -9,7 +9,7 @@ class MultiLinkTextPart {
 }
 
 /// Rich text with tappable links, each running a [DwUiAction].
-class MultiLinkText extends StatefulWidget {
+class MultiLinkText extends HookWidget {
   MultiLinkText.single({
     super.key,
     String? text,
@@ -34,59 +34,37 @@ class MultiLinkText extends StatefulWidget {
   final AppTextStyle linkStyle;
 
   @override
-  State<MultiLinkText> createState() => _MultiLinkTextState();
-}
-
-class _MultiLinkTextState extends State<MultiLinkText> {
-  late List<TapGestureRecognizer?> _recognizers;
-
-  @override
-  void initState() {
-    super.initState();
-    _initRecognizers();
-  }
-
-  @override
-  void didUpdateWidget(MultiLinkText oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.parts != widget.parts) {
-      _disposeRecognizers();
-      _initRecognizers();
-    }
-  }
-
-  void _initRecognizers() {
-    _recognizers = widget.parts.map((e) {
-      if (e.linkText != null && e.onLinkTap != null) {
-        return TapGestureRecognizer()..onTap = () => e.onLinkTap!.call(context);
-      }
-      return null;
-    }).toList();
-  }
-
-  void _disposeRecognizers() {
-    for (final r in _recognizers) {
-      r?.dispose();
-    }
-  }
-
-  @override
-  void dispose() {
-    _disposeRecognizers();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final baseStyle = widget.textStyle.resolve(context);
-    final linkStyle = widget.linkStyle.resolve(context);
+    // One recognizer per link, made again when the parts change and disposed
+    // with the ones they replace.
+    final recognizers = useMemoized(
+      () => [
+        for (final part in parts)
+          if (part.onLinkTap case final action? when part.linkText != null)
+            TapGestureRecognizer()..onTap = () => action.call(context)
+          else
+            null,
+      ],
+      [parts],
+    );
+    useEffect(
+      () => () {
+        for (final recognizer in recognizers) {
+          recognizer?.dispose();
+        }
+      },
+      [recognizers],
+    );
+
+    final baseStyle = textStyle.resolve(context);
+    final linkStyle = this.linkStyle.resolve(context);
 
     return RichText(
-      textAlign: widget.textAlign ?? TextAlign.center,
+      textAlign: textAlign ?? TextAlign.center,
       text: TextSpan(
         style: baseStyle,
         children: [
-          ...widget.parts
+          ...parts
               .mapIndexed(
                 (i, e) => <InlineSpan>[
                   if (i != 0) const TextSpan(text: ' '),
@@ -97,7 +75,7 @@ class _MultiLinkTextState extends State<MultiLinkText> {
                     TextSpan(
                       text: e.linkText,
                       style: linkStyle,
-                      recognizer: _recognizers[i],
+                      recognizer: recognizers[i],
                     ),
                 ],
               )

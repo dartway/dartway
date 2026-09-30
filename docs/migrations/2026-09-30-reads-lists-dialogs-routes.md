@@ -1,8 +1,8 @@
 ---
 title: "One way to show a read, a feed, a spinner, a dialog and a route: DwReadBuilder, DwPagedListView, and dartway check fails the rest"
 affects:
-  dartway_core_flutter: "0.21.0-dev.9"
-  dartway_cli: "0.13.0"
+  dartway_core_flutter: "0.21.0-dev.15"
+  dartway_cli: "0.21.0"
 ---
 
 ## Who is affected

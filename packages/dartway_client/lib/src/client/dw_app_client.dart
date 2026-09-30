@@ -101,6 +101,7 @@ final class DwAppClient {
     this.options = const DwClientOptions(),
     void Function(Object error, StackTrace stackTrace)? onError,
     Random? random,
+    this.utcOffset,
   }) : baseUrl = _checkBaseUrl(baseUrl),
        appVersion = DwAppVersion.parse(appVersion),
        tokenStore = tokenStore ?? DwMemoryTokenStore(),
@@ -132,6 +133,12 @@ final class DwAppClient {
   final DwStorageTransport storageTransport;
 
   final DwClientOptions options;
+
+  /// The UTC offset every call reports (`Dw-Utc-Offset`, the server's
+  /// `ctx.callerUtcOffset`) instead of the device's. `null`, the default,
+  /// reports the device's, read at each send; a test pins one so what it
+  /// asserts does not depend on the zone of the machine it runs on.
+  final Duration? utcOffset;
 
   final bool _ownsTransport;
   final bool _ownsStorageTransport;

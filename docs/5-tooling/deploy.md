@@ -23,10 +23,12 @@ environments `deploy/config.yaml` declares. Every one that connects takes `--as 
 
 ## One file describes an environment
 
-`deploy/config.yaml` holds one environment per top-level key, plus two keys that belong to the
-project rather than to one of its machines: `requires` (below) and `local`, which is what a
+`deploy/config.yaml` holds one environment per top-level key, plus three keys that belong to the
+project rather than to one of its machines: `requires` (below); `local`, which is what a
 developer's own machine starts a server with and is not a deployment at all — see
-[Secrets](#secrets). **The server has no configuration file of its own** — it is configured by its
+[Secrets](#secrets); and `migrations`, whose `dataChecksAfter` names the last migration
+`dart run dartway_cli:dartway check` leaves out of `migrationChangesData`
+([Migrations](../4-server/migrations.md#a-migration-changes-the-schema)). **The server has no configuration file of its own** — it is configured by its
 environment, which the deploy derives from this file (database coordinates, storage, port) and from
 the secret store on the server (passwords, keys). Nothing writes `config.yaml`; the deploy only
 reads it.

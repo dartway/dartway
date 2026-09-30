@@ -8,23 +8,23 @@ import '../src/settings.dart';
 final DwWireProtocol dartwayStarterProtocol = DwWireProtocol(
   [
     DwProtocolEntry<AdminCounters>('AdminCounters', $AdminCountersFromJson),
-    DwProtocolEntry<AppSetting>('AppSetting', $AppSettingFromJson),
+    DwProtocolEntry<AppSettings>('AppSettings', $AppSettingsFromJson),
     DwProtocolEntry<ChangeUserRole>('ChangeUserRole', $ChangeUserRoleFromJson),
     DwProtocolEntry<GetAdminCounters>(
       'GetAdminCounters',
       $GetAdminCountersFromJson,
     ),
+    DwProtocolEntry<GetAppSettings>('GetAppSettings', $GetAppSettingsFromJson),
     DwProtocolEntry<GetMyProfile>('GetMyProfile', $GetMyProfileFromJson),
     DwProtocolEntry<GetUserCard>('GetUserCard', $GetUserCardFromJson),
-    DwProtocolEntry<ListAppSettings>(
-      'ListAppSettings',
-      $ListAppSettingsFromJson,
-    ),
     DwProtocolEntry<ListUserProfiles>(
       'ListUserProfiles',
       $ListUserProfilesFromJson,
     ),
-    DwProtocolEntry<SaveAppSetting>('SaveAppSetting', $SaveAppSettingFromJson),
+    DwProtocolEntry<SaveAppSettings>(
+      'SaveAppSettings',
+      $SaveAppSettingsFromJson,
+    ),
     DwProtocolEntry<UpdateMyProfile>(
       'UpdateMyProfile',
       $UpdateMyProfileFromJson,

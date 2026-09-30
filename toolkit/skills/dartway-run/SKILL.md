@@ -51,6 +51,9 @@ dart run bin/server.dart          # in the background; does not exit
 dart run bin/seed_dev.dart        # once, after the server logged "listening"
 ```
 
+The server's own seeds (`DwSeedRows`) run at every start, before "listening", in every environment;
+`bin/seed_dev.dart` adds development accounts and data on top and is never run in production.
+
 ```bash
 cd __FLUTTER_PKG__
 flutter pub get

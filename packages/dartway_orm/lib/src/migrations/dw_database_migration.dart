@@ -7,11 +7,18 @@ import '../schema/dw_ddl_writer.dart';
 import '../schema/dw_database_schema.dart';
 import 'dw_migration_errors.dart';
 
-/// One migration: Dart code that moves the schema (and data) one step.
+/// One migration: Dart code that moves the schema one step.
 ///
 /// A migration never imports row classes — they change, and an old
 /// migration must still run in six months. It describes tables with schema
-/// literals and works on data with SQL.
+/// literals.
+///
+/// It changes rows only to carry them across its own schema change, and says
+/// so with [DwMigrationContext.backfill]; `dartway check` refuses an
+/// `INSERT`, `UPDATE` or `DELETE` anywhere else in a project's migration
+/// (`migrationChangesData`). Rows the code declares — a catalogue, a
+/// questionnaire, defaults — are a seed step (`DwSeedRows`) that every start
+/// converges on, not a migration that runs once per database.
 abstract class DwDatabaseMigration {
   const DwDatabaseMigration();
 
@@ -94,6 +101,20 @@ final class DwMigrationContext {
     String sql, {
     Map<String, Object?> params = const {},
   }) => _db.query(sql, params: params);
+
+  /// Rewrites rows the database already holds so they fit this migration's
+  /// schema change: a renamed enum value, a column split in two, rows a new
+  /// constraint forbids. Runs like [sql] — without [params] the text may hold
+  /// several statements — and is the one place `dartway check` accepts an
+  /// `INSERT`, `UPDATE` or `DELETE` in a project's migration.
+  ///
+  /// Not for content: rows the code declares are a seed step (`DwSeedRows`),
+  /// which applies them to every database at every start and applies an
+  /// edit of them too, where a migration would have run once.
+  Future<int> backfill(
+    String sql, {
+    Map<String, Object?> params = const {},
+  }) => _db.execute(sql, params: params);
 
   /// Creates the table with its columns, constraints and indexes.
   Future<void> createTable(DwTableSchema table) =>

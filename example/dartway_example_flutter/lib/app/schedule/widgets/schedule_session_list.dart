@@ -1,4 +1,4 @@
-import 'package:dartway_example_flutter/app/schedule/logic/today_provider.dart';
+import 'package:dartway_example_flutter/app/schedule/logic/today_controller.dart';
 import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -20,7 +20,9 @@ class ScheduleSessionList extends ConsumerWidget {
     // Two reads, one nested in the other: the list waits for both, and each
     // fails, retries and follows the server on its own.
     return DwReadBuilder(
-      dw.request(ListUpcomingSessions(from: ref.watch(todayProvider))),
+      dw.request(
+        ListUpcomingSessions(from: ref.watch(todayControllerProvider)),
+      ),
       placeholder: PlaceholderObjects.listOf(PlaceholderObjects.session, 5),
       builder: (context, sessions) => DwReadBuilder(
         dw.request(const ListMyBookings()),

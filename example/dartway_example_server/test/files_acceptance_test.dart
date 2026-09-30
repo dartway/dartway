@@ -15,26 +15,25 @@ import 'support/app_harness.dart';
 /// (see `../README.md`).
 void main() {
   group('configuration from the environment', () {
-    const credentials = {
+    const required = {
+      'DW_DATABASE_HOST': '127.0.0.1',
+      'DW_DATABASE_NAME': 'club',
+      'DW_DATABASE_USER': 'club',
+      'DW_DATABASE_PASSWORD': 'club',
       'DW_STORAGE_ACCESS_KEY': 'club',
       'DW_STORAGE_SECRET_KEY': 'club-secret',
     };
+    DwFileStorageConfig? storageOf(Map<String, String> variables) =>
+        AppEnvironment.read({...required, ...variables}).server.storage;
 
     test('without an endpoint there is no storage', () {
-      expect(AppFiles.storageConfig(const {}), isNull);
-      expect(
-        AppFiles.storageConfig(const {
-          'DW_STORAGE_ENDPOINT': '',
-          ...credentials,
-        }),
-        isNull,
-      );
+      expect(storageOf(const {}), isNull);
+      expect(storageOf(const {'DW_STORAGE_ENDPOINT': ''}), isNull);
     });
 
     test('a development storage needs only its endpoint and keys', () {
-      final config = AppFiles.storageConfig(const {
+      final config = storageOf(const {
         'DW_STORAGE_ENDPOINT': 'http://127.0.0.1:9000',
-        ...credentials,
       })!;
       expect(config.publicBucket, 'club-public');
       expect(config.privateBucket, 'club-private');
@@ -46,18 +45,39 @@ void main() {
     });
 
     test('what the environment names wins over every default', () {
-      final config = AppFiles.storageConfig(const {
+      final config = storageOf(const {
         'DW_STORAGE_ENDPOINT': 'https://storage.yandexcloud.net',
         'DW_STORAGE_PUBLIC_BUCKET': 'club-files',
         'DW_STORAGE_PUBLIC_BASE_URL': 'https://cdn.club.example',
         'DW_STORAGE_PRIVATE_BUCKET': 'club-documents',
         'DW_STORAGE_VERIFY_BUCKETS': 'false',
-        ...credentials,
       })!;
       expect(config.publicBucket, 'club-files');
       expect(config.publicBaseUrl, Uri.parse('https://cdn.club.example'));
       expect(config.privateBucket, 'club-documents');
       expect(config.verifyBuckets, isFalse);
+    });
+
+    test('RuStore push takes both of its variables or neither', () {
+      expect(
+        () => AppEnvironment.read({
+          ...required,
+          'RUSTORE_PUSH_PROJECT_ID': 'club',
+        }),
+        throwsA(
+          isA<DwEnvironmentException>().having(
+            (e) => e.problems,
+            'problems',
+            [contains('RUSTORE_PUSH_SERVICE_TOKEN')],
+          ),
+        ),
+      );
+      final both = AppEnvironment.read({
+        ...required,
+        'RUSTORE_PUSH_PROJECT_ID': 'club',
+        'RUSTORE_PUSH_SERVICE_TOKEN': 'token',
+      });
+      expect(both.push.ruStore?.projectId, 'club');
     });
   });
 

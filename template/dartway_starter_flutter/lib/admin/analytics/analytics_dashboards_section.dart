@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
+import 'package:dartway_starter_flutter/admin/analytics/logic/analytics_dashboard_commands.dart';
 import 'package:dartway_starter_flutter/admin/analytics/logic/analytics_period_choice.dart';
 import 'package:dartway_starter_flutter/admin/analytics/widgets/analytics_dashboard_actions.dart';
 import 'package:dartway_starter_flutter/admin/analytics/widgets/analytics_dashboard_grid.dart';
@@ -69,14 +70,13 @@ class AnalyticsDashboardsSection extends HookWidget implements DwFeatureWidget {
         child: const AnalyticsTitleSheet(),
       );
       if (title == null || !context.mounted) return;
-      final result = await dw.action(
-        (_) =>
-            dw.plugins.analytics.saveDashboard(title: title, widgets: const []),
+      await dw.action(
+        (_) => AnalyticsDashboardCommands.save(title: title, widgets: const []),
+        followUpIfMountedAction: (_, created) {
+          selectedId.value = created.id;
+          editing.value = true;
+        },
       )(context);
-      if (result case DwCallOk(:final value)) {
-        selectedId.value = value.id;
-        editing.value = true;
-      }
     }
 
     const request = DwListAnalyticsDashboards();

@@ -57,9 +57,10 @@ void main() {
       ),
       const GetUserCard(profileId: 7),
       const ChangeUserRole(profileId: 7, role: UserRole.admin),
-      const AppSetting(id: AppSettingKeys.appName, value: 'Acme'),
-      const ListAppSettings(),
-      const SaveAppSetting(key: AppSettingKeys.signUpEnabled, value: 'false'),
+      const AppSettings(appName: 'Acme', signUpEnabled: false),
+      const AppSettings(),
+      const GetAppSettings(),
+      const SaveAppSettings(signUpEnabled: false),
     ];
     for (final object in objects) {
       expect(
@@ -78,12 +79,11 @@ void main() {
       'firstNameRequired@firstName',
     ]);
     expect(codes(const UpdateMyProfile()), isEmpty);
-    expect(codes(const SaveAppSetting(key: 'colour', value: 'red')), [
-      'settingKeyUnknown@key',
+    expect(codes(const SaveAppSettings(appName: '  ')), [
+      'appNameRequired@appName',
     ]);
-    for (final key in AppSettingKeys.all) {
-      expect(codes(SaveAppSetting(key: key, value: 'x')), isEmpty);
-    }
+    expect(codes(const SaveAppSettings(appName: 'Acme')), isEmpty);
+    expect(codes(const SaveAppSettings(signUpEnabled: false)), isEmpty);
   });
 
   test("the member's own profile names no account: it lives on the caller's "

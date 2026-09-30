@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_composing_controller.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_session.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_composer.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_row.dart';
@@ -80,6 +81,9 @@ class _ChannelBody extends HookConsumerWidget {
       },
       const [],
     );
+    // The reply or edit under way belongs to the channel on screen: held for
+    // as long as it is, whether or not the composer is showing.
+    ref.listen(chatComposingProvider(channel.id), (_, _) {});
     final hasPinned = ref.watch(chatHasPinnedProvider(channel.id));
     final query = searchQuery?.trim();
     final searching = query != null;
