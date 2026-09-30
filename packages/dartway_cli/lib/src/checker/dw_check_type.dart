@@ -297,7 +297,30 @@ enum DwCheckType {
   /// builds one with `DwFieldPatch.set`/`.clear()`/`.keep()`. Hand matching
   /// is how each handler grew its own idea of what a blank text or a kept
   /// field on insert means.
-  fieldPatchMatched;
+  fieldPatchMatched,
+
+  /// A `StatefulWidget` (with its `State`, `setState`, `StatefulBuilder`), a
+  /// `ChangeNotifier` or a `ValueNotifier` held as state anywhere in the
+  /// app's `lib/` but generated code (dartway/dartway#389). Widget-local
+  /// state is hooks; state shared between widgets, or a flow with logic, is a
+  /// Riverpod `Notifier` named `<Thing>Controller` in the feature's `logic/`.
+  ///
+  /// An error, because three ways to hold state side by side is what the
+  /// audit found in every project, and a `didUpdateWidget` that forgets to
+  /// resync a controller is a bug hooks do not allow. The one exception —
+  /// an API that needs a `State` subclass or a `Listenable` — is written on
+  /// the class as `// dw:allow-stateful <reason>`, and every run lists it.
+  forbiddenStateHolder,
+
+  /// `dw.command` outside a feature's `logic/` and `core/` (app-wide wiring
+  /// with no button), or inside a `try` that catches; a widget
+  /// running `<Feature>Commands` outside `dw.action`, or reading a result
+  /// (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) itself
+  /// (dartway/dartway#389).
+  ///
+  /// An error: a command sent any other way is a refusal nobody shows, or
+  /// one shown in words the app's refusal texts do not own.
+  forbiddenCommandCall;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///

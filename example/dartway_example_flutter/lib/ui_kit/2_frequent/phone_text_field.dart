@@ -1,6 +1,6 @@
 part of '../ui_kit.dart';
 
-class PhoneTextField extends StatefulWidget {
+class PhoneTextField extends HookWidget {
   const PhoneTextField({
     super.key,
     required this.value,
@@ -27,76 +27,42 @@ class PhoneTextField extends StatefulWidget {
   final Iterable<String>? autofillHints;
 
   @override
-  State<PhoneTextField> createState() => _PhoneTextFieldState();
-}
-
-class _PhoneTextFieldState extends State<PhoneTextField> {
-  late FocusNode _focusNode;
-  bool _ownFocus = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _attachFocusNode(widget.focusNode);
-  }
-
-  @override
-  void didUpdateWidget(covariant PhoneTextField oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.focusNode != widget.focusNode) {
-      _detachFocusNode();
-      _attachFocusNode(widget.focusNode);
-    }
-  }
-
-  void _attachFocusNode(FocusNode? external) {
-    if (external != null) {
-      _focusNode = external;
-      _ownFocus = false;
-    } else {
-      _focusNode = FocusNode();
-      _ownFocus = true;
-    }
-    _focusNode.addListener(_handleFocusChange);
-  }
-
-  void _detachFocusNode() {
-    _focusNode.removeListener(_handleFocusChange);
-    if (_ownFocus) {
-      _focusNode.dispose();
-    }
-  }
-
-  void _handleFocusChange() {
-    final prefix = RuPhoneMaskFormatter.minText();
-    final text = widget.value;
-
-    if (_focusNode.hasFocus && text.isEmpty) {
-      widget.onChanged(prefix);
-    }
-    if (!_focusNode.hasFocus && text.length == prefix.length) {
-      widget.onChanged('');
-    }
-  }
-
-  @override
-  void dispose() {
-    _detachFocusNode();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    // The caller's focus node, or the field's own — a hook is called on every
+    // build, so the own one exists either way and is disposed with the field.
+    final ownFocusNode = useFocusNode();
+    final node = focusNode ?? ownFocusNode;
+    // This widget as last built, for the listener registered by an earlier
+    // build.
+    final latest = useRef(this)..value = this;
+
+    useEffect(() {
+      void onFocusChange() {
+        final prefix = RuPhoneMaskFormatter.minText();
+        final text = latest.value.value;
+
+        if (node.hasFocus && text.isEmpty) {
+          latest.value.onChanged(prefix);
+        }
+        if (!node.hasFocus && text.length == prefix.length) {
+          latest.value.onChanged('');
+        }
+      }
+
+      node.addListener(onFocusChange);
+      return () => node.removeListener(onFocusChange);
+    }, [node]);
+
     return AppTextFormField(
-      value: widget.value,
-      onChanged: widget.onChanged,
-      enabled: widget.enabled,
-      focusNode: _focusNode,
-      labelText: widget.labelText,
-      hintText: widget.hintText,
+      value: value,
+      onChanged: onChanged,
+      enabled: enabled,
+      focusNode: node,
+      labelText: labelText,
+      hintText: hintText,
       keyboardType: TextInputType.phone,
-      textInputAction: widget.textInputAction,
-      autofillHints: widget.autofillHints,
+      textInputAction: textInputAction,
+      autofillHints: autofillHints,
       inputFormatters: [RuPhoneMaskFormatter()],
       validator: (value) {
         final text = value ?? '';
@@ -108,8 +74,8 @@ class _PhoneTextFieldState extends State<PhoneTextField> {
         if (digits.length < 11) {
           return context.l10n.invalidPhoneNumber;
         }
-        if (widget.additionValidator != null) {
-          return widget.additionValidator!(text);
+        if (additionValidator != null) {
+          return additionValidator!(text);
         }
         return null;
       },

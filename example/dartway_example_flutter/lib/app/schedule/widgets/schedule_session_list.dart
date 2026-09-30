@@ -1,4 +1,4 @@
-import 'package:dartway_example_flutter/app/schedule/logic/today_provider.dart';
+import 'package:dartway_example_flutter/app/schedule/logic/today_controller.dart';
 import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -21,7 +21,7 @@ class ScheduleSessionList extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final sessionsRequest = ListUpcomingSessions(
-      from: ref.watch(todayProvider),
+      from: ref.watch(todayControllerProvider),
     );
     const bookingsRequest = ListMyBookings();
     final sessions = ref.watch(dw.request(sessionsRequest));

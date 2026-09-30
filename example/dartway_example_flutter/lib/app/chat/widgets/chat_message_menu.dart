@@ -1,6 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
-import 'package:dartway_example_flutter/app/chat/logic/chat_session.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_composing_controller.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/profile/profile_roles.dart';
@@ -21,7 +21,7 @@ abstract final class ChatMessageMenu {
   static Future<void> show(
     BuildContext context, {
     required ChatMessage message,
-    required ChatSession session,
+    required ChatComposingController composing,
     required UserProfile me,
   }) {
     final l10n = context.l10n;
@@ -54,7 +54,7 @@ abstract final class ChatMessageMenu {
                 title: Text(l10n.chatReply),
                 onTap: () {
                   close();
-                  session.startReply(message);
+                  composing.startReply(message);
                 },
               ),
               if (message.editableBy(me.id))
@@ -63,7 +63,7 @@ abstract final class ChatMessageMenu {
                   title: Text(l10n.chatEdit),
                   onTap: () {
                     close();
-                    session.startEdit(message);
+                    composing.startEdit(message);
                   },
                 ),
               if (message.text.isNotEmpty)

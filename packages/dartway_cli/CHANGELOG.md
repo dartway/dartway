@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.20.0
+
+- **BREAKING: two new errors in `dartway check` — one way to hold state and one way to send a
+  command** (dartway/dartway#389, D-114). `forbiddenStateHolder`: a `StatefulWidget`
+  (`ConsumerStatefulWidget`, `StatefulHookWidget`, …) with its `State` and `setState`, a
+  `StatefulBuilder`, or a `ChangeNotifier`/`ValueNotifier` held as state, anywhere in the Flutter
+  package's `lib/` but generated code. A class marked `// dw:allow-stateful <reason>` on the line
+  above is passed over and listed after the tally (`🔓 Allowed by dw:allow-stateful`); a marker
+  with no reason, or on no class, is a finding. `forbiddenCommandCall`: `dw.command` outside a
+  feature's `logic/` and `core/` (app-wide wiring) or inside a `try` that catches; a widget running `<Feature>Commands` outside
+  `dw.action`, or reading `DwCallOk`/`DwCallRefused`/`DwCallFailed`/`valueOrThrow` outside
+  `logic/` and `core/`. Both read the source with comments and strings blanked; refusal text
+  built outside the catalogue is stated in the toolkit, not checked. The skeleton
+  follows: its kit fields are hooks, the identifier change is an `IdentityChangeController`, the
+  sign-in notifier is `AuthController`, the analytics saves are `AnalyticsDashboardCommands`, and
+  the router state carries the one marker. Migration note:
+  `docs/migrations/2026-09-30-flutter-state-and-commands.md`.
+
 ## 0.19.0
 
 - **Four new errors: a project's data has one pattern per problem** (dartway/dartway#388).

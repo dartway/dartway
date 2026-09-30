@@ -35,7 +35,9 @@ There is no client package: the shared package *is* the client contract, and bot
 
    **A zone holds features and nothing else. A widget with no story of its own is a building block, and blocks live in `lib/ui_kit/`** (`2_frequent/` or `3_special/`): visual, with no business logic, laying out what they are handed. The line is not how many places use it but whether there is anything to tell: a card with rules about what it shows and when is a feature even with one consumer; a form field, a badge row, a layout wrapper is a block — its description is a doc comment over the class, not a `DwFeatureSpec`. Inside a feature, `widgets/` is its private layout and `logic/` its state and commands. Don't create a `common/`, `shared/` or `widgets/` folder *inside* a zone: that is a block asking for the wrong home.
 
-   **A feature speaks from two places only.** Its `DwFeatureSpec` sits on the entry file and nowhere else in the feature. Its changes are sent from `logic/`: `dw.command` is called in the feature's `logic/` (`<feature>_commands.dart`, or the notifier of a flow), and runs inside the `dw.action` the widget owning the button builds; `widgets/` never sends a command.
+   **A feature speaks from two places only.** Its `DwFeatureSpec` sits on the entry file and nowhere else in the feature. Its changes are sent from `logic/`: `dw.command` is called in the feature's `logic/` (`<feature>_commands.dart`, or the notifier of a flow; app-wide wiring no button starts, in `lib/core/`), and runs inside the `dw.action` the widget owning the button builds; `widgets/` never sends a command and never reads a result (`forbiddenCommandCall`, `dartway-data-layer`).
+
+   **State is held one way.** A widget's own state is hooks; state two widgets share, or a flow with logic, is a Riverpod `Notifier` named `<Thing>Controller` in the feature's `logic/`. No `StatefulWidget`, `setState` or `ChangeNotifier`/`ValueNotifier` as a holder anywhere in `lib/` (`forbiddenStateHolder`); the one way out is `// dw:allow-stateful <reason>` on the class, which every check run lists. The rule and its hooks — `dartway-feature-scaffold`, "Where a feature's logic lives".
 
    **Splitting into small features is the recommendation, not a tolerated evil** — and the reason is the passport. Every feature brings a `DwFeatureSpec`, so the finer the cut, the denser the description of the interface: one big feature is described in generalities, ten small ones each carry their own `behaviors`, `requirements` and `knownIssues`. That description is what error reports, Studio and the agent read. `dart run dartway_cli:dartway check` builds a "zone → group → feature" tree and grades every feature A–D.
 
@@ -49,7 +51,7 @@ There is no client package: the shared package *is* the client contract, and bot
 
 **Law is what makes it DartWay** — the seven rules above; a project does not override a law. **Default is everything else** here and in the skills — the commit format, the base branch, how a decision is recorded, the language of the project's own texts — and a project may replace it. **Precedence:** a default yields to the project's own root `CLAUDE.md`; a law does not; where both are silent, this file stands. A project records an override in its root `CLAUDE.md`, under "Project conventions", **with the reason** — `.claude/CLAUDE.md` is overwritten on update, and a README beside the code is where an override goes to die.
 
-**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Twenty-five checks fail today:
+**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Twenty-seven checks fail today:
 
 | What it holds | Checks that fail |
 |---|---|
@@ -66,6 +68,7 @@ There is no client package: the shared package *is* the client contract, and bot
 | One way to the environment and to other services | `forbiddenEnvironmentRead`, `forbiddenHttpClient` |
 | A `!` that means nothing is an error, so the one that guards a null is seen | `redundantBangAllowed` |
 | One pattern for data: seeds are startup steps, migrations change the schema, settings are typed, patches are read by their helpers | `migrationChangesData`, `workAfterServerStart`, `settingsKeyValueTable`, `fieldPatchMatched` |
+| One way to hold state and send a command (law 3) | `forbiddenStateHolder`, `forbiddenCommandCall` |
 
 Eleven further checks are warnings and one is a nudge. Anything this table and the types do not hold is a default. Not held yet: the naming law beyond the contract's DTO names, a `DwHttpRoute` the app calls instead of a request, and "done" (only the `featureSpecMissing` warning); `migrationsDrift` needs a Postgres and says when it did not run.
 

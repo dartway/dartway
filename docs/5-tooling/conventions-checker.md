@@ -84,10 +84,13 @@ From the project root or from inside the `*_flutter` package, in this order:
    development containers' credentials against what the server is told to reach them by
    (`devComposeDrifted`);
 9. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
-   in the zones and `shared/` — the other sixteen checks.
+   in the zones and `shared/` — sixteen more checks;
+10. **state and commands** over every file of the Flutter package's `lib/` but generated code
+   (`forbiddenStateHolder`, `forbiddenCommandCall`), and the classes a `dw:allow-stateful` marker
+   passes over, listed after the tally.
 
-`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 9 and skips
-steps 1–7 and the UI kit pass: each of those judges a whole package or the whole project, and has
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of steps 9–10 and skips
+steps 1–8 and the UI kit pass: each of those judges a whole package or the whole project, and has
 nothing to say about one folder. `--type <check>` runs one check by name; `--level
 info|warning|error` runs the checks of one severity.
 
@@ -114,7 +117,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Twenty-five errors, eleven warnings, one info — `DwCheckType` and its `severity` in
+Twenty-seven errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -142,6 +145,8 @@ Twenty-five errors, eleven warnings, one info — `DwCheckType` and its `severit
 | `workAfterServerStart` | error | `bin/server.dart` awaiting anything, or reaching `.db`, `.accounts` or `runInContext`, after the server's `start()` — the variable a `DwAppServer(…)` or `…Server.build(…)` was assigned to — in the same function; awaiting `stop()`/`close()` or a `ProcessSignal` passes ([Startup steps and seeds](../4-server/app-server.md#startup-steps-and-seeds)) |
 | `settingsKeyValueTable` | error | A row class whose own body has a unique `String key` beside a `String value`: settings are a data object read through `ctx.settings` ([Settings](../4-server/database.md#settings)) |
 | `fieldPatchMatched` | error | `DwSetField`, `DwClearField` or `DwKeepField` named in the code of the server, shared or Flutter package (`lib/`, `bin/`, `test/`; generated files exempt) — read a patch through its helpers ([Clearing a field](../2-core/data-objects-and-generation.md#clearing-a-field-dwfieldpatch)) |
+| `forbiddenStateHolder` | error | A `StatefulWidget` (its `State`, `setState`, a `StatefulBuilder`), a `ChangeNotifier` or a `ValueNotifier` held as state, anywhere in the app's `lib/` but generated code — local state is hooks, shared state a `Notifier`. A class marked `// dw:allow-stateful <reason>` is passed over and listed |
+| `forbiddenCommandCall` | error | `dw.command` outside a feature's `logic/` and `core/`, or inside a `try` that catches; a widget running `<Feature>Commands` outside `dw.action`, or reading a result (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) outside `logic/` and `core/` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |
@@ -282,6 +287,47 @@ rather than its meaning; it stays quiet on a list filtered by the caller in its 
 canonical "my rows"), on handlers under a resource rule, and on a membership read from a table of its
 own. The one pattern per shape is in
 [Access and roles](../2-core/access-and-roles.md#whose-row-is-it-one-rule-per-shape).
+
+## State and commands: one way each, and one visible way out
+
+A widget's own state — a controller, a focus node, an animation, a timer, a subscription, a toggle —
+is held by hooks (`HookWidget`/`HookConsumerWidget`: `useTextEditingController`, `useFocusNode`,
+`useAnimationController`, `useEffect` returning its cleanup, `useState`); what `didUpdateWidget` did
+is a `useEffect` keyed on the prop. State two widgets share, or a flow with logic, is a Riverpod
+`Notifier` named `<Thing>Controller` in the feature's `logic/`. `forbiddenStateHolder` reads every
+file of `lib/`, `core/` and `ui_kit/` included — a kit field is where a `StatefulWidget` hides best.
+
+**The way out is written on the class and counted.** An API that needs a `State` subclass or a
+`Listenable` of its own (the router's refresh listenable is the skeleton's one case) takes one
+comment on the line above the class, doc comments and annotations allowed between:
+
+```dart
+// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable
+class AppRouterState extends ChangeNotifier { … }
+```
+
+The class — and, for a widget, its `State` — is passed over, and every run prints it under
+`🔓 Allowed by dw:allow-stateful` with the reason. A marker with no reason, or on no class, is a
+finding itself. The exception stays in sight rather than spreading.
+
+**`forbiddenCommandCall`** holds the command canon: `dw.command` sent from a feature's `logic/`
+(`<feature>_commands.dart`, or a flow's controller) — or from `core/`, the app-wide wiring no button
+starts (a push token, a bootstrap step) — never inside a `try` that catches; a widget
+runs `<Feature>Commands.x(…)` only inside `dw.action(…)` and reads no result. A value the widget
+needs is unwrapped in `logic/` (`valueOrThrow`) and arrives in `followUpIfMountedAction`; a refusal
+becomes words only through `DwFlutterConfig.refusalText`, the app's catalogue in `lib/core/`. That
+last rule is **stated, not held**: nothing tells a sentence built from a refusal code in a
+controller from any other string, and a guess would flag the wrong ones.
+
+Both are read from the source with comments and strings blanked, so they see what a text can show:
+a flow controller's method run outside `dw.action` is not caught (its name says nothing), nor a
+state holder reached through a subclass of the project's own, nor a `Notifier` not named
+`<Thing>Controller`, nor a command sent under another spelling than `dw.command` or
+`<Feature>Commands.x(…)` — a plugin's method (`dw.plugins.analytics.saveDashboard`) or
+`dw.files.getLink` from a widget — nor refusal text built outside the catalogue. A `<Feature>Commands`
+class holds command senders only — a pure helper on it reads as a command sent outside `dw.action`.
+Only the first argument of `dw.action(…)` counts as inside it: a command in
+`followUpIfMountedAction` runs after the action's refusal handling is over.
 
 ## Why `notAFeature` and `featureSpecMissing` are one rule
 

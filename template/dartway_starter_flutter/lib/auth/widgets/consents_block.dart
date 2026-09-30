@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../logic/auth_state.dart';
+import '../logic/auth_controller.dart';
 
 /// What a new account needs before the code creates it: a name and the terms
 /// accepted, news and offers optional.
@@ -14,8 +14,8 @@ class ConsentsBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(authStateProvider);
-    final notifier = ref.read(authStateProvider.notifier);
+    final state = ref.watch(authControllerProvider);
+    final notifier = ref.read(authControllerProvider.notifier);
     final l10n = context.l10n;
 
     return SingleChildScrollView(

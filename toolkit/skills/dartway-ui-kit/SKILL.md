@@ -183,6 +183,14 @@ Two consequences that are easy to get wrong:
 - **Sizes are published by the kit, not by the feature.** The card height a feed needs is a kit constant
   (`AppEventCard.compactHeight`), not a public field of the feature. A feature may read the size, but not assign it.
 
+## A kit widget's own state is hooks
+
+A field that owns its controller, a timeline that tracks a drag, rich text that owns its tap
+recognizers — each is a `HookWidget` holding them in hooks, never a `StatefulWidget`: the check
+reads `ui_kit/` like every other folder (`forbiddenStateHolder`). The hooks for what a `State` used
+to hold, and the one marked way out, are in `dartway-feature-scaffold`, "Where a feature's logic
+lives". The kit takes a value and an `onChanged`, not a caller's `ValueNotifier`.
+
 ## The kit does not know the domain
 
 The kit does not import app models and does not switch on domain enums. If a widget picks an image based
