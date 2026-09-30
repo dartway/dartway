@@ -48,7 +48,7 @@ final session = dw.plugins.media.open(
 
 ## Controls, fullscreen, the mini-player
 
-Copy what the feature needs from the example's
+Copy what the feature needs from the framework repository's example (on GitHub, not in this project),
 [`ui_kit/3_special/media/`](https://github.com/dartway/dartway/tree/master/example/dartway_example_flutter/lib/ui_kit/3_special/media)
 into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle — `AppMediaPlayer`,
 `AppMediaControlBar`, `AppMediaTimeline` (one `seek` on release), `AppMediaNextItemCard`,
@@ -62,9 +62,9 @@ into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle 
 - **The player page** restores the session on entry and minimizes it on leaving, in a hook —
   `final media = dw.plugins.media.sessionManager;` then
   `useEffect(() { media.active.value?.restore(); return () => media.active.value?.minimize(); }, const [])`,
-  as the example's
-  [`workouts_page.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/app/workouts/workouts_page.dart)
-  does. With `miniPlayer: false`, `minimize()` follows `onLeaveWithoutMiniPlayer`.
+  as the framework repository's example (on GitHub, not in this project) does in
+  [`workouts_page.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/app/workouts/workouts_page.dart).
+  With `miniPlayer: false`, `minimize()` follows `onLeaveWithoutMiniPlayer`.
 
 ## Platforms and tests
 

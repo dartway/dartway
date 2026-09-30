@@ -69,7 +69,7 @@ DwReadBuilder(
   onVisibleItemsChanged:, emptyBuilder:, itemBuilder: (context, row) …)` — `initialAnchor` is
   `request.cursorOf(item)` or `null` for the newest; `DwWindowListController` scrolls (`scrollToCursor`,
   `jumpToNewest`, `newerCount`); `row.older`/`row.newer` for grouping, `row.isHighlighted`; it keeps
-  position on loads and stays at the newest row. Worked example:
+  position on loads and stays at the newest row. Worked example, in the framework repository's example (on GitHub, not in this project):
   [`chat_channel_view.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/app/chat/widgets/chat_channel_view.dart).
 
 ## 3. Refreshing

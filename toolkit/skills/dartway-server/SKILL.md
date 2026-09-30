@@ -219,7 +219,7 @@ The payload is spelled as a map once, in the kind's codec — never `payload['x'
 A command enqueues by the kind — `ctx.jobs.enqueue(InvoicesJobs.remind, (invoiceId: id), runAt: …,
 key: …)` — which joins its transaction (`key` deduplicates pending jobs). A queued job is transactional by default; with
 `transactional: false` (it calls a service) it may run twice after a crash. A job has no caller, reads
-its state when it runs, may publish, and is due by the server's clock. Worked example:
+its state when it runs, may publish, and is due by the server's clock. Worked example, in the framework repository's example (on GitHub, not in this project):
 [`bookings_jobs.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/bookings/bookings_jobs.dart).
 
 **A `DwHttpRoute` is for callers that cannot speak the contract** — a webhook, a download link. In
@@ -250,7 +250,7 @@ The framework owns accounts, identifiers and keys; `DwAuthConfig` (the skeleton'
   with `DwOnDelete.setNull`, every personal field cleared, `deletedAt` stamped, `isDeleted` on the data
   objects)? Never a `hidden` flag with the personal data still in it; the app says which route before
   asking to confirm. The server refuses to start while a project table cascades from `dw_account` with
-  no hook. Worked example:
+  no hook. Worked example, in the framework repository's example (on GitHub, not in this project):
   [`account/logic/auth.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/account/logic/auth.dart);
 - `onExternalAccountCreated` — the profile for a Google/Apple sign-in, required to allow one; the
   verified claims are in `registration` under `DwProviderClaim` keys, which the app cannot write;

@@ -13,7 +13,8 @@ description: >-
 
 **A handler never calls FCM.** It queues a message for accounts in its own transaction; the job queue
 delivers it and records every outcome. The project writes four things: **the category, the payload,
-who is eligible, where a tap leads.** The framework's example does all of it for news — read it first:
+who is eligible, where a tap leads.** The framework repository's example (on GitHub, not in this project) does all of it for news — read
+it first:
 the category ([`dartway_example_push_category.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/dartway_example_push_category.dart)),
 the protocol ([`dartway_example_protocol.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_shared/lib/src/dartway_example_protocol.dart)),
 the module and providers from the environment ([`core/push.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/core/push.dart)),

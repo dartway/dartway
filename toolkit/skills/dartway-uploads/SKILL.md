@@ -41,7 +41,7 @@ One `DwUploadRule` per purpose, in the `_access.dart` of the feature it belongs 
 **`canRead`** — `DwFileStorage(config, rules:, canRead:)` — one function for every private purpose;
 without it only the uploader reads a file. A feature answers for its purpose in its `_access.dart`
 (a membership through `ctx.membershipOf`, `dartway-access`), `null` for others, and the library's
-`canReadFile` asks each, then falls back to the uploader — as the example does:
+`canReadFile` asks each, then falls back to the uploader — as the framework repository's example (on GitHub, not in this project) does:
 [`chat_access.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/chat/chat_access.dart)
 (`ChatAttachments.canRead`, branching on `file.isFor(…)`) and `canReadFile` in
 [`dartway_example_server.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/dartway_example_server.dart).

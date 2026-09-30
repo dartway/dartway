@@ -80,4 +80,5 @@ A tapped push notification, a cold start from it, a deep link or a background re
 no place in the tree. It goes through **one seam per app, in `core/`**, that holds the router, maps the
 payload to a route name and parameters, and cancels its subscription with the tree; inside widgets the
 rule above is unchanged. For a push tap the framework hands the payload over through
-`dw.plugins.push.opened`; which route it means is the app's. Worked example: [`push_opened_listener.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/core/push/push_opened_listener.dart).
+`dw.plugins.push.opened`; which route it means is the app's. Worked example, in the framework repository's example (on GitHub, not in this project):
+[`push_opened_listener.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/core/push/push_opened_listener.dart).
