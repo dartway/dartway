@@ -1,471 +1,102 @@
 ---
 name: dartway-ui-kit
 description: >-
-  UI Kit rules in DartWay Flutter: the kit lives as SOURCE inside the app (lib/ui_kit/) — the framework
-  ships neither buttons, nor text, nor a theme. AppText/AppButton are app widgets with named
-  constructors, AppTextStyle is a token for places where Flutter demands a TextStyle; the theme
-  (AppTheme) is in the kit too. DwActionBuilder from the framework guards the action (busy, double tap,
-  form validation). Inside features Color/TextStyle/BorderRadius/Theme.of/context.textTheme/colorScheme
-  are forbidden; the only import is ui_kit.dart; part-of structure. The kit owns the app's loading and
-  failed views for reads (handed to DwFlutterConfig once), the one spinner (AppProgressIndicator) and
-  the frames of dialogs and sheets (showAppDialog, showAppBottomSheet). Use when creating/editing UI
-  components, styles, colors, themes, buttons, or when adding widgets to the kit.
+  The UI kit of a DartWay app — source in lib/ui_kit/, owned by the project (the framework ships no
+  design): one import, part-of structure, no raw styles outside it, kit widgets that take no visual
+  types, AppSpace spacing, assets as an enum plus one renderer, AppText/AppTextStyle, AppButton over
+  DwActionBuilder, the theme, the one spinner, the read views, and localization. Use when creating or
+  editing UI components, styles, themes, buttons, texts, or when adding widgets to the kit.
 ---
 
-# DartWay — UI Kit
-
-**The kit belongs to the app.** It lives as source in `__FLUTTER_PKG__/lib/ui_kit/`, `dartway create`
-puts it there, and from then on the project edits it freely — it is its code, not a dependency.
-
-**The framework ships no design.** `dartway_core_flutter` has **no** button, no text widget, no theme
-and no style presets. Don't look for them and don't import them — they do not exist. There is no
-`dartway_ui_kit` package either, and there won't be: otherwise the app
-would end up with two kits — ours in dependencies and its own in `lib/` — and every `AppButton` would
-raise the question "whose is this".
-
-The framework gives exactly what the app should not reinvent: **`DwActionBuilder`**
-(action mechanics) and **`DwReadBuilder`** / **`DwPagedListView`** (a single render of a read's
-loading/refusal/failure/data) — whose loading and failed views are the kit's (below).
-
-**Naming convention.** `Dw*` — framework: comes from outside, gets updated, don't edit. The kit is app
-code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutter (`AppText`,
-`AppButton`), and no prefix where there is no collision (`ConditionalParent`, `MultiLinkText`,
-`DeviceFrameShell`). One look at an identifier tells you whether it is yours or the framework's.
-
-## Core principles
-
-1. **One import.** Components are imported only through the root `ui_kit.dart`. Never import
-   individual buttons/colors/styles directly — `dart run dartway_cli:dartway check` fails on it (`forbiddenUiKitImport`).
-2. **Everything is declared in `ui_kit.dart`.** Every component file starts with `part of '../ui_kit.dart';`
-   (a file without it fails `dart run dartway_cli:dartway check` as `uiKitPartMissing`). The root file assembles everything
-   with `part` directives and re-exports `dartway_core_flutter`.
-3. **No raw styling in features.** Inside a zone (`app/`, `admin/`, `auth/`, `common/`) and in `shared/`
-   the following are **forbidden**: `Color`, `TextStyle`, `BorderRadius`, `Colors.*`, `Theme.of(context)`,
-   `context.theme`, `context.textTheme`, `context.colorScheme`. This is not a wish — the
-   `forbidden_ui_style_usage` rule of the `dartway_lints` analyzer plugin allows them **only inside
-   `ui_kit/`** and recognizes `BuildContext` by type, not by variable name, and `dart run dartway_cli:dartway check` fails on
-   the same usages (`forbiddenUiUsage`).
-
-   **What to do when Flutter demands a style, not a widget** (`Icon(color:)`,
-   `InputDecoration.labelStyle`, `TextSpan`, a third-party widget with `style:`): such a widget
-   **moves into the kit whole**, and the feature composes it. Inside the kit the style is taken from a
-   token (`AppTextStyle.body.resolve(context)`). Working around the rule with `// ignore:` is a style
-   that escaped the kit; the next screen will never learn about it.
-
-   **And inside the kit a colour comes from the context too.** The rule above says where styling may
-   live and nothing about how a kit widget obtains a colour — so a `static const Color` looks
-   permitted, and it is the token that will not survive a second theme: a const does not depend on a
-   context, so changing `ThemeData` does not touch it. Nothing diagnoses it — the analyzer is quiet,
-   the tests are green — and it surfaces on the day somebody asks for a light theme, as a rewrite of
-   every read in the kit at once. Take colours and text styles from the palette
-   (`context.colorScheme`, a `resolve(context)` token); `dart run dartway_cli:dartway check` warns on a `static const
-   Color`/`TextStyle` under `lib/ui_kit/` (`uiKitConstStyle`). **`ui_kit/theme/` is exempt** — that is
-   where the theme is assembled and a seed colour has to live somewhere. Geometry stays `const`: a
-   radius does not depend on the theme. One theme in a project means a palette with one set of
-   colours, not the absence of `of(context)`.
-
-   **Spacing is a token too.** The kit ships one scale, `AppSpace` in `ui_kit/theme/app_space.dart`:
-   a closed set of steps named by their value (`s2` · `s4` · `s6` · `s8` · `s10` · `s12` · `s16` · `s20` · `s24` · `s28` · `s32` · `s36` · `s48`). Outside the kit
-   a gap or an inset is `Gap(AppSpace.s12)`, `EdgeInsets.all(AppSpace.s16)`,
-   `EdgeInsets.symmetric(horizontal: AppSpace.s16)`, `Row(spacing: AppSpace.s8)` — a number there
-   (a spacer `SizedBox`, `Gap`, `EdgeInsets.*`, a `spacing:`/`runSpacing:`/`mainAxisSpacing:`/
-   `crossAxisSpacing:`) fails `dart run dartway_cli:dartway check` (`rawSpacing`). A value the design
-   uses that the scale lacks becomes a step (`s14`), named by value so nothing else is renamed; a
-   visible value is never rounded to fit. A dimension that belongs to one component (a chip strip's
-   height, an avatar's size — a `SizedBox` with a `child:`, or with both a width and a height) lives
-   in that component, in the kit.
-4. **Isolated visual layer.** The kit does not depend on business logic or state. A component =
-   pure visuals + minimal props.
-5. **Every visual building block lives here, and nowhere else.** A block many screens draw (a
-   load-failed message, an avatar) goes to `2_frequent/`; a composite one area needs (an event card, a
-   card feed, a section header) to `3_special/`. `lib/shared/` holds no widgets — only non-visual
-   helpers several features use (an extension on a data object, a formatter) — and a feature's
-   `widgets/` is its private layout. What stays in the feature is **mapping the domain** to the kit's
-   parameters, not layout.
-
-6. **The public API of a kit widget takes no visual types.** No `Color`, `TextStyle`,
-   `EdgeInsets`, `BorderRadius`, `BoxDecoration` in the constructor — the look is chosen by **named
-   constructors**, and only data, state and callbacks go outward.
-
-   This is the twin rule to point 3, and without it point 3 is bypassed **by construction**: `AppColors.x`
-   is a legal symbol, so as long as the kit accepts a color, the feature is obliged to know it. That is
-   exactly what happened on a production project: 40 kit widgets with color fields, 268 palette lookups
-   from features, and 48 tokens out of 131 named after somebody else's feature — an event badge was
-   painted with `settingsNavigationRowLeadingFill` and `chatSendIconActive`.
-
-   **Review signal:** you see in a feature a token named after another feature — what's needed is a kit
-   constructor, not picking a color by visual resemblance.
-
-7. **A feature assembles a surface by hand only when the kit doesn't have it.** Before fixing such a
-   place, look at the kit primitive: most likely it **doesn't cover the needed variant**, and it is the
-   primitive that must be rewritten, not twenty call sites.
-
-   How it looks in real life: `AppContainer` could do a fill but **could not do a border** — while
-   accepting `fillColor` and `borderRadius` from outside. Simultaneously too weak (the needed case is
-   missing) and too open (it lets a color through). The result — ten nearly identical
-   `Container(decoration: BoxDecoration(...))` across features: a badge, a category card, a preview, a
-   post body, a dialog, a popup. It is fixed by one edit of the primitive:
-
-   ```dart
-   // ❌ a primitive that forces the feature to know the color and the radius
-   const AppContainer.surface({required this.child, this.fillColor, this.borderRadius});
-
-   // ✅ the constructor picks the look, the tone is a semantic enum; padding stays (that's screen layout)
-   const AppContainer.surface({required this.child, this.padding, this.onTap});
-   const AppContainer.tinted({required this.child, required this.tone, ...});
-   const AppContainer.outlined({required this.child, ...});
-   const AppContainer.dialogCard({required this.child, ...});
-
-   enum AppSurfaceTone { plain, muted, control, achieved }
-   ```
-
-   **Rule for migrating without changing the visuals:** walk through every call site that passed a
-   visual parameter and check the value. Some pass exactly the default — the parameter is simply
-   removed. Some pass their own — they need a constructor or a tone **with the same token**. Not a
-   single color and not a single radius may change value; then "we reworked the primitive" doesn't turn
-   into "the design drifted".
-
-   **Distinguish what belongs to the kit at all.** `padding` outward is fine: how much air there is
-   inside a block is the screen's call. Color, radius, shadow, border — no.
-
-## Assets — an enum dictionary plus one renderer, no generator
-
-Two files in the kit, and that's it:
-
-```dart
-// ui_kit/assets/app_icon.dart — the dictionary: what can be shown at all
-enum AppIcon {
-  authRobot('assets/icons/auth/robot.svg'),
-  lessonLock('assets/icons/lessons/lock.png');
-
-  const AppIcon(this.path);
-  final String path;
-  bool get isVector => path.endsWith('.svg');
-}
-
-// ui_kit/assets/app_icon_view.dart — the only place that calls Image.asset/SvgPicture.asset
-class AppIconView extends StatelessWidget {
-  const AppIconView(this.icon, {super.key, this.size});
-  ...
-}
-```
-
-A feature writes `AppIconView(AppIcon.authRobot, size: 24)` — it **names the meaning, not the file**.
-
-**Why this way and not a constructor per asset:** the parameters live in one place. Adding
-`semanticsLabel` is an edit in one widget, not in seventy constructors. And both formats are resolved
-**inside**, by extension: replacing a PNG with an SVG is a one-line edit in the dictionary, the screens
-are not touched at all.
-
-**One `size`, not `width` and `height`.** An icon keeps its proportions; separate width and height
-almost always mean the wrong asset was taken, not a deliberate stretch. Something that must fill an
-area by width with `fit` is **not an icon but a cover**: it has its own widget and its own parameters.
-
-- **a raw path in a feature is forbidden** — `Image.asset('assets/…')` in a screen means the image
-  cannot be found by search and will survive a file rename only by accident (`dart run dartway_cli:dartway check` warns:
-  `forbiddenAssetPath`);
-- `flutter_gen` is not needed: that a path leads to an existing file is checked by `dart run dartway_cli:dartway check`
-  (`assetPathMissing`, an error) — and the same checker catches raw paths, which the generator never
-  could;
-- **fonts** never reach the code: they are declared in the pubspec and arrive through text styles. Sounds
-  and video are not widgets, their place is in the data layer next to the player, not in the kit.
-
-## Named constructor or parameter
-
-Both express meaning, not decoration — the question is who chooses.
-
-- **Named constructor** — when the choice is static at the call site: `AppEventCard.compact` in a feed,
-  `.wide` in a list. The caller always knows which one it needs.
-- **Semantic parameter** — when the caller has a runtime value: `AppButton.filterChip(selected: isActive)`,
-  `AppBottomSheetPageBody(fillsScreen: isFullScreen)`. Forcing a constructor choice here means getting a
-  ten-line ternary in the feature — that is, the same composition, just sideways.
-
-A parameter is named by meaning (`selected`, `fillsScreen`), not by look (`isDark`, `withShadow`),
-and if it changes several things at once, that is written in its doc: why one flag and not three.
-
-## Composing a recognizable unit — in the kit
-
-A card, a card feed, a section header with an "all" link, a screen surface — these are units, not
-one-off layout. Their geometry, paddings, corner radii and background belong to the kit entirely; the
-feature passes data and callbacks.
-
-Two consequences that are easy to get wrong:
-
-- **System insets (safe area) — inside the kit widget.** A surface glued to the bottom must respect the
-  bottom inset by definition. As long as the caller computes it, every next screen repeats the same
-  arithmetic, and one day it will forget it.
-- **Sizes are published by the kit, not by the feature.** The card height a feed needs is a kit constant
-  (`AppEventCard.compactHeight`), not a public field of the feature. A feature may read the size, but not assign it.
-
-## Waiting, failing, dialogs and sheets are the kit's
-
-Four things every screen needs and none may draw for itself — each is decided once, here:
-
-- **`AppProgressIndicator`** (`1_essentials/`) is the one spinner: a read without a placeholder, an
-  upload, a busy button. `CircularProgressIndicator`, `LinearProgressIndicator`,
-  `RefreshProgressIndicator` or `CupertinoActivityIndicator` outside
-  `ui_kit/` fails `dart run dartway_cli:dartway check` (`forbiddenProgressIndicator`).
-- **The read views.** `lib/core/dw_core.dart` hands the kit to the framework once:
-  `DwFlutterConfig(readLoadingBuilder: (context) => const Center(child: AppProgressIndicator()),
-  readFailedBuilder: (context, error, retry) => LoadFailedMessage(…, onRetry: dw.action((_) =>
-  retry())))`. Every `DwReadBuilder`, `DwPagedListView` and `DwWindowListView` shows them; a screen
-  never builds its own "could not load".
-- **`context.showAppDialog(child: …)`** and **`context.showAppBottomSheet(child: …)`**
-  (`2_frequent/`) are the frames of a dialog and a sheet. `showDialog`, `showModalBottomSheet`,
-  `showCupertino…` outside `ui_kit/` fail the check (`forbiddenNavigationCall`). A yes/no before an
-  action is not a dialog at all: `dw.action(…, confirmation: DwUiConfirmation(…))`.
-- **Closing** a dialog or a sheet is `Navigator.of(context).pop(value)` with the builder's own
-  context; a page goes back through the router (`dartway-navigation`).
-
-## A kit widget's own state is hooks
-
-A field that owns its controller, a timeline that tracks a drag, rich text that owns its tap
-recognizers — each is a `HookWidget` holding them in hooks, never a `StatefulWidget`: the check
-reads `ui_kit/` like every other folder (`forbiddenStateHolder`). The hooks for what a `State` used
-to hold, and the one marked way out, are in `dartway-feature-scaffold`, "Where a feature's logic
-lives". The kit takes a value and an `onChanged`, not a caller's `ValueNotifier`.
-
-## The kit does not know the domain
-
-The kit does not import app models and does not switch on domain enums. If a widget picks an image based
-on the reason a course is locked, and that enum carries user-facing texts inside — **a widget with two
-constructors moves into the kit**, and the domain `switch` stays in the feature as a single line. Moving
-the enum itself into the kit is not allowed: the texts would come with it, and text constants have no
-place in the kit (`dart run dartway_cli:dartway check` warns on a string literal under `ui_kit/`: `uiKitContainsText`).
-
-**The kit does not know the language either.** A kit widget takes **every** visible string as a
-parameter and never reads `context.l10n`: the locale belongs to the app, and a label baked into the
-kit is text nobody can translate and a second source of truth beside the `.arb`. The first kit widget
-that needs a label is where this goes wrong — it gets a parameter, not a constant. The one exception is
-a string no person reads: a semantics key, a `debugLabel`.
-
-## Text: a widget with named constructors + a token enum
-
-Two different entities, and they must not be collapsed into one:
-
-- **`AppText`** — a widget with `const` constructors. This is what you write in 99% of places.
-- **`AppTextStyle`** — a token. It is needed where Flutter demands exactly a `TextStyle`, not a widget
-  (`InputDecoration.labelStyle`, `TextSpan`, `Icon`, third-party widgets with `style:`).
-
-```dart
-const AppText.title('DartWay.dev')          // const works — and enclosing consts too
-AppText.body(post.description)
-AppText.caption('${date.dayLabel} · ${date.timeLabel}')
-```
-
-**All user-facing text comes from l10n, not from a string literal.** Every DartWay project is localized — a requirement, not a description of how the project started, and if the wiring is missing it is fixed before the strings pile up (see "Localization — the law in full" below, and its old-shape entry in `dartway-update`). `AppText.body('Book a spot')` with a hardcoded string desyncs the feature from the rest of the app. Take the text from `context.l10n`:
-
-```dart
-final l10n = context.l10n;
-AppText.body(l10n.bookSpot)
-```
-
-A new string = add a key to **every** ARB the project keeps (a new project keeps one — the language it was created in; a second is added deliberately, with a switch that sets `appLocaleProvider`), run `flutter gen-l10n`, and **commit its output** — `lib/l10n/gen/` belongs in the repository for the same reason the output of `dart run dartway_cli:dartway generate` does. `gen-l10n` is a separate CLI, not `build_runner`: it runs when an `.arb` changes, not on every save. Only non-text stays a literal in the UI (icons, debug labels behind `kDebugMode`).
-
-```dart
-// ui_kit/theme/app_text.dart
-enum AppTextStyle {
-  title, body, link, caption;
-
-  TextStyle resolve(BuildContext context) => switch (this) {
-    AppTextStyle.title => (context.textTheme.titleLarge ?? const TextStyle(fontSize: 20))
-        .copyWith(color: context.colorScheme.onSurface),
-    // ...
-  };
-}
-
-class AppText extends StatelessWidget {
-  const AppText.title(this.text, {super.key, this.textAlign, this.maxLines})
-      : style = AppTextStyle.title;
-  const AppText.body(...)    : style = AppTextStyle.body;
-  const AppText.caption(...) : style = AppTextStyle.caption;
-
-  final String text;
-  final AppTextStyle style;
-
-  @override
-  Widget build(BuildContext context) => Text(text, style: style.resolve(context), ...);
-}
-```
-
-**Why not a "callable enum"** (`AppText.body('x')` as an enum method): a
-method can never be a `const` expression. One non-const text leaf drags along every enclosing
-`const Padding`, `const Center`, `const Expanded` — and `const` gets washed out of the tree.
-Named constructors give exactly the same call site, but `const` stays legal.
-
-Need a new style — **add a value to `AppTextStyle` and a constructor to `AppText`**, don't write a
-`TextStyle` on the spot.
-
-## Localization — the law in full
-
-**Every project is localized, and user-visible text is never written in code.** This is a requirement on the project, not a report on how it began. What has to be present: `flutter_localizations` and `generate: true` in the Flutter pubspec, `l10n.yaml` and `lib/l10n/*.arb` with its generated output committed beside them, `appLocaleProvider` (the system locale when supported, the first supported one otherwise), `context.l10n` in widgets and `appL10n` for code outside the tree — an error toast, a refusal text. `dart run dartway_cli:dartway check` reports a missing piece as `l10nNotWired`, an error.
-
-**Refusals are texts of the app.** The server sends codes with parameters; `lib/core/` maps every code — the project's `<Package>Refusal`, the framework's `dw.*` codes — to a localized string, and `DwFlutterConfig.refusalText` hands that mapping to the core. A code without a text is a user staring at a code.
-
-**The law reaches as far as the app does, and no further.** Text composed on the *server* — a sign-in code message, an e-mail — is outside it: there is no `appL10n` there. That text has no rule yet, which is a gap named rather than covered; a project sending server-composed text in more than one language decides for itself how, and says so where its next reader will look.
-
-A project with one language keeps one `.arb` and pays nothing. New strings are added to **every** `.arb`, then `flutter gen-l10n` is run and its output committed.
-
-**A widget test mounts three things, not two:** `localizationsDelegates`, `supportedLocales`, **and an explicit `locale:`**. Without the third the test resolves against the locale of the machine it runs on, so an assertion on the skeleton's text passes for the author and fails for whoever else runs the suite. The skeleton's `test/support/` harness does it in one place; the rest is in `dartway-testing`.
-
-**A string the user reads is content, not decoration** — so `ui_kit` may not hold it and a feature may not hardcode it. `AppText.body(context.l10n.issuesTitle)`, never `AppText.body('Issues')`. Outside the kit this is not mechanically enforced (telling `'Issues'` from `'issues/board'` takes reading the meaning); `/dartway-checkup` looks for it. Inside `ui_kit/` `dart run dartway_cli:dartway check` reports it as `uiKitContainsText`; strings in the `fontFamily` and `fontFamilyFallback` positions are exempt.
-
-## Buttons: `AppButton` + `DwActionBuilder`
-
-A button is an ordinary app widget. From the framework you take only `DwActionBuilder`: it holds the
-"running" flag, **blocks a repeated tap**, validates the `Form` on `requireValidation`, drops focus —
-and hands back a ready `onPressed` (`null` while the action runs) and `busy`.
-
-```dart
-AppButton.primary(
-  l10n.saveAction,
-  onTap: dw.action(
-    (_) => InvoiceCardCommands.pay(invoice), // dw.command, in the feature's logic/
-    onSuccessNotification: l10n.invoicePaid,
-  ),
-)
-```
-
-```dart
-// ui_kit/theme/app_button.dart — also a widget with named constructors
-// (AppButton.primary / .secondary / .text). The variant is chosen by a real
-// Material widget, so the outlined style is worn by OutlinedButton, not by a
-// repainted ElevatedButton.
-DwActionBuilder(
-  action: onTap,
-  requireValidation: requireValidation,
-  unfocusOnTap: unfocusOnTap,
-  builder: (context, onPressed, busy) => switch (_variant) {
-    _AppButtonVariant.primary   => ElevatedButton(style: ..., onPressed: onPressed, child: child),
-    _AppButtonVariant.secondary => OutlinedButton(style: ..., onPressed: onPressed, child: child),
-    _AppButtonVariant.text      => TextButton(style: ..., onPressed: onPressed, child: child),
-  },
-)
-```
-
-**Button width is not a kit parameter.** A Material button shrinks to its content by itself, and
-"full width" in Flutter is done by the parent: `SizedBox(width: double.infinity)` or `Expanded`. Don't
-introduce width-mode enums — introduce a parent.
-
-⚠️ **`requireValidation: true` requires a `Form` up the tree.** With no form there is nothing to
-validate: the action will run, and in debug the framework's `assert` will fire. Don't set the flag
-"just in case".
-
-**A label inside a kit widget must be able to shrink.** A row of an icon and text in a `Row` with
-`mainAxisSize.min` overflows as soon as the label doesn't fit the allotted width — and instead of a
-button the user sees a red `RenderFlex overflowed` stripe. Text in such a row is always `Flexible`;
-then it either wraps (the skeleton's `AppButton` does) or is cut to one line with
-`maxLines: 1` + `TextOverflow.ellipsis`:
-
-```dart
-Row(
-  mainAxisSize: MainAxisSize.min,
-  children: [
-    if (leading != null) ...[leading!, const SizedBox(width: 8)],
-    Flexible(child: Text(label, maxLines: 1, overflow: TextOverflow.ellipsis)),
-  ],
-)
-```
-
-This applies to any kit widget with text in a row, not just a button. A widget test at a narrow width
-(`SizedBox(width: 360)` + `expect(tester.takeException(), isNull)`) catches this immediately — and it
-catches long-standing overflows nobody knew about, because the screen was only ever opened wide.
-
-**`DwActionBuilder` is not only for buttons.** Any tap (`ListTile`, an icon, a card, a swipe) is made
-safe by the same builder — don't hand-roll a `bool _busy`:
-
-```dart
-DwActionBuilder(
-  action: deleteAction,
-  builder: (context, onPressed, busy) => ListTile(
-    onTap: onPressed,
-    trailing: busy ? const AppProgressIndicator(size: 20) : const Icon(Icons.delete),
-  ),
-)
-```
-
-Division of labor: **`DwUiAction` — what the action does** (confirmation, notifications, follow-up,
-error report), **`DwActionBuilder` — what happens in the UI while it runs**.
-
-## Theme and breakpoints
-
-**The theme lives in the kit, not in the app root.** `ThemeData` is styles, and styles live in the kit;
-the root only mounts it. No `ThemeExtension` from the framework needs to be registered: `AppText`/
-`AppButton` know their styles themselves.
-
-```dart
-// ui_kit/theme/app_theme.dart
-abstract final class AppTheme {
-  static const Color _seed = Color.fromARGB(255, 4, 49, 57);
-
-  static ThemeData get light => ThemeData(
-    colorScheme: ColorScheme.fromSeed(seedColor: _seed),
-    bottomNavigationBarTheme: ..., // everything that must look the same everywhere goes here
-  );
-}
-
-// the app
-MaterialApp.router(theme: AppTheme.light, ...)
-```
-
-A color set on a widget is a color the next screen will forget about. If something must look the same
-across the whole app, its place is in `AppTheme`, not in widget parameters.
-
-Access to the theme goes through a kit extension (raw access is allowed by the lint only here):
-
-```dart
-// ui_kit/theme/app_context.dart
-abstract final class AppBreakpoints {
-  static const double mobileMaxWidth = 600;      // where mobile layout ends
-  static const double deviceFrameMinWidth = 1024; // where the desktop shell draws the phone frame
-}
-
-extension AppBuildContextX on BuildContext {
-  ThemeData get theme => Theme.of(this);
-  TextTheme get textTheme => Theme.of(this).textTheme;
-  ColorScheme get colorScheme => Theme.of(this).colorScheme;
-  bool get isMobile =>
-      MediaQuery.sizeOf(this).width <= AppBreakpoints.mobileMaxWidth;
-}
-```
-
-These are **two different questions**, and they need two constants: "is this mobile layout" and "is
-there enough width to frame a phone on desktop". On a single threshold a 700px browser window gets a
-phone frame.
-
-## Structure
+# DartWay — the UI kit (`dartway-ui-kit`)
+
+**The kit is the app's code**, in `__FLUTTER_PKG__/lib/ui_kit/`; `dartway_core_flutter` has no button,
+text widget or theme, and there is no kit package. The framework gives the mechanics only:
+`DwActionBuilder` and the read widgets whose loading and failed views are the kit's. Kit widgets carry
+no `Dw` prefix — `App*` where Flutter has the name, none otherwise. A client-specific need inside a
+framework widget is an extension point in the kit, never a fork of `dartway_core_flutter`.
 
 ```
-lib/ui_kit/
-  ui_kit.dart              // root: imports + part directives + export dartway_core_flutter
-  assets/                  // app_icon.dart (the dictionary), app_icon_view.dart (the renderer)
-  1_essentials/            // basics: checkbox, input, multi_link_text
-  2_frequent/              // frequent: card, bottom sheet, rating
-  3_special/               // narrow, grouped by feature: pin code, chat bubble
-  theme/                   // app_theme.dart, app_text.dart, app_button.dart, app_context.dart
-  layout/                  // device_frame_shell.dart
-  utils/                   // conditional_parent.dart, app_keyboard_inset.dart, formatters, date labels
+lib/ui_kit/ui_kit.dart     imports, part directives, export of dartway_core_flutter
+  1_essentials/  2_frequent/  3_special/   by frequency of use
+  assets/  theme/  layout/  utils/
 ```
 
-The numbered prefixes keep the kit sorted by usage frequency — the most needed on top.
+## The rules the checks hold, and how to satisfy them
 
-## Best practices
+- Everything outside the kit imports `ui_kit.dart` only, and each kit file is `part of '../ui_kit.dart';`.
+- **No raw styling outside the kit** (`forbiddenUiUsage`, and the lint `forbidden_ui_style_usage`):
+  where Flutter demands a style (`Icon(color:)`, `InputDecoration.labelStyle`, a third-party `style:`),
+  the whole widget moves into the kit, which takes the style from a token
+  (`AppTextStyle.body.resolve(context)`). Never `// ignore:`. Raw theme access is allowed anywhere in
+  `ui_kit/` and nowhere else; `theme/app_context.dart` defines the shortcuts (`context.colorScheme`,
+  `textTheme`) and the breakpoints — two constants for two questions (mobile layout; room for a device
+  frame).
+- **Spacing is `AppSpace`** (`ui_kit/theme/app_space.dart`, steps named by value, `s2`…`s48`):
+  `Gap(AppSpace.s12)`, `EdgeInsets.all(AppSpace.s16)`, `Row(spacing: AppSpace.s8)` (`rawSpacing`). A
+  missing value becomes a step named by its value; never round a visible value. A component's own
+  dimension (an avatar's size) lives in the component.
+- **A widget never decides its own size** — `Expanded` or `SizedBox.expand` at the root of `build`
+  (`widgetSizesItself`) — and never sets its own outer padding or margin: space is the parent's.
+- **`AppProgressIndicator`** (`1_essentials/`) is the one spinner (`forbiddenProgressIndicator`) — a read
+  without a placeholder, an upload, a busy button; `lib/core/dw_core.dart` hands `readLoadingBuilder` and
+  `readFailedBuilder` (`LoadFailedMessage`) to the framework once. The frames of dialogs and sheets live
+  in `2_frequent/`; when to open them: `dartway-navigation`.
+- A kit widget's own state is hooks (`dartway-feature-scaffold`); it takes a value and an `onChanged`,
+  never a caller's `ValueNotifier`.
 
-- Props are minimal and semantic, not visual details.
-- Don't breed variants by copy-paste — composition and extensions.
-- Don't put outer `padding`/`margin` inside a component — the parent sets the spacing.
-- Consistency beats visual hacks.
-- **Anything that depends on the keyboard is computed from the smoothed inset** (`AppKeyboardInset`
-  in `utils/`), never from `MediaQuery.viewInsets` directly — and *everything* of it, because half
-  the layout left on the raw inset slides apart from the other half. Why the raw inset is wrong is
-  not a kit question but a platform one: `dartway-on-device`. The drift check is
-  `grep -rn 'viewInsetsOf' lib/ui_kit` — any hit outside the smoother is one.
-- Tempted by a "client-specific hack" inside a framework widget — that's a signal that an extension
-  point is missing. Introduce it in the kit, don't fork `dartway_core_flutter`.
-- **No pass-through widgets in a feature** — a class that only re-assembles its own parameters into
-  a single kit widget, adding at most a padding constant. It costs a reader an extra file to learn
-  there is nothing in it. Inline the kit widget at the call site instead; if the same wrapper is
-  really needed in several places, that is a reason to add a named constructor to the kit widget
-  itself, not to keep a copy of it in every feature that wants it. The line: a **mapper** that turns
-  a model or a domain enum into kit parameters is work and belongs in the feature; a widget whose
-  only import is `ui_kit.dart` has nothing to decide and should not exist.
+**Warnings the kit owns:** `uiKitContainsText` — a string literal in the kit (the kit takes every
+visible string as a parameter and never reads `context.l10n`; `fontFamily` strings are exempt);
+`uiKitConstStyle` — a `static const Color`/`TextStyle` outside `ui_kit/theme/`: colours and text styles
+come from the context, or a second theme rewrites the kit (geometry, like a radius, stays `const`);
+`forbiddenAssetPath` — an `assets/` path outside the kit.
+
+## A kit widget takes no visual types
+
+The kit is pure visuals with minimal props: no business logic, no state of the app's, no app models, no
+switch on a domain enum — the feature maps the domain to the kit's parameters, and a domain enum does
+not move into the kit to get around that (its texts would come along). No `Color`, `TextStyle`,
+`EdgeInsets`, `BorderRadius`, `BoxDecoration` in a kit widget's constructor, or every feature is forced
+to know the palette:
+
+- **a named constructor** when the variant is static at the call site — `AppButton.primary` / `.secondary`
+  / `.text`;
+- **a semantic parameter** when the caller has a runtime value — `selected: isActive`, named by meaning
+  (`selected`, `fillsScreen`), never by look (`isDark`, `withShadow`); a flag that changes several things
+  says so in its doc.
+
+`padding` outward is fine: air inside a block is the screen's call. A feature assembling a surface by
+hand usually means the primitive lacks a variant — add it to the primitive, keeping every token value as
+it was; never breed variants by copy-paste. A class in a feature that only re-assembles its parameters
+into one kit widget is deleted, or becomes a named constructor of that widget.
+
+Units — a card, a feed, a section header — own their geometry, safe-area insets and published sizes (a
+card's height is a constant of the kit widget, which a feature may read but not set). Text in a `Row`
+inside a kit widget is `Flexible` (wrap, or one line with ellipsis); a widget test at 360 px with
+`expect(tester.takeException(), isNull)` finds overflows. Keyboard-dependent layout: `dartway-on-device`.
+
+## Assets, text, buttons, theme
+
+- **Assets**: an enum dictionary in `assets/app_icon.dart` — `brandMark('assets/dartway_mark.svg')` — and
+  `AppIconView(AppIcon.brandMark, size: 24)`, the only place calling `Image.asset`/`SvgPicture`. One
+  `size`, not a width and a height: something filling an area by width is a cover with a widget of its
+  own. No `flutter_gen`; a path to a missing file is `assetPathMissing`. Fonts come through text styles;
+  sounds and video are not the kit's.
+- **Text**: `AppText.title(…)`, `.body`, `.caption` — `const` constructors — in 99% of places;
+  `AppTextStyle` is the token where Flutter demands a `TextStyle`. A new style is a value of
+  `AppTextStyle` and a constructor of `AppText` (`theme/app_text.dart`), never a `TextStyle` on the spot.
+- **Buttons**: `AppButton` (`theme/app_button.dart`) over `DwActionBuilder` (`dartway-data-layer` §4);
+  its width is the parent's; `requireValidation` needs a `Form` above it.
+- **Theme**: `AppTheme` (`theme/app_theme.dart`) holds `ThemeData`; what must look the same everywhere
+  goes there, not into widget parameters.
+
+## Localization
+
+**Every project is localized, and user-visible text is never a literal.** The wiring
+(`l10nNotWired` holds it): `flutter_localizations` and `generate: true` in the pubspec, `l10n.yaml`,
+`lib/l10n/*.arb` with the generated output committed, `appLocaleProvider`, `context.l10n` in widgets and
+`appL10n` for code outside the tree. **A new string goes into every `.arb`**, then `flutter gen-l10n`,
+output committed; a second language is added deliberately. Outside the kit nothing mechanical finds a
+hardcoded string — `/dartway-checkup` reads for it. Refusal texts: `dartway-data-layer` §5. Tests and the
+locale: `dartway-testing`. Text composed on the server (a code message, an e-mail) has no rule yet; a
+project sending it in several languages decides how and says so.

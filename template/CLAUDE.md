@@ -10,7 +10,7 @@ Nothing here yet, and the emptiness is the point — this is the stated place fo
 
 **What belongs here:** a DartWay **default** this project replaces, and the project's own conventions DartWay says nothing about — the shape of a commit message where it differs, the language the project writes its own texts in, how decisions are recorded.
 
-**What does not:** a **law** — the numbered cross-stack rules in `.claude/CLAUDE.md`. Those are not a project's to override; a project that has to break one has outgrown the framework rather than configured it.
+**What does not:** a **law** — the numbered cross-stack rules in `.claude/CLAUDE.md` and the checks of its law table. Those are not a project's to override; a project that has to break one has outgrown the framework rather than configured it.
 
 **Nor where tasks come from.** A tracker moves faster than the code, and a rule here keeps sending the next session to an address that has already changed. The task's own brief carries what the work needs.
 

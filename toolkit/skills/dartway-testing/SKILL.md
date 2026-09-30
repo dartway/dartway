@@ -1,517 +1,129 @@
 ---
 name: dartway-testing
 description: >-
-  How a DartWay project tests itself, by where the behaviour lives: the contract in
-  __SHARED_PKG__ (`dart test` — codecs round-trip through the protocol, `validate()` codes and
-  fields, a request's `onUpdate` and channels); the server as acceptance tests on a real Postgres
-  and storage (`dart run dartway_cli:dartway test`; `DwTestDatabase` per test file, `DwTestServer.start`, the real client
-  from `connectClient()`, raw wire through `caller()` / `openLive()`, `DwTestStorage`, `wakeJobs`);
-  screens as widget tests on the in-memory server from `package:dartway_client/testing.dart`
-  (`DwFakeServer`, `DwFakeStorage`, `dwFakeTablePage` …) with the app's own `DwFlutterCore` built
-  per test and disposed after it, the localization delegates mounted and the locale pinned. Covers
-  what deserves a test and what does not, the skeleton's harnesses, the timing traps, and why there
-  are no coverage thresholds. Use when writing or reviewing tests, when a widget test fails with
-  "Dw is not initialized" / "Another dw core is alive" / "found 0 widgets" / a pending Timer, or
-  when an acceptance test cannot reach its database.
+  How a DartWay project tests itself, by where the behaviour lives: contract tests in __SHARED_PKG__
+  (round trip, validate(), onUpdate, channels); server acceptance tests on a real Postgres and storage
+  (`dart run dartway_cli:dartway test`, the skeleton's AppHarness, DwTestServer, real clients, raw
+  calls, DwTestClock, server.http); widget tests on the in-memory DwFakeServer through the skeleton's
+  TestApp; where test files go; the timing traps; what not to test; proving a test by breaking the
+  code. Use when writing or reviewing tests, or when a test fails with "Dw is not initialized",
+  "Another dw core is alive", "found 0 widgets" or a pending Timer.
 ---
 
 # DartWay — how a project tests itself
 
-**What** deserves a test is a question of the behaviour's complexity, never the fact that a line
-changed: complex logic, non-trivial rules, edge cases and rollback/degradation paths, and every
-bugfix of non-trivial behaviour — starting with a test that reproduces it, red, before the fix. Not
-cosmetics: a recoloured button or a renamed identifier needs no test of its own. Assert the
-outcome, not that the code ran — for anything that accumulates (growth, decay, a streak), the claim
-is about where it ends up after N steps, not that it moved. This skill decides **where** the test
-goes and how to write it.
+**What** deserves a test is the behaviour's complexity — rules, edge cases, rollback paths, and every
+non-trivial bugfix, starting red — never the fact that a line changed; not cosmetics. Assert the
+outcome, not that code ran. **Where** is decided by where the behaviour lives:
 
-**The level follows where the behaviour lives.** A DartWay project has three places where a rule
-can live, and each has its own kind of test:
+| The behaviour | Its test | Runs with |
+|---|---|---|
+| what a DTO carries, which field a command refuses, what an update does to a request, a request's channels | **contract test**, pure Dart | `dart test` in `__SHARED_PKG__` |
+| who may call what, what a command writes and publishes, who may subscribe, a job's effect, where a file lands | **acceptance test**: the real server, a real database and storage | `dart run dartway_cli:dartway test` |
+| what a screen shows, what the user's action sends, how a refusal or an update looks | **widget test** on the in-memory server | `flutter test` |
+| a calculation, a parse, a state machine without I/O | **unit test** | the package's runner |
 
-| The behaviour | Lives in | Its test | Runs with |
-|---|---|---|---|
-| What a DTO carries, which field a command refuses, what an arriving object does to a request, which channel a request listens on | The contract, `__SHARED_PKG__` | **Contract test**, pure Dart | `dart test` in `__SHARED_PKG__` |
-| Who may call what, what a command writes and publishes, who may subscribe, what a job does, where a file lands | Handlers, access and channel rules, jobs, upload rules — `__SERVER_PKG__` | **Acceptance test** against a real server on a real database and storage | `dart run dartway_cli:dartway test` |
-| What a screen shows, what the user's action sends, how a refusal or a live update looks | A feature — `__FLUTTER_PKG__` | **Widget test** on the in-memory server | `flutter test` in `__FLUTTER_PKG__` |
-| A calculation, a parse, a state machine with no I/O | A plain class or an extension | **Unit test**, in whichever package holds it | `dart test` / `flutter test` |
+A widget test cannot prove a member is refused — the hidden button is not the rule; an acceptance test
+cannot prove the button sends the right command.
 
-Choosing the wrong place is the common failure. A widget test cannot prove that a member is refused:
-the button being hidden is not the rule, the server's access rule is. An acceptance test cannot prove
-that the button sends the right command. And a contract rule tested only through the server is
-tested on one of the two sides that apply it.
+**Where the file goes** (`testLayout`, `testHarnessBypassed`): at the mirror of what it tests —
+`lib/src/core/files.dart` → `test/src/core/files_test.dart`; a server feature through its calls →
+`test/src/invoices/invoices_acceptance_test.dart` (a scenario: `invoices_<scenario>_acceptance_test.dart`;
+`check --fix` moves a root-level one); the contract → `test/<shared package>_test.dart`. A test walking
+through two features is split by feature, what they share moved into the harness. Helpers and the
+harness live in `test/support/`, imported relatively; a test builds no server, fake server or
+`ProviderScope` of its own — a configuration it needs is a method on the harness.
 
-**Where the file goes, in every package** — `dart run dartway_cli:dartway check` fails the rest
-(`testLayout`):
+## 1. The contract
 
-- a test sits at the mirror of the `lib/` path it tests: `lib/<path>.dart` → `test/<path>_test.dart`
-  (`lib/src/core/files.dart` → `test/src/core/files_test.dart`);
-- a test of a whole folder — a server feature through its calls — is
-  `test/<path>/<folder>_acceptance_test.dart` for `lib/<path>/<folder>/`
-  (`lib/src/invoices/` → `test/src/invoices/invoices_acceptance_test.dart`), and a scenario of it
-  `test/src/invoices/invoices_<scenario>_acceptance_test.dart`; a scenario across features names the
-  feature that owns it. `dart run dartway_cli:dartway check --fix` moves a root-level
-  `test/<feature>_acceptance_test.dart` there. What the server's library
-  wires (a module) is tested at the mirror of that library, and the contract at the mirror of the
-  shared package's (`test/<shared package>_test.dart`);
-- helpers and the harness live in `test/support/`, and nothing else does. A test imports them
-  relatively (`../../support/app_harness.dart`) — the one relative import a project has;
-- a test builds no server, no fake server and no `ProviderScope` of its own: the harness does
-  (`testHarnessBypassed`). A configuration a test needs is a method on the harness.
+The skeleton's `__SHARED_PKG__/test/<shared package>_test.dart` is the file to extend: one list
+round-trips a value of every DTO through the project's protocol
+(`<project>Protocol.decodeNamed(o.dwTypeName, o.toJson())` equals `o`), with and without optional fields;
+`validate()` asserted as `code@field`; `onUpdate` of each request with `matches`, `sort` or a custom
+`onUpdate` (`DwUpdateAction.upsert` / `remove`); a caller channel resolved
+(`channels.single.resolvedFor(42).wireName`).
 
----
+## 2. The server — acceptance tests
 
-## 1. The contract — `dart test` in `__SHARED_PKG__`
+`dart run dartway_cli:dartway test` (from `__FLUTTER_PKG__`; `-- --name x` passes arguments, `--keep`
+keeps the database up, `--no-storage`) starts a Postgres and a storage on ports Docker picks, runs
+`dart test` in `__SERVER_PKG__`, and removes both. Never a test database in compose or a fixed port.
 
-The shared package is pure Dart, so its tests need nothing running. The skeleton ships them in one
-file, `__SHARED_PKG__/test/<shared package>_test.dart` — the mirror of the package's library; extend
-that file's lists rather than starting a new style.
+**One harness, extended, never replaced**: `AppHarness` in `__SERVER_PKG__/test/support/app_harness.dart`
+— `start`, `stop`, `client`, `signUp`, `admin`, with the matcher `refusedWith` beside it — builds the
+server with the **same factory `bin/server.dart` uses**, on a `DwTestDatabase` per file, with captured codes. A new file is
+`setUpAll` → `AppHarness.start()`, `tearDownAll` → `stop()`; domain helpers (a staff member) are added to
+it or an extension on it.
 
-**Every DTO travels and comes back equal.** One test lists a value of every data object, request and
-command — with the optional fields set, and once more without them — and decodes each through the
-project's protocol:
-
-```dart
-for (final object in <DwWireObject>[
-  const ListMyInvoices(),
-  const PayInvoice(invoiceId: 7, note: DwFieldPatch.clear()),
-  invoice(paidAt: null),
-]) {
-  expect(
-    appProtocol.decodeNamed(object.dwTypeName, object.toJson()),
-    object,
-    reason: object.dwTypeName,
-  );
-}
-```
-
-It catches a type missing from the registry, a field that does not survive the trip, and equality
-that ignores a field (which would make the client treat two different requests as one). A new DTO
-is a new line here.
-
-**Validation, as codes and fields.** A `DwSelfValidating` command's `validate()` runs on both sides,
-so its test is here, asserted as `code@field` rather than as text:
-
-```dart
-List<String> codes(DwSelfValidating dto) => [
-  for (final refusal in dto.validate()) '${refusal.code}@${refusal.field}',
-];
-expect(codes(const PayInvoice(invoiceId: 0)), ['dw.invalid@invoiceId']);
-```
-
-**Update actions and channels are pure functions — test them as such.** What a list request does
-with an arriving object is `onUpdate`, and a mistake in `matches` shows up in the app as a row that
-does not leave its filter, with nothing failing anywhere:
-
-```dart
-const unpaid = ListMyInvoices(status: InvoiceStatus.unpaid);
-expect(unpaid.onUpdate(invoice(status: InvoiceStatus.unpaid)), DwUpdateAction.upsert);
-expect(unpaid.onUpdate(invoice(status: InvoiceStatus.paid)), DwUpdateAction.remove);
-expect(
-  const ListMyInvoices().channels.single.resolvedFor(42).wireName,
-  'invoices:42',
-);
-```
-
-Write one whenever a request has `matches`, a custom `onUpdate`, a `sort`, or a caller channel.
-
-## 2. The server — acceptance tests with `dart run dartway_cli:dartway test`
-
-A handler's access rule, what it writes, what it publishes and to whom run inside a real call against
-a real database. A mock of the context would only restate the code, so the test starts the project's
-real server and talks to it the way an app does.
-
-### Running them
-
-```bash
-cd __FLUTTER_PKG__
-dart run dartway_cli:dartway test                          # finds the project from here
-dart run dartway_cli:dartway test -- --name 'refund'       # arguments after -- go to dart test
-dart run dartway_cli:dartway test --keep                   # leave the database container up to inspect a failure
-dart run dartway_cli:dartway test --no-storage             # a server without uploads
-```
-
-`dart run dartway_cli:dartway test` starts a Postgres and a storage for the run on ports Docker picks, passes their
-coordinates as `DW_DATABASE_*` (the maintenance database `postgres`) and `DW_STORAGE_ENDPOINT` /
-`_ACCESS_KEY` / `_SECRET_KEY`, runs `dart test` in `__SERVER_PKG__`, and removes both containers at
-the end — Ctrl-C included.
-
-Do not add a test database to `docker compose` and do not point the suite at a fixed port. A fixed
-port is shared between projects on one machine, and a second container that does not get it starts
-anyway with the port unpublished: the suite then reads the neighbour's database and can pass having
-verified nothing. A database that outlives its run turns up as arithmetic — `Expected: <2>, Actual:
-<3>` — several hypotheses away from the cause.
-
-Running `dart test` by hand works when `DW_DATABASE_*` names a Postgres where the user may create
-databases (the development one does) and, for storage tests, `DW_STORAGE_*` names a storage. Without
-them the suite fails at its first `create`, naming the missing variables.
-
-### One database and one server per test file
-
-```dart
-late DwTestDatabase database;
-late DwTestServer server;
-
-setUpAll(() async {
-  database = await DwTestDatabase.create(prefix: 'app_test');
-  server = await DwTestServer.start(
-    buildInvoiceServer(database: database.config), // the project's own server factory
-  );
-});
-tearDownAll(() async {
-  await server.stop(); // stops every client from connectClient first
-  await database.drop();
-});
-```
-
-- **`DwTestDatabase.create`** makes an empty database named `<prefix>_<random>` on the server
-  `DW_DATABASE_*` names; `drop` removes it, disconnecting whatever still holds it. Starting the
-  server migrates it — framework and project migrations — exactly as a deployment does, so an
-  acceptance run also proves the migrations apply to an empty database.
-- **`DwTestServer.start`** starts the server on a free loopback port without signal handling. Build
-  it with the **same factory `bin/server.dart` uses**, overriding only what a test must: the database,
-  the storage, and the auth config's code delivery (capture the codes instead of printing them) and
-  resend delay. A server assembled separately for tests drifts from the one that ships. This is the
-  harness's code, in `test/support/`; a test file that calls it itself fails `testHarnessBypassed`.
-- **Time is the harness's clock.** The factory takes `clock:`, and the harness passes a
-  `DwTestClock` that stands still until the test moves it (`harness.clock.advance(…)`, `moveTo(…)`):
-  every `ctx.now` answers it, and a job is due when it passes the job's `runAt` — a reminder due
-  tomorrow is tested by moving the clock to tomorrow, never by rewriting `dw_job` or waiting. Times a
-  test sets up (a session starting "tomorrow") are `harness.clock.now().add(…)`, not
-  `DateTime.now()`. A clock that stands still also holds back a job retry, a push retry and a
-  recurring job until the test moves it; what the database stamps (`created_at`, session and code
-  expiry) keeps real time.
-- **The caller's offset is pinned, zero by default.** Every `server.caller()` and
-  `server.connectClient()` reports `DwTestServer.utcOffset` (`Duration.zero`) as the device's
-  offset, so `ctx.callerUtcOffset` and `ctx.callerLocalTime` do not depend on the zone of the machine
-  the suite runs on. A test about someone else's day sets `server.utcOffset = …`, or passes
-  `connectClient(utcOffset: …)`; `headers: {DwHttpContract.utcOffsetHeader: null}` on a raw call
-  sends none, as an app too old to send it would. `DwAppServer.callAs` never carries one.
-- **Tests in one file share the database**, so each test creates its own members with distinct
-  identifiers and asserts on what it created — never on table-wide counts it did not set up.
-
-**The skeleton's harness does all of this once**, in `__SERVER_PKG__/test/support/`: start and stop,
-a signed-up member by identifier and delivered code, an administrator promoted in the database, a
-watch that waits until it is live, a matcher for a refusal code. The counting HTTP transport, the
-recording live connector and the polling wait are the framework's (`DwCountingTransport`,
-`DwRecordingConnector`, `dwWaitUntil` in `testing.dart`), not copies to keep. **One harness per
-side, extended and never replaced:** `AppHarness` in `test/support/app_harness.dart` keeps its name,
-its file and its methods (`start`, `stop`, `client`, `signUp`, `admin`); a project adds what its
-domain needs to the same class or an extension on it (a staff member, a chat channel), never a
-second harness beside it. A new test file is `setUpAll` → harness start, `tearDownAll` → harness
-stop.
-
-### Three ways to talk to the server
-
-**The real client — for behaviour.** `server.connectClient()` answers a started `DwAppClient` over
-real HTTP and the real live socket, with short test timings (`dwTestClientOptions`):
-
-```dart
-final client = await server.connectClient();
-final session = (await client.command(
-  DwVerifyCode(ticketId: ticket.id, code: code),
-)).valueOrThrow;
-await client.signIn(session);
-
-final invoices = client.watch(const ListMyInvoices()); // live, like a screen
-final paid = (await client.command(const PayInvoice(invoiceId: 7))).valueOrThrow;
-```
-
-A second member's client is how "the other device sees it live" and "someone else is refused" are
-tested. Wait for live state with `dwWaitUntil` (`testing.dart`) rather than a
-fixed delay.
-
-**Raw calls — for the wire.** `server.caller(token: …)` sends a call exactly as a client would and
-answers the HTTP status, headers and body; `.response`, `.value(call)`, `.refusal`, `.updates` read
-it:
-
-```dart
-final anonymous = server.caller();
-addTearDown(anonymous.close);
-final answer = await anonymous.call(const ListMyInvoices());
-expect(answer.status, 401);
-```
-
-Use it when the status, a header or the idempotency key is the point. `server.openLive()` opens a raw
-socket (`authenticate`, `subscribe`, `expect<…>()`, `expectSilence()`) for channel rules:
-subscribing to another account's channel must answer `DwSubscriptionRefusedMessage`.
-
-**The database — for what is stored.** `server.db` is the running server's `DwDatabaseHandle`:
-assert the row a command wrote, arrange a state no command can reach yet. Do not assert through the
-database what the client could observe — that ties the test to the schema instead of the behaviour.
-
-### Jobs and storage
-
-- **`server.wakeJobs()`** runs the job executor now instead of at its next poll. Call it after the
-  command that enqueued, then wait for the effect.
-- **`server.runInContext((ctx) async { ... })`** calls a domain service directly with a real
-  context — no command, no scaffolding job: a background context in one transaction, publications
-  delivered after commit, nothing delivered if it throws. Use it for a service that has rules of its
-  own; what a command publishes to whom is still tested through the command.
-- **`DwTestStorage.create(prefix:)`** provisions a public and a private bucket for the file on the
-  storage `dart run dartway_cli:dartway test` started; pass `storage.config` to the server factory, `storage.drop()` after
-  the server stops. `storage.keys(bucket)` lists what landed where. What to test — `dartway-uploads`.
-
-### Other services — `server.http`
-
-Every `DwTestServer` answers the server's `ctx.http` from its `DwFakeOutboundHttp`, `server.http`:
-it records each request and answers from the test's rules, and a request no rule answers fails the
-call with a `StateError` — a test never reaches the network. Nothing is threaded through the server
-factory for it:
-
-```dart
-server.http.when(
-  (request) => request.url.host == 'sms.example.com',
-  (request) => DwOutboundResponse(200, json: {'id': 7}),
-);
-final ticket = (await client.command(DwRequestCode(kind: kind, identifier: phone))).valueOrThrow;
-expect(server.http.requests.single.form['phones'], '79990000001');
-```
-
-- The rule added last is asked first: the harness scripts the usual answer, a test overrides it
-  (`DwOutboundResponse(503)`) for the failure path.
-- A rule that throws `DwOutboundException(request, cause: 'refused')` is an unreachable provider; one
-  whose future never completes runs into the call's timeout.
-- `server.http.reset()` forgets requests and rules — between tests of one file that share a server.
-- **Without a server**, a class that takes a `DwOutboundHttp` is unit-tested over the same fake:
-  `final http = DwFakeOutboundHttp()..when(…);` then `SmsGateway(settings).send(http.client(), …)`,
-  and `http.requests` as above.
-
-### What deserves an acceptance test
-
-**Write one when the rule is the point:** a role or ownership boundary, a refusal with its code and
-field, a filter that must not leak another account's rows, what a command publishes and who receives
-it, a channel rule, an idempotent retry, a job's effect, a file landing in the right bucket. A
-bugfix in a handler starts with the failing test.
-
-**Not** for a handler that reads a table and maps it with no rule in between — the framework's
-calls, transport and updates are tested in the DartWay repository.
+- **Time is the harness's `DwTestClock`**: every `ctx.now` answers it and a job runs when the clock
+  passes its `runAt` — move it (`clock.advance`, `moveTo`), never wait or rewrite `dw_job`. Times a test
+  sets up are `harness.clock.now().add(…)`, never `DateTime.now()`. A standing clock also holds back job
+  and push retries and recurring jobs until moved; what the database stamps (`created_at`, session and
+  code expiry) keeps real time.
+- **The caller's UTC offset is pinned to zero**: `server.utcOffset = …` for someone else's day (callers
+  made after it use it; `null` — a raw caller sends none, as an old app), `connectClient(utcOffset:)`;
+  `DwAppServer.callAs` carries none.
+- Tests in one file share a database: each creates its own members and asserts on what it created.
+- **Real clients for behaviour** — `connectClient()`, `watch(…)`, `command(…)`, a second member for "the
+  other device" and "someone else is refused"; wait with `dwWaitUntil`, never a fixed delay
+  (`dwWaitUntil`, `DwCountingTransport`, `DwRecordingConnector` are the framework's, in `testing.dart`).
+  **Raw calls for the wire** — `server.caller(token:)` (status, headers; `addTearDown(caller.close)`),
+  `server.openLive()` (subscribe, `expectSilence`). **`server.db`** for what is stored, not for what a client could observe.
+- `server.wakeJobs()` runs due jobs now; `server.runInContext((ctx) async …)` calls a service that has
+  rules of its own with a real context — what a command publishes is still tested through the command; `DwTestStorage.create(prefix:)` provisions buckets (`dartway-uploads`).
+- **Other services**: `server.http` answers `ctx.http` from rules —
+  `server.http.when((r) => r.url.host == 'sms.example.com', (r) => DwOutboundResponse(200, json: {…}))`;
+  the last rule wins, a request no rule answers fails the call, `server.http.requests` records what left,
+  `server.http.reset()` between tests sharing a server. A rule throwing
+  `DwOutboundException(request, cause: 'refused')` is an unreachable provider; one never completing runs
+  into the timeout. Without a server, `DwFakeOutboundHttp()..when(…)` and `http.client()`.
+- Write one when the rule is the point — a boundary, a refusal with its code, a filter that must not
+  leak, a publication and its audience, an idempotent retry, a job's effect. Not for a read that maps a
+  table with no rule.
 
 ## 3. Screens — widget tests on the in-memory server
 
-A DartWay feature reads and writes through the ambient `dw` and hands no callback out, so there is
-nothing above it to spy on — and **nothing should be added to make it spyable**: a callback kept "for
-tests" buys a weaker screen for a weaker test. The seam is the server itself, replaced by one in
-memory.
+A feature reads and writes through the ambient `dw`; nothing is added to make it spyable. The seam is
+the server, replaced by `DwFakeServer(protocol: appProtocol)` (`package:dartway_client/testing.dart`):
+`onRequest<ListMyInvoices>((request, call) => DwCallOk(<CustomerInvoice>[…]))` — the exact result
+type, not `DwCallOk([])` — `onCommand<…>`,
+`call.publish(…)`; assert with `callsOf<PayInvoice>()`, `requestsOf<…>()`; push from outside with
+`server.publish(channel, [object])`; page with `dwFakeTablePage`, `dwFakeOffsetPage`, `dwFakeWindow`;
+files with `DwFakeStorage`. **Every test ends asserting `server.errors` is empty.**
 
-### The in-memory server
+**Start from the skeleton's `FakeApp` and `TestApp`** (`__FLUTTER_PKG__/test/support/app_test_app.dart`):
+they build the core through the app's own factory in `lib/core/dw_core.dart` with the fake's transports
+and a `DwMemoryTokenStore` (the signed-in user is that session, not a provider override), dispose it,
+answer the reads every screen makes, pump at phone size, tap, settle, and check the fake met no
+surprise. A widget test lives at `test/<zone>/<feature>/<entry>_test.dart`. Sample:
+`__FLUTTER_PKG__/test/admin/users/admin_users_page_test.dart`.
 
-`package:dartway_client/testing.dart` (`dartway_client` is a dev dependency of `__FLUTTER_PKG__`):
+- `Dw is not initialized` / `found 0 widgets` — no core: a feature reaches `dw` while building.
+  `Another dw core is alive` — a previous test did not dispose its core (`addTearDown(core.dispose)`).
+- A `MaterialApp` a test builds mounts the delegates, the supported locales **and an explicit `locale:`**;
+  the app's root takes the product's stated language from `appLocaleProvider` — a test of another
+  language overrides that provider.
+- **Never `await` a core call directly** (`core.signOut()`): fake time moves only with pumped frames —
+  `await app.run(tester, …)`.
+- **No `pumpAndSettle` over a spinner**; settle as the harness does. A success notification holds a
+  timer — `app.waitOutNotifications(tester)` before unmounting, and before tapping what it covers. A failed read is retried: assert what was asked,
+  never how many times. Settle after `enterText` before asserting a button enabled.
 
-- **`DwFakeServer(protocol: appProtocol)`** speaks the real HTTP contract and live socket in memory —
-  statuses, idempotent commands, `426` for an older contract line (`server.contractVersion = ...`), hello and authentication on the socket,
-  subscriptions — with handlers registered per DTO type:
+Assert what the screen shows from the server's answer, that the action **sent the right DTO**, that a
+refusal renders as its text and nothing else changed, that a publication changed the screen without a
+re-read.
 
-  ```dart
-  final server = DwFakeServer(protocol: appProtocol)
-    ..registerToken('token-42', 42)
-    ..onRequest<ListMyInvoices>((request, call) => DwCallOk(<Invoice>[...invoices]))
-    ..onCommand<PayInvoice>((command, call) {
-      final paid = invoices.first.copyWith(status: InvoiceStatus.paid);
-      call.publish(DwLiveChannel.forAccount(AcmeChannel.invoices, 42), [paid]);
-      return DwCallOk(paid);
-    });
-  ```
+## 4. Not tested here
 
-  A handler answers a `DwCallResult` whose value has the call's result type exactly
-  (`DwCallOk(<Invoice>[])`, not `DwCallOk([])`). `call.accountId` is the caller; `call.publish`
-  publishes as a real command does (in the response when the caller's live connection subscribes
-  to the channel, and to other subscribers).
-- **Assert what left**: `server.callsOf<PayInvoice>()` (each with `.call`, headers, status),
-  `server.requestsOf<ListMyInvoices>()`, `server.executions(key)`.
-- **Push from outside**: `server.publish(channel, [object])` is an update someone else caused;
-  `server.closeChannel`, `server.revokeToken`, `server.reachable = false` for the rest.
-- **`server.errors`** collects handler exceptions, calls nobody registered a handler for, and frames
-  that do not decode. **Every test ends asserting it is empty** — a fake that swallowed them would let
-  a broken test pass.
-- Paged reads: answer with `dwFakeTablePage(rows, request)`, `dwFakeOffsetPage(rows, request, call.page)`
-  or `dwFakeWindow(newestFirst, request, call.page)` — they page as the real server does.
-- Uploads: `DwFakeStorage(server)` and its `transport` (`dartway-uploads`).
+The framework (calls, updates, reconnects, upload retries — tested in the DartWay repository);
+cosmetics; generated code (the round trip and `generate --check` cover it); a UI rule mirroring a server
+rule as proof of access. No coverage thresholds, and none reported.
 
-### The core: built per test, disposed after it
+## 5. A test is proved by breaking the code
 
-The app builds its `DwFlutterCore` in one factory in `lib/core/`, which takes the transports as
-optional parameters. A widget test calls **that factory** with the fake's `httpTransport` and
-`liveConnector`, a `DwMemoryTokenStore` holding the session to start signed in (or none),
-`clientOptions: dwFakeClientOptions`, and a `DwFakeStorage`'s `transport` when uploads are involved:
-
-```dart
-final core = createInvoiceCore( // the app's own factory, which assigns dw
-  baseUrl: server.baseUrl,
-  appVersion: appVersion,
-  httpTransport: server.httpTransport,
-  liveConnector: server.liveConnector,
-  tokenStore: DwMemoryTokenStore(session),
-  clientOptions: dwFakeClientOptions,
-);
-addTearDown(core.dispose);
-await core.init();
-await tester.pumpWidget(const ProviderScope(child: InvoiceAppRoot()));
-```
-
-- **Through the app's factory, not a second core written in the test.** A core assembled in a test
-  drifts from the one the app ships — its refusal text, its update-required screen, its error
-  reporting — and the drift is invisible until it matters.
-- **With a token store of its own, the core needs no storage plugin** — no platform channel for a
-  widget test to answer.
-- **One core at a time, and it must be disposed.** Building a core while another is alive throws
-  `Another dw core is alive`; the next test in the file fails on it, blaming a test that did nothing
-  wrong. `addTearDown(core.dispose)` right after building covers a test that failed halfway;
-  disposing twice is harmless.
-- **The core is needed to render, not only to tap.** A feature reaches `dw` while building —
-  `dw.action(...)` is constructed in `build` — so a test that never taps still needs one. Without it
-  the subtree throws `Dw is not initialized` and the test dies later at a finder ("found 0 widgets"),
-  with the real cause in an exception block further up the output.
-
-**The skeleton's harness does this once**, in `__FLUTTER_PKG__/test/support/`: a fake app that answers
-the reads every screen makes on its way (the signed-in profile, the settings) the way the real
-handlers do, and a running app that builds the core, pumps the app at phone size, settles, taps,
-waits out notifications, and on stop unmounts, disposes the core and asserts the fake server met no
-surprise. It can also mount the app under `DwAppBootstrapper`, as `DwAppRunner` does, for what covers
-the whole app (the update-required screen). A new widget test starts from it — `FakeApp` and
-`TestApp` in `test/support/app_test_app.dart`, extended with what the project's screens read, never
-replaced.
-
-**A widget test mirrors the path of what it tests:** `test/<zone>/<feature>/<entry>_test.dart` for a
-feature (`lib/admin/users/admin_users_page.dart` → `test/admin/users/admin_users_page_test.dart`),
-the same path under `test/core/` and `test/ui_kit/` for those layers. A test that walks through two
-features is split by feature, with what they share moved into the harness.
-
-The signed-in user is the session in the token store and the profile the fake answers — not a
-provider override. There is no session to fake beyond that.
-
-### Localization is mounted with a locale, not just with delegates
-
-Every user-visible string comes from the app's localizations, so the tree must be able to answer the
-lookup. The app's root widget already carries the delegates and the supported locales; a test that
-builds its own `MaterialApp` around a widget mounts **three** things:
-
-```dart
-MaterialApp(
-  localizationsDelegates: AppLocalizations.localizationsDelegates,
-  supportedLocales: AppLocalizations.supportedLocales,
-  locale: const Locale('en'), // explicit: the default is whatever the platform reports
-  home: subject,
-)
-```
-
-- **Without the delegates** the first lookup fails a null check, and the failure lands where the
-  subject fails to build rather than where localization is missing. When localization reaches a
-  living app this turns every such test red at once — fix it in the shared harness, not per file.
-- **Without an explicit locale** the tree resolves against the locale the test platform reports, so
-  `find.text('Pay')` asserts on whichever language that was. Pin it to the language the assertions
-  are written in — `locale:` on a `MaterialApp` the test builds; for the app's root, which takes its
-  locale from the app's locale provider, set `tester.platformDispatcher.localeTestValue` before
-  pumping (with `addTearDown(tester.platformDispatcher.clearLocaleTestValue)`), or override that
-  provider in the test's `ProviderScope`.
-
-A test that needs another language passes that locale — the point of it being a value in one place.
-
-### Traps about time
-
-- **Never `await` a call on the core directly in a widget test** — `core.signOut()`, a `dw.command`
-  outside a tap. The test runs on fake time and the fake server's traffic moves only with pumped
-  frames, so the future never completes. `await app.run(tester, core.signOut())` pumps until it does
-  and fails, naming the wait, after ten seconds of pumped time.
-- **Do not `pumpAndSettle` a screen that shows a spinner.** A progress indicator animates for as long
-  as it is on screen, so settling by frames waits out its timeout. Pump a few short frames, then a few
-  hundred milliseconds for Riverpod, the in-memory traffic and a page transition, then a few frames
-  more — the skeleton's harness settles exactly that way.
-- **A notification holds a timer.** A successful `dw.action` shows a notification that removes itself
-  after `DwUiNotification.defaultDuration`; a test that ends with it on screen fails on "A Timer is
-  still pending even after the widget tree was disposed" — an error about a toast in a test about a
-  payment. Pump that duration before unmounting, and before tapping a button the notification covers.
-- **A failed read is retried.** With `dwFakeClientOptions` retries are milliseconds apart, so a read
-  you made fail is attempted several times while the test settles. Assert the shape of what was asked
-  (the request arrived, the error text is on screen), never the number of attempts.
-- **A text field may report a change a frame late** — settle after `enterText` before asserting that a
-  button became enabled.
-
-### What a widget test asserts
-
-That the screen shows what the server answered; that the user's action **sent the right DTO**
-(`callsOf<PayInvoice>().single.call` equals the expected command); that a refusal is rendered as its
-text and nothing else changed; that a published update changes the screen without a re-read
-(`requestsOf` did not grow); that the signed-out and failure states look like themselves.
-
-## 4. What we deliberately do not test
-
-- **The framework.** That a command reaches the server, that a list applies an update, that a watch
-  resubscribes after a reconnect, that an upload retries — all tested in the DartWay repository.
-  Re-testing it in a project buys nothing and breaks on every upgrade.
-- **Cosmetics.** A recoloured button, a padding, a rename. A test written for a checkbox contradicts
-  KISS and YAGNI, and it will be deleted by the first person who touches the widget.
-- **Generated code.** Codecs, the protocol registry, table definitions, the schema. The contract's
-  round-trip test covers what matters about them; `dart run dartway_cli:dartway generate --check` covers the rest.
-- **A UI rule that mirrors a server rule.** Asserting that the pay button is hidden from a viewer is
-  fine as UI, but it says nothing about access — write the acceptance test for the rule and let the
-  widget test be about the button.
-
-## 5. No coverage thresholds
-
-We do not set a percentage and we do not gate anything on one. A threshold is met by writing tests for
-what is easy to cover — getters, mappers, generated wrappers — while the calculation everyone is afraid
-of stays at the one test it had. The number goes up and the suite gets worse.
-
-`dart run dartway_cli:dartway check` does not ask whether a feature has a test either: that is not a gap with a name, it is
-a percentage. The question at review is "**is the thing that would break covered, at the place where
-it lives**" — which is what `dartway-finish` asks.
-
-## 6. A test is proved by breaking the code, not by passing
-
-A new test that passes has proved nothing yet: a test that cannot fail passes too, and it passes
-for the rest of the project's life. So before a test is committed, **break the thing it is about and
-watch it go red** — change the comparison, drop the flag, return the wrong row, delete the line the
-test exists for. It stays green: it does not test what its name says, and the fix is the test, not
-the code.
-
-State the mutation in the review, by name: "removed `isDeleted` from the mapper — red; removed the
-blanking in the hook — red". A reviewer asked to *check* a test reads it and agrees with it. A
-reviewer asked to **break it and say whether it went red** finds the hollow ones: Studio did this
-for one day across its own suite and found seven tests that had been passing without exercising
-anything, plus a cascade deletion nobody had noticed and a schema check its own new code walked
-around.
-
-All of them are one thing: **a claim with nothing that could make it false.** That is the question
-to ask of a test, and of a check, and of a startup guard — *name the state in which this must fail,
-and say whether it is reachable.* A claim with no such state is a ritual, however green.
-
-Three shapes turn up again and again, and all look like ordinary green:
-
-- **The subject is inert where the test stands.** A test of the Studio binding that never mounts the
-  binding, a test of a rule whose enforcement runs only on a real connection, a test of a job that
-  nothing runs. Whatever is passed in, the assertions hold — because nothing reads them.
-- **The test compares a copy with the copy.** A manifest checked against a hand-written list of
-  zones instead of against the router; an expected JSON built by the same function that encodes it;
-  the length of a list asserted against the length of what that list was built from. It cannot
-  disagree with itself, so it goes red only when somebody edits both — and in the tautological case,
-  never at all.
-
-  **This is the shape the mutation does not find**, and the only one: break something nearby and the
-  test goes red, which reads as proof. It is found by eye, by asking of each side where its value
-  came from — two sides from one source are one side written twice.
-- **The mutation proved something else.** The trap of this practice itself: an edit that changes two
-  things at once — the behaviour *and* who is watching it — goes red for the wrong reason and is
-  written down as proof. Removing a whole handler makes every test of that path fail, including the
-  ones that never asserted anything about it. Change one thing: a comparison, a flag, one line, the
-  value of one field. If the red cannot be explained in a sentence naming that one thing, it proved
-  nothing.
-
-This is the same rule the framework applies to its own work — `dartway-finish` asks for the
-mutation, and a change that cannot be broken in front of a reviewer is not covered.
-
-## Common mistakes
-
-- Testing an access rule through the UI instead of an acceptance test.
-- A server built for tests by hand instead of through the project's server factory.
-- Asserting table-wide counts in a file whose tests share one database.
-- A fixed delay instead of waiting for the condition (a watch going live, a job's effect).
-- A core built in a test and not disposed — the *next* test fails with "Another dw core is alive".
-- A second `DwFlutterCore` written inside the test instead of the app's factory.
-- A widget test that does not assert `server.errors` is empty.
-- `pumpAndSettle` on a screen with a spinner; ending a test with a notification on screen.
-- A `MaterialApp` in a test with the delegates but no locale.
-- Keeping a callback parameter on a widget "so it can be tested".
-- A test whose subject is inert where it stands — the widget never mounted, the rule never reached —
-  so it passes whatever it is given.
-- A test that compares a copy with the copy it is checking: a hand-written list beside the one the
-  code builds, an expectation encoded by the function under test.
+Before committing a test, **break the one thing it is about** — a comparison, a flag, one line — and
+watch it go red; name the change in the review ("removed `isDeleted` from the mapper — red"). Three
+shapes pass while testing nothing: the subject is inert where it stands (never mounted, never reached);
+**the test compares a copy with the copy** (an expectation built by the code under test, a hand list
+beside the one the code builds) — the mutation does not find this one, reading each side's source does;
+and a mutation that changed two things, going red for the wrong reason.

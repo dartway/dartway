@@ -1,348 +1,136 @@
 ---
 name: dartway-feature-scaffold
 description: >-
-  Step-by-step playbook for building a DartWay feature end to end: (1) the contract in
-  __SHARED_PKG__ — data object, requests with channels, commands with DwSelfValidating, refusal
-  codes; (2) the server in __SERVER_PKG__ — row class, `dart run dartway_cli:dartway generate`, a reviewed migration
-  draft, one handler per call with its access rule, rows mapped to data objects in batch, publishing
-  what a command changed; (3) the Flutter feature in __FLUTTER_PKG__ — a folder with one public file
-  declaring its DwFeatureSpec, widgets/ and logic/, ref.watch(dw.request(...)), local state in
-  hooks and shared state in a <Thing>Controller Notifier, commands sent from logic/ inside
-  dw.action, texts in l10n including refusal texts; (4) tests and checks.
-  Also the Flutter feature law: what a feature, a group and a building block are, isolation (import
-  the public file only), where logic lives, and that a feature must be constructible from its address
-  (identifiers and data objects), never from lists and callbacks its parent assembled. Use when
-  adding functionality, a screen, a flow, or a new kind of data.
+  Building a DartWay feature end to end, in order — contract, server, Flutter, tests — and the
+  Flutter feature law: the app's top-level layout, what a feature, a group and a building block are,
+  one public file with its DwFeatureSpec, widgets/ and logic/, where logic and state live (hooks, a
+  <Thing>Controller Notifier), a feature constructible from its address, and the DwFeatureSpec
+  fields. Use when adding functionality, a screen, a flow or a new kind of data.
 ---
 
 # DartWay — building a feature, end to end
 
-A DartWay feature runs through all three packages: the **contract** both sides compile, the
-**server** that answers it, and the **Flutter feature** that shows it. Build them in that order —
-the contract first, because the server and the app are both written against it, and a screen built
-before its request exists is built against a guess.
+Contract first — the server and the screen are both written against it — then the server, then the
+app. **An existing feature: read its public file first**; its `DwFeatureSpec` and `knownIssues` are the
+current description, and a change of behaviour fixes them in the same diff. The skeleton's admin members
+table and user card (`lib/admin/users/`, `lib/admin/user_card/`, the server's `admin/` feature) are the
+worked reference across all three packages.
 
-Related skills, one per layer: `dartway-contract`, `dartway-server`, `dartway-access`,
-`dartway-realtime`, `dartway-migrations`, `dartway-uploads`, `dartway-data-layer`,
-`dartway-navigation`, `dartway-ui-kit`, `dartway-testing`, `dartway-finish`.
+## Step 1 — the contract (`dartway-contract`)
 
-> **If the feature already exists, read its public file first.** Its `DwFeatureSpec` is the current
-> description of the behaviour, and `knownIssues` says what is already known to be wrong. The server's
-> rules are in the doc comments of its handlers and of the contract classes. Change the behaviour and
-> fix those descriptions in the same diff — a feature's description lives in its code.
+The data object the screen shows (a two-word noun, what the reader sees, not the table); the requests
+by the screen's shape, with channels (`dartway-realtime`); the commands (the user's input only,
+`DwFieldPatch` for clearable fields, `validate()`); refusal codes with doc comments. Put them in the
+file of their server feature, generate, extend the contract test. A change installed builds already
+call: the table in `dartway-contract` §8.
 
-The worked reference is in the skeleton `dartway create` gave the project: the admin members table
-and the user card run through all three packages — a table request and a single request with their
-channel, a role-changing command with a refusal, the handlers with an admin rule, publications to the
-member's own channel and the admin channel, and two admin features on top.
+## Step 2 — the server (`dartway-server`)
 
-## Step 1 — the contract (`__SHARED_PKG__/lib/src/`)
+In `lib/src/<feature>/`: the row class (indexes for the handlers' queries) → generate → a migration
+draft, reviewed (`dartway-migrations`) → one handler per call with its rule (`dartway-access`), locking
+what a command decides by, a `///` comment above each → rows mapped in batch in `_objects` → what a
+command changed published through `_publications`, and the channel rule for a new kind → the feature
+declared in `<feature>_feature.dart` and listed in `DwAppServer(features: [...])`.
 
-Decide what the screen shows and what the user changes, then declare it (`dartway-contract`):
+## Step 3 — the Flutter feature
 
-1. **The data object** the screen shows — a two-word noun with an `id`
-   (`CustomerInvoice`). It is what the user sees, not the table: fields the screen needs, resolved
-   names instead of foreign keys where the screen shows names.
-2. **The requests** — the kind chosen by the screen's shape (single, maybe, list, page, table,
-   window); every parameter that changes the answer a field; "my" requests without an account id;
-   `channels` so the screen follows changes (`dartway-realtime`); `matches`/`sort` where the kind
-   inserts.
-3. **The commands** — verb+object; only the user's input and the ids acted on, never the owner,
-   timestamps or a status the server moves; `DwFieldPatch` for clearable fields;
-   `implements DwSelfValidating` for input rules.
-4. **Refusal codes** in the project's refusal enum, each with a doc comment saying when it happens.
-5. Export the new file from `lib/__SHARED_PKG__.dart`, run `dart run dartway_cli:dartway generate`, and extend the shared
-   contract test (round trip, `validate()`, `onUpdate`).
+### The top level of `lib/`
 
-If the change alters a DTO that installed app builds already use, check the table in
-`dartway-contract` ("a DTO change is a contract change between app builds") before going on.
-
-## Step 2 — the server (`__SERVER_PKG__/lib/src/<feature>/`)
-
-Everything of the feature goes into its own folder under `lib/src/` — rows, handlers, objects,
-publications, jobs — in the closed set of files named after it (`invoices_rows.dart`,
-`invoices_handlers.dart`, …, anything else in its `logic/`), and it declares itself in
-`<feature>_feature.dart`. Never a file at the top of `src/`, never a layer-named folder
-(`dartway-server` §1); `dart run dartway_cli:dartway check` refuses both. Details in `dartway-server`; the order:
-
-1. **Row class** (`InvoiceRow extends DwTableRow`, `@DwSqlTable`, foreign keys, indexes for the
-   queries the handlers will make). Nullable only when the domain allows absence.
-2. **`dart run dartway_cli:dartway generate`** — writes the row part and `lib/generated/dw_schema.dart`
-   (`db.invoices`).
-3. **Migration draft:** from `__SERVER_PKG__`, `dart run bin/migrate.dart create <snake_name>`. It
-   writes a draft into `lib/src/migrations/` and registers it. **Review it before applying** — from
-   then on it is an ordinary migration and yours: a new non-null column on a table with rows needs a
-   default or a backfill, a rename is not a drop and an add (`dartway-migrations`).
-4. **Handlers — one per request and command**, each with its access rule (`dartway-access`):
-   ownership checked by `DwAccessRule.resource`, someone else's row answering `dw.notFound`; commands
-   locking the row they change (`DwRowLock.forUpdate`); refusals with `ctx.refuse`; a `///` doc
-   comment above each handler — who may call it, what it changes and publishes.
-5. **Rows → data objects in batch** — one mapping function per area, relations loaded with
-   `findByIds` once per relation; every handler and every publication goes through it.
-6. **Publish what a command changed** to every channel that shows it, after commit
-   (`ctx.publish`); deletions as `DwDeletedObject.of<T>(id, ctx.protocol)`; add the channel rule when
-   the kind is new (`dartway-realtime`).
-7. **Declare the feature** in `<feature>_feature.dart` — `DwServerFeature('<feature>', handlers:,
-   channels:, jobs:)` — and add it to `DwAppServer(features: [...])` in the server library.
-
-## Step 3 — the Flutter feature (`__FLUTTER_PKG__`)
-
-### Where it goes
-
-A feature lives in a **zone**, and the zones are four folders at the top of `lib/`: `app/` (the app
-itself), `admin/` (the admin panel), `auth/` (signing in), `common/` (features more than one zone draws
-on). The rest of the top level is closed too: `core/`, `shared/`, `ui_kit/`, `l10n/`, plus `main.dart`
-and `__FLUTTER_APP_FILE__`. There is no `data/` (the data layer is `dw.request` and `dw.command` over
-the contract) and no `domain/` (the rules live in the contract and the handlers). `dart run dartway_cli:dartway check`
-reports anything else as `invalidTopLevelLayout` — a zone name used lower down included: `app/admin/`
-is not the admin panel, it is a group that has quietly left every check written for zones.
-
-```
-lib/app/<feature>/
-  <feature>_page.dart        // the only public file — a widget, the only DwFeatureSpec
-  widgets/                   // the feature's private layout
-    <feature>_row.dart
-  logic/                     // state, rules and commands of this feature only
-    <feature>_commands.dart  // <Feature>Commands: every dw.command the feature sends, and nothing else
-    <feature>_filter.dart
-```
-
-- **The public file** is the only file imported from outside, at any nesting depth, and it is a
-  widget: a page, or a widget that carries its own way of being shown. It alone declares a
-  `DwFeatureSpec`.
-- **`widgets/`** holds the feature's private layout — what lays out what it was handed. No spec, and
-  no command.
-- **`logic/`** holds what only this feature uses: its providers and notifiers, and every
-  `dw.command` it sends (`<feature>_commands.dart`, or the notifier of a flow).
-- Non-visual cross-feature helpers (an extension on a data object, a formatter) → `lib/shared/`. A
-  visual building block → `lib/ui_kit/` (`2_frequent/`, `3_special/`). Styles → `ui_kit.dart` only. Imports: `package:` only, the feature's own files included
-  (`relativeImport`; `dart run dartway_cli:dartway check --fix` rewrites relative ones).
+Two files — `main.dart` (the environment: backend URL, version) and `__FLUTTER_APP_FILE__` (the
+wiring). Four zones, which hold features only — `app/`, `admin/`, `auth/`, `common/` (features more
+than one zone draws). Four layers — `core/` (router and the zones' shells, the `dw` core, the signed-in
+profile, settings, refusal texts, `core/platform/` for a conditional-import trio), `shared/` (non-visual
+helpers several features use: an extension on a data object, a formatter), `ui_kit/`, `l10n/`. Nothing
+else, and none of these names lower down (`invalidTopLevelLayout`). No `data/`, no `domain/`.
 
 ### Feature, group, building block
 
-A folder **without** root-level `.dart` files is a **group**: it only groups features, encapsulates
-nothing and does not affect visibility — the router may import `app/billing/invoice/invoice_page.dart`
-because `invoice` is a feature and `billing` a group. The moment a feature gains a second public
-entity (a screen plus an embeddable block, a three-screen flow, a card both of them draw), it becomes a
-group of features, each with its one public file. **Behaviour two features share is one more feature.**
+```
+lib/app/invoices/invoice_card/
+  invoice_card.dart            the only public file: a widget, the only DwFeatureSpec
+  widgets/                     its private layout — no spec, no command
+  logic/invoice_card_commands.dart   every dw.command it sends
+```
 
-| | Where | Described by |
-|---|---|---|
-| **Feature** — it reads a data object and **decides** something by it: shows different things in different states, picks a label, hides a button, opens a dialog, sends a command | a zone | `DwFeatureSpec` |
-| **Building block** — it **arranges what it was handed**: a row, an inset, a form field, a badge | `lib/ui_kit/` (or the feature's own `widgets/`) | a doc comment |
-| **Layer** — presentation, wiring, localisation | `ui_kit/`, `core/`, `l10n/` | — |
+- **A feature decides something by the data** — shows different things per state, picks a label, hides
+  a button, sends a command. However small (a card in a list), it is a feature, with a spec.
+- **A building block arranges what it is handed** — a row, a form field, a badge: `lib/ui_kit/`
+  (`2_frequent/`, `3_special/`) or the feature's `widgets/`, described by a doc comment.
+- **A group** is a folder with no root `.dart` file; it only groups and does not affect visibility (the
+  router imports `app/billing/invoice/invoice_page.dart`). A feature that gains a second public entity
+  — a page plus an embeddable block, a three-screen flow — becomes a group of features. Behaviour two
+  features share is one more feature. **Split small**: every feature carries its own description.
+- Not a feature: state several features watch → `core/`; a helper → `shared/`; a visual one →
+  `ui_kit/`. The tell: its `purpose` and `behaviors` could only restate the type name (`notAFeature`
+  when a zone folder's entry declares no widget).
+- A file in `widgets/` or `logic/` that nothing in the feature uses is `unusedFeatureFile` (a warning); a
+  file that only re-exports others is `barrelFile` — import the file itself.
 
-The criterion is read off the file: **does this widget decide anything by the data, or lay out what it
-was given?** Decides → a feature, however small (a card in a list, one row of work). Lays out → a block.
-A file in `widgets/` that switches over a data object, picks a label from a state or fires an action is
-a feature standing in the wrong place — move it up beside its neighbours and give it a spec. **Split
-small**: every feature brings its own `behaviors` and `knownIssues`, so the finer the cut, the denser the
-description.
+### Where logic and state live — bottom up
 
-**Not a feature:** state several features watch and app-wide registries → `lib/core/`; a non-visual
-helper with no story → `lib/shared/`; a visual one → `lib/ui_kit/`. A folder in a zone whose public file is not a widget is `notAFeature` (error);
-the tell is that you cannot write `purpose` and `behaviors` for it without restating the type name.
+1. **In the widget**: a couple of reads, local state in hooks, a `.where` over a loaded list.
+2. **A provider in `logic/`** when state derives from several sources or carries a rule; the decision
+   is a factory on the state type (`dartway-data-layer`, §8).
+3. **A `Notifier` named `<Thing>Controller` in `logic/`** when widgets share state or a flow has logic
+   — a draft two widgets edit, a multi-step sign-in (the skeleton's `auth/logic/auth_controller.dart`).
+   First check the server does not already hold it.
 
-### Where a feature's logic lives — bottom up
+A widget's own state is a hook in a `HookWidget`/`HookConsumerWidget` (`forbiddenStateHolder`):
 
-1. **In the widget** — the default. A couple of `ref.watch(dw.request(...))` calls, local state in
-   hooks, a `.where` over a list already loaded.
-2. **A provider plus a decision on the state type** — when state is derived from several sources or
-   carries a rule. The provider says where the data comes from, a factory on the state type decides
-   what follows (time passed in, not read). Written by hand (`dartway-data-layer`).
-3. **A `Notifier` named `<Thing>Controller`** in `logic/` — when state is shared between widgets or
-   a flow has logic: a draft two widgets edit, a multi-select, a multi-step sign-in, a form with an
-   async submit. First check it does not duplicate what the server already holds: a command's result
-   is in the watched requests without any local copy.
-
-**State is held one way** (law, `forbiddenStateHolder`, anywhere in `lib/` — `core/` and `ui_kit/`
-included). A widget's own state is a hook in a `HookWidget`/`HookConsumerWidget`; there is no
-`StatefulWidget`, no `setState`, no `StatefulBuilder`, and no `ChangeNotifier`/`ValueNotifier` held
-as state:
-
-| What `State` held | The hook |
+| What a `State` held | The hook |
 |---|---|
-| a `TextEditingController`, `ScrollController`, `FocusNode`, `TabController` | `useTextEditingController`, `useScrollController`, `useFocusNode`, `useTabController` |
-| an `AnimationController` with its ticker mixin | `useAnimationController` |
+| a text, scroll, tab controller, a `FocusNode` | `useTextEditingController`, `useScrollController`, `useTabController`, `useFocusNode` |
+| an `AnimationController` | `useAnimationController` |
 | a flag, a selection, a draft | `useState` |
-| a `Timer`, a `StreamSubscription`, a `WidgetsBindingObserver` | `useEffect` returning its cleanup; `useOnAppLifecycleStateChange` |
-| `didUpdateWidget` resyncing from a prop | `useEffect(…, [prop])`, or `useValueChanged(prop, …)` for the old value |
+| a timer, a subscription, a lifecycle observer | `useEffect` returning its cleanup; `useOnAppLifecycleStateChange` |
+| `didUpdateWidget` resyncing from a prop | `useEffect(…, [prop])`, `useValueChanged` |
 | an object built once and disposed | `useMemoized` plus a `useEffect` cleanup |
-| a `StatefulBuilder` around part of a tree | `HookBuilder` (`HookConsumer` with a `ref`) |
-| a mixin or extension `on State` that calls `setState` | a `use…` function of your own that calls hooks and returns what the widget needs |
+| a `StatefulBuilder` | `HookBuilder` (`HookConsumer` with a `ref`) |
+| a mixin or extension on `State` calling `setState` | a `use…` function of your own that calls hooks |
 
-A callback registered once that must see the widget's latest props reads them through
-`final latest = useRef(this)..value = this;`. A shared controller the provider owns lives exactly as
-long as someone watches it (`NotifierProvider.autoDispose`, `.family` keyed by what it is about).
-
-**The one way out** is a third-party API that needs a `State` subclass or a `Listenable` of its own —
-a map or a platform view SDK that calls into a `State`. The skeleton has none: even the router
-follows a provider (`dartway-navigation`). It takes one line on the class, with the reason, and
-`dart run dartway_cli:dartway check` lists it on every run:
-
-```dart
-// dw:allow-stateful the map SDK calls into a State subclass
-class VenueMapView extends StatefulWidget { … }
-```
-
-State used by two features is a feature whose public surface is a provider: the provider in the root
-file, the state class and the notifier in `logic/`. State only one feature uses may keep notifier and
-provider in one file — provider first.
-
-### Build it
-
-1. **Navigation** — the entry and exit points; a route if needed (`dartway-navigation`).
-2. **The public widget**, `implements DwFeatureWidget` with its `DwFeatureSpec` (below). Without it
-   `dart run dartway_cli:dartway check` warns `featureSpecMissing`.
-3. **Reads:** `DwReadBuilder(dw.request(...), builder: …)` (or `dw.table`), `DwPagedListView` for a
-   feed, `DwWindowListView` for a chat — loading, refusal branches and the failed view in one place;
-   the `AsyncValue` is never taken apart in a widget (`dartway-data-layer`).
-4. **Changes:** `dw.command` in the feature's `logic/<feature>_commands.dart`, run by
-   `dw.action((_) => <Feature>Commands.x(...))` on the button of the widget that owns it; a refusal is
-   shown by itself (`dartway-data-layer`).
-5. **Texts:** every user-visible string in **every** `lib/l10n/*.arb`, then `flutter gen-l10n`; widgets
-   read `context.l10n`. **Each new refusal code gets its text** and its case in the app's refusal
-   texts in `lib/core/` — the exhaustive switch does not compile until it has one.
-6. **Showing a feature that is not a route** — a sheet or a dialog publishes itself as a static method
-   on its own widget, taking `BuildContext` first:
-
-```dart
-class InvoiceEditSheet extends ConsumerWidget implements DwFeatureWidget {
-  const InvoiceEditSheet({super.key, required this.invoiceId});
-
-  static Future<void> show(BuildContext context, {required int invoiceId}) =>
-      context.showAppBottomSheet(child: InvoiceEditSheet(invoiceId: invoiceId));
-
-  final int invoiceId;
-  // …
-}
-```
-
-Not an `extension on BuildContext` (`context.showInvoiceEdit()`): that splits the feature into two
-public entities, hides the widget, and leaves the spec nowhere to live.
+A callback registered once reads the latest props through `final latest = useRef(this)..value = this;`.
+A controller the provider owns lives while watched (`NotifierProvider.autoDispose`, `.family`). The one
+way out — a third-party API that needs a `State` subclass or its own `Listenable` — is
+`// dw:allow-stateful <reason>` on the class, listed by every check run. State two features use is a
+feature whose public surface is a provider (the provider in the root file, the notifier in `logic/`);
+state one feature uses may keep notifier and provider in one file, provider first.
 
 ### A feature is constructible from its address
 
-**The test, one attempt:** write the call. Can the widget be constructed in the router, in a
-kit dialog, in a `ListView.builder` — with nothing in hand but identifiers and data objects?
+Write the call: can the widget be built in the router, in a kit dialog, in a `ListView.builder`, from
+identifiers and data objects alone? No → it is its parent's layout; fold it back, or take the assembled
+data out of its constructor. A `Function`, a `Map` or a computed `List` in a constructor is the tell; a
+list of data objects is fine.
 
-- yes → a feature; it reads the rest itself;
-- no → it is part of its parent's layout; fold it back, or take the assembled data out of its
-  constructor.
+A sheet or dialog that is a feature shows itself through a static method taking `BuildContext` first —
+`static Future<void> show(BuildContext context, {required int invoiceId}) =>
+context.showAppBottomSheet(child: InvoiceEditSheet(invoiceId: invoiceId));` — never an extension on
+`BuildContext`.
 
-A constructor that requires a `Function`, a `Map` or a `List` of something the parent computed is the
-shape to look for. A list of data objects is not automatically wrong (a card list takes its items); a
-list the parent had to compute is.
+### Build it
 
-### Example
-
-```dart
-// lib/app/invoices/my_invoices/my_invoices_page.dart
-class MyInvoicesPage extends StatelessWidget implements DwFeatureWidget {
-  const MyInvoicesPage({super.key});
-
-  @override
-  DwFeatureSpec get dwFeature => const DwFeatureSpec(
-    id: 'invoices/my-invoices',
-    title: 'My invoices',
-    purpose: 'A member sees what they owe and pays it.',
-    behaviors: [
-      'Invoices are listed newest first.',
-      'Paying an invoice marks it paid at once, on every device of the member.',
-      'A paid invoice has no pay button.',
-    ],
-    requirements: [
-      'A member sees only their own invoices — decided by the server, which '
-          'reads the caller, not by this screen.',
-    ],
-  );
-
-  @override
-  Widget build(BuildContext context) {
-    final l10n = context.l10n;
-
-    return Scaffold(
-      body: DwReadBuilder(
-        dw.request(const ListMyInvoices()),
-        placeholder: List.filled(4, placeholderInvoice),
-        builder: (context, invoices) => invoices.isEmpty
-            ? AppText.body(l10n.noInvoicesYet)
-            : ListView(
-                children: [
-                  for (final invoice in invoices) InvoiceCard(invoice: invoice),
-                ],
-              ),
-      ),
-    );
-  }
-}
-```
-
-`InvoiceCard` decides by the invoice (a pay button only while it is unpaid) — so it is a feature of
-its own (`lib/app/invoices/invoice_card/invoice_card.dart`), constructible from the invoice alone, and
-it sends `PayInvoice` from its own button through `logic/invoice_card_commands.dart`. `AppText`
-stands for the project's kit; the loading and failed views are the app's, configured once in
-`lib/core/dw_core.dart`.
+The route (`dartway-navigation`) → the public widget `implements DwFeatureWidget` with its spec → reads
+and commands (`dartway-data-layer`) → the kit (`dartway-ui-kit`) → the texts (`dartway-ui-kit`,
+"Localization") and a refusal text for every new code (`dartway-data-layer` §5). Sample: the skeleton's `lib/admin/user_card/admin_user_card_page.dart`.
 
 ## The feature spec — `DwFeatureSpec`
 
-A feature describes itself **in its own file**, and that is its only description: no registry, no
-separate doc. A description apart from the code drifts on the first edit, silently. Error reports,
-Studio and the agent read this one.
+The feature's only description, on its public widget (`dwFeature`); without one, `featureSpecMissing`
+(a warning). Written from what the code does.
 
-- **`id`** — `<feature-folder>/<meaningful-name>`. A contract: Studio, feedback and tickets refer to
-  it. The folder moves, the id stays; a new name is a new id, never a rename in place.
-- **`title`** — what the feature is called out loud.
-- **`purpose`** — why the user needs it. Optional and often unnecessary: a card serves its screen.
-- **`behaviors`** — what the feature observably does, one statement per item, **each verifiable by
-  looking at the running app**.
-- **`requirements`** — what it must honour, imposed from outside (who may see it, what the server
-  enforces). Phrased as an observable action → it belongs in `behaviors`.
-- **`implementationNotes`** — what the code cannot say about itself: why it is done this way, a trap
-  not visible from outside. Test: would it still be worth reading after a rewrite? "The list is not
-  paged — a member has dozens of invoices, not thousands" survives; "the list comes from
-  `dw.request(ListMyInvoices())`" is a map of the code and starts lying at the next edit.
-- **`knownIssues`** — what is **wrong** and worth picking up, one sentence with its cost. If fixing it
-  makes the entry disappear, it is a known issue; if it stays as an explanation, it is a note. Record
-  a finding in the feature you noticed it in, when you notice it.
+- **`id`** — `<feature-folder>/<name>`, a contract Studio and tickets refer to: it survives a move; a
+  new name is a new id.
+- **`title`**; **`purpose`** — why the user needs it, often unnecessary.
+- **`behaviors`** — what it observably does, each checkable by looking at the running app.
+- **`requirements`** — what it must honour, imposed from outside (who may see it); one phrased as
+  something observable belongs in `behaviors`.
+- **`implementationNotes`** — what the code cannot say about itself and survives a rewrite ("not paged
+  — dozens of rows, not thousands"), never a map of the code.
+- **`knownIssues`** — what is wrong and worth picking up, one sentence with its cost; noticed here,
+  recorded here.
 
-**Write the spec from what the code does, not from what was intended.** Phrasing verifiable
-statements is how undeclared behaviour surfaces.
+## Step 4 — tests, then finish
 
-## Step 4 — tests and checks
-
-Tests (`dartway-testing`), by layer:
-
-- **shared** (`dart test` in `__SHARED_PKG__`): round trip of the new DTOs, `validate()`, `onUpdate`
-  of the new requests;
-- **server** (`dart run dartway_cli:dartway test`): each handler's behaviour on real clients and a real database; **one
-  refused call per access rule** (`dartway-access`); a second client hearing what a command published
-  (`dartway-realtime`);
-- **Flutter** (`flutter test` in `__FLUTTER_PKG__`): a widget test of the feature over the fake server
-  — its reads answered, its command recorded, a publication applied — with the skeleton's test app
-  harness.
-
-Checks, all green before `dartway-finish`:
-
-```bash
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)  # generated code matches its sources
-(cd __SERVER_PKG__ && dart run bin/migrate.dart check)       # against the local database: migrations match the rows
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)    # server tests with a throwaway Postgres and storage
-(cd __FLUTTER_PKG__ && flutter test)
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)   # layout, features, UI kit, l10n, generated code, migrations
-```
-
-Then run `dartway-finish`: it audits the diff against the cleanliness contract, reconciles the
-`DwFeatureSpec` and the handlers' doc comments with the new behaviour, and checks the tests.
-
-## Checklist
-
-- [ ] Contract: data object, requests (kind, fields, channels), commands (input only, `validate()`),
-      refusal codes; `dart run dartway_cli:dartway generate`; shared test extended.
-- [ ] Server: row class, generated, migration drafted **and reviewed**; one handler per call with an
-      access rule; batch mapping; every change published; channel rule for a new kind.
-- [ ] Flutter: one public widget with a `DwFeatureSpec`; blocks in `widgets/`; constructible from its
-      address; reads with an error branch; changes through `dw.action`; texts and refusal texts in
-      every `.arb`.
-- [ ] Tests at each layer, including refused calls and a live update.
-- [ ] `dart run dartway_cli:dartway generate --check`, `migrate check`, `dart run dartway_cli:dartway test`, `flutter test`, `dart run dartway_cli:dartway check` pass.
+A contract test for the new DTOs, an acceptance test per handler with one refused call per rule and a
+second client hearing the publication, a widget test on the in-memory server (`dartway-testing`). Then
+`dartway-finish`.

@@ -1,73 +1,40 @@
 ---
 name: dartway-contract
 description: >-
-  The shared package (__SHARED_PKG__) of a DartWay project — the contract the server and the app
-  both compile: data objects (DwDataObject, an int or String id), requests (DwSingleRequest,
-  DwMaybeRequest, DwListRequest, DwPageRequest, DwTableRequest, DwWindowRequest and their named
-  constructors) with channels, commands (DwActionCommand<R>, one result value), DwFieldPatch for
-  clearable fields and its helpers, settings objects, defaults on the wire, DwSelfValidating, the project's refusal enum
-  (DwRefusalCodes), channel kinds (DwChannelKind), upload purposes (DwUploadPurpose), naming
-  (two words, Get…/List…, verb+object), where a DTO lives (lib/src/ mirrors the server's features), and generation (`dart run dartway_cli:dartway generate`, `*.dw.dart`,
-  lib/generated/ — never edited). Also what a DTO change costs installed app builds and when to
-  raise the contract's breaking line (the shared package's version). Use when adding or changing a data object, a request, a command, a refusal
-  code, a channel kind or an upload purpose, or when choosing which request kind a screen needs.
+  The shared package (__SHARED_PKG__), the contract both sides compile: data objects, the six request
+  kinds and how to choose one, commands (DwActionCommand<R>), DwFieldPatch, settings objects,
+  defaults on the wire, DwSelfValidating, the refusal / channel / upload enums, where a DTO lives,
+  generation, and what a DTO change costs installed app builds (the contract's breaking line). Use
+  when adding or changing a DTO, a refusal code, a channel kind or an upload purpose.
 ---
 
 # DartWay — the contract (`__SHARED_PKG__`)
 
-Everything the app and the server exchange is declared in `__SHARED_PKG__`, in pure Dart, and
-nowhere else. Both sides compile the same classes: the server decodes what the app encoded with the
-same generated codec, and a rule written here (`validate()`, `matches`) runs identically on both.
-A rule written twice — once in a handler, once in a widget — drifts silently, because each copy
-passes its own tests.
+Pure Dart: `dartway_core_shared` and nothing from Flutter, IO, a database or the other two packages.
+A rule written here (`validate()`, `matches`) runs identically on both sides; written twice, once per
+side, it drifts. Samples use the package `acme_shared`, so its enums are `AcmeChannel`, `AcmeRefusal`,
+`AcmeUpload`.
 
-**Allowed:** `dartway_core_shared` and pure Dart. **Not allowed:** Flutter, a database, IO, anything
-from `__SERVER_PKG__` or `__FLUTTER_PKG__`. The public library `lib/__SHARED_PKG__.dart` exports
-`package:dartway_core_shared/dartway_core_shared.dart`, `generated/dw_protocol.dart` and every
-`src/` file.
-
-Related skills: `dartway-server` (the handler of every call declared here), `dartway-realtime`
-(channels, `matches`, `sort`, update actions), `dartway-access` (who may call), `dartway-data-layer`
-(how the app watches and sends these), `dartway-uploads`, `dartway-testing`.
-
-In the samples below the shared package is `acme_shared`, so its enums are `AcmeChannel`,
-`AcmeRefusal` and `AcmeUpload` — a project's are named after `__SHARED_PKG__` the same way (toolkit
-`CLAUDE.md`, law 5); the domain (`CustomerInvoice`) is invented.
-
-## 1. Three kinds of DTO, nothing else
+## 1. Three kinds of DTO, in the file of their server feature
 
 | Kind | Extends | Is |
 |---|---|---|
-| Data object | `DwDataObject` | what the server returns and publishes; has an `id` (`int` or `String`) that updates merge by |
-| Request | one of the six `DwDataRequest` kinds | a read: no side effects, its fields are its parameters |
-| Command | `DwActionCommand<R>` | a change: its fields are its input, `R` its answer |
+| Data object | `DwDataObject` | what the server returns and publishes; an `int` or `String` `id` updates merge by |
+| Request | one of the six request kinds (§3) | a read: no side effects, its fields are its parameters |
+| Command | `DwActionCommand<R>` | a change: its fields are the input, `R` the answer |
 
-A project never extends `DwWireObject` or `DwServerCall` directly. Rows (`…Row`) are server-only and
-never appear here — the handler maps a row to a data object explicitly (`dartway-server`).
-
-**Where a DTO lives: `lib/src/` mirrors the server's features** (`invalidSharedLayout`). The DTOs
-of the server feature `invoices/` are in `lib/src/invoices.dart`; when that file grows (`fileLong`
-over 200 lines, `fileTooLong` over 350 — the same limits as the app's), it becomes a flat folder of
-parts only, `lib/src/invoices/invoices_<part>.dart`, each named for a group of DTOs — a data object
-with the requests and commands that answer it (`invoices_payments.dart`), never exactly a layer
-(`invoices_models.dart`); no `invoices/invoices.dart` beside them, and no deeper folders. The file
-or folder name is a folder of the server's `lib/src/`, letter for letter: what exists only in the
-contract — a rule both sides apply, the keys a sign-up sends — goes with the feature that owns it,
-and a DTO goes where its handler is. Beside the features, the top of `lib/src/` holds only the
-package-wide files named after the package (`acme_shared` → `acme_`): `acme_channel.dart`,
-`acme_refusal.dart`, `acme_upload.dart` (§8), `acme_protocol.dart` (the protocol both sides speak,
-when a module adds calls to the generated one) and `acme_push_category.dart` (with push).
-
-The shape every DTO file has:
+**`lib/src/` mirrors the server's features** (`invalidSharedLayout`): the DTOs of the server feature
+`invoices/` are `lib/src/invoices.dart`, a DTO goes where its handler is, and a rule both sides apply
+goes with the feature that owns it. Grown past the file limits (`fileLong`/`fileTooLong`, as in the
+app), it becomes a flat `lib/src/invoices/` of parts `invoices_<part>.dart`, each a data object with
+the calls that answer it — never a layer name. Beside the features: only `acme_channel.dart`,
+`acme_refusal.dart`, `acme_upload.dart`, `acme_protocol.dart` and `acme_push_category.dart`. A new
+`src/` file is exported from `lib/acme_shared.dart`.
 
 ```dart
-import 'package:acme_shared/src/acme_channel.dart';
-import 'package:acme_shared/src/acme_refusal.dart';
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 part 'invoices.dw.dart';
-
-enum InvoiceStatus { draft, sent, paid }
 
 /// An invoice as its owner sees it.
 final class CustomerInvoice extends DwDataObject with _$CustomerInvoice {
@@ -75,8 +42,6 @@ final class CustomerInvoice extends DwDataObject with _$CustomerInvoice {
     required this.id,
     required this.customerName,
     required this.amountCents,
-    required this.status,
-    required this.createdAt,
     this.note,
   });
 
@@ -84,69 +49,50 @@ final class CustomerInvoice extends DwDataObject with _$CustomerInvoice {
   final int id;
   final String customerName;
   final int amountCents;
-  final InvoiceStatus status;
-  final DateTime createdAt;
   final String? note;
 }
 ```
 
-The rules the generator enforces (it refuses the file with a message otherwise):
+The generator refuses anything else, naming the reason: one `part '<file>.dw.dart'`, `with _$Class`,
+the class `extends` its kind and has no type parameters, every serialised field `final` and set by a
+named constructor parameter of the same name (declare the class `final` with a `const` constructor);
+field types `int`, `double`, `String`, `bool`, `DateTime` (UTC), `Duration`, `Uint8List`, an enum, a
+DTO, `List`, `Map<String, T>`, `DwFieldPatch<T>`, or nullable. A single object with a fixed identity
+uses an `id` getter (`String get id => 'invoice-totals';`).
 
-- `part '<file>.dw.dart';` exactly once, and `with _$ClassName` on every DTO class;
-- the class `extends` its kind (not `implements` or `with`) and has no type parameters;
-- every serialised field is `final` and set by a **named** constructor parameter of the same name
-  (a field with an initializer stays off the wire); declare the class `final` with a `const`
-  constructor, as the skeleton does — requests are compared and cached as values;
-- field types: `int`, `double`, `String`, `bool`, `DateTime` (UTC microseconds on the wire),
-  `Duration`, `Uint8List`, an enum (by name), another concrete DTO class, `List<T>`,
-  `Map<String, T>`, `DwFieldPatch<T>`, or a nullable one of these;
-- a data object declares `@override final int id;` (or `String`), or an `id` getter — a single
-  object with a fixed identity uses a getter (`String get id => 'invoice-totals';`).
+**Names** follow law 5 (`contractNameInvalid`); a caller-scoped call says `My` (`ListMyInvoices`). **The class name is the wire name** (`POST /dw/<ClassName>`): renaming one is a
+wire change (§8).
 
-`==`, `hashCode`, `toString`, `toJson`, the decoder and `copyWith` are generated. Rebuild an
-existing value with `copyWith`, never by listing its fields in the constructor: a field added later
-silently takes its default in every place that rebuilt by hand.
+## 2. A request's fields are its complete filter
 
-## 2. Naming
+A request is a value: the client caches and shares its live state under the request itself.
 
-Every public class name has two or more words (`Dw` is not a word).
+- Everything that changes the answer is a field — a filter, a search string, a page, a date. "Today" is
+  a `DateTime day` field the widget fills, never `ctx.now` or `ctx.callerLocalTime` in the handler,
+  which would answer two equal requests differently.
+- **"My" calls carry no account or profile id**: the handler reads the caller from its context, and the
+  client keeps state per signed-in account. A field holding "my" id is a field anyone can change to
+  someone else's.
+- `channels`, `matches`, `sort`, `positionOf` and an overridden `onUpdate` are pure functions of the
+  item and the fields — no clock, no global.
 
-| What | Shape | Such as |
-|---|---|---|
-| Data object | two-word noun | `CustomerInvoice`, `InvoiceTotals` — never `Invoice` |
-| Read | `Get…` (one object), `List…` (many) | `GetInvoice`, `ListMyInvoices`, `ListOverdueInvoices` |
-| Change | verb + object | `CreateInvoice`, `PayInvoice`, `CancelInvoice` |
-| Caller-scoped call | `My` in the name, no account id in the fields | `ListMyInvoices`, `UpdateMyProfile` |
-| Channel kinds | `<Package>Channel` enum `with DwChannelKind` | |
-| Refusal codes | `<Package>Refusal` enum `with DwRefusalCodes` | |
-| Upload purposes | `<Package>Upload` enum `with DwUploadPurpose` | |
+## 3. Choosing the request kind — by the shape of the screen
 
-**The class name is the wire name** — the call path is `POST /dw/<ClassName>` and updates are grouped
-by it. Renaming a DTO class is a wire change (section 9).
-
-## 3. Choosing the request kind
-
-Decide by the shape of what the screen shows, not by the table behind it:
-
-| The screen shows | Kind | Declared as | Server handler |
+| The screen shows | Kind | Declared as | Handler (`dartway-server`) |
 |---|---|---|---|
-| one object that must exist — a detail page by id, "my profile" | `DwSingleRequest<T>` | `const GetInvoice({required this.invoiceId})` | `single`: return `null` → the framework refuses `dw.notFound` |
-| one object that may be absent — "my open draft, if any" | `DwMaybeRequest<T>` | must override `bool matches(T item)` | `maybe`: `null` is an answer |
-| a whole list, small enough to send at once | `DwListRequest<T>` | `super()` | `list` |
+| one object that must exist | `DwSingleRequest<T>` | `const GetInvoice({required this.invoiceId})` | `single`; `null` → `dw.notFound` |
+| one object that may be absent | `DwMaybeRequest<T>` | overrides `matches` | `maybe`; `null` is an answer |
+| a small whole list | `DwListRequest<T>` | `super()` | `list` |
 | a list whose membership only the server decides | `DwListRequest<T>` | `super.updateOnly()` | `list` |
 | a derived list the client cannot compute (a ranking, an aggregate) | `DwListRequest<T>` | `super.refetchOnUpdate()` | `list` |
-| an endless feed with "load more" | `DwPageRequest<T>` | `super(pageSize: 20, maxPageSize: 100)` | `page` |
-| numbered pages with a total — an admin table | `DwTableRequest<T>` | `page`/`pageSize` **fields**, `super(maxPageSize: 100)` | `table`: `rows` + `count` |
-| a long newest-first sequence opened at an anchor — a chat, a log | `DwWindowRequest<T, S, I>` | `super(pageSize: 40)`, `positionOf` | `window` |
+| an endless feed | `DwPageRequest<T>` | `super(pageSize: 20, maxPageSize: 100)` | `page` |
+| numbered pages with a total | `DwTableRequest<T>` | `page`/`pageSize` fields, `super(maxPageSize: 100)` — below 1 is refused by the framework | `table` |
+| a newest-first sequence at an anchor — a chat, a log | `DwWindowRequest<T, S, I>` | `super(pageSize: 40)`, `positionOf` | `window` |
 
-The named constructors choose what an update does (`dartway-realtime`): the default of the list
-kinds is `matches ? upsert : remove`; `.updateOnly()` replaces what is there and never inserts;
-`.refetchOnUpdate()` asks again on any update.
-
-Page size is a **constant of the class** for page and window requests (the client cannot ask the
-server for everything); for a table it is a field, because page 2 and page 3 are different states.
-The order a page, table or window handler reads in must be total (`createdAt, id`), or pages skip
-and repeat rows.
+What an update does to each kind is `dartway-realtime`. The order a page, table or window handler reads
+in is total (`createdAt, id`). A window names a row's place for both sides:
+`DwWindowPosition<DateTime, int> positionOf(InvoiceEvent item) => (sortValue: item.happenedAt, id: item.id);`
+(`S` is `int`, `String` or `DateTime`; `I` is `int` or `String`).
 
 ```dart
 /// The caller's invoices, newest first, live on the caller's own channel.
@@ -161,101 +107,35 @@ final class ListMyInvoices extends DwListRequest<CustomerInvoice>
 
   @override
   int Function(CustomerInvoice a, CustomerInvoice b) get sort =>
-      (a, b) => b.createdAt.compareTo(a.createdAt);
-}
-
-/// One numbered page of every invoice, filtered by status. Managers only.
-final class ListInvoicesPage extends DwTableRequest<CustomerInvoice>
-    with _$ListInvoicesPage {
-  const ListInvoicesPage({this.page = 1, this.pageSize = 20, this.status})
-    : super(maxPageSize: 100);
-
-  @override
-  final int page;
-
-  @override
-  final int pageSize;
-
-  final InvoiceStatus? status;
-
-  @override
-  List<DwLiveChannel> get channels => const [
-    DwLiveChannel(AcmeChannel.billing),
-  ];
-
-  /// The server's filter, on one object: a row that leaves it leaves the page.
-  @override
-  bool matches(CustomerInvoice item) => status == null || item.status == status;
+      (a, b) => b.id.compareTo(a.id);
 }
 ```
 
-A `DwWindowRequest` names one row's place in the sequence, and both sides use it — the server builds
-and checks cursors with it, the client places live inserts with it:
+## 4. Commands: the user's input, one answer
 
-```dart
-@override
-DwWindowPosition<DateTime, int> positionOf(InvoiceEvent item) =>
-    (sortValue: item.happenedAt, id: item.id);
-```
+A command carries the ids it acts on and what the user typed — **never what the server decides**: the
+owner, the caller's id, timestamps, a status the server moves, a computed price, a storage key, the
+caller's UTC offset (`ctx.callerUtcOffset`). The answer `R` is one value — a data object, a JSON
+primitive, or `void`; a collection is wrapped in a data object (the generator refuses others). Other
+objects the command changed reach screens by publication, not in the answer. Idempotency keys are the
+client's; nothing to declare.
 
-`S` is `int`, `String` or `DateTime`; `I` is `int` or `String`.
-
-## 4. A request's fields are its complete filter
-
-A request is a value: the client caches its state under the request itself (equality is generated
-from the fields) and keeps it live. So:
-
-- **everything that changes the answer is a field.** A status filter, a search string, a page, a
-  date. "Today" is a `DateTime day` field the widget fills in — not `ctx.now` or
-  `ctx.callerLocalTime` in the handler, which would answer differently for two equal requests;
-- **the caller is not a field.** "My" requests carry no account or profile id: the handler reads the
-  caller from its context, and the client already keeps state per signed-in account. A field holding
-  the caller's own id is a field anyone can change to someone else's (`dartway-access`);
-- `channels`, `matches`, `sort` and `positionOf` are pure functions of the item and the fields.
-  `DateTime.now()` or a global inside them is a bug.
-
-## 5. Commands: input only, and one answer
-
-A command carries **what the user decided**: the ids of the things it acts on and the values typed
-in. It never carries what the server decides — the owner, the caller's id, timestamps, a status
-the server moves, a price the server computes, a storage key. The handler derives those from its
-context; a field for them is an invitation to forge them. Nor the caller's UTC offset: the app sends
-it with every call, and the handler reads `ctx.callerUtcOffset` (`dartway-server`).
-
-The answer `R` is **one value** (D-006): a data object, a JSON primitive (`int`, `double`, `num`,
-`String`, `bool`), or nothing (`DwActionCommand<void>`; a nullable `R` may answer `null`). A
-collection is wrapped in a data object; `dart run dartway_cli:dartway generate` refuses any other `R`. Usually the answer is the object the command changed; the
-other objects it changed reach the screens through publications (`dartway-realtime`), not through
-the answer.
-
-Every command travels with an idempotency key the client generates once per intent: a retry after a
-lost answer gets the stored outcome, not a second execution. Nothing to declare for that.
-
-### `DwFieldPatch` — a field that can be cleared
-
-A plain nullable field cannot tell "leave it" from "clear it". An edit command uses:
-
-| Field | Meaning |
-|---|---|
-| `final String? firstName;` (default `null`) | `null` keeps; the value cannot be cleared |
-| `final DwFieldPatch<String> note;` with `this.note = const DwFieldPatch.keep()` | keep / `DwFieldPatch.set(v)` / `DwFieldPatch.clear()` |
-
-The inner type is non-nullable (`DwFieldPatch<String>`, not `DwFieldPatch<String?>`), and a patch
-field is never itself nullable. On the wire a kept field is absent, a set one carries its value, a
-cleared one an explicit `null`. The server passes it straight to the row's generated `copyWith`,
-whose nullable parameters take a `DwFieldPatch` too.
-
-**A patch is read through its helpers, never by matching `DwSetField`/`DwClearField`/`DwKeepField`**
-(`fieldPatchMatched` fails the check):
+**`DwFieldPatch<T>` — a field that can be cleared.** A plain nullable field cannot tell "keep" from
+"clear": an edit command declares `final DwFieldPatch<String> note;` defaulting to
+`const DwFieldPatch.keep()` (inner type non-nullable, the field never nullable). It is read through its
+helpers (`fieldPatchMatched` fails matching its variants):
 
 | Need | Write |
 |---|---|
 | an existing row | `row.copyWith(note: command.note)` |
-| a row being inserted | the same `copyWith` on the new row, or `command.note.apply(null)` for a constructor argument — kept means the column's default |
-| a text a person typed: trimmed, blank clears | `command.note.trimmedOrCleared` |
-| a check on a new value only (an owned file, a length) | `if (command.photoFileId.newValue case final id?) …` |
-| is it set / cleared / kept | `isSet`, `isCleared`, `isKept` |
-| the patch of another type | `command.photoFileId.map((id) => urlOf(id))` |
+| a value for a constructor | `command.note.apply(null)` — kept means the default |
+| a typed text: trimmed, blank clears | `command.note.trimmedOrCleared` |
+| a check on a new value only | `if (command.photoFileId.newValue case final id?) …` |
+| its state; another type | `isSet`, `isCleared`, `isKept`; `command.photoFileId.map(…)` |
+
+**Validation** — a request or command whose input can be wrong `implements DwSelfValidating` and returns
+every problem from `validate()`, reading only its fields (no IO, no clock). The client runs it before
+sending, the server again before the access check. A rule that needs data is a refusal in the handler.
 
 ```dart
 /// Edits a draft invoice. A field left as it is is kept.
@@ -280,72 +160,20 @@ final class EditInvoice extends DwActionCommand<CustomerInvoice>
 }
 ```
 
-### A settings object
+**Defaults on the wire:** a field with a constructor default may be absent — the decoder applies it,
+the encoder omits a value equal to it; a required field without one must be present (`400`).
 
-The app's settings are one data object: a default for every field — the value while nobody has
-saved one — and a fixed `id`. The server keeps it through `ctx.settings` (`dartway-server`); it is
-read with a `DwSingleRequest` and changed by a command whose fields keep when absent — `null` for a
-non-nullable setting, a `DwFieldPatch` for a nullable one:
+## 5. A settings object
 
-```dart
-final class BillingSettings extends DwDataObject with _$BillingSettings {
-  const BillingSettings({this.dueDays = 14, this.invoiceFooter});
+One data object with a default for every field and a fixed `id`; read with a `DwSingleRequest`,
+changed by a command whose fields keep when absent — `null` for a non-nullable setting, a
+`DwFieldPatch` for a nullable one. `null` means none, never `''`. The server side: `dartway-server`.
+The skeleton's `__SHARED_PKG__/lib/src/settings.dart` is the sample.
 
-  @override
-  String get id => 'billing';
-
-  final int dueDays;
-  final String? invoiceFooter;
-}
-
-final class SaveBillingSettings extends DwActionCommand<BillingSettings>
-    with _$SaveBillingSettings {
-  const SaveBillingSettings({
-    this.dueDays,
-    this.invoiceFooter = const DwFieldPatch.keep(),
-  });
-
-  final int? dueDays;
-
-  /// Nullable in the object, so a patch here: it can be cleared.
-  final DwFieldPatch<String> invoiceFooter;
-}
-```
-
-A nullable setting is never `''` meaning none: the object holds `null`, and the command clears it
-with `DwFieldPatch.clear()`.
-Never a key/value list of strings: every reader then parses text and supplies its own default.
-
-## 6. Defaults on the wire
-
-A field with a constructor default may be absent on the wire: the decoder applies the default, and
-the encoder omits a value equal to it (D-041). A required field without a default must be present,
-or the call is malformed (`400`). Choose defaults deliberately — they are also what makes adding a
-field safe for app builds already installed (section 9).
-
-## 7. Validation — `DwSelfValidating`
-
-A request or command whose input can be wrong `implements DwSelfValidating` and returns **every**
-problem from `validate()`:
-
-- the **client** runs it before sending — the first refusal is the answer at once and nothing is
-  sent;
-- the **server** runs it again before the access check and the handler — a client is never trusted
-  to have checked.
-
-`validate()` reads the DTO's fields and nothing else: no IO, no clock, no database. A rule that
-needs data ("the invoice is already paid") is a refusal in the handler (`ctx.refuse`,
-`dartway-server`). Point at the input with `field:`; put the numbers a text needs in `params`
-(they travel as strings).
-
-A table request's page and page size below 1 are refused by the framework (`checkPage`) without any
-code.
-
-## 8. Refusal codes, channel kinds, upload purposes
+## 6. Refusal codes, channel kinds, upload purposes
 
 ```dart
-/// Why the server refuses. Codes only: the app renders each through its
-/// refusal texts, and a code added here needs a text there.
+/// Why the server refuses. Each code needs a text in the app's refusal texts.
 enum AcmeRefusal with DwRefusalCodes {
   /// An invoice that is paid cannot be edited or paid again.
   invoiceAlreadyPaid,
@@ -354,141 +182,54 @@ enum AcmeRefusal with DwRefusalCodes {
   amountNotPositive,
 }
 
-/// The app's live channels. The server declares who may subscribe to each.
-enum AcmeChannel with DwChannelKind {
-  /// One member's own invoices: a caller channel. Its owner only.
-  invoices,
+/// The app's live channels; the server declares who may subscribe to each.
+enum AcmeChannel with DwChannelKind { invoices, billing }
 
-  /// Everything the billing screens show. Managers only.
-  billing,
-}
-
-/// What an uploaded file is for. The server declares one rule per purpose.
+/// What an uploaded file is for; the server declares one rule per purpose.
 enum AcmeUpload with DwUploadPurpose {
   invoiceScan;
 
-  /// Read by the server's rule and by the app's picker alike.
   static const int invoiceScanMaxBytes = 10 * 1024 * 1024;
 }
 ```
 
-- **A refusal is a code with parameters, never a sentence.** The wire code is the enum value's name
-  (the framework's own are `dw.*`: `DwCoreRefusal`, `DwAuthRefusal`, `DwUploadRefusal`). Texts live in
-  the app — `dartway-data-layer`. Before adding a code, check whether `DwCoreRefusal.notFound`,
-  `forbidden`, `conflict` or `invalid` with a `field` already says it.
-- Doc-comment every code with when it happens and what the user can do — that comment is what the
-  person writing its text reads.
-- A channel kind's name must not contain `:`. Its access rule lives on the server
-  (`dartway-realtime`); a kind without one refuses every subscription.
-- Limits both sides read (max bytes, content types) sit on the purpose enum as constants. The rule
-  itself is the server's — `dartway-uploads`.
+- A refusal is a code with parameters (`field:`, `params:` as strings), never a sentence. Check first
+  whether `DwCoreRefusal.notFound`, `forbidden`, `conflict` or `invalid` with a `field` already says it.
+  Doc-comment every code: when it happens, what the user can do. Its text: `dartway-data-layer`.
+- A channel kind's name has no `:`. Its rule: `dartway-realtime`.
+- Limits both sides read sit on the purpose enum as constants. The rule: `dartway-uploads`.
 
-## 9. A DTO change is a contract change between app builds
+## 7. Generation
 
-The web app ships with the server, but an installed mobile build keeps calling the server it was
-built against — for weeks. The framework's own wire format is guarded by the protocol version and
-is not the project's concern; **the project's DTOs are**. What an old build does with a change:
+After any DTO (or row class) change: `dart run dartway_cli:dartway generate` from `__FLUTTER_PKG__`,
+commit the output with the change. It writes `*.dw.dart` and `lib/generated/dw_protocol.dart` here, row
+parts and `lib/generated/dw_schema.dart` in the server. Never edit them; a refused declaration is fixed
+in the declaration.
 
-| Change | Old installed build |
+## 8. A DTO change reaches installed app builds
+
+An installed build keeps calling with the contract it was built with, for weeks.
+
+| Change | An old build |
 |---|---|
-| add an optional field with a default (or nullable) to a request or command | keeps working — it omits the field, the server decodes the default |
-| add a field to a data object | keeps working — it ignores the key |
-| add a new request or command | keeps working — it never calls it |
-| add a **required** field without a default to a request or command | its calls fail as malformed (`400`) |
-| rename or remove a field of a data object the old build reads | the answer does not decode on the old build |
-| add a value to an enum carried in a data object | the old build reads an object holding it as "this app is out of date" and shows its update screen — no call fails, no list breaks; an open enum (below) reads it as `unknown` |
-| publish a new data object type on a channel old builds already listen to | the update does not decode: the old build reports a protocol error and reads that channel's requests again, every time |
-| rename or remove a request or command class | its calls answer "unknown call" (`404`) |
-| rename a refusal code | the old build shows its generic refusal text |
+| an optional field with a default on a request/command; a field on a data object; a new call | keeps working |
+| a required field without a default on a request/command | its calls fail `400` |
+| a data-object field renamed or removed | its answers do not decode |
+| a value added to an enum in a data object | shows its update screen (an open enum reads `unknown`) |
+| a new data object type on a channel old builds listen to | refetches that channel's requests on every update |
+| a request/command renamed or removed | `404` |
+| a refusal code renamed | its generic refusal text |
 
-**Prefer the additive change:** a new optional field, a new call beside the old one, the old handler
-kept until no supported build uses it. When a breaking change is unavoidable, **raise the breaking
-line of `__SHARED_PKG__/pubspec.yaml`'s `version:` in the same change** — the minor while it is below
-1.0 (`0.4.2` → `0.5.0`), the major after (`2.3.0` → `3.0.0`) — and run `dart run dartway_cli:dartway generate`.
-That version is the contract's (`DwContractVersion`): the generator writes it into the protocol both
-sides are compiled with, every call carries it as `Dw-Contract-Version`, and a server answers an app of
-an older line `426` with `dw.updateRequired` — the app shows its update-required screen instead of
-failing call by call. An additive change raises the patch, or nothing. Nothing is set in an
-environment at deploy time: the minimum ships with the code that needs it.
+Prefer the additive change. When a breaking one is unavoidable, **raise the breaking line of
+`__SHARED_PKG__/pubspec.yaml`'s `version:`** in the same change — the minor below 1.0, the major after —
+and regenerate: an app of an older line is then answered `426` and shows its update screen instead of
+failing call by call. An additive change raises the patch, or nothing. Nothing is set in an environment
+at deploy time: the minimum ships with the code. The commit and the PR say which kind of change it is,
+and a breaking one names the version it raises to.
 
-Say which kind of change it is in the commit and the pull request; a breaking one names the contract
-version it raises to.
+**Open enums** — `with DwOpenEnum` and a value `unknown` — only for display values an unknown one can be
+shown neutrally for (a feed entry's kind), never for anything behaviour depends on (a status, a role).
+`unknown` is never stored in a row; a command carrying it back is answered `dw.updateRequired`, so keep
+open enums out of commands.
 
-### Open enums — rare, by declaration
-
-Every enum is strict: a name the build does not know is not a value to guess, it means the app is
-older than the data, and the client switches to the update screen by itself. That is what keeps an
-exhaustive `switch` over an enum honest.
-
-Mark an enum `with DwOpenEnum` — with a value named `unknown` — only when a value is **for display
-alone** and an unknown one can be shown neutrally or left out without anyone acting on it wrongly:
-the kind of an entry in an activity feed, the icon of a notification. **Never** when behaviour
-depends on the value: a status that decides what may happen next, a role, a permission, a kind of
-payment. Every reader turns an unknown name into `unknown` (the screen must handle it: hide the
-row, show a neutral label); `unknown` can never be written to a **row**, so nothing stored is
-overwritten with it, and it does travel on the wire as itself — an older server answering from a
-row it cannot read sends `unknown` instead of failing the answer. `dart run dartway_cli:dartway generate` refuses an open enum without `unknown`.
-
-**An open enum in a command is the case those two halves create together**, and the framework
-answers it rather than leaving it to you: a build that read `unknown` off the wire and sends it
-back in a command is older than the data it is writing, so the call is answered
-`dw.updateRequired` — the update screen — and nothing is stored. Not an incident and not the
-caller's mistake: no alert reaches the operator, and no "internal server error" reaches the user.
-Prefer not to put an open enum in a command at all: it is a display value, and a command that
-carries one is asking an app to write back something it could not read.
-
-## 10. Generation
-
-After any change to a DTO file (and to a row class on the server), starting at the project root — the pinned CLI runs in `__FLUTTER_PKG__`:
-
-```bash
-cd __FLUTTER_PKG__
-dart run dartway_cli:dartway generate          # writes every *.dw.dart and lib/generated/ in both packages
-dart run dartway_cli:dartway generate --check  # exits non-zero when anything is out of date; CI runs it
-```
-
-**`dartway` here means the CLI this project pins**, which is `dart run dartway_cli:dartway <command>`
-— the project carries it as a dev dependency at the version of the framework it pins. A globally
-activated `dartway` may be older than the project and write the wrong files or lack the command
-outright; it refuses rather than guessing, and names the invocation above.
-
-It writes, in `__SHARED_PKG__`, the `*.dw.dart` parts and `lib/generated/dw_protocol.dart` — the
-protocol registry `<project>Protocol` that the server and `DwFlutterCore` are built with; in
-`__SERVER_PKG__`, the row parts and `lib/generated/dw_schema.dart`. **Never edit `*.dw.dart` or
-`lib/generated/` by hand**, and commit them with the source change: a stale codec is the wire, so a
-field its part does not know compiles, starts, and travels without that field. `dart run dartway_cli:dartway check`
-reports drift as `generatedCodeStale`, an error.
-
-The generator runs from the server package's dev dependency (`dartway_generator`), so it always
-matches the framework the project builds against. A refused declaration is printed with the file
-and the reason — fix the declaration, never the output.
-
-## 11. Test the contract where it lives
-
-`__SHARED_PKG__/test/` (plain `dart test`, no services) holds the checks that need no server:
-
-- every new DTO round-trips: `<project>Protocol.decodeNamed(dto.dwTypeName, dto.toJson())` equals
-  `dto`;
-- `validate()` answers the codes and fields you expect, and nothing for good input;
-- `matches`, `sort`, `onUpdate` answer what the screen needs
-  (`request.onUpdate(object)` → `DwUpdateAction.upsert` / `remove`);
-- a caller channel resolves per account: `request.channels.single.resolvedFor(42).wireName`.
-
-The skeleton's shared package ships such a test; extend it rather than starting another.
-
-## Checklist
-
-- [ ] Names: two words; `Get…`/`List…`; verb+object; `My…` without an account id.
-- [ ] The DTO sits in the file of its server feature (`src/<feature>.dart` or
-      `src/<feature>/<feature>_<part>.dart`), not in a file of its own name.
-- [ ] Request kind chosen by the table in section 3; `matches` on a maybe request; total order
-      for page/table/window.
-- [ ] Every parameter that changes a request's answer is a field; nothing impure in `channels`,
-      `matches`, `sort`, `positionOf`.
-- [ ] A command carries no owner, caller id, timestamp, server status or storage key.
-- [ ] Clearable edit fields are `DwFieldPatch<T>` defaulting to `keep()`.
-- [ ] `validate()` covers input rules, reads fields only; data rules stay in the handler.
-- [ ] New refusal codes documented; the app has a text for each.
-- [ ] The change is additive for installed builds, or it raises the breaking line of `__SHARED_PKG__`'s `version:`.
-- [ ] `dart run dartway_cli:dartway generate` run and its output committed; `dart run dartway_cli:dartway generate --check` passes.
-- [ ] The shared contract test covers the new DTOs.
+Contract tests (round trip, `validate()`, `onUpdate`, channels): `dartway-testing`.
