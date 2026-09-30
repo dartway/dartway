@@ -34,7 +34,6 @@ mixin _$ClubSessionRow on DwTableRow {
 
 extension ClubSessionRowCopyWith on ClubSessionRow {
   ClubSessionRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? serviceId,
     DwFieldPatch<int> previousSessionId = const DwFieldPatch.keep(),
     DateTime? startsAt,
@@ -42,13 +41,93 @@ extension ClubSessionRowCopyWith on ClubSessionRow {
     DwFieldPatch<String> note = const DwFieldPatch.keep(),
     DwFieldPatch<List<String>> labels = const DwFieldPatch.keep(),
   }) => ClubSessionRow(
-    id: id.apply(this.id),
+    id: id,
     serviceId: serviceId ?? this.serviceId,
     previousSessionId: previousSessionId.apply(this.previousSessionId),
     startsAt: startsAt ?? this.startsAt,
     capacity: capacity ?? this.capacity,
     note: note.apply(this.note),
     labels: labels.apply(this.labels),
+  );
+}
+
+mixin _$NewClubSessionRow on DwRowDraft<ClubSessionRow> {
+  NewClubSessionRow get _self => this as NewClubSessionRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewClubSessionRow &&
+          other.serviceId == _self.serviceId &&
+          other.previousSessionId == _self.previousSessionId &&
+          other.startsAt == _self.startsAt &&
+          other.capacity == _self.capacity &&
+          other.note == _self.note &&
+          dwListEquals(other.labels, _self.labels);
+
+  @override
+  int get hashCode => Object.hash(
+    _self.serviceId,
+    _self.previousSessionId,
+    _self.startsAt,
+    _self.capacity,
+    _self.note,
+    _self.labels == null ? null : Object.hashAll(_self.labels!),
+  );
+
+  @override
+  String toString() =>
+      'NewClubSessionRow(serviceId: ${_self.serviceId}, previousSessionId: ${_self.previousSessionId}, startsAt: ${_self.startsAt}, capacity: ${_self.capacity}, note: ${_self.note}, labels: ${_self.labels})';
+}
+
+/// A [ClubSessionRow] before insert: every column but the id.
+final class NewClubSessionRow extends DwRowDraft<ClubSessionRow>
+    with _$NewClubSessionRow {
+  const NewClubSessionRow({
+    required this.serviceId,
+    this.previousSessionId,
+    required this.startsAt,
+    required this.capacity,
+    this.note,
+    this.labels,
+  });
+
+  final int serviceId;
+  final int? previousSessionId;
+  final DateTime startsAt;
+  final int capacity;
+  final String? note;
+  final List<String>? labels;
+}
+
+extension NewClubSessionRowCopyWith on NewClubSessionRow {
+  NewClubSessionRow copyWith({
+    int? serviceId,
+    DwFieldPatch<int> previousSessionId = const DwFieldPatch.keep(),
+    DateTime? startsAt,
+    int? capacity,
+    DwFieldPatch<String> note = const DwFieldPatch.keep(),
+    DwFieldPatch<List<String>> labels = const DwFieldPatch.keep(),
+  }) => NewClubSessionRow(
+    serviceId: serviceId ?? this.serviceId,
+    previousSessionId: previousSessionId.apply(this.previousSessionId),
+    startsAt: startsAt ?? this.startsAt,
+    capacity: capacity ?? this.capacity,
+    note: note.apply(this.note),
+    labels: labels.apply(this.labels),
+  );
+}
+
+extension NewClubSessionRowWithId on NewClubSessionRow {
+  /// The row stored under [id], for `update`.
+  ClubSessionRow withId(int id) => ClubSessionRow(
+    id: id,
+    serviceId: serviceId,
+    previousSessionId: previousSessionId,
+    startsAt: startsAt,
+    capacity: capacity,
+    note: note,
+    labels: labels,
   );
 }
 
@@ -112,12 +191,21 @@ final class ClubSessionTable extends DwTableDef<ClubSessionRow> {
 
   @override
   Map<String, Object?> toRow(ClubSessionRow row) => {
-    if (row.id != null) 'id': row.id,
     'service_id': row.serviceId,
     'previous_session_id': row.previousSessionId,
     'starts_at': row.startsAt,
     'capacity': row.capacity,
     'note_text': row.note,
     'labels': row.labels,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewClubSessionRow draft) => {
+    'service_id': draft.serviceId,
+    'previous_session_id': draft.previousSessionId,
+    'starts_at': draft.startsAt,
+    'capacity': draft.capacity,
+    'note_text': draft.note,
+    'labels': draft.labels,
   };
 }

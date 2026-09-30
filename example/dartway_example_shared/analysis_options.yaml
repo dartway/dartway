@@ -1,1 +1,7 @@
 include: package:lints/recommended.yaml
+
+analyzer:
+  errors:
+    # A stored row's id is `int`: `row.id!` is noise that hides the `!` that
+    # guards a real null. On by default as a warning; an error here.
+    unnecessary_non_null_assertion: error

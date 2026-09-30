@@ -10,6 +10,7 @@ import '../analysis/framework.dart';
 import '../analysis/library_names.dart';
 import '../analysis/wire_type.dart';
 import '../diagnostic.dart';
+import '../dto/default_value_writer.dart';
 import '../emit/source_text.dart';
 import 'entity_model.dart';
 
@@ -17,10 +18,12 @@ import 'entity_model.dart';
 /// `docs/DESIGN.md` §8) into an [EntityClass].
 final class EntityReader {
   EntityReader(this.names, this.diagnostics)
-    : types = WireTypeReader(names, forEntity: true);
+    : types = WireTypeReader(names, forEntity: true),
+      defaults = DefaultValueWriter(names);
 
   final LibraryNames names;
   final WireTypeReader types;
+  final DefaultValueWriter defaults;
   final List<DwGenerationDiagnostic> diagnostics;
 
   /// Postgres truncates longer identifiers silently.
@@ -111,23 +114,28 @@ final class EntityReader {
         hasId = true;
         final type = fieldElement.type;
         if (!type.isDartCoreInt ||
-            type.nullabilitySuffix != NullabilitySuffix.question) {
+            type.nullabilitySuffix != NullabilitySuffix.none ||
+            !field.parameter.isRequiredNamed) {
           diagnostics.add(
             DwGenerationDiagnostic.at(
               location,
-              'the id of row class `$name` must be `int?` (a bigserial key, '
-              'null before insert), not `${type.getDisplayString()}`',
+              'the id of row class `$name` must be `int`, a required named '
+              'parameter (`required this.id`): a row is what the database '
+              'stored, and a row before insert is its draft, `New$name`; '
+              'found `${type.getDisplayString()}`'
+              '${field.parameter.isRequiredNamed ? '' : ' without `required`'}',
             ),
           );
           valid = false;
           continue;
         }
         fields.add(
-          EntityField(
+          const EntityField(
             name: 'id',
-            type: const ScalarWire('int', nullable: true),
-            spelling: 'int?',
+            type: ScalarWire('int', nullable: false),
+            spelling: 'int',
             column: null,
+            constructor: EntityParameter.required,
           ),
         );
         continue;
@@ -245,6 +253,35 @@ final class EntityReader {
             '${onDelete == null || onDelete == 'noAction' ? '' : ', onDelete: DwOnDelete.$onDelete'})';
       }
 
+      final EntityParameter constructor;
+      final parameter = field.parameter;
+      if (parameter.isRequiredNamed) {
+        constructor = EntityParameter.required;
+      } else if (!parameter.hasDefaultValue) {
+        constructor = EntityParameter.optional;
+      } else {
+        final value = parameter.computeConstantValue();
+        try {
+          final written = value == null
+              ? throw const UnsupportedDefault('it does not evaluate')
+              : defaults.write(value);
+          constructor = written == null
+              ? EntityParameter.optional
+              : EntityParameter.defaulted(written.expression);
+        } on UnsupportedDefault catch (problem) {
+          diagnostics.add(
+            DwGenerationDiagnostic.at(
+              location,
+              'the default of field `$fieldName` of `$name` cannot be written '
+              'into the generated `New$name`, whose constructor repeats it: '
+              '${problem.reason}',
+            ),
+          );
+          valid = false;
+          continue;
+        }
+      }
+
       final defaultValue = _annotation(annotations, 'DwDefaultValue');
       final defaultSql = defaultValue?.getField('sql')?.toStringValue();
 
@@ -264,6 +301,7 @@ final class EntityReader {
                 : 'DwDefaultValue(${dartString(defaultSql)})',
             references: references,
           ),
+          constructor: constructor,
         ),
       );
     }
@@ -272,8 +310,8 @@ final class EntityReader {
       diagnostics.add(
         DwGenerationDiagnostic.at(
           element,
-          'row class `$name` must declare `@override final int? id;` with a '
-          'named constructor parameter `this.id`',
+          'row class `$name` must declare `@override final int id;` with a '
+          'named constructor parameter `required this.id`',
         ),
       );
       valid = false;

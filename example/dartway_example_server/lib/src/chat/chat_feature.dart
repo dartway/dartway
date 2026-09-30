@@ -3,11 +3,20 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 import '../core/call_context.dart';
 import 'chat_handlers.dart';
+import 'chat_rows.dart';
 
 /// The staff chat: its channels, messages and read positions.
 final chatFeature = DwServerFeature(
   'chat',
   handlers: chatHandlers,
+  startup: [
+    DwSeedRows(
+      'staff channels',
+      table: ChatChannelRow.tableDef,
+      key: (t) => [t.slug],
+      rows: staffChannels,
+    ),
+  ],
   channels: [
     DwChannelRule.single(
       DartwayExampleChannel.staffChannels,

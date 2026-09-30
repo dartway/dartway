@@ -32,19 +32,91 @@ mixin _$ClubServiceRow on DwTableRow {
 
 extension ClubServiceRowCopyWith on ClubServiceRow {
   ClubServiceRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     String? title,
     String? description,
     int? durationMinutes,
     int? price,
     DwFieldPatch<String> imageUrl = const DwFieldPatch.keep(),
   }) => ClubServiceRow(
-    id: id.apply(this.id),
+    id: id,
     title: title ?? this.title,
     description: description ?? this.description,
     durationMinutes: durationMinutes ?? this.durationMinutes,
     price: price ?? this.price,
     imageUrl: imageUrl.apply(this.imageUrl),
+  );
+}
+
+mixin _$NewClubServiceRow on DwRowDraft<ClubServiceRow> {
+  NewClubServiceRow get _self => this as NewClubServiceRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewClubServiceRow &&
+          other.title == _self.title &&
+          other.description == _self.description &&
+          other.durationMinutes == _self.durationMinutes &&
+          other.price == _self.price &&
+          other.imageUrl == _self.imageUrl;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.title,
+    _self.description,
+    _self.durationMinutes,
+    _self.price,
+    _self.imageUrl,
+  );
+
+  @override
+  String toString() =>
+      'NewClubServiceRow(title: ${_self.title}, description: ${_self.description}, durationMinutes: ${_self.durationMinutes}, price: ${_self.price}, imageUrl: ${_self.imageUrl})';
+}
+
+/// A [ClubServiceRow] before insert: every column but the id.
+final class NewClubServiceRow extends DwRowDraft<ClubServiceRow>
+    with _$NewClubServiceRow {
+  const NewClubServiceRow({
+    required this.title,
+    required this.description,
+    required this.durationMinutes,
+    required this.price,
+    this.imageUrl,
+  });
+
+  final String title;
+  final String description;
+  final int durationMinutes;
+  final int price;
+  final String? imageUrl;
+}
+
+extension NewClubServiceRowCopyWith on NewClubServiceRow {
+  NewClubServiceRow copyWith({
+    String? title,
+    String? description,
+    int? durationMinutes,
+    int? price,
+    DwFieldPatch<String> imageUrl = const DwFieldPatch.keep(),
+  }) => NewClubServiceRow(
+    title: title ?? this.title,
+    description: description ?? this.description,
+    durationMinutes: durationMinutes ?? this.durationMinutes,
+    price: price ?? this.price,
+    imageUrl: imageUrl.apply(this.imageUrl),
+  );
+}
+
+extension NewClubServiceRowWithId on NewClubServiceRow {
+  /// The row stored under [id], for `update`.
+  ClubServiceRow withId(int id) => ClubServiceRow(
+    id: id,
+    title: title,
+    description: description,
+    durationMinutes: durationMinutes,
+    price: price,
+    imageUrl: imageUrl,
   );
 }
 
@@ -88,12 +160,20 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
 
   @override
   Map<String, Object?> toRow(ClubServiceRow row) => {
-    if (row.id != null) 'id': row.id,
     'title': row.title,
     'description': row.description,
     'duration_minutes': row.durationMinutes,
     'price': row.price,
     'image_url': row.imageUrl,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewClubServiceRow draft) => {
+    'title': draft.title,
+    'description': draft.description,
+    'duration_minutes': draft.durationMinutes,
+    'price': draft.price,
+    'image_url': draft.imageUrl,
   };
 }
 
@@ -128,19 +208,91 @@ mixin _$ClubSessionRow on DwTableRow {
 
 extension ClubSessionRowCopyWith on ClubSessionRow {
   ClubSessionRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? serviceId,
     DwFieldPatch<int> coachProfileId = const DwFieldPatch.keep(),
     DateTime? startsAt,
     int? capacity,
     int? bookedCount,
   }) => ClubSessionRow(
-    id: id.apply(this.id),
+    id: id,
     serviceId: serviceId ?? this.serviceId,
     coachProfileId: coachProfileId.apply(this.coachProfileId),
     startsAt: startsAt ?? this.startsAt,
     capacity: capacity ?? this.capacity,
     bookedCount: bookedCount ?? this.bookedCount,
+  );
+}
+
+mixin _$NewClubSessionRow on DwRowDraft<ClubSessionRow> {
+  NewClubSessionRow get _self => this as NewClubSessionRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewClubSessionRow &&
+          other.serviceId == _self.serviceId &&
+          other.coachProfileId == _self.coachProfileId &&
+          other.startsAt == _self.startsAt &&
+          other.capacity == _self.capacity &&
+          other.bookedCount == _self.bookedCount;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.serviceId,
+    _self.coachProfileId,
+    _self.startsAt,
+    _self.capacity,
+    _self.bookedCount,
+  );
+
+  @override
+  String toString() =>
+      'NewClubSessionRow(serviceId: ${_self.serviceId}, coachProfileId: ${_self.coachProfileId}, startsAt: ${_self.startsAt}, capacity: ${_self.capacity}, bookedCount: ${_self.bookedCount})';
+}
+
+/// A [ClubSessionRow] before insert: every column but the id.
+final class NewClubSessionRow extends DwRowDraft<ClubSessionRow>
+    with _$NewClubSessionRow {
+  const NewClubSessionRow({
+    required this.serviceId,
+    this.coachProfileId,
+    required this.startsAt,
+    required this.capacity,
+    this.bookedCount = 0,
+  });
+
+  final int serviceId;
+  final int? coachProfileId;
+  final DateTime startsAt;
+  final int capacity;
+  final int bookedCount;
+}
+
+extension NewClubSessionRowCopyWith on NewClubSessionRow {
+  NewClubSessionRow copyWith({
+    int? serviceId,
+    DwFieldPatch<int> coachProfileId = const DwFieldPatch.keep(),
+    DateTime? startsAt,
+    int? capacity,
+    int? bookedCount,
+  }) => NewClubSessionRow(
+    serviceId: serviceId ?? this.serviceId,
+    coachProfileId: coachProfileId.apply(this.coachProfileId),
+    startsAt: startsAt ?? this.startsAt,
+    capacity: capacity ?? this.capacity,
+    bookedCount: bookedCount ?? this.bookedCount,
+  );
+}
+
+extension NewClubSessionRowWithId on NewClubSessionRow {
+  /// The row stored under [id], for `update`.
+  ClubSessionRow withId(int id) => ClubSessionRow(
+    id: id,
+    serviceId: serviceId,
+    coachProfileId: coachProfileId,
+    startsAt: startsAt,
+    capacity: capacity,
+    bookedCount: bookedCount,
   );
 }
 
@@ -195,11 +347,19 @@ final class ClubSessionTable extends DwTableDef<ClubSessionRow> {
 
   @override
   Map<String, Object?> toRow(ClubSessionRow row) => {
-    if (row.id != null) 'id': row.id,
     'service_id': row.serviceId,
     'coach_profile_id': row.coachProfileId,
     'starts_at': row.startsAt,
     'capacity': row.capacity,
     'booked_count': row.bookedCount,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewClubSessionRow draft) => {
+    'service_id': draft.serviceId,
+    'coach_profile_id': draft.coachProfileId,
+    'starts_at': draft.startsAt,
+    'capacity': draft.capacity,
+    'booked_count': draft.bookedCount,
   };
 }

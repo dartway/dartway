@@ -103,7 +103,7 @@ ctx.publish(
 for (final booking in affected) {
   ctx.publish(
     AppChannels.bookingsOf(clients[booking.clientProfileId]!),
-    DwDeletedObject.of<SessionBooking>(booking.id!, ctx.protocol),
+    DwDeletedObject.of<SessionBooking>(booking.id, ctx.protocol),
   );
 }
 ```

@@ -65,19 +65,13 @@ final class FakeApp {
         trackedEvents.addAll(command.events);
         return const DwCallOk<void>(null);
       })
-      ..onRequest<ListAppSettings>(
-        (request, call) => DwCallOk(<AppSetting>[...settings]),
-      )
+      ..onRequest<GetAppSettings>((request, call) => DwCallOk(settings))
       ..onCommand<UpdateMyProfile>((command, call) {
         profile = profile.copyWith(
           firstName: command.firstName,
           lastName: command.lastName,
           gender: command.gender,
-          avatarUrl: switch (command.avatarFileId) {
-            DwSetField(:final value) => DwFieldPatch.set(avatarUrls[value]!),
-            DwClearField() => const DwFieldPatch.clear(),
-            _ => const DwFieldPatch.keep(),
-          },
+          avatarUrl: command.avatarFileId.map((id) => avatarUrls[id]!),
         );
         call.publish(profileChannel, [profile]);
         return DwCallOk(profile);
@@ -90,7 +84,7 @@ final class FakeApp {
   final trackedEvents = <DwTrackedEvent>[];
 
   UserProfile profile;
-  final settings = <AppSetting>[];
+  AppSettings settings = const AppSettings();
 
   /// Public URLs of the files a `DwFakeStorage` confirmed, by id.
   final Map<int, String> avatarUrls = {};

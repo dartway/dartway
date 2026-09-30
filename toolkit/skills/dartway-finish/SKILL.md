@@ -276,6 +276,8 @@ run and why.
   every row, and the file looks ordinary. Every `backfill:` is a data decision: check the expression is
   what existing rows should hold. A migration file that **existed on the base branch and is modified**
   in the diff is a stop, not a note: an applied migration is never edited (`dartway-migrations`).
+  So is a diff that changes `migrations` > `dataChecksAfter` in `deploy/config.yaml`: moving it
+  exempts migrations from `migrationChangesData` — ask the human.
 
 ### A.6 Findings that outlive this task
 

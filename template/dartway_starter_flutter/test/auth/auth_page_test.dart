@@ -189,7 +189,7 @@ void main() {
     final app = await TestApp.start(tester, fake);
 
     expect(find.text('What is your name?'), findsOneWidget);
-    expect(app.server.requestsOf<ListAppSettings>(), isEmpty);
+    expect(app.server.requestsOf<GetAppSettings>(), isEmpty);
 
     await app.enter(tester, find.byType(TextField), '  Vera ');
     await app.tap(tester, find.text('Continue'));

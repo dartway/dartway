@@ -1,9 +1,32 @@
 # Changelog
 
-## 0.21.0-dev.9
+## 0.21.0-dev.14
 
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the new
   state and command checks of `dartway check` (dartway/dartway#389).
+
+## 0.21.0-dev.13
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#388).
+
+## 0.21.0-dev.12
+
+- Nothing changed here; the family moves in lockstep with `dartway_orm` (dartway/dartway#384).
+
+## 0.21.0-dev.11
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
+
+## 0.21.0-dev.10
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
+
+## 0.21.0-dev.9
+
+- **Every call carries the device's UTC offset** (`Dw-Utc-Offset`), read at each send, so a change
+  of zone or of daylight saving time reaches the server with the next call; the server reads it as
+  `ctx.callerUtcOffset` (dartway/dartway#385). `DwAppClient(utcOffset:)` reports a fixed offset
+  instead — for tests; `DwFakeServer.newClient` pins zero unless told otherwise.
 
 ## 0.21.0-dev.8
 

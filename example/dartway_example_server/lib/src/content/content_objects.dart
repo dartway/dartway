@@ -14,12 +14,12 @@ abstract final class ContentObjects {
     UserProfileRow? author,
   }) async {
     final authors = author != null
-        ? {author.id!: author}
+        ? {author.id: author}
         : await ProfileObjects.rowsById(db, rows.map((p) => p.authorProfileId));
     return [
       for (final row in rows)
         NewsPost(
-          id: row.id!,
+          id: row.id,
           title: row.title,
           text: row.text,
           author: ProfileObjects.person(authors[row.authorProfileId]!),
@@ -27,7 +27,4 @@ abstract final class ContentObjects {
         ),
     ];
   }
-
-  static AppSetting setting(AppSettingRow row) =>
-      AppSetting(id: row.key, value: row.value);
 }

@@ -5,7 +5,7 @@ description: >-
   both compile: data objects (DwDataObject, an int or String id), requests (DwSingleRequest,
   DwMaybeRequest, DwListRequest, DwPageRequest, DwTableRequest, DwWindowRequest and their named
   constructors) with channels, commands (DwActionCommand<R>, one result value), DwFieldPatch for
-  clearable fields, defaults on the wire, DwSelfValidating, the project's refusal enum
+  clearable fields and its helpers, settings objects, defaults on the wire, DwSelfValidating, the project's refusal enum
   (DwRefusalCodes), channel kinds (DwChannelKind), upload purposes (DwUploadPurpose), naming
   (two words, Get…/List…, verb+object), and generation (`dart run dartway_cli:dartway generate`, `*.dw.dart`,
   lib/generated/ — never edited). Also what a DTO change costs installed app builds and when to
@@ -194,8 +194,8 @@ A request is a value: the client caches its state under the request itself (equa
 from the fields) and keeps it live. So:
 
 - **everything that changes the answer is a field.** A status filter, a search string, a page, a
-  date. "Today" is a `DateTime day` field the widget fills in — not `DateTime.now()` in the handler,
-  which would answer differently for two equal requests;
+  date. "Today" is a `DateTime day` field the widget fills in — not `ctx.now` or
+  `ctx.callerLocalTime` in the handler, which would answer differently for two equal requests;
 - **the caller is not a field.** "My" requests carry no account or profile id: the handler reads the
   caller from its context, and the client already keeps state per signed-in account. A field holding
   the caller's own id is a field anyone can change to someone else's (`dartway-access`);
@@ -207,7 +207,8 @@ from the fields) and keeps it live. So:
 A command carries **what the user decided**: the ids of the things it acts on and the values typed
 in. It never carries what the server decides — the owner, the caller's id, timestamps, a status
 the server moves, a price the server computes, a storage key. The handler derives those from its
-context; a field for them is an invitation to forge them.
+context; a field for them is an invitation to forge them. Nor the caller's UTC offset: the app sends
+it with every call, and the handler reads `ctx.callerUtcOffset` (`dartway-server`).
 
 The answer `R` is **one value** (D-006): a data object, a JSON primitive (`int`, `double`, `num`,
 `String`, `bool`), or nothing (`DwActionCommand<void>`; a nullable `R` may answer `null`). A
@@ -232,6 +233,18 @@ field is never itself nullable. On the wire a kept field is absent, a set one ca
 cleared one an explicit `null`. The server passes it straight to the row's generated `copyWith`,
 whose nullable parameters take a `DwFieldPatch` too.
 
+**A patch is read through its helpers, never by matching `DwSetField`/`DwClearField`/`DwKeepField`**
+(`fieldPatchMatched` fails the check):
+
+| Need | Write |
+|---|---|
+| an existing row | `row.copyWith(note: command.note)` |
+| a row being inserted | the same `copyWith` on the new row, or `command.note.apply(null)` for a constructor argument — kept means the column's default |
+| a text a person typed: trimmed, blank clears | `command.note.trimmedOrCleared` |
+| a check on a new value only (an owned file, a length) | `if (command.photoFileId.newValue case final id?) …` |
+| is it set / cleared / kept | `isSet`, `isCleared`, `isKept` |
+| the patch of another type | `command.photoFileId.map((id) => urlOf(id))` |
+
 ```dart
 /// Edits a draft invoice. A field left as it is is kept.
 final class EditInvoice extends DwActionCommand<CustomerInvoice>
@@ -254,6 +267,42 @@ final class EditInvoice extends DwActionCommand<CustomerInvoice>
   ];
 }
 ```
+
+### A settings object
+
+The app's settings are one data object: a default for every field — the value while nobody has
+saved one — and a fixed `id`. The server keeps it through `ctx.settings` (`dartway-server`); it is
+read with a `DwSingleRequest` and changed by a command whose fields keep when absent — `null` for a
+non-nullable setting, a `DwFieldPatch` for a nullable one:
+
+```dart
+final class BillingSettings extends DwDataObject with _$BillingSettings {
+  const BillingSettings({this.dueDays = 14, this.invoiceFooter});
+
+  @override
+  String get id => 'billing';
+
+  final int dueDays;
+  final String? invoiceFooter;
+}
+
+final class SaveBillingSettings extends DwActionCommand<BillingSettings>
+    with _$SaveBillingSettings {
+  const SaveBillingSettings({
+    this.dueDays,
+    this.invoiceFooter = const DwFieldPatch.keep(),
+  });
+
+  final int? dueDays;
+
+  /// Nullable in the object, so a patch here: it can be cleared.
+  final DwFieldPatch<String> invoiceFooter;
+}
+```
+
+A nullable setting is never `''` meaning none: the object holds `null`, and the command clears it
+with `DwFieldPatch.clear()`.
+Never a key/value list of strings: every reader then parses text and supplies its own default.
 
 ## 6. Defaults on the wire
 

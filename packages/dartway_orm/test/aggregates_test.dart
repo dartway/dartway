@@ -11,13 +11,13 @@ void main() {
   final database = useTestDatabase();
   DwDatabaseHandle db() => database().db;
 
-  ClubServiceRow service(
+  NewClubServiceRow service(
     String title, {
     ClubServiceKind kind = ClubServiceKind.group,
     double? price,
     List<String> tags = const [],
     List<ClubServiceKind> offeredAs = const [],
-  }) => ClubServiceRow(
+  }) => NewClubServiceRow(
     title: title,
     kind: kind,
     price: price,
@@ -34,25 +34,25 @@ void main() {
     await db().execute(
       'TRUNCATE app_setting, club_session, club_service RESTART IDENTITY CASCADE',
     );
-    yoga = (await db().clubServices.insert(service('Yoga', price: 10))).id!;
+    yoga = (await db().clubServices.insert(service('Yoga', price: 10))).id;
     boxing = (await db().clubServices.insert(
       service('Boxing', kind: ClubServiceKind.personal),
-    )).id!;
+    )).id;
     await db().clubSessions.insertAll([
-      ClubSessionRow(
+      NewClubSessionRow(
         serviceId: yoga,
         startsAt: DateTime.utc(2026, 9, 1, 9),
         capacity: 10,
         labels: const ['morning'],
       ),
-      ClubSessionRow(
+      NewClubSessionRow(
         serviceId: yoga,
         startsAt: DateTime.utc(2026, 9, 2, 9),
         capacity: 12,
         note: 'full',
         labels: const [],
       ),
-      ClubSessionRow(
+      NewClubSessionRow(
         serviceId: boxing,
         startsAt: DateTime.utc(2026, 9, 1, 18),
         capacity: 4,
@@ -187,7 +187,7 @@ void main() {
   });
 
   group('upsert', () {
-    AppSettingRow setting(String key, String value) => AppSettingRow(
+    NewAppSettingRow setting(String key, String value) => NewAppSettingRow(
       key: key,
       value: value,
       updatedAt: DateTime.utc(2026, 9, 1),
@@ -218,6 +218,122 @@ void main() {
       expect(
         await db().appSettings.count(where: (t) => t.key.equals('signUp')),
         1,
+      );
+    });
+  });
+
+  group('upsertAll', () {
+    NewAppSettingRow setting(
+      String key,
+      String value, {
+      Map<String, int> limits = const {},
+    }) => NewAppSettingRow(
+      key: key,
+      value: value,
+      limits: limits,
+      updatedAt: DateTime.utc(2026, 9, 1),
+    );
+
+    Future<Map<String, String>> stored() async => {
+      for (final row in await db().appSettings.find()) row.key: row.value,
+    };
+
+    test('inserts what is missing and counts it', () async {
+      final written = await db().appSettings.upsertAll([
+        setting('appName', 'Club'),
+        setting('signUp', 'true', limits: {'max': 3}),
+      ], conflictOn: (t) => [t.key]);
+      expect(written, 2);
+      expect(await stored(), {'appName': 'Club', 'signUp': 'true'});
+    });
+
+    test('run again with the same rows, writes nothing', () async {
+      final rows = [
+        setting('appName', 'Club'),
+        setting('signUp', 'true', limits: {'max': 3}),
+      ];
+      await db().appSettings.upsertAll(rows, conflictOn: (t) => [t.key]);
+      final before = {
+        for (final row in await db().appSettings.find()) row.key: row,
+      };
+      expect(
+        await db().appSettings.upsertAll(rows, conflictOn: (t) => [t.key]),
+        0,
+      );
+      final after = {
+        for (final row in await db().appSettings.find()) row.key: row,
+      };
+      expect(after, before, reason: 'ids and values stay as they were');
+    });
+
+    test('an unchanged row is not rewritten', () async {
+      Future<Map<String, String>> versions() async => {
+        for (final row in await db().query(
+          'SELECT "key", xmin::text AS version FROM app_setting',
+        ))
+          row.get<String>('key'): row.get<String>('version'),
+      };
+      final rows = [setting('appName', 'Club'), setting('signUp', 'true')];
+      await db().appSettings.upsertAll(rows, conflictOn: (t) => [t.key]);
+      final first = await versions();
+      await db().appSettings.upsertAll(rows, conflictOn: (t) => [t.key]);
+      expect(await versions(), first);
+    });
+
+    test('writes a changed row over the stored one, by its key', () async {
+      await db().appSettings.upsertAll([
+        setting('appName', 'Club'),
+        setting('signUp', 'true'),
+      ], conflictOn: (t) => [t.key]);
+      final id = (await db().appSettings.findFirst(
+        where: (t) => t.key.equals('appName'),
+      ))!.id;
+      expect(
+        await db().appSettings.upsertAll([
+          setting('appName', 'Club Two'),
+          setting('signUp', 'true'),
+        ], conflictOn: (t) => [t.key]),
+        1,
+      );
+      final renamed = (await db().appSettings.findFirst(
+        where: (t) => t.key.equals('appName'),
+      ))!;
+      expect(renamed.id, id);
+      expect(renamed.value, 'Club Two');
+    });
+
+    test('leaves rows it does not name alone', () async {
+      await db().appSettings.insert(setting('theme', 'dark'));
+      await db().appSettings.upsertAll([
+        setting('appName', 'Club'),
+      ], conflictOn: (t) => [t.key]);
+      expect(await stored(), {'theme': 'dark', 'appName': 'Club'});
+    });
+
+    test('refuses two rows with one key', () async {
+      await expectLater(
+        db().appSettings.upsertAll([
+          setting('appName', 'A'),
+          setting('appName', 'B'),
+        ], conflictOn: (t) => [t.key]),
+        throwsArgumentError,
+      );
+      expect(await db().appSettings.count(), 0);
+    });
+
+    test('refuses a nullable conflict column', () async {
+      await expectLater(
+        db().appSettings.upsertAll([
+          setting('appName', 'A'),
+        ], conflictOn: (t) => [t.featuredServiceId]),
+        throwsArgumentError,
+      );
+    });
+
+    test('nothing is sent for no rows', () async {
+      expect(
+        await db().appSettings.upsertAll(const [], conflictOn: (t) => [t.key]),
+        0,
       );
     });
   });

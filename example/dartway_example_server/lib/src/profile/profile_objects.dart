@@ -8,7 +8,7 @@ import 'profile_rows.dart';
 /// the card other people's screens show for them.
 abstract final class ProfileObjects {
   static PersonCard person(UserProfileRow row) => PersonCard(
-    id: row.id!,
+    id: row.id,
     firstName: row.firstName,
     lastName: row.lastName,
     imageUrl: row.imageUrl,
@@ -16,7 +16,7 @@ abstract final class ProfileObjects {
   );
 
   static UserProfile profile(UserProfileRow row) => UserProfile(
-    id: row.id!,
+    id: row.id,
     accountId: row.accountId,
     phone: row.phone,
     firstName: row.firstName,
@@ -36,7 +36,7 @@ abstract final class ProfileObjects {
     final wanted = ids.whereType<int>().toSet();
     if (wanted.isEmpty) return const {};
     return {
-      for (final row in await db.userProfiles.findByIds(wanted)) row.id!: row,
+      for (final row in await db.userProfiles.findByIds(wanted)) row.id: row,
     };
   }
 }

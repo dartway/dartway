@@ -41,7 +41,7 @@ abstract final class AppAuth {
     // signed-in account without a profile cannot exist.
     onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
       final profile = await AppAuth.createProfile(
-        ctx.db,
+        ctx,
         accountId,
         identifier,
         switch (origin) {
@@ -76,7 +76,7 @@ abstract final class AppAuth {
       // coming, and the next member should be able to book them.
       final held = await ctx.db.sessionBookings.find(
         where: (t) =>
-            t.clientProfileId.equals(profile.id!) &
+            t.clientProfileId.equals(profile.id) &
             t.status.equals(BookingStatus.booked),
         lock: DwRowLock.forUpdate,
       );
@@ -105,7 +105,7 @@ abstract final class AppAuth {
           gender: const DwFieldPatch.clear(),
           testVerificationCode: const DwFieldPatch.clear(),
           agreedForMarketing: false,
-          deletedAt: DwFieldPatch.set(DateTime.now()),
+          deletedAt: DwFieldPatch.set(ctx.now),
         ),
       );
       // The admins' members table holds the row: it must show what it became,
@@ -144,20 +144,21 @@ abstract final class AppAuth {
         return profile?.testVerificationCode;
       });
 
-  /// The profile a new account starts with. Separate from the hook so tools that
-  /// create accounts without a running server (the dev seed) create the same row.
+  /// The profile a new account starts with, its conditions accepted as of
+  /// `ctx.now`. Separate from the hook so tools that create accounts without a
+  /// running server (the dev seed) create the same row.
   static Future<UserProfileRow> createProfile(
-    DwDatabaseHandle db,
+    DwCallContext ctx,
     int accountId,
     String phone,
     Map<String, String> registration,
-  ) => db.userProfiles.insert(
-    UserProfileRow(
+  ) => ctx.db.userProfiles.insert(
+    NewUserProfileRow(
       accountId: accountId,
       phone: phone,
       firstName: registration['firstName']?.trim() ?? '',
       agreedForMarketing: registration['marketing'] == 'true',
-      conditionsAcceptedAt: DateTime.now(),
+      conditionsAcceptedAt: ctx.now,
     ),
   );
 

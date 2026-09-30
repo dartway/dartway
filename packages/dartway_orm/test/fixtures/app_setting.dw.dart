@@ -34,19 +34,93 @@ mixin _$AppSettingRow on DwTableRow {
 
 extension AppSettingRowCopyWith on AppSettingRow {
   AppSettingRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     String? key,
     String? value,
     Map<String, int>? limits,
     DwFieldPatch<int> featuredServiceId = const DwFieldPatch.keep(),
     DateTime? updatedAt,
   }) => AppSettingRow(
-    id: id.apply(this.id),
+    id: id,
     key: key ?? this.key,
     value: value ?? this.value,
     limits: limits ?? this.limits,
     featuredServiceId: featuredServiceId.apply(this.featuredServiceId),
     updatedAt: updatedAt ?? this.updatedAt,
+  );
+}
+
+mixin _$NewAppSettingRow on DwRowDraft<AppSettingRow> {
+  NewAppSettingRow get _self => this as NewAppSettingRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewAppSettingRow &&
+          other.key == _self.key &&
+          other.value == _self.value &&
+          dwMapEquals(other.limits, _self.limits) &&
+          other.featuredServiceId == _self.featuredServiceId &&
+          other.updatedAt == _self.updatedAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.key,
+    _self.value,
+    Object.hashAllUnordered(
+      _self.limits.entries.map((e) => Object.hash(e.key, e.value)),
+    ),
+    _self.featuredServiceId,
+    _self.updatedAt,
+  );
+
+  @override
+  String toString() =>
+      'NewAppSettingRow(key: ${_self.key}, value: ${_self.value}, limits: ${_self.limits}, featuredServiceId: ${_self.featuredServiceId}, updatedAt: ${_self.updatedAt})';
+}
+
+/// A [AppSettingRow] before insert: every column but the id.
+final class NewAppSettingRow extends DwRowDraft<AppSettingRow>
+    with _$NewAppSettingRow {
+  const NewAppSettingRow({
+    required this.key,
+    required this.value,
+    this.limits = const <String, int>{},
+    this.featuredServiceId,
+    required this.updatedAt,
+  });
+
+  final String key;
+  final String value;
+  final Map<String, int> limits;
+  final int? featuredServiceId;
+  final DateTime updatedAt;
+}
+
+extension NewAppSettingRowCopyWith on NewAppSettingRow {
+  NewAppSettingRow copyWith({
+    String? key,
+    String? value,
+    Map<String, int>? limits,
+    DwFieldPatch<int> featuredServiceId = const DwFieldPatch.keep(),
+    DateTime? updatedAt,
+  }) => NewAppSettingRow(
+    key: key ?? this.key,
+    value: value ?? this.value,
+    limits: limits ?? this.limits,
+    featuredServiceId: featuredServiceId.apply(this.featuredServiceId),
+    updatedAt: updatedAt ?? this.updatedAt,
+  );
+}
+
+extension NewAppSettingRowWithId on NewAppSettingRow {
+  /// The row stored under [id], for `update`.
+  AppSettingRow withId(int id) => AppSettingRow(
+    id: id,
+    key: key,
+    value: value,
+    limits: limits,
+    featuredServiceId: featuredServiceId,
+    updatedAt: updatedAt,
   );
 }
 
@@ -97,11 +171,19 @@ final class AppSettingTable extends DwTableDef<AppSettingRow> {
 
   @override
   Map<String, Object?> toRow(AppSettingRow row) => {
-    if (row.id != null) 'id': row.id,
     'key': row.key,
     'value': row.value,
     'limits': row.limits,
     'featured_service_id': row.featuredServiceId,
     'updated_at': row.updatedAt,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewAppSettingRow draft) => {
+    'key': draft.key,
+    'value': draft.value,
+    'limits': draft.limits,
+    'featured_service_id': draft.featuredServiceId,
+    'updated_at': draft.updatedAt,
   };
 }

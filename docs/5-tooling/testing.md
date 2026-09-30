@@ -77,6 +77,8 @@ end-to-end test imports nothing else of the framework:
 | `DwTestDatabase.create(prefix:)` | A database of its own for one test file, on the server `DW_DATABASE_*` names; `config` goes to `DwAppServer(database:)`, `drop()` removes it |
 | `DwTestStorage.create(prefix:)` | A public and a private bucket of its own on the storage `DW_STORAGE_*` names, provisioned as a project's are; `config` goes to `DwFileStorage`, `drop()` removes both with their objects |
 | `DwTestServer.start(server)` | Starts a `DwAppServer` on a free loopback port without signal handling — migrations applied, handlers validated, exactly as `bin/server.dart` starts it. `db` is its database, `wakeJobs()` runs the job executor now, `stop()` stops every client it handed out and then the server |
+| `DwTestClock(at)` | The server's clock for `DwAppServer(clock:)`: it stands at `at` until the test calls `advance(by)` or `moveTo(at)`, and each move wakes the job executor — what `ctx.now` answers and when a job is due ([jobs](../4-server/jobs.md#time-is-the-servers-clock)). A retry, a push retry or a recurring job waits until it is moved past; database-stamped times keep real time |
+| `utcOffset` | The UTC offset every `caller()` and `connectClient()` of this server reports as the device's, `Duration.zero` unless set — so `ctx.callerUtcOffset` never depends on the machine's zone. `connectClient(utcOffset:)` names another for one client; `null` makes a raw caller send none |
 | `caller(token:)` → `DwTestCaller` | Raw calls as a client sends them: the path, the headers and the body, a fresh `Dw-Idempotency-Key` per command. `call(dto)` answers a `DwTestAnswer` — `status`, `headers`, `response`, `value(call)`, `updates`, `refusal`; `raw(...)` sends anything. For tests of the wire itself |
 | `openLive()` → `DwTestLiveSocket` | A raw live socket that has read its `hello`: `authenticate`, `subscribe`, `waitFor`, `expect<T>`, `expectSilence` |
 | `connectClient()` | A started, real `DwAppClient` of this server — real HTTP, the real live socket — with `dwTestClientOptions` (millisecond retries, no release delay). Transports passed in wrap the real ones, to lose an answer or watch the frames |
@@ -87,14 +89,19 @@ end-to-end test imports nothing else of the framework:
 The skeleton wraps them once per test file (`template/dartway_starter_server/test/support/app_harness.dart`):
 
 ```dart
-static Future<AppHarness> start({DwFileStorageConfig? storage}) async {
+static Future<AppHarness> start({
+  DwFileStorageConfig? storage,
+  DateTime? now,
+}) async {
   final database = await DwTestDatabase.create(prefix: 'app_test');
+  final clock = DwTestClock(now ?? DateTime.now());
   late final AppHarness harness;
   final server = await DwTestServer.start(
     DartwayStarterServer.build(
       database: database.config,
       storage: storage,
       port: 0,
+      clock: clock,
       auth: AppAuth.config(
         // Tests ask one identifier for several codes within a minute.
         resendDelay: Duration.zero,
@@ -103,12 +110,13 @@ static Future<AppHarness> start({DwFileStorageConfig? storage}) async {
       ),
     ),
   );
-  return harness = AppHarness._(database, server);
+  return harness = AppHarness._(database, server, clock);
 }
 ```
 
 The server under test is built by the same function `bin/server.dart` uses, with the sign-in code
-captured instead of delivered. Members sign up through real clients, so an acceptance test reads like
+captured instead of delivered and a clock the test holds (`harness.clock`): a test that stamps or
+schedules by time reads `harness.clock.now()` and moves it, rather than waiting. Members sign up through real clients, so an acceptance test reads like
 the product: one member changes a role, and another member's watched request hears it without a
 re-read.
 
@@ -145,12 +153,10 @@ testWidgets('the app name comes from the server settings, and a name saved '
   final app = await TestApp.start(tester, fake);
   expect(find.text('You are in DartwayStarter'), findsOneWidget);
 
-  app.server.publish(AppChannels.settings, [
-    const AppSetting(id: AppSettingKeys.appName, value: 'Acme'),
-  ]);
+  app.server.publish(AppChannels.settings, [const AppSettings(appName: 'Acme')]);
   await app.settle(tester);
   expect(find.text('You are in Acme'), findsOneWidget);
-  expect(app.server.requestsOf<ListAppSettings>(), hasLength(1));
+  expect(app.server.requestsOf<GetAppSettings>(), hasLength(1));
 
   await app.stop(tester);
 });

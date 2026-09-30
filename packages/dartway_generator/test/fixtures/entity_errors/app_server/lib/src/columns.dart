@@ -14,7 +14,7 @@ part 'columns.dw.dart';
 )
 final class ColumnsRow extends DwTableRow with _$ColumnsRow {
   const ColumnsRow({
-    this.id,
+    required this.id,
     required this.title,
     required this.view,
     required this.dates,
@@ -25,7 +25,7 @@ final class ColumnsRow extends DwTableRow with _$ColumnsRow {
   });
 
   @override
-  final int? id;
+  final int id;
   final String title;
   final ValueView view;
   final List<DateTime> dates;
@@ -44,20 +44,20 @@ final class ColumnsRow extends DwTableRow with _$ColumnsRow {
 
 @DwSqlTable('shared_name')
 final class SameTableARow extends DwTableRow with _$SameTableARow {
-  const SameTableARow({this.id});
+  const SameTableARow({required this.id});
 
   @override
-  final int? id;
+  final int id;
 
   static const tableDef = SameTableATable();
 }
 
 @DwSqlTable('shared_name')
 final class SameTableBRow extends DwTableRow with _$SameTableBRow {
-  const SameTableBRow({this.id});
+  const SameTableBRow({required this.id});
 
   @override
-  final int? id;
+  final int id;
 
   static const tableDef = SameTableBTable();
 }
@@ -66,10 +66,10 @@ final class SameTableBRow extends DwTableRow with _$SameTableBRow {
   'a_table_name_that_is_far_too_long_for_postgres_to_keep_in_one_piece',
 )
 final class LongNameRow extends DwTableRow with _$LongNameRow {
-  const LongNameRow({this.id});
+  const LongNameRow({required this.id});
 
   @override
-  final int? id;
+  final int id;
 
   static const tableDef = LongNameTable();
 }

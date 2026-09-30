@@ -14,7 +14,7 @@ final adminHandlers = <DwCallHandler>[
   /// [AdminPublications.counters] from every command that moves them.
   DwCallHandler.single<GetAdminCounters, AdminCounters>(
     access: AppAccess.admin,
-    handle: (ctx, request) => AdminPublications.countCounters(ctx.db),
+    handle: (ctx, request) => AdminPublications.countCounters(ctx),
   ),
 
   /// The members table: a page of profiles by name or phone, and by role.
@@ -62,7 +62,7 @@ final adminHandlers = <DwCallHandler>[
       if (row.role != UserRole.client && command.role == UserRole.client) {
         ctx.revoke(AppChannels.staffChannels, account);
         for (final channel in await ctx.db.chatChannels.find()) {
-          ctx.revoke(AppChannels.chatOf(channel.id!), account);
+          ctx.revoke(AppChannels.chatOf(channel.id), account);
         }
       }
       return profile;

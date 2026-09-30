@@ -36,9 +36,14 @@ abstract class DwTableDef<R extends DwTableRow> {
 
   R fromRow(DwResultRow row);
 
-  /// Dart values by SQL column name; `id` is absent when the row has none
-  /// yet. The ORM encodes each value through its column's type.
+  /// Dart values by SQL column name, every column but `id`, which is the key
+  /// an update is written by. The ORM encodes each value through its column's
+  /// type.
   Map<String, Object?> toRow(R row);
+
+  /// The values of [draft], as [toRow] gives them for a stored row. The
+  /// generated table narrows the parameter to its own draft class.
+  Map<String, Object?> toDraftRow(covariant DwRowDraft<R> draft);
 
   @override
   String toString() => 'DwTableDef($tableName)';

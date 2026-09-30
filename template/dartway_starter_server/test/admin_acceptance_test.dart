@@ -163,37 +163,54 @@ void main() {
   });
 
   test('settings: an admin saves one and every signed-in member hears it; '
-      'nobody else may, and an unknown key never leaves the client', () async {
+      'nobody else may, and a blank name never leaves the client', () async {
     final anna = await app.admin('79990006030', 'Anna');
     final vera = await app.signUp('79990006031', firstName: 'Vera');
-    final settings = await vera.watch(const ListAppSettings());
+    final settings = await vera.watch(const GetAppSettings());
+    await dwWaitUntil(() => dataOf(settings.state) != null);
+    expect(dataOf(settings.state), const AppSettings(), reason: 'the defaults');
 
     (await anna.client.command(
-      const SaveAppSetting(key: AppSettingKeys.appName, value: 'Acme'),
+      const SaveAppSettings(appName: '  Acme '),
     )).valueOrThrow;
-    await dwWaitUntil(
-      () => dataOf(settings.state)!.any(
-        (setting) =>
-            setting.id == AppSettingKeys.appName && setting.value == 'Acme',
-      ),
-    );
+    await dwWaitUntil(() => dataOf(settings.state)?.appName == 'Acme');
+    expect(dataOf(settings.state)!.signUpEnabled, isTrue);
 
     expect(
-      await vera.client.command(
-        const SaveAppSetting(key: AppSettingKeys.appName, value: 'Mine'),
-      ),
+      await vera.client.command(const SaveAppSettings(appName: 'Mine')),
       refusedWith(DwCoreRefusal.forbidden),
     );
     expect(
-      await anna.client.command(
-        const SaveAppSetting(key: 'colour', value: 'red'),
-      ),
-      refusedWith(DartwayStarterRefusal.settingKeyUnknown),
+      await anna.client.command(const SaveAppSettings(appName: ' ')),
+      refusedWith(DartwayStarterRefusal.appNameRequired),
     );
     expect(
-      anna.http.posts('SaveAppSetting'),
+      anna.http.posts('SaveAppSettings'),
       1,
       reason: 'refused before sending',
+    );
+  });
+
+  test('settings: two admins saving for the first time at once both succeed, '
+      'and each keeps the setting it changed (#394)', () async {
+    await app.server.runInContext(
+      (ctx) => ctx.db.execute('DELETE FROM dw_setting'),
+    );
+    final anna = await app.admin('79990006040', 'Anna');
+    final boris = await app.admin('79990006041', 'Boris');
+    final saved = await Future.wait([
+      anna.client.command(const SaveAppSettings(appName: 'Acme')),
+      boris.client.command(const SaveAppSettings(signUpEnabled: false)),
+    ]);
+    for (final result in saved) {
+      result.valueOrThrow;
+    }
+    expect(
+      await app.server.runInContext((ctx) => ctx.settings.read<AppSettings>()),
+      const AppSettings(appName: 'Acme', signUpEnabled: false),
+    );
+    await app.server.runInContext(
+      (ctx) => ctx.settings.save(const AppSettings()),
     );
   });
 }

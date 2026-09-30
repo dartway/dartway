@@ -1,8 +1,8 @@
 ---
 title: "One way to hold state and one way to send a command: dartway check fails the rest"
 affects:
-  dartway_core_flutter: "0.21.0-dev.9"
-  dartway_cli: "0.13.0"
+  dartway_core_flutter: "0.21.0-dev.14"
+  dartway_cli: "0.20.0"
 ---
 
 ## Who is affected

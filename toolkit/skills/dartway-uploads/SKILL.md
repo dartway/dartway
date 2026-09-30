@@ -180,7 +180,8 @@ learns nothing about files that are not theirs. Skip it and one member can put a
 private document on their own row and read it through the row's rules.
 
 An optional file on an update command travels as `DwFieldPatch<int>` (keep / set / clear), as the
-skeleton's profile photo does; check `requireOwned` only on `DwSetField`.
+skeleton's profile photo does; check `requireOwned` only on a new value:
+`if (command.photoFileId.newValue case final fileId?)`.
 
 ## 5. Showing files
 

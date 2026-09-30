@@ -435,7 +435,11 @@ final class _Run {
     }
 
     unique('table name', [for (final e in entities) (e.tableName, e)]);
-    unique('class name', [for (final e in entities) (e.name, e)]);
+    // A row class named like another's draft (`NewCourseRow` beside
+    // `CourseRow`) would collide with the generated `New<Name>Row`.
+    unique('class name', [
+      for (final e in entities) ...[(e.name, e), (e.draftClass, e)],
+    ]);
     unique('repository getter', [
       for (final e in entities) (e.repositoryGetter, e),
     ]);
@@ -485,6 +489,7 @@ final class _Run {
     'DwJsonListType': 'dartway_orm',
     'DwJsonMapType': 'dartway_orm',
     'DwTableDef': 'dartway_orm',
+    'DwRowDraft': 'dartway_orm',
     'DwResultRow': 'dartway_orm',
     'DwForeignKey': 'dartway_orm',
     'DwOnDelete': 'dartway_orm',
