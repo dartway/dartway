@@ -1,12 +1,11 @@
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
-import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/refusal_text.dart';
+import 'package:dartway_starter_flutter/core/update_required_page.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/widgets.dart';
-
-import 'app_l10n.dart';
-import 'refusal_text.dart';
-import 'update_required_page.dart';
 
 /// The app's DartWay core: `dw.request`, `dw.table`, `dw.window`,
 /// `dw.command`, `dw.uploader`, `dw.action`, `dw.notify` — reachable from

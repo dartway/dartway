@@ -5,7 +5,6 @@ import 'package:test_reflective_loader/test_reflective_loader.dart';
 void main() {
   defineReflectiveSuite(() {
     defineReflectiveTests(ForbiddenUiStyleUsageTest);
-    defineReflectiveTests(DeepRelativeImportTest);
     defineReflectiveTests(ForbiddenProviderScopeTest);
   });
 }
@@ -91,29 +90,6 @@ class Settings { int get theme => 1; }
 int f(Settings context) => context.theme;
 """);
     await assertNoDiagnosticsInFile(path);
-  }
-}
-
-@reflectiveTest
-class DeepRelativeImportTest extends AnalysisRuleTest {
-  @override
-  void setUp() {
-    rule = DeepRelativeImportRule();
-    super.setUp();
-  }
-
-  Future<void> test_three_levels_up_is_reported_two_are_not() async {
-    newFile('$testPackageLibPath/ui_kit/kit.dart', '');
-    newFile('$testPackageLibPath/app/group/sibling/sibling.dart', '');
-    const source = '''
-// ignore_for_file: unused_import
-import '../../../ui_kit/kit.dart';
-import '../sibling/sibling.dart';
-''';
-    final path = '$testPackageLibPath/app/group/feature/feature.dart';
-    newFile(path, source);
-    final (offset, length) = _at(source, "'../../../ui_kit/kit.dart'");
-    await assertDiagnosticsInFile(path, [lint(offset, length)]);
   }
 }
 

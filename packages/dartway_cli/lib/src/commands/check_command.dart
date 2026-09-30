@@ -20,6 +20,8 @@ import '../checker/dw_server_contract.dart';
 import '../checker/dw_server_features.dart';
 import '../checker/dw_server_outside_world.dart';
 import '../checker/dw_inline_ownership.dart';
+import '../checker/dw_project_template.dart';
+import '../checker/dw_uniformity_rules.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
 import '../checker/dw_check_tally.dart';
@@ -46,6 +48,15 @@ class CheckCommand extends Command<int> {
       ..addOption(
         'dir',
         help: 'Validate a single folder (relative to the Flutter package).',
+      )
+      ..addFlag(
+        'fix',
+        negatable: false,
+        help:
+            'Before checking, rewrite relative imports in lib/ to package: '
+            '(relativeImport) and move root-level acceptance tests to the '
+            'mirror of their lib/src/<feature>/ (testLayout); --type and '
+            '--dir narrow it.',
       );
   }
 
@@ -59,7 +70,8 @@ class CheckCommand extends Command<int> {
 
   @override
   String get invocation =>
-      'dartway check [--type <check>] [--level <severity>] [--dir <folder>]';
+      'dartway check [--type <check>] [--level <severity>] [--dir <folder>] '
+      '[--fix]';
 
   @override
   Future<int> run() async {
@@ -84,6 +96,41 @@ class CheckCommand extends Command<int> {
     final layout = _detectLayout();
     final flutterPackageDir = layout?.flutterPackageDir ?? Directory.current;
     stdout.writeln('Checking ${flutterPackageDir.path} ...');
+
+    // Before any section reads an import: the feature and kit import rules
+    // read `package:` imports only, so a relative one they would have missed
+    // is judged once it is rewritten.
+    // Each fix is the mechanical half of one check, and runs where that check
+    // would: `--type` names the check, `--dir` narrows imports to one folder
+    // of the Flutter package and leaves the tests, which it does not judge.
+    final dir = results.option('dir');
+    bool fixes(DwCheckType type) =>
+        results.flag('fix') && (filterType == null || filterType == type);
+    if (fixes(DwCheckType.relativeImport)) {
+      for (final line in DwUniformityInspector.fixRelativeImports(
+        [
+          flutterPackageDir,
+          if (dir == null) ?layout?.sharedPackageDir,
+          if (dir == null) ?layout?.serverPackageDir,
+        ],
+        onlyUnder: dir == null
+            ? null
+            : Directory(
+                p.isAbsolute(dir) ? dir : p.join(flutterPackageDir.path, dir),
+              ),
+      )) {
+        stdout.writeln('🔧 rewritten to package: — $line');
+      }
+    }
+    if (fixes(DwCheckType.testLayout) && dir == null) {
+      for (final line in DwUniformityInspector.fixTestLayout([
+        flutterPackageDir,
+        ?layout?.sharedPackageDir,
+        ?layout?.serverPackageDir,
+      ])) {
+        stdout.writeln('🔧 moved to the mirror of lib/ — $line');
+      }
+    }
 
     var errorCount = 0;
     final tally = DwCheckTally();
@@ -202,6 +249,21 @@ class CheckCommand extends Command<int> {
     ).run(tally: tally);
     errorCount += DwFlutterUiInspector(
       flutterPackageDir: flutterPackageDir,
+      filterType: filterType,
+      filterSeverity: filterSeverity,
+      targetDirPath: results.option('dir'),
+    ).run(tally: tally);
+    errorCount += DwUniformityInspector(
+      template: layout == null
+          ? null
+          : DwProjectTemplate.forProject(
+              layout.root,
+              layout.flutterPackage.replaceAll(RegExp(r'_flutter$'), ''),
+            ),
+      projectRoot: layout?.root ?? flutterPackageDir,
+      flutterPackageDir: flutterPackageDir,
+      serverPackageDir: layout?.serverPackageDir,
+      sharedPackageDir: layout?.sharedPackageDir,
       filterType: filterType,
       filterSeverity: filterSeverity,
       targetDirPath: results.option('dir'),

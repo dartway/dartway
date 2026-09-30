@@ -1,3 +1,4 @@
+import 'package:dartway_starter_flutter/admin/users/widgets/admin_users_table.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
@@ -5,8 +6,6 @@ import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-
-import 'widgets/admin_users_table.dart';
 
 /// Member management: search, role filter, numbered pages, inline role
 /// editing, and a card per member. Listing profiles and changing a role are
@@ -70,9 +69,9 @@ class AdminUsersPage extends HookWidget implements DwFeatureWidget {
             labelText: l10n.searchLabel,
             hintText: l10n.searchHint,
           ),
-          const Gap(12),
+          const Gap(AppSpace.s12),
           Wrap(
-            spacing: 8,
+            spacing: AppSpace.s8,
             children: [
               FilterChip(
                 label: Text(l10n.allRoles),
@@ -87,7 +86,7 @@ class AdminUsersPage extends HookWidget implements DwFeatureWidget {
                 ),
             ],
           ),
-          const Gap(12),
+          const Gap(AppSpace.s12),
           Expanded(
             child: AdminUsersTable(
               request: ListUserProfiles(

@@ -1,13 +1,12 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_starter_server/generated/dw_schema.dart';
+import 'package:dartway_starter_server/src/admin/admin_publications.dart';
+import 'package:dartway_starter_server/src/core/call_context.dart';
+import 'package:dartway_starter_server/src/core/channels.dart';
+import 'package:dartway_starter_server/src/profile/profile_objects.dart';
+import 'package:dartway_starter_server/src/profile/profile_publications.dart';
+import 'package:dartway_starter_server/src/profile/profile_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-
-import '../../generated/dw_schema.dart';
-import '../core/call_context.dart';
-import '../core/channels.dart';
-import '../profile/profile_rows.dart';
-import '../profile/profile_objects.dart';
-import '../profile/profile_publications.dart';
-import 'admin_publications.dart';
 
 final adminHandlers = <DwCallHandler>[
   /// The dashboard numbers. Admins only; kept live by

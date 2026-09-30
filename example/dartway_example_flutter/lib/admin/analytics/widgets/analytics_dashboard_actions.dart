@@ -26,7 +26,7 @@ class AnalyticsDashboardActions extends StatelessWidget {
   Widget build(BuildContext context) {
     final l10n = context.l10n;
     return Wrap(
-      spacing: 8,
+      spacing: AppSpace.s8,
       children: [
         AppButton.text(
           l10n.analyticsRenameDashboard,

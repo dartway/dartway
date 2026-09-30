@@ -1,11 +1,10 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/core/call_context.dart';
+import 'package:dartway_example_server/src/profile/profile_objects.dart';
+import 'package:dartway_example_server/src/profile/profile_publications.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-
-import '../../generated/dw_schema.dart';
-import '../core/call_context.dart';
-import 'profile_objects.dart';
-import 'profile_publications.dart';
-import 'profile_rows.dart';
 
 final profileHandlers = <DwCallHandler>[
   /// The caller's own profile. "My" profile names no account: the caller's

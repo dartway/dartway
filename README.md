@@ -122,7 +122,7 @@ No agent at hand? Every command is in the created project's `README.md`, and the
 |---|---|
 | [`dartway_cli`](packages/dartway_cli) | `dartway quickstart`, `doctor`, `create`, `setup-ai`, `update`, `generate`, `check`, `dev`, `test`, `deploy`, `stats` |
 | [`dartway_router`](packages/dartway_router) | A wrapper around go_router: enum-based routes, navigation zones, guards, typed parameters |
-| [`dartway_lints`](packages/dartway_lints) | Lint rules for the conventions the analyzer can see: the UI kit as the single source of styles, short relative imports, `ProviderScope` left to the bootstrap and tests |
+| [`dartway_lints`](packages/dartway_lints) | Lint rules for the conventions the analyzer can see: the UI kit as the single source of styles, `ProviderScope` left to the bootstrap and tests |
 | [`dartway_shared_preferences`](packages/dartway_shared_preferences) | Local storage under `dw.plugins.prefs`, and where the skeleton keeps the signed-in session. Optional — the core does not depend on it |
 | [`dartway_telegram`](packages/dartway_telegram) | Telegram Mini App integration under `dw.plugins.telegram`. Optional — an app that is not a Mini App never downloads it |
 | [`dartway_studio_bridge`](packages/dartway_studio_bridge) | The open bridge between an app and DartWay Studio: screen specs in code and the runtime protocol |

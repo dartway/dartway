@@ -4,6 +4,8 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
+import '../../support/app_harness.dart';
+
 /// The club's settings moved from a key/value table into a settings object;
 /// the migration that drops the table carries what was saved (#388).
 void main() {
@@ -41,20 +43,12 @@ void main() {
     );
     await migrate((_) => true);
 
-    final server = await DwTestServer.start(
-      DartwayExampleServer.build(
-        database: database.config,
-        port: 0,
-        adminIdentifier: null,
-      ),
-    );
-    try {
-      expect(
+    await AppHarness.onDatabase(
+      database,
+      (server) async => expect(
         await server.runInContext((ctx) => ctx.settings.read<ClubSettings>()),
         const ClubSettings(clubName: 'Iron Gym', bookingEnabled: false),
-      );
-    } finally {
-      await server.stop();
-    }
+      ),
+    );
   });
 }

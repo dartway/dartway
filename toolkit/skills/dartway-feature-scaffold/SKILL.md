@@ -115,8 +115,8 @@ lib/app/<feature>/
 - **`logic/`** holds what only this feature uses: its providers and notifiers, and every
   `dw.command` it sends (`<feature>_commands.dart`, or the notifier of a flow).
 - Non-visual cross-feature helpers (an extension on a data object, a formatter) → `lib/shared/`. A
-  visual building block → `lib/ui_kit/` (`2_frequent/`, `3_special/`). Styles → `ui_kit.dart` only. Imports: relative inside the feature and to a sibling feature (at most two
-  `../`, `deep_relative_import` warns past that), `package:` for everything further away.
+  visual building block → `lib/ui_kit/` (`2_frequent/`, `3_special/`). Styles → `ui_kit.dart` only. Imports: `package:` only, the feature's own files included
+  (`relativeImport`; `dart run dartway_cli:dartway check --fix` rewrites relative ones).
 
 ### Feature, group, building block
 

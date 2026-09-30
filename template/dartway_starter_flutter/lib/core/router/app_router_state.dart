@@ -1,9 +1,8 @@
+import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/foundation.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-import '../dw_core.dart';
-import '../profile/my_profile.dart';
 
 /// Refresh listenable for the DartWay router: what the zone guards decide by,
 /// notifying the router so the guards re-run whenever it changes.

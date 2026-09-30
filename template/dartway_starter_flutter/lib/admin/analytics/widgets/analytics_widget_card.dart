@@ -34,7 +34,7 @@ class AnalyticsWidgetCard extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const Gap(12),
+          const Gap(AppSpace.s12),
           DwReadBuilder(
             dw.request(request),
             placeholder: const DwAnalyticsReport(total: 0),
@@ -45,7 +45,7 @@ class AnalyticsWidgetCard extends StatelessWidget {
             ),
           ),
           if (actions.isNotEmpty) ...[
-            const Gap(8),
+            const Gap(AppSpace.s8),
             Row(mainAxisAlignment: MainAxisAlignment.end, children: actions),
           ],
         ],

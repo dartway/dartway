@@ -101,10 +101,12 @@ class _ChannelBody extends HookConsumerWidget {
                   initialAnchor: session.openAnchor,
                   anchorAlignment: 0.3,
                   padding: EdgeInsets.fromLTRB(
-                    10,
-                    hasPinned ? ChatPinnedBar.height + 8 : 8,
-                    10,
-                    12,
+                    AppSpace.s10,
+                    hasPinned
+                        ? ChatPinnedBar.height + AppSpace.s8
+                        : AppSpace.s8,
+                    AppSpace.s10,
+                    AppSpace.s12,
                   ),
                   onVisibleItemsChanged: tracker.seen,
                   emptyBuilder: (context) =>

@@ -35,10 +35,10 @@ class IdentityChangeSheet extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppText.title(l10n.identitySheetTitle(kind.name)),
-            const Gap(8),
+            const Gap(AppSpace.s8),
             if (sent == null) ...[
               AppText.body(l10n.identitySheetIntro),
-              const Gap(16),
+              const Gap(AppSpace.s16),
               switch (kind) {
                 DwIdentifierKind.phone => PhoneTextField(
                   labelText: l10n.phoneLabel,
@@ -62,7 +62,7 @@ class IdentityChangeSheet extends ConsumerWidget {
                       : null,
                 ),
               },
-              const Gap(24),
+              const Gap(AppSpace.s24),
               AppButton.primary(
                 l10n.getCodeAction,
                 requireValidation: true,
@@ -70,7 +70,7 @@ class IdentityChangeSheet extends ConsumerWidget {
               ),
             ] else ...[
               AppText.body(l10n.codeSentTo(change.draft.trim())),
-              const Gap(16),
+              const Gap(AppSpace.s16),
               PinCodeTextFieldWidget(
                 pinCode: change.code,
                 onChanged: controller.editCode,
@@ -79,7 +79,7 @@ class IdentityChangeSheet extends ConsumerWidget {
                 availableAt: sent.resendAfter,
                 onResend: dw.action((_) => controller.requestCode()),
               ),
-              const Gap(16),
+              const Gap(AppSpace.s16),
               AppButton.primary(
                 l10n.identityConfirmAction,
                 requireValidation: true,

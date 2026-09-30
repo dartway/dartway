@@ -1,9 +1,8 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
-
-import '../../generated/dw_schema.dart';
-import '../profile/profile_rows.dart';
 
 /// What the bookings feature's jobs are — name and payload codec — imported by
 /// the commands that enqueue them.

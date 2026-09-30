@@ -1,11 +1,10 @@
+import 'package:dartway_starter_flutter/admin/analytics/analytics_dashboards_section.dart';
+import 'package:dartway_starter_flutter/admin/dashboard/widgets/admin_counter_tiles.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-
-import 'package:dartway_starter_flutter/admin/analytics/analytics_dashboards_section.dart';
-import 'package:dartway_starter_flutter/core/app_l10n.dart';
-import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
-import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
-import 'widgets/admin_counter_tiles.dart';
 
 /// Admin home: headline counters the server counts and keeps live, and under
 /// them the analytics dashboards the team builds from the app's events.
@@ -40,9 +39,9 @@ class AdminDashboardPage extends StatelessWidget implements DwFeatureWidget {
       body: ListView(
         children: [
           const AdminCounterTiles(),
-          const Gap(16),
+          const Gap(AppSpace.s16),
           AppText.body(context.l10n.countersLiveHint),
-          const Gap(32),
+          const Gap(AppSpace.s32),
           const AnalyticsDashboardsSection(),
         ],
       ),

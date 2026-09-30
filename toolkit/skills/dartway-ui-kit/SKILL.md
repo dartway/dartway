@@ -63,6 +63,17 @@ code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutte
    where the theme is assembled and a seed colour has to live somewhere. Geometry stays `const`: a
    radius does not depend on the theme. One theme in a project means a palette with one set of
    colours, not the absence of `of(context)`.
+
+   **Spacing is a token too.** The kit ships one scale, `AppSpace` in `ui_kit/theme/app_space.dart`:
+   a closed set of steps named by their value (`s2` · `s4` · `s6` · `s8` · `s10` · `s12` · `s16` · `s20` · `s24` · `s28` · `s32` · `s36` · `s48`). Outside the kit
+   a gap or an inset is `Gap(AppSpace.s12)`, `EdgeInsets.all(AppSpace.s16)`,
+   `EdgeInsets.symmetric(horizontal: AppSpace.s16)`, `Row(spacing: AppSpace.s8)` — a number there
+   (a spacer `SizedBox`, `Gap`, `EdgeInsets.*`, a `spacing:`/`runSpacing:`/`mainAxisSpacing:`/
+   `crossAxisSpacing:`) fails `dart run dartway_cli:dartway check` (`rawSpacing`). A value the design
+   uses that the scale lacks becomes a step (`s14`), named by value so nothing else is renamed; a
+   visible value is never rounded to fit. A dimension that belongs to one component (a chip strip's
+   height, an avatar's size — a `SizedBox` with a `child:`, or with both a width and a height) lives
+   in that component, in the kit.
 4. **Isolated visual layer.** The kit does not depend on business logic or state. A component =
    pure visuals + minimal props.
 5. **Every visual building block lives here, and nowhere else.** A block many screens draw (a

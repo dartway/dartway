@@ -17,11 +17,11 @@ class NewsPostList extends StatelessWidget {
     request: const ListNews(),
     placeholder: PlaceholderObjects.newsPost,
     placeholderCount: 5,
-    padding: const EdgeInsets.symmetric(vertical: 8),
+    padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
     emptyBuilder: (context) =>
         Center(child: AppText.body(context.l10n.noNewsYet)),
     itemBuilder: (context, post) => Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: AppSpace.s8),
       child: NewsPostCard(post: post),
     ),
   );

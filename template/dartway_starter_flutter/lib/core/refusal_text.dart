@@ -1,7 +1,6 @@
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-
-import 'app_l10n.dart';
 
 /// The words for a refusal the server answered with, in this language.
 extension AppRefusalText on AppLocalizations {

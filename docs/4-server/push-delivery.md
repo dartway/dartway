@@ -227,7 +227,7 @@ fcm.answer = (send) => DwFakePushAnswer.fcmError(404, 'NOT_FOUND', 'Requested en
 On a server with a `DwTestClock`, a scheduled push is sent when the test moves the clock to its
 time, and a retry runs once the clock passes its backoff — while the clock stands, neither happens.
 
-The example's `test/push_acceptance_test.dart` publishes a post and checks who is notified, and
+The example's `test/src/core/push_test.dart` publishes a post and checks who is notified, and
 sends a booking's reminder by moving the clock. The
 package's own suites run on Postgres: an enqueue rolled back with its command, dedup, eligibility
 skip and delay, four workers draining 200 deliveries without a duplicate, provider failures

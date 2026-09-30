@@ -5,7 +5,7 @@ import 'package:dartway_starter_server/src/profile/profile_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/app_harness.dart';
+import '../../support/app_harness.dart';
 
 /// Signing in: by phone and by e-mail with a one-time code, the consent a
 /// sign-up needs, sign-up switched off, fixed codes, the first administrator.

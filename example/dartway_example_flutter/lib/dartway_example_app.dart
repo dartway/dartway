@@ -1,14 +1,13 @@
+import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/core/profile/signed_in_gate.dart';
+import 'package:dartway_example_flutter/core/push/push_opened_listener.dart';
+import 'package:dartway_example_flutter/core/router/router.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-import 'core/app_l10n.dart';
-import 'core/dw_core.dart';
-import 'core/profile/signed_in_gate.dart';
-import 'core/push/push_opened_listener.dart';
-import 'core/router/router.dart';
-import 'ui_kit/ui_kit.dart';
 
 /// The DartWay example application. All app wiring lives here; `main` only
 /// supplies concrete parameters (server address, version) and runs it.

@@ -3,6 +3,8 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_server/src/chat/chat_rows.dart';
 import 'package:test/test.dart';
 
+import '../../support/app_harness.dart';
+
 /// The staff channels are the chat feature's seed step: every start writes
 /// them, and a start with nothing new writes nothing (#388).
 void main() {
@@ -18,23 +20,14 @@ void main() {
   Future<Map<String, (int, String)>> startedChannels({
     Future<void> Function(DwTestServer server)? then,
   }) async {
-    final server = await DwTestServer.start(
-      DartwayExampleServer.build(
-        database: database.config,
-        port: 0,
-        adminIdentifier: null,
-      ),
-    );
-    try {
+    return AppHarness.onDatabase(database, (server) async {
       final channels = {
         for (final row in await server.db.chatChannels.find())
           row.slug: (row.id, row.title),
       };
       await then?.call(server);
       return channels;
-    } finally {
-      await server.stop();
-    }
+    });
   }
 
   test('a fresh database starts with the declared channels, and the next '

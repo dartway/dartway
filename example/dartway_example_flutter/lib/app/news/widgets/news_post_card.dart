@@ -14,7 +14,7 @@ class NewsPostCard extends StatelessWidget {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.s16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -23,9 +23,9 @@ class NewsPostCard extends StatelessWidget {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            const Gap(8),
+            const Gap(AppSpace.s8),
             AppText.body(post.text),
-            const Gap(12),
+            const Gap(AppSpace.s12),
             Row(
               children: [
                 Expanded(

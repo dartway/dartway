@@ -1,6 +1,5 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-
-import 'files.dart';
+import 'package:dartway_starter_server/src/core/files.dart';
 
 /// Everything the server is configured with, read once as it starts: the
 /// framework's variables and the app's own, typed.

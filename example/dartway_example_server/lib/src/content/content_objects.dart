@@ -1,9 +1,8 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_server/src/content/content_rows.dart';
+import 'package:dartway_example_server/src/profile/profile_objects.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-
-import '../profile/profile_objects.dart';
-import '../profile/profile_rows.dart';
-import 'content_rows.dart';
 
 /// Content rows → the data objects clients see.
 abstract final class ContentObjects {

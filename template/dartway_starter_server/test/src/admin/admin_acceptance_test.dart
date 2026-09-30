@@ -4,7 +4,7 @@ import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/app_harness.dart';
+import '../../support/app_harness.dart';
 
 /// The admin panel on real clients: a role changed arrives live at the member
 /// it concerns and at every admin screen, the table pages and filters on the

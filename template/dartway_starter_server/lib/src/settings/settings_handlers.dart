@@ -1,8 +1,7 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_starter_server/src/core/call_context.dart';
+import 'package:dartway_starter_server/src/core/channels.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-
-import '../core/call_context.dart';
-import '../core/channels.dart';
 
 final settingsHandlers = <DwCallHandler>[
   /// The app's settings, their defaults while nobody has saved them. Every

@@ -32,14 +32,14 @@ class AdminCounterTiles extends StatelessWidget {
                 count: counters.members,
               ),
             ),
-            const Gap(12),
+            const Gap(AppSpace.s12),
             Expanded(
               child: _CounterTile(
                 label: l10n.countAdmins,
                 count: counters.admins,
               ),
             ),
-            const Gap(12),
+            const Gap(AppSpace.s12),
             Expanded(
               child: _CounterTile(
                 label: l10n.countMarketingOptIns,
@@ -64,7 +64,7 @@ class _CounterTile extends StatelessWidget {
     return AppCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: [AppText.title('$count'), const Gap(4), AppText.body(label)],
+        children: [AppText.title('$count'), const Gap(AppSpace.s4), AppText.body(label)],
       ),
     );
   }

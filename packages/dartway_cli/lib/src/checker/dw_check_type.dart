@@ -356,7 +356,51 @@ enum DwCheckType {
   /// A route parameter set to `0` or `-1` standing for "no id" —
   /// `…Params.<name>.set(0)` (dartway/dartway#390). A new thing is a route
   /// of its own; "none" is `null`.
-  sentinelId;
+  sentinelId,
+
+  /// A relative `import`/`export` in `lib/` of the Flutter, server or shared
+  /// package (dartway/dartway#391). `lib/` imports by `package:` only: a
+  /// file mixing both forms reads one library under two names, and the audit
+  /// found such files in every project. Under `test/` a relative import of
+  /// `test/support/` is the only form there is, and allowed at any depth
+  /// (#396). Generated files are passed over. `dartway check --fix` rewrites
+  /// them.
+  relativeImport,
+
+  /// A doc comment in `lib/` written in a script other than the project's
+  /// language — recorded by `dartway setup-ai --language` (#391). One the
+  /// skeleton wrote, found verbatim in the template, is not the project's.
+  ///
+  /// A warning, because it is a heuristic on scripts rather than a reading
+  /// of the language, and a guess must not fail a build.
+  docCommentLanguage,
+
+  /// A test that mirrors no `lib/` path, a helper outside `test/support/`,
+  /// or a test inside it (#391). A test sits at the path of what it tests —
+  /// `test/<path>_test.dart` for `lib/<path>.dart` — or, testing a whole
+  /// folder (a server feature through its calls), is
+  /// `test/<path>/<folder>/<folder>[_<scenario>]_acceptance_test.dart` for
+  /// `lib/<path>/<folder>/`.
+  testLayout,
+
+  /// A test outside `test/support/` building what the harness owns: a
+  /// `ProviderScope` or a `DwFakeServer` in a widget test, a `DwTestServer`
+  /// or a `DwAppServer` in a server test (#391). One harness per side,
+  /// extended and never bypassed.
+  testHarnessBypassed,
+
+  /// A gap or an inset written as a number outside `ui_kit/`: a spacer
+  /// `SizedBox(height:|width: n)`, `Gap(n)`, `EdgeInsets.*(n)`, a
+  /// `spacing:`/`runSpacing:`/`mainAxisSpacing:`/`crossAxisSpacing:` (#391).
+  /// Spacing is the kit's `AppSpace` tokens, so a project has one scale
+  /// rather than fourteen values of `Gap`.
+  rawSpacing,
+
+  /// The Flutter package does not enable the `dartway_lints` analyzer plugin
+  /// (#379). The rules are part of the framework's contract, and without the
+  /// plugin they are off with nothing saying so — `flutter analyze` does not
+  /// run plugins. `dartway update` wires it, pinned as `dartway create` does.
+  lintsPluginMissing;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -380,6 +424,7 @@ enum DwCheckType {
     DwCheckType.localSecretMissing ||
     DwCheckType.devComposeDrifted ||
     DwCheckType.inlineOwnershipCheck ||
+    DwCheckType.docCommentLanguage ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

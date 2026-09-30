@@ -1,10 +1,9 @@
+import 'package:dartway_example_flutter/admin/settings/widgets/admin_settings_form.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/router/admin_scaffold.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-
-import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
-import 'package:dartway_example_flutter/core/router/admin_scaffold.dart';
-import 'widgets/admin_settings_form.dart';
 
 /// The club's settings, one row per field of `ClubSettings` — write access is
 /// admin-only on the server.
@@ -42,7 +41,7 @@ class AdminSettingsPage extends StatelessWidget implements DwFeatureWidget {
       body: ListView(
         children: [
           AppText.title(context.l10n.clubSettings),
-          const Gap(8),
+          const Gap(AppSpace.s8),
           const AdminSettingsForm(),
         ],
       ),

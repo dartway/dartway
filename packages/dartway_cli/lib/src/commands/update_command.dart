@@ -3,7 +3,9 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
+import '../framework_overrides.dart';
 import '../framework_versions.dart';
+import '../lints_plugin.dart';
 import '../migration_notes.dart';
 import '../monorepo_source.dart';
 import '../project_layout.dart';
@@ -16,7 +18,9 @@ import '../version_check.dart';
 ///
 /// **The command does not edit the project's code, and that is deliberate.** It
 /// installs `.claude/` — a generated artifact, whose whole update is a copy —
-/// and for everything else it produces the work list: which packages are
+/// wires the `dartway_lints` plugin into the Flutter package's
+/// `analysis_options.yaml` the way `create` does (one line of configuration,
+/// pinned to the channel), and for everything else it produces the work list: which packages are
 /// behind, and which migration notes the project still owes an edit to. Raising
 /// a caret is one line; answering a changed API is not, and a command that
 /// half-did it would leave a tree nobody can tell apart from a finished one.
@@ -38,6 +42,13 @@ class UpdateCommand extends Command<int> {
       defaultChannel:
           Platform.environment['DARTWAY_BRANCH'] ??
           MonorepoSource.defaultBranch,
+    );
+    argParser.addOption(
+      'framework-path',
+      help:
+          'A local DartWay checkout the project builds against: the '
+          'dartway_lints plugin is then pinned to it by path, as '
+          '`dartway create --framework-path` pins it.',
     );
   }
 
@@ -84,6 +95,11 @@ class UpdateCommand extends Command<int> {
     );
     _reportPackages(gaps);
     _reportMigrations(result.monorepoDir, gaps);
+    _wireLintsPlugin(
+      projectRoot,
+      frameworkVersions['dartway_lints'],
+      frameworkPath: argResults!['framework-path'] as String?,
+    );
 
     stdout.writeln(
       '\nCommit .claude/ with the rest of the update, so the history says '
@@ -145,6 +161,42 @@ class UpdateCommand extends Command<int> {
         'in ${{for (final gap in git) ...gap.locations}.join(', ')}.',
       );
     }
+  }
+
+  /// The framework's lint rules, as `dartway create` wires them: a project
+  /// that predates the plugin never had them, and `dartway check` fails on
+  /// that (`lintsPluginMissing`).
+  void _wireLintsPlugin(
+    Directory projectRoot,
+    String? version, {
+    String? frameworkPath,
+  }) {
+    if (version == null) return;
+    final checkoutPlugin = frameworkPath == null || frameworkPath.isEmpty
+        ? null
+        : frameworkPackageDirectories(
+            Directory(p.normalize(p.absolute(frameworkPath))),
+          )['dartway_lints'];
+    final ProjectLayout layout;
+    try {
+      layout = ProjectLayout.detect(projectRoot);
+    } on StateError {
+      return;
+    }
+    final (:change, :manual) = wireLintsPlugin(
+      File(p.join(layout.flutterPackageDir.path, 'analysis_options.yaml')),
+      version,
+      path: checkoutPlugin,
+    );
+    if (manual != null) {
+      stdout.writeln('\n⚠️  Lints: not wired — $manual');
+    }
+    if (change == null) return;
+    stdout.writeln(
+      '\n🔎 Lints: $change in ${layout.flutterPackage}/analysis_options.yaml '
+      '— restart the analysis server, and run `dart analyze` (not '
+      '`flutter analyze`, which runs no plugins).',
+    );
   }
 
   /// The migrations this project still owes, keyed off the packages it is

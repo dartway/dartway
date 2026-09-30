@@ -1,5 +1,27 @@
 # Changelog
 
+## 0.22.0
+
+- **BREAKING: `dartway check` holds one shape for imports, tests and spacing, in every package**
+  (dartway/dartway#391, #379, #396). Five new errors and a warning, in a section of their own:
+  `relativeImport` — a relative `import`/`export` in `lib/` of the Flutter, server or shared package
+  (generated files passed over); `testLayout` — a test that mirrors no `lib/` path
+  (`test/<path>_test.dart` for `lib/<path>.dart`, `test/<path>/<folder>_acceptance_test.dart` for a
+  whole folder), a helper outside `test/support/`, or a test inside it; `testHarnessBypassed` — a
+  `ProviderScope`/`DwFakeServer` built by a widget test, a `DwTestServer.start`/`DwAppServer` by a
+  server test, outside `test/support/`; `rawSpacing` — a number in a spacer `SizedBox`, a `Gap` or an
+  `EdgeInsets.*` or a `spacing:`/`runSpacing:`/`mainAxisSpacing:`/`crossAxisSpacing:` outside
+  `ui_kit/`, where the kit's `AppSpace` steps go; `lintsPluginMissing` — the Flutter package does not
+  enable the `dartway_lints` plugin, or names neither a version nor a path; and `docCommentLanguage`
+  (warning) — a doc comment in `lib/` in another script than the language `setup-ai --language`
+  recorded, those the skeleton wrote excepted. `dartway check --fix` rewrites relative imports to
+  `package:` (sorting the import block) and moves root-level acceptance tests to
+  `test/src/<feature>/`, before checking; `--type` and `--dir` narrow it. `dartway update` enables the
+  `dartway_lints` plugin in a Flutter package without it, or raises its caret, pinned to the channel
+  as `create` pins it (`--framework-path` pins a checkout by path); a `plugins:` section it cannot
+  edit safely is left alone, with the lines to add printed instead. Migration note:
+  `docs/migrations/2026-09-30-imports-tests-spacing.md`.
+
 ## 0.21.0
 
 - **BREAKING: four new errors in `dartway check` — one way to show a read, wait, open a dialog and

@@ -3,30 +3,29 @@ library;
 
 import 'package:dartway_analytics_server/dartway_analytics_server.dart';
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/admin/admin_feature.dart';
+import 'package:dartway_example_server/src/bookings/bookings_feature.dart';
+import 'package:dartway_example_server/src/chat/chat_feature.dart';
+import 'package:dartway_example_server/src/content/content_feature.dart';
+import 'package:dartway_example_server/src/core/auth.dart';
+import 'package:dartway_example_server/src/core/bootstrap.dart';
+import 'package:dartway_example_server/src/core/call_context.dart';
+import 'package:dartway_example_server/src/core/files.dart';
+import 'package:dartway_example_server/src/core/push.dart';
+import 'package:dartway_example_server/src/migrations/migrations.dart';
+import 'package:dartway_example_server/src/profile/profile_feature.dart';
+import 'package:dartway_example_server/src/schedule/schedule_feature.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
-import 'generated/dw_schema.dart';
-import 'src/core/auth.dart';
-import 'src/core/bootstrap.dart';
-import 'src/core/call_context.dart';
-import 'src/core/files.dart';
-import 'src/core/push.dart';
-import 'src/admin/admin_feature.dart';
-import 'src/bookings/bookings_feature.dart';
-import 'src/chat/chat_feature.dart';
-import 'src/content/content_feature.dart';
-import 'src/migrations/migrations.dart';
-import 'src/profile/profile_feature.dart';
-import 'src/schedule/schedule_feature.dart';
-
-export 'generated/dw_schema.dart';
-export 'src/core/auth.dart' show AppAuth;
-export 'src/core/bootstrap.dart' show AppBootstrap;
-export 'src/core/environment.dart' show AppEnvironment, AppPushEnvironment;
-export 'src/core/files.dart' show AppFiles;
-export 'src/core/push.dart' show AppPush;
-export 'src/migrations/migrations.dart' show appMigrations;
+export 'package:dartway_example_server/generated/dw_schema.dart';
+export 'package:dartway_example_server/src/core/auth.dart' show AppAuth;
+export 'package:dartway_example_server/src/core/bootstrap.dart' show AppBootstrap;
+export 'package:dartway_example_server/src/core/environment.dart' show AppEnvironment, AppPushEnvironment;
+export 'package:dartway_example_server/src/core/files.dart' show AppFiles;
+export 'package:dartway_example_server/src/core/push.dart' show AppPush;
+export 'package:dartway_example_server/src/migrations/migrations.dart' show appMigrations;
 
 /// The club's server, as `bin/server.dart` and the tests build it.
 abstract final class DartwayExampleServer {

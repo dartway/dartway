@@ -1,8 +1,7 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-
-import '../../generated/dw_schema.dart';
-import '../profile/profile_rows.dart';
 
 /// What the club means by "the caller". The framework only knows an account;
 /// the profile, and so the role, is the example's.

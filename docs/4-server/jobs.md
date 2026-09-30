@@ -124,7 +124,7 @@ clock.moveTo(DateTime.utc(2026, 9, 30, 10, 5)); // the queue fell behind
 // the reminder runs, sees the session already started, and sends nothing
 ```
 
-The example's `test/push_acceptance_test.dart` does exactly this. A clock that stands still has a
+The example's `test/src/core/push_test.dart` does exactly this. A clock that stands still has a
 consequence: a retry after its backoff, a non-transactional job's expired lease and a recurring
 job's next run wait until the test moves the clock past them. What the framework stamps in the
 database itself — `created_at`, session keys and sign-in codes with their expiry, command outcomes —

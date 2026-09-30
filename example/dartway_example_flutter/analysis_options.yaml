@@ -18,8 +18,8 @@ analyzer:
 
 # DartWay's own rules, the dartway_lints analyzer plugin: the UI kit is the
 # single source of styles, so raw Color/TextStyle/BorderRadius and direct theme
-# access are flagged everywhere outside `ui_kit/`; relative imports stay short;
-# ProviderScope is left to the bootstrap and tests. A convention that only lives
+# access are flagged everywhere outside `ui_kit/`; ProviderScope is left to the
+# bootstrap and tests. A convention that only lives
 # in a document is a convention that drifts. They show in the IDE and in
 # `dart analyze` — `flutter analyze` does not run analyzer plugins.
 #

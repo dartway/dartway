@@ -4,7 +4,7 @@
 ///
 /// ```yaml
 /// plugins:
-///   dartway_lints: ^0.4.0
+///   dartway_lints: ^0.5.0
 /// ```
 ///
 /// The analysis server loads the plugin from `lib/main.dart`; this library
@@ -12,6 +12,5 @@
 library;
 
 export 'main.dart' show DartwayLintsPlugin;
-export 'src/deep_relative_import_rule.dart';
 export 'src/forbidden_provider_scope_rule.dart';
 export 'src/forbidden_ui_style_usage_rule.dart';

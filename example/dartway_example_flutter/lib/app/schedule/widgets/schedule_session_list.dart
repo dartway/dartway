@@ -54,13 +54,13 @@ class _ScheduleDays extends StatelessWidget {
     };
 
     return ListView(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
       children: [
         for (final (index, session) in sessions.indexed) ...[
           if (index == 0 ||
               !session.startsAt.isSameDayAs(sessions[index - 1].startsAt))
             Padding(
-              padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+              padding: const EdgeInsets.fromLTRB(AppSpace.s4, AppSpace.s16, AppSpace.s4, AppSpace.s8),
               child: AppText.caption(session.startsAt.dayLabel),
             ),
           SessionCard(

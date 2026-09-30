@@ -56,25 +56,25 @@ class HomePage extends StatelessWidget implements DwFeatureWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppText.title(l10n.helloUser(context.profile.firstName)),
-                  const Gap(8),
+                  const Gap(AppSpace.s8),
                   DwReadBuilder(
                     settings,
                     placeholder: const AppSettings(),
                     builder: (context, stored) =>
                         AppText.body(l10n.homeAppName(stored.appName)),
                   ),
-                  const Gap(8),
+                  const Gap(AppSpace.s8),
                   AppText.caption(l10n.homeLiveHint),
                 ],
               ),
             ),
-            const Gap(16),
+            const Gap(AppSpace.s16),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppText.body(l10n.homeNextStepTitle),
-                  const Gap(8),
+                  const Gap(AppSpace.s8),
                   AppText.caption(l10n.homeNextStepBody),
                 ],
               ),

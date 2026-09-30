@@ -1,14 +1,13 @@
-import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:dartway_example_flutter/auth/logic/auth_controller.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
+import 'package:dartway_example_flutter/auth/widgets/greeting_block.dart';
 import 'package:dartway_example_flutter/auth/widgets/phone_entry_block.dart';
 import 'package:dartway_example_flutter/auth/widgets/verify_otp_block.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
-
-import '../core/router/app_scaffold.dart';
-import 'logic/auth_controller.dart';
-import 'widgets/greeting_block.dart';
+import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class AuthPage extends ConsumerWidget {
   const AuthPage({super.key});
@@ -34,7 +33,7 @@ class AuthPage extends ConsumerWidget {
       ),
       body: SizedBox.expand(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpace.s16),
           child: Form(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),

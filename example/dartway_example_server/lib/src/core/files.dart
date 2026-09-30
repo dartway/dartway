@@ -1,8 +1,7 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-
-import '../../generated/dw_schema.dart';
-import 'call_context.dart';
 
 /// File storage: the upload rules, who may read a file, and the default names
 /// of its buckets.

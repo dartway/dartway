@@ -1,6 +1,5 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-
-import 'files.dart';
+import 'package:dartway_example_server/src/core/files.dart';
 
 /// Everything the club's server is configured with, read once as it starts:
 /// the framework's variables and the club's own, typed.

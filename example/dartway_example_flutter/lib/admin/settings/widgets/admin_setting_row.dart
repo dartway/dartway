@@ -22,7 +22,7 @@ class AdminToggleSettingRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpace.s16),
       child: Row(
         children: [
           Expanded(child: AppText.body(label)),
@@ -62,7 +62,7 @@ class AdminTextSettingRow extends HookWidget {
     final canSave = (clearable || trimmed.isNotEmpty) && trimmed != value;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpace.s16),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
@@ -73,7 +73,7 @@ class AdminTextSettingRow extends HookWidget {
               labelText: label,
             ),
           ),
-          const Gap(12),
+          const Gap(AppSpace.s12),
           AppButton.primary(
             context.l10n.saveAction,
             onTap: canSave ? onSave(trimmed) : null,

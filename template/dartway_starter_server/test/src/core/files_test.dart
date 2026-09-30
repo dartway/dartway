@@ -6,7 +6,7 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/app_harness.dart';
+import '../../support/app_harness.dart';
 
 /// A profile photo: uploaded by the real client straight to the storage, set
 /// on the profile by its file id, shown by its public URL. Runs against an

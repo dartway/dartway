@@ -1,7 +1,6 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
-
-import 'dartway_starter_channel.dart';
-import 'profile.dart';
+import 'package:dartway_starter_shared/src/dartway_starter_channel.dart';
+import 'package:dartway_starter_shared/src/profile.dart';
 
 part 'admin.dw.dart';
 

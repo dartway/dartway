@@ -1,9 +1,8 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_server/src/core/channels.dart';
+import 'package:dartway_example_server/src/profile/profile_objects.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
-
-import '../core/channels.dart';
-import 'profile_objects.dart';
-import 'profile_rows.dart';
 
 /// What a changed profile is published as, and to whom — one place, so every
 /// handler and hook that changes a profile tells the same listeners the same

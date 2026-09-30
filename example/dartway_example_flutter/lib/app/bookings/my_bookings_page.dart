@@ -52,9 +52,9 @@ class MyBookingsPage extends StatelessWidget implements DwFeatureWidget {
           }
 
           return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
             itemCount: bookings.length,
-            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            separatorBuilder: (_, _) => const SizedBox(height: AppSpace.s8),
             itemBuilder: (context, index) =>
                 BookingCard(booking: bookings[index]),
           );

@@ -21,7 +21,7 @@ class BookingCard extends StatelessWidget {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(AppSpace.s16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -38,7 +38,7 @@ class BookingCard extends StatelessWidget {
               ],
             ),
             AppText.caption('${startsAt.dayLabel} · ${startsAt.timeLabel}'),
-            const Gap(12),
+            const Gap(AppSpace.s12),
             if (booking.status == BookingStatus.booked &&
                 startsAt.isAfter(DateTime.now()))
               CancelBookingButton(booking: booking),

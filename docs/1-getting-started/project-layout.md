@@ -49,7 +49,7 @@ my_app_shared/
     my_app_upload.dart           enum MyAppUpload with DwUploadPurpose — what a file is for
     auth_identifier.dart         rules both sides apply identically
     registration_keys.dart       the keys a sign-up sends with its code
-  test/contract_test.dart
+  test/my_app_shared_test.dart
 ```
 
 **It depends on `dartway_core_shared` and nothing else.** Whatever it declares is compiled into the
@@ -229,9 +229,12 @@ a `part of` `ui_kit.dart`, and the rest of the app imports that file and nothing
 
 The boundary is enforced by `dartway_lints`, an analyzer plugin: raw `Color(...)`, `TextStyle(...)`,
 `BorderRadius` and direct theme access **outside** `ui_kit/` are flagged, because a style that leaks
-into a feature is a style nobody can change centrally. The same package limits a relative import to
-two levels up (`deep_relative_import`): past that the path names nothing, and a `package:` import says
-where it goes. See [the UI kit](../3-flutter/ui-kit.md).
+into a feature is a style nobody can change centrally. Spacing is the kit's too: a gap or an inset
+outside it is an `AppSpace` token. See [the UI kit](../3-flutter/ui-kit.md).
+
+**Imports in `lib/` are `package:` only**, in all three packages — `dart run dartway_cli:dartway check`
+fails a relative one (`relativeImport`) and `--fix` rewrites it. Under `test/`, the harness in
+`test/support/` is imported relatively, since `package:` cannot reach it.
 
 ### `web/index.html` is part of the app
 
