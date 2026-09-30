@@ -2,6 +2,15 @@
 
 ## 0.24.0
 
+- **The toolkit `dartway update` installs states every rule once** (dartway/dartway#392, D-121):
+  `CLAUDE.md` is the seven laws and a law table with one row per rule, naming its failing checks and
+  the skill that owns it; each skill holds only its own topic, task-first, with pointers instead of
+  restatements; `/dartway-checkup` runs the gates and `check` first and reads only the skills its
+  findings point at. About a third of the words it had. Two stale instructions went with the copies:
+  the uploads skill's `initState` fallback and the navigation skill's `notifyListeners`, both banned.
+  A new test, `docs_paths_test.dart`, fails on an `example/…`, `template/…` or `__*_PKG__/…` path in
+  `toolkit/` or `docs/` that does not resolve.
+
 - **`dartway check` fails an app that disposes its router** (dartway/dartway#407, D-120):
   `routerDisposedByApp`, an error, in the state inspector — `<x>.router.dispose`, called or torn off
   (`ref.onDispose(router.router.dispose)`), anywhere in the Flutter package's `lib/` but generated

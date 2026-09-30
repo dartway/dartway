@@ -1,354 +1,111 @@
 ---
 name: dartway-access
 description: >-
-  Who may do what in a DartWay project, and the tests that prove it: the DwAccessRule every handler
-  declares (anonymous only for sign-in-like calls, signedIn, check with the call for rules on its
-  real parameters, resource for whose row it is — owned, through a parent, by membership), roles as the project's own (a profile row plus a DwCallContext extension cached
-  with memo), "someone else's row does not exist" (dw.notFound rather than dw.forbidden), "my" calls
-  that carry no account id, channel rules (DwChannelRule) as the second access point and upload
-  rules / DwFileStorage.canRead as the third, what a command's publications reveal to its caller,
-  personal keys for tools (DwAccountService.issueKey, ctx.sessionKey.kind), revocation, identifiers
-  attached by code (the refusal after the right code), and never raw SQL on the framework's tables.
-  Use when adding a handler, a role, a channel, an upload purpose or a key-issuing flow, or when
-  reviewing whether a call leaks data.
+  Who may do what in a DartWay project: the DwAccessRule of every handler (anonymous, signedIn,
+  check, resource — owned, through a parent, by membership), roles as the project's own, someone
+  else's row answering dw.notFound, channel rules and file rules as the second and third access
+  points, what a command's publications reveal, personal keys and revocation, identifiers attached
+  by code, and the tests that prove each rule. Use when adding a handler, a role, a channel, an
+  upload purpose or a key-issuing flow, or when reviewing whether a call leaks data.
 ---
 
-# DartWay — access: rules, roles, channels, keys
+# DartWay — access (`dartway-access`)
 
-The server is the only place access is decided. A hidden button, a route guard, a field the app
-"never sends" are conveniences; the server's rules are the access. There are exactly three access
-points, and each must be as strict as the others:
-
-1. **the call** — the `DwAccessRule` of every handler, ownership included (`DwAccessRule.resource`);
-2. **the channel** — the `DwChannelRule` of every channel kind, checked once at subscription;
-3. **the file** — the upload rule of every purpose and `DwFileStorage.canRead` for private files.
-
-Related skills: `dartway-server`, `dartway-realtime`, `dartway-uploads`, `dartway-contract`,
-`dartway-testing`.
+The server is the only place access is decided; a hidden button or a route guard is a convenience.
+Three access points, each as strict as the others: **the call** (§1–3), **the channel** (§4), **the
+file** (`dartway-uploads`).
 
 ## 1. Every handler declares its rule
 
-`access:` is required on every `DwCallHandler` factory — there is no default, so no handler is open by
-omission.
+`access:` is required on every handler factory; there is no default.
 
 | Rule | Who | For |
 |---|---|---|
-| `DwAccessRule.anonymous` | anyone, with or without a session | calls that must work before sign-in: a public landing read, a sign-up-like flow of the project's own. The framework's sign-in commands are built in — you do not declare them |
-| `DwAccessRule.signedIn` | any signed-in account | "my" calls, and anything every member may do; a call naming a row by id is `resource` |
-| `DwAccessRule.check<C>((ctx, call) async => …)` | a signed-in account for which the check is true; otherwise `dw.forbidden` | roles, and rules on the call's real parameters |
-| `DwAccessRule.resource<C, R>(load: …, allows: …, visible: …)` | a signed-in account that may reach the row the call names; otherwise `dw.notFound` (`dw.forbidden` when `visible`) | "is this mine", "am I in this project" — the handler reads the row as `ctx.accessed<R>()` |
+| `DwAccessRule.anonymous` | anyone | what must work before sign-in; say why in the handler's comment |
+| `DwAccessRule.signedIn` | any signed-in account | "my" calls, and what every member may do |
+| `DwAccessRule.check<C>((ctx, call) async => …)` | signed in and the check holds, else `dw.forbidden` | roles; rules on the call's parameters |
+| `DwAccessRule.resource<C, R>(load:, allows:, visible:)` | signed in and may reach the row the call names, else `dw.notFound` | whose row it is; the handler reads it as `ctx.accessed<R>()` |
 
-Order on the server: the sign-in requirement (anonymous caller → `unauthenticated`, `401`), then
-`validate()`, then the check, then the handler. The check runs in the handler's context — inside the
-transaction of a transactional command — and after validation, so it may trust the fields' shape.
-
-`C` is the call class the check is written for; a check typed for one class on a handler of another
-fails the server's startup. A role rule shared by many handlers is typed for every call:
-
-```dart
-/// Access rules of the app, in the words handlers read.
-abstract final class ProfileAccess {
-  static final DwAccessRule manager = DwAccessRule.check<DwServerCall<Object?>>(
-    (ctx, _) => ctx.isManager,
-  );
-
-  /// Reading a customer's invoices: managers, or the account manager of that
-  /// customer.
-  static final DwAccessRule customerInvoices =
-      DwAccessRule.check<ListCustomerInvoices>((ctx, request) async {
-        if (await ctx.isManager) return true;
-        final customer = await ctx.db.customers.findById(request.customerId);
-        return customer?.accountManagerProfileId == (await ctx.profile).id;
-      });
-}
-```
+Order: sign-in (`401`), `validate()`, the rule, the handler — the rule runs inside a transactional
+command's transaction. A rule shared by many handlers is typed for every call:
+`DwAccessRule.check<DwServerCall<Object?>>((ctx, _) => ctx.isAdmin)` — the skeleton's `ProfileAccess.admin`
+in `__SERVER_PKG__/lib/src/profile/profile_access.dart`, beside the `ProfileCallContext` extension that
+makes the role a word handlers read.
 
 ## 2. Roles are the project's
 
-The framework knows that an account signed in, not who that person is to the project. A role is a
-column of the project's profile row, and the context extension — `ProfileCallContext` in
-`profile/profile_access.dart`, the profile feature's surface every feature imports (`core/` imports
-no feature) — turns it into words handlers read, cached per call:
-
-```dart
-extension ProfileCallContext on DwCallContext {
-  Future<MemberProfileRow> get profile => memo(#profile, () async {
-    final accountId = requireAccountId;
-    final profile = await db.memberProfiles.findFirst(
-      where: (t) => t.accountId.equals(accountId),
-    );
-    return profile ?? (throw StateError('Account $accountId has no profile'));
-  });
-
-  Future<bool> get isManager async =>
-      (await profile).role == MemberRole.manager;
-}
-```
-
-The profile row is created with the account, in `DwAuthConfig.onAccountCreated`
-(`dartway-server`), so "a signed-in account without a profile" is a broken invariant, not a case
-to handle. The skeleton ships this extension with an admin role, and an `ProfileAccess`-style class of
-rules beside it.
-
-**A role change is guarded like any other data**, and two locks are worth copying from the skeleton:
-
-- **nobody changes their own role** — refuse it with a project refusal code (the skeleton's
-  `ownRoleLocked`): an admin demoting themselves locks the panel's only way back;
-- **the first admin is declared per environment**, not granted by a default: `DW_ADMIN_IDENTIFIER`
-  names an identifier the framework's `DwFirstAdministrator` startup step brings into existence at
-  every start, handing the account to the project's `grant` — which is where the role is given. A
-  default admin identifier in a template would hand every project that forgot it to whoever
-  receives that identifier's codes.
-
-A role taken away also closes what it opened: `ctx.revoke(channel, accountId)` for every channel
-the role could subscribe to (`dartway-realtime`).
+A role is a column of the profile row, created with the account (`dartway-server`, §8). Guard a role
+change like any data: **nobody changes their own role** (a project refusal code — the skeleton's
+`ownRoleLocked`), and **the first admin is declared per environment** (`DW_ADMIN_IDENTIFIER`), never a
+default. A role taken away closes what it opened: `ctx.revoke` on its channels (`dartway-realtime`).
 
 ## 3. Someone else's row does not exist
 
-Whether the row a call names is the caller's is answered **once, in the rule**, and its answer is
-`dw.notFound`, not `dw.forbidden`. Never `signedIn` or a role rule with the check written in the body
-or in a private `_requireOwn…` helper — every copy answers a little differently, and
-`dart run dartway_cli:dartway check` warns on it (`inlineOwnershipCheck`). **`allows` carries the
-whole permission** — role included; `visible` is not a gate, it only picks the refusal code. One form
-per shape:
-
-**Owned by the caller** — a field of the row names the caller's profile:
+Whether the row a call names is the caller's is answered **once, in `DwAccessRule.resource`**, and the
+answer is `dw.notFound` — `forbidden` for a foreign id and `notFound` for a free one would let a caller
+enumerate ids. An owner comparison written in a handler body or a helper is `inlineOwnershipCheck`
+(a warning). `allows` carries the whole permission, role included; `visible` only turns the refusal into
+`dw.forbidden` for someone allowed to see the row.
 
 ```dart
-DwCallHandler.command<PayInvoice, Invoice>(
-  access: DwAccessRule.resource<PayInvoice, InvoiceRow>(
-    // Locked: the rule runs inside the command's transaction.
-    load: (ctx, command) =>
-        ctx.db.invoices.findById(command.invoiceId, lock: DwRowLock.forUpdate),
-    allows: (ctx, command, invoice) async =>
-        invoice.ownerProfileId == (await ctx.profile).id,
-  ),
-  handle: (ctx, command) async {
-    final invoice = ctx.accessed<InvoiceRow>();
-    // …
-  },
+// Owned by the caller; locked, since the rule runs in the command's transaction.
+access: DwAccessRule.resource<PayInvoice, InvoiceRow>(
+  load: (ctx, command) =>
+      ctx.db.invoices.findById(command.invoiceId, lock: DwRowLock.forUpdate),
+  allows: (ctx, command, invoice) async =>
+      invoice.ownerProfileId == (await ctx.profile).id,
 ),
+handle: (ctx, command) async {
+  final invoice = ctx.accessed<InvoiceRow>();
+  // …
+},
 ```
 
-**Owned through a parent** — `load` reads the row and the parent that decides, as a record; the
-handler reads neither again:
+- **Owned through a parent:** `load` returns the row and the parent as a record,
+  `DwAccessRule.resource<RenameLesson, (LessonRow, CourseRow)>`; the handler reads
+  `ctx.accessed<(LessonRow, CourseRow)>()`.
+- **Membership of a parent:** one function returns the caller's membership or `null` —
+  `ctx.membershipOf(teamId)`, a context extension in the parent feature's `_access.dart` — and is the
+  only definition of "a member". Every resource rule, the parent's channel rule and `canRead` for its
+  files call it; another feature imports that file. A rule for many calls on one kind of row is a
+  function returning the rule, in the same file.
+- **Visible but not yours to change** (a note on the team's board): `load` answers `null` outside the
+  team before taking any lock, `allows` compares the author, `visible: (…) => true`.
+- **The caller's rows as a list** is `signedIn` and a `where` naming the caller; a list under a parent
+  takes the parent's membership rule.
 
-```dart
-access: DwAccessRule.resource<RenameLesson, (LessonRow, CourseRow)>(
-  load: (ctx, command) async {
-    final lesson = await ctx.db.lessons.findById(command.lessonId);
-    if (lesson == null) return null;
-    final course = await ctx.db.courses.findById(lesson.courseId);
-    return course == null ? null : (lesson, course);
-  },
-  allows: (ctx, command, found) async =>
-      found.$2.teacherProfileId == (await ctx.profile).id,
-),
-// handle: final (lesson, course) = ctx.accessed<(LessonRow, CourseRow)>();
-```
+**"My" calls carry no account or profile id**, and no command carries what the server decides
+(`dartway-contract`). A staff screen acting on someone else's data is a different call with its own
+rule, never the "my" call with an optional id.
 
-**Membership of a parent** — **one function returns the caller's membership, or `null`**, in the
-`_access.dart` of the feature that owns the parent, as a context extension of its own; it is the
-only definition of "a member" (active, accepted, not blocked). Every resource rule's `load`, the
-parent's `DwChannelRule` and `DwFileStorage.canRead` for files attached inside the parent call it,
-and another feature asking the same question imports that file — its surface — rather than
-writing a second definition, which is how one of them skips a check:
+## 4. Channels are the second access point
 
-```dart
-// teams/teams_access.dart
-extension TeamsCallContext on DwCallContext {
-  Future<TeamMemberRow?> membershipOf(int teamId) async {
-    final me = await profile;
-    final row = await db.teamMembers.findFirst(
-      where: (t) => t.teamId.equals(teamId) & t.profileId.equals(me.id),
-    );
-    return row != null && row.isActive ? row : null;
-  }
-}
-```
+Everything published to a channel reaches every subscriber, checked once at subscription. So a kind's
+`canSubscribe` admits **only accounts allowed to read every object any command publishes there** —
+answered for any caller, never `(ctx) async => true` because "only the staff screen subscribes": a
+command's response carries its publications on the channels whose rule admits the caller, socket or
+not. Rules and publishing: `dartway-realtime`.
 
-A rule shared by many calls of one kind of row is a function returning the rule, in the same
-`_access.dart`:
+## 5. Keys, revocation, identifiers
 
-```dart
-static DwAccessRule teamMember<C extends DwServerCall<Object?>>(
-  int Function(C call) teamId,
-) => DwAccessRule.resource<C, TeamMemberRow>(
-  load: (ctx, call) => ctx.membershipOf(teamId(call)),
-  allows: (ctx, call, membership) => true, // membershipOf decided
-);
+- Every session is a key; keys do not expire, they are revoked. A sign-in makes an app key; a tool gets
+  `ctx.accounts.issueKey(accountId, label: …)` → `(key:, token:)` — **the token exists only in that
+  answer**, returned once in the command's result.
+- Tell a tool from the app by the server's record, `ctx.sessionKey?.kind == DwSessionKeyKind.personal`,
+  never by something the client sends.
+- `revokeKey(keyId, accountId: callerAccountId)` — always with the account when the id came from the
+  client; `revokeKeys(accountId)` signs out everywhere; `listKeys` for a sessions screen.
+- A second phone or e-mail is `DwRequestIdentifierCode` then `DwConfirmIdentifier`; a taken identifier
+  is refused only after the right code (`DwAuthRefusal.identifierTaken`). **Never check "taken"
+  earlier** — that is an account-existence oracle.
+- Never SQL on `dw_*` tables: `DwAccountService` holds the locks, runs the hooks, closes live sessions.
 
-// and the channel: canSubscribe: (ctx, teamId) async => await ctx.membershipOf(teamId) != null
-```
+## 6. Tests that prove access
 
-**A row inside the parent, visible but not yours to change** — a note someone else wrote on the
-team's board. `load` returns the row with the caller's membership, and locks the row only once the
-membership is known; `visible` turns the refusal into `dw.forbidden` for a member:
-
-```dart
-access: DwAccessRule.resource<EditNote, (NoteRow, TeamMemberRow)>(
-  load: (ctx, command) async {
-    final seen = await ctx.db.notes.findById(command.noteId);
-    if (seen == null) return null;
-    final membership = await ctx.membershipOf(seen.teamId);
-    if (membership == null) return null; // outside the team: nothing locked
-    final note = await ctx.db.notes.findById(
-      command.noteId,
-      lock: DwRowLock.forUpdate,
-    );
-    return note == null ? null : (note, membership);
-  },
-  allows: (ctx, command, found) =>
-      found.$1.authorProfileId == found.$2.profileId,
-  visible: (ctx, command, found) => true, // every member reads the board
-),
-```
-
-A permission that also rests on a role puts the role in `allows` (`await ctx.isManager && …`) and
-has `load` answer `null` for a caller without it before taking any lock.
-
-**The caller's rows as a list** is not a rule: `signedIn`, and the query names the caller in its
-`where` (`t.ownerProfileId.equals(me.id!)`). A list under a parent takes the parent's membership
-rule and filters by the parent's id.
-
-Why `notFound`: `forbidden` for someone else's id and `notFound` for a free id tell a caller which ids
-exist — typing ids one by one enumerates other people's data.
-
-## 4. "My" calls carry no account id
-
-A request or command about the caller's own data names nothing about the caller: the handler reads
-`ctx.profile` / `ctx.requireAccountId`. A field holding "my" id is a field anyone can change
-to someone else's, and the handler that trusts it serves them. The same goes for every value the
-server decides — owner, author, timestamps, status (`dartway-contract`).
-
-When a staff screen really does act on someone else's data, that is a different call with its own
-rule (`ListCustomerInvoices` with `ProfileAccess.customerInvoices`), never the "my" call with an optional
-id.
-
-## 5. Channels are the second access point
-
-Everything published to a channel is readable by every subscriber, and nothing re-checks the objects.
-So `canSubscribe` of a kind must admit **only people allowed to read every object any command
-publishes there** — as strict as the strictest handler of a request on that channel:
-
-- a caller channel: `DwChannelRule.ofCaller(kind)` — a connection subscribes to its own account's
-  key only (another key is `dw.forbidden`);
-- a role channel: `DwChannelRule.single(kind, canSubscribe: (ctx) => ctx.isManager)`;
-- a group channel: `DwChannelRule.keyed<int>(kind, parseKey: int.parse, canSubscribe: (ctx, id) …)`
-  checks membership of that group — through the same `ctx.membershipOf` the calls' rules use (§3);
-- **a subscription is checked once**: a command that removes someone's right revokes it
-  (`ctx.revoke`).
-
-**A publication reaches only those allowed to read its channel.** The response of a command carries
-its publications on the channels whose rule allows the caller — the same check a subscription runs —
-with or without a live socket; subscribers get them over the socket (D-053). So a member's command may
-publish an object only managers may read: managers hear it, the member never sees it. Two things
-follow:
-
-- **a channel rule answers "may this account read this channel" for any caller.** Never `(ctx) async
-  => true` on a staff channel because only the staff screen subscribes: every command publishing
-  there would hand it to its caller;
-- publish a manager's figure to a managers' channel, never to one the member may read.
-
-## 6. Files are the third
-
-An upload purpose's rule decides who may upload (`canUpload`), how large and of which types, and
-whether the file is public (served by URL to anyone holding it) or private. A private file is read
-only through a short link after `DwFileStorage(canRead: …)` says yes for that caller and that file;
-a file attached inside a parent is readable to its members through `ctx.membershipOf` (§3).
-And a file id in a command is a number anyone can type: a command that attaches a file checks it is
-the caller's own finished upload of the right purpose (`ctx.files.requireOwned`). Details —
-`dartway-uploads`.
-
-## 7. Keys, revocation and tools
-
-Every session is a key of an account. Keys do not expire; they are revoked.
-
-- **The app's key** is made by a sign-in (`DwSessionKeyKind.app`), labelled with the app build.
-- **A personal key for a tool** (a script, an agent, an integration) is made by
-  `ctx.accounts.issueKey(accountId, label: '…')` (`DwSessionKeyKind.personal`). It answers
-  `(key: DwSessionKeyInfo, token: String)`; **the token exists only in that answer** — the database
-  keeps its hash — so hand it over once, in the command's result (a data object of your own that
-  carries it). The framework does not store that command's successful outcome for idempotency, so
-  the token never sits in the outcome table.
-- **Tell a tool from the app by the server's record**, never by something the client sends:
-  `ctx.sessionKey?.kind == DwSessionKeyKind.personal`. Refuse what a tool must not do, or allow only
-  to tools what only tools may do.
-- **Revoke**: `ctx.accounts.revokeKey(keyId, accountId: callerAccountId)` — pass `accountId` whenever
-  the key id came from the client, or anyone could revoke anyone's key; `revokeKeys(accountId)` signs
-  an account out everywhere; `listKeys(accountId)` for a "your sessions" screen. Revocation takes
-  effect at once in the server that commits it — connections on the key lose their subscriptions.
-
-All of it goes through `DwAccountService` (`ctx.accounts`, `server.accounts`,
-`DwAccountService(db, auth)`). **Never raw SQL on `dw_account`, `dw_identity`, `dw_auth_key` or any
-`dw_*` table**: the service holds the locks sign-in takes, runs `onIdentifierChanged`, and revokes
-live sessions; SQL does none of that.
-
-## 8. Identifiers attached by code
-
-Attaching a second phone or e-mail, or changing one, is built in: `DwRequestIdentifierCode(kind,
-identifier)` then `DwConfirmIdentifier(ticketId:, code:, replace:)`. An identifier that belongs to
-another account is refused **only after the right code** (`DwAuthRefusal.identifierTaken`, field
-`code`): the request answers the same for a free and a taken identifier.
-
-**Do not add a project check that answers earlier** ("this phone is already taken" before the code is
-sent). It turns the call into an account-existence oracle for any signed-in user. Mirror or publish
-the change in `DwAuthConfig.onIdentifierChanged`, which runs in the changing transaction.
-
-## 9. Tests that prove access
-
-Access that is not tested is a hope. In `__SERVER_PKG__/test/` (real server, real clients,
-`dart run dartway_cli:dartway test`), **one refused call per rule**:
-
-```dart
-Matcher refusedWith(DwRefusalCode code) => isA<DwCallRefused<Object?>>()
-    .having((result) => result.refusal.code, 'refusal code', code.code);
-```
-
-Write each case as the call a hostile client would make (`member`, `anonymous` are `DwAppClient`s
-from `DwTestServer.connectClient`, the first signed in):
-
-```dart
-// anonymous → not authenticated
-expect(await anonymous.fetch(const ListMyInvoices()), isA<DwNotAuthenticated<Object?>>());
-
-// a member calling a manager's read → forbidden
-expect(await member.fetch(const ListInvoicesPage()), refusedWith(DwCoreRefusal.forbidden));
-
-// someone else's id → not found, and nothing changed
-expect(
-  await member.command(PayInvoice(invoiceId: othersInvoiceId)),
-  refusedWith(DwCoreRefusal.notFound),
-);
-
-// a foreign caller channel → refused at subscription
-final socket = await server.openLive();
-await socket.authenticate(memberToken);
-expect(
-  (await socket.subscribe('invoices:$otherAccountId') as DwSubscriptionRefusedMessage)
-      .refusal
-      ?.isCode(DwCoreRefusal.forbidden),
-  isTrue,
-);
-```
-
-Plus, where they apply: a demoted role loses its channel (the client gets the channel's `closed`
-frame) and its calls; an admin cannot change their own role; a personal key is refused what tools
-must not do; a key id of another account is not revoked. The skeleton's server tests hold the
-harness (`refusedWith`, signed-in members, a promoted admin) — `dartway-testing`.
-
-## Checklist
-
-- [ ] Every handler's rule is the narrowest that works; `anonymous` only where sign-in cannot exist yet.
-- [ ] Role rules read the cached profile through the context extension.
-- [ ] Every row an id names is guarded by `DwAccessRule.resource`; `allows` carries the whole
-      permission, `visible` only the refusal code; someone else's is `dw.notFound`.
-- [ ] One `membershipOf` per kind of membership, called by every rule, channel and `canRead`.
-- [ ] "My" calls carry no account or profile id; no command carries what the server decides.
-- [ ] Each channel kind's `canSubscribe` is as strict as every request on it; lost rights are revoked.
-- [ ] A command publishes nothing its caller may not read.
-- [ ] File ids from the client are checked with `ctx.files.requireOwned`; private files have `canRead`.
-- [ ] Keys: token returned once; `revokeKey` with the caller's `accountId`; tools told apart by
-      `ctx.sessionKey?.kind`.
-- [ ] No SQL on `dw_*`; no early "identifier taken" check.
-- [ ] One refused call per rule in the server tests.
+In the server's acceptance tests (`dartway-testing`), **one refused call per rule**, written as the call a
+hostile client makes — anonymous → `DwNotAuthenticated`; a member on an admin read → `dw.forbidden`;
+someone else's id → `dw.notFound` and nothing changed; a foreign caller channel → refused at
+subscription. Where they apply: a demoted role loses its channel and calls, an admin cannot change their
+own role, a key id of another account is not revoked. The skeleton's
+`__SERVER_PKG__/test/src/admin/admin_acceptance_test.dart` and its harness (`refusedWith`) are the
+pattern.

@@ -1,74 +1,44 @@
 ---
 name: dartway-analytics
 description: >-
-  Analytics in a DartWay project: the server module `DwAnalyticsModule`
-  (`dartway_analytics_server`) in `DwAppServer(modules:)`, the protocol composed with
-  `dwAnalyticsProtocolEntries`, the project's event enum `with DwAnalyticsEvent` in the shared
-  package, the app plugin `DwAnalytics` (`dartway_analytics_flutter`, `dw.plugins.analytics.track`)
-  with `attribution`, events the server records with `ctx.analytics.track` in a command's
-  transaction, sessions, retention, reports (`DwGetAnalyticsReport`), the catalog, saved dashboards
-  and who may read them (`readAccess`), the admin viewer in `lib/admin/analytics/`, and SQL. Use
-  when a feature must be measured — a funnel, activation, usage of a screen — when the team needs a
-  dashboard, or when numbers look wrong.
+  Product analytics in the project's own Postgres: DwAnalyticsModule with readAccess, the protocol
+  composed with dwAnalyticsProtocolEntries, the event enum in the shared package, the app plugin
+  DwAnalytics (dw.plugins.analytics.track), server-side ctx.analytics.track, reports
+  (DwGetAnalyticsReport), dashboards and the admin viewer, and SQL. Use when a feature must be
+  measured, when the team needs a dashboard, or when numbers look wrong.
 ---
 
 # DartWay — analytics (`dartway-analytics`)
 
-**Events stay in the project's Postgres.** Nothing goes to a third party; the full description is
+Events stay in the project's Postgres; nothing goes to a third party. The full page:
 `docs/4-server/analytics.md` in the framework repository.
 
-## Wiring
+**Wiring.** `enum <Project>Event with DwAnalyticsEvent { … }` in `__SHARED_PKG__` — lowerCamelCase names
+of what happened (`orderPlaced`); both protocols include `dwAnalyticsProtocolEntries`;
+`DwAnalyticsModule(readAccess: …)` in the server's `modules:` — the skeleton's admin rule or narrower
+(without it every read is `dw.forbidden`; `anonymous` refuses to start; `editAccess` defaults to it);
+`DwAnalytics(attribution: …)` in the app's `plugins:`.
 
-- `__SHARED_PKG__`: `enum <Project>Event with DwAnalyticsEvent { ... }` — one enum, names in
-  lowerCamelCase that say what happened (`orderPlaced`, not `clickButton3`). `dw.` is the
-  framework's.
-- Both protocols: `DwWireProtocol(dwAnalyticsProtocolEntries, include: appProtocol)`.
-- `__SERVER_PKG__`: `DwAnalyticsModule(readAccess: <the project's rule>)` in `modules:` — the
-  admin rule the skeleton declares, or a narrower one; its migrations apply at start. Without
-  `readAccess` every report and dashboard read is refused `dw.forbidden`; `DwAccessRule.anonymous`
-  refuses to start. `editAccess` (saving dashboards) defaults to `readAccess`.
-- `__FLUTTER_PKG__`: `DwAnalytics(attribution: ...)` in `plugins:`.
+**Tracking.**
 
-## Tracking
+- In the app, where it happened — a tap handler, a state change, never `build`:
+  `dw.plugins.analytics.track(Event.x, {'key': value})`. It never throws; events batch and send in the
+  background.
+- On the server what only the server knows (a payment settled): `await ctx.analytics.track(Event.x,
+  properties: {…})` in the command's transaction.
+- Properties: strings, numbers, booleans, at most 30, flat — ids, amounts, variants; **never personal
+  data**. Name them so a non-developer can pick them from a list.
 
-- **In the app, at the moment it happened**: `dw.plugins.analytics.track(Event.x, {'key': value})`
-  in the handler of the tap or where the state changed — not in `build`, which runs many times.
-- **On the server, when only the server knows**: payment settled, order accepted, job done —
-  `await ctx.analytics.track(Event.x, properties: {...})` in the command's transaction. A fact the
-  server decides is recorded there, not by the app that asked for it.
-- Properties are strings, numbers, booleans; at most 30; nothing nested. Ids, amounts, variants —
-  never personal data (names, phones, e-mails, message text).
-- `track` makes no call and never throws: events are batched, kept on the device and sent every
-  30 s, at 50 waiting, and when the app goes to the background.
+**Reading.** A number the team watches is a dashboard widget, not code: the skeleton's viewer in
+`lib/admin/analytics/` (source the project owns) builds number, bar and pie widgets from the catalog of
+recorded names. In code: `dw.request(DwGetAnalyticsReport(spec: DwAnalyticsReportSpec(…), period:
+DwAnalyticsPeriod.localDays(…)))` — a metric (events, accounts, installs), filters, a breakdown (time or
+a property; `DwAnalyticsBreakdownOrder.byLabel` for funnel steps). Dashboards change through
+`dw.plugins.analytics.saveDashboard` / `deleteDashboard`, which refresh their list. Charts are kit widgets
+(`ui_kit/3_special/charts/`). Sequences and cohorts are SQL over `dw_analytics_event` (`name`,
+`occurred_at`, `install_id`, `session_number`, `account_id`, `properties`) — installs for activity,
+accounts for people; a session ends after 30 minutes of silence.
 
-## Reading
-
-**A number the team watches is a dashboard widget, not code.** The skeleton's admin panel has the
-viewer (`lib/admin/analytics/`, source the project owns): a period on top, widgets of three types —
-a number with its change, bars, a pie — built from the catalog of recorded names and keys. A new
-event shows up there once the app records it; name events and properties so a non-developer can
-pick them from a list (`stepNumber`, `sectionName` rather than `p1`).
-
-- In code: `ref.watch(dw.request(DwGetAnalyticsReport(spec: ..., period: ...)))` — a
-  `DwAnalyticsReportSpec` (event, `DwAnalyticsMetric` events / accounts / installs,
-  `DwAnalyticsFilter`s, `DwAnalyticsBreakdown` none / by time / by a property's values, largest
-  first or `DwAnalyticsBreakdownOrder.byLabel` for a funnel's steps) over a `DwAnalyticsPeriod`
-  (`localDays`, which ends at now; `previous`, the same shape earlier). Distinct counts are counted
-  over the whole period, so a pie is only for events by a property.
-- Dashboards change through `dw.plugins.analytics.saveDashboard` / `deleteDashboard`, which refresh
-  `DwListAnalyticsDashboards`; `dw.command` with the dashboard commands leaves the list stale.
-- Charts are the UI kit's (`AppBarChart`, `AppPieChart`, `AppStatValue`): a new chart type goes
-  into `ui_kit/3_special/charts/`, never as raw styling in the feature.
-
-What reports do not answer — a sequence within a session, cohorts — is SQL over
-`dw_analytics_event` (`name`, `source`, `occurred_at`, `install_id`, `session_number`,
-`account_id`, `properties` jsonb) and `dw_analytics_install`. Count installs for activity (one per
-device, before and after sign-in), accounts for people. Sessions end after 30 minutes of silence.
-
-## Tests
-
-- Server: call the command that records and read `dw_analytics_event` in the test database; a
-  report through a signed-in admin client, and `dw.forbidden` for a member.
-- App: `DwAnalytics(store: DwMemoryAnalyticsStore())` against `DwFakeServer` answering
-  `DwTrackEvents`; `await analytics.flush()` sends what waits. Widget tests of admin screens answer
-  `DwListAnalyticsDashboards` (and the reports a dashboard shows) on the fake server.
+**Tests.** Server: run the command, read `dw_analytics_event`; a report as an admin, `dw.forbidden` as a
+member. App: `DwAnalytics(store: DwMemoryAnalyticsStore())` against a fake answering `DwTrackEvents`,
+then `flush()`.

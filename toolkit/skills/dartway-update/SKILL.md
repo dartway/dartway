@@ -1,233 +1,66 @@
 ---
 name: dartway-update
 description: >-
-  Moving this project onto a newer DartWay (DartWay projects): update the CLI, run `dartway update`
-  (it installs the agent toolkit into .claude/ and reports the framework packages that are behind
-  and the migration notes still owed), make the edits the notes ask for, then move the package
-  versions — the core family (`dartway_core_shared`, `dartway_core_server`, `dartway_core_flutter`
-  and the packages released with it, `dartway_client`, `dartway_generator`) together to one
-  version, satellites (`dartway_router`, `dartway_lints`, `dartway_shared_preferences`,
-  `dartway_cli`, …) each on its own — regenerate with `dart run dartway_cli:dartway generate`, and prove the result with
-  the checks, the tests and a run. Use when the framework has released, when `dartway update`
-  reports the project is behind, or when a fix the project is waiting for has landed upstream; runs
-  as /dartway-update.
+  Moving the project onto a newer DartWay: update the CLI, run `dartway update` (installs .claude/,
+  reports the packages behind and the migration notes owed), make the edits the notes ask for, then
+  move the core family together and each satellite on its own, regenerate, prove it with the gates
+  and a run, and report whether the protocol version moved. Also the old shapes a project may still
+  carry and how to recognise them. Use when the framework has released, when `dartway update` says
+  the project is behind, or when a fix the project waits for has landed.
 ---
 
 # DartWay — updating the project (`dartway-update`)
 
-A project on DartWay drifts silently. The toolkit is a committed artifact that looks exactly the same
-when it is a month old; a package version lives in a lock file nobody reads; and the framework changes
-that ask the project to change with them are invisible until something stops compiling — or worse,
-until it compiles and behaves differently.
+The update is: what moved, what the project owes because of it, and proof the result works. Raising a
+caret is the last step, not the task; the update is its own branch and PR, never folded into a feature.
 
-This skill is the update, end to end: **what moved, what the project owes because of it, and the proof
-that the result works.**
+1. **A branch from a clean tree**: `git status`, then `git switch -c chore/dartway-update __BASE_BRANCH__`.
+2. **Update the CLI**: `dart pub global activate dartway_cli` — an old CLI installs an old toolkit.
+3. **`dartway update`** — takes the framework from the recorded channel (`--channel`, `--local-repo`),
+   installs `.claude/`, and reports the `dartway_*` packages behind (resolved version, the channel's,
+   the directories holding it) and the migration notes that still apply, oldest first. It changes
+   nothing but `.claude/`. Nothing behind and no notes: commit `.claude/` and stop. An unreadable note
+   is a framework defect — file it, read it by hand.
+4. **Each note, in the order given**: first `grep` whether the project uses what changed — not applying
+   is a normal outcome. A note keyed to `dartway_cli` is the only way a skeleton change reaches an
+   existing project.
+5. **Make the edits**, one note at a time, in the project's own conventions. Where a note and the
+   project disagree, stop and ask. A wrong or missing note goes to `__NOTES_TRACKER__`.
+6. **Move the packages.** The core family — `dartway_core_shared`, `dartway_core_server`,
+   `dartway_core_flutter`, `dartway_client` (dev, Flutter) and `dartway_generator` (dev, server) — to
+   **one** version, every caret in every package, in one change; the app and the server speak the wire of
+   the family they resolve. Under `0.x` a minor is a major: `^0.20.0` excludes `0.21.0`, and lowering a
+   caret is never the fix. From git: `dart pub upgrade` of all the `dartway_*` packages together in each
+   directory (`frameworkRefsDiverged` warns on packages locked to different commits). Satellites
+   (`dartway_router`, `dartway_lints`, `dartway_shared_preferences`, `dartway_cli`, …) move each to its
+   own version; a `dependency_overrides` taken early goes once the family admits that version
+   (`frameworkOverrideOutlived`). The `dartway_lints` plugin must be enabled in the Flutter package's
+   `analysis_options.yaml` — `dartway update` wires it (`lintsPluginMissing`).
+7. **Regenerate and prove**: `dart run dartway_cli:dartway generate` even when no DTO changed (the
+   generator moved), then every gate in `dartway-finish` (A.2), then run the app (`dartway-run`): a
+   changed default or wiring step shows only there. The framework's own migrations apply at server start.
+   **Say whether `dwProtocolVersion` moved** between the resolved `dartway_core_shared` before and after:
+   installed apps then get `426`, and the server and the new builds must ship together.
+8. **Commit** `.claude/` with the rest: `chore(deps): move to dartway <version>, applying <n> migrations`,
+   the body naming the notes applied and found not to apply.
+9. **Report**: the toolkit's channel and commit; what moved from what to what; notes applied, not
+   applicable, and **left undone with why**; the protocol version; the gates, and what was red before.
 
-## What this is not
+## Old shapes — a project that grew under an older wording of a law
 
-**Not a version bump.** Raising a caret is the last step, not the task. A framework release can carry
-changes that expect the project's own code to be different, and moving the packages before making those
-edits turns a readable instruction into a screen of compile errors.
+Legacy moves as you touch it, never as a sweep, and a gap left is said out loud. Each entry: how to
+tell, the target, what to do with what accumulated. An entry goes once no project carries the shape.
 
-**Not a release of this project.** It ends with a commit and a PR like any other change. Whether that
-goes out is a separate decision, made the way this project makes it — with one consequence named in
-step 7.
-
----
-
-## Step 1. Start on a branch, from a clean tree
-
-`git status` first. A dirty tree means somebody's unfinished work is in it, and an update touches files
-across the whole project — `.claude/`, pubspecs, lock files, generated code, and whatever the migration
-notes ask for.
-
-```bash
-git switch -c chore/dartway-update __BASE_BRANCH__
-```
-
-Clean tree, own branch, and the update is reviewable as one diff. That matters more here than usual:
-the toolkit diff is large and mechanical, and it must not arrive mixed into a feature.
-
-## Step 2. Update the CLI itself
-
-```bash
-dart pub global activate dartway_cli
-```
-
-The CLI reads the framework and installs the toolkit, so an old one installs an old idea of what a
-project needs — including being unaware of files a newer toolkit ships. It cannot replace itself
-mid-run, which is why this is a step: `dartway update` only warns when the channel carries a newer CLI
-than the one running.
-
-## Step 3. Run the update
-
-```bash
-dartway update
-```
-
-It takes the framework from the channel this project was set up with (the recorded one; `--channel`
-overrides it, `--local-repo` points at a local checkout), replays the recorded install settings, and:
-
-- **installs the toolkit** into `.claude/` and says where it came from — channel and commit;
-- reports **the framework packages this project is behind on** — for each: the version the project
-  resolves (the lowest across its lock files), the version the channel has, and the directories whose
-  `pubspec.lock` holds it — with the instruction for hosted and for git dependencies;
-- reports **the migration notes that still apply**, oldest first — the framework changes this project
-  has to answer with an edit of its own, each with its file in the framework checkout and the version
-  it lands in.
-
-Read that output before doing anything. If it names no packages behind and no migrations, the update
-is already finished: commit `.claude/` and stop.
-
-> `dartway update` deliberately changes nothing but `.claude/`. Everything else it reports is work with
-> judgement in it, and a command that half-applied it would leave a tree nobody can tell apart from a
-> finished one.
-
-A note reported as unreadable ("Migration notes that could not be read") is a framework defect, not
-this project's: file it (step 5) and read the file by hand anyway.
-
-## Step 4. Read every migration note, in the order given
-
-A note applies because the project resolves a package below the version the note's `affects` names.
-Each note says who is affected, what to change and how to check it. They are listed oldest first, and
-that is the order to apply them in: a project several releases behind may be carrying two changes to the
-same call site.
-
-**Before editing, find out whether this project is actually affected.** `affects` puts a note in front
-of you by version; whether the code uses what changed is a `grep`. A note that turns out not to apply is
-a normal outcome — say so and move on.
-
-A change to the skeleton alone reaches an existing project only through a note (keyed to `dartway_cli`):
-a project keeps its copy of what `dartway create` gave it, so such a note is the whole delivery.
-
-## Step 5. Make the edits
-
-Apply what the notes ask for, one note at a time, and keep them separable in the diff. Use the project's
-own conventions — the note says *what* has to change, not how this project writes code;
-the layer skills still decide that.
-
-**Where a note and this project disagree, stop and ask.** A note is written for the general case, and a
-project that has done something deliberately different is exactly the case its author could not see. Do
-not invent a third way silently.
-
-**Findings about the framework go to `__NOTES_TRACKER__`**, as they always do: a note that is wrong,
-incomplete, or missing for a change that clearly needed one is a framework defect, and it is worth more
-filed than fixed locally.
-
-## Step 6. Move the packages
-
-Only now, and by the source `dartway update` named for each.
-
-**The core family moves in lockstep.** `dartway_core_shared`, `dartway_core_server`,
-`dartway_core_flutter`, and the packages released with them — `dartway_client` (a dev dependency of the
-Flutter package, for the in-memory server) and `dartway_generator` (a dev dependency of the server
-package) — carry one version. Raise **every** caret of the family in **every** package to the same
-version, in one change:
-
-```yaml
-# __SHARED_PKG__/pubspec.yaml
-dependencies:
-  dartway_core_shared: ^<version>
-# __SERVER_PKG__/pubspec.yaml
-dependencies:
-  dartway_core_server: ^<version>
-dev_dependencies:
-  dartway_generator: ^<version>
-# __FLUTTER_PKG__/pubspec.yaml
-dependencies:
-  dartway_core_flutter: ^<version>
-dev_dependencies:
-  dartway_client: ^<version>
-```
-
-Then `dart pub get` in `__SHARED_PKG__` and `__SERVER_PKG__`, `flutter pub get` in `__FLUTTER_PKG__`.
-
-- **Why together:** the app and the server speak the wire of the family they resolve. Halves on
-  different releases fail at runtime, not at compile time — as `426` "update the app" when the protocol
-  version differs, or as a field one side does not know. And the generator must match the core it
-  generates for.
-- **Under a `0.x` version a minor behaves like a major**: `^0.20.0` does not admit `0.21.0`, so the
-  caret has to move. Lowering a caret to make something resolve is never the fix.
-- **From git** instead of pub: `dart pub upgrade <the dartway packages>` in each directory
-  `dartway update` named. A git dependency is pinned when it is added and stays there until something
-  upgrades it *by name*, so upgrading one package at a time is how a project ends up running two
-  framework releases against each other. `dart run dartway_cli:dartway check` reports that state as `frameworkRefsDiverged`.
-
-**Satellites move on their own.** `dartway_router` (arrives through `dartway_core_flutter`),
-`dartway_lints`, `dartway_shared_preferences`, `dartway_studio_bridge`, `dartway_telegram`,
-`dartway_cli` (a dev dependency of the Flutter package) are versioned independently: raise the caret of
-the ones `dartway update` lists as behind, each to its own version. The core family raises its own
-constraint on a satellite only in its next minor; a project that needs a newer satellite sooner uses
-`dependency_overrides` — and removes the override once the family's constraint admits that version, or
-it outlives its reason silently.
-
-## Step 7. Regenerate and prove it
-
-In this order, because each answers a question the next cannot:
-
-```bash
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate) # the generator moved with the family
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)
-(cd __SERVER_PKG__ && dart run bin/migrate.dart check)     # against the local database: migrations still produce the schema
-(cd __SHARED_PKG__ && dart analyze && dart test)
-(cd __SERVER_PKG__ && dart analyze)
-(cd __FLUTTER_PKG__ && dart analyze --fatal-infos)
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)
-(cd __FLUTTER_PKG__ && flutter test)
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)
-```
-
-- **Regenerate even when no DTO or row class changed.** Generated codecs, the protocol registry and the
-  schema are written by the generator the project now resolves; `dart run dartway_cli:dartway check` reports a stale tree as
-  `generatedCodeStale`, and the codecs are the wire. Commit what it writes.
-- **The framework's own migrations are applied by the server as it starts** (the `dw` namespace) —
-  nothing to write in the project. `migrate check` and `dart run dartway_cli:dartway test` replay them together with the
-  project's, which is what proves they agree.
-- **Then run the app** (`dartway-run`): an update can be green everywhere and still land on a blank
-  screen, because what changed was a default or a wiring step rather than an API.
-
-**Say whether the protocol version moved.** Compare `dwProtocolVersion` in the `dartway_core_shared`
-the project resolved before the update and after. When it changed, app builds already installed on
-phones get `426` from the updated server and show "update the app" — so the server and the new app
-builds have to go out together, and whoever releases this project needs to know before merging.
-
-## Step 8. Commit
-
-`.claude/` is committed with the rest — it is a generated-but-committed artifact, and its history is what
-says which skills the code was written with.
-
-One commit per concern, and the update itself is one:
-
-```
-chore(deps): move to dartway <version>, applying <n> migrations
-```
-
-Say in the body which migration notes were applied and which were read and found not to apply. The next
-person doing this update on another project reads that as the first data point.
-
-## Step 9. Report
-
-- toolkit: what was installed, from which channel and commit;
-- packages: what moved, from what to what — the family's one version, each satellite's;
-- migration notes: applied · not applicable · **left undone, and why** — an update stopped halfway is a
-  legitimate outcome and a dangerous silence;
-- protocol version: moved or not, and what that means for installed apps;
-- checks: what is green, and what was already red before this started;
-- anything filed to `__NOTES_TRACKER__`.
-
-## Old shapes: a project that lives by an older version of a law
-
-A law is written for a clean start, and says nothing to a project that already grew under the previous wording. Two rules cover that gap:
-
-- **Legacy moves as you touch it, never as a sweep.** Refactored a feature — bring along what it drags with it. Converting a whole folder at once is a separate task a human asks for.
-- **A gap you left is said out loud.** Decided not to touch the legacy — say so in the report.
-
-An entry below answers three things, in this order: **how to tell** the project still has the old shape (something greppable), **what the target is**, and **what to do with what has already accumulated**. Delete an entry once no project is on the old shape.
-
-- **Blocks inside zones, or widgets in `lib/shared/` → `lib/ui_kit/` (feature law).** *You have the old shape if:* a zone contains a `common/`, `shared/` or `widgets/` folder, `dart run dartway_cli:dartway check` reports `featureSpecMissing` for folders whose passport would only restate the class name, or `lib/shared/` holds widgets. *Target:* only features in a zone; a visual building block in `lib/ui_kit/` (`2_frequent/`, `3_special/`), described by a doc comment; `lib/shared/` for non-visual helpers only; a zone's shell (the scaffold with its navigation) in `lib/core/router/`. *A passport with nothing in it is deleted with the move, not reworded.*
-
-- **Commands and specs out of `widgets/` (feature law).** *You have the old shape if:* `grep -rn 'dw\.command' lib | grep -v /logic/` or `grep -rln DwFeatureSpec lib | grep '/widgets/'` finds anything. *Target:* every `dw.command` in the feature's `logic/` (`<feature>_commands.dart`, or the notifier of a flow), run inside the `dw.action` of the widget that owns the button; a `DwFeatureSpec` on the entry file only, what a widget's passport said folded into it. *What has accumulated:* move it as you touch the feature.
-
-- **State and queries out of zones → `core/` and `shared/` (feature law).** *You have the old shape if:* `dart run dartway_cli:dartway check` reports `notAFeature` — a folder in a zone whose entry point declares no widget. *Target:* state that several features watch is wiring, so `lib/core/`; a non-visual helper with no story of its own goes to `lib/shared/`, a visual one to `lib/ui_kit/`. *What has accumulated:* move it as you touch the feature that reads it — a provider named in tests through `overrideWith` stays a named provider, it just changes address.
-
-- **An unlocalized app → the localization law (`dartway-ui-kit`, "Localization — the law in full").** *You have the old shape if:* `dart run dartway_cli:dartway check` reports `l10nNotWired`, or `grep -r 'context\.l10n' __FLUTTER_PKG__/lib` finds nothing while the widgets are full of readable strings. *Target:* the wiring the law lists, and every user-visible string coming from `context.l10n` or `appL10n`. *What has accumulated:* **the wiring goes in one commit, the strings screen by screen.** Every widget test that builds its own `MaterialApp` starts failing at the first lookup — fix it in the shared test harness, not in each test. The first `.arb` is written in whatever language the app's strings are already in, or the migration turns into an unasked-for translation.
+- **Blocks in zones, widgets in `lib/shared/`.** *Tell:* a `common/`, `shared/` or `widgets/` folder
+  inside a zone; `featureSpecMissing` on folders whose spec would restate the class name; widgets in
+  `lib/shared/`. *Target:* a zone holds features; a visual block in `lib/ui_kit/` with a doc comment; a
+  zone's shell in `lib/core/router/`. An empty spec is deleted with the move.
+- **Commands and specs in `widgets/`.** *Tell:* `grep -rn 'dw\.command' lib | grep -v /logic/`,
+  `grep -rln DwFeatureSpec lib | grep '/widgets/'`. *Target:* `dartway-data-layer` §4, one spec per
+  feature on its entry file. Move as you touch the feature.
+- **State and queries in zones.** *Tell:* `notAFeature`. *Target:* state several features watch in
+  `lib/core/`, helpers in `lib/shared/` or `lib/ui_kit/`. A provider tests override keeps its name, it
+  changes address.
+- **An unlocalized app.** *Tell:* `l10nNotWired`, or no `context.l10n` among widgets full of strings.
+  *Target:* `dartway-ui-kit`, "Localization". **The wiring in one commit, the strings screen by screen**;
+  fix widget tests in the shared harness; the first `.arb` in the language the strings already are.

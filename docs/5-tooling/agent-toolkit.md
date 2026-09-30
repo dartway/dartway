@@ -48,10 +48,15 @@ short and points at skills for the how.
 
 **The laws are the checker's error set.** A law is a rule a project does not override; everything
 else in the toolkit is a default a project may replace with its own rule. The line is not drawn by
-taste: the published law list is exactly the checks `dart run dartway_cli:dartway check` fails on (thirty-one today), and
+taste: the published law list is exactly the checks `dart run dartway_cli:dartway check` fails on, and
 `packages/dartway_cli/test/toolkit_law_list_test.dart` holds the two together. A check that is only a
 warning is one with a second legitimate reading, and a project cannot be forbidden to decide that for
 itself.
+
+**Every rule is stated once.** A rule the checker holds is one row of that law table, naming the
+check and the skill that owns its topic — the check's own message says what to write instead. A rule
+no check can hold is written in the one skill that owns its topic, and everything else points there.
+The history and the reasons behind the rules are the framework's decision record, not the toolkit's.
 
 ## The skills
 
@@ -79,6 +84,7 @@ skills → `dartway-finish`.
 | `dartway-update` | Moving onto a newer framework: `dartway update`, the migration notes, then the versions |
 | `dartway-push-delivery` | Server-side push delivery |
 | `dartway-analytics` | Events tracked in the app and on the server, stored in the project's Postgres |
+| `dartway-media` | Video and audio through the media plugin; the controls are the project's own kit widgets |
 | `dartway-documentation` | Where descriptions live — `DwFeatureSpec`, doc comments, registries in code — and what `docs/adr/` and `docs/dev_notes/` must earn |
 | `dartway-framework-notes` | Filing a finding back to the framework as an issue: what must not travel, the labels, the marker a workaround leaves in the code |
 
@@ -87,7 +93,7 @@ nothing local — whether commits carry a ticket belongs to the project's own `C
 reports the state of the whole project and what is worth taking into work next: it runs the
 project's gates first (`dart run dartway_cli:dartway check`, `dart run dartway_cli:dartway generate --check`, the analyzers, the tests), compares
 them with what CI actually runs, measures how far the project trails the framework, and only then
-spends reading on features.
+spends reading on features — loading only the skills its findings point at, never the whole toolkit.
 
 ## The names in the skills are the project's
 

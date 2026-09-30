@@ -6,119 +6,74 @@ allowed-tools: Read, Grep, Glob, Bash
 
 # DartWay Checkup — the state of the project, and what to do about it
 
-You are a hard-to-please reviewer-architect of a DartWay project. Your job is to find the **hacks, crooked solutions and architectural drift** that pile up when a team writes code without the project owner watching — and, just as much, the things nobody wrote at all: a check that is declared and never executed, a pin that trails the framework, a test suite excluded from CI.
+A strict reviewer's pass over the project: the drift that piles up unwatched, and what nobody wrote
+at all — a gate declared and never run, a pin trailing the framework. The picture first, then a short
+list of what to fix next.
 
-The owner is himself the author of the DartWay framework and of most of the codebase. He expects strictness, not politeness.
+**Scope:** `$ARGUMENTS`. Empty → the whole project: the three packages, CI, `deploy/`, the pins. A
+path or a module name narrows it (resolve a name with Glob). State the scope and the file count first.
 
-**This command has two readers, and they are the same person on different days.** One wants to know what state the project is in. The other wants a short list of what to fix next. Serve both — the picture first, the list second — and do not let the first swallow the second.
+**Do not read the whole toolkit.** The machine answers first; then read only the skills the findings
+point at — each law-table row in `.claude/CLAUDE.md` names its skill, and `dartway-finish` holds the
+code-shape rules no layer skill owns.
 
-## The contract of principles
+## Phase 0 — the facts a command answers
 
-Before analyzing, **read the full body of rules**: the laws in `.claude/CLAUDE.md` and the layer skills: `dartway-contract` (`__SHARED_PKG__`), `dartway-server` / `dartway-access` / `dartway-realtime` / `dartway-migrations` / `dartway-uploads` (`__SERVER_PKG__`), `dartway-feature-scaffold` / `dartway-data-layer` / `dartway-navigation` / `dartway-ui-kit` (`__FLUTTER_PKG__`), and the detector lists in `dartway-finish` — they carry the code-shape rules no layer skill holds (no top-level functions, no `_buildXxx()`, no data computed in widget methods). Plain SOLID/KISS/DRY/YAGNI, Law of Demeter, tell-don't-ask and single-source-of-truth apply throughout and need no citation.
+1. **Run every gate** in `dartway-finish` (A.2) and record each result. `migrationsDrift` without a
+   database is "not run", never a pass.
+2. **Compare with CI.** Which of those does CI actually run? A gate configured and never executed reads
+   as covered — the most valuable finding class. Watch for excluded test folders.
+3. **The distance to the framework.** The `dartway_*` versions in each `pubspec.lock` against the
+   channel in `.claude/dartway-toolkit.json`; `frameworkRefsDiverged`, `frameworkOverrideOutlived`.
+   Do not run `dartway update` here — that is `dartway-update`. Grep every
+   `TODO(dartway, checked: …)` project-wide and report the ones whose `checked:` trails the resolved
+   version (`dartway-finish` A.5 decides each).
+4. **`docs/dev_notes/`**: each entry's issue state decides (`gh issue view`); a closed issue means
+   delete the entry and re-check its workaround. An entry with no issue on a project with a tracker is
+   a finding nobody filed.
+5. **`docs/dev_notes/_coverage.md`** — which features had a deep pass, and when.
+6. **`docs/adr/`**, if present, is context and authoritative about why; an ADR describing how something
+   works now, or code contradicting an accepted ADR, is a finding. Any other architecture note is
+   context too, and where it disagrees with the skills, the skills win — say so.
 
-**`docs/adr/`, if the project has it, is context — read it.** Those are decisions with the alternatives they ruled out, and an ADR is authoritative about *why* a shape was chosen; do not report the folder as drift. Two things are worth a remark: an ADR that describes **how something works now** (that part rots silently and belongs in the code), and code contradicting an accepted ADR with no superseding one.
+## Phase 1 — the sweep
 
-**Any other free-floating architecture note is still drift** — read it as project context, but where it disagrees with the skills, the skills win, and say so rather than judging against a stale file.
+`dart run dartway_cli:dartway check` is the sweep for everything in the law table and its warnings:
+group its findings by check and by feature. Then grep only what it cannot see — the code-shape list in
+`dartway-finish` (A.3), plus:
 
-## Scope
+- `.refetch()` / `ref.invalidate(` — every hit read in Phase 2 (`dartway-data-layer`, "Refreshing");
+- `asData?.value`, `.value ??` in `logic/` — a failure rendered as an endless spinner;
+- `DwAccessRule.anonymous` — each one a decision its handler's doc comment explains;
+- a caller's mistake answered with `throw` instead of `ctx.refuse`; a command that publishes nothing;
+  a refusal code nothing on the server raises;
+- a deployment-owned value with a default (`dartway-server`, "Settings");
+- `deploy/secrets.yaml` tracked by git; one `dartway_*` package behind its siblings.
 
-- The argument: `$ARGUMENTS`
-- **Empty → the whole project**: the contract (`__SHARED_PKG__`), the server (`__SERVER_PKG__`), the app (`__FLUTTER_PKG__`), the CI configuration, the deploy configuration (`deploy/`), the pins. Not just the Flutter package.
-- A path or a module name → limit yourself to it (resolve a name with Glob). A narrowed run skips Phase 0's project-wide questions where they make no sense.
-- State the scope and the file count before you start.
+Summarise as a table: rule → count.
 
-## Phase 0 — The free facts. Run things; do not read them
+## Phase 2 — depth, three to five features per run
 
-**Start here, always.** These answers are certain and cost a minute, and they tell you where the expensive reading should go. Skipping this phase is how a checkup ends up guessing at something a command would have answered.
+Choose in this order: never passed (no coverage row) → changed most since their pass
+(`git log --oneline <path>`) → open findings from the last pass → the oldest pass. Plus the top
+offenders of Phase 1.
 
-1. **Run every gate the project has** and record the result of each. A failure here is a fact, not an opinion.
-   - `dart run dartway_cli:dartway check` — the app's structure and UI kit, the top-level layout, generated code against its sources (`generatedCodeStale`) and migrations against the rows (`migrationsDrift`). The last one needs `DW_DATABASE_*` pointing at a Postgres; without one it says it did not run — record that as "not run", never as a pass;
-   - `dart run dartway_cli:dartway generate --check` — the same staleness question asked directly, and what CI should run;
-   - `dart analyze` in `__SHARED_PKG__` and `__SERVER_PKG__`, `dart analyze --fatal-infos` in `__FLUTTER_PKG__` (not `flutter analyze`, which does not run the `dartway_lints` plugin);
-   - the tests: `dart test` in `__SHARED_PKG__`, `flutter test` in `__FLUTTER_PKG__`, and `dart run dartway_cli:dartway test` for the server — it starts a Postgres and a storage of its own for the run, so it needs Docker and nothing else.
-2. **Then read the CI configuration and compare.** Which of those does CI actually run? *The gap between declared and executed is a finding class of its own, and usually the most valuable one in the report.* A rule configured and never executed is worse than a rule absent: it reads as covered. Watch for a test folder excluded with a comment explaining why — the comment is usually older than the reason.
-3. **Measure the distance to the framework.** The `dartway_*` versions in each `pubspec.lock` (or the `resolved-ref` of a git dependency) against the channel recorded in `.claude/dartway-toolkit.json`, and what landed there since; `frameworkRefsDiverged` in the `dart run dartway_cli:dartway check` output means the git dependencies are not even locked to one commit. Do not run `dartway update` to find out — it rewrites `.claude/` and wires the lint plugin; that is `dartway-update`'s job. Two things follow: a workaround in this project may have become a duplicate of something the framework now does, and the installed harness may be teaching rules the current framework no longer holds (the harness channel must match the framework channel). The workarounds are findable rather than guessed at: each carries a `// TODO(dartway, checked: <ref>)` naming the version it was last confirmed against, so grep them **project-wide** and report the ones whose `checked:` has fallen behind the resolved version. `dartway-finish` does this too, but only over a task's diff — a workaround in a file nobody has opened in months is compared here or nowhere.
-4. **Read `docs/dev_notes/`** — one file per finding this project is carrying. They are context, and **the files do not get to answer whether a finding is still open**: each references an issue, and that issue's state is what counts (`gh issue view`). This run is where the two are reconciled — a closed issue means delete the entry and re-check the workaround it stood for. This is the reconciliation a record needs to survive being written down: the journal these files replaced went unreconciled and advertised eleven open findings a fortnight after all eleven had shipped. An entry with no issue is either a project on `--notes-tracker none`, where the entry is the whole record, or a finding nobody filed — offer to file it under the rules in `.claude/CLAUDE.md`.
-5. **Read `docs/dev_notes/_coverage.md`** — which features had a deep pass, and when. Phase 2 is chosen from it.
+For each, load the skills of the layers it spans and read it against them, with what grep cannot see:
+responsibilities, duplication, over-engineering, feature isolation, hacks and commented-out code, a
+second way across the contract, hardcoded user-visible text (judge by meaning), a `DwFeatureSpec`
+that no longer matches the widget, logic without tests.
 
-## Phase 1 — The sweep. Breadth, no deep reading
+**A finding a command could confirm is a hypothesis until the command ran**, and is labelled so. Ten
+verified findings beat thirty plausible ones.
 
-Grep-level detectors across the scope, `file:line` for each. Do not read whole files here.
+## Phase 3 — the report, in the chat, in the user's language
 
-- **Long files** — >350 lines is a warning (a likely dump of responsibilities), 200–350 worth noting. Judge responsibilities, not the counter: a meaningful 300-line file beats a pointless chop.
-- **`BuildContext`/`WidgetRef` in parameters** outside `build(...)`.
-- **`_buildXxx()` returning a widget** — `Widget\s+_\w+\s*\(`.
-- **`.refetch()` and `ref.invalidate(`** — any occurrence, **as a Phase 2 read rather than a verdict.** The rule (`dartway-data-layer`) permits a re-read as a user command — a retry button, pull-to-refresh — and forbids it as a way to propagate data. Grep cannot tell a gesture handler from a listener, so every hit is opened: in an `onPressed`/`onRefresh`/`dw.action` it is correct and reported as nothing; anywhere else it is the finding. A re-read right after a `dw.command` is the one worth chasing — it means the command's handler does not publish what it changed, or the request does not declare the channel. A `ref.invalidate` on a `dw.request`/`dw.table`/`dw.pages`/`dw.window` provider is a finding wherever it stands: it does not ask again.
-- **`asData?.value` / `.value ??`** — combining several `AsyncValue`s by hand. Both answer `null` for loading *and* for error, so a failure renders as an endless spinner (`dartway-data-layer`). Read the hit: a deliberate degradation is stated in the feature's `implementationNotes`, and an unstated one is the finding.
-- **An `AsyncValue` of a read handed around** — a provider of the project's own that returns `ref.watch(dw.request(…))` whole, then `.value`/`.when` on it in a widget. `dart run dartway_cli:dartway check` (`forbiddenRequestRead`) sees a read taken apart only where `dw.request(…)` is spelled; one reached through such a provider is read in Phase 2 (`dartway-data-layer`).
-- **`GlobalKey`** with `.currentState` / `.currentContext`.
-- **Private widget classes in feature files.**
-- **Outer padding inside a widget** — a `Padding`/`margin:` at the top level of `build` (verify by reading in Phase 2).
-- **Swallowed errors** — `catch\s*\(\s*[_e]\s*\)\s*\{\s*\}`, `catch.*return null`.
-- **Magic strings and numbers** in comparisons (`== '`).
-- **Contract** (`__SHARED_PKG__`): a hand edit in a generated file (`*.dw.dart`, `lib/generated/`) — `dart run dartway_cli:dartway generate --check` answers it; a public class named with one word; a refusal code nobody on the server raises.
-- **Server** (`__SERVER_PKG__`): every `DwAccessRule.anonymous` — each one is a decision and should say why in the handler's doc comment; a `DwAccessRule.check` that reads a request field without checking it belongs to the caller; a caller's mistake answered with `throw` — a failure, reported as an incident — instead of `ctx.refuse` with a code of the project's refusal enum; a data object that copies a field of its row the caller must not see (a row cannot leave the server by type, so this is where a leak happens); a command whose handler changes rows and publishes nothing; a migration edited after it was applied (`migrationsDrift` says so).
-- **Configuration**: pins that drift (a `dartway_*` package in one of the three packages behind the others), `deploy/secrets.yaml` tracked by Git, a setting with a default where the value belongs to the environment — a sender address, a provider key, an admin identifier: an unset one must fail loud, never fall back to a plausible foreign value (`dartway-server` §9a) — a deploy config naming a domain that is written down elsewhere too.
+1. **The picture** — ten lines: the state and the three systemic tendencies.
+2. **Facts from Phase 0** — gates, what CI runs, the distance to the framework.
+3. **Take into work** — prioritised; each: where (a clickable `file:line`), what is wrong, what it
+   costs, what it unblocks, verified or hypothesis.
+4. **Systemic patterns** — recurring drift, not isolated points.
+5. **Coverage** — what got a deep pass, what remains; the next invocations (`/dartway-checkup lib/app/x`).
 
-Summarize Phase 1 as a table: rule → count.
-
-## Phase 2 — Depth, on a budget, chosen and remembered
-
-You cannot read everything, and pretending otherwise is how a checkup skims. **Read three to five features per run, properly**, and record which ones.
-
-Choose them in this order:
-
-1. features never given a deep pass (the coverage table has no row);
-2. features that changed most since their last pass (`git log --oneline <path>`);
-3. features whose last pass left findings still open;
-4. otherwise the oldest pass.
-
-Plus, always: **the top offenders from Phase 1** — the longest files and the ones with the most flags, because that is where hacks concentrate.
-
-For each chosen feature apply the **whole** set of rules above, not a skim of it. Focus on what grep cannot see:
-
-- SRP / God objects / logic in the UI / DIP nailed down hard;
-- KISS and YAGNI: over-engineering, an abstraction with one implementation, dead code;
-- DRY: copy-pasted widgets, mappings, logic;
-- the Law of Demeter, tell-don't-ask, a single source of truth;
-- **feature isolation** — importing another feature's `widgets/`/`logic/`, or a helper in `logic/` that everyone else has started reaching for;
-- **hacks**: workarounds, `TODO`/`HACK`/`FIXME`, temporary patches, commented-out code, a second way across the contract (a `DwHttpRoute` or a raw HTTP call doing what a request or a command should). A `TODO(dartway, checked: <ref>)` is the exception and is **not** a finding on its own: it is the required marker on a workaround over a framework API, and it is judged in Phase 0 by whether its `checked:` still matches — a marker without one, on such a workaround, is the finding;
-- **hardcoded user-visible text** — a string a person reads, written into a widget instead of coming from `context.l10n`. Judge by meaning; do not report identifiers, keys, paths, format patterns or test data. Nothing mechanical catches this, which is why it is here;
-- **a spec that has drifted** — `behaviors` that no longer match what the widget does;
-- non-trivial logic without tests; a bugfix without a regression test.
-
-**Depth grows across runs, not within one.** The first pass over a feature finds the structural problems; once those are fixed, the next pass sees the design underneath them. The coverage table is what guarantees there *is* a next pass.
-
-## The verification rule
-
-**A finding that a command could confirm is a hypothesis until the command has been run**, and it is labelled as one in the report.
-
-This is not pedantry. Two real errors from a real checkup: a widget parameter was called legacy because a doc comment said so — the code said otherwise; and a folder was said to be missing a passport that the checker does not in fact demand — one run of `dart run dartway_cli:dartway check` would have shown it. Both were read rather than verified.
-
-Ten verified findings beat thirty plausible ones. If you are not sure, run it or read the file. Do not invent.
-
-## Phase 3 — The report, and what survives it
-
-The report goes **in the chat**, in the user's language. Structure:
-
-1. **The picture** — ten lines. What state the project is in and the three systemic tendencies. Not a list of defects: the shape of them.
-2. **Facts from Phase 0** — the gates and their results, what CI runs, the distance to the framework.
-3. **Take into work** — a prioritized list. Each item: where, what is wrong, what it costs, what it unblocks, and **verified or hypothesis**.
-4. **🧭 Systemic patterns** — recurring drift rather than isolated points. "Every new chat widget puts loading in the State." This is what the command exists for.
-5. **Coverage** — which features got a deep pass this run, and what remains unvisited.
-6. **Where to go next** — name the follow-up invocations: `/dartway-checkup lib/app/issues`.
-
-**Then place the findings.** Every finding has exactly one home, and the first one that fits wins:
-
-| The finding… | Goes to |
-|---|---|
-| is being fixed right now | fix it — no entry anywhere |
-| belongs to one feature | that feature's `knownIssues` (propose the edit) |
-| is about the framework, not this project | an issue in `__NOTES_TRACKER__` (the rules for filing are in `.claude/CLAUDE.md`) |
-| **has no address in code** — cross-cutting, infrastructural, a decision with a price | a file under `docs/dev_notes/` |
-
-`docs/dev_notes/` entries are **short**: where, what is wrong, what we did about it, and the issue they reference. Mention an option if one is obvious; do not write it up. A journal of treatises is a journal nobody reads.
-
-Finally, update the **coverage table** in `docs/dev_notes/_coverage.md` with the features read this run and the date.
-
-Be concrete: a real `file:line` for every item, as a clickable markdown link. Fewer accurate findings beat a list of guesses.
+Then place every finding by `dartway-documentation` (fix now · `knownIssues` · the framework tracker ·
+`docs/dev_notes/`), and update `docs/dev_notes/_coverage.md` with this run's features and the date.

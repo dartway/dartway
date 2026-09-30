@@ -1,176 +1,78 @@
 # A DartWay project — the guide for Claude
 
-A fullstack Dart project on **DartWay**: a server and a Flutter app that speak one contract, declared once in a shared package. DartWay is a **highly opinionated** framework: less freedom in *how* to do things → more consistency and speed. Don't invent alternative approaches — follow the established patterns.
+A fullstack Dart project on **DartWay**: a server and a Flutter app that speak one contract, declared once in a shared package. The framework is opinionated on purpose: follow the established pattern, do not invent a second one.
 
-> This harness (methodology + skills + commands) ships from the DartWay monorepo (`toolkit/`) and is installed into this repository's `.claude/` (committed). The files `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-checkup` commands are **managed**: don't edit them here, they get overwritten on update; customize by copying under your own name. The package names below were substituted at install time.
->
-> **A rule that let you down is not fixed here** — the fix would be overwritten on the next update. File it as an issue in the framework tracker instead (`dartway-framework-notes`).
+> `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-checkup` commands are **managed** — installed from the framework's `toolkit/` and overwritten on update. Do not edit them here; a rule that let you down is filed back to the framework (`dartway-framework-notes`).
 
-**This project writes in __PROJECT_LANGUAGE__.** That covers what the project owns — `DwFeatureSpec` texts, doc comments, `docs/dev_notes/` — and is set at install time (`dartway setup-ai --language`). What ships to other people is English regardless: package APIs, log and error strings, and anything going back into the framework. `dart run dartway_cli:dartway check` warns on a doc comment in another script (`docCommentLanguage`).
+**This project writes in __PROJECT_LANGUAGE__**: `DwFeatureSpec` texts, doc comments, `docs/dev_notes/` (a doc comment in another script is `docCommentLanguage`). What ships to other people — package APIs, log and error strings, issues to the framework — is English.
 
 ## The project
 
-Three Dart packages; the role is determined by the name suffix:
-
-| Package | Role | What it holds |
-|---|---|---|
-| `__SHARED_PKG__` | the contract | Pure Dart. Data objects, requests, commands, live channel kinds, refusal codes, upload purposes, and the rules both sides apply identically. Generated codecs and the protocol registry |
-| `__SERVER_PKG__` | the server | One folder per feature (its `DwServerFeature`, row classes, one handler per request and command with its access rule, channel rules), the auth configuration, upload rules, migrations, `bin/server.dart`, `bin/migrate.dart`, `bin/seed_dev.dart` |
-| `__FLUTTER_PKG__` | the app | Features in zones, navigation, the UI kit, localization; reads with `dw.request`, changes with `dw.command` |
-
-There is no client package: the shared package *is* the client contract, and both the app and the server import it.
-
-## Cross-stack laws (they hold everywhere)
-
-1. **The contract is the only way across.** Everything the app and the server exchange is a DTO declared in `__SHARED_PKG__`: a **data object** the server returns and publishes, a **request** that reads, a **command** that changes. No hand-written HTTP for the app, no JSON maps, no second API. A `DwHttpRoute` is a door for callers that are not the app — a webhook, a tool — and nothing else.
-2. **Rows never leave the server.** A row class (`<Entity>Row`) is the server's shape of a table; a data object is what a reader may see. The server maps one to the other explicitly, in batch. A data object is designed for its readers — not a copy of the table, and never carrying what they may not see.
-3. **A feature is end-to-end.** A feature is a flow running through the contract (its DTOs), the server (their handlers) and Flutter (entry point + widgets + logic). From outside the feature, **only** its entry point is imported — at any nesting depth.
-
-   **What a feature is gets decided by the folder's contents — nothing has to be declared:**
-   - a **feature** is a folder with **exactly one** `.dart` at its root. That file is its entire public surface;
-   - the **internals** are only `widgets/` and `logic/`; nobody imports them from outside;
-   - a **group** is a folder **without** root-level `.dart` files. It only groups features, encapsulates nothing, and has no `widgets/`/`logic/` of its own. Grouping **does not affect visibility**: the router is allowed to import `app/learning/lesson/lesson_page.dart`, because `lesson` is a feature and `learning` is a group;
-   - **behaviour two features share is one more feature.** A card drawn both by the block on the home screen and by the list screen goes into its own folder with a single public file;
-   - a feature has **exactly one public entity**. A second one appeared (a page plus an embeddable block, a three-screen flow) — that is a group of several features.
-
-   **A zone holds features and nothing else. A widget with no story of its own is a building block, and blocks live in `lib/ui_kit/`** (`2_frequent/` or `3_special/`): visual, with no business logic, laying out what they are handed. The line is not how many places use it but whether there is anything to tell: a card with rules about what it shows and when is a feature even with one consumer; a form field, a badge row, a layout wrapper is a block — its description is a doc comment over the class, not a `DwFeatureSpec`. Inside a feature, `widgets/` is its private layout and `logic/` its state and commands. Don't create a `common/`, `shared/` or `widgets/` folder *inside* a zone: that is a block asking for the wrong home.
-
-   **A feature speaks from two places only.** Its `DwFeatureSpec` sits on the entry file and nowhere else in the feature. Its changes are sent from `logic/`: `dw.command` is called in the feature's `logic/` (`<feature>_commands.dart`, or the notifier of a flow; app-wide wiring no button starts, in `lib/core/`), and runs inside the `dw.action` the widget owning the button builds; `widgets/` never sends a command and never reads a result (`forbiddenCommandCall`, `dartway-data-layer`).
-
-   **State is held one way.** A widget's own state is hooks; state two widgets share, or a flow with logic, is a Riverpod `Notifier` named `<Thing>Controller` in the feature's `logic/`. No `StatefulWidget`, `setState` or `ChangeNotifier`/`ValueNotifier` as a holder anywhere in `lib/` (`forbiddenStateHolder`); the one way out is `// dw:allow-stateful <reason>` on the class, which every check run lists. The rule and its hooks — `dartway-feature-scaffold`, "Where a feature's logic lives".
-
-   **Splitting into small features is the recommendation, not a tolerated evil** — and the reason is the passport. Every feature brings a `DwFeatureSpec`, so the finer the cut, the denser the description of the interface: one big feature is described in generalities, ten small ones each carry their own `behaviors`, `requirements` and `knownIssues`. That description is what error reports, Studio and the agent read. `dart run dartway_cli:dartway check` builds a "zone → group → feature" tree and grades every feature A–D.
-
-   **Not a feature:** app-wide wiring (the router and the zones' shells, the `dw` core, the signed-in profile, app settings) — that is `lib/core/`; a non-visual helper several features use — an extension on a data object, a formatter — `lib/shared/`; a visual block — `lib/ui_kit/`. If such a file sits in some feature's `logic/`, everyone else starts importing that feature's internals.
-4. **The server decides, and says no with a code.** Every request and command has exactly one handler with an explicit access rule; every channel kind has a rule for who may listen; every upload purpose has a rule for who may upload. **A refusal is a code with parameters, never a sentence** — the words are the app's, in its localization. Who the caller is gets decided on the server only; the client validates a form for speed, the server validates again.
-5. **Naming.** Every class name has at least two words (`UserProfile`, not `User`). Row classes are `<Entity>Row`; data objects are nouns (`InvoiceLine`); reads are `Get…` / `List…` (`ListMyInvoices`); changes are verb + object (`PayInvoice`); the contract's own enums take their prefix mechanically from the shared package's name — `<Package>Refusal`, `<Package>Channel`, `<Package>Upload`, where `<Package>` is `__SHARED_PKG__` without `_shared`, in PascalCase (`acme_shared` → `AcmeRefusal`). Variables are fully descriptive and match the type (`userProfile`, `userProfileId`). A field that refers to a profile carries the word Profile (`authorProfileId`); one that refers to a framework account says so (`accountId`). Forbidden: `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x` as the whole name.
-6. **Derived code is derived.** Codecs, the protocol registry, table definitions and the schema come from `dart run dartway_cli:dartway generate`; the database schema comes from migrations generated from the row classes and reviewed. Neither is edited into agreement by hand, and both are checked.
-7. **Done = audit + a description next to the code.** A feature is not finished until `dartway-finish` has been run: an audit of the diff against the cleanliness contract, and a reconciliation of the feature's description with the new behaviour. **The description lives in the code, not in a separate doc:** a screen's behaviour in the `DwFeatureSpec` of the feature widget; what a DTO means, above the DTO; who may call it and what it changes and publishes, above its handler. A description far from the code drifts on the first edit, and drifts silently — the code compiles while the doc lies.
-
-## Law and default — and which one a project may override
-
-**Law is what makes it DartWay** — the seven rules above; a project does not override a law. **Default is everything else** here and in the skills — the commit format, the base branch, how a decision is recorded, the language of the project's own texts — and a project may replace it. **Precedence:** a default yields to the project's own root `CLAUDE.md`; a law does not; where both are silent, this file stands. A project records an override in its root `CLAUDE.md`, under "Project conventions", **with the reason** — `.claude/CLAUDE.md` is overwritten on update, and a README beside the code is where an override goes to die.
-
-**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Forty-two checks fail today:
-
-| What it holds | Checks that fail |
+| Package | Role |
 |---|---|
-| The feature boundary (feature law) | `invalidFeatureStructure`, `notAFeature`, `barrelFile`, `forbiddenFeatureImport` |
-| The UI kit boundary | `uiKitPartMissing`, `forbiddenUiUsage`, `forbiddenUiKitImport` |
-| The widget's contract with its parent | `widgetSizesItself` |
-| The declared top-level layout | `invalidTopLevelLayout` |
-| The closed file set inside a server feature | `invalidServerFeatureFile`, `misplacedServerCode` |
-| The shared package mirrors the server's features | `invalidSharedLayout` |
-| Server features form a graph without cycles, reach each other through a declared surface, write only their own rows, and `core/` imports none | `featureImportCycle`, `coreImportsFeature`, `featureImportOutsideSurface`, `foreignRowWrite` |
-| What the router refuses on the first frame | `routeNameDuplicated` |
-| The router owns its lifetime | `routerDisposedByApp` |
-| The contract's names are its wire names (law 5) | `contractNameInvalid` |
-| What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
-| Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
-| The server's time is its clock, which tests set | `forbiddenDateTimeNow` |
-| One way to the environment and to other services | `forbiddenEnvironmentRead`, `forbiddenHttpClient` |
-| A `!` that means nothing is an error, so the one that guards a null is seen | `redundantBangAllowed` |
-| One pattern for data: seeds are startup steps, migrations change the schema, settings are typed, patches are read by their helpers | `migrationChangesData`, `workAfterServerStart`, `settingsKeyValueTable`, `fieldPatchMatched` |
-| One way to hold state and send a command (law 3) | `forbiddenStateHolder`, `forbiddenCommandCall` |
-| One way to show a read, wait, open a dialog, go to a screen | `forbiddenRequestRead`, `forbiddenProgressIndicator`, `forbiddenNavigationCall`, `sentinelId` |
-| One way to write the ordinary things | `relativeImport`, `testLayout`, `testHarnessBypassed`, `rawSpacing` |
-| The framework's lint rules are on | `lintsPluginMissing` |
+| `__SHARED_PKG__` | The contract, pure Dart: data objects, requests, commands, channel kinds, refusal codes, upload purposes, rules both sides apply. `dartway-contract` |
+| `__SERVER_PKG__` | The server: one folder per feature (rows, handlers with access rules, publications, jobs), migrations, `bin/`. `dartway-server` |
+| `__FLUTTER_PKG__` | The app: features in zones, `core/`, `shared/`, `ui_kit/`, `l10n/`. `dartway-feature-scaffold` |
 
-Twelve further checks are warnings and one is a nudge. Anything this table and the types do not hold is a default. Not held yet: the naming law beyond the contract's DTO names, a `DwHttpRoute` the app calls instead of a request, and "done" (only the `featureSpecMissing` warning); `migrationsDrift` needs a Postgres and says when it did not run.
+The shared package *is* the client contract; there is no client package. A new path dependency between them is named in both Dockerfiles, or `pub get` inside the image fails.
 
-## The project's `dartway` is `dart run dartway_cli:dartway`
+## Laws
 
-`generate`, `check`, `test`, `dev`, `deploy` and `stats` run the CLI the project pins — a dev
-dependency of `__FLUTTER_PKG__`, at the version of the framework it builds against — as
-**`dart run dartway_cli:dartway <command>`, in `__FLUTTER_PKG__`**; each finds the project from
-there. A globally activated `dartway` refuses them when it is another version and names this form.
-Every command in this toolkit is written that way; `dartway create`, `quickstart`, `update`,
-`setup-ai` and `doctor` are the global CLI's and run anywhere.
+1. **The contract is the only way across.** Everything the app and the server exchange is a DTO of `__SHARED_PKG__`: a data object, a request that reads, a command that changes. No hand-written HTTP, no JSON maps; a `DwHttpRoute` is a door for callers that are not the app.
+2. **Rows never leave the server.** A handler maps a row to a data object designed for its readers — never carrying what they may not see — in batch.
+3. **A feature is end to end** — its DTOs, its handlers, its Flutter folder — and from outside only its entry point is imported.
+4. **The server decides, and says no with a code.** Every request and command has exactly one handler with an explicit access rule; every channel kind and upload purpose has a rule. A refusal is a code with parameters; the words are the app's.
+5. **Naming.** Every class name has at least two words (`Dw` is not one): `<Entity>Row`; data objects are nouns; reads `Get…`/`List…`; changes verb + object; `<Package>Refusal`/`Channel`/`Upload`, where `<Package>` is `__SHARED_PKG__` without `_shared` in PascalCase. Variables say what they hold and match the type (`userProfileId`); a field referring to a profile says Profile, to a framework account says account. Never `id`/`data`/`info`/`obj`/`temp`/`val`/`item`/`x` as a whole name.
+6. **Derived code is derived.** Codecs, the protocol registry and the schema come from the generator; the database schema from reviewed migrations. Neither is edited into agreement by hand.
+7. **Done = checks + a description next to the code.** A task ends with `dartway-finish`; a feature's behaviour lives in its `DwFeatureSpec`, a DTO's meaning above the DTO, a handler's rule above the handler (`dartway-documentation`).
 
-## Code generation: two generators, and no `build_runner`
+## Law and default
 
-Exactly two: **`dart run dartway_cli:dartway generate`** (codecs and the protocol registry in `__SHARED_PKG__`, tables and the schema in `__SERVER_PKG__`) and **`flutter gen-l10n`** (`AppLocalizations` from `lib/l10n/*.arb`). Both are **run by hand** when their input changes — a DTO or a row class, an `.arb` — never on save; their **output is committed**; and they **can be forgotten**: a field added without `generate` compiles and travels *without that field*. `dart run dartway_cli:dartway generate --check` and `check` (`generatedCodeStale`) say so.
+**Law is what fails** — in the types, at the server's start, or as an `error` of `dart run dartway_cli:dartway check`. A project does not override a law. **Everything else is a default** (commit format, base branch, how a decision is recorded) and a project may replace it in its root `CLAUDE.md`, under "Project conventions", with the reason; a default yields to it, a law does not.
 
-Everything else is written by hand: providers (`Provider` / `NotifierProvider`, families included — the argument arrives in the factory and the notifier takes it through its constructor; server data needs no provider of your own, `ref.watch(dw.request(...))` is one), state classes with `copyWith` and `==` (no `freezed`), assets as constants in the kit (no `flutter_gen`). `build_runner` in the edit loop cost minutes per provider edit and sent the agent "fixing" working code after a forgotten run. A project may decide otherwise, deliberately.
+The law list is therefore derived from `DwCheckType.severity`, not from how firmly a sentence is worded. Forty-two checks fail today; twelve more are warnings and one is a nudge, each named in the skill that owns its topic. Each check's message says what to write instead; the skill has the pattern.
 
-## Documentation: the description lives in the code
+| Rule | Checks that fail | Skill |
+|---|---|---|
+| A feature folder has one root file; only that file is imported from outside; a zone holds features only; no re-export files | `invalidFeatureStructure`, `notAFeature`, `forbiddenFeatureImport`, `barrelFile` | `dartway-feature-scaffold` |
+| Each package's top level is the declared list | `invalidTopLevelLayout` | `dartway-feature-scaffold`, `dartway-server` |
+| State is hooks or a `<Thing>Controller` Notifier — no `StatefulWidget`, `ChangeNotifier`, no setState | `forbiddenStateHolder` | `dartway-feature-scaffold` |
+| Styles live in `ui_kit/`, imported through `ui_kit.dart`, each kit file a part of it; spacing is `AppSpace`; a widget never sizes itself; asset paths exist | `uiKitPartMissing`, `forbiddenUiUsage`, `forbiddenUiKitImport`, `rawSpacing`, `widgetSizesItself`, `assetPathMissing` | `dartway-ui-kit` |
+| The app is localized | `l10nNotWired` | `dartway-ui-kit` |
+| A screen shows a read through `DwReadBuilder` / `DwPagedListView` / `DwWindowListView`; the one spinner is the kit's | `forbiddenRequestRead`, `forbiddenProgressIndicator` | `dartway-data-layer` |
+| `dw.command` runs in the feature's `logic/`, inside `dw.action` | `forbiddenCommandCall` | `dartway-data-layer` |
+| A screen is a route; dialogs through the kit; "new" is a route, never id 0; route names are global; the router disposes itself | `forbiddenNavigationCall`, `sentinelId`, `routeNameDuplicated`, `routerDisposedByApp` | `dartway-navigation` |
+| A server feature is a closed file set; features form a graph without cycles, import each other's surface only, write only their own rows; `core/` imports no feature | `invalidServerFeatureFile`, `misplacedServerCode`, `featureImportCycle`, `featureImportOutsideSurface`, `foreignRowWrite`, `coreImportsFeature` | `dartway-server` |
+| Time is `ctx.now`; the environment is read in `core/environment.dart`; other services through `ctx.http` | `forbiddenDateTimeNow`, `forbiddenEnvironmentRead`, `forbiddenHttpClient` | `dartway-server` |
+| Startup work is a step before the port opens; settings are a typed object; a `!` on a row id is an error | `workAfterServerStart`, `settingsKeyValueTable`, `redundantBangAllowed` | `dartway-server` |
+| The shared package mirrors the server's features; DTO names follow law 5; a patch is read through its helpers | `invalidSharedLayout`, `contractNameInvalid`, `fieldPatchMatched` | `dartway-contract` |
+| Generated code matches its sources | `generatedCodeStale` | `dartway-contract` |
+| Migrations produce the declared schema and change rows only through `m.backfill` | `migrationsDrift`, `migrationChangesData` | `dartway-migrations` |
+| A test mirrors a `lib/` path and starts through `test/support/` | `testLayout`, `testHarnessBypassed` | `dartway-testing` |
+| `lib/` imports by `package:` only (`check --fix` rewrites) | `relativeImport` | — |
+| The framework's lint plugin is on | `lintsPluginMissing` | `dartway-update` |
 
-**There are no separate "a file per feature" docs.** A feature's behaviour, and what is wrong with it, is its `DwFeatureSpec` (`knownIssues`); what a DTO means, above the DTO; who may call a handler and what it changes and publishes, above the handler; a cross-cutting registry is an enum. A doc apart from the code drifts silently, and the agent reads it and believes it. `docs/` holds only what survives the question "what would this say that a spec or a doc comment cannot": `docs/adr/` — decisions and the alternatives they ruled out — and `docs/dev_notes/` — findings with no address in code. **Before writing or changing any of it — a spec, `knownIssues`, an ADR, a dev note — load `dartway-documentation`**: it has the admission tests and the forms.
+Not held by any check: naming beyond DTO class names, "done", and a `DwHttpRoute` the app calls. `migrationsDrift` needs `DW_DATABASE_*` and says when it did not run.
 
-## Cleanliness and finishing
+## Commands and generators
 
-For **any** Dart/Flutter code the cleanliness contract applies: naming, single responsibility, no `BuildContext`/`WidgetRef` in services, no `_buildXxx()` (widget or data), a re-read only as a user command, `copyWith` over field-by-field rebuilds, no environment default for a deployment credential, and the rest — spelled out in full, with the detectors that check it, in `dartway-finish` and `/dartway-checkup`, plus a boundary's own silent-rejection rule in `dartway-server`. This is a style contract — check against it while writing, refactoring and reviewing.
+`generate`, `check`, `test`, `dev`, `deploy` and `stats` run the CLI the project pins: **`dart run dartway_cli:dartway <command>`, from `__FLUTTER_PKG__`**. `create`, `quickstart`, `update`, `setup-ai` and `doctor` are the global CLI's.
 
-**One shape for the ordinary things, held by `check`:** `lib/` of all three packages imports by `package:` only (`dart run dartway_cli:dartway check --fix` rewrites a relative one; under `test/`, `test/support/` is imported relatively); a test sits at the mirror of the `lib/` path it tests and starts what it needs through the harness in `test/support/` (`dartway-testing`); a gap or an inset outside the kit is an `AppSpace` token, never a number (`dartway-ui-kit`).
-
-**`dartway-testing` decides what deserves a test and where it goes** — a rule of the contract is a test in `__SHARED_PKG__`, a handler's rule is an acceptance test on a real database (`dart run dartway_cli:dartway test`), a feature is a widget test on the in-memory server. The skeleton ships a worked example of each.
-
-**Finishing a task (law 7):** when a feature/task is done, run `dartway-finish` before the commit/PR. It runs the checks, audits the diff against the contract, checks the descriptions for drift and the test coverage, and **shows suggestions and applies only what was confirmed**.
-
-## Notes back to the framework
-
-`.claude/` is managed and overwritten on update, so a rule that let you down is not fixed here: it is **filed as an issue in `__NOTES_TRACKER__`**. File one without being asked when the code broke a rule that does not exist or is too vague, when the app had to work around a `dartway_*` API, or when you are tempted to edit a managed file — that temptation *is* the finding. **Load `dartway-framework-notes` before creating the issue**: it says what must not travel, the labels, the `TODO(dartway, checked: …)` marker a workaround leaves in the code, and that the text is shown and waits for a yes.
-
-## A project that lives by an older version of a law
-
-**Legacy moves as you touch it, never as a sweep; a gap you leave is said out loud.** The old shapes a project may still carry — blocks inside zones, state in zones, an unlocalized app, root journals — are listed in `dartway-update` ("Old shapes"), each with how to tell and what to do; load it when `dart run dartway_cli:dartway check` reports `featureSpecMissing`, `notAFeature` or `l10nNotWired` on code you did not write.
+Two generators, both run by hand when their input changes, output committed: `dart run dartway_cli:dartway generate` (DTOs and row classes) and `flutter gen-l10n` (`.arb`). No `build_runner`: providers, `copyWith`/`==` of state classes and asset constants are written by hand.
 
 ## Skills and commands
 
-- Skills (`.claude/skills/`): `dartway-requirements`, `dartway-plan`, `dartway-run`, `dartway-feature-scaffold`, `dartway-contract`, `dartway-server`, `dartway-data-layer`, `dartway-realtime`, `dartway-access`, `dartway-migrations`, `dartway-uploads`, `dartway-testing`, `dartway-navigation`, `dartway-ui-kit`, `dartway-on-device`, `dartway-push-delivery`, `dartway-analytics`, `dartway-media`, `dartway-documentation`, `dartway-framework-notes`, `dartway-finish`, `dartway-update` — loaded by relevance to the task.
-- Commands (`.claude/commands/`): `/dartway-checkup` — the state of the project and what to take into work next (whole project by default, a path narrows it); `/commit` — a commit in the project's format.
+- Skills (`.claude/skills/`): `dartway-requirements`, `dartway-plan`, `dartway-feature-scaffold`, `dartway-contract`, `dartway-server`, `dartway-access`, `dartway-realtime`, `dartway-migrations`, `dartway-uploads`, `dartway-data-layer`, `dartway-navigation`, `dartway-ui-kit`, `dartway-testing`, `dartway-documentation`, `dartway-finish`, `dartway-run`, `dartway-on-device`, `dartway-update`, `dartway-push-delivery`, `dartway-analytics`, `dartway-media`, `dartway-framework-notes` — load the ones the task touches.
+- Commands (`.claude/commands/`): `/dartway-checkup` — the project's state and what to fix next; `/commit` — a commit in the project's format.
 
-**Task lifecycle:** `dartway-requirements` (analyze the spec → questions → options) → `dartway-plan` (a step-by-step plan + risks) → implementation (`dartway-feature-scaffold`, and the layer skills: `dartway-contract` → `dartway-server` → `dartway-data-layer`, with `dartway-realtime`, `dartway-access`, `dartway-migrations`, `dartway-uploads` where the feature reaches them) → `dartway-finish` (checks, audit, descriptions reconciled with the code, tests) before the PR.
+**A task:** `dartway-requirements` → `dartway-plan` → build with `dartway-feature-scaffold` and the layer skills (contract → server → app) → `dartway-finish` before the PR. Bringing the project up: `dartway-run`. A newer framework: `dartway-update`, as its own change. "Works in the simulator, not on the phone": `dartway-on-device`.
 
-**Moving onto a newer framework** is its own job, not part of a task: `dartway-update` installs the toolkit, reads the framework's migration notes, makes the edits they ask for and only then moves the package versions. Run it when `dartway update` says this project is behind.
+**Legacy moves as you touch it, never as a sweep; a gap you leave is said out loud.** Old shapes and how to recognise them: `dartway-update`.
 
-**"Works in the simulator, not on my phone"** — `dartway-on-device`. **Bringing the project up locally** — `dartway-run`; report liveness as a fact (`/health` answering `200`), not an assumption.
+## Notes back to the framework
+
+File an issue in `__NOTES_TRACKER__` — after loading `dartway-framework-notes`, and only once the text was shown and approved — when the code broke a rule that does not exist or is too vague, when the app had to work around a `dartway_*` API, or when you are tempted to edit a managed file.
 
 ## Git
 
-PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commit: `<type>(<scope>): <description in English>` — `type` = `feat`/`fix`/`chore`, the scope optional. Whether commits also carry a ticket, and whether anything checks the format, is this project's own convention and is stated in its root `CLAUDE.md` rather than assumed by the toolkit.
-
----
-
-## Shared (`__SHARED_PKG__`)
-
-**The contract, and nothing but pure Dart** — no Flutter, server, IO or database: both sides import it.
-
-- **What goes here:** data objects, requests (`DwSingleRequest` … `DwWindowRequest`), commands, the enums of channel kinds, refusal codes and upload purposes, validation both sides run (`DwSelfValidating`). Playbook — `dartway-contract`.
-- **`lib/src/` mirrors the server's features:** `<feature>.dart`, or a flat `<feature>/` of `<feature>_<part>.dart` parts only once it grows, `<feature>` a folder of the server's `lib/src/`; beside them only `<prefix>_channel`, `_refusal`, `_upload`, `_protocol` and `_push_category.dart` (`invalidSharedLayout`). What belongs to no server feature goes with the one that owns it. `dartway-contract` §1.
-- **A request's fields are its complete filter**, and a request is a value: the client caches and shares its live state under the request itself. `channels`, `matches`, `sort` and `positionOf` are pure functions of the object and the fields — `DateTime.now()` inside them is a bug.
-- **A command never carries what the server decides** — the owner, timestamps, a status, a storage key. The handler derives them from the context.
-- **"My …" requests carry no account id**: the server reads the caller, and the channel is `DwLiveChannel.ofCaller(kind)`.
-- **A DTO change is a change to installed apps.** Adding a field with a default is safe; renaming or removing a field, a DTO or a refusal code raises the breaking line of `__SHARED_PKG__`'s `version:` (the minor below 1.0, the major after) in the same change, so installed builds are shown "update the app" instead of failing. A new enum value needs no raise (`dartway-contract`).
-- **A new path dependency is named in both Dockerfiles**, or `pub get` inside the image fails three layers from the cause.
-
-## Server (`__SERVER_PKG__`)
-
-**The top level of `lib/` is a closed list:** `__SERVER_PKG__.dart`, `generated/` (**do not edit**) and `src/`. **`src/` is folders only: `core/`, `migrations/`, and one folder per feature** declaring its `DwServerFeature` in `<feature>_feature.dart`. No layer-named folders at any depth — the list is `dartway-server` §1's (`invalidTopLevelLayout`, `invalidServerFeatureFile`).
-
-- **`core/` is what every feature imports, and it imports no feature** (`coreImportsFeature`). Fixed file names, without the project's name: `channels.dart` (`AppChannels`), `environment.dart` (`AppEnvironment`), `files.dart` (`AppFiles`, the buckets' defaults), and `push.dart` with push. What needs a feature is the feature's: the caller and `ProfileAccess` in `profile/profile_access.dart`; an upload purpose's rule in the `_access.dart` of the feature it belongs to, listed by `__SERVER_PKG__.dart`; the sign-in hooks (`AccountAuth`) and the first administrator in `account/`, the feature at the top that imports what an account's life touches and that nothing imports. The profile is the sink: it imports no other feature.
-- **A feature's file set is closed:** `<feature>_<kind>.dart` or `<feature>_<part>_<kind>.dart`, kind one of `feature`, `rows`, `handlers`, `objects` (rows → data objects), `publications` (what a change is published as, and to whom), `jobs`, `access`, `routes`, `changes` (how another feature writes its rows), plus one flat `logic/` for everything else; what a file declares matches its kind, and `core/` holds none of them (`invalidServerFeatureFile`, `misplacedServerCode`; `dartway-server` §1). **Features form a graph without cycles** (`featureImportCycle`), **and a feature imports another only through its surface** — its `_rows` (read and join its tables, read only), `_access` (its rules: whose row, who is a member), `_objects` (its rows shown its way), `_publications` (its changes announced its way) and `_changes` (its rows written its way); never its `_feature`, `_handlers`, `_jobs`, `_routes` or `logic/` (`featureImportOutsideSurface`). **A row is written only by the feature that owns its invariants**: another feature calls its `_changes`, never `ctx.db.<its table>.insert/update/delete` (`foreignRowWrite`; `dartway-server` §1).
-
-- **Handlers:** one per request and command, each with an explicit `DwAccessRule`; commands are transactional — lock the rows a decision depends on before deciding; refuse with `ctx.refuse(<Package>Refusal.…)`; someone else's row does not exist for the caller. Playbook — `dartway-server`.
-- **Rows → data objects in batch**: one query per relation for the whole batch (`findByIds`), never per row; one mapping for reads and publications.
-- **The caller's notions are the project's**: `ctx.profile` and the role come from the `ProfileCallContext` extension in `profile/profile_access.dart`, cached with `memo`, read once per call. A membership or ownership is one function, in the `_access.dart` of the feature that owns it.
-- **Publish what a command changed** to every channel that shows it (`ctx.publish`), through the owning feature's `<feature>_publications.dart`; close removed access with `ctx.revoke`; a request never publishes. A number several features move (the admin dashboard's counters) is published by the feature that owns it, and the others call that publication. Playbooks — `dartway-realtime`, `dartway-access`.
-- **Another service's HTTP API is `ctx.http`** — bounded, logged, faked by the test server (`server.http`); `HttpClient(` or `package:http` in `lib/` fails the check (`forbiddenHttpClient`). Playbook — `dartway-server`.
-- **Accounts, identities and session keys are the framework's**: the profile row is created in `onAccountCreated`; a project never queries `dw_*` tables — `ctx.accounts`, `ctx.files` are the surface.
-- **The schema moves by migrations**: row class → `generate` → `dart run bin/migrate.dart create <name>` → review → `check`; an applied migration is never edited. Playbook — `dartway-migrations`.
-- **Configuration is the environment, read once, in `core/environment.dart`**: `AppEnvironment` with `DwServerEnvironment` for the framework's variables and a typed sub-config per concern, read at start (`DwEnvironmentReader`) so a missing variable stops the start; `Platform.environment` anywhere else in `lib/`, and in `bin/` anything but `AppEnvironment.read(DwLocalEnvironment.overlay(Platform.environment))`, fails the check (`forbiddenEnvironmentRead`). Secrets are never printed. Locally the entry points overlay `deploy/config.yaml > local` and `deploy/secrets.yaml > local` (git-ignored, never read by you); `dartway secret list --env local` says what is missing.
-
-## Flutter (`__FLUTTER_PKG__`)
-
-**The top level of `lib/` is a closed list: two files, four zones, four layers.** Files — `main.dart` (the environment: backend URL, version) and `__FLUTTER_APP_FILE__` (all the wiring). Zones, which hold features and are the only places asked for a `DwFeatureSpec` — `app/` (the app itself) · `admin/` (the admin panel) · `auth/` (signing in) · `common/` (features more than one zone draws on). Layers — `core/` (router and the zones' shells, the `dw` core, the signed-in profile, app settings, refusal texts, and `core/platform/` for a conditional-import trio: `x.dart` exporting `x_stub.dart` / `x_web.dart`) · `shared/` (non-visual helpers several features use: extensions on data objects, formatters) · `ui_kit/` (the design system: styles, and the visual building blocks) · `l10n/`.
-
-Nothing else sits at the top level, and none of those names appears lower down (`app/admin/` is a group, not the admin panel). **No `data/`, no `domain/`** — the data layer is `dw.request`/`dw.command`, the rules live in the shared package and the handlers (`invalidTopLevelLayout`).
-
-- **Features:** a feature = an entry point (one public file) + `widgets/` + `logic/`. From outside, import **only the entry point**. The entry-point widget declares the feature spec (`implements DwFeatureWidget` with a `DwFeatureSpec`) right in its own file, and no other file of the feature declares one. Skill — `dartway-feature-scaffold`.
-- **Data:** a screen shows a read through `DwReadBuilder(dw.request(request), …)` (or `dw.table`), a feed through `DwPagedListView`, a chat through `DwWindowListView` — never by taking `ref.watch(dw.request(…))` apart (`forbiddenRequestRead`; a controller in `logic/` may watch a read); chrome — a title, an enabled button, a badge — comes from a `logic/` provider answering a plain value with a fallback, never a `DwReadBuilder` in an app bar; changes are `dw.command` in the feature's `logic/`, run inside `dw.action` by the widget that owns the button. No repositories, no hand-written HTTP, no copies of server state; a failed read must not look like an empty one. `dartway-data-layer`.
-- **`ProviderScope` is not written by the app** — `DwAppRunner` owns it, tests build their own; a nested override is silently invisible to providers reading through `Ref`. A value that differs per subtree is a family key or a constructor argument (`forbidden_provider_scope`).
-- **The UI Kit is the only source of styles:** in the zones and in `shared/`, direct `Color`/`TextStyle`/`BorderRadius`/`context.textTheme`/`context.colorScheme` are forbidden; the only import is `ui_kit.dart`. Skill — `dartway-ui-kit`.
-- **Every project is localized, and user-visible text is never written in code** — `context.l10n` in widgets, `appL10n` outside the tree; a new string goes into **every** `.arb`, then `flutter gen-l10n`, output committed. **Refusals are texts of the app**: `lib/core/` maps every code, the project's and the framework's `dw.*`, to a localized string for `DwFlutterConfig.refusalText`. `dart run dartway_cli:dartway check` reports missing wiring as `l10nNotWired` and text inside the kit as `uiKitContainsText`. The wiring list, server-composed text, the widget test's explicit `locale:` and what counts as content — `dartway-ui-kit`, "Localization".
-- **Navigation:** the DartWay Router — enum routes, enum parameters, guards in the zones; a tapped notification or deep link navigates through one seam in `core/`. A screen is a route (no `Navigator.push`, no `MaterialPageRoute`), a dialog or a sheet opens through the kit; a page goes back with `goNamed(parent)` or the `AppBar`'s leading button, and `Navigator.of(context).pop(…)` closes only a dialog or a sheet (`forbiddenNavigationCall`); what a screen opens on is a route parameter, never a one-shot "focus" notifier, and "new" is a route of its own, never id `0`/`-1` (`sentinelId`). `dartway-navigation`.
-- **Specials:** notifications — `dw.notify.*` (not `SnackBar`); actions from the UI — `dw.action`; sign-out — `dw.signOut()`; the signed-in account — `dw.accountId`; "update the app" — `DwFlutterConfig.updateRequiredScreen`, shown by the core when the server refuses this build.
-- **`web/index.html` is part of the app**: its scroll lock keeps iOS from taking the app off screen when a field is focused, and anything that regenerates the shell drops it — `grep -q 'focusin' web/index.html`; `dartway-on-device`.
+PRs and diffs go against `__BASE_BRANCH__`. The first line of a commit is `<type>(<scope>): <description in English>`, `type` one of `feat`/`fix`/`chore`. Tickets and message checks are the project's own convention, stated in its root `CLAUDE.md`.
