@@ -9,7 +9,7 @@ the rule of every upload purpose.
 
 ```dart
 DwCallHandler.single<GetAdminCounters, AdminCounters>(
-  access: AppAccess.admin,
+  access: ProfileAccess.admin,
   handle: (ctx, request) => AdminPublications.countCounters(ctx.db),
 ),
 ```
@@ -58,10 +58,11 @@ problem. A missing handler is found at deploy, not by the first user to press th
 ## Roles are the project's
 
 A role is a column of the project's profile row, and the project names it in its own words with an
-extension on the context (`example/dartway_example_server/lib/src/core/call_context.dart`):
+extension on the context, in the profile feature's surface every other feature imports
+(`example/dartway_example_server/lib/src/profile/profile_access.dart`):
 
 ```dart
-extension AppCallContext on DwCallContext {
+extension ProfileCallContext on DwCallContext {
   /// The caller's profile, read once per call.
   Future<UserProfileRow> get profile => memo(#profile, () async {
     final accountId = requireAccountId;
@@ -79,7 +80,7 @@ extension AppCallContext on DwCallContext {
 }
 
 /// Access rules of the example, in the words handlers read.
-abstract final class AppAccess {
+abstract final class ProfileAccess {
   static final DwAccessRule staff = DwAccessRule.check<DwServerCall<Object?>>(
     (ctx, _) => ctx.isStaff,
   );
@@ -92,7 +93,7 @@ abstract final class AppAccess {
 
 `memo` runs its function at most once per call: the access check, the handler and every helper ask
 `ctx.profile`, and one query answers them all. The skeleton `dartway create` gives a project has the
-same shape in its server package's `lib/src/core/call_context.dart`, with an `admin` rule.
+same shape in its server package's `lib/src/profile/profile_access.dart`, with an `admin` rule.
 
 The framework ships no roles because every project's are different — a club has coaches, a shop has
 sellers — and a role enum in the framework would be a second one beside the project's. What it
@@ -162,31 +163,35 @@ DwCallHandler.command<RenameLesson, Lesson>(
 
 **Membership of a parent** — the caller is in the conversation, the project, the circle the call
 names. What "a member" means (active, invitation accepted, not blocked) is decided by **one function
-that returns the caller's membership, or `null`**, beside `profile` in the context extension. Every
-access point that asks the question calls it — each resource rule's `load`, the channel rule of the
-parent's channel, and `DwFileStorage.canRead` for files attached inside it. A second definition,
-written inline somewhere, is how one of them ends up skipping the block check:
+that returns the caller's membership, or `null`**, in the `_access.dart` of the feature that owns
+the parent, as a context extension of its own. Every access point that asks the question calls it —
+each resource rule's `load`, the channel rule of the parent's channel, and `DwFileStorage.canRead`
+for files attached inside it — and another feature asking it imports that file, the owner's surface,
+rather than writing its own (`dart run dartway_cli:dartway check` fails an import of another feature's handlers or
+`logic/`). A second definition, written inline somewhere, is how one of them ends up skipping the
+block check:
 
 ```dart
-extension AppCallContext on DwCallContext {
+// chat/chat_access.dart
+extension ChatCallContext on DwCallContext {
   /// The caller's membership of [conversationId], or `null` when they are
   /// not a member — the one definition of "in this conversation".
   Future<ConversationMemberRow?> membershipOf(int conversationId) async {
     final me = await profile;
     final row = await db.conversationMembers.findFirst(
       where: (t) =>
-          t.conversationId.equals(conversationId) & t.profileId.equals(me.id!),
+          t.conversationId.equals(conversationId) & t.profileId.equals(me.id),
     );
     return row != null && row.isActive && !row.isBlocked ? row : null;
   }
 }
 ```
 
-A rule shared by many calls of one kind of row is a function returning the rule, next to the
-project's other rules; every handler of that parent names it:
+A rule shared by many calls of one kind of row is a function returning the rule, in the same
+`_access.dart`; every handler of that parent names it:
 
 ```dart
-abstract final class AppAccess {
+abstract final class ChatAccess {
   /// A member of the conversation the call names; the handler reads the
   /// membership as `ctx.accessed<ConversationMemberRow>()`.
   static DwAccessRule conversationMember<C extends DwServerCall<Object?>>(
@@ -199,7 +204,7 @@ abstract final class AppAccess {
 }
 
 DwCallHandler.command<LeaveConversation, void>(
-  access: AppAccess.conversationMember<LeaveConversation>(
+  access: ChatAccess.conversationMember<LeaveConversation>(
     (command) => command.conversationId,
   ),
   handle: (ctx, command) async {

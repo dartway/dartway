@@ -1,8 +1,8 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/admin/admin_publications.dart';
-import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_server/src/core/channels.dart';
+import 'package:dartway_example_server/src/profile/profile_access.dart';
 import 'package:dartway_example_server/src/schedule/schedule_objects.dart';
 import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
@@ -33,7 +33,7 @@ final scheduleHandlers = <DwCallHandler>[
 
   /// Adds a service or rewrites one. Admins only; published on the schedule.
   DwCallHandler.command<SaveClubService, ClubService>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     handle: (ctx, command) async {
       // The command carries every column of a service, which has no owner:
       // the draft is the whole row, and `withId` saves it.
@@ -58,7 +58,7 @@ final scheduleHandlers = <DwCallHandler>[
   /// the past is refused, and a service or coach that does not exist is
   /// `dw.notFound`. Published on the schedule and to the admin counters.
   DwCallHandler.command<ScheduleSession, ClubSession>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       if (command.startsAt.isBefore(ctx.now)) {
         ctx.refuse(DartwayExampleRefusal.sessionInPast, field: 'startsAt');
@@ -89,7 +89,7 @@ final scheduleHandlers = <DwCallHandler>[
   /// session leaves the schedule, each booking its member's list, and the
   /// admin counters move.
   DwCallHandler.command<CancelSession, void>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       final session = await ctx.db.clubSessions.findById(
         command.sessionId,

@@ -4,13 +4,13 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_server/generated/dw_schema.dart';
 import 'package:dartway_starter_server/src/admin/admin_publications.dart';
 import 'package:dartway_starter_server/src/core/channels.dart';
+import 'package:dartway_starter_server/src/profile/profile_changes.dart';
 import 'package:dartway_starter_server/src/profile/profile_objects.dart';
 import 'package:dartway_starter_server/src/profile/profile_publications.dart';
-import 'package:dartway_starter_server/src/profile/profile_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
-/// The delivery a deploying project plugs into [AppAuth.config] — narrower
-/// than `DwAuthConfig.deliverCode` itself, because [AppAuth] already answers
+/// The delivery a deploying project plugs into [AccountAuth.config] — narrower
+/// than `DwAuthConfig.deliverCode` itself, because [AccountAuth] already answers
 /// the one question every project would otherwise have to ask again (is this
 /// a test account's fixed code, and if so say nothing).
 typedef CodeDelivery =
@@ -23,7 +23,7 @@ typedef CodeDelivery =
 
 /// Signing in: the auth configuration, and the profile an account is created
 /// with.
-abstract final class AppAuth {
+abstract final class AccountAuth {
   /// Sign-in by a one-time code to a phone number or an e-mail address.
   ///
   /// [deliverCode] sends the code. By default it is written to the server log:
@@ -49,10 +49,10 @@ abstract final class AppAuth {
     // code set on their profile; nobody else has one — `null` for them, the
     // framework's own default, `codeLength` random digits (6, left unset).
     generateCode: (ctx, kind, identifier, accountId) =>
-        AppAuth._testCode(ctx, accountId),
+        AccountAuth._testCode(ctx, accountId),
 
     deliverCode: (ctx, kind, identifier, code, accountId) async {
-      if (await AppAuth._testCode(ctx, accountId) != null) return;
+      if (await AccountAuth._testCode(ctx, accountId) != null) return;
       await (deliverCode ?? _logCode)(ctx, kind, identifier, code);
     },
 
@@ -60,7 +60,7 @@ abstract final class AppAuth {
     // signed-in account without a profile cannot exist. A refusal here rolls the
     // account back and leaves the code usable.
     onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
-      final profile = await AppAuth.createProfile(ctx, accountId, origin);
+      final profile = await ProfileChanges.create(ctx, accountId, origin);
       // The newcomer goes to the admins: the dashboard counts them, and a
       // members table page reads itself again — a new row moves the paging and
       // the total, which only the server can compute.
@@ -107,7 +107,7 @@ abstract final class AppAuth {
     //    with a `deleted_at` and no name, phone or photo, `account_id` nulled by
     //    `ON DELETE SET NULL`, so other people's content keeps an author and the
     //    screens say "member who left". The example does exactly this, in
-    //    `example/dartway_example_server/lib/src/core/auth.dart`.
+    //    `example/dartway_example_server/lib/src/account/logic/auth.dart`.
     //
     // What may not be done is hiding the person behind a flag and keeping their
     // name and phone: that is a deletion the law does not accept and the member
@@ -134,43 +134,4 @@ abstract final class AppAuth {
         );
         return profile?.testVerificationCode;
       });
-
-  /// The profile a new account starts with, in the account's transaction.
-  ///
-  /// A sign-up is refused, and nothing is created, while sign-up is switched off
-  /// in the settings ([DartwayStarterRefusal.signUpClosed]) or without the terms
-  /// accepted ([DartwayStarterRefusal.consentsRequired]) — the app then asks for
-  /// them and verifies the same code again. An account made by a tool
-  /// ([DwToolOrigin]: the admin bootstrap, the dev seed) accepts nothing on
-  /// anyone's behalf: its `termsAcceptedAt` stays empty.
-  static Future<UserProfileRow> createProfile(
-    DwCallContext ctx,
-    int accountId,
-    DwAccountOrigin origin,
-  ) async {
-    final now = ctx.now;
-    switch (origin) {
-      case DwSignInOrigin(:final registration):
-        if (!(await ctx.settings.read<AppSettings>()).signUpEnabled) {
-          ctx.refuse(DartwayStarterRefusal.signUpClosed, field: 'identifier');
-        }
-        if (registration[RegistrationKeys.terms] != 'true') {
-          ctx.refuse(DartwayStarterRefusal.consentsRequired, field: 'consents');
-        }
-        return ctx.db.userProfiles.insert(
-          NewUserProfileRow(
-            accountId: accountId,
-            firstName: registration[RegistrationKeys.firstName]?.trim() ?? '',
-            agreedForMarketing:
-                registration[RegistrationKeys.marketing] == 'true',
-            termsAcceptedAt: now,
-            createdAt: now,
-          ),
-        );
-      case DwToolOrigin():
-        return ctx.db.userProfiles.insert(
-          NewUserProfileRow(accountId: accountId, createdAt: now),
-        );
-    }
-  }
 }

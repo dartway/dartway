@@ -43,7 +43,7 @@ final class AppHarness {
         storage: storage,
         port: 0,
         clock: clock,
-        auth: AppAuth.config(
+        auth: AccountAuth.config(
           // Tests ask one identifier for several codes within a minute.
           resendDelay: Duration.zero,
           deliverCode: (ctx, kind, identifier, code) async =>

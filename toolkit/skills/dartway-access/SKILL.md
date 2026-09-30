@@ -47,7 +47,7 @@ fails the server's startup. A role rule shared by many handlers is typed for eve
 
 ```dart
 /// Access rules of the app, in the words handlers read.
-abstract final class AppAccess {
+abstract final class ProfileAccess {
   static final DwAccessRule manager = DwAccessRule.check<DwServerCall<Object?>>(
     (ctx, _) => ctx.isManager,
   );
@@ -66,11 +66,12 @@ abstract final class AppAccess {
 ## 2. Roles are the project's
 
 The framework knows that an account signed in, not who that person is to the project. A role is a
-column of the project's profile row, and the context extension — `AppCallContext` in
-`core/call_context.dart` — turns it into words handlers read, cached per call:
+column of the project's profile row, and the context extension — `ProfileCallContext` in
+`profile/profile_access.dart`, the profile feature's surface every feature imports (`core/` imports
+no feature) — turns it into words handlers read, cached per call:
 
 ```dart
-extension AppCallContext on DwCallContext {
+extension ProfileCallContext on DwCallContext {
   Future<MemberProfileRow> get profile => memo(#profile, () async {
     final accountId = requireAccountId;
     final profile = await db.memberProfiles.findFirst(
@@ -86,7 +87,7 @@ extension AppCallContext on DwCallContext {
 
 The profile row is created with the account, in `DwAuthConfig.onAccountCreated`
 (`dartway-server`), so "a signed-in account without a profile" is a broken invariant, not a case
-to handle. The skeleton ships this extension with an admin role, and an `AppAccess`-style class of
+to handle. The skeleton ships this extension with an admin role, and an `ProfileAccess`-style class of
 rules beside it.
 
 **A role change is guarded like any other data**, and two locks are worth copying from the skeleton:
@@ -147,24 +148,27 @@ access: DwAccessRule.resource<RenameLesson, (LessonRow, CourseRow)>(
 ```
 
 **Membership of a parent** — **one function returns the caller's membership, or `null`**, in the
-context extension beside `profile`; it is the only definition of "a member" (active, accepted, not
-blocked). Every resource rule's `load`, the parent's `DwChannelRule` and `DwFileStorage.canRead`
-for files attached inside the parent call it — a second definition is how one of them skips a check:
+`_access.dart` of the feature that owns the parent, as a context extension of its own; it is the
+only definition of "a member" (active, accepted, not blocked). Every resource rule's `load`, the
+parent's `DwChannelRule` and `DwFileStorage.canRead` for files attached inside the parent call it,
+and another feature asking the same question imports that file — its surface — rather than
+writing a second definition, which is how one of them skips a check:
 
 ```dart
-extension AppCallContext on DwCallContext {
+// teams/teams_access.dart
+extension TeamsCallContext on DwCallContext {
   Future<TeamMemberRow?> membershipOf(int teamId) async {
     final me = await profile;
     final row = await db.teamMembers.findFirst(
-      where: (t) => t.teamId.equals(teamId) & t.profileId.equals(me.id!),
+      where: (t) => t.teamId.equals(teamId) & t.profileId.equals(me.id),
     );
     return row != null && row.isActive ? row : null;
   }
 }
 ```
 
-A rule shared by many calls of one kind of row is a function returning the rule, next to the
-project's other rules:
+A rule shared by many calls of one kind of row is a function returning the rule, in the same
+`_access.dart`:
 
 ```dart
 static DwAccessRule teamMember<C extends DwServerCall<Object?>>(
@@ -218,7 +222,7 @@ to someone else's, and the handler that trusts it serves them. The same goes for
 server decides — owner, author, timestamps, status (`dartway-contract`).
 
 When a staff screen really does act on someone else's data, that is a different call with its own
-rule (`ListCustomerInvoices` with `AppAccess.customerInvoices`), never the "my" call with an optional
+rule (`ListCustomerInvoices` with `ProfileAccess.customerInvoices`), never the "my" call with an optional
 id.
 
 ## 5. Channels are the second access point

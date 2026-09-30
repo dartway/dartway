@@ -30,7 +30,7 @@ import 'dw_analytics_settings.dart';
 /// Who reads is the project's to say — the framework knows no roles:
 ///
 /// ```dart
-/// DwAnalyticsModule(readAccess: AppAccess.admin)
+/// DwAnalyticsModule(readAccess: ProfileAccess.admin)
 /// ```
 ///
 /// Without [readAccess] every read is refused `dw.forbidden`.

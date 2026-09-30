@@ -51,23 +51,31 @@ enum DartwayStarterUpload with DwUploadPurpose {
 (`template/dartway_starter_shared/lib/src/dartway_starter_upload.dart`: the server's rule and the
 app's picker read the same limits.)
 
-The server declares one `DwUploadRule` per purpose. From
-`template/dartway_starter_server/lib/src/core/files.dart`:
+The server declares one `DwUploadRule` per purpose, in the `_access.dart` of the feature the purpose
+belongs to — the avatar is the profile's. From
+`template/dartway_starter_server/lib/src/profile/profile_access.dart`:
 
 ```dart
-// AppFiles
-static List<DwUploadRule> get uploadRules => [
-  DwUploadRule(
-    DartwayStarterUpload.avatar,
-    // Shown to anyone who sees the member, by URL: a photo is not private.
-    visibility: DwFileVisibility.public,
-    maxBytes: DartwayStarterUpload.avatarMaxBytes,
-    contentTypes: DartwayStarterUpload.avatarContentTypes,
-    // Any member. The command that puts a photo on a profile checks it is the
-    // caller's own finished upload (`ctx.files.requireOwned`).
-    canUpload: (ctx) async => true,
-  ),
-];
+// ProfileAccess
+/// A profile photo: shown to anyone who sees the member, by URL — a photo is
+/// not private.
+static final avatarUpload = DwUploadRule(
+  DartwayStarterUpload.avatar,
+  visibility: DwFileVisibility.public,
+  maxBytes: DartwayStarterUpload.avatarMaxBytes,
+  contentTypes: DartwayStarterUpload.avatarContentTypes,
+  // Any member. The command that puts a photo on a profile checks it is the
+  // caller's own finished upload (`ctx.files.requireOwned`).
+  canUpload: (ctx) async => true,
+);
+```
+
+The server's library lists every purpose's rule, as it lists the features — the one file that sees
+them all, since `core/` imports no feature:
+
+```dart
+// DartwayStarterServer
+static List<DwUploadRule> get uploadRules => [ProfileAccess.avatarUpload];
 ```
 
 | Field | Meaning |
@@ -97,12 +105,14 @@ prefix's.
 
 Who reads a private file is `DwFileStorage.canRead(ctx, DwFileRecord file)`. Without it, only the
 uploader. A `false` answers `dw.forbidden` to a signed-in caller and `401` to an anonymous one, who
-may be allowed after signing in. The example lets chat members read chat attachments
-(`example/dartway_example_server/lib/src/core/files.dart`):
+may be allowed after signing in. The example lets chat members read chat attachments: the chat
+answers for its own files (`ChatAttachments.canRead` in
+`example/dartway_example_server/lib/src/chat/chat_access.dart`, `null` for a file of another
+purpose), and the server's library asks each feature in turn:
 
 ```dart
-// AppFiles
-static Future<bool> canRead(DwCallContext ctx, DwFileRecord file) async =>
+// DartwayExampleServer
+static Future<bool> canReadFile(DwCallContext ctx, DwFileRecord file) async =>
     await ChatAttachments.canRead(ctx, file) ?? file.accountId == ctx.accountId;
 ```
 
@@ -141,12 +151,11 @@ probe say whether it is right. The skeleton's `bin/server.dart` provisions when
 ## Configuration
 
 ```dart
-// AppFiles
-static DwFileStorage storage(DwFileStorageConfig config) =>
-    DwFileStorage(config, rules: uploadRules);
+// DartwayStarterServer.build
+files: storage == null ? null : DwFileStorage(storage, rules: uploadRules),
 ```
 
-passed as `DwAppServer(files: …)` (`template/dartway_starter_server/lib/src/core/files.dart`).
+passed as `DwAppServer(files: …)` (`template/dartway_starter_server/lib/dartway_starter_server.dart`).
 
 `DwFileStorageConfig`:
 

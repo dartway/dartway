@@ -67,7 +67,7 @@ registry both sides share. The server answers each call with one handler. Abridg
 
 ```dart
 DwCallHandler.command<PublishNews, NewsPost>(
-  access: AppAccess.staff,
+  access: ProfileAccess.staff,
   handle: (ctx, command) async {
     final me = await ctx.profile;
     final row = await ctx.db.newsPosts.insert(

@@ -71,7 +71,7 @@ dev_dependencies:
   # real HTTP contract and live socket.
   dartway_client: ^0.21.0-dev.16
 
-  dartway_cli: ^0.23.0
+  dartway_cli: ^0.24.0
 
 # Inside the monorepo the example builds against the LOCAL framework packages.
 # Copied out into a standalone project — drop the whole dependency_overrides block.

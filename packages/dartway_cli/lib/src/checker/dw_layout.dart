@@ -34,8 +34,10 @@ const dwServerLibFolders = {'generated', 'src'};
 /// The fixed folders of a server's `lib/src/`; every other folder there is a
 /// feature.
 ///
-/// `core/` is the server-wide wiring — sign-in hooks, what the caller is and
-/// the access rules, channel and upload rules, the startup steps.
+/// `core/` is what every feature imports — the channels, the environment,
+/// the storage's defaults — and it imports no feature
+/// ([DwCheckType.coreImportsFeature]): who the caller is, the sign-in hooks
+/// and the upload rules live with the features they need.
 /// `migrations/` is written and read by `bin/migrate.dart` by that path.
 const dwServerSrcLayers = {'core', 'migrations'};
 

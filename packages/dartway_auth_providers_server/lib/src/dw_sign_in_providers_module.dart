@@ -19,7 +19,7 @@ import 'dw_sign_in_providers.dart';
 ///   auth: DwAuthConfig(
 ///     ...,
 ///     onExternalAccountCreated: (ctx, accountId, provider, subject, data) =>
-///         AppAuth.createProfile(ctx, accountId, data),
+///         ProfileChanges.create(ctx, accountId, data),
 ///   ),
 /// );
 /// ```

@@ -1,11 +1,12 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/chat/chat_access.dart';
 import 'package:dartway_example_server/src/chat/chat_objects.dart';
 import 'package:dartway_example_server/src/chat/chat_publications.dart';
 import 'package:dartway_example_server/src/chat/chat_rows.dart';
 import 'package:dartway_example_server/src/chat/logic/chat_lookups.dart';
-import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_server/src/core/channels.dart';
+import 'package:dartway_example_server/src/profile/profile_access.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 /// Advisory lock namespace of reactions: the first key of the two-key lock,
@@ -20,7 +21,7 @@ final chatMessagesHandlers = <DwCallHandler>[
   /// only. Published on its channel; moves the sender's read position and
   /// everyone's unread counts.
   DwCallHandler.command<SendChatMessage, ChatMessage>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
       await ctx.requireChatChannel(command.channelId);
@@ -154,7 +155,7 @@ final chatMessagesHandlers = <DwCallHandler>[
 
   /// Pins or unpins a message. Staff only; published on its channel.
   DwCallHandler.command<PinChatMessage, ChatMessage>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final row = await ctx.requireChatMessage(command.messageId, lock: true);
@@ -181,7 +182,7 @@ final chatMessagesHandlers = <DwCallHandler>[
   /// Sets or clears the caller's reaction to a message. Staff only; published
   /// on its channel.
   DwCallHandler.command<ReactToChatMessage, ChatMessage>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final row = await ctx.requireChatMessage(command.messageId);

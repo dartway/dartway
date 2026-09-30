@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 import '../checker/dw_analysis_options.dart';
 import '../checker/dw_contract_names.dart';
 import '../checker/dw_data_lifecycle.dart';
+import '../checker/dw_feature_imports.dart';
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_flutter_state_rules.dart';
@@ -168,6 +169,14 @@ class CheckCommand extends Command<int> {
       errorCount += DwPackageFileSizeInspector(
         serverPackageDir: layout?.serverPackageDir,
         sharedPackageDir: layout?.sharedPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+
+      // Between the server's features: which of them import and write which,
+      // and through what. The server's, like the ones above.
+      errorCount += DwFeatureImportInspector(
+        serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);

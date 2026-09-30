@@ -15,6 +15,7 @@ void main() {
     fcm = await DwFakePushService.start();
     club = await AppHarness.start(
       push: AppPush.module(
+        eligibility: ProfileAccess.pushEligibility,
         providers: [
           fcm.fcmProvider(webLinkBase: Uri.parse('https://app.example.com')),
         ],

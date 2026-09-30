@@ -79,13 +79,13 @@ How long a resolved token is trusted without a query is a server setting, not an
 - `DwToolOrigin()` — `DwAccountService.ensure`: a seed, an admin bootstrap, an import. It has
   accepted nothing on anyone's behalf.
 
-The skeleton's `AppAuth.createProfile` (`template/dartway_starter_server/lib/src/core/auth.dart`) shows why the
+The skeleton's `ProfileChanges.create` (`template/dartway_starter_server/lib/src/profile/profile_changes.dart`), which the sign-in hook calls, shows why the
 difference matters:
 
 ```dart
 switch (origin) {
   case DwSignInOrigin(:final registration):
-    if (!await AppAuth.isSignUpEnabled(ctx.db)) {
+    if (!await AccountAuth.isSignUpEnabled(ctx.db)) {
       ctx.refuse(DartwayStarterRefusal.signUpClosed, field: 'identifier');
     }
     if (registration[RegistrationKeys.terms] != 'true') {
@@ -124,7 +124,7 @@ verified e-mail match (`linkByVerifiedEmail`, below) rather than a confirmed cod
 
 The framework publishes nothing about identifiers. The skeleton republishes the profile, which
 shows identifiers read from the framework; the example mirrors the phone into its profile row in
-the same transaction (`example/dartway_example_server/lib/src/core/auth.dart`).
+the same transaction (`example/dartway_example_server/lib/src/account/logic/auth.dart`).
 
 ## Built-in commands
 
@@ -263,7 +263,7 @@ DwAppServer(
   auth: DwAuthConfig(
     ...,
     onExternalAccountCreated: (ctx, accountId, provider, subject, data) =>
-        AppAuth.createProfile(ctx, accountId, data),
+        ProfileChanges.create(ctx, accountId, data),
   ),
 );
 ```

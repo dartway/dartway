@@ -6,6 +6,7 @@ library;
 export 'package:dartway_core_shared/dartway_core_shared.dart';
 
 export 'package:dartway_starter_shared/generated/dw_protocol.dart';
+export 'package:dartway_starter_shared/src/account.dart';
 export 'package:dartway_starter_shared/src/admin.dart';
 export 'package:dartway_starter_shared/src/dartway_starter_channel.dart';
 export 'package:dartway_starter_shared/src/dartway_starter_protocol.dart';

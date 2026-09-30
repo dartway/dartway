@@ -3,8 +3,8 @@ import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/admin/admin_publications.dart';
 import 'package:dartway_example_server/src/content/content_objects.dart';
 import 'package:dartway_example_server/src/content/content_rows.dart';
-import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_server/src/core/channels.dart';
+import 'package:dartway_example_server/src/profile/profile_access.dart';
 import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
@@ -26,7 +26,7 @@ final contentHandlers = <DwCallHandler>[
   /// Publishes a news post by the caller. Staff only. The post goes to the
   /// feed and the admin counters, and a push to every member but the author.
   DwCallHandler.command<PublishNews, NewsPost>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final row = await ctx.db.newsPosts.insert(
@@ -70,7 +70,7 @@ final contentHandlers = <DwCallHandler>[
 
   /// Removes a news post. Staff only; gone from the feed and the counters.
   DwCallHandler.command<RemoveNews, void>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       if (await ctx.db.newsPosts.delete(command.postId) == 0) {
         ctx.refuse(DwCoreRefusal.notFound);
@@ -93,7 +93,7 @@ final contentHandlers = <DwCallHandler>[
   /// Changes the settings the command names, the rest as they are. Admins
   /// only; published to every member.
   DwCallHandler.command<SaveClubSettings, ClubSettings>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     handle: (ctx, command) async {
       final saved = await ctx.settings.update<ClubSettings>(
         (current) => current.copyWith(

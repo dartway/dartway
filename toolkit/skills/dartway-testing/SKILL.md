@@ -44,7 +44,7 @@ tested on one of the two sides that apply it.
 (`testLayout`):
 
 - a test sits at the mirror of the `lib/` path it tests: `lib/<path>.dart` → `test/<path>_test.dart`
-  (`lib/src/core/auth.dart` → `test/src/core/auth_test.dart`);
+  (`lib/src/core/files.dart` → `test/src/core/files_test.dart`);
 - a test of a whole folder — a server feature through its calls — is
   `test/<path>/<folder>_acceptance_test.dart` for `lib/<path>/<folder>/`
   (`lib/src/invoices/` → `test/src/invoices/invoices_acceptance_test.dart`), and a scenario of it

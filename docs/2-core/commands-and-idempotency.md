@@ -107,7 +107,7 @@ first, whose token nobody received, is listed and revocable
 
 ```dart
 DwCallHandler.command<PublishNews, NewsPost>(
-  access: AppAccess.staff,
+  access: ProfileAccess.staff,
   handle: (ctx, command) async {
     final me = await ctx.profile;
     final row = await ctx.db.newsPosts.insert(

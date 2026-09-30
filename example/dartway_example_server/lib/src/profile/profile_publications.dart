@@ -17,4 +17,12 @@ abstract final class ProfilePublications {
       ..publish(AppChannels.admin, profile);
     return profile;
   }
+
+  /// A member who left, to the admins' members table, which holds the row and
+  /// must show what it became — not to its owner, who is gone.
+  static UserProfile tombstone(DwCallContext ctx, UserProfileRow row) {
+    final profile = ProfileObjects.profile(row);
+    ctx.publish(AppChannels.admin, profile);
+    return profile;
+  }
 }

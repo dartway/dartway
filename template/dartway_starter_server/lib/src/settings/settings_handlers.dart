@@ -1,6 +1,6 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_starter_server/src/core/call_context.dart';
 import 'package:dartway_starter_server/src/core/channels.dart';
+import 'package:dartway_starter_server/src/profile/profile_access.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 final settingsHandlers = <DwCallHandler>[
@@ -14,7 +14,7 @@ final settingsHandlers = <DwCallHandler>[
   /// Changes the settings the command names, the rest as they are. Admins
   /// only; published to every member.
   DwCallHandler.command<SaveAppSettings, AppSettings>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     handle: (ctx, command) async {
       final saved = await ctx.settings.update<AppSettings>(
         (current) => current.copyWith(

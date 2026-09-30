@@ -1,40 +1,22 @@
 import 'dart:io';
 
-import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/core/environment.dart';
-import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
 /// Push notifications: the module, and the providers the environment enables.
 abstract final class AppPush {
-  /// Push for the club. News goes only to members who agreed to marketing:
-  /// the rule runs when deliveries fall due, once per batch, with one query.
+  /// Push for the club. Who a notice reaches is [eligibility], the profile
+  /// feature's rule (`ProfileAccess.pushEligibility`) — `core/` imports no
+  /// feature, so the library hands it in; required, because a default would
+  /// send news to members who never agreed to it.
   static DwPushModule module({
     List<DwPushProvider> providers = const [],
     DwPushSettings settings = const DwPushSettings(),
+    required DwPushEligibility eligibility,
   }) => DwPushModule(
     providers: providers,
     settings: settings,
-    eligibility: (ctx, notice, accountIds) async {
-      switch (notice.categoryIn(DartwayExamplePushCategory.values)) {
-        case DartwayExamplePushCategory.news:
-          final agreed = {
-            for (final profile in await ctx.db.userProfiles.find(
-              where: (t) =>
-                  t.accountId.inList(accountIds) &
-                  t.agreedForMarketing.equals(true),
-            ))
-              profile.accountId,
-          };
-          return {
-            for (final id in accountIds)
-              if (!agreed.contains(id)) id: DwPushDecision.skip,
-          };
-        case DartwayExamplePushCategory.bookingReminder || null:
-          return const {};
-      }
-    },
+    eligibility: eligibility,
   );
 
   /// The providers [environment] enables; none without their variables, and

@@ -25,7 +25,7 @@ import 'dw_check_type.dart';
 ///   framework refuses `notFound`;
 /// - a helper counts only when such a handler of the same file calls it;
 /// - a rule is a resource rule when it is `DwAccessRule.resource` itself, or a
-///   project function or field (`AppAccess.ownTask(…)`) whose declaration in
+///   project function or field (`TasksAccess.ownTask(…)`) whose declaration in
 ///   the server's `lib/` builds one.
 ///
 /// Comments and strings are not code.

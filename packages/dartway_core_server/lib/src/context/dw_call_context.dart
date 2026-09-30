@@ -30,7 +30,7 @@ final class DwNotAuthenticatedException implements Exception {
 /// notions by extension, cached with [memo]:
 ///
 /// ```dart
-/// extension AppCallContext on DwCallContext {
+/// extension ProfileCallContext on DwCallContext {
 ///   Future<UserProfile> get profile => memo(#profile, () => …);
 /// }
 /// ```

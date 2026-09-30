@@ -68,7 +68,8 @@ From the project root or from inside the `*_flutter` package, in this order:
 1. **the declared top level** of the Flutter package and the server package (`invalidTopLevelLayout`),
    the server's features (`invalidServerFeatureFile`, `misplacedServerCode`), the shared package
    mirroring them (`invalidSharedLayout`), and file length in the server and the shared package
-   (`fileLong`, `fileTooLong`);
+   (`fileLong`, `fileTooLong`), and how the server's features import and write one another
+   (`featureImportCycle`, `coreImportsFeature`, `featureImportOutsideSurface`, `foreignRowWrite`);
 2. **localization wiring** (`l10nNotWired`);
 3. **analysis options**: the server and the shared package raise `unnecessary_non_null_assertion` to
    an error (`redundantBangAllowed`);
@@ -132,7 +133,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Thirty-seven errors, twelve warnings, one info — `DwCheckType` and its `severity` in
+Forty-one errors, twelve warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -148,8 +149,12 @@ Thirty-seven errors, twelve warnings, one info — `DwCheckType` and its `severi
 | `barrelFile` | error | A file that only re-exports |
 | `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone; in the server's `lib/src/`, a file, a layer-named folder (the list is in [project layout](../1-getting-started/project-layout.md)) or a feature folder without its `<feature>_feature.dart` |
-| `invalidServerFeatureFile` | error | Inside a server feature, a file that is not `<feature>_<kind>.dart` / `<feature>_<part>_<kind>.dart` (kind: `feature`, `rows`, `handlers`, `objects`, `publications`, `jobs`, `access`, `routes`), a subfolder other than `logic/`, a folder or a kind-suffixed file inside `logic/`, or a layer-named folder at any depth of `lib/src/`. The rule: [project layout](../1-getting-started/project-layout.md) |
+| `invalidServerFeatureFile` | error | Inside a server feature, a file that is not `<feature>_<kind>.dart` / `<feature>_<part>_<kind>.dart` (kind: `feature`, `rows`, `handlers`, `objects`, `publications`, `jobs`, `access`, `routes`, `changes`), a subfolder other than `logic/`, a folder or a kind-suffixed file inside `logic/`, or a layer-named folder at any depth of `lib/src/`. The rule: [project layout](../1-getting-started/project-layout.md) |
 | `misplacedServerCode` | error | Server code in a file of the wrong kind: handlers outside `*_handlers.dart`, row classes outside `*_rows.dart`, jobs outside `*_jobs.dart`, a `DwHttpRoute` outside `*_routes.dart`, a `DwServerFeature` outside `<feature>_feature.dart`, a function that publishes outside `*_publications.dart`, a row → data object mapping outside `*_objects.dart` — and any of them in `core/` |
+| `featureImportCycle` | error | Server features importing one another in a cycle, by any import — within the surface or not. One finding per knot of features: a shortest cycle, the import behind each step, and the other features of the knot |
+| `coreImportsFeature` | error | A file of the server's `lib/src/core/` importing a feature. Every feature imports `core/`, so what `core/` needs from a feature belongs to the feature — who the caller is in `profile/profile_access.dart`, the sign-in hooks in a feature above the ones they touch |
+| `featureImportOutsideSurface` | error | A server feature importing another's file outside its surface: only `<feature>_rows`, `_access`, `_objects`, `_publications`, `_changes` (and their `<part>` files) may be imported — never `_feature`, `_handlers`, `_jobs`, `_routes` or `logic/`; nor may any file under `lib/src/` import the package's library. `import`, `export` and `part` count. `lib/<project>_server.dart`, `migrations/`, `bin/` and `test/` are not judged |
+| `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
 | `generatedCodeStale` | error | A generated file that `dart run dartway_cli:dartway generate` would write differently, or whose source is gone |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
@@ -239,7 +244,13 @@ closed list:
 Dot entries and the folders `generated/`, `gen/`, `l10n/` and `.dart_tool/` are passed over. Inside
 the server's `src/`, `migrations/` is a fixed name (`bin/migrate.dart` writes and reads it by that
 path), every other folder but `core/` is a feature, and a feature's own files are a closed set held by
-`dw_server_features.dart` (`invalidServerFeatureFile`, `misplacedServerCode`).
+`dw_server_features.dart` (`invalidServerFeatureFile`, `misplacedServerCode`). How the features import
+and write one another is `dw_feature_imports.dart`: from the `import`/`export`/`part` directives of
+every file under `src/`, `package:` or relative, it builds the graph of features and fails a cycle
+(`featureImportCycle`), a file of `core/` importing a feature (`coreImportsFeature`), an import of
+another feature's file outside its surface or of the package's library (`featureImportOutsideSurface`);
+from the generated schema and the row classes it knows which feature owns each `db.<table>`, and
+fails a write into it from anywhere else (`foreignRowWrite`).
 
 The shared package's top level is `dw_shared_layout.dart`'s (`invalidSharedLayout`): `lib/` holds
 `<project>_shared.dart` (directives only), `generated/` (only files with a generator's header) and
@@ -347,7 +358,7 @@ condition compares a row's field named for an owner (`…ProfileId`, `authorId`,
 `senderId`, `accountId`, …) with the caller (`me`, `profile`, `ctx.accountId`, …) with `!=`, and
 whose branch refuses `notFound` or `forbidden` — or answers `null` from a `single` handler, which the
 framework refuses `notFound`. A helper counts when such a handler of the same file calls it. A rule
-is a resource rule when it is `DwAccessRule.resource` itself or a project rule (`AppAccess.ownTask(…)`)
+is a resource rule when it is `DwAccessRule.resource` itself or a project rule (`ProfileAccess.ownTask(…)`)
 whose declaration in the server's `lib/` builds one. A warning, because it reads the shape of the code
 rather than its meaning; it stays quiet on a list filtered by the caller in its `where` (the
 canonical "my rows"), on handlers under a resource rule, and on a membership read from a table of its

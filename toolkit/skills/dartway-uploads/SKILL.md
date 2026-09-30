@@ -70,9 +70,11 @@ enum AcmeUpload with DwUploadPurpose {
 
 ## 2. The rule — `__SERVER_PKG__`
 
-One `DwUploadRule` per purpose, in the list the server's `DwFileStorage` is built with. The skeleton
-keeps the list, the storage and its environment defaults in one file under `lib/src/`; add the rule
-there.
+One `DwUploadRule` per purpose, in the list the server's `DwFileStorage` is built with. The rule is
+declared in the `_access.dart` of the feature the purpose belongs to (the skeleton's avatar is
+`ProfileAccess.avatarUpload` in `profile/profile_access.dart`), and the server's library lists it — `uploadRules`
+beside `build`, the one file that sees every feature: `core/` imports none, so a rule that asks a
+role or a membership cannot live there.
 
 ```dart
 DwUploadRule(
@@ -121,7 +123,10 @@ DwFileStorage(config, rules: uploadRules, canRead: canReadFile);
 - **Without `canRead`, only the account that uploaded a file may read it.** Often that is exactly
   right; write a rule only when others must read it (a manager, the other side of a conversation).
 - **One function answers for every private purpose**, so branch on `file.isFor(AcmeUpload.…)` and
-  end with the default for purposes it does not know:
+  end with the default for purposes it does not know. When the answer is a feature's (a membership,
+  a row of its own), the feature answers for its purpose in its `_access.dart` — `null` for any
+  other — and `canReadFile` in the server's library asks each in turn, then falls back to the
+  uploader:
 
 ```dart
 /// A scanned invoice is readable by its owner while the invoice exists;

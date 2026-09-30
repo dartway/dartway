@@ -107,8 +107,8 @@ final class SendMessage extends DwActionCommand<ChatMessage> {}
           contains(
             'courses/amo_client.dart — not courses_<kind>.dart or '
             'courses_<part>_<kind>.dart (kind one of feature, rows, handlers, '
-            'objects, publications, jobs, access, routes, a part never a '
-            'kind): move it to courses/logic/amo_client.dart',
+            'objects, publications, jobs, access, routes, changes, a part '
+            'never a kind): move it to courses/logic/amo_client.dart',
           ),
           contains('courses/courses_job_kinds.dart'),
           contains(

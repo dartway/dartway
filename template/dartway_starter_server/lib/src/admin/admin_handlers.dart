@@ -1,10 +1,10 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_server/generated/dw_schema.dart';
 import 'package:dartway_starter_server/src/admin/admin_publications.dart';
-import 'package:dartway_starter_server/src/core/call_context.dart';
 import 'package:dartway_starter_server/src/core/channels.dart';
+import 'package:dartway_starter_server/src/profile/profile_access.dart';
+import 'package:dartway_starter_server/src/profile/profile_changes.dart';
 import 'package:dartway_starter_server/src/profile/profile_objects.dart';
-import 'package:dartway_starter_server/src/profile/profile_publications.dart';
 import 'package:dartway_starter_server/src/profile/profile_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
@@ -12,14 +12,14 @@ final adminHandlers = <DwCallHandler>[
   /// The dashboard numbers. Admins only; kept live by
   /// [AdminPublications.counters] from every command that moves them.
   DwCallHandler.single<GetAdminCounters, AdminCounters>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     handle: (ctx, request) => AdminPublications.countCounters(ctx.db),
   ),
 
   /// The members table: a page of profiles by name, phone or e-mail, and by
   /// role. Admins only.
   DwCallHandler.table<ListUserProfiles, UserProfile>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     rows: (ctx, request, table) async => ProfileObjects.profiles(
       ctx,
       await ctx.db.userProfiles.find(
@@ -36,7 +36,7 @@ final adminHandlers = <DwCallHandler>[
   /// One member's card: the profile, every identifier, when the terms were
   /// accepted. Admins only.
   DwCallHandler.single<GetUserCard, UserCard>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     handle: (ctx, request) async {
       final row = await ctx.db.userProfiles.findById(request.profileId);
       if (row == null) ctx.refuse(DwCoreRefusal.notFound);
@@ -48,7 +48,7 @@ final adminHandlers = <DwCallHandler>[
   /// (`ownRoleLocked`). Publishes the profile and the counters, and closes the
   /// admin channel for a role taken away.
   DwCallHandler.command<ChangeUserRole, UserProfile>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     handle: (ctx, command) async {
       if ((await ctx.profile).id == command.profileId) {
         ctx.refuse(DartwayStarterRefusal.ownRoleLocked, field: 'role');
@@ -59,16 +59,14 @@ final adminHandlers = <DwCallHandler>[
       );
       if (row == null) ctx.refuse(DwCoreRefusal.notFound);
       if (row.role == command.role) return ProfileObjects.profile(ctx, row);
-      final updated = await ctx.db.userProfiles.update(
-        row.copyWith(role: command.role),
-      );
+      final profile = await ProfileChanges.changeRole(ctx, row, command.role);
       // Access is checked once, at subscription: a role taken away closes
       // what it opened.
       if (row.role == UserRole.admin) {
-        ctx.revoke(AppChannels.admin, updated.accountId);
+        ctx.revoke(AppChannels.admin, row.accountId);
       }
       await AdminPublications.counters(ctx);
-      return ProfilePublications.profile(ctx, updated);
+      return profile;
     },
   ),
 ];
