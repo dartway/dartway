@@ -32,7 +32,7 @@ class _FakeStudio implements StudioMessageChannel {
   Iterable<T> of<T extends StudioBridgeMessage>() => heard.whereType<T>();
 }
 
-class _RouterState extends ChangeNotifier {}
+typedef _RouterState = ();
 
 class _Plain extends StatelessWidget {
   const _Plain();
@@ -143,16 +143,30 @@ void main() {
   Future<void> drainRescanWindow(WidgetTester tester) async =>
       tester.pump(const Duration(milliseconds: 1200));
 
-  Future<void> mountBinding(WidgetTester tester, {DwStudioLocale? locale}) async {
+  Future<void> mountBinding(
+    WidgetTester tester, {
+    DwStudioLocale? locale,
+  }) async {
     studio = _FakeStudio();
-    router = DwAppRouter<_RouterState>(
-      navigationZones: [_Routes.values],
-      pageBuilder: DwPageBuilder.material,
-      routerState: _RouterState(),
-    );
+    // Built the way an app builds it: in a provider, with its ref.
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    router = container
+        .listen(
+          Provider<DwAppRouter<_RouterState>>(
+            (ref) => DwAppRouter<_RouterState>(
+              ref: ref,
+              navigationZones: [_Routes.values],
+              pageBuilder: DwPageBuilder.material,
+            ),
+          ),
+          (_, _) {},
+        )
+        .read();
 
     await tester.pumpWidget(
-      ProviderScope(
+      UncontrolledProviderScope(
+        container: container,
         child: MaterialApp.router(
           routerConfig: router.router,
           builder: (context, child) => DwStudioBinding(

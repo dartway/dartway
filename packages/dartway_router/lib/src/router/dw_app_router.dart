@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:go_router/go_router.dart';
 
 import '../navigation_zones/dw_navigation_route.dart';
@@ -6,8 +8,26 @@ import '../navigation_zones/dw_navigation_route_extension.dart';
 import '../navigation_zones/dw_navigation_types.dart';
 import 'dw_go_router_options.dart';
 
-class DwAppRouter<RouterState extends Listenable> {
+/// The app's router: navigation zones over one [GoRouter], built inside a
+/// Riverpod provider.
+///
+/// ```dart
+/// final appRouterProvider = Provider<DwAppRouter<AppRouterState>>(
+///   (ref) => DwAppRouter<AppRouterState>(
+///     ref: ref,
+///     routerState: appRouterStateProvider,
+///     navigationZones: [AppNavigationZone.values, AuthNavigationZone.values],
+///     pageBuilder: DwPageBuilder.fade,
+///   ),
+/// );
+/// ```
+///
+/// The router follows [routerState] through `ref` and re-runs its guards
+/// whenever the value changes, and it disposes itself with the provider that
+/// built it — the app holds no `Listenable` and disposes nothing.
+class DwAppRouter<RouterState> {
   DwAppRouter({
+    required Ref ref,
     required this.navigationZones,
     required this.pageBuilder,
     this.routerState,
@@ -15,21 +35,25 @@ class DwAppRouter<RouterState extends Listenable> {
   }) {
     _validate();
     _buildRegistry();
+    _followRouterState(ref);
     router = _buildRouter();
+    ref.onDispose(_dispose);
   }
 
   // ------------------------------------------------------------
   // Public API
   // ------------------------------------------------------------
 
-  /// Optional router state for refresh notifications.
+  /// What the zone guards decide by: a provider of an immutable value — a
+  /// record or a class with value equality — derived from the providers it
+  /// depends on (the signed-in account, the profile's role).
   ///
-  /// When provided, the router will refresh when this [Listenable] notifies
-  /// its listeners. This is useful for authentication state changes or other
-  /// global state that affects navigation.
+  /// Each guard is handed its current value. Whenever the value changes the
+  /// router re-runs the guards on the location it shows, so signing in leaves
+  /// the sign-in screen and signing out returns to it with nothing else wired.
   ///
-  /// Required when using [zoneGuards] in your routes.
-  final RouterState? routerState;
+  /// Required when any route declares [DwNavigationRoute.zoneGuards].
+  final ProviderListenable<RouterState>? routerState;
 
   /// Navigation structure grouped by zones.
   ///
@@ -82,6 +106,27 @@ class DwAppRouter<RouterState extends Listenable> {
   ///
   /// Used for efficient route lookup by name from [GoRouterState].
   final Map<String, DwNavigationRoute<RouterState>> _routeRegistry = {};
+
+  /// The subscription to [routerState]; `null` when the router has none.
+  ProviderSubscription<RouterState>? _state;
+
+  /// What go_router listens to (`refreshListenable`), notified whenever
+  /// [routerState] changes. go_router asks for a [Listenable]; the router
+  /// keeps it to itself so the app does not have to hold one.
+  _RouterRefresh? _refresh;
+
+  void _followRouterState(Ref ref) {
+    final source = routerState;
+    if (source == null) return;
+
+    final refresh = _refresh = _RouterRefresh();
+    _state = ref.listen<RouterState>(source, (_, _) => refresh.notify());
+  }
+
+  void _dispose() {
+    router.dispose();
+    _refresh?.dispose();
+  }
 
   // ------------------------------------------------------------
   // Route resolving API
@@ -155,7 +200,7 @@ class DwAppRouter<RouterState extends Listenable> {
       navigatorKey: options.navigatorKey,
       initialLocation: options.initialLocation,
       initialExtra: options.initialExtra,
-      refreshListenable: routerState,
+      refreshListenable: _refresh,
       redirectLimit: options.redirectLimit,
       routerNeglect: options.routerNeglect,
       debugLogDiagnostics: options.debugLogDiagnostics,
@@ -170,17 +215,20 @@ class DwAppRouter<RouterState extends Listenable> {
         // First, check zone guards
         final targetRoute = topRouteFromState(state);
 
+        final subscription = _state;
         if (targetRoute != null &&
             targetRoute.zoneGuards.isNotEmpty &&
-            routerState != null) {
+            subscription != null) {
           final target = DwNavigationTarget(
             uri: state.uri,
             routeName: state.topRoute?.name,
             pathParameters: state.pathParameters,
           );
+          // Read once: every guard of this redirect decides by one value.
+          final current = subscription.read();
           // Execute guards in order until one returns a redirect path
           for (final guard in targetRoute.zoneGuards) {
-            final redirectPath = guard(routerState!, target);
+            final redirectPath = guard(current, target);
             if (redirectPath != null) {
               return redirectPath;
             }
@@ -316,7 +364,7 @@ class DwAppRouter<RouterState extends Listenable> {
   /// - Ensures no duplicate route names across zones
   /// - Ensures no duplicate route paths
   /// - Ensures all paths are valid (start with '/')
-  /// - Ensures routerState is provided when guards are used
+  /// - Ensures [routerState] is provided when guards are used
   ///
   /// Throws [ArgumentError] if any validation fails.
   void _validate() {
@@ -389,7 +437,8 @@ class DwAppRouter<RouterState extends Listenable> {
 
     if (hasGuards && routerState == null) {
       throw ArgumentError(
-        'refreshListenable is required when using zoneGuards',
+        'routerState is required when using zoneGuards: the guards decide by '
+        'its value, and the router re-runs them when it changes.',
       );
     }
   }
@@ -426,12 +475,18 @@ class DwAppRouter<RouterState extends Listenable> {
   }
 }
 
+/// The `refreshListenable` handed to go_router, notified when the router
+/// state changes. Internal: an app never holds a `Listenable` for the router.
+class _RouterRefresh extends ChangeNotifier {
+  void notify() => notifyListeners();
+}
+
 /// A route paired with the index of the zone that declares it.
 ///
 /// [DwAppRouter.navigationZones] is a list of lists; flattening it loses the one
 /// fact a duplicate-route message has to carry — which zones the colliding
 /// declarations came from.
-class _ZonedRoute<RouterState extends Listenable> {
+class _ZonedRoute<RouterState> {
   const _ZonedRoute(this.route, this.zoneIndex);
 
   final DwNavigationRoute<RouterState> route;

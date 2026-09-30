@@ -2,24 +2,25 @@
 
 import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // -----------------------------------------------------------------------------
 // Entry point & app
 // -----------------------------------------------------------------------------
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'DartWay Router Example',
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      routerConfig: appRouter.router,
+      routerConfig: ref.watch(appRouterProvider).router,
     );
   }
 }
@@ -28,16 +29,18 @@ class MyApp extends StatelessWidget {
 // Router (defined after route enums)
 // -----------------------------------------------------------------------------
 
-final appRouter = DwAppRouter<AppSession>(
-  routerState: AppSession(),
-  navigationZones: [
-    AppRoutes.values,
-    AuthRoutes.values,
-  ],
-  pageBuilder: DwPageBuilder.fade,
-  options: DwGoRouterOptions(
-    initialLocation: AuthRoutes.auth.fullPath,
-    debugLogDiagnostics: true,
+// The router follows appSessionProvider: signing in or out re-runs the
+// guards, which move the person between the zones — no page navigates itself.
+final appRouterProvider = Provider<DwAppRouter<AppSession>>(
+  (ref) => DwAppRouter<AppSession>(
+    ref: ref,
+    routerState: appSessionProvider,
+    navigationZones: [AppRoutes.values, AuthRoutes.values],
+    pageBuilder: DwPageBuilder.fade,
+    options: DwGoRouterOptions(
+      initialLocation: AuthRoutes.auth.fullPath,
+      debugLogDiagnostics: true,
+    ),
   ),
 );
 
@@ -64,21 +67,21 @@ enum AuthRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-        // Signed in: on to where the app zone turned them away from — one of
-        // the app's own paths, whatever else the link says.
-        (session, target) => session.isLoggedIn
-            ? _ownPath(target.uri.queryParameters['from']) ??
-                AppRoutes.catalog.fullPath
-            : null,
-      ];
+    // Signed in: on to where the app zone turned them away from — one of
+    // the app's own paths, whatever else the link says.
+    (session, target) => session.isLoggedIn
+        ? _ownPath(target.uri.queryParameters['from']) ??
+              AppRoutes.catalog.fullPath
+        : null,
+  ];
 }
 
 /// [location] when it is one of this app's own paths: a leading `/`, not `//`
 /// — anything outside the app can write the link.
 String? _ownPath(String? location) =>
     location != null && location.startsWith('/') && !location.startsWith('//')
-        ? location
-        : null;
+    ? location
+    : null;
 
 // -----------------------------------------------------------------------------
 // Routes: app zone (protected by guard)
@@ -109,7 +112,11 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder =>
-      (BuildContext context, GoRouterState state, StatefulNavigationShell navigationShell) {
+      (
+        BuildContext context,
+        GoRouterState state,
+        StatefulNavigationShell navigationShell,
+      ) {
         return DwPageBuilder.fade(
           context,
           state.pageKey,
@@ -138,64 +145,57 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 
   @override
   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-        // Signed out: to sign-in, remembering where they were going.
-        (session, target) => session.isLoggedIn
-            ? null
-            : Uri(
-                path: AuthRoutes.auth.fullPath,
-                queryParameters: {'from': target.location},
-              ).toString(),
-      ];
+    // Signed out: to sign-in, remembering where they were going.
+    (session, target) => session.isLoggedIn
+        ? null
+        : Uri(
+            path: AuthRoutes.auth.fullPath,
+            queryParameters: {'from': target.location},
+          ).toString(),
+  ];
 }
 
 // -----------------------------------------------------------------------------
 // Navigation parameters
 // -----------------------------------------------------------------------------
 
-enum AppParams<T> with DwNavigationParamsMixin<T> {
-  bookId<int>();
-}
+enum AppParams<T> with DwNavigationParamsMixin<T> { bookId<int>() }
 
 // -----------------------------------------------------------------------------
 // Router state (used by guards and pages)
 // -----------------------------------------------------------------------------
 
-class AppSession extends ChangeNotifier {
-  static final AppSession _instance = AppSession._();
-  factory AppSession() => _instance;
-  AppSession._();
+/// What the guards decide by: an immutable value, so the router re-runs them
+/// only when it actually changes.
+typedef AppSession = ({bool isLoggedIn});
 
-  bool _isLoggedIn = false;
-  bool get isLoggedIn => _isLoggedIn;
+final appSessionProvider = NotifierProvider<AppSessionController, AppSession>(
+  AppSessionController.new,
+);
 
-  void login() {
-    _isLoggedIn = true;
-    notifyListeners();
-  }
+class AppSessionController extends Notifier<AppSession> {
+  @override
+  AppSession build() => (isLoggedIn: false);
 
-  void logout() {
-    _isLoggedIn = false;
-    notifyListeners();
-  }
+  void login() => state = (isLoggedIn: true);
+
+  void logout() => state = (isLoggedIn: false);
 }
 
 // -----------------------------------------------------------------------------
 // Pages
 // -----------------------------------------------------------------------------
 
-class AuthPage extends StatelessWidget {
+class AuthPage extends ConsumerWidget {
   const AuthPage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('Login')),
       body: Center(
         child: ElevatedButton(
-          onPressed: () {
-            AppSession().login();
-            context.goNamed(AppRoutes.catalog.name);
-          },
+          onPressed: () => ref.read(appSessionProvider.notifier).login(),
           child: const Text('Authorize'),
         ),
       ),
@@ -239,19 +239,16 @@ class BookDetailPage extends StatelessWidget {
   }
 }
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
       body: Center(
         child: ElevatedButton(
-          onPressed: () {
-            AppSession().logout();
-            context.goNamed(AuthRoutes.auth.name);
-          },
+          onPressed: () => ref.read(appSessionProvider.notifier).logout(),
           child: const Text('Logout'),
         ),
       ),

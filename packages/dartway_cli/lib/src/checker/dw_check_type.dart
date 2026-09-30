@@ -322,6 +322,17 @@ enum DwCheckType {
   /// one shown in words the app's refusal texts do not own.
   forbiddenCommandCall,
 
+  /// `<x>.router.dispose` — the app disposing the `GoRouter` of its
+  /// `DwAppRouter`, called or torn off (`ref.onDispose(router.router.dispose)`),
+  /// anywhere in the app's `lib/` but generated code (dartway/dartway#407).
+  /// The router disposes itself with the provider that built it.
+  ///
+  /// An error: the line is what every project wrote before the router owned
+  /// its lifetime, and left in place it disposes the router a second time,
+  /// which fails in debug when the provider goes. Read from text, so a
+  /// `GoRouter` field named `router` on any object is taken for one too.
+  routerDisposedByApp,
+
   /// The `AsyncValue` of `ref.watch(dw.request|pages|table|window(…))` taken
   /// apart by hand outside `logic/` and the widget-free files of `core/` — a
   /// member of it (`.value`, `.when(`, `.hasError`, …), a `switch` or `case`

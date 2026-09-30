@@ -2,6 +2,12 @@
 
 ## 0.24.0
 
+- **`dartway check` fails an app that disposes its router** (dartway/dartway#407, D-120):
+  `routerDisposedByApp`, an error, in the state inspector — `<x>.router.dispose`, called or torn off
+  (`ref.onDispose(router.router.dispose)`), anywhere in the Flutter package's `lib/` but generated
+  code. `DwAppRouter` disposes itself with its provider now, and the line every project wrote before
+  would dispose it a second time. The law table gains the row "The router owns its lifetime".
+
 - **BREAKING: `dartway check` holds how server features import and write one another**
   (dartway/dartway#382, D-118). Four new errors, in their own inspector (`dw_feature_imports.dart`):
   `coreImportsFeature` — a file of `core/` importing a feature or the package's library;

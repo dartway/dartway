@@ -92,6 +92,8 @@ one line above it, with the reason:
 
 The skeleton's `lib/core/router/app_router_state.dart` needs exactly this line. Every run lists the
 marked classes after the tally.
+Not for long: with `dartway_router` 3.0.0 the router follows a provider and `AppRouterState` becomes a
+record, marker and all — [router-state-provider](2026-09-30-router-state-provider.md).
 
 **Commands are sent from `logic/` and run inside `dw.action`.** App-wide wiring that no button
 starts — registering a push token, a bootstrap step — stays in `lib/core/` (for example

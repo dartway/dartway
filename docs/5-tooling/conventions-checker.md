@@ -133,7 +133,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-one errors, twelve warnings, one info — `DwCheckType` and its `severity` in
+Forty-two errors, twelve warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -167,6 +167,7 @@ Forty-one errors, twelve warnings, one info — `DwCheckType` and its `severity`
 | `fieldPatchMatched` | error | `DwSetField`, `DwClearField` or `DwKeepField` named in the code of the server, shared or Flutter package (`lib/`, `bin/`, `test/`; generated files exempt) — read a patch through its helpers ([Clearing a field](../2-core/data-objects-and-generation.md#clearing-a-field-dwfieldpatch)) |
 | `forbiddenStateHolder` | error | A `StatefulWidget` (its `State`, `setState`, a `StatefulBuilder`), a `ChangeNotifier` or a `ValueNotifier` held as state, anywhere in the app's `lib/` but generated code — local state is hooks, shared state a `Notifier`. A class marked `// dw:allow-stateful <reason>` is passed over and listed |
 | `forbiddenCommandCall` | error | `dw.command` outside a feature's `logic/` and `core/`, or inside a `try` that catches; a widget running `<Feature>Commands` outside `dw.action`, or reading a result (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) outside `logic/` and `core/` |
+| `routerDisposedByApp` | error | `<x>.router.dispose`, called or torn off (`ref.onDispose(router.router.dispose)`), anywhere in the app's `lib/` but generated code — `DwAppRouter` disposes itself with the provider that built it, and a second dispose fails in debug. Read from text: a `GoRouter` field named `router` on any object counts too |
 | `forbiddenRequestRead` | error | The `AsyncValue` of `ref.watch/read(dw.request/pages/table/window(…))` taken apart outside `logic/` and widget-free files of `core/` — a member (`.value`, `.when(`, `.hasError`, …), a `switch` or `case` over it, a `.select` of the read, the values of a `ref.listen` over it. A screen shows a read through `DwReadBuilder`, `DwPagedListView` or `DwWindowListView`; its chrome through a `logic/` provider answering a plain value |
 | `forbiddenProgressIndicator` | error | `CircularProgressIndicator`, `LinearProgressIndicator`, `RefreshProgressIndicator` or `CupertinoActivityIndicator` outside `ui_kit/` |
 | `forbiddenNavigationCall` | error | `showDialog`, `showModalBottomSheet`, `showCupertino…` and their siblings, `Navigator.push…` or a page route (`MaterialPageRoute`, …) outside `ui_kit/` and `core/router/`; `Navigator.pop`, `GoRouter.of(…).pop` or `context.pop` anywhere |
@@ -374,13 +375,14 @@ is a `useEffect` keyed on the prop. State two widgets share, or a flow with logi
 `Notifier` named `<Thing>Controller` in the feature's `logic/`. `forbiddenStateHolder` reads every
 file of `lib/`, `core/` and `ui_kit/` included — a kit field is where a `StatefulWidget` hides best.
 
-**The way out is written on the class and counted.** An API that needs a `State` subclass or a
-`Listenable` of its own (the router's refresh listenable is the skeleton's one case) takes one
-comment on the line above the class, doc comments and annotations allowed between:
+**The way out is written on the class and counted.** A third-party API that needs a `State`
+subclass or a `Listenable` of its own (a map SDK that calls into a `State`) takes one comment on the
+line above the class, doc comments and annotations allowed between. The skeleton and the example
+have none — the router follows a provider, not a `Listenable`:
 
 ```dart
-// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable
-class AppRouterState extends ChangeNotifier { … }
+// dw:allow-stateful the map SDK calls into a State subclass
+class VenueMapView extends StatefulWidget { … }
 ```
 
 The class — and, for a widget, its `State` — is passed over, and every run prints it under

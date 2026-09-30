@@ -60,7 +60,7 @@ class DwStudioBinding extends ConsumerStatefulWidget {
 
   /// The app's router — the source of the current route and the target of
   /// Studio's navigation requests.
-  final DwAppRouter<Listenable> router;
+  final DwAppRouter<Object?> router;
 
   /// Who is signed in, in the terms Studio needs: the project's own provider
   /// over its profile, mapped to [DwStudioUser] — `null` when nobody is

@@ -33,7 +33,7 @@ import 'dw_navigation_route.dart';
 ///   );
 /// }
 /// ```
-abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
+abstract class DwNavigationRouteDescriptor<RouterState> {
   /// Internal constructor for route descriptors.
   ///
   /// Use the factory constructors instead:
@@ -250,7 +250,7 @@ abstract class DwNavigationRouteDescriptor<RouterState extends Listenable> {
 ///
 /// Zone root routes always contribute an empty path segment, making them
 /// accessible at the zone's root path.
-class _ZoneRootRouteDescriptor<RouterState extends Listenable>
+class _ZoneRootRouteDescriptor<RouterState>
     extends DwNavigationRouteDescriptor<RouterState> {
   const _ZoneRootRouteDescriptor({
     required super.pageWidget,
@@ -278,7 +278,7 @@ class _ZoneRootRouteDescriptor<RouterState extends Listenable>
 /// name here, since [routeName] here *is* the name [extraPathSegment] exists
 /// to replace (`editProfile` + `extraPathSegment: 'edit'` must build `edit`,
 /// not `edit/editProfile`).
-class _SimpleRouteDescriptor<RouterState extends Listenable>
+class _SimpleRouteDescriptor<RouterState>
     extends DwNavigationRouteDescriptor<RouterState> {
   const _SimpleRouteDescriptor({
     required super.pageWidget,
@@ -298,7 +298,7 @@ class _SimpleRouteDescriptor<RouterState extends Listenable>
 ///
 /// Parameterized routes contribute a parameter pattern (e.g., ':userId')
 /// as their path segment, optionally prefixed with an extraPathSegment.
-class _ParameterizedRouteDescriptor<RouterState extends Listenable>
+class _ParameterizedRouteDescriptor<RouterState>
     extends DwNavigationRouteDescriptor<RouterState> {
   const _ParameterizedRouteDescriptor({
     required super.pageWidget,

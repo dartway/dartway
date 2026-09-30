@@ -5,7 +5,8 @@ description: >-
   implementing DwNavigationRoute<AppRouterState>; descriptors
   DwNavigationRouteDescriptor.zoneRoot/.simple/.parameterized; zone guards in
   zoneGuards; type-safe parameters via an enum with DwNavigationParamsMixin
-  (set/fromPath/fromQuery); the router is assembled with DwAppRouter<T>(routerState:,
+  (set/fromPath/fromQuery); AppRouterState is a record held by a provider; the router is
+  assembled in a provider with DwAppRouter<T>(ref:, routerState: <provider>,
   navigationZones:, pageBuilder:, options:). A screen is a route — no Navigator.push or
   MaterialPageRoute; dialogs and sheets through the kit; back from a page is
   goNamed(parent) or the AppBar's leading button, Navigator.of(context).pop only
@@ -45,7 +46,7 @@ Navigation rules for DartWay projects. The router is a wrapper over go_router: `
 ```
 lib/core/router/
   router.dart                       // providers + part directives
-  app_router_state.dart             // ChangeNotifier: what the guards react to
+  app_router_state.dart             // record + provider: what the guards decide by
   navigation_zones/
     app_navigation_zone.dart        // part of '../router.dart'
     admin_navigation_zone.dart
@@ -131,42 +132,29 @@ costs a screen, not a leak.
 
 ## Router state
 
-`AppRouterState` is a `ChangeNotifier` the guards watch: it listens to providers and calls `notifyListeners()`, which makes the guards re-run. There is no other link between authorization and navigation. `DwAppRouter` needs a `Listenable`, so it is the skeleton's one `// dw:allow-stateful` class — keep the marker, and do not grow a second (`dartway-feature-scaffold`).
+`AppRouterState` is an immutable record, and `appRouterStateProvider` derives it from the providers the guards depend on. The router follows that provider: whenever the record changes it re-runs the guards on the location shown, so signing in leaves the sign-in screen and signing out returns to it — nothing navigates by hand, and there is no other link between authorization and navigation. An equal record re-runs nothing, so put in it only what the guards read. No `ChangeNotifier`, no `Listenable`: the router keeps go_router's refresh to itself.
 
-The skeleton's listens to two things: `dw.accountId` — known from the stored session at start, before the server has answered, so a signed-in user opens straight into the app — and the role on the signed-in profile (`myProfileProvider` in `core/profile/`), which is a live request, so a role an admin changes re-runs the guards without a reload.
+The skeleton's derives from two things: `dw.accountId` — known from the stored session at start, before the server has answered, so a signed-in user opens straight into the app — and the role on the signed-in profile (`myProfileProvider` in `core/profile/`), which is a live request, so a role an admin changes re-runs the guards without a reload.
 
 ```dart
-// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable (go_router's refreshListenable), and this is the one it listens to
-class AppRouterState extends ChangeNotifier {
-  AppRouterState(Ref ref) {
-    ref.listen<int?>(dw.accountId, (_, accountId) {
-      isSignedIn = accountId != null;
-      notifyListeners();
-    }, fireImmediately: true);
-    ref.listen<UserRole?>(
-      myProfileProvider.select((profile) => profile.value?.role),
-      (_, next) {
-        role = next;
-        notifyListeners();
-      },
-      fireImmediately: true,
-    );
-  }
+typedef AppRouterState = ({bool isSignedIn, UserRole? role});
 
-  bool isSignedIn = false;
-
-  /// `null` while signed out and while the profile has not loaded yet.
-  UserRole? role;
-}
+final appRouterStateProvider = Provider<AppRouterState>(
+  (ref) => (
+    isSignedIn: ref.watch(dw.accountId) != null,
+    // `null` while signed out and while the profile has not loaded yet.
+    role: ref.watch(myProfileProvider.select((profile) => profile.value?.role)),
+  ),
+);
 ```
 
 ## Assembling the router
 
 ```dart
-final appRouterProvider = Provider<DwAppRouter<AppRouterState>>((ref) {
-  final routerState = ref.watch(appRouterStateProvider);
-  return DwAppRouter<AppRouterState>(
-    routerState: routerState,
+final appRouterProvider = Provider<DwAppRouter<AppRouterState>>(
+  (ref) => DwAppRouter<AppRouterState>(
+    ref: ref, // follows routerState through it, and disposes itself with this provider — never dispose it yourself (`routerDisposedByApp`)
+    routerState: appRouterStateProvider, // the provider, not ref.watch of it
     navigationZones: [
       AppNavigationZone.values,
       AdminNavigationZone.values,
@@ -177,11 +165,11 @@ final appRouterProvider = Provider<DwAppRouter<AppRouterState>>((ref) {
       initialLocation: AppNavigationZone.home.fullPath,
       debugLogDiagnostics: false,
     ),
-  );
-});
+  ),
+);
 ```
 
-In the app: `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)`.
+In the app: `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)`. The watch is what keeps the guards following: Riverpod pauses a provider nobody listens to, and its subscriptions with it. Watch nothing inside `appRouterProvider` — a rebuild is a new router and a lost navigation stack.
 
 ## Route names are global
 

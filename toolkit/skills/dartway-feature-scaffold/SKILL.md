@@ -175,13 +175,14 @@ A callback registered once that must see the widget's latest props reads them th
 `final latest = useRef(this)..value = this;`. A shared controller the provider owns lives exactly as
 long as someone watches it (`NotifierProvider.autoDispose`, `.family` keyed by what it is about).
 
-**The one way out** is an API that needs a `State` subclass or a `Listenable` of its own — the
-skeleton's router refresh listenable is the case. It takes one line on the class, with the reason,
-and `dart run dartway_cli:dartway check` lists it on every run:
+**The one way out** is a third-party API that needs a `State` subclass or a `Listenable` of its own —
+a map or a platform view SDK that calls into a `State`. The skeleton has none: even the router
+follows a provider (`dartway-navigation`). It takes one line on the class, with the reason, and
+`dart run dartway_cli:dartway check` lists it on every run:
 
 ```dart
-// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable
-class AppRouterState extends ChangeNotifier { … }
+// dw:allow-stateful the map SDK calls into a State subclass
+class VenueMapView extends StatefulWidget { … }
 ```
 
 State used by two features is a feature whose public surface is a provider: the provider in the root

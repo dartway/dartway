@@ -231,7 +231,7 @@ ref.watch(dw.accountId); // int?, null when signed out
 
 `dw.accountId` is known from the stored session right after start, before the server has answered —
 the example's router and profile gate decide by it
-(`example/dartway_example_flutter/lib/core/router/app_router_state.dart`). The server corrects it: a
+(`appRouterStateProvider` in `example/dartway_example_flutter/lib/core/router/app_router_state.dart`). The server corrects it: a
 rejected token makes it `null`.
 
 **Every watched request belongs to an account.** State is kept per signed-in account, and a request
@@ -395,7 +395,7 @@ is held one way:
 `StatefulWidget`, `setState` and a `ChangeNotifier`/`ValueNotifier` held as state fail
 `dart run dartway_cli:dartway check` anywhere in `lib/` (`forbiddenStateHolder`). An API that needs a
 `State` or a `Listenable` of its own takes `// dw:allow-stateful <reason>` on the class, and every run
-lists it — the skeleton's router state is the one case
+lists it; the skeleton and the example have none, the router included
 ([the checker](../5-tooling/conventions-checker.md)).
 
 ## Where a rule lives

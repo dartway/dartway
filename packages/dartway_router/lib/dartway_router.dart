@@ -4,7 +4,7 @@
 /// ## Features
 ///
 /// - **Type-Safe Navigation**: Enum-based routes with compile-time checking
-/// - **State Management Agnostic**: Works with any [Listenable] (ChangeNotifier, ValueNotifier, etc.)
+/// - **Guards follow a provider**: the router re-runs its guards whenever a Riverpod provider's value changes
 /// - **Navigation Zones**: Group routes into logical zones (authenticated, public, etc.)
 /// - **Route Guards**: Protect routes with authentication/authorization guards
 /// - **Type-Safe Parameters**: Extract and use navigation parameters with full type safety
@@ -15,10 +15,12 @@
 /// ## Quick Start
 ///
 /// ```dart
-/// // 1. Define your router state (any Listenable)
-/// class AppSession extends ChangeNotifier {
-///   bool isAuthenticated = false;
-/// }
+/// // 1. What the guards decide by: an immutable value from a provider
+/// typedef AppSession = ({bool isAuthenticated});
+///
+/// final appSessionProvider = Provider<AppSession>(
+///   (ref) => (isAuthenticated: ref.watch(accountIdProvider) != null),
+/// );
 ///
 /// // 2. Define your routes
 /// enum AppRoutes implements DwNavigationRoute<AppSession> {
@@ -37,18 +39,26 @@
 ///   DwShellRoutePageBuilder? get shellRouteBuilder => null;
 ///
 ///   @override
-///   List<DwNavigationGuard<AppSession>> get zoneGuards => [];
+///   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+///
+///   @override
+///   List<DwNavigationGuard<AppSession>> get zoneGuards => [
+///     (session, _) => session.isAuthenticated ? null : '/login',
+///   ];
 /// }
 ///
-/// // 3. Create the router
-/// final router = DwAppRouter<AppSession>(
-///   routerState: AppSession.instance,
-///   navigationZones: [AppRoutes.values],
-///   pageBuilder: DwPageBuilder.material,
+/// // 3. Create the router in a provider
+/// final appRouterProvider = Provider<DwAppRouter<AppSession>>(
+///   (ref) => DwAppRouter<AppSession>(
+///     ref: ref,
+///     routerState: appSessionProvider,
+///     navigationZones: [AppRoutes.values, AuthRoutes.values],
+///     pageBuilder: DwPageBuilder.material,
+///   ),
 /// );
 ///
 /// // 4. Use in your app
-/// MaterialApp.router(routerConfig: router.router)
+/// MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)
 /// ```
 ///
 /// See the [README](https://github.com/dartway/dartway_router) for detailed documentation.
