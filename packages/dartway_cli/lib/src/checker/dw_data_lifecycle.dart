@@ -5,6 +5,7 @@ import 'package:yaml/yaml.dart';
 
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
+import 'dw_dart_source.dart';
 
 /// How a project's data comes to be and changes: seeds, migrations, settings
 /// and patches, each with the one pattern the framework has for it
@@ -277,7 +278,7 @@ class DwDataLifecycleInspector {
   /// split across lines is found; a literal held in a variable is judged
   /// where it is written, not where it is used.
   static List<(int, String)> dataChangesIn(String content) {
-    final source = DwDartSource(content);
+    final source = DwDartSource(content, interpolationsAsCode: true);
     final found = <(int, String)>[];
     for (final group in source.stringGroups()) {
       final statements = _statements(group.text);
@@ -340,7 +341,7 @@ class DwDataLifecycleInspector {
   /// server's database or accounts. Awaiting `stop()`/`close()` or a
   /// `ProcessSignal` is shutdown, not work, and passes.
   static List<(int, String)> workAfterStartIn(String content) {
-    final source = DwDartSource(content);
+    final source = DwDartSource(content, interpolationsAsCode: true);
     final code = source.code;
     final startEnd = _serverStartEnd(code);
     if (startEnd == null) return const [];
@@ -383,7 +384,7 @@ class DwDataLifecycleInspector {
   /// Row classes in [content] that are a key/value store — a unique
   /// `String key` beside a `String value` — as `(line, table)`.
   static List<(int, String)> keyValueTablesIn(String content) {
-    final source = DwDartSource(content);
+    final source = DwDartSource(content, interpolationsAsCode: true);
     // Table names are strings, which the blanked code no longer holds: the
     // annotations are found in the source, and judged in the code.
     final code = source.code;
@@ -416,7 +417,7 @@ class DwDataLifecycleInspector {
   /// `DwSetField`, `DwClearField` and `DwKeepField` in [content]'s code, as
   /// `(line, name)`.
   static List<(int, String)> patchMatchesIn(String content) {
-    final source = DwDartSource(content);
+    final source = DwDartSource(content, interpolationsAsCode: true);
     return [
       for (final match in _patchVariant.allMatches(source.code))
         (source.lineOf(match.start), match.group(1)!),
@@ -428,48 +429,67 @@ class DwDataLifecycleInspector {
 final class DwStringGroup {
   const DwStringGroup(this.start, this.text);
 
-  /// Offset of the first literal's opening quote.
+  /// Offset where the first literal starts: its `r` when raw, else its quote.
   final int start;
 
   /// The literals' contents, joined.
   final String text;
 }
 
-/// A Dart source with its comments removed and string contents blanked
-/// ([code], same length and offsets as the source), and the string literals
-/// it holds.
-final class DwDartSource {
-  DwDartSource(this.content) {
-    _scan();
-  }
-
-  final String content;
-  late final String code;
-  final _literals = <(int, int, String)>[];
-
-  int lineOf(int offset) =>
-      '\n'.allMatches(content.substring(0, offset)).length + 1;
-
-  /// Runs of literals separated by nothing but whitespace.
+/// How the data checks read a source's strings: as the SQL they hold.
+extension on DwDartSource {
+  /// Runs of literals separated by nothing but whitespace, each read as the
+  /// one string it is.
   List<DwStringGroup> stringGroups() {
     final groups = <DwStringGroup>[];
     int? start;
     var end = 0;
     final text = StringBuffer();
-    for (final (from, to, value) in _literals) {
-      if (start != null && code.substring(end, from).trim().isEmpty) {
+    for (final literal in literals) {
+      final value = _valueOf(literal);
+      if (start != null && code.substring(end, literal.start).trim().isEmpty) {
         text.write(value);
       } else {
         if (start != null) groups.add(DwStringGroup(start, text.toString()));
-        start = from;
+        start = literal.start;
         text
           ..clear()
           ..write(value);
       }
-      end = to;
+      end = literal.end;
     }
     if (start != null) groups.add(DwStringGroup(start, text.toString()));
     return groups;
+  }
+
+  /// The text [literal] holds: an escaped line break is one, and an
+  /// interpolation — `${table}` or `$table` — is read as a name, so
+  /// `UPDATE ${table} SET` is still a statement.
+  String _valueOf(DwStringLiteral literal) {
+    final value = StringBuffer();
+    final interpolations = literal.interpolations.iterator;
+    var next = interpolations.moveNext() ? interpolations.current : null;
+    var i = literal.contentStart;
+    while (i < literal.contentEnd) {
+      if (next != null && next.$1 == i) {
+        value.write('interpolated_name');
+        i = next.$2;
+        next = interpolations.moveNext() ? interpolations.current : null;
+        continue;
+      }
+      if (!literal.raw && content[i] == r'\' && i + 1 < literal.contentEnd) {
+        value.write(switch (content[i + 1]) {
+          'n' => '\n',
+          't' => '\t',
+          final other => other,
+        });
+        i += 2;
+        continue;
+      }
+      value.write(content[i]);
+      i++;
+    }
+    return value.toString();
   }
 
   /// The name of the call whose argument list holds [offset] — `backfill`
@@ -491,99 +511,5 @@ final class DwDartSource {
       }
     }
     return null;
-  }
-
-  void _scan() {
-    final out = StringBuffer();
-    var i = 0;
-    void blank(int from, int to) {
-      for (var k = from; k < to; k++) {
-        out.write(content[k] == '\n' ? '\n' : ' ');
-      }
-    }
-
-    while (i < content.length) {
-      if (content.startsWith('//', i)) {
-        final end = content.indexOf('\n', i);
-        final stop = end < 0 ? content.length : end;
-        blank(i, stop);
-        i = stop;
-        continue;
-      }
-      if (content.startsWith('/*', i)) {
-        final close = content.indexOf('*/', i + 2);
-        final end = close < 0 ? content.length : close + 2;
-        blank(i, end);
-        i = end;
-        continue;
-      }
-      final char = content[i];
-      if (char == "'" || char == '"') {
-        final raw = i > 0 && content[i - 1] == 'r';
-        final delimiter = content.startsWith(char * 3, i) ? char * 3 : char;
-        var j = i + delimiter.length;
-        final value = StringBuffer();
-        final inner = StringBuffer();
-        while (j < content.length && !content.startsWith(delimiter, j)) {
-          // An interpolation is code: kept in [code], left out of the text.
-          if (!raw && content.startsWith(r'${', j)) {
-            var depth = 0;
-            var k = j + 1;
-            for (; k < content.length; k++) {
-              if (content[k] == '{') depth++;
-              if (content[k] == '}' && --depth == 0) break;
-            }
-            final end = k + 1 > content.length ? content.length : k + 1;
-            inner.write(content.substring(j, end));
-            // Read as a name, so `UPDATE ${table} SET` is still a statement.
-            value.write('interpolated_name');
-            j = end;
-            continue;
-          }
-          // `$table` is code too, read as a name like `${table}`.
-          if (!raw &&
-              content[j] == r'$' &&
-              j + 1 < content.length &&
-              RegExp(r'[A-Za-z_]').hasMatch(content[j + 1])) {
-            var k = j + 1;
-            while (k < content.length && RegExp(r'\w').hasMatch(content[k])) {
-              k++;
-            }
-            inner.write(content.substring(j, k));
-            value.write('interpolated_name');
-            j = k;
-            continue;
-          }
-          final step = !raw && content[j] == r'\' ? 2 : 1;
-          final end = j + step > content.length ? content.length : j + step;
-          // The text the literal holds: an escaped line break is one.
-          value.write(
-            step == 2 && end == j + 2
-                ? switch (content[j + 1]) {
-                    'n' => '\n',
-                    't' => '\t',
-                    final other => other,
-                  }
-                : content.substring(j, end),
-          );
-          for (var k = j; k < end; k++) {
-            inner.write(content[k] == '\n' ? '\n' : ' ');
-          }
-          j = end;
-        }
-        final end = j + delimiter.length > content.length
-            ? content.length
-            : j + delimiter.length;
-        out.write(delimiter);
-        out.write(inner);
-        if (end - j == delimiter.length) out.write(delimiter);
-        _literals.add((i, end, value.toString()));
-        i = end;
-        continue;
-      }
-      out.write(char);
-      i++;
-    }
-    code = out.toString();
   }
 }

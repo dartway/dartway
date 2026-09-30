@@ -35,6 +35,16 @@
   not connect, a script stopped by `set -e`): the command's own exit code and stderr are reported.
   The output is read while the input is written, so a command that echoes a large input no longer
   deadlocks (dartway/dartway#400).
+- `dartway check` reads Dart source through one scanner (dartway/dartway#403): every detector that
+  blanks comments and strings — the route names, the declaration outline, the clock, the
+  environment and HTTP client, inline ownership, the Flutter state and UI rules, the data
+  lifecycle, the feature imports, the uniformity rules, unused feature files and the UI kit's text
+  constants — uses `dw_dart_source.dart` instead of its own copy, and its edge cases (raw and
+  triple-quoted strings, nested interpolation with quotes and braces, `$name`, nested block
+  comments, `//` inside a string) are one fixture suite. No finding changes over the skeleton, the
+  example and the three projects on the framework; where the copies disagreed on source no project
+  holds, the unified reading is the correct one (a comment or a quote inside `${…}`, nested block
+  comments, `//` in a string before a name).
 
 ## 0.23.0
 

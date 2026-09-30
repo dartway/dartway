@@ -8,136 +8,7 @@
 /// its opening parenthesis share a line.
 library;
 
-/// [source] with every comment and string literal replaced by spaces,
-/// newlines kept — so offsets and line numbers still point into the original,
-/// and a name inside a comment or a string is not taken for code.
-String dwBlankNonCode(String source) {
-  final out = StringBuffer();
-  var i = 0;
-  final n = source.length;
-
-  void blank(int from, int to) {
-    for (var k = from; k < to; k++) {
-      out.write(source[k] == '\n' ? '\n' : ' ');
-    }
-  }
-
-  while (i < n) {
-    final c = source[i];
-    if (c == '/' && i + 1 < n && source[i + 1] == '/') {
-      final start = i;
-      while (i < n && source[i] != '\n') {
-        i++;
-      }
-      blank(start, i);
-      continue;
-    }
-    if (c == '/' && i + 1 < n && source[i + 1] == '*') {
-      final end = dwSkipBlockComment(source, i);
-      blank(i, end);
-      i = end;
-      continue;
-    }
-    if (c == "'" || c == '"') {
-      final raw = i > 0 && source[i - 1] == 'r';
-      final end = _skipString(source, i, raw: raw);
-      blank(i, end);
-      i = end;
-      continue;
-    }
-    out.write(c);
-    i++;
-  }
-  return out.toString();
-}
-
-/// Past the string literal starting at [start] (its opening quote, after any
-/// `r`). Interpolations are skipped as code, so a quote inside `${…}` does not
-/// end the string.
-int _skipString(String source, int start, {required bool raw}) {
-  final n = source.length;
-  final quote = source[start];
-  final triple =
-      start + 2 < n && source[start + 1] == quote && source[start + 2] == quote;
-  var k = start + (triple ? 3 : 1);
-  while (k < n) {
-    final c = source[k];
-    if (!raw && c == r'\') {
-      k += 2;
-      continue;
-    }
-    if (!raw && c == r'$' && k + 1 < n && source[k + 1] == '{') {
-      k = _skipInterpolation(source, k + 2);
-      continue;
-    }
-    if (triple) {
-      if (c == quote &&
-          k + 2 < n &&
-          source[k + 1] == quote &&
-          source[k + 2] == quote) {
-        return k + 3;
-      }
-    } else if (c == quote) {
-      return k + 1;
-    } else if (c == '\n') {
-      return k; // an unterminated literal ends with its line
-    }
-    k++;
-  }
-  return n;
-}
-
-/// Past the `}` that closes the interpolation whose code starts at [start].
-int _skipInterpolation(String source, int start) {
-  final n = source.length;
-  var depth = 0;
-  var k = start;
-  while (k < n) {
-    final c = source[k];
-    if (c == '/' && k + 1 < n && source[k + 1] == '/') {
-      while (k < n && source[k] != '\n') {
-        k++;
-      }
-      continue;
-    }
-    if (c == '/' && k + 1 < n && source[k + 1] == '*') {
-      k = dwSkipBlockComment(source, k);
-      continue;
-    }
-    if (c == "'" || c == '"') {
-      k = _skipString(source, k, raw: k > 0 && source[k - 1] == 'r');
-      continue;
-    }
-    if (c == '{') depth++;
-    if (c == '}') {
-      if (depth == 0) return k + 1;
-      depth--;
-    }
-    k++;
-  }
-  return n;
-}
-
-/// Past the end of the (possibly nested) block comment starting at [start].
-int dwSkipBlockComment(String text, int start) {
-  var depth = 0;
-  var k = start;
-  while (k < text.length) {
-    if (text.startsWith('/*', k)) {
-      depth++;
-      k += 2;
-      continue;
-    }
-    if (text.startsWith('*/', k)) {
-      depth--;
-      k += 2;
-      if (depth == 0) return k;
-      continue;
-    }
-    k++;
-  }
-  return text.length;
-}
+import 'dw_dart_source.dart';
 
 /// A named function, method or getter declared at the top level or directly
 /// in the body of a class, mixin, enum or extension.
@@ -184,7 +55,7 @@ final class DwDeclaredFunction {
 
 /// What a blanked Dart file declares, and where its brackets close.
 final class DwDartOutline {
-  DwDartOutline(String source) : code = dwBlankNonCode(source) {
+  DwDartOutline(String source) : code = DwDartSource(source).code {
     _matchBrackets();
     _collectDeclarations();
   }

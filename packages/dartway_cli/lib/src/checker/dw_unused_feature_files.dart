@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'dw_dart_source.dart';
 import 'dw_feature_tree.dart';
 
 /// A file inside a feature that nothing in that feature refers to.
@@ -61,8 +62,11 @@ List<DwUnusedFeatureFile> findUnusedFeatureFiles(DwFeatureNode feature) {
   final sources = {
     for (final file in files) file.path: file.readAsStringSync(),
   };
+  // Comments and string literals are not references: a name inside them proves
+  // nothing, and a doc comment naming the class it documents would keep every
+  // dead file alive.
   final contents = {
-    for (final file in files) file.path: _strip(sources[file.path]!),
+    for (final file in files) file.path: DwDartSource(sources[file.path]!).code,
   };
   final declarations = {
     for (final file in internalFiles)
@@ -205,20 +209,6 @@ final _partDirective = RegExp(
 final _conditionalClause = RegExp(r'\bif\s*\(\s*dart\.library\.');
 
 final _quotedUri = RegExp(r'''["']([^"'\n]+)["']''');
-
-/// Comments and string literals are not references: a name inside them proves
-/// nothing, and a doc comment naming the class it documents would keep every
-/// dead file alive.
-String _strip(String source) {
-  var text = source;
-  text = text.replaceAll(RegExp(r'//.*'), ' ');
-  text = text.replaceAll(RegExp(r'/\*.*?\*/', dotAll: true), ' ');
-  text = text.replaceAll(RegExp(r"'''.*?'''", dotAll: true), ' ');
-  text = text.replaceAll(RegExp(r'""".*?"""', dotAll: true), ' ');
-  text = text.replaceAll(RegExp(r"'(?:[^'\\\n]|\\.)*'"), ' ');
-  text = text.replaceAll(RegExp(r'"(?:[^"\\\n]|\\.)*"'), ' ');
-  return text;
-}
 
 final _typeDeclaration = RegExp(
   r'\b(?:class|mixin|enum|extension type|extension|typedef)\s+(\w+)',

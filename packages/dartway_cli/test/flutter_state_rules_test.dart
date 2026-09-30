@@ -503,21 +503,4 @@ class MapCamera extends ChangeNotifier {}
       expect(command.severity, DwCheckSeverity.error);
     });
   });
-
-  test(
-    'comments and strings are blanked in place, interpolations with them',
-    () {
-      const source = r'''
-final a = 'x ${b('y')} z'; // c
-/* d
-e */ final f = """g""";
-''';
-      final blank = DwFlutterStateInspector.blankCommentsAndStrings(source);
-      expect(blank.length, source.length);
-      expect(blank.split('\n').length, source.split('\n').length);
-      expect(blank, isNot(contains('y')));
-      expect(blank, isNot(contains('//')));
-      expect(blank, contains('final f = """'));
-    },
-  );
 }

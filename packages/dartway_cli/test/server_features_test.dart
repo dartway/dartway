@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:dartway_cli/src/checker/dw_dart_outline.dart';
 import 'package:dartway_cli/src/checker/dw_server_features.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -734,28 +733,6 @@ final h = <DwCallHandler>[DwCallHandler.command<A, B>()];
       lines.join('\n'),
       contains('mapping not checked: no shared package found'),
     );
-  });
-
-  group('the blanker', () {
-    test('raw and triple-quoted strings are blanked, newlines kept', () {
-      const source = "a(r'\\'); b('''x\n'y' \"z\"\n'''); c();";
-      final code = dwBlankNonCode(source);
-      expect(code.length, source.length);
-      expect(code, isNot(contains('x')));
-      expect(code, contains('c()'));
-      expect('\n'.allMatches(code).length, 2);
-    });
-
-    test('a nested interpolation with a brace and quotes does not end the '
-        'string early', () {
-      const source =
-          r'''final s = 'a ${m({'k': "}"}['k'])} DwServerFeature(';'''
-          '\nfinal t = DwServerFeature(\'x\');';
-      final code = dwBlankNonCode(source);
-      expect(code.length, source.length);
-      expect(RegExp(r'DwServerFeature\(').allMatches(code), hasLength(1));
-      expect(code, contains('final t ='));
-    });
   });
 
   test('dwServerFeatureFileKind reads the closed set', () {

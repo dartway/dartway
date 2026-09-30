@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
+import 'dw_dart_source.dart';
 import 'dw_feature_tree.dart';
 
 /// One way to show a read, a spinner, a dialog, a route and a new thing, in a
@@ -127,7 +128,7 @@ class DwFlutterUiInspector {
 
   /// Judges one file of `lib/`, [rel] being its path under `lib/`.
   static List<DwUiFinding> judge(String rel, String content) {
-    final code = blankCommentsAndStrings(content);
+    final code = DwDartSource(content).code;
     final findings = <DwUiFinding>[];
     int lineOf(int offset) =>
         '\n'.allMatches(content.substring(0, offset)).length + 1;
@@ -483,12 +484,6 @@ class DwFlutterUiInspector {
     }
     return code.length;
   }
-
-  /// [content] with every comment and every string's contents replaced by
-  /// spaces, newlines kept — so an offset in the result is the same offset in
-  /// [content]. Interpolations are blanked with the string around them.
-  static String blankCommentsAndStrings(String content) =>
-      _DwUiSourceBlanker(content).run();
 }
 
 /// A finding of [DwFlutterUiInspector]: the check, where, and what to do.
@@ -504,92 +499,4 @@ final class DwUiFinding {
 
   @override
   String toString() => 'lib/$file:$line — $message';
-}
-
-/// The scanner behind [DwFlutterUiInspector.blankCommentsAndStrings].
-final class _DwUiSourceBlanker {
-  _DwUiSourceBlanker(this.content) : out = content.split('');
-
-  final String content;
-  final List<String> out;
-
-  String run() {
-    var i = 0;
-    while (i < content.length) {
-      if (content.startsWith('//', i)) {
-        final end = content.indexOf('\n', i);
-        final stop = end < 0 ? content.length : end;
-        _blank(i, stop);
-        i = stop;
-        continue;
-      }
-      if (content.startsWith('/*', i)) {
-        final close = content.indexOf('*/', i + 2);
-        final stop = close < 0 ? content.length : close + 2;
-        _blank(i, stop);
-        i = stop;
-        continue;
-      }
-      final char = content[i];
-      if (char == "'" || char == '"') {
-        final quoteLength = content.startsWith(char * 3, i) ? 3 : 1;
-        final end = _skipString(i);
-        _blank(i + quoteLength, end - quoteLength);
-        i = end;
-        continue;
-      }
-      i++;
-    }
-    return out.join();
-  }
-
-  void _blank(int from, int to) {
-    for (var i = from; i < to && i < out.length; i++) {
-      if (out[i] != '\n') out[i] = ' ';
-    }
-  }
-
-  /// Past the string whose opening quote is at [start]; an `r` before the
-  /// quote makes it raw. A one-quote string ends at the line's end at most.
-  int _skipString(int start) {
-    final raw =
-        start > 0 &&
-        content[start - 1] == 'r' &&
-        (start < 2 || !RegExp(r'[\w$]').hasMatch(content[start - 2]));
-    final quote = content[start];
-    final delimiter = content.startsWith(quote * 3, start) ? quote * 3 : quote;
-    var i = start + delimiter.length;
-    while (i < content.length) {
-      if (content.startsWith(delimiter, i)) return i + delimiter.length;
-      if (!raw && content[i] == r'\') {
-        i += 2;
-        continue;
-      }
-      if (delimiter.length == 1 && content[i] == '\n') return i;
-      if (!raw && content.startsWith(r'${', i)) {
-        i = _skipInterpolation(i + 1);
-        continue;
-      }
-      i++;
-    }
-    return content.length;
-  }
-
-  /// Past the `}` closing the interpolation whose `{` is at [open], stepping
-  /// over the strings nested in it.
-  int _skipInterpolation(int open) {
-    var depth = 0;
-    var i = open;
-    while (i < content.length) {
-      final char = content[i];
-      if (char == "'" || char == '"') {
-        i = _skipString(i);
-        continue;
-      }
-      if (char == '{') depth++;
-      if (char == '}' && --depth == 0) return i + 1;
-      i++;
-    }
-    return content.length;
-  }
 }

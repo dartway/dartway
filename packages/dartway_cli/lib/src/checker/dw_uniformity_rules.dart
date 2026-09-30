@@ -9,6 +9,7 @@ import '../project_locale.dart';
 import '../toolkit_manifest.dart';
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
+import 'dw_dart_source.dart';
 import 'dw_feature_tree.dart';
 import 'dw_project_template.dart';
 
@@ -573,12 +574,12 @@ class DwUniformityInspector {
 
   /// `import`/`export` directives: found in the text with comments and
   /// strings blanked, so a directive quoted inside a multi-line string is not
-  /// one, and read, for their URIs, from the text with only comments blanked.
+  /// one, and read, for their URIs, from the literals of the source.
   /// Each directive's URI literals — the first, and those after `if (…)`.
   /// `part` and `part of` are not directives this touches.
   static List<_Directive> _directivesIn(String content) {
-    final code = _blankComments(content);
-    final bare = _blankCommentsAndStrings(content);
+    final source = DwDartSource(content);
+    final bare = source.code;
     final directives = <_Directive>[];
     for (final match in _directiveStart.allMatches(bare)) {
       final end = bare.indexOf(';', match.end);
@@ -586,14 +587,9 @@ class DwUniformityInspector {
       // The directive's URIs: the first literal, and each one following
       // `if (…)`. `show`/`hide`/`as` name identifiers, not strings.
       final uris = <_Literal>[
-        for (final literal in _uriLiteral.allMatches(
-          code.substring(match.end, end),
-        ))
-          _Literal(
-            match.end + literal.start + 1,
-            match.end + literal.start + 1 + literal.group(2)!.length,
-            literal.group(2)!,
-          ),
+        for (final literal in source.literals)
+          if (literal.start >= match.end && literal.end <= end)
+            _Literal(literal.contentStart, literal.contentEnd, literal.text),
       ];
       directives.add(_Directive(uris));
     }
@@ -720,7 +716,7 @@ class DwUniformityInspector {
   /// of a scale but its absence, and passes; `double.infinity` is not a number
   /// literal and passes.
   static List<(int, String)> rawSpacingIn(String content) {
-    final code = _blankCommentsAndStrings(content);
+    final code = DwDartSource(content).code;
     final found = <(int, int, String)>[];
     void report(int start, int end) {
       final written = content
@@ -826,7 +822,7 @@ class DwUniformityInspector {
     String content, {
     required bool server,
   }) {
-    final code = _blankCommentsAndStrings(content);
+    final code = DwDartSource(content).code;
     final pattern = server
         ? RegExp(r'(?<![\w$.])(DwTestServer\s*\.\s*start|DwAppServer)\s*\(')
         : RegExp(r'(?<![\w$.])(ProviderScope|DwFakeServer)\s*\(');
@@ -938,64 +934,6 @@ class DwUniformityInspector {
       }
     }
     return -1;
-  }
-
-  /// [content] with comments replaced by spaces, newlines kept.
-  static String _blankComments(String content) =>
-      _blank(content, strings: false);
-
-  /// [content] with comments and the insides of string literals replaced by
-  /// spaces, newlines kept, so offsets and lines stay where they were.
-  static String _blankCommentsAndStrings(String content) =>
-      _blank(content, strings: true);
-
-  static String _blank(String content, {required bool strings}) {
-    final out = StringBuffer();
-    var i = 0;
-    String spaces(String text) => text.replaceAll(RegExp(r'[^\n]'), ' ');
-    while (i < content.length) {
-      if (content.startsWith('//', i)) {
-        final end = content.indexOf('\n', i);
-        final stop = end < 0 ? content.length : end;
-        out.write(spaces(content.substring(i, stop)));
-        i = stop;
-        continue;
-      }
-      if (content.startsWith('/*', i)) {
-        final end = content.indexOf('*/', i + 2);
-        final stop = end < 0 ? content.length : end + 2;
-        out.write(spaces(content.substring(i, stop)));
-        i = stop;
-        continue;
-      }
-      final char = content[i];
-      if (char == "'" || char == '"') {
-        final raw = i > 0 && content[i - 1] == 'r';
-        final triple = content.startsWith(char * 3, i);
-        final delimiter = triple ? char * 3 : char;
-        var j = i + delimiter.length;
-        while (j < content.length && !content.startsWith(delimiter, j)) {
-          if (!triple && content[j] == '\n') break;
-          j += (!raw && content[j] == r'\') ? 2 : 1;
-        }
-        if (j > content.length) j = content.length;
-        final closed = content.startsWith(delimiter, j);
-        final stop = closed ? j + delimiter.length : j;
-        if (strings) {
-          out
-            ..write(delimiter)
-            ..write(spaces(content.substring(i + delimiter.length, j)))
-            ..write(closed ? delimiter : '');
-        } else {
-          out.write(content.substring(i, stop));
-        }
-        i = stop;
-        continue;
-      }
-      out.write(char);
-      i++;
-    }
-    return out.toString();
   }
 }
 

@@ -7,6 +7,8 @@
 /// listed in source, so the collision is knowable before anything runs (#240).
 library;
 
+import 'dw_dart_source.dart';
+
 /// One zone's route: which enum declares it, and in which file.
 typedef DwZoneRoute = ({String zone, String route, String file});
 
@@ -21,7 +23,7 @@ class DwRouteNames {
 
   /// Every route declared by a navigation-zone enum in [content].
   static List<DwZoneRoute> routesIn(String file, String content) {
-    final code = _withoutCommentsAndStrings(content);
+    final code = DwDartSource(content).code;
     return [
       for (final header in _zoneHeader.allMatches(code))
         for (final route in _valueNames(code, header.end))
@@ -78,39 +80,5 @@ class DwRouteNames {
       }
     }
     return names;
-  }
-
-  /// [content] with comments removed and string contents blanked, so a
-  /// bracket, comma or `//` inside either is not read as code.
-  static String _withoutCommentsAndStrings(String content) {
-    final out = StringBuffer();
-    var i = 0;
-    while (i < content.length) {
-      if (content.startsWith('//', i)) {
-        final end = content.indexOf('\n', i);
-        i = end < 0 ? content.length : end;
-        continue;
-      }
-      if (content.startsWith('/*', i)) {
-        final end = content.indexOf('*/', i + 2);
-        i = end < 0 ? content.length : end + 2;
-        continue;
-      }
-      final char = content[i];
-      if (char == "'" || char == '"') {
-        final raw = i > 0 && content[i - 1] == 'r';
-        final delimiter = content.startsWith(char * 3, i) ? char * 3 : char;
-        var j = i + delimiter.length;
-        while (j < content.length && !content.startsWith(delimiter, j)) {
-          j += !raw && content[j] == r'\' ? 2 : 1;
-        }
-        out.write('""');
-        i = j + delimiter.length;
-        continue;
-      }
-      out.write(char);
-      i++;
-    }
-    return out.toString();
   }
 }
