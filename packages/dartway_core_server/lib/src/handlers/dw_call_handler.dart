@@ -38,6 +38,18 @@ sealed class DwAccessRule {
   /// every handler used to write inline after `signedIn`, and the one that
   /// drifted into three different answers to the same question.
   ///
+  /// [R] is whatever the handler needs from the check — a row, or a record
+  /// of the row and the parent that decided (a message and the caller's
+  /// membership of its conversation), so nothing is read twice.
+  ///
+  /// [visible] is for a resource the caller may know exists but may not act
+  /// on — a message of a chat they are in, written by someone else: when
+  /// [allows] answers `false` and [visible] `true`, the call is refused
+  /// `dw.forbidden` instead. Without it every refusal is `dw.notFound`.
+  /// [visible] is not a gate: [allows] carries the whole permission, a role
+  /// included, and [visible] only picks the refusal. A rule that rests on a
+  /// role checks it in [load] too, before any lock is taken.
+  ///
   /// [C] is checked against the handler's class at startup, as with [check];
   /// both run in the handler's context, inside a transactional command's
   /// transaction.
@@ -46,7 +58,8 @@ sealed class DwAccessRule {
     required Future<R?> Function(DwCallContext ctx, C call) load,
     required FutureOr<bool> Function(DwCallContext ctx, C call, R resource)
     allows,
-  }) => DwResourceAccess<C, R>._(load, allows);
+    FutureOr<bool> Function(DwCallContext ctx, C call, R resource)? visible,
+  }) => DwResourceAccess<C, R>._(load, allows, visible);
 }
 
 final class DwAnonymousAccess extends DwAccessRule {
@@ -81,19 +94,28 @@ final class DwCheckAccess<C extends DwServerCall<Object?>>
 
 final class DwResourceAccess<C extends DwServerCall<Object?>, R extends Object>
     extends DwCallAccess<C> {
-  const DwResourceAccess._(this._load, this._allows) : super._();
+  const DwResourceAccess._(this._load, this._allows, this._visible) : super._();
 
   final Future<R?> Function(DwCallContext ctx, C call) _load;
   final FutureOr<bool> Function(DwCallContext ctx, C call, R resource) _allows;
+  final FutureOr<bool> Function(DwCallContext ctx, C call, R resource)?
+  _visible;
 
   /// Loads the resource and keeps it for `ctx.accessed`; refuses
-  /// `dw.notFound` when it is absent or not the caller's to reach.
+  /// `dw.notFound` when it is absent or not the caller's to reach, and
+  /// `dw.forbidden` when it is not theirs to act on but `visible` to them.
   @internal
   Future<void> resolve(DwCallContext ctx, DwServerCall<Object?> call) async {
     final typed = call as C;
     final resource = await _load(ctx, typed);
-    if (resource == null || !await _allows(ctx, typed, resource)) {
-      ctx.refuse(DwCoreRefusal.notFound);
+    if (resource == null) ctx.refuse(DwCoreRefusal.notFound);
+    if (!await _allows(ctx, typed, resource)) {
+      final visible = _visible;
+      ctx.refuse(
+        visible != null && await visible(ctx, typed, resource)
+            ? DwCoreRefusal.forbidden
+            : DwCoreRefusal.notFound,
+      );
     }
     ctx.memo(_accessedKey, () => resource);
   }

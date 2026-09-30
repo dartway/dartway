@@ -10,7 +10,7 @@ import 'app_harness.dart';
 extension ChatHarness on AppHarness {
   /// A channel of the test's own, beside the seeded [staffChannels].
   Future<ChatChannelRow> chatChannel(String title) => db.chatChannels.insert(
-    ChatChannelRow(slug: 'test-${++_channels}', title: title),
+    NewChatChannelRow(slug: 'test-${++_channels}', title: title),
   );
 }
 

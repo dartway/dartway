@@ -26,7 +26,7 @@ void main() {
 
     /// Starts the server with [catalogue] seeded, runs [body], stops it.
     Future<T> started<T>(
-      List<CatalogItemRow> catalogue,
+      List<NewCatalogItemRow> catalogue,
       Future<T> Function(DwTestServer server) body,
     ) async {
       final base = app.server(database.config);
@@ -81,8 +81,8 @@ void main() {
         if (line.contains('seed catalog')) line,
     ];
 
-    const yoga = CatalogItemRow(slug: 'yoga', title: 'Yoga');
-    const boxing = CatalogItemRow(slug: 'boxing', title: 'Boxing');
+    const yoga = NewCatalogItemRow(slug: 'yoga', title: 'Yoga');
+    const boxing = NewCatalogItemRow(slug: 'boxing', title: 'Boxing');
 
     test('the first start inserts the declared rows', () async {
       final rows = await started([yoga, boxing], stored);
@@ -111,7 +111,7 @@ void main() {
         final after = await started([
           yoga.copyWith(title: 'Hatha yoga'),
           boxing,
-          const CatalogItemRow(slug: 'swim', title: 'Swim'),
+          const NewCatalogItemRow(slug: 'swim', title: 'Swim'),
         ], stored);
         expect(after['yoga'], (before['yoga']!.$1, 'Hatha yoga', true));
         expect(after['boxing'], before['boxing']);
@@ -149,8 +149,8 @@ void main() {
     final auth = TestApp().auth();
     List<String> problems(
       List<DwTableColumn<Object?>> Function(CatalogItemTable t) key, [
-      List<CatalogItemRow> rows = const [
-        CatalogItemRow(slug: 'yoga', title: 'Yoga'),
+      List<NewCatalogItemRow> rows = const [
+        NewCatalogItemRow(slug: 'yoga', title: 'Yoga'),
       ],
     ]) => DwSeedRows(
       'catalog',
@@ -175,9 +175,9 @@ void main() {
       expect(problems((t) => [t.title, t.published]), isEmpty);
       expect(
         problems((t) => [t.title, t.published], const [
-          CatalogItemRow(slug: 'a', title: 'Yoga'),
-          CatalogItemRow(slug: 'b', title: 'Yoga', published: false),
-          CatalogItemRow(slug: 'c', title: 'Yoga'),
+          NewCatalogItemRow(slug: 'a', title: 'Yoga'),
+          NewCatalogItemRow(slug: 'b', title: 'Yoga', published: false),
+          NewCatalogItemRow(slug: 'c', title: 'Yoga'),
         ]),
         [contains('share the key (title, published) = (Yoga, true)')],
       );
@@ -514,7 +514,7 @@ final class UnregisteredSettings extends DwDataObject {
 /// produces.
 final class CatalogItemRow extends DwTableRow {
   const CatalogItemRow({
-    this.id,
+    required this.id,
     required this.slug,
     required this.title,
     this.published = true,
@@ -522,7 +522,7 @@ final class CatalogItemRow extends DwTableRow {
   });
 
   @override
-  final int? id;
+  final int id;
   final String slug;
   final String title;
   final bool published;
@@ -537,6 +537,29 @@ final class CatalogItemRow extends DwTableRow {
   );
 
   static const tableDef = CatalogItemTable();
+}
+
+/// [CatalogItemRow] before it is stored, as `dartway generate` produces it.
+final class NewCatalogItemRow extends DwRowDraft<CatalogItemRow> {
+  const NewCatalogItemRow({
+    required this.slug,
+    required this.title,
+    this.published = true,
+    this.note,
+  });
+
+  final String slug;
+  final String title;
+  final bool published;
+  final String? note;
+
+  NewCatalogItemRow copyWith({String? title, bool? published}) =>
+      NewCatalogItemRow(
+        slug: slug,
+        title: title ?? this.title,
+        published: published ?? this.published,
+        note: note,
+      );
 }
 
 final class CatalogItemTable extends DwTableDef<CatalogItemRow> {
@@ -582,11 +605,18 @@ final class CatalogItemTable extends DwTableDef<CatalogItemRow> {
 
   @override
   Map<String, Object?> toRow(CatalogItemRow row) => {
-    if (row.id != null) 'id': row.id,
     'slug': row.slug,
     'title': row.title,
     'published': row.published,
     'note': row.note,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewCatalogItemRow draft) => {
+    'slug': draft.slug,
+    'title': draft.title,
+    'published': draft.published,
+    'note': draft.note,
   };
 }
 

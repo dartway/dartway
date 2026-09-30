@@ -231,7 +231,7 @@ anywhere else; a DTO field cannot be a row. A handler reads rows and maps them t
 
 ```dart
 static PersonCard person(UserProfileRow row) => PersonCard(
-  id: row.id!,
+  id: row.id,
   firstName: row.firstName,
   lastName: row.lastName,
   imageUrl: row.imageUrl,

@@ -7,10 +7,14 @@ part 'chat_rows.dw.dart';
 /// ([staffChannels]) and kept in the table by the chat feature's seed step.
 @DwSqlTable('chat_channel')
 final class ChatChannelRow extends DwTableRow with _$ChatChannelRow {
-  const ChatChannelRow({this.id, required this.slug, required this.title});
+  const ChatChannelRow({
+    required this.id,
+    required this.slug,
+    required this.title,
+  });
 
   @override
-  final int? id;
+  final int id;
 
   /// The channel's name in the code: what the seed finds it by, so a title
   /// changed here reaches the stored channel instead of adding a second one.
@@ -25,9 +29,9 @@ final class ChatChannelRow extends DwTableRow with _$ChatChannelRow {
 /// The staff chat's channels: every start writes them into `chat_channel`
 /// (`chatFeature`'s `DwSeedRows`), in every environment.
 const staffChannels = [
-  ChatChannelRow(slug: 'front-desk', title: 'Front desk'),
-  ChatChannelRow(slug: 'coaches', title: 'Coaches'),
-  ChatChannelRow(slug: 'maintenance', title: 'Maintenance'),
+  NewChatChannelRow(slug: 'front-desk', title: 'Front desk'),
+  NewChatChannelRow(slug: 'coaches', title: 'Coaches'),
+  NewChatChannelRow(slug: 'maintenance', title: 'Maintenance'),
 ];
 
 /// One message of a channel. Deleting it only sets [deletedAt]: replies keep
@@ -44,7 +48,7 @@ const staffChannels = [
 )
 final class ChatMessageRow extends DwTableRow with _$ChatMessageRow {
   const ChatMessageRow({
-    this.id,
+    required this.id,
     required this.channelId,
     required this.authorProfileId,
     required this.text,
@@ -57,7 +61,7 @@ final class ChatMessageRow extends DwTableRow with _$ChatMessageRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('chat_channel', onDelete: DwOnDelete.cascade)
   final int channelId;
@@ -104,7 +108,7 @@ final class ChatMessageRow extends DwTableRow with _$ChatMessageRow {
 final class ChatMessageAttachmentRow extends DwTableRow
     with _$ChatMessageAttachmentRow {
   const ChatMessageAttachmentRow({
-    this.id,
+    required this.id,
     required this.messageId,
     required this.fileId,
     required this.position,
@@ -113,7 +117,7 @@ final class ChatMessageAttachmentRow extends DwTableRow
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('chat_message', onDelete: DwOnDelete.cascade)
   final int messageId;
@@ -141,14 +145,14 @@ final class ChatMessageAttachmentRow extends DwTableRow
 final class ChatMessageReactionRow extends DwTableRow
     with _$ChatMessageReactionRow {
   const ChatMessageReactionRow({
-    this.id,
+    required this.id,
     required this.messageId,
     required this.profileId,
     required this.reaction,
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('chat_message', onDelete: DwOnDelete.cascade)
   final int messageId;
@@ -172,7 +176,7 @@ final class ChatMessageReactionRow extends DwTableRow
 )
 final class ChatReadPositionRow extends DwTableRow with _$ChatReadPositionRow {
   const ChatReadPositionRow({
-    this.id,
+    required this.id,
     required this.profileId,
     required this.channelId,
     required this.messageId,
@@ -180,7 +184,7 @@ final class ChatReadPositionRow extends DwTableRow with _$ChatReadPositionRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('user_profile', onDelete: DwOnDelete.cascade)
   final int profileId;

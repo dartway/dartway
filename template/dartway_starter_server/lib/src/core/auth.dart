@@ -149,7 +149,7 @@ abstract final class AppAuth {
     int accountId,
     DwAccountOrigin origin,
   ) async {
-    final now = DateTime.now().toUtc();
+    final now = ctx.now;
     switch (origin) {
       case DwSignInOrigin(:final registration):
         if (!(await ctx.settings.read<AppSettings>()).signUpEnabled) {
@@ -159,7 +159,7 @@ abstract final class AppAuth {
           ctx.refuse(DartwayStarterRefusal.consentsRequired, field: 'consents');
         }
         return ctx.db.userProfiles.insert(
-          UserProfileRow(
+          NewUserProfileRow(
             accountId: accountId,
             firstName: registration[RegistrationKeys.firstName]?.trim() ?? '',
             agreedForMarketing:
@@ -170,7 +170,7 @@ abstract final class AppAuth {
         );
       case DwToolOrigin():
         return ctx.db.userProfiles.insert(
-          UserProfileRow(accountId: accountId, createdAt: now),
+          NewUserProfileRow(accountId: accountId, createdAt: now),
         );
     }
   }

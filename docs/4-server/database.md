@@ -27,7 +27,7 @@ part 'bookings_rows.dw.dart';
 )
 final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
   const SessionBookingRow({
-    this.id,
+    required this.id,
     required this.sessionId,
     required this.clientProfileId,
     required this.status,
@@ -35,7 +35,7 @@ final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('club_session', onDelete: DwOnDelete.cascade)
   final int sessionId;
@@ -54,7 +54,8 @@ The rules, each enforced by `dart run dartway_cli:dartway generate`:
 
 - the class is named `<Entity>Row` and extends `DwTableRow` — a row and the data object clients see
   (`SessionBooking`) never share a name, and a row never leaves the server;
-- `@override final int? id;` with `this.id` — a `bigserial` primary key, `null` before insert;
+- `@override final int id;` with `required this.id` — the `bigserial` primary key the database
+  assigned: a row is what is stored, so its id is never missing and never needs a `!`;
 - `static const tableDef = <Entity>Table();` and `part '<file>.dw.dart';`;
 - columns are the constructor's fields; nullability is the field's type.
 
@@ -92,8 +93,9 @@ A data object is not a column type: a row holds ids, and the handler builds the 
 ### What `dartway generate` writes
 
 - `<file>.dw.dart`: `==`, `hashCode`, `toString`, a `copyWith` (nullable fields take a
-  `DwFieldPatch` — keep, set or clear), and the table class `<Entity>Table extends DwTableDef`,
-  whose getters are the typed columns (`t.status`, `t.createdAt`).
+  `DwFieldPatch` — keep, set or clear; the id is kept, a copy of a stored row is the same row), the
+  draft `New<Entity>Row` and the table class `<Entity>Table extends DwTableDef`, whose getters are
+  the typed columns (`t.status`, `t.createdAt`).
 - `lib/generated/dw_schema.dart`: the project's `DwDatabaseSchema` (the migration tools and the
   server's startup check compare against it) and one getter per table on `DwDatabaseHandle`, named
   by the plural of the entity:
@@ -105,6 +107,62 @@ extension DartwayExampleDb on DwDatabaseHandle {
   // one per table
 }
 ```
+
+### Rows and drafts
+
+A row not stored yet has no id, so it is not a row: it is its draft. `New<Entity>Row` is generated
+beside every row class — the same constructor without `id`, the same defaults — and it is what the
+inserting methods take; each answers the stored row, id included:
+
+```dart
+final booking = await ctx.db.sessionBookings.insert(
+  NewSessionBookingRow(
+    sessionId: session.id,
+    clientProfileId: me.id,
+    status: BookingStatus.booked,
+    createdAt: DateTime.now(),
+  ),
+);
+booking.id; // an int, assigned by the database
+```
+
+A draft is a value like the row: it compares, hashes and prints by its columns, and has a
+`copyWith` of its own. `withId(id)` turns it into the row stored under an id already known.
+
+"Create or save" by an optional id takes one of two shapes, decided by what the command carries:
+
+- **The command carries every column of the row** — an admin form over the whole of a table with no
+  owner, no creation time, no counter the command does not set. The draft is the whole row, and
+  `withId` saves it (`update` of an id that is gone throws `DwRowNotFound`):
+
+  ```dart
+  final draft = NewClubServiceRow(title: command.title.trim(), /* every column */);
+  final saved = switch (command.id) {
+    null => await ctx.db.clubServices.insert(draft),
+    final id => await ctx.db.clubServices.update(draft.withId(id)),
+  };
+  ```
+
+- **Otherwise — the usual case** — the row has columns the command does not own: its owner, when it
+  was created, what other commands set. Read the stored row, by its id *and* its owner, and change
+  what the command owns; `withId` would overwrite the rest with the draft's defaults:
+
+  ```dart
+  final current = await ctx.db.invoices.findFirst(
+    where: (t) => t.id.equals(id) & t.ownerProfileId.equals(me.id),
+    lock: DwRowLock.forUpdate,
+  );
+  if (current == null) ctx.refuse(DwCoreRefusal.notFound);
+  final saved = await ctx.db.invoices.update(
+    current.copyWith(note: DwFieldPatch.set(command.note)),
+  );
+  ```
+
+  A row keyed by a unique column rather than an id (one settings row per member) is
+  `upsert(draft, conflictOn: (t) => [t.profileId])`.
+
+Ids are always the database's: there is no insert with an id of one's own, which would also leave
+the `bigserial` sequence behind the rows and fail the next insert.
 
 So `ctx.db.sessionBookings` is a `DwTableRepository` inside a handler, `server.db.sessionBookings`
 next to a running server, and `tx.sessionBookings` inside a transaction body. Changing a row class
@@ -129,11 +187,11 @@ once per connection and reused.
 | `maxBy(group, of, {where})`, `minBy(group, of, {where})` | `Map` of the group's value → extreme; a group whose cells are all null is absent |
 | `findFirstPer(group, {orderBy, where})` | `Map` of the group's value → its first row in `orderBy` order: the latest plan of each member, in one statement (`DISTINCT ON`) |
 | `exists({where})` | whether any |
-| `insert(row)` | the row as stored, with its id and every value read back |
-| `tryInsert(row, onConflict: …)` | the stored row, or `null` when it conflicted |
-| `upsert(row, conflictOn: (t) => [t.key])` | inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
-| `upsertAll(rows, conflictOn: (t) => [t.slug])` | every row inserted, or written over the row with the same key — unless that row already holds exactly these values — in one statement; the count of rows inserted or changed, `0` for a second run with the same rows. What `DwSeedRows` runs |
-| `insertAll(rows)` | the rows as stored, in order, in one statement; either every row has an id or none has |
+| `insert(draft)` | the row as stored, with its id and every value read back |
+| `tryInsert(draft, onConflict: …)` | the stored row, or `null` when it conflicted |
+| `upsert(draft, conflictOn: (t) => [t.key])` | inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
+| `upsertAll(drafts, conflictOn: (t) => [t.slug])` | every row inserted, or written over the row with the same key — unless that row already holds exactly these values — in one statement; the count of rows inserted or changed, `0` for a second run with the same rows. What `DwSeedRows` runs |
+| `insertAll(drafts)` | the rows as stored, in order, in one statement |
 | `update(row)` | writes every column by id; throws `DwRowNotFound` when no row has that id — an update that changed nothing is a failure, not a quiet success |
 | `updateWhere({where, set})` | sets columns on every matching row; returns the count |
 | `updateWhereReturning({where, set})` | the same, answering the rows as updated — what to publish, without a second read |
@@ -147,8 +205,8 @@ once per connection and reused.
 ```dart
 final alreadyBooked = await ctx.db.sessionBookings.exists(
   where: (t) =>
-      t.sessionId.equals(session.id!) &
-      t.clientProfileId.equals(me.id!) &
+      t.sessionId.equals(session.id) &
+      t.clientProfileId.equals(me.id) &
       t.status.equals(BookingStatus.booked),
 );
 ```
@@ -176,11 +234,11 @@ conflicting row and returns `null`:
 
 ```dart
 final inserted = await ctx.db.sessionReviews.tryInsert(
-  SessionReviewRow(
-    bookingId: booking.id!,
+  NewSessionReviewRow(
+    bookingId: booking.id,
     rating: command.rating,
     text: command.text,
-    createdAt: DateTime.now(),
+    createdAt: ctx.now,
   ),
   onConflict: DwOnConflict.doNothing((t) => [t.bookingId]),
 );
@@ -202,8 +260,8 @@ await db.chatReadPositions.updateWhere(
       t.profileId.equals(profileId) &
       t.channelId.equals(message.channelId) &
       (t.sentAt.lt(message.sentAt) |
-          (t.sentAt.equals(message.sentAt) & t.messageId.lt(message.id!))),
-  set: (t) => [t.messageId.set(message.id!), t.sentAt.set(message.sentAt)],
+          (t.sentAt.equals(message.sentAt) & t.messageId.lt(message.id))),
+  set: (t) => [t.messageId.set(message.id), t.sentAt.set(message.sentAt)],
 );
 ```
 

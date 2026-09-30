@@ -1,8 +1,8 @@
 ---
 title: "Seeds are startup steps, migrations change the schema, settings are one typed object, patches are read by their helpers"
 affects:
-  dartway_core_shared: "0.21.0-dev.9"
-  dartway_core_server: "0.21.0-dev.9"
+  dartway_core_shared: "0.21.0-dev.13"
+  dartway_core_server: "0.21.0-dev.13"
 ---
 
 ## Who is affected
@@ -46,7 +46,7 @@ Rows the code declares — a questionnaire, a catalogue — leave the migration 
 2. Declare the rows beside the row class, in `<feature>_rows.dart`, as `const` rows without ids:
 
        const onboardingQuestions = [
-         SurveyQuestionRow(slug: 'goal', position: 1, title: '…', kind: …),
+         NewSurveyQuestionRow(slug: 'goal', position: 1, title: '…', kind: …),
          …
        ];
 

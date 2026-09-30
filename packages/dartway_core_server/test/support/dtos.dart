@@ -231,6 +231,41 @@ final class GetMyNote extends DwSingleRequest<NoteView> {
       GetMyNote(json['noteId']! as int);
 }
 
+/// A message by id, to members of its room: a resource reached through its
+/// parent (`DwAccessRule.resource` over a record of the message and room).
+final class GetRoomMessage extends DwSingleRequest<MessageView> {
+  const GetRoomMessage(this.messageId);
+
+  final int messageId;
+
+  @override
+  String get dwTypeName => 'GetRoomMessage';
+
+  @override
+  Map<String, Object?> toJson() => {'messageId': messageId};
+
+  static GetRoomMessage fromJson(Map<String, Object?> json) =>
+      GetRoomMessage(json['messageId']! as int);
+}
+
+/// Renames the caller's note; staff see every note and are refused
+/// `forbidden`, anyone else `notFound` (`DwAccessRule.resource` `visible`).
+final class RenameNote extends DwActionCommand<NoteView> {
+  const RenameNote(this.noteId, this.text);
+
+  final int noteId;
+  final String text;
+
+  @override
+  String get dwTypeName => 'RenameNote';
+
+  @override
+  Map<String, Object?> toJson() => {'noteId': noteId, 'text': text};
+
+  static RenameNote fromJson(Map<String, Object?> json) =>
+      RenameNote(json['noteId']! as int, json['text']! as String);
+}
+
 final class FindNote extends DwMaybeRequest<NoteView> {
   const FindNote(this.noteId);
 
@@ -597,6 +632,34 @@ final class Ping extends DwActionCommand<String> {
   static Ping fromJson(Map<String, Object?> json) => const Ping();
 }
 
+/// What the command's context says about time: `ctx.now`, the caller's
+/// offset in minutes and `ctx.callerLocalTime`, joined by `|` (`-` for null).
+final class ReadClock extends DwActionCommand<String> {
+  const ReadClock();
+
+  @override
+  String get dwTypeName => 'ReadClock';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static ReadClock fromJson(Map<String, Object?> json) => const ReadClock();
+}
+
+/// [ReadClock] as a request: the same text, as a note's.
+final class GetClockNote extends DwSingleRequest<NoteView> {
+  const GetClockNote();
+
+  @override
+  String get dwTypeName => 'GetClockNote';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static GetClockNote fromJson(Map<String, Object?> json) =>
+      const GetClockNote();
+}
+
 /// Anonymous access, but the handler requires an account.
 final class NeedsAccount extends DwActionCommand<int> {
   const NeedsAccount();
@@ -845,6 +908,8 @@ final DwWireProtocol testProtocol = DwWireProtocol([
   DwProtocolEntry<NotesOfOwner>('NotesOfOwner', NotesOfOwner.fromJson),
   DwProtocolEntry<GetNote>('GetNote', GetNote.fromJson),
   DwProtocolEntry<GetMyNote>('GetMyNote', GetMyNote.fromJson),
+  DwProtocolEntry<GetRoomMessage>('GetRoomMessage', GetRoomMessage.fromJson),
+  DwProtocolEntry<RenameNote>('RenameNote', RenameNote.fromJson),
   DwProtocolEntry<FindNote>('FindNote', FindNote.fromJson),
   DwProtocolEntry<FeedNotes>('FeedNotes', FeedNotes.fromJson),
   DwProtocolEntry<GreedyFeed>('GreedyFeed', GreedyFeed.fromJson),
@@ -871,6 +936,8 @@ final DwWireProtocol testProtocol = DwWireProtocol([
     CountProvisional.fromJson,
   ),
   DwProtocolEntry<Ping>('Ping', Ping.fromJson),
+  DwProtocolEntry<ReadClock>('ReadClock', ReadClock.fromJson),
+  DwProtocolEntry<GetClockNote>('GetClockNote', GetClockNote.fromJson),
   DwProtocolEntry<NeedsAccount>('NeedsAccount', NeedsAccount.fromJson),
   DwProtocolEntry<RevokeNotes>('RevokeNotes', RevokeNotes.fromJson),
   DwProtocolEntry<EnqueueJob>('EnqueueJob', EnqueueJob.fromJson),

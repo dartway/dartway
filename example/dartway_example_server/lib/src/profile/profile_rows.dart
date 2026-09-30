@@ -16,7 +16,7 @@ part 'profile_rows.dw.dart';
 )
 final class UserProfileRow extends DwTableRow with _$UserProfileRow {
   const UserProfileRow({
-    this.id,
+    required this.id,
     this.accountId,
     required this.phone,
     required this.firstName,
@@ -31,7 +31,7 @@ final class UserProfileRow extends DwTableRow with _$UserProfileRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   /// The account that signs in as this person; `null` once they deleted it.
   /// The row stays: posts, messages and complaints of a person who left keep

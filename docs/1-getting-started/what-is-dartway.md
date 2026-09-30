@@ -71,11 +71,11 @@ DwCallHandler.command<PublishNews, NewsPost>(
   handle: (ctx, command) async {
     final me = await ctx.profile;
     final row = await ctx.db.newsPosts.insert(
-      NewsPostRow(
-        authorProfileId: me.id!,
+      NewNewsPostRow(
+        authorProfileId: me.id,
         title: command.title.trim(),
         text: command.text.trim(),
-        createdAt: DateTime.now(),
+        createdAt: ctx.now,
       ),
     );
     final post = (await ContentObjects.news(ctx.db, [row], author: me)).single;

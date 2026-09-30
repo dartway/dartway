@@ -217,36 +217,31 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     return result.first.first! as bool;
   }
 
-  /// Inserts [row] and returns it as stored, with its id and every value
-  /// read back from the database.
-  Future<R> insert(R row) async {
-    final result = await _insert(row, '');
+  /// Inserts [draft] and returns the row as stored, with the id the database
+  /// assigned and every value read back.
+  Future<R> insert(DwRowDraft<R> draft) async {
+    final result = await _insert(draft, '');
     return _decode(result).first;
   }
 
-  /// Inserts [row] unless it conflicts; returns `null` when the row was
-  /// skipped.
-  Future<R?> tryInsert(R row, {required DwOnConflict<T> onConflict}) async {
-    final result = await _insert(row, onConflict.sql(table));
+  /// Inserts [draft] unless it conflicts; returns `null` when it was skipped.
+  Future<R?> tryInsert(
+    DwRowDraft<R> draft, {
+    required DwOnConflict<T> onConflict,
+  }) async {
+    final result = await _insert(draft, onConflict.sql(table));
     return result.isEmpty ? null : _decode(result).first;
   }
 
-  /// Inserts all [rows] in one statement and returns them as stored, in the
-  /// same order.
-  ///
-  /// Either every row has an id or none has: the statement binds one array
-  /// per column, and a column cannot be half defaulted.
-  Future<List<R>> insertAll(Iterable<R> rows) async {
-    final list = rows.toList(growable: false);
+  /// Inserts all [drafts] in one statement and returns the rows as stored, in
+  /// the same order.
+  Future<List<R>> insertAll(Iterable<DwRowDraft<R>> drafts) async {
+    final list = drafts.toList(growable: false);
     if (list.isEmpty) return const [];
-    final withId = list.first.id != null;
-    if (list.any((row) => (row.id != null) != withId)) {
-      throw ArgumentError('insertAll: either every row has an id or none has');
-    }
-    final columns = _sql.insertColumns(withId: withId);
+    final columns = _sql.valueColumns;
     final arrays = [for (final _ in columns) <Object?>[]];
-    for (final row in list) {
-      final values = _valuesOf(row);
+    for (final draft in list) {
+      final values = _checked(table.toDraftRow(draft));
       for (final (position, column) in columns.indexed) {
         final value = values[column.name];
         arrays[position].add(
@@ -254,7 +249,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
         );
       }
     }
-    final result = await _db.run(_sql.insertAll(withId: withId), [
+    final result = await _db.run(_sql.insertAll, [
       for (final column in columns) column.type.arrayParameterType,
     ], arrays);
     return _decode(result);
@@ -265,21 +260,20 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   /// Throws [DwRowNotFound] when no row has that id: an update that
   /// changed nothing is a failure, not a quiet success.
   Future<R> update(R row) async {
-    final id = row.id;
-    if (id == null) {
-      throw ArgumentError('update: the row has no id; insert it first');
-    }
-    final values = _valuesOf(row);
-    final columns = _sql.insertColumns(withId: false);
+    final values = _checked(table.toRow(row));
+    final columns = _sql.valueColumns;
     final result = await _db.run(
       _sql.updateById,
       [
         for (final column in columns) column.type.parameterType,
         pg.Type.bigInteger,
       ],
-      [for (final column in columns) _encode(column, values[column.name]), id],
+      [
+        for (final column in columns) _encode(column, values[column.name]),
+        row.id,
+      ],
     );
-    if (result.isEmpty) throw DwRowNotFound(table.tableName, id);
+    if (result.isEmpty) throw DwRowNotFound(table.tableName, row.id);
     return _decode(result).first;
   }
 
@@ -301,7 +295,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     return _decode(await _run(writer));
   }
 
-  /// Inserts [row], or — when it conflicts on the unique [conflictOn]
+  /// Inserts [draft], or — when it conflicts on the unique [conflictOn]
   /// columns — writes every other column of it over the row already there;
   /// returns the stored row either way.
   ///
@@ -309,14 +303,14 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   /// statement, with no window between "not there" and "insert" for a
   /// concurrent writer to fall into.
   Future<R> upsert(
-    R row, {
+    DwRowDraft<R> draft, {
     required List<DwTableColumn<Object?>> Function(T t) conflictOn,
   }) async {
     final target = conflictOn(table);
     if (target.isEmpty) throw ArgumentError('upsert: no conflict columns');
     final names = {for (final column in target) column.name};
     final written = [
-      for (final column in _sql.insertColumns(withId: false))
+      for (final column in _sql.valueColumns)
         if (!names.contains(column.name)) column,
     ];
     // With nothing but the key to write, the key itself is set to what it
@@ -326,41 +320,36 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
         '${column.sql} = EXCLUDED.${column.sql}',
     ];
     final result = await _insert(
-      row,
+      draft,
       ' ON CONFLICT (${target.map((column) => column.sql).join(', ')}) '
       'DO UPDATE SET ${set.join(', ')}',
     );
     return _decode(result).first;
   }
 
-  /// Writes [rows] in one statement: each is inserted, or — when a row with
-  /// the same [conflictOn] values exists — written over it, unless that row
-  /// already holds exactly these values. Returns how many rows were inserted
-  /// or changed, so a second run with the same rows writes nothing and
-  /// answers `0`.
+  /// Writes [drafts] in one statement: each is inserted, or — when a row
+  /// with the same [conflictOn] values exists — written over it, unless that
+  /// row already holds exactly these values. Returns how many rows were
+  /// inserted or changed, so a second run with the same drafts writes nothing
+  /// and answers `0`.
   ///
-  /// Rows the table holds that [rows] does not name are left alone. The
+  /// Rows the table holds that [drafts] does not name are left alone. The
   /// rows the code declares and a database converges on at every start — a
   /// catalogue, the reasons a project refuses something — which is what
   /// `DwSeedRows` runs it for.
   ///
-  /// Throws [ArgumentError] for a row that has an id, for a nullable
-  /// [conflictOn] column (a conflict never matches a null, so every run would
-  /// insert again), and for two rows with the same [conflictOn] values: one
-  /// statement cannot write a row twice.
+  /// Throws [ArgumentError] for a nullable [conflictOn] column (a conflict
+  /// never matches a null, so every run would insert again), and for two
+  /// drafts with the same [conflictOn] values: one statement cannot write a
+  /// row twice.
   Future<int> upsertAll(
-    Iterable<R> rows, {
+    Iterable<DwRowDraft<R>> drafts, {
     required List<DwTableColumn<Object?>> Function(T t) conflictOn,
   }) async {
-    final list = rows.toList(growable: false);
+    final list = drafts.toList(growable: false);
     if (list.isEmpty) return 0;
     final target = conflictOn(table);
     if (target.isEmpty) throw ArgumentError('upsertAll: no conflict columns');
-    if (list.any((row) => row.id != null)) {
-      throw ArgumentError(
-        'upsertAll: a row has an id; its key is its identity',
-      );
-    }
     for (final column in target) {
       if (column.nullable) {
         // A conflict never matches a null: every run would insert again.
@@ -369,14 +358,14 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
         );
       }
     }
-    final columns = _sql.insertColumns(withId: false);
+    final columns = _sql.valueColumns;
     final arrays = [for (final _ in columns) <Object?>[]];
     final seen = LinkedHashSet<List<Object?>>(
       equals: const ListEquality<Object?>().equals,
       hashCode: const ListEquality<Object?>().hash,
     );
-    for (final row in list) {
-      final values = _valuesOf(row);
+    for (final draft in list) {
+      final values = _checked(table.toDraftRow(draft));
       final key = [for (final column in target) values[column.name]];
       if (!seen.add(key)) {
         throw ArgumentError(
@@ -499,23 +488,21 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     };
   }
 
-  Future<pg.Result> _insert(R row, String onConflict) {
-    final withId = row.id != null;
-    final values = _valuesOf(row);
-    final columns = _sql.insertColumns(withId: withId);
+  Future<pg.Result> _insert(DwRowDraft<R> draft, String onConflict) {
+    final values = _checked(table.toDraftRow(draft));
+    final columns = _sql.valueColumns;
     return _db.run(
-      '${_sql.insert(withId: withId)}$onConflict${_sql.returning}',
+      '${_sql.insert}$onConflict${_sql.returning}',
       [for (final column in columns) column.type.parameterType],
       [for (final column in columns) _encode(column, values[column.name])],
     );
   }
 
-  Map<String, Object?> _valuesOf(R row) {
-    final values = table.toRow(row);
-    for (final column in _sql.insertColumns(withId: row.id != null)) {
+  Map<String, Object?> _checked(Map<String, Object?> values) {
+    for (final column in _sql.valueColumns) {
       if (!values.containsKey(column.name)) {
         throw StateError(
-          '${table.tableName}.toRow has no value for "${column.name}"; regenerate the table',
+          '${table.tableName} has no value for "${column.name}"; regenerate the table',
         );
       }
     }
@@ -591,33 +578,20 @@ final class _DwTableSql {
   late final String deleteById;
   late final String updateById;
 
-  late final List<DwTableColumn<Object?>> _withoutId = List.unmodifiable(
+  /// Every column but the id: what an insert and an update write.
+  late final List<DwTableColumn<Object?>> valueColumns = List.unmodifiable(
     columns.skip(1),
   );
 
-  List<DwTableColumn<Object?>> insertColumns({required bool withId}) =>
-      withId ? columns : _withoutId;
+  late final String insert =
+      'INSERT INTO $table (${valueColumns.map((column) => column.sql).join(', ')}) '
+      'VALUES (${[for (var i = 1; i <= valueColumns.length; i++) '\$$i'].join(', ')})';
 
-  late final String _insertWithId = _insertInto(columns);
-  late final String _insertWithoutId = _insertInto(_withoutId);
+  late final String insertAll = _insertAllInto(valueColumns) + returning;
 
-  String insert({required bool withId}) =>
-      withId ? _insertWithId : _insertWithoutId;
-
-  String _insertInto(List<DwTableColumn<Object?>> columns) =>
-      'INSERT INTO $table (${columns.map((column) => column.sql).join(', ')}) '
-      'VALUES (${[for (var i = 1; i <= columns.length; i++) '\$$i'].join(', ')})';
-
-  late final String _insertAllWithId = _insertAllInto(columns) + returning;
-  late final String _insertAllWithoutId =
-      _insertAllInto(_withoutId) + returning;
-
-  String insertAll({required bool withId}) =>
-      withId ? _insertAllWithId : _insertAllWithoutId;
-
-  /// The insert of every row without an id, from one array per column, with
-  /// no `RETURNING`: what `upsertAll` completes with its conflict clause.
-  late final String insertAllSelect = _insertAllInto(_withoutId);
+  /// The insert of every draft, from one array per column, with no
+  /// `RETURNING`: what `upsertAll` completes with its conflict clause.
+  late final String insertAllSelect = _insertAllInto(valueColumns);
 
   /// One array per column, zipped by `unnest` and kept in input order by
   /// its ordinality, so the returned rows line up with the rows given.

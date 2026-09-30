@@ -163,9 +163,12 @@ passed as `DwAppServer(files: …)` (`template/dartway_starter_server/lib/src/co
 
 `DwFileStorageConfig.fromEnvironment(env, {prefix: 'DW_STORAGE_'})` reports every missing or
 malformed key at once. Which buckets are needed is the rules' business, so neither is required
-there; the server names the missing one at startup. The skeleton's `AppFiles.storageConfig` fills in
-development defaults — bucket names after the project, the public base URL on the endpoint — and
-answers `null` without `DW_STORAGE_ENDPOINT`, so the server runs without uploads.
+there; the server names the missing one at startup. A project does not call it itself:
+`DwServerEnvironment.read` does, in the project's `AppEnvironment`
+([configuration](app-server.md#configuration-comes-from-the-environment)), and fills in development
+defaults — the bucket names the project passes (the skeleton's `AppFiles.defaultPublicBucket` and
+`defaultPrivateBucket`, named after the project), the public base URL on the endpoint — and answers
+`null` without `DW_STORAGE_ENDPOINT`, so the server runs without uploads.
 
 `DwFileStorage`:
 
@@ -204,7 +207,7 @@ DwCallHandler.command<UpdateMyProfile, UserProfile>(
   access: DwAccessRule.signedIn,
   handle: (ctx, command) async {
     final current = (await ctx.db.userProfiles.findById(
-      (await ctx.profile).id!,
+      (await ctx.profile).id,
       lock: DwRowLock.forUpdate,
     ))!;
     final previousAvatar = current.avatarFileId;

@@ -16,6 +16,7 @@ abstract final class DartwayExampleServer {
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
     DwPushModule? push,
+    DwServerClock clock = DwServerClock.system, // a DwTestClock in tests
   }) => DwAppServer(
     protocol: appProtocol,
     schema: dartwayExampleSchema,
@@ -34,6 +35,7 @@ abstract final class DartwayExampleServer {
     modules: [push ?? AppPush.module()],
     port: port,
     settings: settings,
+    clock: clock,
   );
 }
 ```
@@ -57,6 +59,7 @@ build it on a free port against their own database.
 | `alerts` | no | a `DwAlertSink`; the log by default — [alerts](alerts.md) |
 | `logger` | no | a `DwServerLogger`; `DwConsoleLogger` by default |
 | `settings` | no | `DwServerSettings`, below |
+| `clock` | no | a `DwServerClock`, `DwServerClock.system` by default: what every context reads as `ctx.now` and what the job queue decides due times by; a test passes a `DwTestClock` — [time](handlers-and-context.md#time-ctxnow-and-the-callers-offset) |
 
 ## What `start()` does, in order
 
@@ -145,11 +148,66 @@ app on one server process.
 | `failedJobRetention` | 30 days | How long a job out of attempts stays in `dw_job` for the operator, from when it failed; `dw.cleanup` removes it after. |
 | `alertsPerSignature` | 5 | Alerts of one failure signature per `alertWindow` ([alerts](alerts.md)). |
 | `alertWindow` | 1 h | The window of that ceiling. |
+| `outboundTimeout` | 30 s | How long one outbound request (`ctx.http`) may take, connecting to last byte, unless the call names its own ([handlers](handlers-and-context.md#outbound-http)). |
+| `outboundMaxResponseBytes` | 10 MiB | The largest response body one outbound request reads, unless the call names its own; past it the exchange fails with `DwOutboundException`. |
 
 ## Configuration comes from the environment
 
-There is no configuration file. The framework reads exactly two groups of variables itself, and
-only when the project asks it to:
+There is no configuration file. The server is configured by its environment, read **once, at start,
+in one file**: `lib/src/core/environment.dart` declares the project's typed `AppEnvironment`, and
+`bin/server.dart` reads it through `DwLocalEnvironment.overlay` (which adds `deploy/config.yaml >
+local` and `deploy/secrets.yaml > local` on a developer's machine):
+
+```dart
+// lib/src/core/environment.dart
+final class AppEnvironment {
+  const AppEnvironment({required this.server, required this.sms});
+
+  static AppEnvironment read(Map<String, String> variables) =>
+      DwEnvironmentReader.read(variables, (read) => AppEnvironment(
+        server: DwServerEnvironment.read(
+          read,
+          defaultPublicBucket: AppFiles.defaultPublicBucket,
+          defaultPrivateBucket: AppFiles.defaultPrivateBucket,
+        ),
+        sms: AppSmsEnvironment(
+          login: read.required('SMS_LOGIN'),
+          password: read.required('SMS_PASSWORD'),
+          retries: read.integer('SMS_RETRIES', fallback: 3),
+        ),
+      ));
+
+  final DwServerEnvironment server;
+  final AppSmsEnvironment sms;
+}
+
+// bin/server.dart
+final env = AppEnvironment.read(DwLocalEnvironment.overlay(Platform.environment));
+```
+
+`DwEnvironmentReader` has `required`, `optional`, `integer` (with a `fallback`), `flag` (`true` /
+`false`), `list` (comma-separated) and `report` for a problem no single variable shows (two that go
+together). Each answers at once and records what is wrong; `read` throws `DwEnvironmentException`
+with **every** missing and malformed variable once the object is built, so a deploy that forgot three
+hears about all three in one start. A problem never repeats a text value; a number or flag read with
+`secret: true` is not repeated either. `Platform.environment` anywhere else in `lib/` is an error of
+`dart run dartway_cli:dartway check` (`forbiddenEnvironmentRead`).
+
+`DwServerEnvironment.read` is the framework's own variables, typed:
+
+| Variable | Becomes |
+|---|---|
+| `DW_DATABASE_*` | `database`, as `DwDatabaseConfig.fromEnvironment` reads it (below) |
+| `DW_STORAGE_*` | `storage`, as `DwFileStorageConfig.fromEnvironment` reads it, the buckets defaulting to the names given and the public base URL to the public bucket on the endpoint (path style); `null` without `DW_STORAGE_ENDPOINT` — the server runs without uploads |
+| `DW_STORAGE_PROVISION=true` | `provisionStorage`: `DwFileStorageSetup.provision` before starting — for a storage the project owns; a problem without an endpoint |
+| `PORT` | `port`, 8080 by default |
+| `DW_ALLOWED_ORIGINS` | `allowedOrigins`, comma-separated, for `DwServerSettings.allowedOrigins` |
+| `DW_ADMIN_IDENTIFIER` | `adminIdentifier`, for `DwFirstAdministrator(identifier:)` (below) |
+| `DW_MIGRATE_ONLY=true` | `migrateOnly`, for `DwAppServer.start(migrateOnly:)`: apply the migrations and exit |
+
+Every one of them comes through the local overlay and into the one error list — nothing of the
+framework's reads `Platform.environment` behind the project's back. The two groups above that have
+parsers of their own are:
 
 - `DwDatabaseConfig.fromEnvironment(env)` reads `DW_DATABASE_HOST`, `_PORT` (5432), `_NAME`,
   `_USER`, `_PASSWORD`, `_SSL` (`true` unless `false`), `_CA_FILE` (unset) and `_MAX_CONNECTIONS`
@@ -161,20 +219,8 @@ only when the project asks it to:
   connection — with an error naming the setting.
 - `DwFileStorageConfig.fromEnvironment(env)` reads `DW_STORAGE_*` ([uploads](uploads.md#configuration)).
 
-Everything else is the project's `bin/server.dart` reading `Platform.environment` and passing
-values in. The skeleton's (`template/dartway_starter_server/bin/server.dart`) reads:
-
-| Variable | Becomes |
-|---|---|
-| `DW_DATABASE_*` | `DwDatabaseConfig.fromEnvironment` |
-| `PORT` | `port`, 8080 by default |
-| `DW_STORAGE_*` | the storage configuration; without `DW_STORAGE_ENDPOINT` the server runs without uploads |
-| `DW_STORAGE_PROVISION=true` | `DwFileStorageSetup.provision` before starting — for a storage the project owns |
-| `DW_ALLOWED_ORIGINS` | `DwServerSettings.allowedOrigins`, comma-separated |
-| `DW_ADMIN_IDENTIFIER` | the first administrator, below |
-
-The example's `bin/server.dart` is the same without the administrator. A value the project wants
-configurable is one more line there; the framework does not grow a settings loader for it.
+A value the project wants configurable is one more field of a sub-config in `AppEnvironment`,
+handed to what uses it by `bin/server.dart` through the project's server factory.
 
 ## One process, one isolate
 
@@ -254,9 +300,9 @@ declares its channels (`example/dartway_example_server/lib/src/chat/`):
 ```dart
 // chat_rows.dart
 const staffChannels = [
-  ChatChannelRow(slug: 'front-desk', title: 'Front desk'),
-  ChatChannelRow(slug: 'coaches', title: 'Coaches'),
-  ChatChannelRow(slug: 'maintenance', title: 'Maintenance'),
+  NewChatChannelRow(slug: 'front-desk', title: 'Front desk'),
+  NewChatChannelRow(slug: 'coaches', title: 'Coaches'),
+  NewChatChannelRow(slug: 'maintenance', title: 'Maintenance'),
 ];
 
 // chat_feature.dart
@@ -300,11 +346,14 @@ seed's is listed after it.
 
 The case every project has. The admin role is granted by an admin, which leaves the first one
 nowhere to come from; `DW_ADMIN_IDENTIFIER` names it per environment, and there is no default
-because whoever receives the codes sent to that identifier *is* the administrator.
+because whoever receives the codes sent to that identifier *is* the administrator. It is read into
+`DwServerEnvironment.adminIdentifier`, and `bin/server.dart` hands it to the server factory:
 
 ```dart
 DwAppServer(
-  startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+  startup: [
+    DwFirstAdministrator(grant: AppBootstrap.grantAdmin, identifier: adminIdentifier),
+  ],
   ...
 );
 

@@ -11,6 +11,7 @@ final class EntityField implements ValueField {
     required this.type,
     required this.spelling,
     required this.column,
+    required this.constructor,
   });
 
   @override
@@ -23,6 +24,27 @@ final class EntityField implements ValueField {
   /// The column, or `null` for `id` (every table's primary key, declared by
   /// `DwTableDef`).
   final EntityColumn? column;
+
+  /// How the row class's constructor takes the field, which the draft's
+  /// constructor repeats.
+  final EntityParameter constructor;
+}
+
+/// A constructor parameter of a row class: required, optional (a nullable
+/// field, `null` when absent), or optional with a default.
+final class EntityParameter {
+  const EntityParameter._(this.defaultValue, {required this.isRequired});
+
+  static const required = EntityParameter._(null, isRequired: true);
+  static const optional = EntityParameter._(null, isRequired: false);
+
+  const EntityParameter.defaulted(String this.defaultValue)
+    : isRequired = false;
+
+  final bool isRequired;
+
+  /// The default as a constant expression the generated part can use.
+  final String? defaultValue;
 }
 
 /// A column declared by the generated table class.
@@ -90,6 +112,9 @@ final class EntityClass {
 
   /// `SessionBookingRow` → `SessionBookingTable`.
   String get tableClass => '${entityName}Table';
+
+  /// The row before insert: `SessionBookingRow` → `NewSessionBookingRow`.
+  String get draftClass => 'New$name';
 
   /// The repository getter on the project's `DwDatabaseHandle` extension:
   /// `SessionBookingRow` → `sessionBookings`.

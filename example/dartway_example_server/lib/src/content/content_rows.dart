@@ -10,7 +10,7 @@ part 'content_rows.dw.dart';
 )
 final class NewsPostRow extends DwTableRow with _$NewsPostRow {
   const NewsPostRow({
-    this.id,
+    required this.id,
     required this.authorProfileId,
     required this.title,
     required this.text,
@@ -18,7 +18,7 @@ final class NewsPostRow extends DwTableRow with _$NewsPostRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('user_profile', onDelete: DwOnDelete.cascade)
   final int authorProfileId;

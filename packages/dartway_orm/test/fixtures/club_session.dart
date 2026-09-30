@@ -16,7 +16,7 @@ part 'club_session.dw.dart';
 )
 final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
   const ClubSessionRow({
-    this.id,
+    required this.id,
     required this.serviceId,
     this.previousSessionId,
     required this.startsAt,
@@ -26,7 +26,7 @@ final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('club_service', onDelete: DwOnDelete.cascade)
   final int serviceId;

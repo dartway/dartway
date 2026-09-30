@@ -30,17 +30,82 @@ mixin _$SessionBookingRow on DwTableRow {
 
 extension SessionBookingRowCopyWith on SessionBookingRow {
   SessionBookingRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? sessionId,
     int? clientProfileId,
     BookingStatus? status,
     DateTime? createdAt,
   }) => SessionBookingRow(
-    id: id.apply(this.id),
+    id: id,
     sessionId: sessionId ?? this.sessionId,
     clientProfileId: clientProfileId ?? this.clientProfileId,
     status: status ?? this.status,
     createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+mixin _$NewSessionBookingRow on DwRowDraft<SessionBookingRow> {
+  NewSessionBookingRow get _self => this as NewSessionBookingRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewSessionBookingRow &&
+          other.sessionId == _self.sessionId &&
+          other.clientProfileId == _self.clientProfileId &&
+          other.status == _self.status &&
+          other.createdAt == _self.createdAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.sessionId,
+    _self.clientProfileId,
+    _self.status,
+    _self.createdAt,
+  );
+
+  @override
+  String toString() =>
+      'NewSessionBookingRow(sessionId: ${_self.sessionId}, clientProfileId: ${_self.clientProfileId}, status: ${_self.status}, createdAt: ${_self.createdAt})';
+}
+
+/// A [SessionBookingRow] before insert: every column but the id.
+final class NewSessionBookingRow extends DwRowDraft<SessionBookingRow>
+    with _$NewSessionBookingRow {
+  const NewSessionBookingRow({
+    required this.sessionId,
+    required this.clientProfileId,
+    required this.status,
+    required this.createdAt,
+  });
+
+  final int sessionId;
+  final int clientProfileId;
+  final BookingStatus status;
+  final DateTime createdAt;
+}
+
+extension NewSessionBookingRowCopyWith on NewSessionBookingRow {
+  NewSessionBookingRow copyWith({
+    int? sessionId,
+    int? clientProfileId,
+    BookingStatus? status,
+    DateTime? createdAt,
+  }) => NewSessionBookingRow(
+    sessionId: sessionId ?? this.sessionId,
+    clientProfileId: clientProfileId ?? this.clientProfileId,
+    status: status ?? this.status,
+    createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+extension NewSessionBookingRowWithId on NewSessionBookingRow {
+  /// The row stored under [id], for `update`.
+  SessionBookingRow withId(int id) => SessionBookingRow(
+    id: id,
+    sessionId: sessionId,
+    clientProfileId: clientProfileId,
+    status: status,
+    createdAt: createdAt,
   );
 }
 
@@ -97,11 +162,18 @@ final class SessionBookingTable extends DwTableDef<SessionBookingRow> {
 
   @override
   Map<String, Object?> toRow(SessionBookingRow row) => {
-    if (row.id != null) 'id': row.id,
     'session_id': row.sessionId,
     'client_profile_id': row.clientProfileId,
     'status': row.status,
     'created_at': row.createdAt,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewSessionBookingRow draft) => {
+    'session_id': draft.sessionId,
+    'client_profile_id': draft.clientProfileId,
+    'status': draft.status,
+    'created_at': draft.createdAt,
   };
 }
 
@@ -134,17 +206,78 @@ mixin _$SessionReviewRow on DwTableRow {
 
 extension SessionReviewRowCopyWith on SessionReviewRow {
   SessionReviewRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? bookingId,
     int? rating,
     DwFieldPatch<String> text = const DwFieldPatch.keep(),
     DateTime? createdAt,
   }) => SessionReviewRow(
-    id: id.apply(this.id),
+    id: id,
     bookingId: bookingId ?? this.bookingId,
     rating: rating ?? this.rating,
     text: text.apply(this.text),
     createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+mixin _$NewSessionReviewRow on DwRowDraft<SessionReviewRow> {
+  NewSessionReviewRow get _self => this as NewSessionReviewRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewSessionReviewRow &&
+          other.bookingId == _self.bookingId &&
+          other.rating == _self.rating &&
+          other.text == _self.text &&
+          other.createdAt == _self.createdAt;
+
+  @override
+  int get hashCode =>
+      Object.hash(_self.bookingId, _self.rating, _self.text, _self.createdAt);
+
+  @override
+  String toString() =>
+      'NewSessionReviewRow(bookingId: ${_self.bookingId}, rating: ${_self.rating}, text: ${_self.text}, createdAt: ${_self.createdAt})';
+}
+
+/// A [SessionReviewRow] before insert: every column but the id.
+final class NewSessionReviewRow extends DwRowDraft<SessionReviewRow>
+    with _$NewSessionReviewRow {
+  const NewSessionReviewRow({
+    required this.bookingId,
+    required this.rating,
+    this.text,
+    required this.createdAt,
+  });
+
+  final int bookingId;
+  final int rating;
+  final String? text;
+  final DateTime createdAt;
+}
+
+extension NewSessionReviewRowCopyWith on NewSessionReviewRow {
+  NewSessionReviewRow copyWith({
+    int? bookingId,
+    int? rating,
+    DwFieldPatch<String> text = const DwFieldPatch.keep(),
+    DateTime? createdAt,
+  }) => NewSessionReviewRow(
+    bookingId: bookingId ?? this.bookingId,
+    rating: rating ?? this.rating,
+    text: text.apply(this.text),
+    createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+extension NewSessionReviewRowWithId on NewSessionReviewRow {
+  /// The row stored under [id], for `update`.
+  SessionReviewRow withId(int id) => SessionReviewRow(
+    id: id,
+    bookingId: bookingId,
+    rating: rating,
+    text: text,
+    createdAt: createdAt,
   );
 }
 
@@ -187,10 +320,17 @@ final class SessionReviewTable extends DwTableDef<SessionReviewRow> {
 
   @override
   Map<String, Object?> toRow(SessionReviewRow row) => {
-    if (row.id != null) 'id': row.id,
     'booking_id': row.bookingId,
     'rating': row.rating,
     'text': row.text,
     'created_at': row.createdAt,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewSessionReviewRow draft) => {
+    'booking_id': draft.bookingId,
+    'rating': draft.rating,
+    'text': draft.text,
+    'created_at': draft.createdAt,
   };
 }

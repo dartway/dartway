@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:dartway_orm/dartway_orm.dart';
 
@@ -54,8 +52,9 @@ abstract class DwStartupStep {
   Future<void> run(DwCallContext ctx);
 }
 
-/// Brings the administrator named by an environment variable into existence at
-/// every start.
+/// Brings the administrator the environment names — `DW_ADMIN_IDENTIFIER`,
+/// read into `DwServerEnvironment.adminIdentifier` — into existence at every
+/// start.
 ///
 /// The admin role is granted by an admin, which leaves the very first one with
 /// nowhere to come from. Naming them per environment is that somewhere, and it
@@ -65,8 +64,8 @@ abstract class DwStartupStep {
 ///
 /// The framework goes as far as the account — accounts and identities are its
 /// own — and hands it to [grant], which is where the project grants whatever
-/// it calls an administrator. Unset, the variable is a warning at every start
-/// and nothing else: a server without an admin serves.
+/// it calls an administrator. Without an [identifier] the step is a warning at
+/// every start and nothing else: a server without an admin serves.
 ///
 /// Idempotent, so it acts as a repair as well as a beginning: an identifier
 /// demoted in the panel is an administrator again on the next start. That is
@@ -75,17 +74,16 @@ abstract class DwStartupStep {
 final class DwFirstAdministrator extends DwStartupStep {
   const DwFirstAdministrator({
     required this.grant,
-    this.variable = defaultVariable,
+    required this.identifier,
     this.kindOf = DwIdentifierKind.of,
-    Map<String, String>? environment,
-  }) : _environment = environment;
+  });
 
-  /// The variable every project uses unless it says otherwise. One name across
-  /// projects is the point: the secret store, `deploy/config.yaml` and this
-  /// documentation all mean the same line.
-  static const String defaultVariable = 'DW_ADMIN_IDENTIFIER';
-
-  final String variable;
+  /// The phone or e-mail to make an administrator: the server's
+  /// `DwServerEnvironment.adminIdentifier`, handed in by `bin/server.dart`
+  /// through the project's server factory. `null` or blank for none —
+  /// required all the same, so a factory that forgot to pass it does not
+  /// compile rather than silently making no administrator.
+  final String? identifier;
 
   /// Which kind of identifier the value is. The default is the framework's
   /// rule, [DwIdentifierKind.of]; a project whose identifiers are neither
@@ -98,11 +96,9 @@ final class DwFirstAdministrator extends DwStartupStep {
   /// whether anything is left to do — and says so, if it wants the line.
   final Future<void> Function(DwCallContext ctx, int accountId) grant;
 
-  final Map<String, String>? _environment;
+  static const String _variable = 'DW_ADMIN_IDENTIFIER';
 
-  Map<String, String> get _values => _environment ?? Platform.environment;
-
-  String get _declared => (_values[variable] ?? '').trim();
+  String get _declared => (identifier ?? '').trim();
 
   @override
   String get name => 'first administrator';
@@ -114,7 +110,7 @@ final class DwFirstAdministrator extends DwStartupStep {
     final kind = kindOf(declared);
     if (auth.normalize(kind, declared) != null) return const [];
     return [
-      '$variable is not an identifier this project accepts: "$declared" '
+      '$_variable is not an identifier this project accepts: "$declared" '
           '(read as a ${kind.name})',
     ];
   }
@@ -124,7 +120,7 @@ final class DwFirstAdministrator extends DwStartupStep {
     final declared = _declared;
     if (declared.isEmpty) {
       ctx.log.warning(
-        'no administrator is declared: set $variable to reach the admin panel',
+        'no administrator is declared: set $_variable to reach the admin panel',
       );
       return;
     }
@@ -205,7 +201,8 @@ final class DwSeedRows<R extends DwTableRow, T extends DwTableDef<R>>
   /// The unique, `NOT NULL` columns a declared row is found by.
   final List<DwTableColumn<Object?>> Function(T t) key;
 
-  final Iterable<R> rows;
+  /// The declared rows, as drafts: the id is the database's, never declared.
+  final Iterable<DwRowDraft<R>> rows;
 
   @override
   List<String> problems(DwAuthConfig auth) {
@@ -235,7 +232,7 @@ final class DwSeedRows<R extends DwTableRow, T extends DwTableDef<R>>
     }
     final seen = <_DwSeedKey>{};
     for (final row in rows) {
-      final values = table.toRow(row);
+      final values = table.toDraftRow(row);
       final key = _DwSeedKey([for (final name in names) values[name]]);
       if (!seen.add(key)) {
         problems.add(

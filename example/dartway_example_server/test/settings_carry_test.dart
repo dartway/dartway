@@ -42,7 +42,11 @@ void main() {
     await migrate((_) => true);
 
     final server = await DwTestServer.start(
-      DartwayExampleServer.build(database: database.config, port: 0),
+      DartwayExampleServer.build(
+        database: database.config,
+        port: 0,
+        adminIdentifier: null,
+      ),
     );
     try {
       expect(

@@ -19,12 +19,16 @@ void main() {
     Future<void> Function(DwTestServer server)? then,
   }) async {
     final server = await DwTestServer.start(
-      DartwayExampleServer.build(database: database.config, port: 0),
+      DartwayExampleServer.build(
+        database: database.config,
+        port: 0,
+        adminIdentifier: null,
+      ),
     );
     try {
       final channels = {
         for (final row in await server.db.chatChannels.find())
-          row.slug: (row.id!, row.title),
+          row.slug: (row.id, row.title),
       };
       await then?.call(server);
       return channels;

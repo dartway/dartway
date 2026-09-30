@@ -26,18 +26,23 @@ const personaCode = '111111';
 /// second copy of it, and the copy is wrong the first time the real one gains
 /// a field.
 Future<void> main() async {
-  final env = DwLocalEnvironment.overlay(Platform.environment);
+  final env = AppEnvironment.read(
+    DwLocalEnvironment.overlay(Platform.environment),
+  );
   final server = DartwayStarterServer.build(
-    database: DwDatabaseConfig.fromEnvironment(env),
+    database: env.server.database,
     // The same storage the real server is configured with: a server built
     // without it declares no file jobs, and the job runner would drop the
     // recurring rows of the one that does.
-    storage: AppFiles.storageConfig(env),
+    storage: env.server.storage,
     // Bound to whatever port is free: the seed serves nobody, it only needs
     // what a server has — a migrated database, the project's auth, a context.
     port: 0,
+    // The seed makes its own personas; the declared administrator is the
+    // real server's business.
+    adminIdentifier: null,
   );
-  await server.start();
+  await server.start(migrateOnly: false);
   try {
     await server.runInContext(_seed, scope: 'seed');
   } finally {

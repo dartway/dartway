@@ -22,7 +22,7 @@ final profileHandlers = <DwCallHandler>[
     handle: (ctx, command) async {
       // Locked: two edits at once would each write the other's fields back.
       final current = (await ctx.db.userProfiles.findById(
-        (await ctx.profile).id!,
+        (await ctx.profile).id,
         lock: DwRowLock.forUpdate,
       ))!;
       final updated = await ctx.db.userProfiles.update(
