@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
+import 'dw_dart_source.dart';
 import 'dw_feature_tree.dart';
 import 'dw_layout.dart';
 
@@ -132,7 +133,7 @@ class DwFlutterStateInspector {
 
   /// Judges one file of `lib/`, [rel] being its path under `lib/`.
   static DwJudgedFile judge(String rel, String content) {
-    final code = blankCommentsAndStrings(content);
+    final code = DwDartSource(content).code;
     final findings = <DwStateFinding>[];
     final allowances = <String>[];
     int lineOf(int offset) =>
@@ -375,7 +376,7 @@ class DwFlutterStateInspector {
       '^([ \\t]*)//[ \\t]*${RegExp.escape(allowMarker)}\\b[ \\t:—-]*(.*)\$',
       multiLine: true,
     );
-    final comments = lineCommentStarts(content);
+    final comments = DwDartSource(content).lineCommentStarts;
     for (final match in marker.allMatches(content)) {
       // Text that only looks like the marker — inside a string or a block
       // comment — is not one.
@@ -468,18 +469,6 @@ class DwFlutterStateInspector {
     }
     return code.length;
   }
-
-  /// [content] with every comment and every string's contents replaced by
-  /// spaces, newlines kept — so an offset in the result is the same offset in
-  /// [content], and a bracket inside a string or a comment is not code.
-  /// Interpolations are blanked with the string around them.
-  static String blankCommentsAndStrings(String content) =>
-      _DwSourceBlanker(content).run();
-
-  /// Where each real `//` comment of [content] starts — not one inside a
-  /// string or a block comment.
-  static Set<int> lineCommentStarts(String content) =>
-      (_DwSourceBlanker(content)..run()).lineCommentStarts;
 }
 
 /// A finding of [DwFlutterStateInspector]: the check, where, and what to do.
@@ -523,94 +512,4 @@ final class _ClassDeclaration {
   final List<String> mixins;
   final int start;
   final int end;
-}
-
-/// The scanner behind [DwFlutterStateInspector.blankCommentsAndStrings].
-final class _DwSourceBlanker {
-  _DwSourceBlanker(this.content) : out = content.split('');
-
-  final String content;
-  final List<String> out;
-  final lineCommentStarts = <int>{};
-
-  String run() {
-    var i = 0;
-    while (i < content.length) {
-      if (content.startsWith('//', i)) {
-        lineCommentStarts.add(i);
-        final end = content.indexOf('\n', i);
-        final stop = end < 0 ? content.length : end;
-        _blank(i, stop);
-        i = stop;
-        continue;
-      }
-      if (content.startsWith('/*', i)) {
-        final close = content.indexOf('*/', i + 2);
-        final stop = close < 0 ? content.length : close + 2;
-        _blank(i, stop);
-        i = stop;
-        continue;
-      }
-      final char = content[i];
-      if (char == "'" || char == '"') {
-        final quoteLength = content.startsWith(char * 3, i) ? 3 : 1;
-        final end = _skipString(i);
-        _blank(i + quoteLength, end - quoteLength);
-        i = end;
-        continue;
-      }
-      i++;
-    }
-    return out.join();
-  }
-
-  void _blank(int from, int to) {
-    for (var i = from; i < to && i < out.length; i++) {
-      if (out[i] != '\n') out[i] = ' ';
-    }
-  }
-
-  /// Past the string whose opening quote is at [start]; an `r` before the
-  /// quote makes it raw. A one-quote string ends at the line's end at most.
-  int _skipString(int start) {
-    final raw =
-        start > 0 &&
-        content[start - 1] == 'r' &&
-        (start < 2 || !RegExp(r'[\w$]').hasMatch(content[start - 2]));
-    final quote = content[start];
-    final delimiter = content.startsWith(quote * 3, start) ? quote * 3 : quote;
-    var i = start + delimiter.length;
-    while (i < content.length) {
-      if (content.startsWith(delimiter, i)) return i + delimiter.length;
-      if (!raw && content[i] == r'\') {
-        i += 2;
-        continue;
-      }
-      if (delimiter.length == 1 && content[i] == '\n') return i;
-      if (!raw && content.startsWith(r'${', i)) {
-        i = _skipInterpolation(i + 1);
-        continue;
-      }
-      i++;
-    }
-    return content.length;
-  }
-
-  /// Past the `}` closing the interpolation whose `{` is at [open], stepping
-  /// over the strings nested in it.
-  int _skipInterpolation(int open) {
-    var depth = 0;
-    var i = open;
-    while (i < content.length) {
-      final char = content[i];
-      if (char == "'" || char == '"') {
-        i = _skipString(i);
-        continue;
-      }
-      if (char == '{') depth++;
-      if (char == '}' && --depth == 0) return i + 1;
-      i++;
-    }
-    return content.length;
-  }
 }

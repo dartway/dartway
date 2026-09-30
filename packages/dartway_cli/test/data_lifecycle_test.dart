@@ -39,6 +39,16 @@ Future<void> up(DwMigrationContext m) =>
       );
     });
 
+    test('reads a raw literal beside a plain one as the same string', () {
+      expect(
+        DwDataLifecycleInspector.dataChangesIn(r"""
+Future<void> up(DwMigrationContext m) =>
+    m.sql('DELETE ' r'FROM "issue_event"');
+"""),
+        [(2, 'DELETE')],
+      );
+    });
+
     test('passes a statement given to backfill', () {
       expect(
         DwDataLifecycleInspector.dataChangesIn(r"""

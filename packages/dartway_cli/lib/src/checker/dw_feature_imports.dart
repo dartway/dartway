@@ -5,7 +5,7 @@ import 'package:yaml/yaml.dart';
 
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
-import 'dw_dart_outline.dart';
+import 'dw_dart_source.dart';
 import 'dw_layout.dart';
 import 'dw_server_features.dart';
 
@@ -228,7 +228,7 @@ class DwFeatureImportInspector {
     if (!schema.existsSync()) return;
     final rowOf = {
       for (final match in _schemaGetter.allMatches(
-        dwBlankNonCode(schema.readAsStringSync()),
+        DwDartSource(schema.readAsStringSync()).code,
       ))
         match.group(1)!: match.group(2)!,
     };
@@ -236,7 +236,9 @@ class DwFeatureImportInspector {
     for (final path in paths) {
       final area = _area(path);
       if (area == null || area == 'core' || area == 'migrations') continue;
-      for (final match in _rowClass.allMatches(dwBlankNonCode(files[path]!))) {
+      for (final match in _rowClass.allMatches(
+        DwDartSource(files[path]!).code,
+      )) {
         featureOf[match.group(1)!] = area;
       }
     }
@@ -244,7 +246,7 @@ class DwFeatureImportInspector {
       final area = _area(path);
       if (area == null || area == 'migrations') continue;
       final content = files[path]!;
-      final code = dwBlankNonCode(content);
+      final code = DwDartSource(content).code;
       for (final match in _tableWrite.allMatches(code)) {
         final row = rowOf[match.group(1)];
         final owner = row == null ? null : featureOf[row];
@@ -289,24 +291,15 @@ class DwFeatureImportInspector {
   /// Found in the text with comments and strings blanked, so a directive
   /// quoted in a string is not one.
   static List<(int, String)> importsIn(String content) {
-    final code = dwBlankNonCode(content);
+    final source = DwDartSource(content);
+    final code = source.code;
     final result = <(int, String)>[];
     for (final match in _directive.allMatches(code)) {
       final end = code.indexOf(';', match.end);
       if (end < 0) continue;
-      final text = content.substring(match.end, end);
-      final blanked = code.substring(match.end, end);
-      for (final literal in _uriLiteral.allMatches(text)) {
-        // A literal the blanking left as code is not a string: skip it.
-        if (blanked.substring(literal.start, literal.end).trim().isNotEmpty) {
-          continue;
-        }
-        final line =
-            '\n'
-                .allMatches(content.substring(0, match.end + literal.start))
-                .length +
-            1;
-        result.add((line, literal.group(2)!));
+      for (final literal in source.literals) {
+        if (literal.start < match.end || literal.end > end) continue;
+        result.add((source.lineOf(literal.contentStart), literal.text));
       }
     }
     return result;
@@ -403,8 +396,6 @@ class DwFeatureImportInspector {
     r'^[ \t]*(?:import|export|part)\b(?!\s+of\b)',
     multiLine: true,
   );
-
-  static final _uriLiteral = RegExp(r'''(['"])([^'"\n]*)\1''');
 
   /// The top folder of [path] under `lib/src/` when it names a feature,
   /// `core` or `migrations`; null for a file at the top of `src/` or a

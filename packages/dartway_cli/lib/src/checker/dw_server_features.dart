@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
 import 'dw_dart_outline.dart';
+import 'dw_dart_source.dart';
 import 'dw_layout.dart';
 
 /// What a file of a server feature may be: `<feature>_<kind>.dart`, or
@@ -319,7 +320,7 @@ class DwServerFeatureInspector {
       if (!file.path.endsWith('.dart') || file.path.endsWith('.dw.dart')) {
         continue;
       }
-      final code = dwBlankNonCode(file.readAsStringSync());
+      final code = DwDartSource(file.readAsStringSync()).code;
       for (final match in declaration.allMatches(code)) {
         extendsOf[match.group(1)!] = match.group(2)!;
       }

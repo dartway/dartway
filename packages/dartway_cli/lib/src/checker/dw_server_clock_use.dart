@@ -4,6 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
+import 'dw_dart_source.dart';
 
 /// The server reads the time from its clock, `ctx.now`
 /// ([DwCheckType.forbiddenDateTimeNow], dartway/dartway#385).
@@ -52,7 +53,7 @@ class DwServerClockInspector {
 
   /// What reads the system clock in [content], as `(line, spelling)`.
   static List<(int, String)> readsIn(String content) {
-    final code = withoutCommentsAndStrings(content);
+    final code = DwDartSource(content, interpolationsAsCode: true).code;
     final matches = [
       ..._systemNow.allMatches(code),
       for (final import in _clockImport.allMatches(content))
@@ -96,67 +97,5 @@ class DwServerClockInspector {
     return DwCheckType.forbiddenDateTimeNow.severity == DwCheckSeverity.error
         ? _findings.length
         : 0;
-  }
-
-  /// [content] with comments removed and string contents blanked, newlines
-  /// kept, so a match is reported on its own line.
-  static String withoutCommentsAndStrings(String content) {
-    final out = StringBuffer();
-    var i = 0;
-    void keepNewlines(int from, int to) {
-      out.write('\n' * '\n'.allMatches(content.substring(from, to)).length);
-    }
-
-    while (i < content.length) {
-      if (content.startsWith('//', i)) {
-        final end = content.indexOf('\n', i);
-        i = end < 0 ? content.length : end;
-        continue;
-      }
-      if (content.startsWith('/*', i)) {
-        final close = content.indexOf('*/', i + 2);
-        final end = close < 0 ? content.length : close + 2;
-        keepNewlines(i, end);
-        i = end;
-        continue;
-      }
-      final char = content[i];
-      if (char == "'" || char == '"') {
-        final raw = i > 0 && content[i - 1] == 'r';
-        final delimiter = content.startsWith(char * 3, i) ? char * 3 : char;
-        var j = i + delimiter.length;
-        // An interpolation is code: `'${DateTime.now()}'` reads the clock.
-        final interpolated = StringBuffer();
-        while (j < content.length && !content.startsWith(delimiter, j)) {
-          if (!raw && content.startsWith(r'${', j)) {
-            var depth = 0;
-            var k = j + 1;
-            for (; k < content.length; k++) {
-              if (content[k] == '{') depth++;
-              if (content[k] == '}' && --depth == 0) break;
-            }
-            interpolated.write(' ${content.substring(j + 2, k)} ');
-            j = k + 1;
-            continue;
-          }
-          j += !raw && content[j] == r'\' ? 2 : 1;
-        }
-        final end = j + delimiter.length > content.length
-            ? content.length
-            : j + delimiter.length;
-        // Newlines inside the interpolations are kept by the text itself.
-        final code = interpolated.toString();
-        out.write('""$code');
-        final skipped =
-            '\n'.allMatches(content.substring(i, end)).length -
-            '\n'.allMatches(code).length;
-        out.write('\n' * (skipped < 0 ? 0 : skipped));
-        i = end;
-        continue;
-      }
-      out.write(char);
-      i++;
-    }
-    return out.toString();
   }
 }

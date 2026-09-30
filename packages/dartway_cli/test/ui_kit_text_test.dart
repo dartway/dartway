@@ -113,6 +113,16 @@ class AppTextStyles {
       );
     });
 
+    test('a literal inside a block comment on the line is not one', () async {
+      final findings = await kitFindings('''
+class AppEmptyState {
+  static const gap = 4; /* was 'Nothing here yet' */
+}
+''');
+
+      expect(findings, isNot(contains(DwCheckType.uiKitContainsText)));
+    });
+
     test('a label in the kit is reported', () async {
       final findings = await kitFindings('''
 class AppEmptyState {

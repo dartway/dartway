@@ -4,7 +4,7 @@ import 'package:path/path.dart' as p;
 
 import 'dw_check_tally.dart';
 import 'dw_check_type.dart';
-import 'dw_dart_outline.dart';
+import 'dw_dart_source.dart';
 import 'dw_flutter_inspector.dart';
 import 'dw_shared_layout.dart';
 
@@ -21,9 +21,9 @@ import 'dw_shared_layout.dart';
 /// constants anyway: a value computed at start rewrites the row at every
 /// start.
 bool dwIsSeedDataFile(String source) {
-  final code = dwBlankNonCode(
+  final code = DwDartSource(
     source,
-  ).replaceAll(RegExp(r'\b(?:library|import|export|part)\b[^;]*;'), '');
+  ).code.replaceAll(RegExp(r'\b(?:library|import|export|part)\b[^;]*;'), '');
   var drafts = 0;
   var i = 0;
   while (code.substring(i).trim().isNotEmpty) {

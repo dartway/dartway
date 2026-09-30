@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'dw_check_type.dart';
+import 'dw_dart_source.dart';
 import 'dw_feature_tree.dart';
 import 'dw_layout.dart';
 import 'dw_route_names.dart';
@@ -590,8 +591,8 @@ class DwFlutterInspector {
       final openedFallbackList = insideFallbackList;
       insideFallbackList = _fontFallbackListContinues(line, insideFallbackList);
 
-      for (final match in _DwStringLiteral.allIn(line)) {
-        if (match.value.length < 3) continue;
+      for (final match in _literalsOn(line)) {
+        if (match.text.length < 3) continue;
         // A pattern is not a label either: nobody reads `r'\D'`.
         if (_regExpArgument.hasMatch(line.substring(0, match.start))) {
           continue;
@@ -605,7 +606,7 @@ class DwFlutterInspector {
           continue;
         }
 
-        final String? value = match.value;
+        final String? value = match.text;
         // Skip paths, translations, interpolations, date formats and the like.
         final isException =
             value == null ||
@@ -662,7 +663,7 @@ class DwFlutterInspector {
   static String _maskLiterals(String line) {
     final masked = StringBuffer();
     var at = 0;
-    for (final literal in _DwStringLiteral.allIn(line)) {
+    for (final literal in _literalsOn(line)) {
       masked
         ..write(line.substring(at, literal.start))
         ..write('_' * (literal.end - literal.start));
@@ -816,67 +817,10 @@ class _DwGrade {
   final String badge;
 }
 
-/// A string literal on one line, as Dart reads it: its quote, `r` for raw,
-/// escapes in a cooked one. A pattern of quote characters could not tell
-/// `r'\D'` from the closing quote of the literal before it, and quoted the
-/// text between two literals as a label no one had written.
-class _DwStringLiteral {
-  const _DwStringLiteral(this.start, this.end, this.value);
-
-  /// Where the literal starts (its `r`, if raw) and ends, past the quote.
-  final int start;
-  final int end;
-
-  /// What is between the quotes, as written.
-  final String value;
-
-  /// Every literal on [line] that closes on it; one left open (a multi-line
-  /// string) ends the scan.
-  static List<_DwStringLiteral> allIn(String line) {
-    final found = <_DwStringLiteral>[];
-    var i = 0;
-    while (i < line.length) {
-      final char = line[i];
-      if (char == '/' && i + 1 < line.length && line[i + 1] == '/') break;
-      final raw =
-          char == 'r' &&
-          i + 1 < line.length &&
-          (line[i + 1] == "'" || line[i + 1] == '"') &&
-          (i == 0 || !RegExp(r'[A-Za-z0-9_$]').hasMatch(line[i - 1]));
-      final quoteAt = raw ? i + 1 : i;
-      final quote = line[quoteAt];
-      if (quote != "'" && quote != '"') {
-        i++;
-        continue;
-      }
-      final triple = line.startsWith(quote * 3, quoteAt);
-      final delimiter = triple ? quote * 3 : quote;
-      var j = quoteAt + delimiter.length;
-      int? close;
-      while (j < line.length) {
-        if (!raw && line[j] == r'\') {
-          j += 2;
-          continue;
-        }
-        if (line.startsWith(delimiter, j)) {
-          close = j;
-          break;
-        }
-        j++;
-      }
-      if (close == null) break;
-      found.add(
-        _DwStringLiteral(
-          i,
-          close + delimiter.length,
-          line.substring(quoteAt + delimiter.length, close),
-        ),
-      );
-      i = close + delimiter.length;
-    }
-    return found;
-  }
-}
+/// Every literal on [line] that closes on it: a multi-line string opened on
+/// it is none.
+Iterable<DwStringLiteral> _literalsOn(String line) =>
+    DwDartSource(line).literals.where((literal) => literal.closed);
 
 /// `RegExp(` directly before a literal: its pattern.
 final _regExpArgument = RegExp(r'\bRegExp\(\s*$');
