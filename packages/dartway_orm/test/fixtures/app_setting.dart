@@ -11,7 +11,7 @@ part 'app_setting.dw.dart';
 @DwSqlTable('app_setting')
 final class AppSettingRow extends DwTableRow with _$AppSettingRow {
   const AppSettingRow({
-    this.id,
+    required this.id,
     required this.key,
     required this.value,
     this.limits = const {},
@@ -20,7 +20,7 @@ final class AppSettingRow extends DwTableRow with _$AppSettingRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwUniqueColumn()
   final String key;

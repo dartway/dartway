@@ -19,10 +19,41 @@ mixin _$ChatChannelRow on DwTableRow {
 }
 
 extension ChatChannelRowCopyWith on ChatChannelRow {
-  ChatChannelRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
-    String? title,
-  }) => ChatChannelRow(id: id.apply(this.id), title: title ?? this.title);
+  ChatChannelRow copyWith({String? title}) =>
+      ChatChannelRow(id: id, title: title ?? this.title);
+}
+
+mixin _$NewChatChannelRow on DwRowDraft<ChatChannelRow> {
+  NewChatChannelRow get _self => this as NewChatChannelRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatChannelRow && other.title == _self.title;
+
+  @override
+  int get hashCode => _self.title.hashCode;
+
+  @override
+  String toString() => 'NewChatChannelRow(title: ${_self.title})';
+}
+
+/// A [ChatChannelRow] before insert: every column but the id.
+final class NewChatChannelRow extends DwRowDraft<ChatChannelRow>
+    with _$NewChatChannelRow {
+  const NewChatChannelRow({required this.title});
+
+  final String title;
+}
+
+extension NewChatChannelRowCopyWith on NewChatChannelRow {
+  NewChatChannelRow copyWith({String? title}) =>
+      NewChatChannelRow(title: title ?? this.title);
+}
+
+extension NewChatChannelRowWithId on NewChatChannelRow {
+  /// The row stored under [id], for `update`.
+  ChatChannelRow withId(int id) => ChatChannelRow(id: id, title: title);
 }
 
 final class ChatChannelTable extends DwTableDef<ChatChannelRow> {
@@ -39,9 +70,11 @@ final class ChatChannelTable extends DwTableDef<ChatChannelRow> {
       ChatChannelRow(id: row.decode(id), title: row.decode(title));
 
   @override
-  Map<String, Object?> toRow(ChatChannelRow row) => {
-    if (row.id != null) 'id': row.id,
-    'title': row.title,
+  Map<String, Object?> toRow(ChatChannelRow row) => {'title': row.title};
+
+  @override
+  Map<String, Object?> toDraftRow(NewChatChannelRow draft) => {
+    'title': draft.title,
   };
 }
 
@@ -84,7 +117,6 @@ mixin _$ChatMessageRow on DwTableRow {
 
 extension ChatMessageRowCopyWith on ChatMessageRow {
   ChatMessageRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? channelId,
     int? authorProfileId,
     String? text,
@@ -95,7 +127,7 @@ extension ChatMessageRowCopyWith on ChatMessageRow {
     DwFieldPatch<int> replyToMessageId = const DwFieldPatch.keep(),
     DwFieldPatch<DateTime> deletedAt = const DwFieldPatch.keep(),
   }) => ChatMessageRow(
-    id: id.apply(this.id),
+    id: id,
     channelId: channelId ?? this.channelId,
     authorProfileId: authorProfileId ?? this.authorProfileId,
     text: text ?? this.text,
@@ -105,6 +137,107 @@ extension ChatMessageRowCopyWith on ChatMessageRow {
     pinnedByProfileId: pinnedByProfileId.apply(this.pinnedByProfileId),
     replyToMessageId: replyToMessageId.apply(this.replyToMessageId),
     deletedAt: deletedAt.apply(this.deletedAt),
+  );
+}
+
+mixin _$NewChatMessageRow on DwRowDraft<ChatMessageRow> {
+  NewChatMessageRow get _self => this as NewChatMessageRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatMessageRow &&
+          other.channelId == _self.channelId &&
+          other.authorProfileId == _self.authorProfileId &&
+          other.text == _self.text &&
+          other.sentAt == _self.sentAt &&
+          other.editedAt == _self.editedAt &&
+          other.pinnedAt == _self.pinnedAt &&
+          other.pinnedByProfileId == _self.pinnedByProfileId &&
+          other.replyToMessageId == _self.replyToMessageId &&
+          other.deletedAt == _self.deletedAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.channelId,
+    _self.authorProfileId,
+    _self.text,
+    _self.sentAt,
+    _self.editedAt,
+    _self.pinnedAt,
+    _self.pinnedByProfileId,
+    _self.replyToMessageId,
+    _self.deletedAt,
+  );
+
+  @override
+  String toString() =>
+      'NewChatMessageRow(channelId: ${_self.channelId}, authorProfileId: ${_self.authorProfileId}, text: ${_self.text}, sentAt: ${_self.sentAt}, editedAt: ${_self.editedAt}, pinnedAt: ${_self.pinnedAt}, pinnedByProfileId: ${_self.pinnedByProfileId}, replyToMessageId: ${_self.replyToMessageId}, deletedAt: ${_self.deletedAt})';
+}
+
+/// A [ChatMessageRow] before insert: every column but the id.
+final class NewChatMessageRow extends DwRowDraft<ChatMessageRow>
+    with _$NewChatMessageRow {
+  const NewChatMessageRow({
+    required this.channelId,
+    required this.authorProfileId,
+    required this.text,
+    required this.sentAt,
+    this.editedAt,
+    this.pinnedAt,
+    this.pinnedByProfileId,
+    this.replyToMessageId,
+    this.deletedAt,
+  });
+
+  final int channelId;
+  final int authorProfileId;
+  final String text;
+  final DateTime sentAt;
+  final DateTime? editedAt;
+  final DateTime? pinnedAt;
+  final int? pinnedByProfileId;
+  final int? replyToMessageId;
+  final DateTime? deletedAt;
+}
+
+extension NewChatMessageRowCopyWith on NewChatMessageRow {
+  NewChatMessageRow copyWith({
+    int? channelId,
+    int? authorProfileId,
+    String? text,
+    DateTime? sentAt,
+    DwFieldPatch<DateTime> editedAt = const DwFieldPatch.keep(),
+    DwFieldPatch<DateTime> pinnedAt = const DwFieldPatch.keep(),
+    DwFieldPatch<int> pinnedByProfileId = const DwFieldPatch.keep(),
+    DwFieldPatch<int> replyToMessageId = const DwFieldPatch.keep(),
+    DwFieldPatch<DateTime> deletedAt = const DwFieldPatch.keep(),
+  }) => NewChatMessageRow(
+    channelId: channelId ?? this.channelId,
+    authorProfileId: authorProfileId ?? this.authorProfileId,
+    text: text ?? this.text,
+    sentAt: sentAt ?? this.sentAt,
+    editedAt: editedAt.apply(this.editedAt),
+    pinnedAt: pinnedAt.apply(this.pinnedAt),
+    pinnedByProfileId: pinnedByProfileId.apply(this.pinnedByProfileId),
+    replyToMessageId: replyToMessageId.apply(this.replyToMessageId),
+    deletedAt: deletedAt.apply(this.deletedAt),
+  );
+}
+
+extension NewChatMessageRowWithId on NewChatMessageRow {
+  /// The row stored under [id], for `update`.
+  ChatMessageRow withId(int id) => ChatMessageRow(
+    id: id,
+    channelId: channelId,
+    authorProfileId: authorProfileId,
+    text: text,
+    sentAt: sentAt,
+    editedAt: editedAt,
+    pinnedAt: pinnedAt,
+    pinnedByProfileId: pinnedByProfileId,
+    replyToMessageId: replyToMessageId,
+    deletedAt: deletedAt,
   );
 }
 
@@ -189,7 +322,6 @@ final class ChatMessageTable extends DwTableDef<ChatMessageRow> {
 
   @override
   Map<String, Object?> toRow(ChatMessageRow row) => {
-    if (row.id != null) 'id': row.id,
     'channel_id': row.channelId,
     'author_profile_id': row.authorProfileId,
     'text': row.text,
@@ -199,6 +331,19 @@ final class ChatMessageTable extends DwTableDef<ChatMessageRow> {
     'pinned_by_profile_id': row.pinnedByProfileId,
     'reply_to_message_id': row.replyToMessageId,
     'deleted_at': row.deletedAt,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewChatMessageRow draft) => {
+    'channel_id': draft.channelId,
+    'author_profile_id': draft.authorProfileId,
+    'text': draft.text,
+    'sent_at': draft.sentAt,
+    'edited_at': draft.editedAt,
+    'pinned_at': draft.pinnedAt,
+    'pinned_by_profile_id': draft.pinnedByProfileId,
+    'reply_to_message_id': draft.replyToMessageId,
+    'deleted_at': draft.deletedAt,
   };
 }
 
@@ -233,19 +378,92 @@ mixin _$ChatMessageAttachmentRow on DwTableRow {
 
 extension ChatMessageAttachmentRowCopyWith on ChatMessageAttachmentRow {
   ChatMessageAttachmentRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? messageId,
     int? fileId,
     int? position,
     DwFieldPatch<int> width = const DwFieldPatch.keep(),
     DwFieldPatch<int> height = const DwFieldPatch.keep(),
   }) => ChatMessageAttachmentRow(
-    id: id.apply(this.id),
+    id: id,
     messageId: messageId ?? this.messageId,
     fileId: fileId ?? this.fileId,
     position: position ?? this.position,
     width: width.apply(this.width),
     height: height.apply(this.height),
+  );
+}
+
+mixin _$NewChatMessageAttachmentRow on DwRowDraft<ChatMessageAttachmentRow> {
+  NewChatMessageAttachmentRow get _self => this as NewChatMessageAttachmentRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatMessageAttachmentRow &&
+          other.messageId == _self.messageId &&
+          other.fileId == _self.fileId &&
+          other.position == _self.position &&
+          other.width == _self.width &&
+          other.height == _self.height;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.messageId,
+    _self.fileId,
+    _self.position,
+    _self.width,
+    _self.height,
+  );
+
+  @override
+  String toString() =>
+      'NewChatMessageAttachmentRow(messageId: ${_self.messageId}, fileId: ${_self.fileId}, position: ${_self.position}, width: ${_self.width}, height: ${_self.height})';
+}
+
+/// A [ChatMessageAttachmentRow] before insert: every column but the id.
+final class NewChatMessageAttachmentRow
+    extends DwRowDraft<ChatMessageAttachmentRow>
+    with _$NewChatMessageAttachmentRow {
+  const NewChatMessageAttachmentRow({
+    required this.messageId,
+    required this.fileId,
+    required this.position,
+    this.width,
+    this.height,
+  });
+
+  final int messageId;
+  final int fileId;
+  final int position;
+  final int? width;
+  final int? height;
+}
+
+extension NewChatMessageAttachmentRowCopyWith on NewChatMessageAttachmentRow {
+  NewChatMessageAttachmentRow copyWith({
+    int? messageId,
+    int? fileId,
+    int? position,
+    DwFieldPatch<int> width = const DwFieldPatch.keep(),
+    DwFieldPatch<int> height = const DwFieldPatch.keep(),
+  }) => NewChatMessageAttachmentRow(
+    messageId: messageId ?? this.messageId,
+    fileId: fileId ?? this.fileId,
+    position: position ?? this.position,
+    width: width.apply(this.width),
+    height: height.apply(this.height),
+  );
+}
+
+extension NewChatMessageAttachmentRowWithId on NewChatMessageAttachmentRow {
+  /// The row stored under [id], for `update`.
+  ChatMessageAttachmentRow withId(int id) => ChatMessageAttachmentRow(
+    id: id,
+    messageId: messageId,
+    fileId: fileId,
+    position: position,
+    width: width,
+    height: height,
   );
 }
 
@@ -305,12 +523,20 @@ final class ChatMessageAttachmentTable
 
   @override
   Map<String, Object?> toRow(ChatMessageAttachmentRow row) => {
-    if (row.id != null) 'id': row.id,
     'message_id': row.messageId,
     'file_id': row.fileId,
     'position': row.position,
     'width': row.width,
     'height': row.height,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewChatMessageAttachmentRow draft) => {
+    'message_id': draft.messageId,
+    'file_id': draft.fileId,
+    'position': draft.position,
+    'width': draft.width,
+    'height': draft.height,
   };
 }
 
@@ -337,15 +563,70 @@ mixin _$ChatMessageReactionRow on DwTableRow {
 
 extension ChatMessageReactionRowCopyWith on ChatMessageReactionRow {
   ChatMessageReactionRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? messageId,
     int? profileId,
     ChatReaction? reaction,
   }) => ChatMessageReactionRow(
-    id: id.apply(this.id),
+    id: id,
     messageId: messageId ?? this.messageId,
     profileId: profileId ?? this.profileId,
     reaction: reaction ?? this.reaction,
+  );
+}
+
+mixin _$NewChatMessageReactionRow on DwRowDraft<ChatMessageReactionRow> {
+  NewChatMessageReactionRow get _self => this as NewChatMessageReactionRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatMessageReactionRow &&
+          other.messageId == _self.messageId &&
+          other.profileId == _self.profileId &&
+          other.reaction == _self.reaction;
+
+  @override
+  int get hashCode =>
+      Object.hash(_self.messageId, _self.profileId, _self.reaction);
+
+  @override
+  String toString() =>
+      'NewChatMessageReactionRow(messageId: ${_self.messageId}, profileId: ${_self.profileId}, reaction: ${_self.reaction})';
+}
+
+/// A [ChatMessageReactionRow] before insert: every column but the id.
+final class NewChatMessageReactionRow extends DwRowDraft<ChatMessageReactionRow>
+    with _$NewChatMessageReactionRow {
+  const NewChatMessageReactionRow({
+    required this.messageId,
+    required this.profileId,
+    required this.reaction,
+  });
+
+  final int messageId;
+  final int profileId;
+  final ChatReaction reaction;
+}
+
+extension NewChatMessageReactionRowCopyWith on NewChatMessageReactionRow {
+  NewChatMessageReactionRow copyWith({
+    int? messageId,
+    int? profileId,
+    ChatReaction? reaction,
+  }) => NewChatMessageReactionRow(
+    messageId: messageId ?? this.messageId,
+    profileId: profileId ?? this.profileId,
+    reaction: reaction ?? this.reaction,
+  );
+}
+
+extension NewChatMessageReactionRowWithId on NewChatMessageReactionRow {
+  /// The row stored under [id], for `update`.
+  ChatMessageReactionRow withId(int id) => ChatMessageReactionRow(
+    id: id,
+    messageId: messageId,
+    profileId: profileId,
+    reaction: reaction,
   );
 }
 
@@ -394,10 +675,16 @@ final class ChatMessageReactionTable
 
   @override
   Map<String, Object?> toRow(ChatMessageReactionRow row) => {
-    if (row.id != null) 'id': row.id,
     'message_id': row.messageId,
     'profile_id': row.profileId,
     'reaction': row.reaction,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewChatMessageReactionRow draft) => {
+    'message_id': draft.messageId,
+    'profile_id': draft.profileId,
+    'reaction': draft.reaction,
   };
 }
 
@@ -430,17 +717,82 @@ mixin _$ChatReadPositionRow on DwTableRow {
 
 extension ChatReadPositionRowCopyWith on ChatReadPositionRow {
   ChatReadPositionRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? profileId,
     int? channelId,
     int? messageId,
     DateTime? sentAt,
   }) => ChatReadPositionRow(
-    id: id.apply(this.id),
+    id: id,
     profileId: profileId ?? this.profileId,
     channelId: channelId ?? this.channelId,
     messageId: messageId ?? this.messageId,
     sentAt: sentAt ?? this.sentAt,
+  );
+}
+
+mixin _$NewChatReadPositionRow on DwRowDraft<ChatReadPositionRow> {
+  NewChatReadPositionRow get _self => this as NewChatReadPositionRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewChatReadPositionRow &&
+          other.profileId == _self.profileId &&
+          other.channelId == _self.channelId &&
+          other.messageId == _self.messageId &&
+          other.sentAt == _self.sentAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.profileId,
+    _self.channelId,
+    _self.messageId,
+    _self.sentAt,
+  );
+
+  @override
+  String toString() =>
+      'NewChatReadPositionRow(profileId: ${_self.profileId}, channelId: ${_self.channelId}, messageId: ${_self.messageId}, sentAt: ${_self.sentAt})';
+}
+
+/// A [ChatReadPositionRow] before insert: every column but the id.
+final class NewChatReadPositionRow extends DwRowDraft<ChatReadPositionRow>
+    with _$NewChatReadPositionRow {
+  const NewChatReadPositionRow({
+    required this.profileId,
+    required this.channelId,
+    required this.messageId,
+    required this.sentAt,
+  });
+
+  final int profileId;
+  final int channelId;
+  final int messageId;
+  final DateTime sentAt;
+}
+
+extension NewChatReadPositionRowCopyWith on NewChatReadPositionRow {
+  NewChatReadPositionRow copyWith({
+    int? profileId,
+    int? channelId,
+    int? messageId,
+    DateTime? sentAt,
+  }) => NewChatReadPositionRow(
+    profileId: profileId ?? this.profileId,
+    channelId: channelId ?? this.channelId,
+    messageId: messageId ?? this.messageId,
+    sentAt: sentAt ?? this.sentAt,
+  );
+}
+
+extension NewChatReadPositionRowWithId on NewChatReadPositionRow {
+  /// The row stored under [id], for `update`.
+  ChatReadPositionRow withId(int id) => ChatReadPositionRow(
+    id: id,
+    profileId: profileId,
+    channelId: channelId,
+    messageId: messageId,
+    sentAt: sentAt,
   );
 }
 
@@ -496,10 +848,17 @@ final class ChatReadPositionTable extends DwTableDef<ChatReadPositionRow> {
 
   @override
   Map<String, Object?> toRow(ChatReadPositionRow row) => {
-    if (row.id != null) 'id': row.id,
     'profile_id': row.profileId,
     'channel_id': row.channelId,
     'message_id': row.messageId,
     'sent_at': row.sentAt,
+  };
+
+  @override
+  Map<String, Object?> toDraftRow(NewChatReadPositionRow draft) => {
+    'profile_id': draft.profileId,
+    'channel_id': draft.channelId,
+    'message_id': draft.messageId,
+    'sent_at': draft.sentAt,
   };
 }

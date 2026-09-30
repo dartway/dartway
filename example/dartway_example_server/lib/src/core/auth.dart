@@ -76,7 +76,7 @@ abstract final class AppAuth {
       // coming, and the next member should be able to book them.
       final held = await ctx.db.sessionBookings.find(
         where: (t) =>
-            t.clientProfileId.equals(profile.id!) &
+            t.clientProfileId.equals(profile.id) &
             t.status.equals(BookingStatus.booked),
         lock: DwRowLock.forUpdate,
       );
@@ -153,7 +153,7 @@ abstract final class AppAuth {
     String phone,
     Map<String, String> registration,
   ) => ctx.db.userProfiles.insert(
-    UserProfileRow(
+    NewUserProfileRow(
       accountId: accountId,
       phone: phone,
       firstName: registration['firstName']?.trim() ?? '',

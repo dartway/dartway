@@ -23,7 +23,7 @@ final profileHandlers = <DwCallHandler>[
     access: DwAccessRule.signedIn,
     handle: (ctx, command) async {
       final current = (await ctx.db.userProfiles.findById(
-        (await ctx.profile).id!,
+        (await ctx.profile).id,
         lock: DwRowLock.forUpdate,
       ))!;
       final previousAvatar = current.avatarFileId;

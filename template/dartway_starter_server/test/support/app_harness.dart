@@ -148,7 +148,7 @@ final class AppMember {
   Future<UserProfileRow> profileRow() async => (await _harness.db.userProfiles
       .findFirst(where: (t) => t.accountId.equals(accountId)))!;
 
-  Future<int> get profileId async => (await profileRow()).id!;
+  Future<int> get profileId async => (await profileRow()).id;
 
   /// Watches [request] and waits until it is live.
   Future<DwRequestWatch<R>> watch<R>(DwDataRequest<R> request) async {

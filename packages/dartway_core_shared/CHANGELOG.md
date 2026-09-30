@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.12
+
+- Nothing changed here; the family moves in lockstep with `dartway_orm` (dartway/dartway#384).
+
 ## 0.21.0-dev.11
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).

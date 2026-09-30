@@ -249,7 +249,14 @@ enum DwCheckType {
   ///
   /// A warning: it reads the shape of the code, not its meaning, and a
   /// comparison it matches may be something else.
-  inlineOwnershipCheck;
+  inlineOwnershipCheck,
+
+  /// The server or the shared package's `analysis_options.yaml` does not raise
+  /// `unnecessary_non_null_assertion` to an error (D-113). A stored row's id is
+  /// `int`, so `row.id!` is a `!` that means nothing — and one that means
+  /// nothing hides the one that guards a real null. The analyzer finds each
+  /// of them; this holds that the project told it to fail on them.
+  redundantBangAllowed;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///

@@ -371,7 +371,7 @@ static Future<List<ClubSession>> sessions(
     for (final row in await db.clubServices.findByIds(
       rows.map((s) => s.serviceId).toSet(),
     ))
-      row.id!: service(row),
+      row.id: service(row),
   };
   final coaches = await ProfileObjects.rowsById(
     db,
@@ -380,7 +380,7 @@ static Future<List<ClubSession>> sessions(
   return [
     for (final row in rows)
       ClubSession(
-        id: row.id!,
+        id: row.id,
         service: services[row.serviceId]!,
         coach: switch (coaches[row.coachProfileId]) {
           final coach? => ProfileObjects.person(coach),

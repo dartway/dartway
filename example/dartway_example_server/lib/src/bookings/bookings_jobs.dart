@@ -55,7 +55,7 @@ final bookingsJobs = <DwJobDefinition>[
         [client.ownerAccountId],
         message: DwPushMessage(title: service.title, link: '/bookings'),
         category: DartwayExamplePushCategory.bookingReminder,
-        dedupKey: BookingsJobs.remindKey(booking.id!),
+        dedupKey: BookingsJobs.remindKey(booking.id),
       );
     },
   ),

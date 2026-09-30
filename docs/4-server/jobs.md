@@ -81,7 +81,7 @@ Future<bool> enqueue<P>(
   String? key,
 });
 
-await ctx.jobs.enqueue(InvoicesJobs.send, (invoiceId: invoice.id!));
+await ctx.jobs.enqueue(InvoicesJobs.send, (invoiceId: invoice.id));
 ```
 
 - The row is written through `ctx.db`, so **an enqueue joins the enclosing transaction**: inside a

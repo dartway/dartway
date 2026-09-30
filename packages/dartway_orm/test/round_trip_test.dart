@@ -90,7 +90,7 @@ void main() {
       ),
       1,
     );
-    final setting = AppSettingRow(
+    final setting = NewAppSettingRow(
       key: 'rt',
       value: 'v',
       updatedAt: DateTime.utc(2026),

@@ -16,7 +16,7 @@ part 'catalog_entry.dw.dart';
 )
 final class CatalogEntryRow extends DwTableRow with _$CatalogEntryRow {
   const CatalogEntryRow({
-    this.id,
+    required this.id,
     required this.name,
     this.schema,
     required this.columns,
@@ -27,7 +27,7 @@ final class CatalogEntryRow extends DwTableRow with _$CatalogEntryRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   final String name;
   final String? schema;

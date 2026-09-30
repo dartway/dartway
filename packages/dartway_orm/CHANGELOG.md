@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.21.0-dev.12
+
+- **BREAKING: a row's `id` is `int`, and a row not stored yet is its draft.** `DwTableRow.id` is
+  non-null — every row comes out of the database, which assigned it — so a stored row's id is read
+  without `!`. `insert`, `tryInsert`, `insertAll` and `upsert` take a `DwRowDraft<R>` (generated as
+  `New<Entity>Row`) and answer the stored row; `DwTableDef` gains `toDraftRow`, and `toRow` no
+  longer carries the id. An insert with an id of one's own is gone, with `insertAll`'s "every row
+  has an id or none has" (it also left the `bigserial` sequence behind the rows). `update(row)`
+  needs no id check: the type holds it (dartway/dartway#384).
+
 ## 0.21.0-dev.11
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).

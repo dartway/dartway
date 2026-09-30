@@ -67,22 +67,24 @@ From the project root or from inside the `*_flutter` package, in this order:
 
 1. **the declared top level** of the Flutter package and the server package (`invalidTopLevelLayout`);
 2. **localization wiring** (`l10nNotWired`);
-3. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
+3. **analysis options**: the server and the shared package raise `unnecessary_non_null_assertion` to
+   an error (`redundantBangAllowed`);
+4. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
    (`generatedCodeStale`);
-4. **the environment and outbound HTTP** in the server package: `Platform.environment` outside
+5. **the environment and outbound HTTP** in the server package: `Platform.environment` outside
    `lib/src/core/environment.dart`, and in `bin/` anything but `DwLocalEnvironment.overlay(Platform.environment)`
    or a map read by a variable's name (`forbiddenEnvironmentRead`); an `HttpClient(` or a
    `package:http` import in `lib/` (`forbiddenHttpClient`);
-5. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
-6. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
+6. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
+7. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
    and **framework overrides** that the framework has caught up with (`frameworkOverrideOutlived`);
-7. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
+8. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
    development containers' credentials against what the server is told to reach them by
    (`devComposeDrifted`);
-8. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
+9. **the Flutter package**: the UI kit, the feature tree of every zone, and the content of every file
    in the zones and `shared/` — the other sixteen checks.
 
-`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 8 and skips
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of step 9 and skips
 steps 1–7 and the UI kit pass: each of those judges a whole package or the whole project, and has
 nothing to say about one folder. `--type <check>` runs one check by name; `--level
 info|warning|error` runs the checks of one severity.
@@ -110,7 +112,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Twenty errors, eleven warnings, one info — `DwCheckType` and its `severity` in
+Twenty-one errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -133,6 +135,7 @@ Twenty errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `forbiddenDateTimeNow` | error | `DateTime.now` or `DateTime.timestamp` (called or torn off, interpolations included), or `package:clock`'s `clock.now()` where it is imported (prefixed or not), anywhere in the server's `lib/` — the factory file included — the time there is `ctx.now`, the server's clock, which tests set and the job queue runs by. Comments and strings are passed over; `bin/` and `test/` are not judged |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
+| `redundantBangAllowed` | error | The server or the shared package's `analysis_options.yaml` (or a local file it includes) does not set `analyzer: errors: unnecessary_non_null_assertion: error` — a stored row's id is `int`, and `row.id!` hides the `!` that guards a real null (D-113) |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |

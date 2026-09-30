@@ -117,19 +117,19 @@ Future<void> _seed(DwCallContext ctx) async {
   }
 
   final services = await db.clubServices.insertAll([
-    const ClubServiceRow(
+    const NewClubServiceRow(
       title: 'Yoga',
       description: 'A slow morning flow for every level.',
       durationMinutes: 60,
       price: 1200,
     ),
-    const ClubServiceRow(
+    const NewClubServiceRow(
       title: 'Strength',
       description: 'Barbell basics in a small group.',
       durationMinutes: 50,
       price: 1500,
     ),
-    const ClubServiceRow(
+    const NewClubServiceRow(
       title: 'Personal training',
       description: 'One coach, one client, your plan.',
       durationMinutes: 60,
@@ -141,21 +141,21 @@ Future<void> _seed(DwCallContext ctx) async {
   final today = DateTime(now.year, now.month, now.day);
   await db.clubSessions.insertAll([
     for (var day = 1; day <= 7; day++) ...[
-      ClubSessionRow(
-        serviceId: services[0].id!,
+      NewClubSessionRow(
+        serviceId: services[0].id,
         coachProfileId: coach.id,
         startsAt: today.add(Duration(days: day, hours: 9)),
         capacity: 12,
       ),
       if (day.isOdd)
-        ClubSessionRow(
-          serviceId: services[2].id!,
+        NewClubSessionRow(
+          serviceId: services[2].id,
           coachProfileId: coach.id,
           startsAt: today.add(Duration(days: day, hours: 12)),
           capacity: 1,
         ),
-      ClubSessionRow(
-        serviceId: services[1].id!,
+      NewClubSessionRow(
+        serviceId: services[1].id,
         coachProfileId: coach.id,
         startsAt: today.add(Duration(days: day, hours: 18)),
         capacity: 8,
@@ -165,8 +165,8 @@ Future<void> _seed(DwCallContext ctx) async {
 
   final chat = await _seedChat(db, admin: admin, staff: [coach, galina]);
   await db.newsPosts.insert(
-    NewsPostRow(
-      authorProfileId: coach.id!,
+    NewNewsPostRow(
+      authorProfileId: coach.id,
       title: 'The club is open',
       text: 'Book your first class in the schedule.',
       createdAt: now,
@@ -201,9 +201,9 @@ Future<({int channels, int messages})> _seedChat(
   final now = DateTime.now();
 
   final channels = await db.chatChannels.insertAll(const [
-    ChatChannelRow(title: 'Front desk'),
-    ChatChannelRow(title: 'Coaches'),
-    ChatChannelRow(title: 'Maintenance'),
+    NewChatChannelRow(title: 'Front desk'),
+    NewChatChannelRow(title: 'Coaches'),
+    NewChatChannelRow(title: 'Maintenance'),
   ]);
   final [desk, coaches, maintenance] = channels;
 
@@ -250,16 +250,16 @@ Future<({int channels, int messages})> _seedChat(
         : more.join(' ');
   }
 
-  List<ChatMessageRow> history(
+  List<NewChatMessageRow> history(
     ChatChannelRow channel,
     int count,
     int days,
     List<String> lines,
   ) => [
     for (final (index, sentAt) in instants(count, days).indexed)
-      ChatMessageRow(
-        channelId: channel.id!,
-        authorProfileId: members[random.nextInt(members.length)].id!,
+      NewChatMessageRow(
+        channelId: channel.id,
+        authorProfileId: members[random.nextInt(members.length)].id,
         text: textFrom(lines),
         sentAt: sentAt,
         editedAt: index % 23 == 7
@@ -279,7 +279,7 @@ Future<({int channels, int messages})> _seedChat(
       if (row.channelId == desk.id) row,
   ];
 
-  final replies = <ChatMessageRow>[];
+  final replies = <NewChatMessageRow>[];
   for (var i = 0; i < deskReplies; i++) {
     final quoted = deskPlain[random.nextInt(deskPlain.length)];
     final others = [
@@ -287,9 +287,9 @@ Future<({int channels, int messages})> _seedChat(
         if (member.id != quoted.authorProfileId) member,
     ];
     replies.add(
-      ChatMessageRow(
-        channelId: desk.id!,
-        authorProfileId: others[random.nextInt(others.length)].id!,
+      NewChatMessageRow(
+        channelId: desk.id,
+        authorProfileId: others[random.nextInt(others.length)].id,
         text: _replyLines[random.nextInt(_replyLines.length)],
         sentAt: _before(
           quoted.sentAt.add(Duration(minutes: 1 + random.nextInt(30))),
@@ -304,7 +304,7 @@ Future<({int channels, int messages})> _seedChat(
   // Pins: a few notes worth keeping at the top of "Front desk".
   final pinned = <int>{};
   while (pinned.length < 5) {
-    pinned.add(deskPlain[random.nextInt(deskPlain.length)].id!);
+    pinned.add(deskPlain[random.nextInt(deskPlain.length)].id);
   }
   await db.chatMessages.updateWhere(
     where: (t) => t.id.inList(pinned),
@@ -315,15 +315,15 @@ Future<({int channels, int messages})> _seedChat(
   );
 
   final reacted = <(int, int)>{};
-  final reactions = <ChatMessageReactionRow>[];
+  final reactions = <NewChatMessageReactionRow>[];
   for (var i = 0; i < 90; i++) {
     final message = plain[random.nextInt(plain.length)];
     final member = members[random.nextInt(members.length)];
-    if (!reacted.add((message.id!, member.id!))) continue;
+    if (!reacted.add((message.id, member.id))) continue;
     reactions.add(
-      ChatMessageReactionRow(
-        messageId: message.id!,
-        profileId: member.id!,
+      NewChatMessageReactionRow(
+        messageId: message.id,
+        profileId: member.id,
         reaction:
             ChatReaction.values[random.nextInt(ChatReaction.values.length)],
       ),
@@ -333,7 +333,7 @@ Future<({int channels, int messages})> _seedChat(
 
   int byPosition(ChatMessageRow a, ChatMessageRow b) {
     final bySent = a.sentAt.compareTo(b.sentAt);
-    return bySent != 0 ? bySent : a.id!.compareTo(b.id!);
+    return bySent != 0 ? bySent : a.id.compareTo(b.id);
   }
 
   final all = [...plain, ...repliesStored];
@@ -341,11 +341,11 @@ Future<({int channels, int messages})> _seedChat(
     for (final row in all)
       if (row.channelId == channel.id) row,
   ]..sort(byPosition);
-  ChatReadPositionRow position(UserProfileRow member, ChatMessageRow at) =>
-      ChatReadPositionRow(
-        profileId: member.id!,
+  NewChatReadPositionRow position(UserProfileRow member, ChatMessageRow at) =>
+      NewChatReadPositionRow(
+        profileId: member.id,
         channelId: at.channelId,
-        messageId: at.id!,
+        messageId: at.id,
         sentAt: at.sentAt,
       );
   final deskInOrder = inOrder(desk);

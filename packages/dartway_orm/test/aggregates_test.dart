@@ -11,13 +11,13 @@ void main() {
   final database = useTestDatabase();
   DwDatabaseHandle db() => database().db;
 
-  ClubServiceRow service(
+  NewClubServiceRow service(
     String title, {
     ClubServiceKind kind = ClubServiceKind.group,
     double? price,
     List<String> tags = const [],
     List<ClubServiceKind> offeredAs = const [],
-  }) => ClubServiceRow(
+  }) => NewClubServiceRow(
     title: title,
     kind: kind,
     price: price,
@@ -34,25 +34,25 @@ void main() {
     await db().execute(
       'TRUNCATE app_setting, club_session, club_service RESTART IDENTITY CASCADE',
     );
-    yoga = (await db().clubServices.insert(service('Yoga', price: 10))).id!;
+    yoga = (await db().clubServices.insert(service('Yoga', price: 10))).id;
     boxing = (await db().clubServices.insert(
       service('Boxing', kind: ClubServiceKind.personal),
-    )).id!;
+    )).id;
     await db().clubSessions.insertAll([
-      ClubSessionRow(
+      NewClubSessionRow(
         serviceId: yoga,
         startsAt: DateTime.utc(2026, 9, 1, 9),
         capacity: 10,
         labels: const ['morning'],
       ),
-      ClubSessionRow(
+      NewClubSessionRow(
         serviceId: yoga,
         startsAt: DateTime.utc(2026, 9, 2, 9),
         capacity: 12,
         note: 'full',
         labels: const [],
       ),
-      ClubSessionRow(
+      NewClubSessionRow(
         serviceId: boxing,
         startsAt: DateTime.utc(2026, 9, 1, 18),
         capacity: 4,
@@ -187,7 +187,7 @@ void main() {
   });
 
   group('upsert', () {
-    AppSettingRow setting(String key, String value) => AppSettingRow(
+    NewAppSettingRow setting(String key, String value) => NewAppSettingRow(
       key: key,
       value: value,
       updatedAt: DateTime.utc(2026, 9, 1),

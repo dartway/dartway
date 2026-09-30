@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.18.0
+
+- **BREAKING: new error check `redundantBangAllowed`** — the server and the shared package's
+  `analysis_options.yaml` (or a local file it includes) must raise the analyzer's
+  `unnecessary_non_null_assertion` to an error. A stored row's id is `int` now, and `row.id!` hides
+  the `!` that guards a real null (dartway/dartway#384, D-113).
+
 ## 0.17.0
 
 - **A new warning in `dartway check`: `inlineOwnershipCheck`** (dartway/dartway#387, D-112). In a

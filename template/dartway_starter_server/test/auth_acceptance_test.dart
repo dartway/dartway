@@ -127,7 +127,7 @@ void main() {
       'account still signs in', () async {
     final member = await app.signUp('79990000020', firstName: 'Oleg');
     await app.db.appSettings.insert(
-      const AppSettingRow(key: AppSettingKeys.signUpEnabled, value: 'false'),
+      const NewAppSettingRow(key: AppSettingKeys.signUpEnabled, value: 'false'),
     );
     addTearDown(
       () => app.db.appSettings.deleteWhere(
@@ -215,7 +215,7 @@ void main() {
     await app.db.userProfiles.update(created.copyWith(role: UserRole.user));
     await start('admin@example.com');
     expect(
-      (await app.db.userProfiles.findById(created.id!))!.role,
+      (await app.db.userProfiles.findById(created.id))!.role,
       UserRole.admin,
     );
 

@@ -9,7 +9,7 @@ import 'schedule_rows.dart';
 /// one query per relation for the whole batch, never per row.
 abstract final class ScheduleObjects {
   static ClubService service(ClubServiceRow row) => ClubService(
-    id: row.id!,
+    id: row.id,
     title: row.title,
     description: row.description,
     durationMinutes: row.durationMinutes,
@@ -26,7 +26,7 @@ abstract final class ScheduleObjects {
       for (final row in await db.clubServices.findByIds(
         rows.map((s) => s.serviceId).toSet(),
       ))
-        row.id!: service(row),
+        row.id: service(row),
     };
     final coaches = await ProfileObjects.rowsById(
       db,
@@ -35,7 +35,7 @@ abstract final class ScheduleObjects {
     return [
       for (final row in rows)
         ClubSession(
-          id: row.id!,
+          id: row.id,
           service: services[row.serviceId]!,
           coach: switch (coaches[row.coachProfileId]) {
             final coach? => ProfileObjects.person(coach),

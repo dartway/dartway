@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
+import '../checker/dw_analysis_options.dart';
 import '../checker/dw_contract_names.dart';
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
@@ -117,6 +118,11 @@ class CheckCommand extends Command<int> {
       // package was found standing on its own.
       errorCount += DwContractNamesInspector(
         sharedPackageDir: layout?.sharedPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwAnalysisOptionsInspector(
+        packageDirs: [layout?.serverPackageDir, layout?.sharedPackageDir],
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);

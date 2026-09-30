@@ -6,7 +6,7 @@ environment:
   sdk: ^3.11.0
 
 dependencies:
-  dartway_core_server: ^0.21.0-dev.11
+  dartway_core_server: ^0.21.0-dev.12
   dartway_push_server: ^0.5.1
   # The app's events in the club's Postgres, and the admin dashboards over them.
   dartway_analytics_server: ^0.2.0
@@ -14,7 +14,7 @@ dependencies:
     path: ../dartway_example_shared
 
 dev_dependencies:
-  dartway_generator: ^0.21.0-dev.11
+  dartway_generator: ^0.21.0-dev.12
   lints: ^6.0.0
   test: ^1.26.0
 
