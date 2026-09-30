@@ -22,6 +22,9 @@ from it drifts silently, and the next agent believes it.
 | an integration's payload | the doc comment on its `DwHttpRoute` |
 | how the app is built | the skills; a copy in the project only falls behind |
 
+All of it is written in the project's language (`docCommentLanguage` warns on a doc comment in another
+script).
+
 Before writing a document, name what it would say that a spec, a doc comment or code cannot. Usually
 the spec is silent where it should not be, and the fix is there.
 
@@ -46,6 +49,5 @@ Every finding has exactly one home; the first line that fits wins:
 | has no address in code — cross-cutting, infrastructural, a decision with a price | a file in `docs/dev_notes/` — the form is `docs/dev_notes/README.md` |
 
 The defect's status lives in the tracker; a `knownIssues` line or a dev note references the issue and
-is deleted when it closes. A workaround the project carries for a framework issue gets both: the issue
-and a dev note, plus the marker in the code (`dartway-framework-notes`). With the tracker `none`, the
-dev note is the whole record.
+**is deleted when it closes**. A workaround the project carries for a framework issue gets the issue, a
+dev note and the marker in the code (`dartway-framework-notes`).

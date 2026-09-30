@@ -43,8 +43,8 @@ final session = dw.plugins.media.open(
   disposes it; opening an item a live session stands on returns that session. Everything goes through
   the session — `play`, `seek`, `setSpeed` (only from `options.speeds`), `retry`, the queue.
 - Per-session settings: `DwMediaOpenOptions` (`withoutResume: true` for a clip feed).
-- `onCompleted` — watched enough (a seek counts); `onReachedEnd` — played to the end; `onStarted` — the
-  first real playback.
+- `onCompleted` — watched enough (a seek counts); `onReachedEnd` — played to the end by real playback
+  only, never a scrub; `onStarted` — the first real playback.
 
 ## Controls, fullscreen, the mini-player
 
@@ -60,6 +60,7 @@ into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle 
 - **Mini-player**: `DwMiniPlayerHost(sessionManager:, onExpand:, builder:)` once, in
   `MaterialApp.builder` over the router's child; it has no `Overlay` above it (no tooltips).
 - **The player page** restores the session on entry and minimizes it on leaving, in a hook —
+  `final media = dw.plugins.media.sessionManager;` then
   `useEffect(() { media.active.value?.restore(); return () => media.active.value?.minimize(); }, const [])`,
   as the example's
   [`workouts_page.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/app/workouts/workouts_page.dart)
@@ -70,5 +71,6 @@ into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle 
 Background audio needs `audio` in iOS `UIBackgroundModes`; the web starts muted until the person
 unmutes. Tests: `DwFakeVideoPlayerPlatform.install()` and `DwFakeJustAudioPlatform.install()` from
 `package:dartway_media_flutter/testing.dart`; real playback is `latest.advanceTo(…)`, a scrub
-`session.seek(…)`, the end `finish()`, a failure `fail(…)`; after an audio command
+`session.seek(…)`, the end `finish()`, a failure `fail(…)` — "a scrub does not count as the end" is
+proved with those, not with a position alone; after an audio command
 `await dwSettleMedia(tester)`; `await dw.plugins.media.dispose()` before a test with a playing video ends.

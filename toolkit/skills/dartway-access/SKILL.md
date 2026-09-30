@@ -44,8 +44,10 @@ default. A role taken away closes what it opened: `ctx.revoke` on its channels (
 Whether the row a call names is the caller's is answered **once, in `DwAccessRule.resource`**, and the
 answer is `dw.notFound` — `forbidden` for a foreign id and `notFound` for a free one would let a caller
 enumerate ids. An owner comparison written in a handler body or a helper is `inlineOwnershipCheck`
-(a warning). `allows` carries the whole permission, role included; `visible` only turns the refusal into
-`dw.forbidden` for someone allowed to see the row.
+(a warning). `allows` carries the whole permission, role included — and a rule resting on a role checks
+it in `load` too, answering `null` before taking any lock; `visible` only turns the refusal into
+`dw.forbidden` for someone allowed to see the row. A `DwAccessRule.check` that reads an id from the
+call without asking whose it is, is this rule written the wrong way.
 
 ```dart
 // Owned by the caller; locked, since the rule runs in the command's transaction.
@@ -74,17 +76,13 @@ handle: (ctx, command) async {
 - **The caller's rows as a list** is `signedIn` and a `where` naming the caller; a list under a parent
   takes the parent's membership rule.
 
-**"My" calls carry no account or profile id**, and no command carries what the server decides
-(`dartway-contract`). A staff screen acting on someone else's data is a different call with its own
-rule, never the "my" call with an optional id.
+"My" calls name nothing about the caller (`dartway-contract` §2). A staff screen acting on someone
+else's data is a different call with its own rule, never the "my" call with an optional id.
 
 ## 4. Channels are the second access point
 
-Everything published to a channel reaches every subscriber, checked once at subscription. So a kind's
-`canSubscribe` admits **only accounts allowed to read every object any command publishes there** —
-answered for any caller, never `(ctx) async => true` because "only the staff screen subscribes": a
-command's response carries its publications on the channels whose rule admits the caller, socket or
-not. Rules and publishing: `dartway-realtime`.
+A kind's `canSubscribe` admits only accounts allowed to read every object published there, answered
+for any caller — the rule and why: `dartway-realtime` §1–2.
 
 ## 5. Keys, revocation, identifiers
 
@@ -92,13 +90,14 @@ not. Rules and publishing: `dartway-realtime`.
   `ctx.accounts.issueKey(accountId, label: …)` → `(key:, token:)` — **the token exists only in that
   answer**, returned once in the command's result.
 - Tell a tool from the app by the server's record, `ctx.sessionKey?.kind == DwSessionKeyKind.personal`,
-  never by something the client sends.
+  never by something the client sends — and refuse there what a tool may not do.
 - `revokeKey(keyId, accountId: callerAccountId)` — always with the account when the id came from the
   client; `revokeKeys(accountId)` signs out everywhere; `listKeys` for a sessions screen.
 - A second phone or e-mail is `DwRequestIdentifierCode` then `DwConfirmIdentifier`; a taken identifier
   is refused only after the right code (`DwAuthRefusal.identifierTaken`). **Never check "taken"
   earlier** — that is an account-existence oracle.
-- Never SQL on `dw_*` tables: `DwAccountService` holds the locks, runs the hooks, closes live sessions.
+- All of it through `DwAccountService` (`dartway-server` §8), which holds the locks sign-in takes and
+  closes live sessions.
 
 ## 6. Tests that prove access
 
@@ -106,6 +105,7 @@ In the server's acceptance tests (`dartway-testing`), **one refused call per rul
 hostile client makes — anonymous → `DwNotAuthenticated`; a member on an admin read → `dw.forbidden`;
 someone else's id → `dw.notFound` and nothing changed; a foreign caller channel → refused at
 subscription. Where they apply: a demoted role loses its channel and calls, an admin cannot change their
-own role, a key id of another account is not revoked. The skeleton's
+own role, a personal key is refused what tools may not do, a key id of another account is not
+revoked. The skeleton's
 `__SERVER_PKG__/test/src/admin/admin_acceptance_test.dart` and its harness (`refusedWith`) are the
 pattern.

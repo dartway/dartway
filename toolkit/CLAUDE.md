@@ -2,7 +2,7 @@
 
 A fullstack Dart project on **DartWay**: a server and a Flutter app that speak one contract, declared once in a shared package. The framework is opinionated on purpose: follow the established pattern, do not invent a second one.
 
-> `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-checkup` commands are **managed** — installed from the framework's `toolkit/` and overwritten on update. Do not edit them here; a rule that let you down is filed back to the framework (`dartway-framework-notes`).
+> `CLAUDE.md`, `skills/dartway-*` and the `commit`/`dartway-checkup` commands are **managed** — installed from the framework's `toolkit/` and overwritten on update. Do not edit them here: a project's variant of a managed skill is a copy under its own name, and a rule that let you down is filed back to the framework (`dartway-framework-notes`).
 
 **This project writes in __PROJECT_LANGUAGE__**: `DwFeatureSpec` texts, doc comments, `docs/dev_notes/` (a doc comment in another script is `docCommentLanguage`). What ships to other people — package APIs, log and error strings, issues to the framework — is English.
 
@@ -28,9 +28,9 @@ The shared package *is* the client contract; there is no client package. A new p
 
 ## Law and default
 
-**Law is what fails** — in the types, at the server's start, or as an `error` of `dart run dartway_cli:dartway check`. A project does not override a law. **Everything else is a default** (commit format, base branch, how a decision is recorded) and a project may replace it in its root `CLAUDE.md`, under "Project conventions", with the reason; a default yields to it, a law does not.
+**Law is the seven rules above and the checks below** — held in the types, at the server's start, or as an `error` of `dart run dartway_cli:dartway check`. A project does not override a law. **Everything else is a default** (commit format, base branch, how a decision is recorded) and a project may replace it in its root `CLAUDE.md`, under "Project conventions", with the reason; a default yields to it, a law does not.
 
-The law list is therefore derived from `DwCheckType.severity`, not from how firmly a sentence is worded. Forty-two checks fail today; twelve more are warnings and one is a nudge, each named in the skill that owns its topic. Each check's message says what to write instead; the skill has the pattern.
+The law list is therefore derived from `DwCheckType.severity`, not from how firmly a sentence is worded. Forty-two checks fail today; twelve more are warnings and one is a nudge, each named in the skill that owns its topic. Each check's message says what to write instead; the skill named beside it shows the pattern where the message is not enough.
 
 | Rule | Checks that fail | Skill |
 |---|---|---|
@@ -39,7 +39,8 @@ The law list is therefore derived from `DwCheckType.severity`, not from how firm
 | State is hooks or a `<Thing>Controller` Notifier — no `StatefulWidget`, `ChangeNotifier`, no setState | `forbiddenStateHolder` | `dartway-feature-scaffold` |
 | Styles live in `ui_kit/`, imported through `ui_kit.dart`, each kit file a part of it; spacing is `AppSpace`; a widget never sizes itself; asset paths exist | `uiKitPartMissing`, `forbiddenUiUsage`, `forbiddenUiKitImport`, `rawSpacing`, `widgetSizesItself`, `assetPathMissing` | `dartway-ui-kit` |
 | The app is localized | `l10nNotWired` | `dartway-ui-kit` |
-| A screen shows a read through `DwReadBuilder` / `DwPagedListView` / `DwWindowListView`; the one spinner is the kit's | `forbiddenRequestRead`, `forbiddenProgressIndicator` | `dartway-data-layer` |
+| A screen shows a read through `DwReadBuilder` / `DwPagedListView` / `DwWindowListView` | `forbiddenRequestRead` | `dartway-data-layer` |
+| The one spinner is the kit's | `forbiddenProgressIndicator` | `dartway-ui-kit` |
 | `dw.command` runs in the feature's `logic/`, inside `dw.action` | `forbiddenCommandCall` | `dartway-data-layer` |
 | A screen is a route; dialogs through the kit; "new" is a route, never id 0; route names are global; the router disposes itself | `forbiddenNavigationCall`, `sentinelId`, `routeNameDuplicated`, `routerDisposedByApp` | `dartway-navigation` |
 | A server feature is a closed file set; features form a graph without cycles, import each other's surface only, write only their own rows; `core/` imports no feature | `invalidServerFeatureFile`, `misplacedServerCode`, `featureImportCycle`, `featureImportOutsideSurface`, `foreignRowWrite`, `coreImportsFeature` | `dartway-server` |
@@ -52,7 +53,7 @@ The law list is therefore derived from `DwCheckType.severity`, not from how firm
 | `lib/` imports by `package:` only (`check --fix` rewrites) | `relativeImport` | — |
 | The framework's lint plugin is on | `lintsPluginMissing` | `dartway-update` |
 
-Not held by any check: naming beyond DTO class names, "done", and a `DwHttpRoute` the app calls. `migrationsDrift` needs `DW_DATABASE_*` and says when it did not run.
+Not held by any check: naming beyond DTO class names, "done", and a `DwHttpRoute` the app calls. `migrationsDrift` needs a database — `DW_DATABASE_*`, or `deploy/config.yaml > local` — and says when it did not run.
 
 ## Commands and generators
 
@@ -69,10 +70,6 @@ Two generators, both run by hand when their input changes, output committed: `da
 
 **Legacy moves as you touch it, never as a sweep; a gap you leave is said out loud.** Old shapes and how to recognise them: `dartway-update`.
 
-## Notes back to the framework
+**A rule that did not exist, an API the app had to work around, the urge to edit a managed file** — each is a finding for the framework: `dartway-framework-notes`, before creating any issue.
 
-File an issue in `__NOTES_TRACKER__` — after loading `dartway-framework-notes`, and only once the text was shown and approved — when the code broke a rule that does not exist or is too vague, when the app had to work around a `dartway_*` API, or when you are tempted to edit a managed file.
-
-## Git
-
-PRs and diffs go against `__BASE_BRANCH__`. The first line of a commit is `<type>(<scope>): <description in English>`, `type` one of `feat`/`fix`/`chore`. Tickets and message checks are the project's own convention, stated in its root `CLAUDE.md`.
+**Git:** PRs and diffs go against `__BASE_BRANCH__`; the commit format is `/commit`.

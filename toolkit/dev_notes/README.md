@@ -6,8 +6,8 @@ is a line in its `knownIssues`; one about the framework is an issue in `__NOTES_
 routing is the `dartway-documentation` skill.
 
 `docs/dev_notes/<slug>.md`, committed like any other file (so it travels through review), one per
-finding (so parallel branches never conflict), in __PROJECT_LANGUAGE__. **Short**, and the issue holds
-the status: delete the file when the issue closes. With the tracker `none`, drop the issue line.
+finding (so parallel branches never conflict), in __PROJECT_LANGUAGE__. **Short**; the issue holds the
+status and decides when the file goes (`dartway-documentation`).
 
 ```markdown
 # <short title>

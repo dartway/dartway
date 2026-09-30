@@ -15,7 +15,7 @@ description: >-
 presigned URL for a key the server built, and sends `DwFinishUpload`; the server records the confirmed
 file in `dw_stored_file`. The project writes **what the file is for, who may upload and read it, and
 which row points at it**. The skeleton's profile photo is the worked case, end to end: the purpose in
-`__SHARED_PKG__/lib/src/dartway_starter_upload.dart`, the rule in
+`__SHARED_PKG__/lib/src/<prefix>_upload.dart`, the rule in
 `__SERVER_PKG__/lib/src/profile/profile_access.dart`, the command and the mapper in `profile_handlers.dart`
 and `profile_objects.dart`, the picker in
 `__FLUTTER_PKG__/lib/app/profile/profile_page/widgets/avatar_picker.dart`, and the tests.
@@ -41,7 +41,11 @@ One `DwUploadRule` per purpose, in the `_access.dart` of the feature it belongs 
 **`canRead`** — `DwFileStorage(config, rules:, canRead:)` — one function for every private purpose;
 without it only the uploader reads a file. A feature answers for its purpose in its `_access.dart`
 (a membership through `ctx.membershipOf`, `dartway-access`), `null` for others, and the library's
-`canReadFile` asks each, then falls back to the uploader. Public files are never asked.
+`canReadFile` asks each, then falls back to the uploader — as the example does:
+[`chat_access.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/chat/chat_access.dart)
+(`ChatAttachments.canRead`, branching on `file.isFor(…)`) and `canReadFile` in
+[`dartway_example_server.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/dartway_example_server.dart).
+Public files are never asked.
 
 ## 2. The row, the command, showing it
 
@@ -54,12 +58,14 @@ without it only the uploader reads a file. A feature answers for its purpose in 
 - **Public URLs in batch**, in the `_objects` mapper: `ctx.files.publicUrls(fileIds)` once per list
   (guard the empty set); the data object carries the URL. **Private files**: the data object carries the
   id; the app asks `dw.files.getLink(id)` when opening, inside `dw.action` — never stored, never watched.
-  Names and sizes for a list: `ctx.files.describe(fileIds)`.
+  Names and sizes for a list: `ctx.files.describe(fileIds)` — never SQL on `dw_stored_file`.
 - **A replaced or cleared file is deleted**: `ctx.files.delete(previous)` — the row in the command's
-  transaction, the object by a job after commit. A file uploaded and abandoned stays until a command of
+  transaction, the object by a job after commit. `delete` and `store` run in a command, a job or a hook;
+  in a request they throw. A file uploaded and abandoned stays until a command of
   the project releases it (`requireOwned`, no row holds it, `delete`).
 - The server works on a file itself with `ctx.files.read`, `readLink` and `store(purpose, accountId:,
-  bytes:, contentType:, fileName:)` — no rule asked. Never make a file public so server code can reach it.
+  bytes:, contentType:, fileName:)` — no rule asked. Never make a file public so server code can reach it,
+  and never pass what `read` or `readLink` answer to a caller who may not read the file.
 
 ## 3. The app
 
@@ -83,7 +89,8 @@ return dw.command(AttachInvoiceScan(invoiceId: invoiceId, scanFileId: file.id));
 
 States: `DwUploadIdle` → `DwUploadProgress` (`fraction`) → `DwUploadDone` or `DwUploadError`; disable the
 trigger while uploading. `DwUploadError.refusal` is shown through the refusal text; failures are reported
-for you. `uploader.cancel()` aborts; retries are built in. The picker is the app's: take the content type
+for you. `uploader.cancel()` aborts — offer it on any upload large enough to watch; `dispose()` does
+not cancel. Retries are built in; never wrap them in your own. The picker is the app's: take the content type
 from it and check the size first. Outside a screen: `dw.files.upload(…)`. A large file is
 `DwUploadSource.stream(() => file.openRead(), byteSize: size)` — the function returns a fresh stream on
 every call, since a retry starts from the first byte.
@@ -102,10 +109,10 @@ a key, an upload URL or a private link.
 ## 5. Tests
 
 - **Server** (`dartway-testing`): `DwTestStorage.create(prefix:)` per file, `storage.config` into the
-  server factory, `storage.drop()` after stopping. Test that the file lands in its visibility's bucket
+  server factory, `storage.drop()` after stopping; upload with the real client (`client.files.upload`). Test that the file lands in its visibility's bucket
   (`storage.keys(…)`), another member's id is refused, a type or size outside the rule is refused, a
   private link is refused where `canRead` says no, and a replaced file disappears (`wakeJobs()`, then
   wait for its URL to stop answering `200`).
-- **Screen**: `DwFakeStorage(fakeServer)` and its `transport`; `storage.files`, `puts`;
+- **Screen**: `DwFakeStorage(fakeServer)`, its `transport` handed to the core's `storageTransport:`; `storage.files`, `puts`;
   `refuseStart` for a refusal; `failPuts`, `loseAnswers`, `chunkDelay` for the network; replace the
   picker's platform interface as the skeleton's profile page test does.

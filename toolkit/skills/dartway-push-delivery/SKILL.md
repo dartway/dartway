@@ -61,15 +61,16 @@ await ctx.push.send(
 is automatic per token and account; nothing on sign-out (a revoked key stops sending). `dw.init()` does
 not wait for push — do not read `transport` or `token` right after it, no timeouts of your own. Ask
 permission at a moment the user understands (`requestPermission()`); `DwPushPermission.unanswered` is
-neither yes nor no — offer a retry. A settings toggle is `pause()` / `resume()` with
+neither yes nor no — offer a retry, never persist a settings toggle as on. A settings toggle is `pause()` / `resume()` with
 `DwPush(isEnabled:)`. Taps route in one listener under `MaterialApp.builder`,
 `dw.plugins.push.opened` with `payloadAs<T>()` — the seam of `dartway-navigation`. Web: copy
 `web/firebase-messaging-sw.js` from `dartway_push_firebase`, fill in only the config.
 
 ## Tests
 
-Server: `DwFakePushService` (`package:dartway_push_server/testing.dart`), a device registered with
-`DwRegisterPushToken` from a real client, then `dw_push_delivery.outcome` and the fake's sends — who was
+Server: `DwFakePushService` (`package:dartway_push_server/testing.dart`) — the module built with
+`providers: [fcm.fcmProvider()]` — a device registered with `DwRegisterPushToken` from a real client, the
+command, then `dwWaitUntil` over `dw_push_delivery.outcome`, and the fake's sends — who was
 notified, who skipped, the payload, nothing sent by a refused command. App: `DwFakePushTransport`
 (`package:dartway_push_flutter/testing.dart`) — one registration, `transport.open(…)` reaches the screen,
 a cold start with `initialOpen` lands there. Never real credentials.

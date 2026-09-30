@@ -34,7 +34,7 @@ AppKeyboardInset(
 ```
 
 **All of it** — height, padding, edges; half on the raw inset slides apart from the other half. Check:
-`grep -rn 'viewInsetsOf' lib/ui_kit` — any hit outside the smoother is one.
+`grep -rn 'viewInsets' lib | grep -v app_keyboard_inset.dart` — every hit is one.
 
 ## WebKit raises the keyboard only for a focus inside the gesture
 

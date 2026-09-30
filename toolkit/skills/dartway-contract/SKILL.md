@@ -28,7 +28,8 @@ side, it drifts. Samples use the package `acme_shared`, so its enums are `AcmeCh
 goes with the feature that owns it. Grown past the file limits (`fileLong`/`fileTooLong`, as in the
 app), it becomes a flat `lib/src/invoices/` of parts `invoices_<part>.dart`, each a data object with
 the calls that answer it — never a layer name. Beside the features: only `acme_channel.dart`,
-`acme_refusal.dart`, `acme_upload.dart`, `acme_protocol.dart` and `acme_push_category.dart`.
+`acme_refusal.dart`, `acme_upload.dart`, `acme_protocol.dart` and `acme_push_category.dart`. A new
+`src/` file is exported from `lib/acme_shared.dart`.
 
 ```dart
 import 'package:dartway_core_shared/dartway_core_shared.dart';
@@ -59,8 +60,7 @@ field types `int`, `double`, `String`, `bool`, `DateTime` (UTC), `Duration`, `Ui
 DTO, `List`, `Map<String, T>`, `DwFieldPatch<T>`, or nullable. A single object with a fixed identity
 uses an `id` getter (`String get id => 'invoice-totals';`).
 
-**Names** follow law 5 (`contractNameInvalid`); a caller-scoped call says `My` and carries no account id
-(`ListMyInvoices`). **The class name is the wire name** (`POST /dw/<ClassName>`): renaming one is a
+**Names** follow law 5 (`contractNameInvalid`); a caller-scoped call says `My` (`ListMyInvoices`). **The class name is the wire name** (`POST /dw/<ClassName>`): renaming one is a
 wire change (§8).
 
 ## 2. A request's fields are its complete filter
@@ -68,8 +68,11 @@ wire change (§8).
 A request is a value: the client caches and shares its live state under the request itself.
 
 - Everything that changes the answer is a field — a filter, a search string, a page, a date. "Today" is
-  a `DateTime day` field the widget fills, not `ctx.now` in the handler.
-- The caller is never a field: the handler reads it from the context (`dartway-access`).
+  a `DateTime day` field the widget fills, never `ctx.now` or `ctx.callerLocalTime` in the handler,
+  which would answer two equal requests differently.
+- **"My" calls carry no account or profile id**: the handler reads the caller from its context, and the
+  client keeps state per signed-in account. A field holding "my" id is a field anyone can change to
+  someone else's.
 - `channels`, `matches`, `sort`, `positionOf` and an overridden `onUpdate` are pure functions of the
   item and the fields — no clock, no global.
 
@@ -80,10 +83,10 @@ A request is a value: the client caches and shares its live state under the requ
 | one object that must exist | `DwSingleRequest<T>` | `const GetInvoice({required this.invoiceId})` | `single`; `null` → `dw.notFound` |
 | one object that may be absent | `DwMaybeRequest<T>` | overrides `matches` | `maybe`; `null` is an answer |
 | a small whole list | `DwListRequest<T>` | `super()` | `list` |
-| a list only the server can filter (a ranking) | `DwListRequest<T>` | `super.updateOnly()` | `list` |
-| a derived list (an aggregate) | `DwListRequest<T>` | `super.refetchOnUpdate()` | `list` |
+| a list whose membership only the server decides | `DwListRequest<T>` | `super.updateOnly()` | `list` |
+| a derived list the client cannot compute (a ranking, an aggregate) | `DwListRequest<T>` | `super.refetchOnUpdate()` | `list` |
 | an endless feed | `DwPageRequest<T>` | `super(pageSize: 20, maxPageSize: 100)` | `page` |
-| numbered pages with a total | `DwTableRequest<T>` | `page`/`pageSize` fields, `super(maxPageSize: 100)` | `table` |
+| numbered pages with a total | `DwTableRequest<T>` | `page`/`pageSize` fields, `super(maxPageSize: 100)` — below 1 is refused by the framework | `table` |
 | a newest-first sequence at an anchor — a chat, a log | `DwWindowRequest<T, S, I>` | `super(pageSize: 40)`, `positionOf` | `window` |
 
 What an update does to each kind is `dartway-realtime`. The order a page, table or window handler reads
@@ -174,6 +177,9 @@ The skeleton's `__SHARED_PKG__/lib/src/settings.dart` is the sample.
 enum AcmeRefusal with DwRefusalCodes {
   /// An invoice that is paid cannot be edited or paid again.
   invoiceAlreadyPaid,
+
+  /// An amount is a positive number of cents.
+  amountNotPositive,
 }
 
 /// The app's live channels; the server declares who may subscribe to each.
@@ -217,7 +223,9 @@ An installed build keeps calling with the contract it was built with, for weeks.
 Prefer the additive change. When a breaking one is unavoidable, **raise the breaking line of
 `__SHARED_PKG__/pubspec.yaml`'s `version:`** in the same change — the minor below 1.0, the major after —
 and regenerate: an app of an older line is then answered `426` and shows its update screen instead of
-failing call by call. Say which kind of change it is in the commit.
+failing call by call. An additive change raises the patch, or nothing. Nothing is set in an environment
+at deploy time: the minimum ships with the code. The commit and the PR say which kind of change it is,
+and a breaking one names the version it raises to.
 
 **Open enums** — `with DwOpenEnum` and a value `unknown` — only for display values an unknown one can be
 shown neutrally for (a feed entry's kind), never for anything behaviour depends on (a status, a role).

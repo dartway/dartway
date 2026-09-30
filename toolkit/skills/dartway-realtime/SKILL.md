@@ -26,7 +26,7 @@ exactly the accounts allowed to read every object published to it** — never on
 |---|---|---|
 | every signed-in member | `DwLiveChannel(AcmeChannel.news)` | `DwChannelRule.single(kind, canSubscribe: (ctx) async => true)` |
 | one group | `DwLiveChannel(AcmeChannel.board, boardId)` (not `const`) | `DwChannelRule.keyed<int>(kind, parseKey: int.parse, canSubscribe: (ctx, boardId) …)` |
-| one person — "my …" | `DwLiveChannel.ofCaller(AcmeChannel.invoices)`, no account id in the request | `DwChannelRule.ofCaller(kind)` |
+| one person — "my …" (`dartway-contract` §2) | `DwLiveChannel.ofCaller(AcmeChannel.invoices)` | `DwChannelRule.ofCaller(kind)` |
 | a role | `DwLiveChannel(AcmeChannel.billing)` | `DwChannelRule.single(kind, canSubscribe: (ctx) => ctx.isAdmin)` |
 
 - Every subscription needs a signed-in connection; signed out, the request is fetched and not live.
@@ -63,7 +63,8 @@ away); without it the account keeps hearing until it reconnects. Sign-out and ke
 subscriptions by themselves.
 
 **Hearing without reading** — a "new posts" badge: `dw.listen([channels])`, a stream subscribed while
-listened to. Never read a page just to get a subscription; missed publications are not replayed.
+listened to. Never read a page just to get a subscription; missed publications are not replayed, so the
+exact number comes from a request.
 
 ## 3. What an update does to a request
 
@@ -79,14 +80,15 @@ An arriving object of the request's type gets one `DwUpdateAction` from the requ
 
 Choose by who knows membership: the client can tell from the object → the default, with `matches`
 mirroring the server's filter and `sort` placing inserts; only the server knows → `.updateOnly()`; the
-value is derived → `.refetchOnUpdate()`. A feed drops an insert that sorts past the loaded pages; a window
+value is derived → `.refetchOnUpdate()`. A table request narrows `matches` to its filter, so a row that
+leaves the filter leaves the page. A feed drops an insert that sorts past the loaded pages; a window
 inserts live only while it shows the newest rows, and counts the rest as unseen. A special case overrides
 `onUpdate`, still pure.
 
 ## 4. Test it
 
 In the server's acceptance tests (`dartway-testing`): **two real clients** — one commands, the other's
-`watch(…)` sees the change with `dwWaitUntil`, and `DwCountingTransport` proves it came live, not by a
+`watch(…)`, awaited until `watch.isLive` before the command, sees the change with `dwWaitUntil`, and `DwCountingTransport` proves it came live, not by a
 re-read; **the rule over a raw socket** — `server.openLive()`, `authenticate`, `subscribe('invoices:$other')`
 answers `DwSubscriptionRefusedMessage`. For a new channel or publishing command: the other client hears
 it; the unentitled are refused; A's "my" data never reaches B; a deletion leaves the other list; a revoked

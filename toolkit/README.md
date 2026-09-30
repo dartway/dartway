@@ -8,8 +8,9 @@ page](https://dartway.dev/5-tooling/agent-toolkit).
 
 ## Developing the toolkit
 
-Install into a real project from a local checkout — `dartway setup-ai --local-repo ../dartway` (or
-`DARTWAY_MONOREPO_DIR=../dartway`) — test there, then change it here. There is no reverse sync.
+Change it here, re-install into a real project from the local checkout —
+`dartway setup-ai --local-repo ../dartway` (or `DARTWAY_MONOREPO_DIR=../dartway`) — and test there. There
+is no reverse sync.
 
 **How it is written:** a rule is stated once, in the skill that owns its topic; everywhere else points
 to it. A rule the checker holds is one row of the law table in `CLAUDE.md` naming the check — the

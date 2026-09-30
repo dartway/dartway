@@ -49,8 +49,11 @@ DwReadBuilder(
 )
 ```
 
-- Without a `placeholder` the app's loading view shows; a failure shows the app's failed view with a
+- Without a `placeholder` the app's loading view shows — leave it out where drawing over stand-in data
+  would mislead (someone else's details for a moment). A failure shows the app's failed view with a
   retry — both configured once in `lib/core/dw_core.dart` (`readLoadingBuilder`, `readFailedBuilder`).
+- A provider of the project's own that returns a read whole is still a read: show it through
+  `DwReadBuilder` too — the check only sees `dw.request(…)` where it is spelled.
 - A refusal that means a screen of its own (gone, not yours) is an `onRefused` branch keyed by the code;
   without one, the failed view. `DwNotAuthenticatedException` shows nothing: the router moves to sign-in.
 - Several reads nest, each `DwReadBuilder` answering for its own failure.
@@ -63,8 +66,10 @@ DwReadBuilder(
   loads the next page as its end nears and retries a failed page in place; inside a page that scrolls as
   a whole it is `DwPagedListView.sliver`, never a list inside a `Column`.
 - A newest-first sequence: `DwWindowListView<T>(request:, initialAnchor:, controller:,
-  onVisibleItemsChanged:, emptyBuilder:, itemBuilder: (context, row) …)` — `row.older`/`row.newer` for
-  grouping, `row.isHighlighted`; it keeps position on loads and stays at the newest row. Worked example:
+  onVisibleItemsChanged:, emptyBuilder:, itemBuilder: (context, row) …)` — `initialAnchor` is
+  `request.cursorOf(item)` or `null` for the newest; `DwWindowListController` scrolls (`scrollToCursor`,
+  `jumpToNewest`, `newerCount`); `row.older`/`row.newer` for grouping, `row.isHighlighted`; it keeps
+  position on loads and stays at the newest row. Worked example:
   [`chat_channel_view.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/app/chat/widgets/chat_channel_view.dart).
 
 ## 3. Refreshing
@@ -103,8 +108,9 @@ value)`; refused → `DwFlutterConfig.refusalText` as an error notification (wri
 signed out → signs out; failed or timed out → `onErrorNotification` and the error report. A value the
 widget needs is unwrapped in the logic function (`(await dw.command(…)).valueOrThrow`).
 
-- A `DwUiAction` goes to the kit's buttons or `DwActionBuilder(action:, builder: (context, onPressed,
-  busy) …)` — no hand-made busy flag, no callback handed down from a parent.
+- A `DwUiAction` goes to the kit's buttons or, for any other tap (a tile, an icon, a card),
+  `DwActionBuilder(action:, builder: (context, onPressed, busy) …)`, which blocks a repeated tap — never a
+  hand-made busy flag, never a callback handed down from a parent.
 - It wraps work, not waiting for a person: open a sheet from a plain handler and wrap what happens
   after the choice.
 - A command is retried with the same idempotency key; a timeout's outcome is unknown.
@@ -115,8 +121,9 @@ widget needs is unwrapped in the logic function (`(await dw.command(…)).valueO
 
 `DwFlutterConfig.refusalText` turns a code into words: the skeleton's `lib/core/refusal_text.dart`, an
 exhaustive `switch` per enum — `<Package>Refusal`, `DwCoreRefusal`, `DwAuthRefusal`,
-`DwUploadRefusal` — plus a generic sentence for an unknown code. **A new refusal code** is a string in
-every `.arb` and a case there (it does not compile without one), with `refusal.params` and
+`DwUploadRefusal`, and each module's the app uses (`DwAnalyticsRefusal`, `DwPushRefusal`,
+`DwProviderRefusal`) — plus a generic sentence for an unknown code. **A new refusal code** is a string
+(`dartway-ui-kit`, "Localization") and a case there (it does not compile without one), with `refusal.params` and
 `refusal.field` where they matter. `onErrorReport` skips `DwRefusalException` and
 `DwNotAuthenticatedException` by type. A client-only rule throws
 `DwRefusalException(DwCallRefusal(code, field: …))`, rendered the same way.
@@ -140,9 +147,11 @@ edit sends only what changed: `DwFieldPatch.keep()` / `set(v)` / `clear()`.
 
 ## 8. Providers are written by hand
 
-Most features need none. One goes into the feature's `logic/` when state is derived from several
-sources or carries a rule — **one question each**, keyed by a value with meaningful equality (a request,
-an id, a record), its decision a factory on the state type with time passed in. Derived from one object
+Most features need none — server data is already a provider (`dw.request(…)`). One goes into the
+feature's `logic/` when state is derived from several sources or carries a rule — **one question each**,
+keyed by a value with meaningful equality (a request, an id, a record: a new object per build is a new
+provider per build), its decision a factory on the state type with time passed in. A family's argument
+arrives in the factory, and a notifier takes it through its constructor. Derived from one object
 → an extension on the data object in `lib/shared/`. No shims over `dw` (a repository, a
 `ref.payInvoice` extension); a `<feature>_commands.dart` is not one. A provider never reaches into
 another feature's internals.
@@ -154,9 +163,10 @@ family key or a constructor argument.
 ## 9. Local state that survives a restart, notifications
 
 Not surviving a restart: a hook or a controller (`dartway-feature-scaffold`). Surviving:
-`dw.plugins.prefs` (`dartway_shared_preferences`) — `provider(key:, defaultValue:)`, or per entity a
+`dw.plugins.prefs` (import `package:dartway_shared_preferences` for the getter; never read `raw` for
+screen state) — `provider(key:, defaultValue:)`, or per entity a
 top-level `providerFamily<String, int>(keyFor: (id) => 'invoices.$id.sort', defaultValue: …)`,
 `mappedProviderFamily` for enums; read with `ref.watch`, write with `.notifier).update(…)`.
 
-Notifications are `dw.notify.success / info / warning / error(text)`, text from `context.l10n` (or
-`appL10n` outside the tree) — never `ScaffoldMessenger` or a `SnackBar`.
+Notifications are `dw.notify.success / info / warning / error(text)`, the text localized
+(`dartway-ui-kit`) — never `ScaffoldMessenger` or a `SnackBar`.

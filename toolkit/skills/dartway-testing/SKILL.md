@@ -29,15 +29,16 @@ cannot prove the button sends the right command.
 **Where the file goes** (`testLayout`, `testHarnessBypassed`): at the mirror of what it tests —
 `lib/src/core/files.dart` → `test/src/core/files_test.dart`; a server feature through its calls →
 `test/src/invoices/invoices_acceptance_test.dart` (a scenario: `invoices_<scenario>_acceptance_test.dart`;
-`check --fix` moves a root-level one); the contract → `test/<shared package>_test.dart`. Helpers and the
+`check --fix` moves a root-level one); the contract → `test/<shared package>_test.dart`. A test walking
+through two features is split by feature, what they share moved into the harness. Helpers and the
 harness live in `test/support/`, imported relatively; a test builds no server, fake server or
 `ProviderScope` of its own — a configuration it needs is a method on the harness.
 
 ## 1. The contract
 
-The skeleton's `__SHARED_PKG__/test/dartway_starter_shared_test.dart` is the file to extend: one list
+The skeleton's `__SHARED_PKG__/test/<shared package>_test.dart` is the file to extend: one list
 round-trips a value of every DTO through the project's protocol
-(`appProtocol.decodeNamed(o.dwTypeName, o.toJson())` equals `o`), with and without optional fields;
+(`<project>Protocol.decodeNamed(o.dwTypeName, o.toJson())` equals `o`), with and without optional fields;
 `validate()` asserted as `code@field`; `onUpdate` of each request with `matches`, `sort` or a custom
 `onUpdate` (`DwUpdateAction.upsert` / `remove`); a caller channel resolved
 (`channels.single.resolvedFor(42).wireName`).
@@ -49,25 +50,33 @@ keeps the database up, `--no-storage`) starts a Postgres and a storage on ports 
 `dart test` in `__SERVER_PKG__`, and removes both. Never a test database in compose or a fixed port.
 
 **One harness, extended, never replaced**: `AppHarness` in `__SERVER_PKG__/test/support/app_harness.dart`
-— `start`, `stop`, `client`, `signUp`, `admin`, `refusedWith` — builds the server with the **same
-factory `bin/server.dart` uses**, on a `DwTestDatabase` per file, with captured codes. A new file is
+— `start`, `stop`, `client`, `signUp`, `admin`, with the matcher `refusedWith` beside it — builds the
+server with the **same factory `bin/server.dart` uses**, on a `DwTestDatabase` per file, with captured codes. A new file is
 `setUpAll` → `AppHarness.start()`, `tearDownAll` → `stop()`; domain helpers (a staff member) are added to
 it or an extension on it.
 
 - **Time is the harness's `DwTestClock`**: every `ctx.now` answers it and a job runs when the clock
-  passes its `runAt` — move it (`clock.advance`, `moveTo`), never wait or rewrite `dw_job`. The caller's
-  UTC offset is pinned to zero (`DwTestServer.utcOffset`, `connectClient(utcOffset:)`).
+  passes its `runAt` — move it (`clock.advance`, `moveTo`), never wait or rewrite `dw_job`. Times a test
+  sets up are `harness.clock.now().add(…)`, never `DateTime.now()`. A standing clock also holds back job
+  and push retries and recurring jobs until moved; what the database stamps (`created_at`, session and
+  code expiry) keeps real time.
+- **The caller's UTC offset is pinned to zero**: `server.utcOffset = …` for someone else's day (callers
+  made after it use it; `null` — a raw caller sends none, as an old app), `connectClient(utcOffset:)`;
+  `DwAppServer.callAs` carries none.
 - Tests in one file share a database: each creates its own members and asserts on what it created.
 - **Real clients for behaviour** — `connectClient()`, `watch(…)`, `command(…)`, a second member for "the
-  other device" and "someone else is refused"; wait with `dwWaitUntil`, never a fixed delay.
-  **Raw calls for the wire** — `server.caller(token:)` (status, headers), `server.openLive()` (subscribe,
-  `expectSilence`). **`server.db`** for what is stored, not for what a client could observe.
-- `server.wakeJobs()` runs due jobs now; `server.runInContext((ctx) async …)` calls a service with a real
-  context; `DwTestStorage.create(prefix:)` provisions buckets (`dartway-uploads`).
+  other device" and "someone else is refused"; wait with `dwWaitUntil`, never a fixed delay
+  (`dwWaitUntil`, `DwCountingTransport`, `DwRecordingConnector` are the framework's, in `testing.dart`).
+  **Raw calls for the wire** — `server.caller(token:)` (status, headers; `addTearDown(caller.close)`),
+  `server.openLive()` (subscribe, `expectSilence`). **`server.db`** for what is stored, not for what a client could observe.
+- `server.wakeJobs()` runs due jobs now; `server.runInContext((ctx) async …)` calls a service that has
+  rules of its own with a real context — what a command publishes is still tested through the command; `DwTestStorage.create(prefix:)` provisions buckets (`dartway-uploads`).
 - **Other services**: `server.http` answers `ctx.http` from rules —
   `server.http.when((r) => r.url.host == 'sms.example.com', (r) => DwOutboundResponse(200, json: {…}))`;
-  the last rule wins, a request no rule answers fails the call, `server.http.requests` records what left.
-  Without a server, `DwFakeOutboundHttp()..when(…)` and `http.client()`.
+  the last rule wins, a request no rule answers fails the call, `server.http.requests` records what left,
+  `server.http.reset()` between tests sharing a server. A rule throwing
+  `DwOutboundException(request, cause: 'refused')` is an unreachable provider; one never completing runs
+  into the timeout. Without a server, `DwFakeOutboundHttp()..when(…)` and `http.client()`.
 - Write one when the rule is the point — a boundary, a refusal with its code, a filter that must not
   leak, a publication and its audience, an idempotent retry, a job's effect. Not for a read that maps a
   table with no rule.
@@ -76,7 +85,8 @@ it or an extension on it.
 
 A feature reads and writes through the ambient `dw`; nothing is added to make it spyable. The seam is
 the server, replaced by `DwFakeServer(protocol: appProtocol)` (`package:dartway_client/testing.dart`):
-`onRequest<ListMyInvoices>((request, call) => DwCallOk(<CustomerInvoice>[…]))`, `onCommand<…>`,
+`onRequest<ListMyInvoices>((request, call) => DwCallOk(<CustomerInvoice>[…]))` — the exact result
+type, not `DwCallOk([])` — `onCommand<…>`,
 `call.publish(…)`; assert with `callsOf<PayInvoice>()`, `requestsOf<…>()`; push from outside with
 `server.publish(channel, [object])`; page with `dwFakeTablePage`, `dwFakeOffsetPage`, `dwFakeWindow`;
 files with `DwFakeStorage`. **Every test ends asserting `server.errors` is empty.**
@@ -91,11 +101,12 @@ surprise. A widget test lives at `test/<zone>/<feature>/<entry>_test.dart`. Samp
 - `Dw is not initialized` / `found 0 widgets` — no core: a feature reaches `dw` while building.
   `Another dw core is alive` — a previous test did not dispose its core (`addTearDown(core.dispose)`).
 - A `MaterialApp` a test builds mounts the delegates, the supported locales **and an explicit `locale:`**;
-  the app's root takes it from `tester.platformDispatcher.localeTestValue`.
+  the app's root takes the product's stated language from `appLocaleProvider` — a test of another
+  language overrides that provider.
 - **Never `await` a core call directly** (`core.signOut()`): fake time moves only with pumped frames —
   `await app.run(tester, …)`.
 - **No `pumpAndSettle` over a spinner**; settle as the harness does. A success notification holds a
-  timer — `waitOutNotifications` before unmounting. A failed read is retried: assert what was asked,
+  timer — `app.waitOutNotifications(tester)` before unmounting, and before tapping what it covers. A failed read is retried: assert what was asked,
   never how many times. Settle after `enterText` before asserting a button enabled.
 
 Assert what the screen shows from the server's answer, that the action **sent the right DTO**, that a

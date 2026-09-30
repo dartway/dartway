@@ -28,7 +28,7 @@ every other skill refers to.
 
 ```bash
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)
-(cd __SERVER_PKG__ && dart run bin/migrate.dart check)      # row classes or migrations changed; needs DW_DATABASE_*
+(cd __SERVER_PKG__ && dart run bin/migrate.dart check)      # row classes or migrations changed; needs a database
 (cd __SHARED_PKG__ && dart analyze && dart test)
 (cd __SERVER_PKG__ && dart analyze)
 (cd __FLUTTER_PKG__ && dart analyze --fatal-infos)          # not flutter analyze: it skips the dartway_lints plugin
@@ -67,7 +67,6 @@ that may be a rename, `dataChecksAfter` moved (`dartway-migrations`); a file id 
   transforms data — an extension in the feature's `logic/`; a widget in a local variable used once —
   inline it.
 - A private widget class in a feature's public file that takes a callback.
-- Outer `padding`/`margin` at the top of a widget's `build`: spacing is the parent's.
 - `GlobalKey().currentState`/`currentContext` to reach into the tree.
 - A value rebuilt by listing its fields in a constructor instead of the generated `copyWith` — a field
   added later silently takes its default there.
@@ -81,7 +80,8 @@ does not start — make sure a test or a start ran).
 
 **Refactors break `test/`**, which `lib` analysis does not see: a moved file, a function turned method,
 a removed parameter, a renamed DTO or code. Bulk import edits go from an explicit old → new path map,
-never a regex with a fallback.
+never a regex with a fallback. An entity that moved into the kit and became private keeps its test,
+through the public kit widget.
 
 ## A.4 Descriptions and tests
 
@@ -89,10 +89,11 @@ never a regex with a fallback.
   doc comment where it is enforced; a changed DTO: its doc comments. An outdated description is worse
   than none. Forms: `dartway-feature-scaffold`, `dartway-documentation`.
 - Something wrong noticed on the way that this task does not fix is placed now — the routing is
-  `dartway-documentation`.
+  `dartway-documentation`. So is a statement in the root `CLAUDE.md` or a skill that the changed code now
+  contradicts, either way; a managed file is a framework finding.
 - Non-trivial logic, money, a rule or a bugfix without a test is flagged; the test belongs where the
-  behaviour lives (`dartway-testing`). **Ask which one change proved each new test red** — a test nobody
-  could break proves nothing. No coverage numbers.
+  behaviour lives (`dartway-testing`). **Ask which one change proved each new test red**
+  (`dartway-testing` §5).
 
 ## A.5 Workarounds whose framework moved
 

@@ -31,6 +31,9 @@ rehash [id ...]                re-seal edited, unapplied migrations
 
 ## The cycle
 
+A schema change always starts from `create`; a migration written by hand from scratch drifts from the
+diff `check` compares against.
+
 1. **Change the row class, then `dart run dartway_cli:dartway generate`** (from `__FLUTTER_PKG__`) —
    always first: `create` diffs against the generated schema, and before `generate` it sees no change.
 2. **`dart run bin/migrate.dart create add_invoice_due_date`** — replays every migration on a scratch
@@ -56,11 +59,13 @@ rehash [id ...]                re-seal edited, unapplied migrations
 4. **Rehash after every edit, before the migration is applied anywhere** (your own database included):
    `dart run bin/migrate.dart rehash`. Keep the `// dart format off` line; never reformat a migration.
 5. **`status` → `apply` (or start the server) → `status`.** Wrong after applying locally? **Roll back
-   first, then edit** (`rollback --id …`, edit, rehash, apply): once edited, the rollback refuses.
+   first, then edit** (`rollback --id …`, edit, rehash, apply): once edited, the rollback refuses — edited
+   already, `git checkout` the file, roll back, redo the edit, rehash.
 6. **`dart run bin/migrate.dart check`** — on scratch databases: files sealed and registered, the
    migrations produce exactly the declared schema, and each rolls back and re-applies. `note:` lines
    (what a row class cannot declare) are informational, `FAIL` fails. `check`'s `migrationsDrift` runs
-   the same when `DW_DATABASE_*` is set, and says "Not checked" otherwise.
+   the same when a database is named — `DW_DATABASE_*` or `deploy/config.yaml > local` — and says "Not
+   checked" otherwise.
 
 ## The body of a migration
 

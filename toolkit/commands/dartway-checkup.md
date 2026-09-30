@@ -27,10 +27,11 @@ code-shape rules no layer skill owns.
    channel in `.claude/dartway-toolkit.json`; `frameworkRefsDiverged`, `frameworkOverrideOutlived`.
    Do not run `dartway update` here — that is `dartway-update`. Grep every
    `TODO(dartway, checked: …)` project-wide and report the ones whose `checked:` trails the resolved
-   version (`dartway-finish` A.5 decides each).
+   version (`dartway-finish` A.5 decides each). A marker is not a finding by itself; a workaround over
+   a `dartway_*` API without one is.
 4. **`docs/dev_notes/`**: each entry's issue state decides (`gh issue view`); a closed issue means
    delete the entry and re-check its workaround. An entry with no issue on a project with a tracker is
-   a finding nobody filed.
+   a finding nobody filed — offer to file it.
 5. **`docs/dev_notes/_coverage.md`** — which features had a deep pass, and when.
 6. **`docs/adr/`**, if present, is context and authoritative about why; an ADR describing how something
    works now, or code contradicting an accepted ADR, is a finding. Any other architecture note is
@@ -43,12 +44,16 @@ group its findings by check and by feature. Then grep only what it cannot see �
 `dartway-finish` (A.3), plus:
 
 - `.refetch()` / `ref.invalidate(` — every hit read in Phase 2 (`dartway-data-layer`, "Refreshing");
+- a provider of the project's own returning a read whole, then taken apart in a widget — the check does
+  not see it (`dartway-data-layer` §2);
 - `asData?.value`, `.value ??` in `logic/` — a failure rendered as an endless spinner;
-- `DwAccessRule.anonymous` — each one a decision its handler's doc comment explains;
+- `DwAccessRule.anonymous` — each one a decision its handler's doc comment explains; a
+  `DwAccessRule.check` reading an id from the call without asking whose it is (`dartway-access` §3);
 - a caller's mistake answered with `throw` instead of `ctx.refuse`; a command that publishes nothing;
   a refusal code nothing on the server raises;
-- a deployment-owned value with a default (`dartway-server`, "Settings");
-- `deploy/secrets.yaml` tracked by git; one `dartway_*` package behind its siblings.
+- a deployment-owned value with a default (`dartway-server` §9);
+- `deploy/secrets.yaml` tracked by git; one `dartway_*` package behind its siblings; a deploy domain
+  written in more than one place.
 
 Summarise as a table: rule → count.
 
@@ -61,7 +66,7 @@ offenders of Phase 1.
 For each, load the skills of the layers it spans and read it against them, with what grep cannot see:
 responsibilities, duplication, over-engineering, feature isolation, hacks and commented-out code, a
 second way across the contract, hardcoded user-visible text (judge by meaning), a `DwFeatureSpec`
-that no longer matches the widget, logic without tests.
+that no longer matches the widget, logic without tests, a bugfix without a regression test.
 
 **A finding a command could confirm is a hypothesis until the command ran**, and is labelled so. Ten
 verified findings beat thirty plausible ones.

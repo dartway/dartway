@@ -21,7 +21,8 @@ skeleton's `__FLUTTER_PKG__/lib/core/router/` is the reference: `router.dart` (t
 A zone is an enum implementing `DwNavigationRoute<AppRouterState>`; every route is a value with a
 descriptor — `.zoneRoot(pageWidget:)`, `.simple(pageWidget:, parent:)`,
 `.parameterized(pageWidget:, parameter:, parent:)` — and the zone declares `zoneRoot` (`''` or
-`'admin'`), `shellRouteBuilder`, `statefulShellRouteBuilder` and `zoneGuards`. Route definitions live in
+`'admin'`), `shellRouteBuilder`, `statefulShellRouteBuilder` and `zoneGuards`. A route without a
+`parent` sits at the top of its zone, not under the screen it belongs to. Route definitions live in
 `core/router/`, never in widgets; calls use enum values, never strings.
 
 ```dart
@@ -64,7 +65,8 @@ GoRouter.of(context).goNamed(
   `set(value)` for the transition, `fromPath(context)` / `fromQuery(context)` (throw) or
   `fromPathOrNull` / `fromQueryOrNull` on the page.
 - **A screen is a route; a dialog or sheet opens through the kit** (`context.showAppDialog`,
-  `showAppBottomSheet`) — `forbiddenNavigationCall`. **Back from a page** is `goNamed(<parent>.name)` or
+  `showAppBottomSheet`) — `forbiddenNavigationCall`; a yes/no before an action is not a dialog but
+  `dw.action(…, confirmation: DwUiConfirmation(…))`. **Back from a page** is `goNamed(<parent>.name)` or
   the `AppBar`'s leading button; `Navigator.of(context).pop(value)` closes only a dialog or a sheet, with
   the builder's own context — on a page the check does not catch it and it is still wrong.
 - **A screen's subject is its address**: "open the chat at this message" is a path or query parameter,
@@ -77,6 +79,5 @@ GoRouter.of(context).goNamed(
 A tapped push notification, a cold start from it, a deep link or a background reply has a payload and
 no place in the tree. It goes through **one seam per app, in `core/`**, that holds the router, maps the
 payload to a route name and parameters, and cancels its subscription with the tree; inside widgets the
-rule above is unchanged. Mark it
-`// TODO(dartway, checked: <ref>): navigating from a payload with no context` (`dartway-framework-notes`).
-Worked example: [`push_opened_listener.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/core/push/push_opened_listener.dart).
+rule above is unchanged. For a push tap the framework hands the payload over through
+`dw.plugins.push.opened`; which route it means is the app's. Worked example: [`push_opened_listener.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/core/push/push_opened_listener.dart).

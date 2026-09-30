@@ -61,8 +61,10 @@ lib/app/invoices/invoice_card/
   — a page plus an embeddable block, a three-screen flow — becomes a group of features. Behaviour two
   features share is one more feature. **Split small**: every feature carries its own description.
 - Not a feature: state several features watch → `core/`; a helper → `shared/`; a visual one →
-  `ui_kit/`. A widget file in `widgets/` that nothing in the feature uses is `unusedFeatureFile` (a
-  warning).
+  `ui_kit/`. The tell: its `purpose` and `behaviors` could only restate the type name (`notAFeature`
+  when a zone folder's entry declares no widget).
+- A file in `widgets/` or `logic/` that nothing in the feature uses is `unusedFeatureFile` (a warning); a
+  file that only re-exports others is `barrelFile` — import the file itself.
 
 ### Where logic and state live — bottom up
 
@@ -84,11 +86,14 @@ A widget's own state is a hook in a `HookWidget`/`HookConsumerWidget` (`forbidde
 | `didUpdateWidget` resyncing from a prop | `useEffect(…, [prop])`, `useValueChanged` |
 | an object built once and disposed | `useMemoized` plus a `useEffect` cleanup |
 | a `StatefulBuilder` | `HookBuilder` (`HookConsumer` with a `ref`) |
+| a mixin or extension on `State` calling `setState` | a `use…` function of your own that calls hooks |
 
 A callback registered once reads the latest props through `final latest = useRef(this)..value = this;`.
 A controller the provider owns lives while watched (`NotifierProvider.autoDispose`, `.family`). The one
 way out — a third-party API that needs a `State` subclass or its own `Listenable` — is
-`// dw:allow-stateful <reason>` on the class, listed by every check run.
+`// dw:allow-stateful <reason>` on the class, listed by every check run. State two features use is a
+feature whose public surface is a provider (the provider in the root file, the notifier in `logic/`);
+state one feature uses may keep notifier and provider in one file, provider first.
 
 ### A feature is constructible from its address
 
@@ -105,8 +110,8 @@ context.showAppBottomSheet(child: InvoiceEditSheet(invoiceId: invoiceId));` — 
 ### Build it
 
 The route (`dartway-navigation`) → the public widget `implements DwFeatureWidget` with its spec → reads
-and commands (`dartway-data-layer`) → the kit (`dartway-ui-kit`) → every string in every `.arb`, a
-refusal text for every new code. Sample: the skeleton's `lib/admin/user_card/admin_user_card_page.dart`.
+and commands (`dartway-data-layer`) → the kit (`dartway-ui-kit`) → the texts (`dartway-ui-kit`,
+"Localization") and a refusal text for every new code (`dartway-data-layer` §5). Sample: the skeleton's `lib/admin/user_card/admin_user_card_page.dart`.
 
 ## The feature spec — `DwFeatureSpec`
 
@@ -117,7 +122,8 @@ The feature's only description, on its public widget (`dwFeature`); without one,
   new name is a new id.
 - **`title`**; **`purpose`** — why the user needs it, often unnecessary.
 - **`behaviors`** — what it observably does, each checkable by looking at the running app.
-- **`requirements`** — what it must honour, imposed from outside (who may see it).
+- **`requirements`** — what it must honour, imposed from outside (who may see it); one phrased as
+  something observable belongs in `behaviors`.
 - **`implementationNotes`** — what the code cannot say about itself and survives a rewrite ("not paged
   — dozens of rows, not thousands"), never a map of the code.
 - **`knownIssues`** — what is wrong and worth picking up, one sentence with its cost; noticed here,

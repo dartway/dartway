@@ -42,7 +42,7 @@ rows; installed app builds and the contract's breaking line; feature isolation a
 break.
 
 **E. Verification**: the scenarios pass in the running app (`dartway-run`); the gates of
-`dartway-finish` are green; refused where intended and live where intended; the descriptions match; then
+`dartway-finish` are green, and the migration applies on a database holding rows, not only on scratch; refused where intended and live where intended; the descriptions match; then
 `dartway-finish`.
 
 Output: **Context → Plan → Risks → Verification**, in the user's language.

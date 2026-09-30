@@ -24,7 +24,7 @@ docker compose up -d
 docker compose exec -T postgres pg_isready -U postgres   # poll until it succeeds; "Started" is not "listening"
 dart pub get
 dart run bin/server.dart     # in the background: it never exits; it migrates as it starts
-dart run bin/seed_dev.dart   # once, after "listening": development accounts and their fixed code
+dart run bin/seed_dev.dart   # once, after "listening" (a second run refuses): dev accounts, their fixed code
 cd ../__FLUTTER_PKG__ && flutter pub get && flutter run
 ```
 
@@ -37,7 +37,8 @@ credentials that no longer match); `dartway secret set <KEY> --env local` reads 
 ask the human before putting any real key anywhere.
 
 **`DW_ADMIN_IDENTIFIER` is asked from the human, never invented**: whoever receives codes on it becomes
-the administrator (`DwFirstAdministrator`, every start). Unset, the server starts and warns.
+the administrator (`DwFirstAdministrator`, every start). Unset, the server starts and warns; a value
+that is neither a phone nor an e-mail stops it — ask the human again.
 
 ## Liveness — mandatory
 
@@ -50,10 +51,12 @@ port 8080`, the buckets verified (or storage not configured), the administrator 
 seeded accounts use the seed's fixed code.
 
 **The app**: desktop and iOS simulator call `http://localhost:8080`, an Android emulator
-`http://10.0.2.2:8080`; a phone needs `--dart-define=DW_BACKEND_URL=http://<LAN address>:8080` and
-`DW_STORAGE_ENDPOINT` at that address too. **In a browser** the app calls its own origin:
-`dart run dartway_cli:dartway dev web` (or a release build served by
-`dart run dartway_cli:dartway dev proxy --web-dir build/web`), opened at exactly `http://localhost:8000`.
+`http://10.0.2.2:8080`; a phone needs `--dart-define=DW_BACKEND_URL=http://<LAN address>:8080`, and
+storage an address the device reaches (`dartway-uploads` §4). **In a browser** the app calls its own
+origin: `dart run dartway_cli:dartway dev web` (or a release build served by
+`dart run dartway_cli:dartway dev proxy --web-dir build/web`), opened at exactly `http://localhost:8000`;
+a `DwHttpRoute` the browser must reach goes through with `--api-path /that-path`. `DW_ALLOWED_ORIGINS`
+only for a socket from a genuinely different origin.
 
 ## When it does not start
 
@@ -67,16 +70,16 @@ The server prints every problem at once — read the whole list.
 | an SSL error against `127.0.0.1` | `DW_DATABASE_SSL=false` locally |
 | `X is a registered request without a handler` | write the handler (`dartway-server`) |
 | `answers X, which the protocol does not register` | `dart run dartway_cli:dartway generate` |
+| `X has more than one handler` | remove the duplicate |
 | `DwMigrationRefused` / `DwMigrationFailed` / `table "x" … missing` | `dartway-migrations`; never edit the ledger |
-| a bucket missing, or readable when it should not be | locally `DW_STORAGE_PROVISION=true` and restart; elsewhere fix the policy, never the probe |
-| storage `could not be checked` | `docker compose up -d`, or unset `DW_STORAGE_ENDPOINT` |
+| a bucket missing or wrongly readable; storage `could not be checked` | `dartway-uploads` §4 |
 | port 8080 in use | a server already runs — `curl …/health` before starting another |
 | `port is already allocated` on compose | another project's containers: `docker ps` |
 | the app shows "update the app" (`426`) | regenerate and rebuild the app; one family version everywhere (`dartway-update`) |
 | browser calls fail | open `http://localhost:8000` through `dev web`/`dev proxy` |
-| uploads fail on a device | `DW_STORAGE_ENDPOINT` at an address the device reaches |
 | no admin panel after sign-in | signed in with another identifier than `DW_ADMIN_IDENTIFIER` |
 
-Never print a secret; never delete the database volume without asking; never fix an empty list by
+Read the error before proposing to reinstall dependencies. Never print a secret, a code delivered for
+someone else or a signed upload URL; never delete the database volume without asking; never fix an empty list by
 loosening an access rule; never switch off a startup check to get the server up. After a DTO, row
 class or handler change: generate and restart; before calling it done: `dartway-finish`.
