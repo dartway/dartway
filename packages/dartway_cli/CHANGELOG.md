@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.17.0
+
+- **A new warning in `dartway check`: `inlineOwnershipCheck`** (dartway/dartway#387, D-112). In a
+  server `*_handlers.dart`, a handler under any rule but a resource rule (`signedIn`, a role check)
+  — or a helper of the same file it calls — that compares a row's owner field (`…ProfileId`,
+  `authorId`, `ownerId`, `senderId`, `accountId`, …) with the caller and refuses
+  `notFound`/`forbidden` (or answers `null` from a `single` handler) is the check
+  `DwAccessRule.resource` makes once. A project rule that builds a resource rule counts as one. A
+  warning: it reads the shape of the code, and does not fail the run. Migration note:
+  `docs/migrations/2026-09-30-ownership-through-access-rules.md`.
+
 ## 0.16.0
 
 - **Two new errors in `dartway check`: `forbiddenEnvironmentRead` and `forbiddenHttpClient`**

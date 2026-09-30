@@ -15,6 +15,7 @@ import '../checker/dw_server_clock_use.dart';
 import '../checker/dw_server_contract.dart';
 import '../checker/dw_server_features.dart';
 import '../checker/dw_server_outside_world.dart';
+import '../checker/dw_inline_ownership.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
 import '../checker/dw_check_tally.dart';
@@ -160,6 +161,11 @@ class CheckCommand extends Command<int> {
       ).run(tally: tally);
       errorCount += DwLocalEnvironmentInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwInlineOwnershipInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

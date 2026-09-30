@@ -231,6 +231,41 @@ final class GetMyNote extends DwSingleRequest<NoteView> {
       GetMyNote(json['noteId']! as int);
 }
 
+/// A message by id, to members of its room: a resource reached through its
+/// parent (`DwAccessRule.resource` over a record of the message and room).
+final class GetRoomMessage extends DwSingleRequest<MessageView> {
+  const GetRoomMessage(this.messageId);
+
+  final int messageId;
+
+  @override
+  String get dwTypeName => 'GetRoomMessage';
+
+  @override
+  Map<String, Object?> toJson() => {'messageId': messageId};
+
+  static GetRoomMessage fromJson(Map<String, Object?> json) =>
+      GetRoomMessage(json['messageId']! as int);
+}
+
+/// Renames the caller's note; staff see every note and are refused
+/// `forbidden`, anyone else `notFound` (`DwAccessRule.resource` `visible`).
+final class RenameNote extends DwActionCommand<NoteView> {
+  const RenameNote(this.noteId, this.text);
+
+  final int noteId;
+  final String text;
+
+  @override
+  String get dwTypeName => 'RenameNote';
+
+  @override
+  Map<String, Object?> toJson() => {'noteId': noteId, 'text': text};
+
+  static RenameNote fromJson(Map<String, Object?> json) =>
+      RenameNote(json['noteId']! as int, json['text']! as String);
+}
+
 final class FindNote extends DwMaybeRequest<NoteView> {
   const FindNote(this.noteId);
 
@@ -873,6 +908,8 @@ final DwWireProtocol testProtocol = DwWireProtocol([
   DwProtocolEntry<NotesOfOwner>('NotesOfOwner', NotesOfOwner.fromJson),
   DwProtocolEntry<GetNote>('GetNote', GetNote.fromJson),
   DwProtocolEntry<GetMyNote>('GetMyNote', GetMyNote.fromJson),
+  DwProtocolEntry<GetRoomMessage>('GetRoomMessage', GetRoomMessage.fromJson),
+  DwProtocolEntry<RenameNote>('RenameNote', RenameNote.fromJson),
   DwProtocolEntry<FindNote>('FindNote', FindNote.fromJson),
   DwProtocolEntry<FeedNotes>('FeedNotes', FeedNotes.fromJson),
   DwProtocolEntry<GreedyFeed>('GreedyFeed', GreedyFeed.fromJson),

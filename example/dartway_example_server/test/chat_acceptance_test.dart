@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_server/src/chat/chat_rows.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
@@ -47,15 +48,18 @@ void main() {
           ),
           forbidden,
         );
+        // A message is guarded by its resource rule: to someone who cannot
+        // read the chat it does not exist.
+        final notFound = refusedWith(DwCoreRefusal.notFound);
         expect(
           await client.command(
             EditChatMessage(messageId: message.id, text: 'mine now'),
           ),
-          forbidden,
+          notFound,
         );
         expect(
           await client.command(DeleteChatMessage(messageId: message.id)),
-          forbidden,
+          notFound,
         );
         expect(
           await client.command(
@@ -137,6 +141,31 @@ void main() {
         );
       },
     );
+
+    test('a demoted author can no longer edit or delete their message: the '
+        'rule decides on the role as well as on the author', () async {
+      final kira = await club.staff('79993000101', 'Kira');
+      final channel = await club.chatChannel('Front desk');
+      final message = await kira.send(channel.id!, 'Keys are at reception');
+
+      final row = await kira.profileRow();
+      await club.db.userProfiles.update(row.copyWith(role: UserRole.client));
+
+      final notFound = refusedWith(DwCoreRefusal.notFound);
+      expect(
+        await kira.client.command(
+          EditChatMessage(messageId: message.id, text: 'still mine?'),
+        ),
+        notFound,
+      );
+      expect(
+        await kira.client.command(DeleteChatMessage(messageId: message.id)),
+        notFound,
+      );
+      final stored = (await club.db.chatMessages.findById(message.id))!;
+      expect(stored.text, 'Keys are at reception');
+      expect(stored.isDeleted, isFalse);
+    });
 
     test('the window reads older and newer messages around an anchor, and '
         'counts what arrives past it', () async {

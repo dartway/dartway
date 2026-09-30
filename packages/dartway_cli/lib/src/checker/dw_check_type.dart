@@ -238,7 +238,18 @@ enum DwCheckType {
   /// project's own has none of the three unless someone writes them again —
   /// and every project did, differently, with a test seam of its own
   /// threaded through the server's factory.
-  forbiddenHttpClient;
+  forbiddenHttpClient,
+
+  /// A handler in a `*_handlers.dart` under any rule but a resource rule
+  /// (`signedIn`, a role check, …) that compares a row's owner field with the
+  /// caller and refuses `notFound`/`forbidden` — in its body or in a helper of
+  /// the same file it calls. Whether a row is the caller's
+  /// is `DwAccessRule.resource`'s question, answered once, with the row
+  /// handed to the handler (D-090, D-112).
+  ///
+  /// A warning: it reads the shape of the code, not its meaning, and a
+  /// comparison it matches may be something else.
+  inlineOwnershipCheck;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -261,6 +272,7 @@ enum DwCheckType {
     DwCheckType.frameworkOverrideOutlived ||
     DwCheckType.localSecretMissing ||
     DwCheckType.devComposeDrifted ||
+    DwCheckType.inlineOwnershipCheck ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };
