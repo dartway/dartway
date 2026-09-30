@@ -110,7 +110,7 @@ final DwCallHandler queueAlertHandler = DwCallHandler.command<QueueAlert, int>(
       dedupKey: command.dedupKey,
       scheduledAt: command.delayMillis == null
           ? null
-          : DateTime.now().add(Duration(milliseconds: command.delayMillis!)),
+          : ctx.now.add(Duration(milliseconds: command.delayMillis!)),
       lifetime: command.lifetimeMillis == null
           ? null
           : Duration(milliseconds: command.lifetimeMillis!),
@@ -197,6 +197,7 @@ final class PushHarness {
     int? maxConnections,
     bool withEligibility = true,
     bool withRuStore = true,
+    DwServerClock clock = DwServerClock.system,
   }) async {
     final database = await DwTestDatabase.create(
       admin: adminConfig(),
@@ -244,6 +245,7 @@ final class PushHarness {
           logger: RecordingLogger(harness.logs),
           alerts: harness.alerts,
           settings: serverSettings,
+          clock: clock,
         ),
       );
     } catch (_) {
@@ -333,6 +335,7 @@ PushHarness Function() usePushHarness({
   ),
   int? maxConnections,
   bool withRuStore = true,
+  DwServerClock clock = DwServerClock.system,
 }) {
   PushHarness? harness;
   setUpAll(
@@ -341,6 +344,7 @@ PushHarness Function() usePushHarness({
       serverSettings: serverSettings,
       maxConnections: maxConnections,
       withRuStore: withRuStore,
+      clock: clock,
     ),
   );
   tearDownAll(() async => harness?.stop());

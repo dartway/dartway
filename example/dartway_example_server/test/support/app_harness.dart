@@ -14,21 +14,28 @@ import 'package:test/test.dart';
 /// The skeleton's harness, extended: the club starts with push and settings
 /// of its own, signs in by phone, and has staff besides admins.
 final class AppHarness {
-  AppHarness._(this.database, this.server);
+  AppHarness._(this.database, this.server, this.clock);
 
   final DwTestDatabase database;
   final DwTestServer server;
 
+  /// The server's clock, which the test sets and moves: it stands where it
+  /// was started until the test moves it.
+  final DwTestClock clock;
+
   /// The codes the server delivered, by normalized phone.
   final Map<String, String> delivered = {};
 
-  /// With [storage], the server takes uploads on its buckets.
+  /// With [storage], the server takes uploads on its buckets. Its clock
+  /// starts at [now], the real time by default.
   static Future<AppHarness> start({
     DwServerSettings settings = const DwServerSettings(),
     DwFileStorageConfig? storage,
     DwPushModule? push,
+    DateTime? now,
   }) async {
     final database = await DwTestDatabase.create(prefix: 'dw_example_test');
+    final clock = DwTestClock(now ?? DateTime.now());
     late final AppHarness harness;
     final server = await DwTestServer.start(
       DartwayExampleServer.build(
@@ -37,6 +44,7 @@ final class AppHarness {
         port: 0,
         settings: settings,
         push: push,
+        clock: clock,
         auth: DwAuthConfig(
           accountDeletion: DwAccountDeletion.byMember,
           normalize: AppAuth.config.normalize,
@@ -48,7 +56,7 @@ final class AppHarness {
         ),
       ),
     );
-    return harness = AppHarness._(database, server);
+    return harness = AppHarness._(database, server, clock);
   }
 
   Future<void> stop() async {

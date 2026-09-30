@@ -11,7 +11,9 @@ import '../calls/dw_idempotency_ledger.dart';
 import '../channels/dw_channel_rules.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
+import '../server/dw_server_clock.dart';
 import '../server/dw_server_module.dart';
+import 'dw_caller_local_time.dart';
 
 /// Thrown when a call needs a signed-in account and has none. The framework
 /// answers `unauthenticated` (HTTP 401).
@@ -57,6 +59,36 @@ abstract class DwCallContext {
   /// The protocol both sides speak (for
   /// `DwDeletedObject.of<T>(id, ctx.protocol)`).
   DwWireProtocol get protocol;
+
+  /// The current instant, in UTC, from the server's clock
+  /// (`DwAppServer(clock: …)`, the system's by default): every time a handler,
+  /// a job, a route or a startup step decides something by, read here rather
+  /// than from `DateTime.now()`, so a test that sets the clock (`DwTestClock`)
+  /// sets it for all of them. Read anew on every access.
+  DateTime get now;
+
+  /// The caller's UTC offset at the moment of the call, as its app sent it
+  /// (`Dw-Utc-Offset`, read from the device on every call) — or `null` when
+  /// unknown: a client that sent none, and every context without a caller's
+  /// device behind it (jobs, routes, startup steps, channel subscription
+  /// checks, `DwAppServer.callAs`).
+  ///
+  /// An offset, not a time zone: it says what the caller's clock reads now,
+  /// not what it will read after the next daylight-saving change. Work that
+  /// runs later for this person — a job, a reminder — needs an offset the
+  /// project stored itself; the framework keeps none.
+  Duration? get callerUtcOffset;
+
+  /// The caller's wall clock now — [now] read on a clock [callerUtcOffset]
+  /// east of UTC: their date, hour, weekday and the instant their day began
+  /// ([DwCallerLocalTime.startOfDayUtc]). `null` when the offset is unknown.
+  ///
+  /// A reading, not an instant: it has no way to be stored or compared as
+  /// one.
+  DwCallerLocalTime? get callerLocalTime => switch (callerUtcOffset) {
+    final offset? => DwCallerLocalTime(now, offset),
+    null => null,
+  };
 
   /// Runs [body] in a transaction (a savepoint when already inside one).
   /// Publications, revocations and jobs made inside it take effect only when
@@ -204,7 +236,10 @@ final class DwRuntimeContext extends DwCallContext {
     void Function(DwRuntimeContext ctx)? deliverOnCommit,
     String? clientAppVersion,
     String? clientUserAgent,
+    required DwServerClock clock,
+    this.callerUtcOffset,
   }) : _root = _Scope(db),
+       _clock = clock,
        _deliverOnCommit = deliverOnCommit,
        _jobs = jobs,
        _accounts = accounts,
@@ -222,8 +257,15 @@ final class DwRuntimeContext extends DwCallContext {
   final DwFileService Function(DwRuntimeContext ctx) _files;
   final Map<Type, DwServerModule> _modules;
   final DwChannelRules _channelRules;
+  final DwServerClock _clock;
 
   final DwContextKind kind;
+
+  @override
+  DateTime get now => _clock.now();
+
+  @override
+  final Duration? callerUtcOffset;
 
   @override
   final DwJobAttempt? job;

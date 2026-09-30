@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.21.0-dev.9
+
+- **`DwHttpContract.utcOffsetHeader` (`Dw-Utc-Offset`)**: the caller's UTC offset at the call, whole
+  minutes east of UTC, optional; `utcOffsetValue` writes it and `parseUtcOffset` reads it
+  (`FormatException` beyond `maxUtcOffset`, 18 hours) — one parser for both sides
+  (dartway/dartway#385, D-110). Additive: `dwProtocolVersion` stays 2, the header is recorded as a
+  wire shape of its own (`http.utcOffset`).
+
 ## 0.21.0-dev.8
 
 - **BREAKING: `DwIdentityInfo.kind` is `DwIdentifierKind?` now, and `provider: String?` joined it —

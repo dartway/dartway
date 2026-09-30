@@ -645,6 +645,14 @@ final class TestApp {
       access: DwAccessRule.anonymous,
       handle: (ctx, command) async => 'pong',
     ),
+    DwCallHandler.command<ReadClock, String>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, command) async => clockText(ctx),
+    ),
+    DwCallHandler.single<GetClockNote, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, request) async => NoteView(id: 1, text: clockText(ctx)),
+    ),
     DwCallHandler.command<NeedsAccount, int>(
       access: DwAccessRule.anonymous,
       handle: (ctx, command) async => ctx.requireAccountId,
@@ -707,9 +715,7 @@ final class TestApp {
           key: command.key,
           runAt: command.delayMillis == null
               ? null
-              : DateTime.now().add(
-                  Duration(milliseconds: command.delayMillis!),
-                ),
+              : ctx.now.add(Duration(milliseconds: command.delayMillis!)),
         );
         if (command.refuse) ctx.refuse(DwCoreRefusal.conflict);
         return enqueued;
@@ -778,6 +784,14 @@ final class TestApp {
     );
   }
 
+  /// What [ctx] says about time: `now`, the caller's offset in minutes and
+  /// the caller's local time, joined by `|`, `-` for what is unknown.
+  static String clockText(DwCallContext ctx) => [
+    ctx.now.toIso8601String(),
+    ctx.callerUtcOffset?.inMinutes ?? '-',
+    ctx.callerLocalTime?.toString() ?? '-',
+  ].join('|');
+
   /// A test job's kind: its payload is one tag.
   static DwJobKind<Object?> tagged(String name) => DwJobKind<Object?>(
     name,
@@ -786,6 +800,12 @@ final class TestApp {
   );
 
   List<DwJobDefinition> jobs({bool withTick = false}) => [
+    // Logs what its context says about time, under its tag.
+    DwQueuedJob(
+      tagged('clock'),
+      handle: (ctx, tag) =>
+          _logJob(ctx, 'clock', '$tag ${TestApp.clockText(ctx)}'),
+    ),
     DwQueuedJob(
       tagged('record'),
       handle: (ctx, tag) async {
@@ -869,6 +889,7 @@ final class TestApp {
     DwDatabaseSchema? schema,
     DwFileStorage? files,
     List<DwServerModule> modules = const [],
+    DwServerClock clock = DwServerClock.system,
   }) => DwAppServer(
     protocol: protocol ?? testProtocol,
     schema: schema,
@@ -889,6 +910,7 @@ final class TestApp {
     alerts: alerts,
     logger: logger,
     settings: settings,
+    clock: clock,
   );
 
   /// Signs [identifier] in over HTTP and returns the session.

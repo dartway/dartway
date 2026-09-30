@@ -59,7 +59,7 @@ final scheduleHandlers = <DwCallHandler>[
   DwCallHandler.command<ScheduleSession, ClubSession>(
     access: AppAccess.staff,
     handle: (ctx, command) async {
-      if (command.startsAt.isBefore(DateTime.now())) {
+      if (command.startsAt.isBefore(ctx.now)) {
         ctx.refuse(DartwayExampleRefusal.sessionInPast, field: 'startsAt');
       }
       final ClubSessionRow row;

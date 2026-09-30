@@ -214,7 +214,7 @@ so the handler refuses cleanly instead of failing (here a payment row whose `inv
 
 ```dart
 final paid = await ctx.db.invoicePayments.tryInsert(
-  InvoicePaymentRow(invoiceId: invoice.id!, paidAt: DateTime.now()),
+  InvoicePaymentRow(invoiceId: invoice.id!, paidAt: ctx.now),
   onConflict: DwOnConflict.doNothing((t) => [t.invoiceId]),
 );
 if (paid == null) ctx.refuse(AcmeRefusal.invoiceAlreadyPaid);
@@ -298,7 +298,7 @@ final invoiceHandlers = <DwCallHandler>[
       final paid = await ctx.db.invoices.update(
         row.copyWith(
           status: InvoiceStatus.paid,
-          paidAt: DwFieldPatch.set(DateTime.now()),
+          paidAt: DwFieldPatch.set(ctx.now),
         ),
       );
       // Publishes the invoice to every channel that shows it and answers it
@@ -379,7 +379,20 @@ exit of the server shows the object the same way.
 ## 6. The call context
 
 `DwCallContext` is one per call: `accountId` / `requireAccountId`, `sessionKey`, `db`, `protocol`,
-`transaction`, `publish`, `revoke`, `refuse`, `jobs`, `accounts`, `files`, `log`, `memo`.
+`now`, `callerUtcOffset` / `callerLocalTime`, `transaction`, `publish`, `revoke`, `refuse`, `jobs`,
+`accounts`, `files`, `log`, `memo`.
+
+**The time is `ctx.now`, and only `ctx.now`** — UTC, from the server's clock, in handlers, jobs,
+routes and startup steps alike. `DateTime.now()` anywhere in `lib/` fails `dart run dartway_cli:dartway check`
+(`forbiddenDateTimeNow`): tests set the server's clock (`DwTestClock`, `dartway-testing`) and the job
+queue runs by it, so the system clock is a time no test can pin. **The caller's day is
+`ctx.callerLocalTime`**: the app sends its device's UTC offset with every call, so a command never
+carries an offset field. `ctx.callerUtcOffset` is the `Duration`; both are `null` in jobs and when
+the app sent none. `callerLocalTime` is a `DwCallerLocalTime` — a reading of the caller's clock
+(`year`, `month`, `day`, `hour`, `minute`, `weekday`), not an instant and not a `DateTime`; its one
+way back to an instant is `startOfDayUtc`, the caller's midnight, for a query over "their today".
+An offset is not a zone: work for a person later (a job at their 8 a.m.) uses an offset the project
+stored from one of their calls — the framework keeps none.
 
 **The project's notions of "the caller" are an extension, cached per call with `memo`** — the
 framework knows an account, the profile and the role are the project's. It is `AppCallContext` in
@@ -462,13 +475,14 @@ The worked example is the framework example's bookings reminder
 `BookSession` enqueues it, and the job checks the booking is still active when it runs.
 
 Enqueue from a command by the kind, never by a string:
-`await ctx.jobs.enqueue(InvoicesJobs.remind, (invoiceId: id), runAt: …, key: …)`. The payload is
+`await ctx.jobs.enqueue(InvoicesJobs.remind, (invoiceId: id), runAt: ctx.now.add(…), key: …)`. The payload is
 spelled as a map once, in the kind's codec — never `payload['x']! as int` in a handler.
 The enqueue joins the command's transaction (no row if it rolls back); a `key` deduplicates pending
 jobs. A queued job is transactional by default (the job row disappears exactly when its work commits);
 `transactional: false` for jobs that call external services, which may then run twice after a crash.
-A job has no caller (`accountId` is `null`): it reads what it needs from its payload, and it may
-publish. Names starting with `dw.` are the framework's.
+A job has no caller (`accountId` and `callerUtcOffset` are `null`): it reads what it needs from its
+payload, and it may publish. It is due by the server's clock — the one `ctx.now` reads — so a test
+that moves a `DwTestClock` past its `runAt` runs it. Names starting with `dw.` are the framework's.
 
 ## 8. Routes — external doors only
 
@@ -678,5 +692,7 @@ call per access rule — `dartway-testing`, `dartway-access`.
 - [ ] Every object a command changed is published to every channel that shows it (`dartway-realtime`).
 - [ ] No SQL on `dw_*` tables; accounts through `DwAccountService`.
 - [ ] A new profile is created in `onAccountCreated`, in the account's transaction.
+- [ ] Time is `ctx.now`; the caller's local day is `ctx.callerLocalTime`, never an offset field on
+      a command.
 - [ ] Row class changed → `dart run dartway_cli:dartway generate`, migration drafted and reviewed.
 - [ ] `dart run dartway_cli:dartway test` and `dart run dartway_cli:dartway check` pass.

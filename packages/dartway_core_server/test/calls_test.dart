@@ -439,6 +439,7 @@ void main() {
             ),
             DwChannelRule.ofCaller(TestChannel.inbox),
           ]),
+          clock: DwServerClock.system,
         );
 
     test('memo creates once per key per call', () {

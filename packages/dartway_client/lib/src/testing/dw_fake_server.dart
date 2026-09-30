@@ -306,6 +306,7 @@ final class DwFakeServer {
     DwClientOptions options = dwFakeClientOptions,
     void Function(Object error, StackTrace stackTrace)? onError,
     DwStorageTransport? storageTransport,
+    Duration? utcOffset = Duration.zero,
   }) => DwAppClient(
     protocol: protocol,
     baseUrl: baseUrl,
@@ -316,6 +317,7 @@ final class DwFakeServer {
     tokenStore: tokenStore,
     options: options,
     onError: onError,
+    utcOffset: utcOffset,
     // Keys and jitter in a test need no secure source, and not every test
     // platform has one (Node under dart2js does not).
     random: Random(),

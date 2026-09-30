@@ -55,7 +55,8 @@ void main() {
     expect(profile.role, UserRole.user);
     expect(profile.agreedForMarketing, isTrue);
     final row = (await app.db.userProfiles.findById(profile.id))!;
-    expect(row.termsAcceptedAt, isNotNull);
+    // Stamped by the server's clock, which the test holds still.
+    expect(row.termsAcceptedAt, app.clock.now());
   });
 
   test('signing up by e-mail, then signing in again without the consent: an '
