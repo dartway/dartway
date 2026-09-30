@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.14.0
+
+- **BREAKING: `dartway check` holds the inside of a server feature** (dartway/dartway#381, D-109).
+  A feature folder `lib/src/<feature>/` holds `<feature>_<kind>.dart` or
+  `<feature>_<part>_<kind>.dart`, the kind one of `feature`, `rows`, `handlers`, `objects`,
+  `publications`, `jobs`, `access`, `routes`, and one optional, flat `logic/` subfolder for
+  everything else, whose files carry no kind's suffix; a layer-named folder (`domain`, `rows`, `handlers`, `services`,
+  `models`, `objects`, `repositories`, `utils`, `helpers`, …) is refused at any depth of `lib/src/`
+  (`invalidServerFeatureFile`, new error). And each kind is held by what a file declares: handlers
+  only in `*_handlers.dart`, row classes only in `*_rows.dart`, job kinds and definitions only in
+  `*_jobs.dart`, `DwHttpRoute`s only in `*_routes.dart`, `DwServerFeature` only in `<feature>_feature.dart`, a named function that publishes
+  only in `*_publications.dart`, a named function that takes a row and builds a data object only in
+  `*_objects.dart` — and none of them in `core/` (`misplacedServerCode`, new error). Read from the
+  source with comments and strings blanked; a closure a handler or a hook runs is not a
+  declaration, so publishing inline from a handler stays legal. `helpers`, `repositories` and
+  `utils` join the layer names refused at the top of `src/` too (`invalidTopLevelLayout`).
+  Migration note: `docs/migrations/2026-09-29-server-feature-closed-file-set.md`.
+
 ## 0.13.0
 
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
