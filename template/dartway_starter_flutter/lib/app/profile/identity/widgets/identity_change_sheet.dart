@@ -61,10 +61,10 @@ class IdentityChangeSheet extends HookWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AppText.title(l10n.identitySheetTitle(kind.name)),
-            const Gap(AppSpace.s),
+            const Gap(AppSpace.s8),
             if (sent == null) ...[
               AppText.body(l10n.identitySheetIntro),
-              const Gap(AppSpace.l),
+              const Gap(AppSpace.s16),
               switch (kind) {
                 DwIdentifierKind.phone => PhoneTextField(
                   labelText: l10n.phoneLabel,
@@ -88,7 +88,7 @@ class IdentityChangeSheet extends HookWidget {
                       : null,
                 ),
               },
-              const Gap(AppSpace.xl),
+              const Gap(AppSpace.s24),
               AppButton.primary(
                 l10n.getCodeAction,
                 requireValidation: true,
@@ -96,7 +96,7 @@ class IdentityChangeSheet extends HookWidget {
               ),
             ] else ...[
               AppText.body(l10n.codeSentTo(draft.value.trim())),
-              const Gap(AppSpace.l),
+              const Gap(AppSpace.s16),
               PinCodeTextFieldWidget(
                 pinCode: code.value,
                 onChanged: (value) => code.value = value,
@@ -105,7 +105,7 @@ class IdentityChangeSheet extends HookWidget {
                 availableAt: sent.resendAfter,
                 onResend: dw.action((_) => requestCode()),
               ),
-              const Gap(AppSpace.l),
+              const Gap(AppSpace.s16),
               AppButton.primary(
                 l10n.identityConfirmAction,
                 requireValidation: true,

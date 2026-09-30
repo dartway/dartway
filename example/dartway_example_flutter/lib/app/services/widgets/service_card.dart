@@ -14,7 +14,7 @@ class ServiceCard extends StatelessWidget {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpace.l),
+        padding: const EdgeInsets.all(AppSpace.s16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -23,9 +23,9 @@ class ServiceCard extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
             ),
-            const Gap(AppSpace.s),
+            const Gap(AppSpace.s8),
             AppText.caption(service.description),
-            const Gap(AppSpace.s),
+            const Gap(AppSpace.s8),
             AppText.caption(
               context.l10n.serviceDurationPrice(
                 service.durationMinutes,

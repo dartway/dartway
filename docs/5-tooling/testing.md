@@ -19,7 +19,8 @@ per side, extended and never replaced.
 **A test sits at the path of what it tests, in every package**: `lib/admin/users/admin_users_page.dart`
 is tested in `test/admin/users/admin_users_page_test.dart`, `lib/src/core/auth.dart` in
 `test/src/core/auth_test.dart`. A test of a whole folder — a server feature through its calls — is
-named after the folder at its mirror: `lib/src/chat/` → `test/src/chat/chat_acceptance_test.dart`.
+named after the folder at its mirror: `lib/src/chat/` → `test/src/chat/chat_acceptance_test.dart`,
+and a scenario of it `test/src/chat/chat_attachments_acceptance_test.dart`.
 Helpers live in `test/support/` and are imported relatively, and a test builds no server and no
 `ProviderScope` of its own. `dart run dartway_cli:dartway check` holds all three (`testLayout`,
 `testHarnessBypassed`).

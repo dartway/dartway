@@ -1,9 +1,8 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-
-import 'package:dartway_example_server/src/core/channels.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/chat/chat_objects.dart';
 import 'package:dartway_example_server/src/chat/chat_rows.dart';
+import 'package:dartway_example_server/src/core/channels.dart';
 
 /// What a chat change is published as, and to whom.
 abstract final class ChatPublications {

@@ -233,7 +233,7 @@ class ChatComposer extends HookConsumerWidget {
         children: [
           if (editing != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: AppSpace.xs),
+              padding: const EdgeInsets.only(bottom: AppSpace.s6),
               child: ChatQuoteBlock(
                 icon: Icons.edit_outlined,
                 title: l10n.chatEditingMessage,
@@ -244,7 +244,7 @@ class ChatComposer extends HookConsumerWidget {
             )
           else if (replyTo != null)
             Padding(
-              padding: const EdgeInsets.only(bottom: AppSpace.xs),
+              padding: const EdgeInsets.only(bottom: AppSpace.s6),
               child: ChatQuoteBlock(
                 icon: Icons.reply,
                 title: l10n.chatReplyTo(replyTo.authorNameIn(l10n)),
@@ -256,10 +256,10 @@ class ChatComposer extends HookConsumerWidget {
             ),
           if (files.value.isNotEmpty && editing == null)
             Padding(
-              padding: const EdgeInsets.only(bottom: AppSpace.xs),
+              padding: const EdgeInsets.only(bottom: AppSpace.s6),
               child: Wrap(
-                spacing: 6,
-                runSpacing: 6,
+                spacing: AppSpace.s6,
+                runSpacing: AppSpace.s6,
                 children: [
                   for (final file in files.value)
                     ChatFileTile(
@@ -297,7 +297,7 @@ class ChatComposer extends HookConsumerWidget {
                       : null,
                 ),
               ),
-              const SizedBox(width: AppSpace.xs),
+              const SizedBox(width: AppSpace.s6),
               IconButton.filled(
                 key: const ValueKey('chat-send'),
                 tooltip: l10n.sendMessage,

@@ -1,5 +1,6 @@
 import 'package:dartway_example_flutter/admin/analytics/logic/analytics_period_choice.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
@@ -39,8 +40,8 @@ class AnalyticsPeriodBar extends StatelessWidget {
     final l10n = context.l10n;
     final period = choice.period;
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpace.s8,
+      runSpacing: AppSpace.s8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         for (final days in AnalyticsPeriodChoice.presets)

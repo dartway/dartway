@@ -20,9 +20,9 @@ class GreetingBlock extends ConsumerWidget {
         // names an icon, not a file: swap the asset and the path in `AppIcon`,
         // and nothing here changes.
         const AppIconView(AppIcon.brandMark, size: 64),
-        const Gap(AppSpace.l),
+        const Gap(AppSpace.s16),
         const AppText.title('DartWay.dev'),
-        const Gap(AppSpace.m),
+        const Gap(AppSpace.s12),
         AppText.body(context.l10n.completeLoginToContinue),
         const Spacer(flex: 1),
         AppButton.primary(
@@ -35,7 +35,7 @@ class GreetingBlock extends ConsumerWidget {
                 .goTo(AuthStep.registration),
           ),
         ),
-        const Gap(AppSpace.xl),
+        const Gap(AppSpace.s20),
         AppButton.secondary(
           context.l10n.loginAction,
           height: 40,

@@ -1,7 +1,6 @@
 // Maintained by `migrate create`: one entry per migration file in this
 // directory, in id order.
 import 'package:dartway_core_server/dartway_core_server.dart';
-
 import 'package:dartway_starter_server/src/migrations/m20260914_204255_initial.dart';
 
 final List<DwDatabaseMigration> appMigrations = [

@@ -33,7 +33,7 @@ class AnalyticsDashboardGrid extends HookWidget {
   final ValueChanged<bool> onSaving;
 
   static const double _cardMinWidth = 300;
-  static const double _gap = 12;
+  static const double _gap = AppSpace.s12;
 
   @override
   Widget build(BuildContext context) {
@@ -168,7 +168,7 @@ class AnalyticsDashboardGrid extends HookWidget {
             ),
             if (editing &&
                 widgets.length < DwAnalyticsDashboard.maxWidgets) ...[
-              const Gap(AppSpace.m),
+              const Gap(AppSpace.s12),
               Align(
                 alignment: Alignment.centerLeft,
                 child: AppButton.secondary(

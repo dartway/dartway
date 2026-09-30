@@ -10,12 +10,16 @@
   whole folder), a helper outside `test/support/`, or a test inside it; `testHarnessBypassed` — a
   `ProviderScope`/`DwFakeServer` built by a widget test, a `DwTestServer.start`/`DwAppServer` by a
   server test, outside `test/support/`; `rawSpacing` — a number in a spacer `SizedBox`, a `Gap` or an
-  `EdgeInsets.*` outside `ui_kit/`, where the kit's `AppSpace` tokens go; `lintsPluginMissing` — the
-  Flutter package does not enable the `dartway_lints` plugin; and `docCommentLanguage` (warning) — a
-  doc comment in `lib/` in another script than the language `setup-ai --language` recorded.
-  `dartway check --fix` rewrites relative imports to `package:` before checking. `dartway update`
-  enables the `dartway_lints` plugin in a Flutter package without it, or raises its caret, pinned to
-  the channel as `create` pins it. Migration note:
+  `EdgeInsets.*` or a `spacing:`/`runSpacing:`/`mainAxisSpacing:`/`crossAxisSpacing:` outside
+  `ui_kit/`, where the kit's `AppSpace` steps go; `lintsPluginMissing` — the Flutter package does not
+  enable the `dartway_lints` plugin, or names neither a version nor a path; and `docCommentLanguage`
+  (warning) — a doc comment in `lib/` in another script than the language `setup-ai --language`
+  recorded, those the skeleton wrote excepted. `dartway check --fix` rewrites relative imports to
+  `package:` (sorting the import block) and moves root-level acceptance tests to
+  `test/src/<feature>/`, before checking; `--type` and `--dir` narrow it. `dartway update` enables the
+  `dartway_lints` plugin in a Flutter package without it, or raises its caret, pinned to the channel
+  as `create` pins it (`--framework-path` pins a checkout by path); a `plugins:` section it cannot
+  edit safely is left alone, with the lines to add printed instead. Migration note:
   `docs/migrations/2026-09-30-imports-tests-spacing.md`.
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
   `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature

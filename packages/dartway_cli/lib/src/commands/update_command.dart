@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
+import '../framework_overrides.dart';
 import '../framework_versions.dart';
 import '../lints_plugin.dart';
 import '../migration_notes.dart';
@@ -41,6 +42,13 @@ class UpdateCommand extends Command<int> {
       defaultChannel:
           Platform.environment['DARTWAY_BRANCH'] ??
           MonorepoSource.defaultBranch,
+    );
+    argParser.addOption(
+      'framework-path',
+      help:
+          'A local DartWay checkout the project builds against: the '
+          'dartway_lints plugin is then pinned to it by path, as '
+          '`dartway create --framework-path` pins it.',
     );
   }
 
@@ -87,7 +95,11 @@ class UpdateCommand extends Command<int> {
     );
     _reportPackages(gaps);
     _reportMigrations(result.monorepoDir, gaps);
-    _wireLintsPlugin(projectRoot, frameworkVersions['dartway_lints']);
+    _wireLintsPlugin(
+      projectRoot,
+      frameworkVersions['dartway_lints'],
+      frameworkPath: argResults!['framework-path'] as String?,
+    );
 
     stdout.writeln(
       '\nCommit .claude/ with the rest of the update, so the history says '
@@ -154,18 +166,31 @@ class UpdateCommand extends Command<int> {
   /// The framework's lint rules, as `dartway create` wires them: a project
   /// that predates the plugin never had them, and `dartway check` fails on
   /// that (`lintsPluginMissing`).
-  void _wireLintsPlugin(Directory projectRoot, String? version) {
+  void _wireLintsPlugin(
+    Directory projectRoot,
+    String? version, {
+    String? frameworkPath,
+  }) {
     if (version == null) return;
+    final checkoutPlugin = frameworkPath == null || frameworkPath.isEmpty
+        ? null
+        : frameworkPackageDirectories(
+            Directory(p.normalize(p.absolute(frameworkPath))),
+          )['dartway_lints'];
     final ProjectLayout layout;
     try {
       layout = ProjectLayout.detect(projectRoot);
     } on StateError {
       return;
     }
-    final change = wireLintsPlugin(
+    final (:change, :manual) = wireLintsPlugin(
       File(p.join(layout.flutterPackageDir.path, 'analysis_options.yaml')),
       version,
+      path: checkoutPlugin,
     );
+    if (manual != null) {
+      stdout.writeln('\n⚠️  Lints: not wired — $manual');
+    }
     if (change == null) return;
     stdout.writeln(
       '\n🔎 Lints: $change in ${layout.flutterPackage}/analysis_options.yaml '

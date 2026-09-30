@@ -1,11 +1,10 @@
+import 'package:dartway_starter_flutter/app/profile/identity/widgets/identity_change_sheet.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-
-import 'package:dartway_starter_flutter/app/profile/identity/widgets/identity_change_sheet.dart';
 
 /// How the member signs in: their phone and e-mail, each added or changed by a
 /// code sent to the new one — without signing in again.
@@ -46,7 +45,7 @@ class ProfileIdentitySection extends StatelessWidget
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppText.body(l10n.identitySectionTitle),
-          const Gap(AppSpace.xs),
+          const Gap(AppSpace.s4),
           for (final kind in DwIdentifierKind.values)
             _IdentityRow(
               kind: kind,

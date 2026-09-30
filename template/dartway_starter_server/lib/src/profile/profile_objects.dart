@@ -1,7 +1,6 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-
 import 'package:dartway_starter_server/src/profile/profile_rows.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 /// Rows → the data objects clients see. Related data is loaded in one query
 /// per relation for the whole batch, never per row.

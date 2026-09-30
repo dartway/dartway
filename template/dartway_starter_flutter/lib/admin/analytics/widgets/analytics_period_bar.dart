@@ -37,8 +37,8 @@ class AnalyticsPeriodBar extends StatelessWidget {
     final l10n = context.l10n;
     final period = choice.period;
     return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+      spacing: AppSpace.s8,
+      runSpacing: AppSpace.s8,
       crossAxisAlignment: WrapCrossAlignment.center,
       children: [
         for (final days in AnalyticsPeriodChoice.presets)

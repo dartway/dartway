@@ -34,14 +34,14 @@ class AdminCounters extends ConsumerWidget {
                     count: counters.members,
                   ),
                 ),
-                const Gap(AppSpace.m),
+                const Gap(AppSpace.s12),
                 Expanded(
                   child: _CounterTile(
                     label: l10n.countSessions,
                     count: counters.upcomingSessions,
                   ),
                 ),
-                const Gap(AppSpace.m),
+                const Gap(AppSpace.s12),
                 Expanded(
                   child: _CounterTile(
                     label: l10n.countNews,
@@ -68,7 +68,7 @@ class _CounterTile extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           AppText.title('$count'),
-          const Gap(AppSpace.xs),
+          const Gap(AppSpace.s4),
           AppText.body(label),
         ],
       ),

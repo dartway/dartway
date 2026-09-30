@@ -90,19 +90,19 @@ class UpdateRequiredPage extends ConsumerWidget {
           return Scaffold(
             body: Center(
               child: Padding(
-                padding: const EdgeInsets.all(AppSpace.xxl),
+                padding: const EdgeInsets.all(AppSpace.s32),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const AppIconView(AppIcon.brandMark, size: 64),
-                    const SizedBox(height: AppSpace.xl),
+                    const SizedBox(height: AppSpace.s24),
                     AppText.title(
                       updateRequired
                           ? l10n.updateRequiredTitle
                           : l10n.serverMismatchTitle,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: AppSpace.m),
+                    const SizedBox(height: AppSpace.s12),
                     AppText.body(
                       updateRequired
                           ? l10n.updateRequiredBody

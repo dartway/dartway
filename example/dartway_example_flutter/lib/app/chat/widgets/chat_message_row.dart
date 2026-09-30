@@ -62,7 +62,7 @@ class ChatMessageRow extends StatelessWidget {
           if (!isMine && first) ChatAuthorName(message.authorNameIn(l10n)),
           if (message.replyTo case final quote?)
             Padding(
-              padding: const EdgeInsets.only(bottom: AppSpace.xs),
+              padding: const EdgeInsets.only(bottom: AppSpace.s4),
               child: ChatQuoteBlock(
                 title: quote.authorDeleted
                     ? l10n.chatDeletedMember
@@ -88,12 +88,12 @@ class ChatMessageRow extends StatelessWidget {
             ChatAttachmentsView(attachments: message.attachments),
           if (message.text.isNotEmpty)
             ChatHighlightedText(message.text, query: searchQuery),
-          const SizedBox(height: AppSpace.xxs),
+          const SizedBox(height: AppSpace.s2),
           Wrap(
             alignment: WrapAlignment.end,
             crossAxisAlignment: WrapCrossAlignment.center,
-            spacing: 4,
-            runSpacing: 4,
+            spacing: AppSpace.s4,
+            runSpacing: AppSpace.s4,
             children: [
               ..._reactions(context, message, me.id),
               ChatMessageMeta(
@@ -112,12 +112,12 @@ class ChatMessageRow extends StatelessWidget {
       children: [
         if (startsDay)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: AppSpace.s),
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
             child: ChatDateChip(message.sentAt.chatDayLabel(l10n)),
           ),
         if (firstUnread) ChatUnreadDivider(l10n.chatUnreadDivider),
         Padding(
-          padding: EdgeInsets.only(top: first ? AppSpace.xs : AppSpace.xxs),
+          padding: EdgeInsets.only(top: first ? AppSpace.s6 : AppSpace.s2),
           child: Row(
             mainAxisAlignment: isMine
                 ? MainAxisAlignment.end
@@ -129,7 +129,7 @@ class ChatMessageRow extends StatelessWidget {
                   name: message.authorNameIn(l10n),
                   visible: last,
                 ),
-                const SizedBox(width: AppSpace.xs),
+                const SizedBox(width: AppSpace.s6),
               ],
               Flexible(
                 child: GestureDetector(

@@ -1,8 +1,7 @@
+import 'package:dartway_starter_flutter/l10n/gen/app_localizations.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
-
-import 'package:dartway_starter_flutter/l10n/gen/app_localizations.dart';
 
 export 'package:dartway_starter_flutter/l10n/gen/app_localizations.dart';
 

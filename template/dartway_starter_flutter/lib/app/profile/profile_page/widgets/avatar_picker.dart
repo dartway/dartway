@@ -51,7 +51,7 @@ class AvatarPicker extends HookWidget {
             ),
           ),
         ),
-        const Gap(AppSpace.s),
+        const Gap(AppSpace.s8),
         AppText.caption(switch (upload) {
           DwUploadError(:final refusal?) => l10n.refusalText(refusal),
           DwUploadError() => l10n.refusalUploadFailed,

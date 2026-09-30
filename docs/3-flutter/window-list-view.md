@@ -19,7 +19,7 @@ DwWindowListView<ChatMessage>(
   controller: session.list,           // DwWindowListController<ChatMessage>
   initialAnchor: session.openAnchor,  // the read position, or null for the newest
   anchorAlignment: 0.3,
-  padding: EdgeInsets.fromLTRB(AppSpace.m, hasPinned ? ChatPinnedBar.height + AppSpace.s : AppSpace.s, AppSpace.m, AppSpace.m),
+  padding: EdgeInsets.fromLTRB(AppSpace.s10, hasPinned ? ChatPinnedBar.height + AppSpace.s8 : AppSpace.s8, AppSpace.s10, AppSpace.s12),
   onVisibleItemsChanged: tracker.seen,
   emptyBuilder: (context) => Center(child: AppText.body(l10n.sayHiToTeam)),
   itemBuilder: (context, row) => ChatMessageRow(row: row, session: session),

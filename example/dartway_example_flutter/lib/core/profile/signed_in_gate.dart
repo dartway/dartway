@@ -1,14 +1,13 @@
 import 'package:dartway_example_flutter/auth/profile_name_page.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 
 /// Lets the app through once the signed-in user's profile is loaded and
 /// complete, and hands it down as [SignedInProfile].

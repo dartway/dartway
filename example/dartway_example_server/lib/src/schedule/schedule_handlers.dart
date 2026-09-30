@@ -1,12 +1,11 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_example_shared/dartway_example_shared.dart';
-
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/admin/admin_publications.dart';
 import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_server/src/core/channels.dart';
 import 'package:dartway_example_server/src/schedule/schedule_objects.dart';
 import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 final scheduleHandlers = <DwCallHandler>[
   /// The club's services, by title. Every signed-in member.

@@ -1,8 +1,7 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_example_shared/dartway_example_shared.dart';
-
-import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_server/src/chat/chat_handlers.dart';
+import 'package:dartway_example_server/src/core/call_context.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 /// The staff chat: its channels, messages and read positions.
 final chatFeature = DwServerFeature(

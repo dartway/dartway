@@ -12,7 +12,7 @@ class AppScaffold extends StatelessWidget {
     required this.body,
     this.appBar,
     this.floatingActionButton,
-    this.bodyInsets = const EdgeInsets.all(AppSpace.l),
+    this.bodyInsets = const EdgeInsets.all(AppSpace.s16),
   }) : showBottomNavigationBar = true;
 
   const AppScaffold.inner({
@@ -20,7 +20,7 @@ class AppScaffold extends StatelessWidget {
     required this.body,
     this.appBar,
     this.floatingActionButton,
-    this.bodyInsets = const EdgeInsets.all(AppSpace.l),
+    this.bodyInsets = const EdgeInsets.all(AppSpace.s16),
   }) : showBottomNavigationBar = false;
 
   final PreferredSizeWidget? appBar;

@@ -1,6 +1,5 @@
-import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-
 import 'package:dartway_starter_flutter/auth/logic/auth_step.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 /// What the sign-in flow holds: where it is, what was typed, what was agreed.
 ///

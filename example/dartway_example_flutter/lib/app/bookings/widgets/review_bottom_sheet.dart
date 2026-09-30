@@ -26,12 +26,12 @@ class ReviewBottomSheet extends HookWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         AppText.title(l10n.reviewSheetTitle),
-        const Gap(AppSpace.l),
+        const Gap(AppSpace.s16),
         AppRatingStars(
           rating: rating.value,
           onRatingChanged: (value) => rating.value = value,
         ),
-        const Gap(AppSpace.l),
+        const Gap(AppSpace.s16),
         AppTextFormField(
           value: reviewText.value,
           onChanged: (value) => reviewText.value = value,
@@ -39,7 +39,7 @@ class ReviewBottomSheet extends HookWidget {
           hintText: l10n.reviewHint,
           maxLines: 3,
         ),
-        const Gap(AppSpace.xl),
+        const Gap(AppSpace.s24),
         AppButton.primary(
           l10n.submitReview,
           onTap: dw.action(

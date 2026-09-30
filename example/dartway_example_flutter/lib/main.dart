@@ -1,10 +1,9 @@
+import 'package:dartway_example_flutter/core/app_version.dart';
+import 'package:dartway_example_flutter/dartway_example_app.dart';
 import 'package:dartway_push_firebase/dartway_push_firebase.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
-
-import 'package:dartway_example_flutter/core/app_version.dart';
-import 'package:dartway_example_flutter/dartway_example_app.dart';
 
 Future<void> main() async {
   // Firebase, when the build names a project: `--dart-define=FIREBASE_API_KEY=…`

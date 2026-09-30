@@ -1,9 +1,8 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_example_shared/dartway_example_shared.dart';
-
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/profile/profile_objects.dart';
 import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 /// Schedule rows → the data objects clients see. Related rows are loaded in
 /// one query per relation for the whole batch, never per row.

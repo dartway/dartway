@@ -29,10 +29,10 @@ And it warns on a doc comment in `lib/` written in another script than the proje
 
     dart run dartway_cli:dartway check --fix
 
-rewrites every relative import and export in `lib/` of the three packages to its `package:` form,
-then checks. Generated files are left to their generator. Run `dart format` over the packages after
-it, and `dart analyze`: a file that imported the same library both ways now imports it twice
-(`duplicate_import`) — delete one line. Under `test/`, nothing changes: the harness in
+rewrites every relative import and export in `lib/` of the three packages to its `package:` form and
+sorts the import block it touched, then checks. Generated files are left to their generator. Run
+`dart format` over the packages after it, and `dart analyze`: a file that imported the same library
+both ways now imports it twice (`duplicate_import`) — delete one line. Under `test/`, nothing changes: the harness in
 `test/support/` is imported relatively, at any depth.
 
 **The lint plugin — mechanical.** `dartway update` adds
@@ -40,39 +40,50 @@ it, and `dart analyze`: a file that imported the same library both ways now impo
     plugins:
       dartway_lints: ^0.5.0
 
-to the Flutter package's `analysis_options.yaml` (or raises an older caret), pinned to the channel.
+to the Flutter package's `analysis_options.yaml` (or raises an older caret), pinned to the channel —
+or, with `--framework-path`, to that checkout by `path:`. A `plugins:` section it cannot edit safely
+is left as it is, and the command prints the lines to add by hand.
 Restart the analysis server, then run `dart analyze` — `flutter analyze` runs no plugins. Fix what
 the rules report (`forbidden_ui_style_usage`, `forbidden_provider_scope`); in a project that never had
 them this is where the raw styles and nested `ProviderScope`s surface.
 
-**Spacing — add the tokens, then replace the numbers.** Copy
-`template/dartway_starter_flutter/lib/ui_kit/theme/app_space.dart` into `lib/ui_kit/theme/`, add
-`part 'theme/app_space.dart';` to `ui_kit.dart`, and adjust the steps to your design if it has its
-own scale. Then replace each number the check lists with its step:
+**Spacing — add the scale, then name the numbers. Never change a visible value.** Copy
+`template/dartway_starter_flutter/lib/ui_kit/theme/app_space.dart` into `lib/ui_kit/theme/` and add
+`part 'theme/app_space.dart';` to `ui_kit.dart`. The steps are named by their value (`s2` … `s48`),
+so the scale grows without renaming: count the values the check lists, and add the project's own
+dominant ones as steps (`static const double s14 = 14;`) — do not round them to a neighbour, since
+that moves what the user sees in a change that is meant to move nothing. Then replace each number
+with its step:
 
     - const Gap(12),
-    + const Gap(AppSpace.m),
+    + const Gap(AppSpace.s12),
     - padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    + padding: const EdgeInsets.symmetric(horizontal: AppSpace.l, vertical: AppSpace.s),
+    + padding: const EdgeInsets.symmetric(horizontal: AppSpace.s16, vertical: AppSpace.s8),
+    - Wrap(spacing: 6, runSpacing: 4, …)
+    + Wrap(spacing: AppSpace.s6, runSpacing: AppSpace.s4, …)
 
-A value between two steps rounds to the nearer one (the skeleton took 6 → `xs`, 20 → `xl`,
-28/36 → `xxl`); if the design needs it exactly, it is a step of the scale — added once, in
-`app_space.dart`. A number that belongs to one component (a strip's height, a badge's inner padding)
-moves into that component in the kit, where numbers are allowed. `SizedBox` with a `child:` sizes the
-child and is not checked; `0`, `EdgeInsets.zero` and `double.infinity` pass.
+A value used once or twice that the design does not mean as a step is a sign it belongs to one
+component: move it into that component in the kit, where numbers are allowed. Whether the scale is
+then tightened is a design decision, taken apart from this migration. A `SizedBox` with a `child:`
+or with both a width and a height, and `SizedBox.square`, size something and are not checked; `0`,
+`EdgeInsets.zero` and `double.infinity` pass.
 
-**Tests — move them to the mirror of what they test.** `git mv`, then fix the relative import of
-`test/support/`:
+**Tests — move them to the mirror of what they test.** Root-level acceptance tests of a server
+feature move mechanically: `dart run dartway_cli:dartway check --fix --type testLayout` moves each
+`test/<feature>[_<scenario>]_acceptance_test.dart` to `test/src/<feature>/` when `lib/src/<feature>/`
+exists, rewriting its relative import of `test/support/`. The rest by hand, with `git mv`, fixing that
+import:
 
-    - test/invoices_acceptance_test.dart            import 'support/app_harness.dart';
-    + test/src/invoices/invoices_acceptance_test.dart  import '../../support/app_harness.dart';
+    - test/invoices_refund_acceptance_test.dart   import 'support/app_harness.dart';
+    + test/src/invoices/invoices_refund_acceptance_test.dart   import '../../support/app_harness.dart';
 
 The forms: `lib/<path>.dart` → `test/<path>_test.dart`; a test of a whole folder (a server feature
-through its calls) → `test/<path>/<folder>_acceptance_test.dart` for `lib/<path>/<folder>/`; a rule of
-`core/` at its file (`lib/src/core/auth.dart` → `test/src/core/auth_test.dart`); the contract test at
-the mirror of the shared package's library (`test/contract_test.dart` →
-`test/<project>_shared_test.dart`). A test that walks two features is split by feature. Helper files
-beside tests (`test/helpers.dart`, `test/src/chat/chat_fixtures.dart`) move to `test/support/`.
+through its calls) → `test/<path>/<folder>/<folder>_acceptance_test.dart`, and a scenario of it
+`<folder>_<scenario>_acceptance_test.dart` beside it; a scenario across features goes with the
+feature that owns it; a rule of `core/` at its file (`lib/src/core/auth.dart` →
+`test/src/core/auth_test.dart`); the contract test at the mirror of the shared package's library
+(`test/contract_test.dart` → `test/<project>_shared_test.dart`). Helper files beside tests
+(`test/helpers.dart`, `test/src/chat/chat_fixtures.dart`) move to `test/support/`.
 
 **The harness — one per side.** A widget test that pumps its own `ProviderScope` (with overrides) or
 builds a `DwFakeServer` moves onto `TestApp`/`FakeApp` from `test/support/app_test_app.dart` (copy
@@ -83,7 +94,9 @@ server test that starts a server of its own moves onto `AppHarness` from
 (the example's `AppHarness.startStorageOnly`).
 
 **Doc comments** in another script than the project's language are a warning, not a failure:
-translate them as you touch the files. Log and error strings stay English.
+translate them as you touch the files. Comments the skeleton wrote and the project kept unchanged are
+not reported (the check compares with the template the project was created from, when a framework
+checkout is at hand), nor are generated files. Log and error strings stay English.
 
 ## How to check
 

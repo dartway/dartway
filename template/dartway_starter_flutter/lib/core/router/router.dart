@@ -1,8 +1,4 @@
-import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/admin/dashboard/admin_dashboard_page.dart';
 import 'package:dartway_starter_flutter/admin/settings/admin_settings_page.dart';
 import 'package:dartway_starter_flutter/admin/user_card/admin_user_card_page.dart';
@@ -10,7 +6,10 @@ import 'package:dartway_starter_flutter/admin/users/admin_users_page.dart';
 import 'package:dartway_starter_flutter/app/home/home_page.dart';
 import 'package:dartway_starter_flutter/app/profile/profile_page/profile_page.dart';
 import 'package:dartway_starter_flutter/auth/auth_page.dart';
+import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/router/app_router_state.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 export 'package:dartway_starter_flutter/core/router/app_router_state.dart';
 

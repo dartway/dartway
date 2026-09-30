@@ -57,13 +57,13 @@ class _ProfileForm extends HookWidget {
             validator: (value) =>
                 (value ?? '').trim().isEmpty ? l10n.firstNameRequired : null,
           ),
-          const Gap(AppSpace.m),
+          const Gap(AppSpace.s12),
           AppTextFormField(
             value: lastName.value,
             onChanged: (value) => lastName.value = value,
             labelText: l10n.lastNameLabel,
           ),
-          const Gap(AppSpace.m),
+          const Gap(AppSpace.s12),
           DropdownButtonFormField<UserGender>(
             initialValue: gender.value,
             onChanged: (value) => gender.value = value,
@@ -81,7 +81,7 @@ class _ProfileForm extends HookWidget {
             ],
           ),
           if (change != null) ...[
-            const Gap(AppSpace.l),
+            const Gap(AppSpace.s16),
             AppButton.primary(
               l10n.saveChanges,
               requireValidation: true,

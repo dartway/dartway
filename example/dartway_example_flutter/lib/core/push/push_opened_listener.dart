@@ -1,12 +1,11 @@
 import 'dart:async';
 
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/core/router/router.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-import 'package:dartway_example_flutter/core/dw_core.dart';
-import 'package:dartway_example_flutter/core/router/router.dart';
 
 /// Opens the screen a notification is about. The plugin holds the
 /// notification that started the app until this listens, so a cold start

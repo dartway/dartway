@@ -28,7 +28,7 @@ class SessionCard extends StatelessWidget {
     return Card(
       elevation: 2,
       child: Padding(
-        padding: const EdgeInsets.all(AppSpace.l),
+        padding: const EdgeInsets.all(AppSpace.s16),
         child: Row(
           children: [
             Column(
@@ -39,7 +39,7 @@ class SessionCard extends StatelessWidget {
                 ),
               ],
             ),
-            const Gap(AppSpace.l),
+            const Gap(AppSpace.s16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -57,7 +57,7 @@ class SessionCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Gap(AppSpace.m),
+            const Gap(AppSpace.s12),
             // The results need no handling: the answer carries the booking and
             // the session, and both lists on screen take them before the
             // command completes; other devices get them on their channels.

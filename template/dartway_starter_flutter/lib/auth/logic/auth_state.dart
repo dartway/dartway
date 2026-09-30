@@ -1,9 +1,8 @@
-import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/auth/logic/auth_state_model.dart';
 import 'package:dartway_starter_flutter/auth/logic/auth_step.dart';
+import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Drives signing in on DartWay auth, by phone or by e-mail.
 ///

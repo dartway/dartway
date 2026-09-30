@@ -1,9 +1,8 @@
-import 'package:dartway_example_shared/dartway_example_shared.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-
-import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_state_model.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Drives the phone sign-in on DartWay auth: [requestCode] sends
 /// `DwRequestCode` and keeps the ticket the server answers with; [verifyCode]

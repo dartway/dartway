@@ -24,7 +24,7 @@ class CreateNewsPostSheet extends HookWidget {
       mainAxisSize: MainAxisSize.min,
       children: [
         AppText.title(l10n.newClubPost),
-        const Gap(AppSpace.l),
+        const Gap(AppSpace.s16),
         AppTextFormField(
           value: title.value,
           onChanged: (value) => title.value = value,
@@ -32,7 +32,7 @@ class CreateNewsPostSheet extends HookWidget {
           hintText: l10n.postTitleHint,
           maxLength: 200,
         ),
-        const Gap(AppSpace.l),
+        const Gap(AppSpace.s16),
         AppTextFormField(
           value: text.value,
           onChanged: (value) => text.value = value,
@@ -41,7 +41,7 @@ class CreateNewsPostSheet extends HookWidget {
           maxLines: 5,
           maxLength: 5000,
         ),
-        const Gap(AppSpace.xl),
+        const Gap(AppSpace.s24),
         AppButton.primary(
           l10n.publish,
           onTap: isFormValid

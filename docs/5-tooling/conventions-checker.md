@@ -86,8 +86,11 @@ From the project root or from inside the `*_flutter` package, in this order:
 skips steps 1–6, the UI kit pass, and the parts of step 8 that judge tests, the other packages and
 the plugin: each of those judges a whole package or the whole project, and has nothing to say about
 one folder. `--type <check>` runs one check by name; `--level info|warning|error` runs the checks of
-one severity. `--fix` first rewrites every relative import in `lib/` of the three packages to its
-`package:` form (generated files are left to their generator), then checks.
+one severity. `--fix` first applies the mechanical fixes, then checks: every relative import in `lib/`
+of the three packages becomes its `package:` form and the import block is sorted (generated files are
+left to their generator), and an acceptance test lying at the root of `test/` moves to the mirror of
+the `lib/src/<feature>/` it is named after, its import of the harness rewritten. `--type` and `--dir`
+narrow the fixes as they narrow the checks; `--dir` leaves the tests.
 
 **Exit codes.** `1` when any error-severity finding is reported (a Flutter package with no `lib/`
 counts as one), `0` otherwise — warnings and infos print and pass. An unknown `--type` is a usage
@@ -133,9 +136,9 @@ Twenty errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
 | `relativeImport` | error | A relative `import`/`export` in `lib/` of the Flutter, server or shared package — `lib/` imports by `package:` only. Generated files are passed over; `--fix` rewrites the rest |
-| `testLayout` | error | A test that mirrors no `lib/` path (`test/<path>_test.dart` for `lib/<path>.dart`, `test/<path>/<folder>_acceptance_test.dart` for `lib/<path>/<folder>/`), a helper outside `test/support/`, or a test inside it |
+| `testLayout` | error | A test that mirrors no `lib/` path (`test/<path>_test.dart` for `lib/<path>.dart`, `test/<path>/<folder>/<folder>[_<scenario>]_acceptance_test.dart` for `lib/<path>/<folder>/`), a helper outside `test/support/`, or a test inside it; `--fix` moves a root-level acceptance test to `test/src/<feature>/` |
 | `testHarnessBypassed` | error | Outside `test/support/`: a `ProviderScope` or a `DwFakeServer` built by a widget test, a `DwTestServer.start` or a `DwAppServer` by a server test |
-| `rawSpacing` | error | Outside `ui_kit/`: a spacer `SizedBox` with a numeric `height` or `width`, a `Gap`, or an `EdgeInsets.*` given a number instead of an `AppSpace` token (zero passes; a `SizedBox` with a `child:` sizes it and is not spacing) |
+| `rawSpacing` | error | Outside `ui_kit/`: a number instead of an `AppSpace` step in a spacer `SizedBox`, a `Gap`, an `EdgeInsets.*`, or a `spacing:`/`runSpacing:`/`mainAxisSpacing:`/`crossAxisSpacing:` — conditionals included. Zero passes; a `SizedBox` with a `child:` or both dimensions, and `SizedBox.square`, are sizes, not spacing |
 | `lintsPluginMissing` | error | The Flutter package's `analysis_options.yaml` does not enable the `dartway_lints` plugin; `dartway update` adds it |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
@@ -146,7 +149,7 @@ Twenty errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
-| `docCommentLanguage` | warning | A doc comment in `lib/` written in a script other than the language `dartway setup-ai --language` recorded — a heuristic on Cyrillic against Latin letters, so it warns and never fails |
+| `docCommentLanguage` | warning | A doc comment in `lib/` written in a script other than the language `dartway setup-ai --language` recorded — a heuristic on Cyrillic against Latin letters, so it warns and never fails. A comment the skeleton wrote (the same text in the template the project came from) is not judged, nor a generated file |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
 | `fileLong` | info | Over 200 lines |
 
@@ -367,14 +370,21 @@ for each.
   shared package are held by the same check.
 - **A test sits at the path of what it tests** (`testLayout`): `lib/app/home/home_page.dart` →
   `test/app/home/home_page_test.dart`; a whole folder — a server feature through its calls — is
-  `test/src/chat/chat_acceptance_test.dart` for `lib/src/chat/`. The acceptance form names the folder
-  rather than its `_feature.dart`, because it drives the feature's handlers, rows and publications
-  together, which is a test of the folder, not of the file that registers it. Helpers are in
+  `test/src/chat/chat_acceptance_test.dart` for `lib/src/chat/`, and a scenario of it
+  `test/src/chat/chat_attachments_acceptance_test.dart`, the `<feature>_*` naming a feature's own
+  files follow. A scenario across features names the feature that owns it. The acceptance form names
+  the folder rather than its `_feature.dart`, because it drives the feature's handlers, rows and
+  publications together, which is a test of the folder, not of the file that registers it. Helpers are in
   `test/support/`, and the harness there is how a test starts what it needs
   (`testHarnessBypassed`).
-- **Spacing is a token** (`rawSpacing`): the kit's `AppSpace` scale, so a project has one set of
-  gaps rather than one per screen. A value that belongs to one component stays inside it, in the kit.
+- **Spacing is a token** (`rawSpacing`): the kit's `AppSpace` scale, a closed set named by value, so
+  a project has one set of gaps rather than one per screen. A value that belongs to one component
+  stays inside it, in the kit.
 - **Doc comments in the project's language** (`docCommentLanguage`) is a warning: it reads scripts,
-  not languages, and a guess must not fail a build. Log and error strings are English either way.
+  not languages, and a guess must not fail a build. A comment the skeleton wrote is the skeleton's —
+  the check compares with the template the project was created from (the checkout the toolkit was
+  installed from, this CLI's own, or the `dartway create` cache, at the recorded commit when it has
+  it) and judges only what the project wrote; without a checkout it judges everything and says so.
+  Log and error strings are English either way.
 - **The lint plugin is on** (`lintsPluginMissing`): a project created before `dartway create` wired
   `dartway_lints` never had its rules, and nothing said so — `flutter analyze` runs no plugins.

@@ -59,9 +59,9 @@ class MyBookingsPage extends ConsumerWidget implements DwFeatureWidget {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: AppSpace.s),
+                padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
                 itemCount: bookings.length,
-                separatorBuilder: (_, _) => const SizedBox(height: AppSpace.s),
+                separatorBuilder: (_, _) => const SizedBox(height: AppSpace.s8),
                 itemBuilder: (context, index) =>
                     BookingCard(booking: bookings[index]),
               );

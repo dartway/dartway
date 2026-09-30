@@ -111,7 +111,7 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
           AppText.title(
             start == null ? l10n.analyticsAddWidget : l10n.analyticsEditWidget,
           ),
-          const Gap(AppSpace.l),
+          const Gap(AppSpace.s16),
           SegmentedButton<DwAnalyticsWidgetType>(
             segments: [
               for (final t in DwAnalyticsWidgetType.values)
@@ -129,14 +129,14 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
               }
             },
           ),
-          const Gap(AppSpace.m),
+          const Gap(AppSpace.s12),
           AppTextFormField(
             value: title.value,
             onChanged: (value) => title.value = value,
             labelText: l10n.analyticsWidgetTitle,
             maxLength: DwAnalyticsWidgetSpec.maxTitleLength,
           ),
-          const Gap(AppSpace.m),
+          const Gap(AppSpace.s12),
           DropdownButtonFormField<String?>(
             initialValue: eventName.value,
             decoration: InputDecoration(labelText: l10n.analyticsEvent),
@@ -154,7 +154,7 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
             ],
             onChanged: (name) => eventName.value = name,
           ),
-          const Gap(AppSpace.m),
+          const Gap(AppSpace.s12),
           DropdownButtonFormField<DwAnalyticsMetric>(
             key: ValueKey(metric.value),
             initialValue: metric.value,
@@ -171,13 +171,13 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
                 ? null
                 : (m) => metric.value = m ?? metric.value,
           ),
-          const Gap(AppSpace.l),
+          const Gap(AppSpace.s16),
           AnalyticsFilterRows(
             filters: filters.value,
             keyChoices: keyChoices,
             onChanged: (next) => filters.value = next,
           ),
-          const Gap(AppSpace.m),
+          const Gap(AppSpace.s12),
           DropdownButtonFormField<String>(
             initialValue: _breakdownKey(breakdown.value),
             decoration: InputDecoration(
@@ -206,7 +206,7 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
             ),
           ),
           if (breakdown.value.property case final key?) ...[
-            const Gap(AppSpace.m),
+            const Gap(AppSpace.s12),
             DropdownButtonFormField<DwAnalyticsBreakdownOrder>(
               key: ValueKey(('order', key)),
               initialValue: breakdown.value.order,
@@ -233,7 +233,7 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
                         : breakdown.value.top,
                   ),
             ),
-            const Gap(AppSpace.m),
+            const Gap(AppSpace.s12),
             DropdownButtonFormField<int>(
               key: ValueKey(('top', key, breakdown.value.top)),
               initialValue: breakdown.value.top,
@@ -252,23 +252,23 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
           ],
           if (type.value == DwAnalyticsWidgetType.pie &&
               !spec.report.isPieShaped) ...[
-            const Gap(AppSpace.s),
+            const Gap(AppSpace.s8),
             AppText.caption(l10n.analyticsPieNeedsProperty),
           ],
           if (type.value == DwAnalyticsWidgetType.indicator) ...[
-            const Gap(AppSpace.m),
+            const Gap(AppSpace.s12),
             Row(
               children: [
                 AppCheckbox(
                   value: comparePrevious.value,
                   onChanged: (value) => comparePrevious.value = value,
                 ),
-                const Gap(AppSpace.s),
+                const Gap(AppSpace.s8),
                 Expanded(child: AppText.body(l10n.analyticsComparePrevious)),
               ],
             ),
           ],
-          const Gap(AppSpace.l),
+          const Gap(AppSpace.s16),
           AppButton.primary(
             l10n.saveAction,
             onTap: spec.problem == null

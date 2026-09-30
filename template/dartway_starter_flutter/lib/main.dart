@@ -1,7 +1,6 @@
-import 'package:flutter/foundation.dart';
-
 import 'package:dartway_starter_flutter/core/app_version.dart';
 import 'package:dartway_starter_flutter/dartway_starter_app.dart';
+import 'package:flutter/foundation.dart';
 
 void main() {
   // Concrete development parameters live here; the app itself stays

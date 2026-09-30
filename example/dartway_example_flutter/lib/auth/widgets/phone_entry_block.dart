@@ -1,12 +1,11 @@
+import 'package:dartway_example_flutter/auth/logic/auth_state.dart';
+import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
-import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
-
-import 'package:dartway_example_flutter/auth/logic/auth_state.dart';
 
 class PhoneEntryBlock extends ConsumerWidget {
   const PhoneEntryBlock({super.key});
@@ -26,10 +25,10 @@ class PhoneEntryBlock extends ConsumerWidget {
     return Column(
       children: [
         AppText.title(l10n.fillRegistrationData),
-        const Gap(AppSpace.xxl),
+        const Gap(AppSpace.s36),
         if (isRegistration)
           Padding(
-            padding: const EdgeInsets.only(bottom: AppSpace.s),
+            padding: const EdgeInsets.only(bottom: AppSpace.s8),
             child: AppTextFormField(
               labelText: l10n.nameLabel,
               value: state.firstName,
@@ -48,7 +47,7 @@ class PhoneEntryBlock extends ConsumerWidget {
         ),
         if (isRegistration)
           Padding(
-            padding: const EdgeInsets.only(top: AppSpace.xl),
+            padding: const EdgeInsets.only(top: AppSpace.s24),
             child: CheckboxFormField(
               value: state.allDocumentsAccepted,
               onChanged: (value) => ref
@@ -79,7 +78,7 @@ class PhoneEntryBlock extends ConsumerWidget {
           ),
         if (isRegistration)
           Padding(
-            padding: const EdgeInsets.only(top: AppSpace.xl),
+            padding: const EdgeInsets.only(top: AppSpace.s24),
             child: CheckboxFormField(
               value: state.marketingAgreed,
               onChanged: (value) => ref
@@ -108,7 +107,7 @@ class PhoneEntryBlock extends ConsumerWidget {
             ),
           ),
         const Spacer(),
-        const SizedBox(height: AppSpace.xl),
+        const SizedBox(height: AppSpace.s20),
         AppButton.primary(
           l10n.continueAction,
           requireValidation: true,
@@ -116,7 +115,7 @@ class PhoneEntryBlock extends ConsumerWidget {
             (_) => ref.read(authStateProvider.notifier).requestCode(),
           ),
         ),
-        const Gap(AppSpace.xl),
+        const Gap(AppSpace.s24),
         isRegistration
             ? MultiLinkText.single(
                 text: l10n.alreadyHaveAccount,

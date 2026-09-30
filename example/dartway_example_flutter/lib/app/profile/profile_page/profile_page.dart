@@ -38,7 +38,7 @@ class ProfilePage extends StatelessWidget implements DwFeatureWidget {
         child: Column(
           children: [
             const ProfileSettingsWidget(),
-            const Gap(AppSpace.xl),
+            const Gap(AppSpace.s24),
             if (context.profile.isClubAdmin) ...[
               AppButton.secondary(
                 l10n.adminPanel,
@@ -48,7 +48,7 @@ class ProfilePage extends StatelessWidget implements DwFeatureWidget {
                   ).goNamed(AdminNavigationZone.admin.name),
                 ),
               ),
-              const Gap(AppSpace.xl),
+              const Gap(AppSpace.s24),
             ],
             AppButton.secondary(
               l10n.ourServices,
@@ -58,7 +58,7 @@ class ProfilePage extends StatelessWidget implements DwFeatureWidget {
                 ).goNamed(AppNavigationZone.services.name),
               ),
             ),
-            const Gap(AppSpace.xl),
+            const Gap(AppSpace.s24),
             AppButton.text(
               l10n.signOutAction,
               // The router takes it from here: signed out, the guards send

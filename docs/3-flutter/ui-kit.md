@@ -126,19 +126,27 @@ One theme in a project means a palette with one set of colours, not the absence 
 
 A gap or an inset is a design decision like a colour, and left to each screen it becomes one project
 with fourteen values of `Gap` — which is what the audit of three real projects found. The skeleton's
-kit ships the scale as `AppSpace` (`ui_kit/theme/app_space.dart`: `xxs` 2, `xs` 4, `s` 8, `m` 12,
-`l` 16, `xl` 24, `xxl` 32), and outside the kit a gap or an inset is written with it:
+kit ships the scale as `AppSpace` (`ui_kit/theme/app_space.dart`), a closed set of steps named by
+their value — `s2` · `s4` · `s6` · `s8` · `s10` · `s12` · `s16` · `s20` · `s24` · `s28` · `s32` · `s36` · `s48` — and outside the kit a gap or an inset is
+written with it:
 
 ```dart
-const Gap(AppSpace.m),
-Padding(padding: const EdgeInsets.symmetric(horizontal: AppSpace.l), child: ...),
+const Gap(AppSpace.s12),
+Padding(padding: const EdgeInsets.symmetric(horizontal: AppSpace.s16), child: ...),
+Row(spacing: AppSpace.s8, children: [...]),
 ```
 
+Named by value on purpose: a step the design adds goes in between (`s14`) without renaming the others,
+and moving onto the scale never changes what the user sees — a project adds its own dominant values
+as steps rather than rounding them to the nearest one.
+
 `dart run dartway_cli:dartway check` fails a number in those positions outside `ui_kit/`
-(`rawSpacing`): a spacer `SizedBox(height:|width:)`, a `Gap`, an `EdgeInsets.*`. Zero passes — it is
-the absence of a step, not one — and a `SizedBox` with a `child:` sizes that child, which is a
-component's dimension rather than spacing; a dimension that belongs to one component lives in that
-component, in the kit.
+(`rawSpacing`): a spacer `SizedBox(height:|width:)`, a `Gap`, an `EdgeInsets.*`, and the `spacing:`,
+`runSpacing:`, `mainAxisSpacing:` and `crossAxisSpacing:` of a flex, a `Wrap` or a grid — a number in
+either branch of a conditional included. Zero passes, as the absence of a step. A `SizedBox` with a
+`child:`, one with both a width and a height, and `SizedBox.square` give something its size — a
+component's dimension rather than spacing — and a dimension that belongs to one component lives in
+that component, in the kit.
 
 ## The rule that makes the previous one hold
 

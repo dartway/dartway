@@ -42,7 +42,7 @@ class ProfileNamePage extends HookWidget implements DwFeatureWidget {
         child: Column(
           children: [
             AppText.body(l10n.whatIsYourNameHint, textAlign: TextAlign.center),
-            const Gap(AppSpace.xl),
+            const Gap(AppSpace.s24),
             AppTextFormField(
               labelText: l10n.nameLabel,
               value: name.value,

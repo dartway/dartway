@@ -1,7 +1,6 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-
 import 'package:dartway_starter_server/src/settings/settings_handlers.dart';
+import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
 /// App settings an admin edits and every member reads live.
 final settingsFeature = DwServerFeature(

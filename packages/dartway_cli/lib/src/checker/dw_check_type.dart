@@ -190,7 +190,8 @@ enum DwCheckType {
   relativeImport,
 
   /// A doc comment in `lib/` written in a script other than the project's
-  /// language — recorded by `dartway setup-ai --language` (#391).
+  /// language — recorded by `dartway setup-ai --language` (#391). One the
+  /// skeleton wrote, found verbatim in the template, is not the project's.
   ///
   /// A warning, because it is a heuristic on scripts rather than a reading
   /// of the language, and a guess must not fail a build.
@@ -200,7 +201,8 @@ enum DwCheckType {
   /// or a test inside it (#391). A test sits at the path of what it tests —
   /// `test/<path>_test.dart` for `lib/<path>.dart` — or, testing a whole
   /// folder (a server feature through its calls), is
-  /// `test/<path>/<folder>_acceptance_test.dart` for `lib/<path>/<folder>/`.
+  /// `test/<path>/<folder>/<folder>[_<scenario>]_acceptance_test.dart` for
+  /// `lib/<path>/<folder>/`.
   testLayout,
 
   /// A test outside `test/support/` building what the harness owns: a
@@ -210,8 +212,8 @@ enum DwCheckType {
   testHarnessBypassed,
 
   /// A gap or an inset written as a number outside `ui_kit/`: a spacer
-  /// `SizedBox(height:|width: n)` (one without a `child:`), `Gap(n)`,
-  /// `EdgeInsets.*(n)` (#391).
+  /// `SizedBox(height:|width: n)`, `Gap(n)`, `EdgeInsets.*(n)`, a
+  /// `spacing:`/`runSpacing:`/`mainAxisSpacing:`/`crossAxisSpacing:` (#391).
   /// Spacing is the kit's `AppSpace` tokens, so a project has one scale
   /// rather than fourteen values of `Gap`.
   rawSpacing,

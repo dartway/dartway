@@ -47,7 +47,10 @@ tested on one of the two sides that apply it.
   (`lib/src/core/auth.dart` → `test/src/core/auth_test.dart`);
 - a test of a whole folder — a server feature through its calls — is
   `test/<path>/<folder>_acceptance_test.dart` for `lib/<path>/<folder>/`
-  (`lib/src/invoices/` → `test/src/invoices/invoices_acceptance_test.dart`); what the server's library
+  (`lib/src/invoices/` → `test/src/invoices/invoices_acceptance_test.dart`), and a scenario of it
+  `test/src/invoices/invoices_<scenario>_acceptance_test.dart`; a scenario across features names the
+  feature that owns it. `dart run dartway_cli:dartway check --fix` moves a root-level
+  `test/<feature>_acceptance_test.dart` there. What the server's library
   wires (a module) is tested at the mirror of that library, and the contract at the mirror of the
   shared package's (`test/<shared package>_test.dart`);
 - helpers and the harness live in `test/support/`, and nothing else does. A test imports them

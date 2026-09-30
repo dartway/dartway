@@ -12,6 +12,7 @@ import '../checker/dw_l10n_wiring.dart';
 import '../checker/dw_local_environment.dart';
 import '../checker/dw_layout.dart';
 import '../checker/dw_server_contract.dart';
+import '../checker/dw_project_template.dart';
 import '../checker/dw_uniformity_rules.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
@@ -44,8 +45,10 @@ class CheckCommand extends Command<int> {
         'fix',
         negatable: false,
         help:
-            'Rewrite relative imports in lib/ to package: imports '
-            '(relativeImport) before checking.',
+            'Before checking, rewrite relative imports in lib/ to package: '
+            '(relativeImport) and move root-level acceptance tests to the '
+            'mirror of their lib/src/<feature>/ (testLayout); --type and '
+            '--dir narrow it.',
       );
   }
 
@@ -89,13 +92,35 @@ class CheckCommand extends Command<int> {
     // Before any section reads an import: the feature and kit import rules
     // read `package:` imports only, so a relative one they would have missed
     // is judged once it is rewritten.
-    if (results.flag('fix')) {
-      for (final line in DwUniformityInspector.fixRelativeImports([
+    // Each fix is the mechanical half of one check, and runs where that check
+    // would: `--type` names the check, `--dir` narrows imports to one folder
+    // of the Flutter package and leaves the tests, which it does not judge.
+    final dir = results.option('dir');
+    bool fixes(DwCheckType type) =>
+        results.flag('fix') && (filterType == null || filterType == type);
+    if (fixes(DwCheckType.relativeImport)) {
+      for (final line in DwUniformityInspector.fixRelativeImports(
+        [
+          flutterPackageDir,
+          if (dir == null) ?layout?.sharedPackageDir,
+          if (dir == null) ?layout?.serverPackageDir,
+        ],
+        onlyUnder: dir == null
+            ? null
+            : Directory(
+                p.isAbsolute(dir) ? dir : p.join(flutterPackageDir.path, dir),
+              ),
+      )) {
+        stdout.writeln('🔧 rewritten to package: — $line');
+      }
+    }
+    if (fixes(DwCheckType.testLayout) && dir == null) {
+      for (final line in DwUniformityInspector.fixTestLayout([
         flutterPackageDir,
         ?layout?.sharedPackageDir,
         ?layout?.serverPackageDir,
       ])) {
-        stdout.writeln('🔧 rewritten to package: — $line');
+        stdout.writeln('🔧 moved to the mirror of lib/ — $line');
       }
     }
 
@@ -173,6 +198,12 @@ class CheckCommand extends Command<int> {
       targetDirPath: results.option('dir'),
     ).run(tally: tally);
     errorCount += DwUniformityInspector(
+      template: layout == null
+          ? null
+          : DwProjectTemplate.forProject(
+              layout.root,
+              layout.flutterPackage.replaceAll(RegExp(r'_flutter$'), ''),
+            ),
       projectRoot: layout?.root ?? flutterPackageDir,
       flutterPackageDir: flutterPackageDir,
       serverPackageDir: layout?.serverPackageDir,

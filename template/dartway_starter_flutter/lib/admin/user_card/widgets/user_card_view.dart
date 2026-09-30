@@ -22,13 +22,13 @@ class UserCardView extends StatelessWidget {
         Row(
           children: [
             UserAvatar(avatarUrl: profile.avatarUrl, radius: 36),
-            const Gap(AppSpace.l),
+            const Gap(AppSpace.s16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppText.title(profile.displayName),
-                  const Gap(AppSpace.xs),
+                  const Gap(AppSpace.s4),
                   AppText.caption(
                     l10n.userCardJoined(profile.joinedAt.dateLabel),
                   ),
@@ -37,7 +37,7 @@ class UserCardView extends StatelessWidget {
             ),
           ],
         ),
-        const Gap(AppSpace.l),
+        const Gap(AppSpace.s16),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -59,7 +59,7 @@ class UserCardView extends StatelessWidget {
             ],
           ),
         ),
-        const Gap(AppSpace.m),
+        const Gap(AppSpace.s12),
         AppCard(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -70,13 +70,13 @@ class UserCardView extends StatelessWidget {
                   RolePicker(user: profile),
                 ],
               ),
-              const Gap(AppSpace.s),
+              const Gap(AppSpace.s8),
               AppText.caption(
                 termsAcceptedAt == null
                     ? l10n.userCardTermsNotAccepted
                     : l10n.userCardTermsAccepted(termsAcceptedAt.dateLabel),
               ),
-              const Gap(AppSpace.xs),
+              const Gap(AppSpace.s4),
               AppText.caption(
                 l10n.userCardMarketing('${profile.agreedForMarketing}'),
               ),
