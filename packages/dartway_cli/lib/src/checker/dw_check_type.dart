@@ -213,7 +213,32 @@ enum DwCheckType {
   /// queue decides due times by, so a handler that reads the system clock is
   /// a handler no test can pin, and disagrees with its own jobs as soon as a
   /// test moves time.
-  forbiddenDateTimeNow;
+  forbiddenDateTimeNow,
+
+  /// `Platform.environment` in the server package's `lib/` outside
+  /// `lib/src/core/environment.dart`; in its `bin/`, `Platform.environment`
+  /// anywhere but inside `DwLocalEnvironment.overlay(…)`, or a map read by a
+  /// variable's name (`env['PORT']`) (dartway/dartway#386).
+  ///
+  /// The project's variables are read in that one file, into a typed
+  /// `AppEnvironment` at start (`DwEnvironmentReader`), and the framework's
+  /// with it (`DwServerEnvironment`). A variable read anywhere else is read
+  /// on first use — a missing one surfaces as a failure hours after a deploy
+  /// that looked fine — and past the local overlay, so a value in
+  /// `deploy/config.yaml > local` never reaches it. An entry point in `bin/`
+  /// hands the environment in — `AppEnvironment.read(DwLocalEnvironment
+  /// .overlay(Platform.environment))` — and parses nothing itself.
+  forbiddenEnvironmentRead,
+
+  /// `dart:io`'s `HttpClient(` or an import of `package:http/…` in the
+  /// server package's `lib/` (dartway/dartway#386).
+  ///
+  /// An outbound request is `ctx.http`: bounded by a timeout, logged through
+  /// the server's log, and answered by the test server's fake. A client of a
+  /// project's own has none of the three unless someone writes them again —
+  /// and every project did, differently, with a test seam of its own
+  /// threaded through the server's factory.
+  forbiddenHttpClient;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///

@@ -18,6 +18,7 @@ import 'src/migrations/migrations.dart';
 export 'generated/dw_schema.dart';
 export 'src/core/auth.dart' show AppAuth, CodeDelivery;
 export 'src/core/bootstrap.dart';
+export 'src/core/environment.dart' show AppEnvironment;
 export 'src/core/files.dart' show AppFiles;
 export 'src/migrations/migrations.dart' show appMigrations;
 
@@ -29,6 +30,9 @@ abstract final class DartwayStarterServer {
   /// With [storage] the server takes uploads by [AppFiles.uploadRules] and checks both
   /// buckets as it starts; without it, it runs and has no files.
   ///
+  /// [adminIdentifier] is made an administrator at every start
+  /// (`DwFirstAdministrator`): `bin/server.dart` passes `DW_ADMIN_IDENTIFIER`,
+  /// read into `DwServerEnvironment.adminIdentifier`.
   /// [clock] is the time every handler and job reads as `ctx.now` — the
   /// system's, unless a test sets its own (`DwTestClock`).
   static DwAppServer build({
@@ -37,6 +41,7 @@ abstract final class DartwayStarterServer {
     int port = 8080,
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
+    required String? adminIdentifier,
     DwServerClock clock = DwServerClock.system,
   }) => DwAppServer(
     protocol: appProtocol,
@@ -46,7 +51,12 @@ abstract final class DartwayStarterServer {
     database: database,
     auth: auth ?? AppAuth.config(),
     features: [profileFeature, adminFeature, settingsFeature],
-    startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+    startup: [
+      DwFirstAdministrator(
+        grant: AppBootstrap.grantAdmin,
+        identifier: adminIdentifier,
+      ),
+    ],
     // The app's events, and the admin panel's reports and dashboards over
     // them: admins read and edit, nobody else.
     modules: [DwAnalyticsModule(readAccess: AppAccess.admin)],

@@ -23,6 +23,7 @@ import 'src/schedule/schedule_feature.dart';
 export 'generated/dw_schema.dart';
 export 'src/core/auth.dart' show AppAuth;
 export 'src/core/bootstrap.dart' show AppBootstrap;
+export 'src/core/environment.dart' show AppEnvironment, AppPushEnvironment;
 export 'src/core/files.dart' show AppFiles;
 export 'src/core/push.dart' show AppPush;
 export 'src/migrations/migrations.dart' show appMigrations;
@@ -39,6 +40,9 @@ abstract final class DartwayExampleServer {
   /// [push] sends notifications (`AppPush.module`); by default it has no providers
   /// and records deliveries it has nobody to send through.
   ///
+  /// [adminIdentifier] is made an administrator at every start
+  /// (`DwFirstAdministrator`): `bin/server.dart` passes `DW_ADMIN_IDENTIFIER`,
+  /// read into `DwServerEnvironment.adminIdentifier`.
   /// [clock] is the time every handler and job reads as `ctx.now` — the
   /// system's, unless a test sets its own (`DwTestClock`).
   static DwAppServer build({
@@ -47,6 +51,7 @@ abstract final class DartwayExampleServer {
     int port = 8080,
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
+    required String? adminIdentifier,
     DwPushModule? push,
     DwServerClock clock = DwServerClock.system,
   }) => DwAppServer(
@@ -64,7 +69,12 @@ abstract final class DartwayExampleServer {
       chatFeature,
       adminFeature,
     ],
-    startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+    startup: [
+      DwFirstAdministrator(
+        grant: AppBootstrap.grantAdmin,
+        identifier: adminIdentifier,
+      ),
+    ],
     files: storage == null ? null : AppFiles.storage(storage),
     modules: [
       push ?? AppPush.module(),

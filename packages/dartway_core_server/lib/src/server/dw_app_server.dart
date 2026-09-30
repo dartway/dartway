@@ -26,6 +26,7 @@ import '../live/dw_live_endpoint.dart';
 import '../live/dw_live_hub.dart';
 import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
+import '../outbound/dw_outbound_http.dart';
 import '../routes/dw_http_route.dart';
 import 'dw_server_clock.dart';
 import 'dw_server_feature.dart';
@@ -229,22 +230,21 @@ final class DwAppServer {
   _DwRunning get _require =>
       _running ?? (throw StateError('The server is not running'));
 
-  /// The environment variable that turns [start] into a one-off migration:
-  /// `DW_MIGRATE_ONLY=true`.
-  static const String migrateOnlyVariable = 'DW_MIGRATE_ONLY';
-
   /// Starts the server; on SIGINT or SIGTERM it stops gracefully.
   ///
-  /// With `DW_MIGRATE_ONLY=true` in the environment it serves nothing: it
-  /// applies the pending migrations ([migrate]) and ends the process — 0 when
-  /// they applied, non-zero with the reason when one failed. `dartway deploy`
-  /// runs the new image this way after the previous server has stopped, so
-  /// no two versions of the server ever run at once and old code never meets
-  /// a new schema. The process ends here rather than returning, because what
-  /// a project's `main` does after `start` (bootstrapping an administrator)
-  /// needs a running server.
-  Future<void> start() async {
-    if (Platform.environment[migrateOnlyVariable] == 'true') {
+  /// [migrateOnly] is required, so an entry point cannot forget it: a server
+  /// that ignored it would start serving in the deploy's migration step.
+  /// With [migrateOnly] — `DwServerEnvironment.migrateOnly`,
+  /// `DW_MIGRATE_ONLY=true` — it serves nothing: it applies the pending
+  /// migrations ([migrate]) and ends the process — 0 when they applied,
+  /// non-zero with the reason when one failed. `dartway deploy` runs the new
+  /// image this way after the previous server has stopped, so no two versions
+  /// of the server ever run at once and old code never meets a new schema.
+  /// The process ends here rather than returning, because what a project's
+  /// `main` does after `start` (bootstrapping an administrator) needs a
+  /// running server.
+  Future<void> start({required bool migrateOnly}) async {
+    if (migrateOnly) {
       try {
         await migrate();
       } catch (error, stackTrace) {
@@ -315,6 +315,7 @@ final class DwAppServer {
     required int port,
     required InternetAddress address,
     required bool handleSignals,
+    DwOutboundTransport? outbound,
   }) async {
     if (_running != null || _stopping) {
       throw StateError('The server is already running');
@@ -326,6 +327,9 @@ final class DwAppServer {
     DwJobRunner? jobRunner;
     StreamSubscription<void>? clockJumps;
     DwHttpFront? front;
+    final transport =
+        outbound ??
+        DwNetworkTransport(connectionTimeout: settings.outboundTimeout);
     final fileStore = switch (files) {
       final storage? => DwFileStore(storage),
       null => null,
@@ -367,6 +371,9 @@ final class DwAppServer {
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),
         channelRules: DwChannelRules(channels),
+        outbound: transport,
+        outboundTimeout: settings.outboundTimeout,
+        outboundMaxResponseBytes: settings.outboundMaxResponseBytes,
         clock: clock,
         files: fileStore,
         modules: modules,
@@ -432,6 +439,7 @@ final class DwAppServer {
         jobRunner: runner,
         front: front,
         files: fileStore,
+        outbound: transport,
         clockJumps: clockJumps,
       );
       _running = running;
@@ -451,6 +459,7 @@ final class DwAppServer {
       await jobRunner?.stop();
       await openedDatabase?.close();
       fileStore?.close();
+      transport.close();
       for (final module in modules) {
         await module.close();
       }
@@ -487,6 +496,7 @@ final class DwAppServer {
       }
       await running.database.close();
       running.files?.close();
+      running.outbound.close();
       logger.info('DartWay server stopped');
     } finally {
       _running = null;
@@ -766,6 +776,7 @@ final class _DwRunning {
     required this.jobRunner,
     required this.front,
     required this.files,
+    required this.outbound,
     required this.clockJumps,
   });
 
@@ -774,6 +785,7 @@ final class _DwRunning {
   final DwJobRunner jobRunner;
   final DwHttpFront front;
   final DwFileStore? files;
+  final DwOutboundTransport outbound;
 
   /// The job executor's wake on every jump of the server's clock.
   final StreamSubscription<void> clockJumps;

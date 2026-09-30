@@ -431,6 +431,7 @@ void main() {
           protocol: testProtocol,
           log: RecordingLogger(),
           jobs: (_) => _NoJobs(),
+          http: (_) => throw UnimplementedError(),
           accounts: (ctx) => throw UnimplementedError(),
           channelRules: DwChannelRules([
             DwChannelRule.single(

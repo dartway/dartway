@@ -210,6 +210,7 @@ One context per call. Everything a handler may touch is on it.
 | `accounts` | a `DwAccountService` bound to this call ([auth](auth-identity.md#dwaccountservice)) |
 | `files` | the `DwFileService` ([uploads](uploads.md#ctxfiles)) |
 | `log` | a `DwServerLogger` scoped to the call (`command BookSession`) |
+| `http` | the `DwOutboundHttp`: requests to other services' HTTP APIs, [below](#outbound-http) |
 | `memo(key, create)` | a per-call cache: `create` runs at most once per key per call |
 
 ### Time: `ctx.now` and the caller's offset
@@ -260,6 +261,63 @@ Both open a transaction, but only `ctx.transaction` ties the call's effects to i
 the transaction inside the body. Inside `ctx.db.transaction((tx) …)`, `ctx.db` is still the outer
 handle — a write through it escapes the transaction — and a publication made there is delivered
 even when that transaction rolls back.
+
+## Outbound HTTP
+
+A request to somebody else's API — an SMS gateway, a CRM, a model provider — is `ctx.http`, in a
+handler, a job, a route or a startup step alike. There is no second client: `dart run dartway_cli:dartway check` refuses
+`HttpClient(` and `package:http` in `lib/src/` (`forbiddenHttpClient`).
+
+```dart
+final response = await ctx.http.post(
+  Uri.parse('https://sms.example.com/send'),
+  headers: {'authorization': 'Bearer ${sms.token}'},
+  json: {'phone': phone, 'text': text},
+);
+if (!response.isSuccess) throw SmsException(response.statusCode, response.body);
+```
+
+- `get`, `post`, `put`, `patch`, `delete` and `send(method, url)` to an `http` or `https` URL (anything
+  else is an `ArgumentError`); a body is `json:` (encoded, with its content type) or `body:` — a
+  `String`, bytes, or a `Map<String, String>` sent as a form.
+- **Bounded.** The whole exchange, from connecting to the last byte of the answer, by
+  `DwServerSettings.outboundTimeout` (30 s), or the call's own `timeout:`.
+- **Capped.** A response body larger than `DwServerSettings.outboundMaxResponseBytes` (10 MiB), or the
+  call's `maxResponseBytes:`, is not read further: `DwOutboundException`.
+- **Logged** through `ctx.log`: method, origin, status and time. Never the user info, the path, the
+  query, a header or a body — that is where credentials travel (`/bot<token>/`, `?psw=`).
+- **An answer is an answer.** Any status comes back as a `DwOutboundResponse` (`statusCode`,
+  `isSuccess`, `body`, `json`, `headers`). What throws is not getting one: `DwOutboundException`,
+  with `timedOut` telling a timeout from an unreachable host.
+- `followRedirects: false` for a request whose headers carry a credential, which a redirect would
+  carry to wherever it points.
+- **Not inside a transaction.** The transaction holds its locks and its connection for as long as the
+  other side takes. Commit first — a `transactional: false` command or a job — then call out.
+
+**In a test**, every `DwTestServer` answers `ctx.http` from its `DwFakeOutboundHttp`, `server.http`,
+and refuses a request no rule answers with a `StateError` — no test reaches the network by accident,
+and nothing is threaded through the project's server factory to arrange it:
+
+```dart
+server.http.when(
+  (request) => request.url.host == 'sms.example.com',
+  (request) => DwOutboundResponse(200, json: {'id': 7}),
+);
+// … the command that sends the SMS
+expect(server.http.requests.single.json, {'phone': '79990000001', 'text': 'Code: 1234'});
+```
+
+The rule added last is asked first, so a test overrides what its harness scripted; a rule that throws
+`DwOutboundException` makes the provider unreachable. A class that talks to a provider takes a
+`DwOutboundHttp` (`ctx.http`) per call, so it is unit-tested without a server over the same fake:
+`DwFakeOutboundHttp().client()`.
+
+A client used only by a command-line entry point, with no server and no context, is not the server's:
+it lives in `bin/` (or a tool package of its own), where the checker does not look for one.
+
+Framework satellites keep their own clients for now — push delivery (`dartway_push_server`) and the
+sign-in providers' key fetches (`dartway_auth_providers_server`) — as does the storage client inside the
+core.
 
 ## A project's own notions of the caller
 

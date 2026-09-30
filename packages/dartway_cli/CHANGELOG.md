@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.16.0
+
+- **Two new errors in `dartway check`: `forbiddenEnvironmentRead` and `forbiddenHttpClient`**
+  (dartway/dartway#386). `Platform.environment` in a server package's `lib/` outside
+  `lib/src/core/environment.dart` — and in its `bin/` outside `DwLocalEnvironment.overlay(…)`, or a
+  map read there by a variable's name (`env['PORT']`) — and `HttpClient(` or an import of
+  `package:http/…` in its `lib/`, fail the check: the environment is read once into
+  `AppEnvironment` (`DwEnvironmentReader`), and an outbound request is `ctx.http`. Comments and
+  strings are passed over, interpolations are not; `test/` is not judged. A project with either fails
+  `dartway check` until it moves — see `docs/migrations/2026-09-29-environment-and-outbound-http.md`.
+
 ## 0.15.0
 
 - **New error, `forbiddenDateTimeNow`: the server's `lib/` reads the time as `ctx.now`**

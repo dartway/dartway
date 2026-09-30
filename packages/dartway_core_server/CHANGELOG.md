@@ -1,5 +1,39 @@
 # Changelog
 
+## 0.21.0-dev.10
+
+- **BREAKING: the environment is read one way — typed, once, at start** (dartway/dartway#386,
+  D-111). `DwEnvironmentReader.read(variables, (read) => …)` builds a project's `AppEnvironment` in
+  `lib/src/core/environment.dart` with `read.required`, `optional`, `integer`, `flag`, `list` and
+  `report`, and throws `DwEnvironmentException` listing **every** missing and malformed variable
+  once the object is built; a text value is never repeated, a number or flag read with
+  `secret: true` neither. `DwServerEnvironment.read(read, defaultPublicBucket:,
+  defaultPrivateBucket:)` is the framework's own variables — `DW_DATABASE_*`, `DW_STORAGE_*` with
+  the development defaults the skeleton used to compute in `AppFiles.storageConfig`,
+  `DW_STORAGE_PROVISION`, `PORT`, `DW_ALLOWED_ORIGINS` — so `bin/server.dart` parses nothing by
+  hand. It also reads `DW_ADMIN_IDENTIFIER` (`adminIdentifier`) and `DW_MIGRATE_ONLY`
+  (`migrateOnly`), so the local overlay reaches both (dartway/dartway#402): **BREAKING**,
+  `DwFirstAdministrator` takes a required `identifier:` instead of reading `Platform.environment`
+  (`variable:`, `environment:` and `defaultVariable` are gone), and `DwAppServer.start({required bool
+  migrateOnly})` replaces
+  its own read of `DW_MIGRATE_ONLY` (`DwAppServer.migrateOnlyVariable` moved to
+  `DwServerEnvironment`). `DwFileStorageConfig` no longer repeats the user info of a URL in a
+  problem. `AppFiles.storageConfig` is gone from the template. Migration note: `docs/migrations/2026-09-29-environment-and-outbound-http.md`.
+- **BREAKING: `ctx.http` — one outbound HTTP client, `DwOutboundHttp`, over `package:http`**
+  (dartway/dartway#386, D-111). `get`/`post`/`put`/`patch`/`delete`/`send`, a body as `json:` or
+  `body:` (text, bytes, a form map); the whole exchange bounded by the new
+  `DwServerSettings.outboundTimeout` (30 s) or the call's `timeout:`; every exchange logged through
+  `ctx.log` by method, origin, status and time (never the user info, path, query, headers or body);
+  only `http`/`https` URLs (`ArgumentError` otherwise); a body capped by the new
+  `DwServerSettings.outboundMaxResponseBytes` (10 MiB) or the call's `maxResponseBytes:`; any status
+  answered as a `DwOutboundResponse`, no answer thrown as `DwOutboundException` (`timedOut`).
+  `DwCallContext` gains the abstract `http` — breaking for a class that implements it. In
+  `testing.dart`, `DwFakeOutboundHttp`: every `DwTestServer` answers `ctx.http` from its own,
+  `server.http`, which records requests, answers from `when(matches, respond)` rules (the last added
+  first) and refuses anything unscripted with a `StateError` — a test server never reaches the
+  network through `ctx.http`; `fake.client()` is a `DwOutboundHttp` over it for a unit test without
+  a server. `dartway_core_server` now depends on `http` directly.
+
 ## 0.21.0-dev.9
 
 - **BREAKING: `ctx.now` — the server's clock — is the time, and `DwTestClock` sets it in tests

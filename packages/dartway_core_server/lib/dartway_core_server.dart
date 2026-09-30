@@ -23,6 +23,9 @@ export 'src/files/dw_file_storage.dart'
         DwUploadRule;
 export 'src/files/dw_object_store.dart' show DwStorageException;
 export 'src/files/dw_storage_buckets.dart' show DwFileStorageSetup;
+export 'src/environment/dw_environment_reader.dart'
+    show DwEnvironmentException, DwEnvironmentReader;
+export 'src/environment/dw_server_environment.dart';
 export 'src/context/dw_call_context.dart'
     show DwCallContext, DwNotAuthenticatedException;
 export 'src/context/dw_caller_local_time.dart';
@@ -46,6 +49,12 @@ export 'src/jobs/dw_job_queue.dart'
         DwQueuedJob,
         DwRecurringJob,
         dwDefaultJobBackoff;
+export 'src/outbound/dw_outbound_http.dart'
+    show
+        DwOutboundException,
+        DwOutboundHttp,
+        DwOutboundRequest,
+        DwOutboundResponse;
 export 'src/routes/dw_http_route.dart';
 export 'src/server/dw_app_server.dart';
 export 'src/server/dw_local_environment.dart' show DwLocalEnvironment;

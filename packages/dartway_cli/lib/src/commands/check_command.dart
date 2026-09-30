@@ -14,6 +14,7 @@ import '../checker/dw_layout.dart';
 import '../checker/dw_server_clock_use.dart';
 import '../checker/dw_server_contract.dart';
 import '../checker/dw_server_features.dart';
+import '../checker/dw_server_outside_world.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
 import '../checker/dw_check_tally.dart';
@@ -124,6 +125,11 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
       errorCount += DwServerClockInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwServerOutsideWorldInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

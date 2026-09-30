@@ -231,6 +231,31 @@ database what the client could observe — that ties the test to the schema inst
   storage `dart run dartway_cli:dartway test` started; pass `storage.config` to the server factory, `storage.drop()` after
   the server stops. `storage.keys(bucket)` lists what landed where. What to test — `dartway-uploads`.
 
+### Other services — `server.http`
+
+Every `DwTestServer` answers the server's `ctx.http` from its `DwFakeOutboundHttp`, `server.http`:
+it records each request and answers from the test's rules, and a request no rule answers fails the
+call with a `StateError` — a test never reaches the network. Nothing is threaded through the server
+factory for it:
+
+```dart
+server.http.when(
+  (request) => request.url.host == 'sms.example.com',
+  (request) => DwOutboundResponse(200, json: {'id': 7}),
+);
+final ticket = (await client.command(DwRequestCode(kind: kind, identifier: phone))).valueOrThrow;
+expect(server.http.requests.single.form['phones'], '79990000001');
+```
+
+- The rule added last is asked first: the harness scripts the usual answer, a test overrides it
+  (`DwOutboundResponse(503)`) for the failure path.
+- A rule that throws `DwOutboundException(request, cause: 'refused')` is an unreachable provider; one
+  whose future never completes runs into the call's timeout.
+- `server.http.reset()` forgets requests and rules — between tests of one file that share a server.
+- **Without a server**, a class that takes a `DwOutboundHttp` is unit-tested over the same fake:
+  `final http = DwFakeOutboundHttp()..when(…);` then `SmsGateway(settings).send(http.client(), …)`,
+  and `http.requests` as above.
+
 ### What deserves an acceptance test
 
 **Write one when the rule is the point:** a role or ownership boundary, a refusal with its code and

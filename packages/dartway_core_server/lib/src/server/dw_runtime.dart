@@ -13,6 +13,7 @@ import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../live/dw_live_connection.dart';
 import '../live/dw_live_hub.dart';
+import '../outbound/dw_outbound_http.dart';
 import 'dw_server_clock.dart';
 import 'dw_server_module.dart';
 
@@ -31,6 +32,9 @@ final class DwRuntime {
     required this.log,
     required this.jobsFor,
     required this.channelRules,
+    required this.outbound,
+    required this.outboundTimeout,
+    required this.outboundMaxResponseBytes,
     this.clock = DwServerClock.system,
     this.files,
     List<DwServerModule> modules = const [],
@@ -49,6 +53,14 @@ final class DwRuntime {
   /// response carries.
   final DwChannelRules channelRules;
 
+  /// What `ctx.http` sends through: the network, or a test's fake.
+  final DwOutboundTransport outbound;
+
+  /// `DwServerSettings.outboundTimeout`.
+  final Duration outboundTimeout;
+
+  /// `DwServerSettings.outboundMaxResponseBytes`.
+  final int outboundMaxResponseBytes;
   /// The server's clock: `ctx.now`, and the job queue's due times.
   final DwServerClock clock;
 
@@ -74,6 +86,12 @@ final class DwRuntime {
     protocol: protocol,
     log: log.scoped(scope),
     jobs: jobsFor,
+    http: (ctx) => DwOutboundHttp(
+      outbound,
+      log: ctx.log,
+      timeout: outboundTimeout,
+      maxResponseBytes: outboundMaxResponseBytes,
+    ),
     accounts: (ctx) => DwAccountService.ofContext(ctx, this),
     files: (ctx) => files?.serviceFor(ctx) ?? const DwUnconfiguredFiles(),
     modules: modules,

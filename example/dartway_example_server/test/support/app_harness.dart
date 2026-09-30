@@ -39,6 +39,7 @@ final class AppHarness {
     late final AppHarness harness;
     final server = await DwTestServer.start(
       DartwayExampleServer.build(
+        adminIdentifier: null,
         database: database.config,
         storage: storage,
         port: 0,

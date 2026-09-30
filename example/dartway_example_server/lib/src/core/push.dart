@@ -5,6 +5,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
 import '../../generated/dw_schema.dart';
+import 'environment.dart';
 
 /// Push notifications: the module, and the providers the environment enables.
 abstract final class AppPush {
@@ -37,39 +38,15 @@ abstract final class AppPush {
     },
   );
 
-  /// The providers configured by the environment; none without their
-  /// variables, and then devices are recorded as having no provider:
-  ///
-  /// - `FCM_SERVICE_ACCOUNT_FILE` — the Firebase service account JSON file;
-  ///   `FCM_WEB_LINK_BASE` — the web app's https origin, for web clicks;
-  /// - `RUSTORE_PUSH_PROJECT_ID` and `RUSTORE_PUSH_SERVICE_TOKEN` — both, or
-  ///   neither.
-  static List<DwPushProvider> providers(Map<String, String> env) {
-    final fcmFile = env['FCM_SERVICE_ACCOUNT_FILE'];
-    final ruStoreProject = env['RUSTORE_PUSH_PROJECT_ID'];
-    final ruStoreToken = env['RUSTORE_PUSH_SERVICE_TOKEN'];
-    if ((ruStoreProject == null) != (ruStoreToken == null)) {
-      throw StateError(
-        'RuStore push needs both RUSTORE_PUSH_PROJECT_ID and '
-        'RUSTORE_PUSH_SERVICE_TOKEN, or neither',
-      );
-    }
-    return [
-      if (fcmFile != null)
-        DwFcmProvider(
-          account: DwFcmServiceAccount.fromJson(
-            File(fcmFile).readAsStringSync(),
-          ),
-          webLinkBase: switch (env['FCM_WEB_LINK_BASE']) {
-            final base? => Uri.parse(base),
-            null => null,
-          },
-        ),
-      if (ruStoreProject != null)
-        DwRuStoreProvider(
-          projectId: ruStoreProject,
-          serviceToken: ruStoreToken!,
-        ),
-    ];
-  }
+  /// The providers [environment] enables; none without their variables, and
+  /// then devices are recorded as having no provider.
+  static List<DwPushProvider> providers(AppPushEnvironment environment) => [
+    if (environment.fcmServiceAccountFile case final file?)
+      DwFcmProvider(
+        account: DwFcmServiceAccount.fromJson(File(file).readAsStringSync()),
+        webLinkBase: environment.fcmWebLinkBase,
+      ),
+    if (environment.ruStore case (:final projectId, :final serviceToken)?)
+      DwRuStoreProvider(projectId: projectId, serviceToken: serviceToken),
+  ];
 }
