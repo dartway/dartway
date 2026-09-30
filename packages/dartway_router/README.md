@@ -7,14 +7,14 @@ A full example — two navigation zones with a guard — is [`example/main.dart`
 ## Features
 
 - **🎯 Type-Safe Navigation**: Enum-based routes with compile-time checking
-- **🔄 State Management Agnostic**: Works with any `Listenable` (ChangeNotifier, ValueNotifier, Riverpod, etc.)
+- **🔄 Guards follow a provider**: the router re-runs its guards whenever a Riverpod provider's value changes — no `Listenable` to hold
 - **🛡️ Route Guards**: Protect routes with authentication/authorization guards
 - **📊 Type-Safe Parameters**: Extract navigation parameters with full type safety
 - **🎭 Flexible Transitions**: Built-in page transitions (material, fade, slide, scale)
 - **🏗️ Navigation Zones**: Group routes into logical zones (authenticated, public, admin, etc.)
 - **🐚 Shell Routes**: Easy shell route configuration for common UI patterns
 - **✅ Comprehensive Validation**: Automatic validation of route configuration
-- **📱 Zero Dependencies**: Only depends on Flutter and Go Router
+- **📱 Few Dependencies**: Flutter, Go Router and Riverpod
 
 ## Installation
 
@@ -26,27 +26,29 @@ flutter pub add dartway_router
 
 ### 1. Define Your Router State
 
-Create a state class that extends `Listenable` (or use `ChangeNotifier`, `ValueNotifier`, etc.):
+What the guards decide by is an immutable value — a record, or a class with value equality — held by a
+Riverpod provider:
 
 ```dart
-import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class AppSession extends ChangeNotifier {
-  bool _isAuthenticated = false;
-  
-  bool get isAuthenticated => _isAuthenticated;
-  
-  void login() {
-    _isAuthenticated = true;
-    notifyListeners();
-  }
-  
-  void logout() {
-    _isAuthenticated = false;
-    notifyListeners();
-  }
+typedef AppSession = ({bool isAuthenticated});
+
+final appSessionProvider =
+    NotifierProvider<AppSessionController, AppSession>(AppSessionController.new);
+
+class AppSessionController extends Notifier<AppSession> {
+  @override
+  AppSession build() => (isAuthenticated: false);
+
+  void login() => state = (isAuthenticated: true);
+
+  void logout() => state = (isAuthenticated: false);
 }
 ```
+
+In an app the value is usually derived from providers it already has — the signed-in account, the
+profile's role — by a plain `Provider` that watches them.
 
 ### 2. Define Navigation Parameters
 
@@ -132,21 +134,24 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
 
 ### 4. Create the Router
 
-Pass both zones and `routerState` (required for guards). Start at login; the guard will redirect to login when the user is not authenticated.
+The router is built in a provider: it takes that provider's `ref`, follows `routerState` through it
+(required for guards) and disposes itself with the provider. Start at login; the guard will redirect to
+login when the user is not authenticated.
 
 ```dart
-final appSession = AppSession();
-
-final router = DwAppRouter<AppSession>(
-  routerState: appSession,
-  navigationZones: [
-    AuthRoutes.values,   // Auth zone (login)
-    AppRoutes.values,    // App zone (protected by guard)
-  ],
-  pageBuilder: DwPageBuilder.material,
-  options: DwGoRouterOptions(
-    initialLocation: AuthRoutes.login.fullPath,
-    debugLogDiagnostics: true,
+final appRouterProvider = Provider<DwAppRouter<AppSession>>(
+  (ref) => DwAppRouter<AppSession>(
+    ref: ref,
+    routerState: appSessionProvider,
+    navigationZones: [
+      AuthRoutes.values,   // Auth zone (login)
+      AppRoutes.values,    // App zone (protected by guard)
+    ],
+    pageBuilder: DwPageBuilder.material,
+    options: DwGoRouterOptions(
+      initialLocation: AuthRoutes.login.fullPath,
+      debugLogDiagnostics: true,
+    ),
   ),
 );
 ```
@@ -158,18 +163,18 @@ import 'package:flutter/material.dart';
 import 'router/app_router.dart';
 
 void main() {
-  runApp(const MyApp());
+  runApp(const ProviderScope(child: MyApp()));
 }
 
-class MyApp extends StatelessWidget {
+class MyApp extends ConsumerWidget {
   const MyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp.router(
       title: 'DartWay Router Example',
       theme: ThemeData(primarySwatch: Colors.blue, useMaterial3: true),
-      routerConfig: router.router,
+      routerConfig: ref.watch(appRouterProvider).router,
     );
   }
 }
@@ -177,20 +182,15 @@ class MyApp extends StatelessWidget {
 
 ### 6. Navigate and Extract Parameters
 
-Use `AppSession` on login/logout and navigate between zones:
+Change the session and let the guards move between zones — a change of `routerState` re-runs them on
+the location shown:
 
 ```dart
-// On login screen: after successful login
-void onLoginPressed() {
-  appSession.login();
-  context.goNamed(AppRoutes.home.name);
-}
+// On login screen: after successful login — the guards leave the login screen
+ref.read(appSessionProvider.notifier).login();
 
-// On profile/settings: logout
-void onLogoutPressed() {
-  appSession.logout();
-  context.goNamed(AuthRoutes.login.name);
-}
+// On profile/settings: logout — the guards return to login
+ref.read(appSessionProvider.notifier).logout();
 
 // Navigate within app zone
 context.goNamed(AppRoutes.profile.name);
@@ -223,7 +223,8 @@ Example with multiple zones (e.g. auth zone + protected app zone, as in Quick St
 
 ```dart
 final router = DwAppRouter<AppSession>(
-  routerState: appSession,
+  ref: ref,
+  routerState: appSessionProvider,
   navigationZones: [
     AuthRoutes.values,   // Public/auth zone (login)
     AppRoutes.values,    // Authenticated zone (guard uses AppSession)
@@ -354,8 +355,9 @@ write the link.
 **Important**: When using guards, you must provide `routerState` to `DwAppRouter`:
 
 ```dart
-final router = DwAppRouter<AppSession>(
-  routerState: appSession, // Required when using guards
+DwAppRouter<AppSession>(
+  ref: ref,
+  routerState: appSessionProvider, // Required when using guards
   navigationZones: [AppRoutes.values],
   pageBuilder: DwPageBuilder.material,
 );
@@ -531,7 +533,8 @@ enum AuthRoutes implements DwNavigationRoute<AppSession> {
 }
 
 final router = DwAppRouter<AppSession>(
-  routerState: appSession,
+  ref: ref,
+  routerState: appSessionProvider,
   navigationZones: [
     AppRoutes.values,   // Authenticated zone
     AuthRoutes.values,  // Public zone
@@ -606,7 +609,8 @@ Configure GoRouter behavior:
 
 ```dart
 final router = DwAppRouter<AppSession>(
-  routerState: appSession,
+  ref: ref,
+  routerState: appSessionProvider,
   navigationZones: [AppRoutes.values],
   pageBuilder: DwPageBuilder.material,
   options: DwGoRouterOptions(

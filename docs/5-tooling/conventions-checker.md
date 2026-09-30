@@ -374,13 +374,14 @@ is a `useEffect` keyed on the prop. State two widgets share, or a flow with logi
 `Notifier` named `<Thing>Controller` in the feature's `logic/`. `forbiddenStateHolder` reads every
 file of `lib/`, `core/` and `ui_kit/` included — a kit field is where a `StatefulWidget` hides best.
 
-**The way out is written on the class and counted.** An API that needs a `State` subclass or a
-`Listenable` of its own (the router's refresh listenable is the skeleton's one case) takes one
-comment on the line above the class, doc comments and annotations allowed between:
+**The way out is written on the class and counted.** A third-party API that needs a `State`
+subclass or a `Listenable` of its own (a map SDK that calls into a `State`) takes one comment on the
+line above the class, doc comments and annotations allowed between. The skeleton and the example
+have none — the router follows a provider, not a `Listenable`:
 
 ```dart
-// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable
-class AppRouterState extends ChangeNotifier { … }
+// dw:allow-stateful the map SDK calls into a State subclass
+class VenueMapView extends StatefulWidget { … }
 ```
 
 The class — and, for a widget, its `State` — is passed over, and every run prints it under

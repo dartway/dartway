@@ -2,8 +2,10 @@ import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import 'test_helpers.dart';
+
 // Test router state
-class TestRouterState extends ChangeNotifier {}
+typedef TestRouterState = ({bool isAuthorized});
 
 // Test routes
 enum TestRoutes implements DwNavigationRoute<TestRouterState> {
@@ -157,10 +159,13 @@ Future<BuildContext> pumpRouterAt(
   String location,
   String leafLabel,
 ) async {
-  final router = DwAppRouter<TestRouterState>(
-    navigationZones: [ParameterizedRoutes.values],
-    pageBuilder: DwPageBuilder.material,
-    options: DwGoRouterOptions(initialLocation: location),
+  final router = buildRouter(
+    (ref) => DwAppRouter<TestRouterState>(
+      ref: ref,
+      navigationZones: [ParameterizedRoutes.values],
+      pageBuilder: DwPageBuilder.material,
+      options: DwGoRouterOptions(initialLocation: location),
+    ),
   );
 
   await tester.pumpWidget(MaterialApp.router(routerConfig: router.router));

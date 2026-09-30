@@ -2,6 +2,17 @@
 
 ### Breaking
 
+**The guards follow a Riverpod provider; the app holds no `Listenable`** (#407). `DwAppRouter` is built inside a provider and takes its `ref`, and `routerState` is a provider of the value the guards decide by — an immutable record or a class with value equality — instead of a `Listenable` the app kept and notified by hand. The router listens to it through `ref`, hands each guard the current value, and re-runs the guards whenever the value changes, so signing in leaves the sign-in screen and signing out returns to it with nothing else wired; an equal value re-runs nothing. go_router's `refreshListenable` is the router's own, internal. The router also disposes itself with the provider that built it. `RouterState` has no `Listenable` bound any more (`DwAppRouter`, `DwNavigationRoute`, `DwNavigationRouteDescriptor`, `DwNavigationGuard`), and the package depends on `flutter_riverpod`. The router provider has to be watched for the guards to follow — `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)` does; Riverpod pauses the subscriptions of a provider nobody listens to.
+
+    - final appRouterStateProvider = Provider<AppRouterState>((ref) { … AppRouterState(ref) … });
+    - DwAppRouter<AppRouterState>(routerState: ref.watch(appRouterStateProvider), …)
+    - ref.onDispose(router.router.dispose);
+    + typedef AppRouterState = ({bool isSignedIn, UserRole? role});
+    + final appRouterStateProvider = Provider<AppRouterState>((ref) => (isSignedIn: …, role: …));
+    + DwAppRouter<AppRouterState>(ref: ref, routerState: appRouterStateProvider, …)
+
+See `docs/migrations/2026-09-30-router-state-provider.md`.
+
 **A simple route's `extraPathSegment` replaces its name in the URL instead of prefixing it** (#314). `buildPathSegment` returned `'$extraPathSegment/$coreSegment'` for every descriptor, and a `.simple()` route's core segment is always its enum name — so `editProfile(DwNavigationRouteDescriptor.simple(parent: profile, extraPathSegment: 'edit'))` built `/profile/edit/editProfile`, not the `/profile/edit` every caller actually wanted. Checked against the framework's own rule that route names are one namespace shared by every zone: `extraPathSegment` on a simple route exists precisely to give a page a URL word of its own without forcing every zone to fight over (or copy) the enum name, so a prefix that still appended the name back on could never have been the intent — a live project's eight simple routes using it (`editProfile` → `edit`, `following` → `following`, `notificationSettings` → `notifications`, …) all read as the segment replacing the name, never as a second word next to it, and its five parameterized routes using `extraPathSegment` (see below) are unaffected.
 
 The parameterized descriptor is unchanged: there `extraPathSegment` prefixes the parameter pattern (`:userId`), which is not a name and cannot double up — `userDetail(extraPathSegment: 'users')` still builds `/users/:userId`.

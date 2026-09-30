@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 import 'dw_navigation_route_descriptor.dart';
 import 'dw_navigation_types.dart';
 
@@ -41,10 +39,9 @@ import 'dw_navigation_types.dart';
 /// }
 /// ```
 ///
-/// Type parameter [RouterState] must extend [Listenable] and is used for
-/// router refresh notifications and guard evaluation.
-abstract class DwNavigationRoute<RouterState extends Listenable>
-    implements Enum {
+/// Type parameter [RouterState] is the value the zone guards decide by — what
+/// the router's `routerState` provider holds.
+abstract class DwNavigationRoute<RouterState> implements Enum {
   /// Creates a navigation route with the given descriptor.
   DwNavigationRoute(this.descriptor);
 
@@ -137,8 +134,9 @@ abstract class DwNavigationRoute<RouterState extends Listenable>
   /// Guards run in order. If one returns a non-null path the user is redirected
   /// there instead. Return `null` to allow navigation to proceed.
   ///
-  /// Guards receive the [RouterState] instance and can check authentication,
-  /// permissions, or any other condition.
+  /// Guards receive the current [RouterState] value and can check
+  /// authentication, permissions, or any other condition. They run again
+  /// whenever that value changes.
   ///
   /// Example:
   /// ```dart

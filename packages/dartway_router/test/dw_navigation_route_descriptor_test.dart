@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 // Test router state
-class TestRouterState extends ChangeNotifier {}
+typedef TestRouterState = ({bool isAuthorized});
 
 // Test pages
 class HomePage extends StatelessWidget {

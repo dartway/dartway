@@ -9,6 +9,10 @@
   Studio for any affected route, or a route nested under one, is the new, shorter path —
   a project using `extraPathSegment` on a `.simple()` route sees Studio's screen identity
   for it change the moment it upgrades.
+- **Takes a router of any state** (#407): `router` is a `DwAppRouter<Object?>` and
+  `dwStudioSpecForRoute` a `DwNavigationRoute<Object?>`, since `dartway_router` 3.0.0 no
+  longer asks the router state to be a `Listenable`. The app passes the same
+  `ref.watch(appRouterProvider)` as before.
 
 ## 0.2.0
 

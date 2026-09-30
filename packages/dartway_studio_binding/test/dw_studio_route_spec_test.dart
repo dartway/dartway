@@ -3,7 +3,7 @@ import 'package:dartway_studio_binding/dartway_studio_binding.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-class _RouterState extends ChangeNotifier {}
+typedef _RouterState = ();
 
 class _Page extends StatelessWidget {
   const _Page();

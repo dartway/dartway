@@ -1,16 +1,30 @@
 import 'package:dartway_router/dartway_router.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-// Test router state
-class TestRouterState extends ChangeNotifier {
-  bool isAuthorized = false;
+import 'test_helpers.dart';
 
-  void authorize() {
-    isAuthorized = true;
-    notifyListeners();
-  }
+// Test router state: an immutable value derived from the signed-in account's
+// id, the way an app derives it.
+typedef TestRouterState = ({bool isAuthorized});
+
+final sessionProvider = NotifierProvider<SessionController, int?>(
+  SessionController.new,
+);
+
+class SessionController extends Notifier<int?> {
+  @override
+  int? build() => null;
+
+  void signIn([int accountId = 1]) => state = accountId;
+
+  void signOut() => state = null;
 }
+
+final testRouterStateProvider = Provider<TestRouterState>(
+  (ref) => (isAuthorized: ref.watch(sessionProvider) != null),
+);
 
 // Test pages
 class HomePage extends StatelessWidget {
@@ -319,11 +333,14 @@ enum OverviewZone implements DwNavigationRoute<TestRouterState> {
 void main() {
   group('DwAppRouter', () {
     test('should create router with valid configuration', () {
-      final router = DwAppRouter<TestRouterState>(
-        navigationZones: [
-          TestRoutes.values,
-        ],
-        pageBuilder: DwPageBuilder.material,
+      final router = buildRouter(
+        (ref) => DwAppRouter<TestRouterState>(
+          ref: ref,
+          navigationZones: [
+            TestRoutes.values,
+          ],
+          pageBuilder: DwPageBuilder.material,
+        ),
       );
 
       expect(router.router, isA<GoRouter>());
@@ -332,9 +349,12 @@ void main() {
 
     test('should throw ArgumentError when navigationZones is empty', () {
       expect(
-        () => DwAppRouter<TestRouterState>(
-          navigationZones: [],
-          pageBuilder: DwPageBuilder.material,
+        () => buildRouter(
+          (ref) => DwAppRouter<TestRouterState>(
+            ref: ref,
+            navigationZones: [],
+            pageBuilder: DwPageBuilder.material,
+          ),
         ),
         throwsA(isA<ArgumentError>().having(
           (e) => e.message,
@@ -346,9 +366,12 @@ void main() {
 
     test('should throw ArgumentError when zone is empty', () {
       expect(
-        () => DwAppRouter<TestRouterState>(
-          navigationZones: [[]],
-          pageBuilder: DwPageBuilder.material,
+        () => buildRouter(
+          (ref) => DwAppRouter<TestRouterState>(
+            ref: ref,
+            navigationZones: [[]],
+            pageBuilder: DwPageBuilder.material,
+          ),
         ),
         throwsA(isA<ArgumentError>().having(
           (e) => e.message,
@@ -358,81 +381,185 @@ void main() {
       );
     });
 
-    test('should throw ArgumentError when guards are used without routerState',
-        () {
-      expect(
-        () => DwAppRouter<TestRouterState>(
-          navigationZones: [
-            RoutesWithGuards.values,
-          ],
-          pageBuilder: DwPageBuilder.material,
-          routerState: null,
-        ),
-        throwsA(isA<ArgumentError>().having(
-          (e) => e.message,
-          'message',
-          contains('refreshListenable is required when using zoneGuards'),
-        )),
-      );
-    });
+    test(
+      'should throw ArgumentError when guards are used without routerState',
+      () {
+        expect(
+          () => buildRouter(
+            (ref) => DwAppRouter<TestRouterState>(
+              ref: ref,
+              navigationZones: [RoutesWithGuards.values],
+              pageBuilder: DwPageBuilder.material,
+            ),
+          ),
+          throwsA(
+            isA<ArgumentError>().having(
+              (e) => e.message,
+              'message',
+              contains('routerState is required when using zoneGuards'),
+            ),
+          ),
+        );
+      },
+    );
 
     test('should work with guards when routerState is provided', () {
-      final routerState = TestRouterState();
-      final router = DwAppRouter<TestRouterState>(
-        navigationZones: [
-          RoutesWithGuards.values,
-        ],
-        pageBuilder: DwPageBuilder.material,
-        routerState: routerState,
+      final router = buildRouter(
+        (ref) => DwAppRouter<TestRouterState>(
+          ref: ref,
+          navigationZones: [RoutesWithGuards.values],
+          pageBuilder: DwPageBuilder.material,
+          routerState: testRouterStateProvider,
+        ),
       );
 
       expect(router.router, isA<GoRouter>());
     });
 
-    testWidgets('a guard is told where the person was going, and can bring '
-        'them back after signing in (#288)', (tester) async {
-      vaultTargets.clear();
-      final routerState = TestRouterState();
-      final router = DwAppRouter<TestRouterState>(
-        navigationZones: [TestRoutes.values, VaultRoutes.values, SignInRoutes.values],
-        pageBuilder: DwPageBuilder.material,
-        routerState: routerState,
-      );
-      await tester.pumpWidget(MaterialApp.router(routerConfig: router.router));
-      await tester.pumpAndSettle();
+    group('guards follow the routerState provider (#407)', () {
+      late ProviderContainer container;
 
-      router.router.go('/vault?tab=items');
-      await tester.pumpAndSettle();
-      expect(find.text('Auth'), findsOneWidget);
-      expect(
-        vaultTargets.first,
-        DwNavigationTarget(
-          uri: Uri.parse('/vault?tab=items'),
-          routeName: 'vault',
-        ),
-      );
-      expect(
-        router.router.routerDelegate.currentConfiguration.uri
-            .queryParameters['from'],
-        '/vault?tab=items',
+      setUp(() {
+        vaultTargets.clear();
+        container = ProviderContainer();
+        addTearDown(container.dispose);
+      });
+
+      DwAppRouter<TestRouterState> vaultRouter({String? initialLocation}) =>
+          buildRouter(
+            (ref) => DwAppRouter<TestRouterState>(
+              ref: ref,
+              routerState: testRouterStateProvider,
+              navigationZones: [
+                TestRoutes.values,
+                VaultRoutes.values,
+                SignInRoutes.values,
+              ],
+              pageBuilder: DwPageBuilder.material,
+              options: DwGoRouterOptions(initialLocation: initialLocation),
+            ),
+            container: container,
+          );
+
+      String location(DwAppRouter<TestRouterState> router) =>
+          router.router.routerDelegate.currentConfiguration.uri.toString();
+
+      void signIn([int accountId = 1]) =>
+          container.read(sessionProvider.notifier).signIn(accountId);
+      void signOut() => container.read(sessionProvider.notifier).signOut();
+
+      testWidgets('a guard is told where the person was going, and can bring '
+          'them back after signing in (#288)', (tester) async {
+        final router = vaultRouter();
+        await tester.pumpWidget(
+          MaterialApp.router(routerConfig: router.router),
+        );
+        await tester.pumpAndSettle();
+
+        router.router.go('/vault?tab=items');
+        await tester.pumpAndSettle();
+        expect(find.text('Auth'), findsOneWidget);
+        expect(
+          vaultTargets.first,
+          DwNavigationTarget(
+            uri: Uri.parse('/vault?tab=items'),
+            routeName: 'vault',
+          ),
+        );
+        expect(
+          router
+              .router
+              .routerDelegate
+              .currentConfiguration
+              .uri
+              .queryParameters['from'],
+          '/vault?tab=items',
+        );
+
+        signIn();
+        await tester.pumpAndSettle();
+        expect(find.text('Profile'), findsOneWidget);
+        expect(location(router), '/vault?tab=items');
+      });
+
+      testWidgets(
+        'a deep link into a guarded zone opens sign-in, signing in leaves '
+        'it for the link, and signing out returns to it',
+        (tester) async {
+          final router = vaultRouter(initialLocation: '/vault');
+          await tester.pumpWidget(
+            MaterialApp.router(routerConfig: router.router),
+          );
+          await tester.pumpAndSettle();
+
+          expect(find.text('Auth'), findsOneWidget);
+          expect(location(router), '/sign-in?from=%2Fvault');
+
+          // Nothing but the provider changes: no navigation call.
+          signIn();
+          await tester.pumpAndSettle();
+          expect(find.text('Profile'), findsOneWidget);
+          expect(location(router), '/vault');
+
+          signOut();
+          await tester.pumpAndSettle();
+          expect(find.text('Auth'), findsOneWidget);
+          expect(location(router), '/sign-in?from=%2Fvault');
+        },
       );
 
-      routerState.authorize();
-      await tester.pumpAndSettle();
-      expect(find.text('Profile'), findsOneWidget);
-      expect(
-        router.router.routerDelegate.currentConfiguration.uri.toString(),
-        '/vault?tab=items',
-      );
+      testWidgets('a deep link opens the guarded zone straight away when the '
+          'guards already let the person in', (tester) async {
+        signIn();
+        final router = vaultRouter(initialLocation: '/vault');
+        await tester.pumpWidget(
+          MaterialApp.router(routerConfig: router.router),
+        );
+        await tester.pumpAndSettle();
+
+        expect(find.text('Profile'), findsOneWidget);
+        expect(location(router), '/vault');
+      });
+
+      testWidgets('a change that leaves the value equal does not re-run the '
+          'guards', (tester) async {
+        final router = vaultRouter(initialLocation: '/vault');
+        await tester.pumpWidget(
+          MaterialApp.router(routerConfig: router.router),
+        );
+        await tester.pumpAndSettle();
+        final asked = vaultTargets.length;
+
+        // The session is set to what it already is: the derived record is
+        // equal, so the router is not told anything changed.
+        signOut();
+        await tester.pumpAndSettle();
+        expect(vaultTargets.length, asked);
+      });
+
+      test('the router is disposed with the provider that built it', () {
+        final router = vaultRouter(initialLocation: '/vault');
+        final information = router.router.routeInformationProvider;
+
+        container.dispose();
+
+        expect(
+          () => ChangeNotifier.debugAssertNotDisposed(information),
+          throwsFlutterError,
+        );
+      });
     });
 
     group('topRouteFromState', () {
       testWidgets('should return route from state', (tester) async {
-        final router = DwAppRouter<TestRouterState>(
-          navigationZones: [
-            TestRoutes.values,
-          ],
-          pageBuilder: DwPageBuilder.material,
+        final router = buildRouter(
+          (ref) => DwAppRouter<TestRouterState>(
+            ref: ref,
+            navigationZones: [
+              TestRoutes.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
         );
 
         await tester.pumpWidget(
@@ -450,11 +577,14 @@ void main() {
       });
 
       test('should return null when route name is not found', () {
-        final router = DwAppRouter<TestRouterState>(
-          navigationZones: [
-            TestRoutes.values,
-          ],
-          pageBuilder: DwPageBuilder.material,
+        final router = buildRouter(
+          (ref) => DwAppRouter<TestRouterState>(
+            ref: ref,
+            navigationZones: [
+              TestRoutes.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
         );
 
         // Test that router is created successfully
@@ -465,11 +595,14 @@ void main() {
 
     group('rootRouteFromState', () {
       testWidgets('should return root route from nested route', (tester) async {
-        final router = DwAppRouter<TestRouterState>(
-          navigationZones: [
-            NestedRoutes.values,
-          ],
-          pageBuilder: DwPageBuilder.material,
+        final router = buildRouter(
+          (ref) => DwAppRouter<TestRouterState>(
+            ref: ref,
+            navigationZones: [
+              NestedRoutes.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
         );
 
         await tester.pumpWidget(
@@ -491,11 +624,14 @@ void main() {
       testWidgets(
           'pushing the same route twice does not trip the Navigator '
           'duplicate page key assertion', (tester) async {
-        final router = DwAppRouter<TestRouterState>(
-          navigationZones: [
-            TestRoutes.values,
-          ],
-          pageBuilder: DwPageBuilder.material,
+        final router = buildRouter(
+          (ref) => DwAppRouter<TestRouterState>(
+            ref: ref,
+            navigationZones: [
+              TestRoutes.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
         );
 
         await tester.pumpWidget(
@@ -520,12 +656,15 @@ void main() {
           'two zones declaring the same name fail when the router is '
           'assembled, naming the value and both zones', () {
         expect(
-          () => DwAppRouter<TestRouterState>(
-            navigationZones: [
-              ProjectsZone.values,
-              AdminProjectsZone.values,
-            ],
-            pageBuilder: DwPageBuilder.material,
+          () => buildRouter(
+            (ref) => DwAppRouter<TestRouterState>(
+              ref: ref,
+              navigationZones: [
+                ProjectsZone.values,
+                AdminProjectsZone.values,
+              ],
+              pageBuilder: DwPageBuilder.material,
+            ),
           ),
           throwsA(
             isA<ArgumentError>().having(
@@ -544,12 +683,15 @@ void main() {
 
       test('the same name in one zone and a different one in another is fine',
           () {
-        final router = DwAppRouter<TestRouterState>(
-          navigationZones: [
-            ProjectsZone.values,
-            ReportsZone.values,
-          ],
-          pageBuilder: DwPageBuilder.material,
+        final router = buildRouter(
+          (ref) => DwAppRouter<TestRouterState>(
+            ref: ref,
+            navigationZones: [
+              ProjectsZone.values,
+              ReportsZone.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
         );
 
         expect(router.router, isA<GoRouter>());
@@ -560,12 +702,15 @@ void main() {
         // Both zones sit at the site root, so `projects` collides on the path
         // as well. The path is the symptom; the message must name the cause.
         expect(
-          () => DwAppRouter<TestRouterState>(
-            navigationZones: [
-              ProjectsZone.values,
-              SecondProjectsZone.values,
-            ],
-            pageBuilder: DwPageBuilder.material,
+          () => buildRouter(
+            (ref) => DwAppRouter<TestRouterState>(
+              ref: ref,
+              navigationZones: [
+                ProjectsZone.values,
+                SecondProjectsZone.values,
+              ],
+              pageBuilder: DwPageBuilder.material,
+            ),
           ),
           throwsA(
             isA<ArgumentError>().having(
@@ -582,12 +727,15 @@ void main() {
 
       test('a duplicate path names its routes and their zones too', () {
         expect(
-          () => DwAppRouter<TestRouterState>(
-            navigationZones: [
-              ReportsZone.values,
-              OverviewZone.values,
-            ],
-            pageBuilder: DwPageBuilder.material,
+          () => buildRouter(
+            (ref) => DwAppRouter<TestRouterState>(
+              ref: ref,
+              navigationZones: [
+                ReportsZone.values,
+                OverviewZone.values,
+              ],
+              pageBuilder: DwPageBuilder.material,
+            ),
           ),
           throwsA(
             isA<ArgumentError>().having(
@@ -606,12 +754,15 @@ void main() {
 
     group('multiple zones', () {
       test('should handle multiple navigation zones', () {
-        final router = DwAppRouter<TestRouterState>(
-          navigationZones: [
-            TestRoutes.values,
-            AuthRoutes.values,
-          ],
-          pageBuilder: DwPageBuilder.material,
+        final router = buildRouter(
+          (ref) => DwAppRouter<TestRouterState>(
+            ref: ref,
+            navigationZones: [
+              TestRoutes.values,
+              AuthRoutes.values,
+            ],
+            pageBuilder: DwPageBuilder.material,
+          ),
         );
 
         expect(router.router, isA<GoRouter>());

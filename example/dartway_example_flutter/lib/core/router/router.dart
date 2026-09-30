@@ -21,19 +21,15 @@ part 'navigation_zones/admin_navigation_zone.dart';
 part 'navigation_zones/app_navigation_zone.dart';
 part 'navigation_zones/auth_navigation_zone.dart';
 
-final appRouterStateProvider = Provider<AppRouterState>((ref) {
-  final state = AppRouterState(ref);
-  ref.onDispose(state.dispose);
-  return state;
-});
-
 /// The app router: three zones (app, admin, auth) with cross-redirect guards.
 /// Signed-out users are redirected to the auth zone; signed-in users are kept
-/// out of it, and non-admins out of the admin zone.
+/// out of it, and non-admins out of the admin zone. The guards re-run whenever
+/// [appRouterStateProvider] changes; the router disposes itself with this
+/// provider.
 final appRouterProvider = Provider<DwAppRouter<AppRouterState>>((ref) {
-  final routerState = ref.watch(appRouterStateProvider);
   final router = DwAppRouter<AppRouterState>(
-    routerState: routerState,
+    ref: ref,
+    routerState: appRouterStateProvider,
     navigationZones: [
       AppNavigationZone.values,
       AdminNavigationZone.values,
@@ -53,6 +49,5 @@ final appRouterProvider = Provider<DwAppRouter<AppRouterState>>((ref) {
     return configuration.isEmpty ? '/' : configuration.uri.path;
   });
 
-  ref.onDispose(router.router.dispose);
   return router;
 });

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.21.0-dev.17
+
+- **BREAKING (re-exported `dartway_router` 3.0.0): the router's guards follow a provider**
+  (dartway/dartway#407, D-120). `DwAppRouter(ref: ref, routerState: appRouterStateProvider, …)` is
+  built in the router's provider and re-runs its guards whenever the provider's value changes; the
+  app's `AppRouterState` becomes a record held by a provider, and the `ChangeNotifier` — the last
+  `// dw:allow-stateful` in the skeleton and the example — goes. The version moves to deliver the
+  migration note.
+
 ## 0.21.0-dev.16
 
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the import,

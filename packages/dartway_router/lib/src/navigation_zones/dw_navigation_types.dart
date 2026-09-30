@@ -57,10 +57,10 @@ final class DwNavigationTarget {
 /// a non-null path, the user will be redirected to that path instead of the
 /// intended route.
 ///
-/// Guards receive the [RouterState] instance (which extends [Listenable]) and
-/// can check authentication, permissions, or any other condition — and the
-/// [DwNavigationTarget] being entered, so a guard that says no can say where
-/// the person was going.
+/// Guards receive the current [RouterState] value — what the router's
+/// `routerState` provider holds — to check authentication, permissions or any
+/// other condition, and the [DwNavigationTarget] being entered, so a guard
+/// that says no can say where the person was going.
 ///
 /// Return `null` to allow navigation to proceed, or return a path string to
 /// redirect to a different route.
@@ -74,8 +74,8 @@ final class DwNavigationTarget {
 ///           .toString(),
 /// ];
 /// ```
-typedef DwNavigationGuard<RouterState extends Listenable> = String? Function(
-  RouterState refreshListenable,
+typedef DwNavigationGuard<RouterState> = String? Function(
+  RouterState state,
   DwNavigationTarget target,
 );
 

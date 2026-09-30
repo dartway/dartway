@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.21.0-dev.17
+
+- Nothing changed here; the family moves in lockstep to deliver the migration note for the router
+  that follows a provider (dartway/dartway#407).
+
 ## 0.21.0-dev.16
 
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
