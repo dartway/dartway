@@ -33,6 +33,8 @@ abstract final class DartwayStarterServer {
   /// [adminIdentifier] is made an administrator at every start
   /// (`DwFirstAdministrator`): `bin/server.dart` passes `DW_ADMIN_IDENTIFIER`,
   /// read into `DwServerEnvironment.adminIdentifier`.
+  /// [clock] is the time every handler and job reads as `ctx.now` — the
+  /// system's, unless a test sets its own (`DwTestClock`).
   static DwAppServer build({
     required DwDatabaseConfig database,
     DwFileStorageConfig? storage,
@@ -40,6 +42,7 @@ abstract final class DartwayStarterServer {
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
     required String? adminIdentifier,
+    DwServerClock clock = DwServerClock.system,
   }) => DwAppServer(
     protocol: appProtocol,
     schema: dartwayStarterSchema,
@@ -60,5 +63,6 @@ abstract final class DartwayStarterServer {
     files: storage == null ? null : AppFiles.storage(storage),
     port: port,
     settings: settings,
+    clock: clock,
   );
 }

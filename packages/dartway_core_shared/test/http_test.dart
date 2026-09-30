@@ -85,6 +85,42 @@ void main() {
     });
   });
 
+  group('UTC offset', () {
+    test('whole minutes east of UTC round-trip', () {
+      for (final offset in const [
+        Duration.zero,
+        Duration(hours: 3),
+        Duration(hours: -5),
+        Duration(hours: 5, minutes: 45),
+        Duration(hours: 18),
+        Duration(hours: -18),
+      ]) {
+        final text = DwHttpContract.utcOffsetValue(offset);
+        expect(DwHttpContract.parseUtcOffset(text), offset, reason: text);
+      }
+      expect(DwHttpContract.utcOffsetValue(const Duration(hours: 3)), '180');
+    });
+
+    test('anything else is a FormatException', () {
+      for (final text in [
+        '',
+        '+180',
+        '180.0',
+        '03:00',
+        '0180',
+        '1081',
+        '-1081',
+        'x',
+      ]) {
+        expect(
+          () => DwHttpContract.parseUtcOffset(text),
+          throwsFormatException,
+          reason: text,
+        );
+      }
+    });
+  });
+
   group('page query', () {
     test('a page request takes an offset and a page size', () {
       const request = FeedBookings();

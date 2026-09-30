@@ -24,9 +24,28 @@ void main() {
       expect(call.headers['dw-protocol'], '$dwProtocolVersion');
       expect(call.headers['dw-app-version'], '1.0.0+1');
       expect(call.headers['content-type'], DwHttpContract.jsonContentType);
+      // The offset the fake server's client is pinned to, as the server
+      // reads it for `ctx.callerUtcOffset`.
+      expect(call.headers['dw-utc-offset'], '0');
       expect(call.authorization, 'Bearer token-7');
       expect(call.idempotencyKey, isNull, reason: 'forbidden for requests');
       expect(call.query, isEmpty);
+    });
+
+    test('a client reports its pinned UTC offset, or the device\'s when none '
+        'is pinned', () async {
+      final server = DwFakeServer(protocol: roomsProtocol)
+        ..onRequest<ListRooms>((request, call) => DwCallOk([a]));
+      for (final (pinned, sent) in [
+        (const Duration(hours: 5, minutes: 45), '345'),
+        (null, '${DateTime.now().timeZoneOffset.inMinutes}'),
+      ]) {
+        final client = server.newClient(utcOffset: pinned);
+        await client.start();
+        await client.fetch(const ListRooms());
+        await client.stop();
+        expect(server.calls.last.headers['dw-utc-offset'], sent);
+      }
     });
 
     test('an anonymous call carries no Authorization', () async {

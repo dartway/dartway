@@ -28,6 +28,7 @@ import '../live/dw_web_origin.dart';
 import '../migrations/dw_framework_migrations.dart';
 import '../outbound/dw_outbound_http.dart';
 import '../routes/dw_http_route.dart';
+import 'dw_server_clock.dart';
 import 'dw_server_feature.dart';
 import 'dw_runtime.dart';
 import 'dw_server_module.dart';
@@ -78,6 +79,7 @@ final class DwAppServer {
     DwAlertSink? alerts,
     this.logger = const DwConsoleLogger(),
     this.settings = const DwServerSettings(),
+    this.clock = DwServerClock.system,
   }) : address = address ?? InternetAddress.anyIPv4,
        alerts = alerts ?? DwLogAlertSink(logger);
 
@@ -179,6 +181,14 @@ final class DwAppServer {
   final DwAlertSink alerts;
   final DwServerLogger logger;
   final DwServerSettings settings;
+
+  /// Where the server reads the current instant: `ctx.now` in every context,
+  /// and the job queue's due times — a job's default `runAt`, when it is
+  /// due, its retries and leases, the schedule of recurring jobs. The
+  /// system's clock by default; a `DwTestClock` in a test that pins or moves
+  /// time. The server wakes its job executor on every
+  /// [DwServerClock.jumps].
+  final DwServerClock clock;
 
   _DwRunning? _running;
   bool _stopping = false;
@@ -315,6 +325,7 @@ final class DwAppServer {
 
     DwPostgresDatabase? openedDatabase;
     DwJobRunner? jobRunner;
+    StreamSubscription<void>? clockJumps;
     DwHttpFront? front;
     final transport =
         outbound ??
@@ -363,6 +374,7 @@ final class DwAppServer {
         outbound: transport,
         outboundTimeout: settings.outboundTimeout,
         outboundMaxResponseBytes: settings.outboundMaxResponseBytes,
+        clock: clock,
         files: fileStore,
         modules: modules,
       );
@@ -379,6 +391,7 @@ final class DwAppServer {
         pollInterval: settings.jobPollInterval,
       );
       await runner.start();
+      clockJumps = clock.jumps.listen((_) => runner.wake());
 
       // After the job runner, so a step may enqueue; before the front binds,
       // so nothing has been served when it runs. A throw leaves the start in
@@ -427,6 +440,7 @@ final class DwAppServer {
         front: front,
         files: fileStore,
         outbound: transport,
+        clockJumps: clockJumps,
       );
       _running = running;
       if (handleSignals) {
@@ -440,6 +454,7 @@ final class DwAppServer {
       }
       logger.info('DartWay server listening on port ${front.port}');
     } catch (_) {
+      await clockJumps?.cancel();
       await front?.close();
       await jobRunner?.stop();
       await openedDatabase?.close();
@@ -470,6 +485,7 @@ final class DwAppServer {
         for (final connection in connections)
           connection.close(DwCloseCode.serverStopping, 'dw.serverStopping'),
       ]);
+      await running.clockJumps.cancel();
       await running.jobRunner.stop().timeout(
         settings.stopTimeout,
         onTimeout: () => logger.warning('jobs still running at stop timeout'),
@@ -733,10 +749,14 @@ final class DwAppServer {
           'WHERE created_at < now() - @age::int8 * interval \'1 microsecond\'',
           params: {'age': ticketRetention.inMicroseconds},
         );
+        // `failed_at` is stamped by the server's clock, so it is aged by it.
         await ctx.db.execute(
-          'DELETE FROM dw_job '
-          'WHERE failed_at < now() - @age::int8 * interval \'1 microsecond\'',
-          params: {'age': settings.failedJobRetention.inMicroseconds},
+          'DELETE FROM dw_job WHERE failed_at < '
+          '@now::timestamptz - @age::int8 * interval \'1 microsecond\'',
+          params: {
+            'age': settings.failedJobRetention.inMicroseconds,
+            'now': ctx.now,
+          },
         );
         // A revoked key has no use once its revocation has been delivered and
         // every cache has forgotten it.
@@ -757,6 +777,7 @@ final class _DwRunning {
     required this.front,
     required this.files,
     required this.outbound,
+    required this.clockJumps,
   });
 
   final DwPostgresDatabase database;
@@ -765,5 +786,8 @@ final class _DwRunning {
   final DwHttpFront front;
   final DwFileStore? files;
   final DwOutboundTransport outbound;
+
+  /// The job executor's wake on every jump of the server's clock.
+  final StreamSubscription<void> clockJumps;
   List<StreamSubscription<ProcessSignal>> signals = const [];
 }

@@ -66,6 +66,9 @@ void main() {
       'Fifteen',
       'Sixteen',
       'Seventeen',
+      'Eighteen',
+      'Nineteen',
+      'Twenty',
     ][count].toLowerCase();
     int of(DwCheckSeverity level) =>
         DwCheckType.values.where((check) => check.severity == level).length;

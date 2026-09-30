@@ -47,22 +47,32 @@ __SERVER_PKG__/
     environment.dart           AppEnvironment — every variable, read once at start
     push.dart                  AppPush — with push only
   lib/src/migrations/      fixed: migration files and migrations.dart
-  lib/src/<feature>/       one folder per area of the app, every file <feature>_*.dart:
+  lib/src/<feature>/       one folder per area of the app; a closed set of files:
     <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes
     <feature>_rows.dart        its row classes
     <feature>_handlers.dart    one handler per request and command
     <feature>_objects.dart     rows → data objects, in batch
     <feature>_publications.dart  what a change publishes, and to whom
     <feature>_jobs.dart        its job kinds and job definitions
+    <feature>_access.dart      its access rules, when they outgrow the handlers
+    <feature>_routes.dart      its DwHttpRoute doors, when it has them
+    <feature>_<part>_<kind>.dart  a kind split in parts: the only way a feature splits
+    logic/                     everything that is none of the kinds — clients, calculators,
+                               domain rules; flat, free names, never a kind's suffix
   test/
 ```
 
 The top level of `lib/` is closed: the package library, `generated/`, `src/`. **So is `src/`: folders
 only — `core/`, `migrations/` and one per feature**, each declaring its `DwServerFeature` in
 `<feature>_feature.dart`, and the server lists the features: `DwAppServer(features: [...])`. A file at
-the top of `src/`, a layer folder (`handlers/`, `rows/`, `entities/`, `domain/`, `objects/`,
-`services/`) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
-`dart run dartway_cli:dartway check`. A feature split across layers ends up in four places, with a
+the top of `src/`, a layer-named folder (the list:
+[project layout](https://dartway.dev/1-getting-started/project-layout)) or a feature folder without its declaration is `invalidTopLevelLayout`, an error of
+`dart run dartway_cli:dartway check`. **So is a feature**: the files above and nothing else, a layer
+name at no depth, and each kind declared only in its own file — handlers in `_handlers`, row classes
+in `_rows`, jobs in `_jobs`, routes in `_routes`, a function that publishes in `_publications`, a row → data object
+mapping in `_objects`, and none of them in `core/` (`invalidServerFeatureFile`,
+`misplacedServerCode`; what counts as each —
+[project layout](https://dartway.dev/1-getting-started/project-layout)). A feature split across layers ends up in four places, with a
 `chat/` beside a `domain/chat/` and two rules for who is in a chat: the whole area lives in its
 folder, and what two features share lives in the one that owns it (the profile's objects in
 `profile/`) or in `core/`. A feature imports another's `_rows`, `_objects` and `_publications` —
@@ -205,7 +215,7 @@ so the handler refuses cleanly instead of failing (here a payment row whose `inv
 
 ```dart
 final paid = await ctx.db.invoicePayments.tryInsert(
-  InvoicePaymentRow(invoiceId: invoice.id!, paidAt: DateTime.now()),
+  InvoicePaymentRow(invoiceId: invoice.id!, paidAt: ctx.now),
   onConflict: DwOnConflict.doNothing((t) => [t.invoiceId]),
 );
 if (paid == null) ctx.refuse(AcmeRefusal.invoiceAlreadyPaid);
@@ -289,7 +299,7 @@ final invoiceHandlers = <DwCallHandler>[
       final paid = await ctx.db.invoices.update(
         row.copyWith(
           status: InvoiceStatus.paid,
-          paidAt: DwFieldPatch.set(DateTime.now()),
+          paidAt: DwFieldPatch.set(ctx.now),
         ),
       );
       // Publishes the invoice to every channel that shows it and answers it
@@ -370,7 +380,20 @@ exit of the server shows the object the same way.
 ## 6. The call context
 
 `DwCallContext` is one per call: `accountId` / `requireAccountId`, `sessionKey`, `db`, `protocol`,
-`transaction`, `publish`, `revoke`, `refuse`, `jobs`, `accounts`, `files`, `log`, `http`, `memo`.
+`now`, `callerUtcOffset` / `callerLocalTime`, `transaction`, `publish`, `revoke`, `refuse`, `jobs`,
+`accounts`, `files`, `log`, `http`, `memo`.
+
+**The time is `ctx.now`, and only `ctx.now`** — UTC, from the server's clock, in handlers, jobs,
+routes and startup steps alike. `DateTime.now()` anywhere in `lib/` fails `dart run dartway_cli:dartway check`
+(`forbiddenDateTimeNow`): tests set the server's clock (`DwTestClock`, `dartway-testing`) and the job
+queue runs by it, so the system clock is a time no test can pin. **The caller's day is
+`ctx.callerLocalTime`**: the app sends its device's UTC offset with every call, so a command never
+carries an offset field. `ctx.callerUtcOffset` is the `Duration`; both are `null` in jobs and when
+the app sent none. `callerLocalTime` is a `DwCallerLocalTime` — a reading of the caller's clock
+(`year`, `month`, `day`, `hour`, `minute`, `weekday`), not an instant and not a `DateTime`; its one
+way back to an instant is `startOfDayUtc`, the caller's midnight, for a query over "their today".
+An offset is not a zone: work for a person later (a job at their 8 a.m.) uses an offset the project
+stored from one of their calls — the framework keeps none.
 
 **The project's notions of "the caller" are an extension, cached per call with `memo`** — the
 framework knows an account, the profile and the role are the project's. It is `AppCallContext` in
@@ -453,13 +476,14 @@ The worked example is the framework example's bookings reminder
 `BookSession` enqueues it, and the job checks the booking is still active when it runs.
 
 Enqueue from a command by the kind, never by a string:
-`await ctx.jobs.enqueue(InvoicesJobs.remind, (invoiceId: id), runAt: …, key: …)`. The payload is
+`await ctx.jobs.enqueue(InvoicesJobs.remind, (invoiceId: id), runAt: ctx.now.add(…), key: …)`. The payload is
 spelled as a map once, in the kind's codec — never `payload['x']! as int` in a handler.
 The enqueue joins the command's transaction (no row if it rolls back); a `key` deduplicates pending
 jobs. A queued job is transactional by default (the job row disappears exactly when its work commits);
 `transactional: false` for jobs that call external services, which may then run twice after a crash.
-A job has no caller (`accountId` is `null`): it reads what it needs from its payload, and it may
-publish. Names starting with `dw.` are the framework's.
+A job has no caller (`accountId` and `callerUtcOffset` are `null`): it reads what it needs from its
+payload, and it may publish. It is due by the server's clock — the one `ctx.now` reads — so a test
+that moves a `DwTestClock` past its `runAt` runs it. Names starting with `dw.` are the framework's.
 
 ## 8. Routes — external doors only
 
@@ -474,7 +498,7 @@ DwHttpRoute.post('/webhooks/payments', (ctx, request) async {
 });
 ```
 
-Registered in a feature's `DwServerFeature(routes: [...])`, matched by exact path; `/dw/…` and `/health` are the
+Declared in the feature's `<feature>_routes.dart` and registered in its `DwServerFeature(routes: [...])`, matched by exact path; `/dw/…` and `/health` are the
 framework's. `auth:` is `DwRouteAuth.none` by default (the sender proves itself otherwise);
 `optional`/`required` read `Authorization: Bearer` like a call. A refusal thrown in a route is
 answered as JSON with its status; anything else as `500` with an incident id.
@@ -738,5 +762,7 @@ call per access rule — `dartway-testing`, `dartway-access`.
 - [ ] Every object a command changed is published to every channel that shows it (`dartway-realtime`).
 - [ ] No SQL on `dw_*` tables; accounts through `DwAccountService`.
 - [ ] A new profile is created in `onAccountCreated`, in the account's transaction.
+- [ ] Time is `ctx.now`; the caller's local day is `ctx.callerLocalTime`, never an offset field on
+      a command.
 - [ ] Row class changed → `dart run dartway_cli:dartway generate`, migration drafted and reviewed.
 - [ ] `dart run dartway_cli:dartway test` and `dart run dartway_cli:dartway check` pass.

@@ -28,6 +28,7 @@ export 'src/environment/dw_environment_reader.dart'
 export 'src/environment/dw_server_environment.dart';
 export 'src/context/dw_call_context.dart'
     show DwCallContext, DwNotAuthenticatedException;
+export 'src/context/dw_caller_local_time.dart';
 export 'src/handlers/dw_call_handler.dart'
     show
         DwAccessRule,
@@ -57,6 +58,7 @@ export 'src/outbound/dw_outbound_http.dart'
 export 'src/routes/dw_http_route.dart';
 export 'src/server/dw_app_server.dart';
 export 'src/server/dw_local_environment.dart' show DwLocalEnvironment;
+export 'src/server/dw_server_clock.dart';
 export 'src/server/dw_server_feature.dart';
 export 'src/server/dw_server_module.dart';
 export 'src/server/dw_server_settings.dart';

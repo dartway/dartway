@@ -36,6 +36,7 @@ GET  /health          liveness and database reachability
 | `Dw-App-Version: <semver>+<build>` | the app build (`DwAppVersion`), e.g. `1.4.2+87` |
 | `Dw-Idempotency-Key` | required on a command, forbidden on a request; at most 128 characters |
 | `Dw-Live-Connection` | optional: the id of the caller's live socket ([channels-and-realtime.md](channels-and-realtime.md)) |
+| `Dw-Utc-Offset` | optional: the device's UTC offset at the call, whole minutes east of UTC (`180`, `-300`, `345`), within 18 hours; read by the handler as `ctx.callerUtcOffset` ([handlers](../4-server/handlers-and-context.md#time-ctxnow-and-the-callers-offset)). The client reads it from the device on every call; an app that sends none gets `null` there, one that sends something else a `400` |
 | `Retry-After` | on a `429` answer, whole seconds |
 
 Query parameters exist only for the kinds whose position is not part of their key:
@@ -162,3 +163,8 @@ unchanged, the test fails with the instruction: bump `dwProtocolVersion` and ref
 `DW_UPDATE_GOLDENS=1 dart test test/wire_golden_test.dart`. A refresh refuses to overwrite a recorded
 encoding while the version is still the one it was recorded at — it follows a bump, it does not
 replace one.
+
+What an installed app may simply not send is not such a change. `Dw-Utc-Offset` was added without a
+bump (D-110): an older build sends no header and its caller's offset is unknown, a newer build's
+header is ignored by an older server — neither side meets a body it cannot read. The header is
+recorded as a shape of its own (`http.utcOffset`), not by changing an existing one.

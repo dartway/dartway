@@ -16,6 +16,7 @@ abstract final class DartwayExampleServer {
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
     DwPushModule? push,
+    DwServerClock clock = DwServerClock.system, // a DwTestClock in tests
   }) => DwAppServer(
     protocol: appProtocol,
     schema: dartwayExampleSchema,
@@ -34,6 +35,7 @@ abstract final class DartwayExampleServer {
     modules: [push ?? AppPush.module()],
     port: port,
     settings: settings,
+    clock: clock,
   );
 }
 ```
@@ -57,6 +59,7 @@ build it on a free port against their own database.
 | `alerts` | no | a `DwAlertSink`; the log by default — [alerts](alerts.md) |
 | `logger` | no | a `DwServerLogger`; `DwConsoleLogger` by default |
 | `settings` | no | `DwServerSettings`, below |
+| `clock` | no | a `DwServerClock`, `DwServerClock.system` by default: what every context reads as `ctx.now` and what the job queue decides due times by; a test passes a `DwTestClock` — [time](handlers-and-context.md#time-ctxnow-and-the-callers-offset) |
 
 ## What `start()` does, in order
 

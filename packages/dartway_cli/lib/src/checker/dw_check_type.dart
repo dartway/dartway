@@ -124,6 +124,30 @@ enum DwCheckType {
   /// apart: an undeclared folder is where the next divergence starts.
   invalidTopLevelLayout,
 
+  /// A file or folder inside a server feature outside its closed set:
+  /// `<feature>_<kind>.dart` or `<feature>_<part>_<kind>.dart` with kind one
+  /// of `feature`, `rows`, `handlers`, `objects`, `publications`, `jobs`,
+  /// `access`, `routes`, and one flat `logic/` subfolder for everything else —
+  /// no folders inside it, and no kind-suffixed file. A layer name (`domain/`, `rows/`, `services/`, …) is
+  /// refused at any depth of `lib/src/`, `core/` included.
+  ///
+  /// Every live project had grown its own layout inside a feature — layer
+  /// subfolders in one, a folder of free names in the next — and an agent
+  /// copying any of them spread it (#381).
+  invalidServerFeatureFile,
+
+  /// Server code declared in a file of the wrong kind: handlers outside
+  /// `*_handlers.dart`, row classes outside `*_rows.dart`, jobs and job kinds
+  /// outside `*_jobs.dart`, a `DwHttpRoute` outside `*_routes.dart`, a
+  /// `DwServerFeature` outside `<feature>_feature.dart`,
+  /// a function that publishes outside `*_publications.dart`, a function
+  /// mapping a row to a data object outside `*_objects.dart`. `core/` and
+  /// `logic/` hold none of them.
+  ///
+  /// The name of a file says where a reader looks; this is what makes the
+  /// name true (#381).
+  misplacedServerCode,
+
   /// Generated code that no longer matches its sources: a `*.dw.dart` part,
   /// the protocol registry or the schema that `dartway generate` would write
   /// differently, or a generated file whose source is gone —
@@ -179,6 +203,17 @@ enum DwCheckType {
   /// a server that cannot log in to the database on the next machine — or,
   /// worse, on this one after the volume is recreated.
   devComposeDrifted,
+
+  /// `DateTime.now()` (or `DateTime.timestamp()`, or `package:clock`'s
+  /// `clock.now()`) anywhere in the server package's `lib/` — the time is
+  /// `ctx.now`, read from the server's clock (dartway/dartway#385).
+  ///
+  /// An error, because the two are not interchangeable spellings: the
+  /// server's clock is the one a test sets (`DwTestClock`) and the one the job
+  /// queue decides due times by, so a handler that reads the system clock is
+  /// a handler no test can pin, and disagrees with its own jobs as soon as a
+  /// test moves time.
+  forbiddenDateTimeNow,
 
   /// `Platform.environment` in the server package's `lib/` outside
   /// `lib/src/core/environment.dart`; in its `bin/`, `Platform.environment`

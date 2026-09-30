@@ -1,8 +1,8 @@
 ---
 title: "The environment is read once into AppEnvironment, and another service's API is ctx.http"
 affects:
-  dartway_core_server: "0.21.0-dev.9"
-  dartway_cli: "0.13.0"
+  dartway_core_server: "0.21.0-dev.10"
+  dartway_cli: "0.16.0"
 ---
 
 ## Who is affected
