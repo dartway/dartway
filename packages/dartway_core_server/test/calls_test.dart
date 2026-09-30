@@ -476,6 +476,7 @@ void main() {
           protocol: testProtocol,
           log: RecordingLogger(),
           jobs: (_) => _NoJobs(),
+          http: (_) => throw UnimplementedError(),
           accounts: (ctx) => throw UnimplementedError(),
           channelRules: DwChannelRules([
             DwChannelRule.single(
@@ -484,6 +485,7 @@ void main() {
             ),
             DwChannelRule.ofCaller(TestChannel.inbox),
           ]),
+          clock: DwServerClock.system,
         );
 
     test('memo creates once per key per call', () {

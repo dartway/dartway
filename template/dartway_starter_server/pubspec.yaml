@@ -6,7 +6,7 @@ environment:
   sdk: '>=3.11.0 <4.0.0'
 
 dependencies:
-  dartway_core_server: ^0.21.0-dev.9
+  dartway_core_server: ^0.21.0-dev.11
   # Events from the app in this project's Postgres, and the reports and
   # dashboards the admin panel reads from them.
   dartway_analytics_server: ^0.2.0
@@ -19,7 +19,7 @@ dependencies:
 dev_dependencies:
   # `dartway generate` runs the generator this package resolves, so it always
   # matches the framework the project builds against.
-  dartway_generator: ^0.21.0-dev.9
+  dartway_generator: ^0.21.0-dev.11
   lints: ^6.0.0
   test: ^1.26.0
 

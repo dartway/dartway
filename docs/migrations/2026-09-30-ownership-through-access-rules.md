@@ -1,8 +1,8 @@
 ---
 title: "Whose row it is moves from handler bodies into DwAccessRule.resource"
 affects:
-  dartway_core_server: "0.21.0-dev.9"
-  dartway_cli: "0.13.0"
+  dartway_core_server: "0.21.0-dev.11"
+  dartway_cli: "0.17.0"
 ---
 
 ## Who is affected

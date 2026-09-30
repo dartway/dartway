@@ -41,7 +41,7 @@ final bookingsHandlers = <DwCallHandler>[
         lock: DwRowLock.forUpdate,
       );
       if (session == null) ctx.refuse(DwCoreRefusal.notFound);
-      final now = DateTime.now();
+      final now = ctx.now;
       if (session.startsAt.isBefore(now)) {
         ctx.refuse(DartwayExampleRefusal.sessionStarted);
       }
@@ -156,7 +156,7 @@ final bookingsHandlers = <DwCallHandler>[
           bookingId: booking.id!,
           rating: command.rating,
           text: command.text,
-          createdAt: DateTime.now(),
+          createdAt: ctx.now,
         ),
         onConflict: DwOnConflict.doNothing((t) => [t.bookingId]),
       );

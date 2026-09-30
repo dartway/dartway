@@ -1,8 +1,18 @@
 # Changelog
 
-## 0.21.0-dev.9
+## 0.21.0-dev.11
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
+
+## 0.21.0-dev.10
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
+
+## 0.21.0-dev.9
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` and
+  `dartway_client` (dartway/dartway#385). An app on `dartway_core_flutter` sends its UTC offset with
+  every call through the client.
 
 ## 0.21.0-dev.8
 

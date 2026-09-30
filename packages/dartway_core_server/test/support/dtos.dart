@@ -632,6 +632,34 @@ final class Ping extends DwActionCommand<String> {
   static Ping fromJson(Map<String, Object?> json) => const Ping();
 }
 
+/// What the command's context says about time: `ctx.now`, the caller's
+/// offset in minutes and `ctx.callerLocalTime`, joined by `|` (`-` for null).
+final class ReadClock extends DwActionCommand<String> {
+  const ReadClock();
+
+  @override
+  String get dwTypeName => 'ReadClock';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static ReadClock fromJson(Map<String, Object?> json) => const ReadClock();
+}
+
+/// [ReadClock] as a request: the same text, as a note's.
+final class GetClockNote extends DwSingleRequest<NoteView> {
+  const GetClockNote();
+
+  @override
+  String get dwTypeName => 'GetClockNote';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+
+  static GetClockNote fromJson(Map<String, Object?> json) =>
+      const GetClockNote();
+}
+
 /// Anonymous access, but the handler requires an account.
 final class NeedsAccount extends DwActionCommand<int> {
   const NeedsAccount();
@@ -908,6 +936,8 @@ final DwWireProtocol testProtocol = DwWireProtocol([
     CountProvisional.fromJson,
   ),
   DwProtocolEntry<Ping>('Ping', Ping.fromJson),
+  DwProtocolEntry<ReadClock>('ReadClock', ReadClock.fromJson),
+  DwProtocolEntry<GetClockNote>('GetClockNote', GetClockNote.fromJson),
   DwProtocolEntry<NeedsAccount>('NeedsAccount', NeedsAccount.fromJson),
   DwProtocolEntry<RevokeNotes>('RevokeNotes', RevokeNotes.fromJson),
   DwProtocolEntry<EnqueueJob>('EnqueueJob', EnqueueJob.fromJson),

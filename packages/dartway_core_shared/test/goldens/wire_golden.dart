@@ -38,6 +38,12 @@ const String wireGolden = r'''
       ]
     },
     "http.contractVersion": "0.7.2",
+    "http.utcOffset": {
+      "header": "Dw-Utc-Offset",
+      "moscow": "180",
+      "newYorkWinter": "-300",
+      "kathmandu": "345"
+    },
     "http.appVersion": "1.4.2+87",
     "http.closeCodes": {
       "serverStopping": 1001,

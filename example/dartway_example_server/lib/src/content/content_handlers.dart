@@ -33,7 +33,7 @@ final contentHandlers = <DwCallHandler>[
           authorProfileId: me.id!,
           title: command.title.trim(),
           text: command.text.trim(),
-          createdAt: DateTime.now(),
+          createdAt: ctx.now,
         ),
       );
       final post = (await ContentObjects.news(ctx.db, [

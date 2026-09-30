@@ -14,7 +14,7 @@ final adminHandlers = <DwCallHandler>[
   /// [AdminPublications.counters] from every command that moves them.
   DwCallHandler.single<GetAdminCounters, AdminCounters>(
     access: AppAccess.admin,
-    handle: (ctx, request) => AdminPublications.countCounters(ctx.db),
+    handle: (ctx, request) => AdminPublications.countCounters(ctx),
   ),
 
   /// The members table: a page of profiles by name or phone, and by role.

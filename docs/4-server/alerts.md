@@ -82,10 +82,12 @@ abstract interface class DwAlertSink {
   status or error type only, since the request URL holds the bot token.
 
 ```dart
+// bin/server.dart; `env.alerts` is read in lib/src/core/environment.dart
+// (`read.required('ALERTS_BOT_TOKEN')`, `read.required('ALERTS_CHAT_ID')`)
 final logger = const DwConsoleLogger();
 final alerts = DwTelegramAlertSink(
-  botToken: Platform.environment['ALERTS_BOT_TOKEN']!,
-  chatId: Platform.environment['ALERTS_CHAT_ID']!,
+  botToken: env.alerts.botToken,
+  chatId: env.alerts.chatId,
   logger: logger,
   title: 'Invoices',
 );
