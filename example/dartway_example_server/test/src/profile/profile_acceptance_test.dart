@@ -2,7 +2,7 @@ import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/app_harness.dart';
+import '../../support/app_harness.dart';
 
 /// A member's own profile, on a real client against the real server.
 void main() {

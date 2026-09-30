@@ -4,7 +4,7 @@ Enable the plugin in your app's `analysis_options.yaml`:
 
 ```yaml
 plugins:
-  dartway_lints: ^0.4.0
+  dartway_lints: ^0.5.0
 ```
 
 Then look at your IDE, or run `dart analyze`.

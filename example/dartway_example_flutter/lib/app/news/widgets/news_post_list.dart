@@ -30,9 +30,9 @@ class NewsPostList extends ConsumerWidget {
             }
 
             return ListView.separated(
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              padding: const EdgeInsets.symmetric(vertical: AppSpace.s),
               itemCount: posts.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 8),
+              separatorBuilder: (_, _) => const SizedBox(height: AppSpace.s),
               itemBuilder: (context, index) => NewsPostCard(post: posts[index]),
             );
           },

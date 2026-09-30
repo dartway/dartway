@@ -1,6 +1,6 @@
 name: dartway_lints
-description: "DartWay's convention rules as an analyzer plugin: the UI kit as the single source of styles, relative imports kept short, and ProviderScope left to the app bootstrap and tests. Shown in the IDE, dart analyze and flutter analyze."
-version: 0.4.0
+description: "DartWay's convention rules as an analyzer plugin: the UI kit as the single source of styles, and ProviderScope left to the app bootstrap and tests. Shown in the IDE, dart analyze and flutter analyze."
+version: 0.5.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues

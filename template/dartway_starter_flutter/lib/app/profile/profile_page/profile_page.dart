@@ -8,8 +8,8 @@ import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 
-import 'widgets/avatar_picker.dart';
-import 'widgets/profile_settings_widget.dart';
+import 'package:dartway_starter_flutter/app/profile/profile_page/widgets/avatar_picker.dart';
+import 'package:dartway_starter_flutter/app/profile/profile_page/widgets/profile_settings_widget.dart';
 
 class ProfilePage extends StatelessWidget implements DwFeatureWidget {
   const ProfilePage({super.key});
@@ -48,11 +48,11 @@ class ProfilePage extends StatelessWidget implements DwFeatureWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             AvatarPicker(avatarUrl: profile.avatarUrl),
-            const Gap(16),
+            const Gap(AppSpace.l),
             const ProfileSettingsWidget(),
-            const Gap(8),
+            const Gap(AppSpace.s),
             const ProfileIdentitySection(),
-            const Gap(24),
+            const Gap(AppSpace.xl),
             if (profile.isAdmin) ...[
               AppButton.secondary(
                 l10n.adminPanel,
@@ -62,7 +62,7 @@ class ProfilePage extends StatelessWidget implements DwFeatureWidget {
                   ).goNamed(AdminNavigationZone.admin.name),
                 ),
               ),
-              const Gap(16),
+              const Gap(AppSpace.l),
             ],
             AppButton.text(
               l10n.signOutAction,
@@ -80,7 +80,7 @@ class ProfilePage extends StatelessWidget implements DwFeatureWidget {
                 confirmation: DwUiConfirmation(l10n.deleteAccountConfirmation),
               ),
             ),
-            const Gap(24),
+            const Gap(AppSpace.xl),
           ],
         ),
       ),

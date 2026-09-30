@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import 'core/app_l10n.dart';
-import 'core/dw_core.dart';
-import 'core/profile/signed_in_gate.dart';
-import 'core/router/router.dart';
-import 'ui_kit/ui_kit.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/core/profile/signed_in_gate.dart';
+import 'package:dartway_starter_flutter/core/router/router.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 
 /// The application. All app wiring lives here; `main` only
 /// supplies concrete parameters (server address, version) and runs it.

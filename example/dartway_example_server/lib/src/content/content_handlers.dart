@@ -2,13 +2,13 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
-import '../../generated/dw_schema.dart';
-import '../admin/admin_publications.dart';
-import '../core/call_context.dart';
-import '../core/channels.dart';
-import '../profile/profile_rows.dart';
-import 'content_objects.dart';
-import 'content_rows.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/admin/admin_publications.dart';
+import 'package:dartway_example_server/src/core/call_context.dart';
+import 'package:dartway_example_server/src/core/channels.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
+import 'package:dartway_example_server/src/content/content_objects.dart';
+import 'package:dartway_example_server/src/content/content_rows.dart';
 
 final contentHandlers = <DwCallHandler>[
   /// The news feed, newest first. Every signed-in member.

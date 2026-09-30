@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'dartway_example_channel.dart';
-import 'dartway_example_refusal.dart';
+import 'package:dartway_example_shared/src/dartway_example_channel.dart';
+import 'package:dartway_example_shared/src/dartway_example_refusal.dart';
 
 part 'people.dw.dart';
 
@@ -102,6 +102,9 @@ final class UpdateMyProfile extends DwActionCommand<UserProfile>
   @override
   List<DwCallRefusal> validate() => [
     if (firstName case final name? when name.trim().isEmpty)
-      DwCallRefusal(DartwayExampleRefusal.firstNameRequired, field: 'firstName'),
+      DwCallRefusal(
+        DartwayExampleRefusal.firstNameRequired,
+        field: 'firstName',
+      ),
   ];
 }

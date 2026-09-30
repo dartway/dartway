@@ -59,7 +59,7 @@ the keyboard's own duration and curve:
 ```dart
 AppKeyboardInset(
   builder: (_, keyboardInset) => Padding(
-    padding: EdgeInsets.only(bottom: 16 + keyboardInset),
+    padding: EdgeInsets.only(bottom: AppSpace.l + keyboardInset),
     child: child,
   ),
 )

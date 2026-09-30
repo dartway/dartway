@@ -1,7 +1,6 @@
 import 'package:analysis_server_plugin/plugin.dart';
 import 'package:analysis_server_plugin/registry.dart';
 
-import 'src/deep_relative_import_rule.dart';
 import 'src/forbidden_provider_scope_rule.dart';
 import 'src/forbidden_ui_style_usage_rule.dart';
 
@@ -22,7 +21,6 @@ class DartwayLintsPlugin extends Plugin {
   void register(PluginRegistry registry) {
     registry
       ..registerWarningRule(ForbiddenUiStyleUsageRule())
-      ..registerWarningRule(DeepRelativeImportRule())
       ..registerWarningRule(ForbiddenProviderScopeRule());
   }
 }

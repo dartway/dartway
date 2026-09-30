@@ -10,12 +10,19 @@ another:
 | Widgets | `flutter test` in `<project>_flutter` | a screen reads, commands, refuses and follows live updates as the user sees it | nothing: an in-memory server |
 
 The skeleton ships a worked example of each, and the reference application in `example/` another:
-`template/dartway_starter_shared/test/contract_test.dart`, `template/dartway_starter_server/test/`
-with its harness `test/support/app_harness.dart`, and `template/dartway_starter_flutter/test/` with
-`test/support/app_test_app.dart`. The example keeps both harnesses at the same paths, under the same
-names, extended with what the club needs — one harness per side, extended and never replaced. A
-widget test sits at the path of what it tests: `lib/admin/users/admin_users_page.dart` is tested in
-`test/admin/users/admin_users_page_test.dart`.
+`template/dartway_starter_shared/test/dartway_starter_shared_test.dart`,
+`template/dartway_starter_server/test/` with its harness `test/support/app_harness.dart`, and
+`template/dartway_starter_flutter/test/` with `test/support/app_test_app.dart`. The example keeps both
+harnesses at the same paths, under the same names, extended with what the club needs — one harness
+per side, extended and never replaced.
+
+**A test sits at the path of what it tests, in every package**: `lib/admin/users/admin_users_page.dart`
+is tested in `test/admin/users/admin_users_page_test.dart`, `lib/src/core/auth.dart` in
+`test/src/core/auth_test.dart`. A test of a whole folder — a server feature through its calls — is
+named after the folder at its mirror: `lib/src/chat/` → `test/src/chat/chat_acceptance_test.dart`.
+Helpers live in `test/support/` and are imported relatively, and a test builds no server and no
+`ProviderScope` of its own. `dart run dartway_cli:dartway check` holds all three (`testLayout`,
+`testHarnessBypassed`).
 
 **Why the split is not negotiable.** A rule the server enforces — who may read a row, what a command
 refuses, which channel hears a change — runs inside a call, against the database. No widget test can

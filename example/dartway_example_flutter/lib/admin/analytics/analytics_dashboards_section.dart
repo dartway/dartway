@@ -123,18 +123,18 @@ class AnalyticsDashboardsSection extends HookConsumerWidget
                     ),
                   ],
                 ),
-                const Gap(8),
+                const Gap(AppSpace.s),
                 if (dashboard == null)
                   AppText.body(l10n.analyticsNoDashboards)
                 else ...[
                   if (dashboards.length == 1 || editing.value)
                     AppText.body(dashboard.title),
-                  const Gap(8),
+                  const Gap(AppSpace.s),
                   AnalyticsPeriodBar(
                     choice: choice.value,
                     onChanged: (next) => choice.value = next,
                   ),
-                  const Gap(16),
+                  const Gap(AppSpace.l),
                   // Keyed by the dashboard: what the grid keeps of a save
                   // belongs to that dashboard, and a switch — even with a save
                   // under way — starts the next one's grid afresh.
@@ -147,7 +147,7 @@ class AnalyticsDashboardsSection extends HookConsumerWidget
                     onSaving: (value) => saving.value = value,
                   ),
                   if (editing.value) ...[
-                    const Gap(16),
+                    const Gap(AppSpace.l),
                     AnalyticsDashboardActions(
                       dashboard: dashboard,
                       enabled: !saving.value,

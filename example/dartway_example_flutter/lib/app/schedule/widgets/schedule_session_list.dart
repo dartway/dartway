@@ -63,7 +63,7 @@ class ScheduleSessionList extends ConsumerWidget {
         };
 
         return ListView(
-          padding: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(vertical: AppSpace.s),
           children: [
             for (final (index, session) in schedule.sessions.indexed) ...[
               if (index == 0 ||
@@ -71,7 +71,12 @@ class ScheduleSessionList extends ConsumerWidget {
                     schedule.sessions[index - 1].startsAt,
                   ))
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpace.xs,
+                    AppSpace.l,
+                    AppSpace.xs,
+                    AppSpace.s,
+                  ),
                   child: AppText.caption(session.startsAt.dayLabel),
                 ),
               SessionCard(

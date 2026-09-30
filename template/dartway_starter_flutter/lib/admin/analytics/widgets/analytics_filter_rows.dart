@@ -51,7 +51,7 @@ class AnalyticsFilterRows extends StatelessWidget {
                   ),
                 ),
               ),
-              const Gap(8),
+              const Gap(AppSpace.s),
               Expanded(
                 child: AppTextFormField(
                   value: filter.value,

@@ -221,7 +221,7 @@ final server = await DwTestServer.start(buildServer(push: AppPush.module(provide
 fcm.answer = (send) => DwFakePushAnswer.fcmError(404, 'NOT_FOUND', 'Requested entity was not found.', fcmCode: 'UNREGISTERED');
 ```
 
-The example's `test/push_acceptance_test.dart` publishes a post and checks who is notified. The
+The example's `test/src/core/push_test.dart` publishes a post and checks who is notified. The
 package's own suites run on Postgres: an enqueue rolled back with its command, dedup, eligibility
 skip and delay, four workers draining 200 deliveries without a duplicate, provider failures
 recorded with their text and retried with backoff, an invalid token removing only its transport's

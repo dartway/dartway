@@ -2,7 +2,7 @@ import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/app_harness.dart';
+import '../../support/app_harness.dart';
 
 /// A signed-in member attaches or changes the phone and the e-mail they sign
 /// in with, by a code sent to the new one — without signing in again. The

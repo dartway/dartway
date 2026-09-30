@@ -7,8 +7,8 @@ import 'package:dartway_example_server/src/chat/chat_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/chat_support.dart';
-import 'support/app_harness.dart';
+import '../../support/chat_support.dart';
+import '../../support/app_harness.dart';
 
 /// The staff chat on real clients, over real HTTP and the live socket, against
 /// the real server and database — and, for attachments, real storage.

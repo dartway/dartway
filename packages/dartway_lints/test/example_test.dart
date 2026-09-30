@@ -21,7 +21,6 @@ void main() {
     timeout: const Timeout(Duration(minutes: 5)),
     () async {
       final rules = {
-        'deep_relative_import',
         'forbidden_provider_scope',
         'forbidden_ui_style_usage',
       };

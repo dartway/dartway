@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../logic/auth_state.dart';
+import 'package:dartway_starter_flutter/auth/logic/auth_state.dart';
 
 /// What a new account needs before the code creates it: a name and the terms
 /// accepted, news and offers optional.
@@ -22,9 +22,9 @@ class ConsentsBlock extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const Gap(16),
+          const Gap(AppSpace.l),
           AppText.body(l10n.consentsIntro(state.rawIdentifier.trim())),
-          const Gap(24),
+          const Gap(AppSpace.xl),
           AppTextFormField(
             labelText: l10n.nameLabel,
             value: state.firstName,
@@ -33,7 +33,7 @@ class ConsentsBlock extends ConsumerWidget {
             validator: (value) =>
                 (value ?? '').trim().isEmpty ? l10n.requiredField : null,
           ),
-          const Gap(16),
+          const Gap(AppSpace.l),
           CheckboxFormField(
             value: state.termsAccepted,
             onChanged: (value) => notifier.update(termsAccepted: value),
@@ -56,13 +56,13 @@ class ConsentsBlock extends ConsumerWidget {
               ],
             ),
           ),
-          const Gap(8),
+          const Gap(AppSpace.s),
           CheckboxFormField(
             value: state.marketingAgreed,
             onChanged: (value) => notifier.update(marketingAgreed: value),
             titleWidget: AppText.body(l10n.marketingConsent),
           ),
-          const Gap(32),
+          const Gap(AppSpace.xxl),
           AppButton.primary(
             l10n.createAccountAction,
             requireValidation: true,

@@ -29,7 +29,7 @@ marketing consent and providers from the environment
 ([`core/push.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/core/push.dart)), the send (`PublishNews` in
 [`content_handlers.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/content/content_handlers.dart)), the tap
 ([`push_opened_listener.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/core/push/push_opened_listener.dart)),
-and the tests ([`push_acceptance_test.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/push_acceptance_test.dart),
+and the tests ([`push_test.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/src/core/push_test.dart),
 [`push_opened_listener_test.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/test/core/push/push_opened_listener_test.dart)).
 Its bookings reminder is a push sent from a job
 ([`bookings_jobs.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/bookings/bookings_jobs.dart)). Read them first.

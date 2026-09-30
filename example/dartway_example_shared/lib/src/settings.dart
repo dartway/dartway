@@ -1,7 +1,7 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'dartway_example_channel.dart';
-import 'dartway_example_refusal.dart';
+import 'package:dartway_example_shared/src/dartway_example_channel.dart';
+import 'package:dartway_example_shared/src/dartway_example_refusal.dart';
 
 part 'settings.dw.dart';
 

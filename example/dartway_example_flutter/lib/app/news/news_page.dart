@@ -8,7 +8,7 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:flutter/material.dart';
 
-import '../../core/dw_core.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 
 class NewsPage extends StatelessWidget implements DwFeatureWidget {
   const NewsPage({super.key});

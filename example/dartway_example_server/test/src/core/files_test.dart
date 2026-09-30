@@ -1,18 +1,17 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/app_harness.dart';
+import '../../support/app_harness.dart';
 
 /// The club's uploads on real storage: a member's avatar goes to the public
 /// bucket and opens for anyone by its URL. Needs `DW_STORAGE_ENDPOINT`,
 /// `DW_STORAGE_ACCESS_KEY` and `DW_STORAGE_SECRET_KEY` besides the database
-/// (see `../README.md`).
+/// (see `../../../README.md`).
 void main() {
   group('configuration from the environment', () {
     const credentials = {
@@ -105,23 +104,7 @@ void main() {
 
     test('a private purpose needs nothing but its rule: the server starts on '
         'the same buckets with it', () async {
-      final server = await DwTestServer.start(
-        DwAppServer(
-          // Nothing but the storage: the calls are the club server's.
-          protocol: DwWireProtocol(const []),
-          migrations: appMigrations,
-          database: club.database.config,
-          auth: AppAuth.config,
-          features: const [],
-          files: DwFileStorage(
-            storage.config,
-            // The club's own rules hold a private purpose (chat
-            // attachments), and nothing else is needed for it.
-            rules: AppFiles.uploadRules,
-          ),
-        ),
-      );
-      await server.stop();
+      await club.startStorageOnly(storage.config);
     });
 
     test('an avatar of a type the rule does not take is refused before '

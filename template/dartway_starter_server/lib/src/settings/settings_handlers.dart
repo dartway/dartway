@@ -1,10 +1,10 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
-import '../../generated/dw_schema.dart';
-import '../core/call_context.dart';
-import '../core/channels.dart';
-import 'settings_rows.dart';
+import 'package:dartway_starter_server/generated/dw_schema.dart';
+import 'package:dartway_starter_server/src/core/call_context.dart';
+import 'package:dartway_starter_server/src/core/channels.dart';
+import 'package:dartway_starter_server/src/settings/settings_rows.dart';
 
 final settingsHandlers = <DwCallHandler>[
   /// Every app setting. Every signed-in member.

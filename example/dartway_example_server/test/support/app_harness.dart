@@ -51,6 +51,29 @@ final class AppHarness {
     return harness = AppHarness._(database, server);
   }
 
+  /// Starts and stops a second server on this harness's database with
+  /// nothing but [storage] and the club's upload rules — the proof that a
+  /// purpose needs only its rule to start.
+  Future<void> startStorageOnly(DwFileStorageConfig storage) async {
+    final bare = await DwTestServer.start(
+      DwAppServer(
+        // Nothing but the storage: the calls are the club server's.
+        protocol: DwWireProtocol(const []),
+        migrations: appMigrations,
+        database: database.config,
+        auth: AppAuth.config,
+        features: const [],
+        files: DwFileStorage(
+          storage,
+          // The club's own rules hold a private purpose (chat attachments),
+          // and nothing else is needed for it.
+          rules: AppFiles.uploadRules,
+        ),
+      ),
+    );
+    await bare.stop();
+  }
+
   Future<void> stop() async {
     await server.stop();
     await database.drop();

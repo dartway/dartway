@@ -5,13 +5,13 @@ library;
 
 export 'package:dartway_core_shared/dartway_core_shared.dart';
 
-export 'generated/dw_protocol.dart';
-export 'src/admin.dart';
-export 'src/app_protocol.dart';
-export 'src/auth_identifier.dart';
-export 'src/dartway_starter_channel.dart';
-export 'src/dartway_starter_refusal.dart';
-export 'src/dartway_starter_upload.dart';
-export 'src/profile.dart';
-export 'src/registration_keys.dart';
-export 'src/settings.dart';
+export 'package:dartway_starter_shared/generated/dw_protocol.dart';
+export 'package:dartway_starter_shared/src/admin.dart';
+export 'package:dartway_starter_shared/src/app_protocol.dart';
+export 'package:dartway_starter_shared/src/auth_identifier.dart';
+export 'package:dartway_starter_shared/src/dartway_starter_channel.dart';
+export 'package:dartway_starter_shared/src/dartway_starter_refusal.dart';
+export 'package:dartway_starter_shared/src/dartway_starter_upload.dart';
+export 'package:dartway_starter_shared/src/profile.dart';
+export 'package:dartway_starter_shared/src/registration_keys.dart';
+export 'package:dartway_starter_shared/src/settings.dart';

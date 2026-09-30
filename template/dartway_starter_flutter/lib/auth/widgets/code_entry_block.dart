@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../logic/auth_state.dart';
+import 'package:dartway_starter_flutter/auth/logic/auth_state.dart';
 
 /// The code that was sent, and a new one once the server allows it.
 class CodeEntryBlock extends ConsumerWidget {
@@ -20,19 +20,19 @@ class CodeEntryBlock extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Gap(16),
+        const Gap(AppSpace.l),
         AppText.title(l10n.codeTitle, textAlign: TextAlign.center),
-        const Gap(12),
+        const Gap(AppSpace.m),
         AppText.body(
           l10n.codeSentTo(state.rawIdentifier.trim()),
           textAlign: TextAlign.center,
         ),
-        const Gap(28),
+        const Gap(AppSpace.xxl),
         PinCodeTextFieldWidget(
           pinCode: state.codeRaw,
           onChanged: (code) => notifier.update(codeRaw: code),
         ),
-        const Gap(8),
+        const Gap(AppSpace.s),
         ResendCodeButton(
           availableAt: state.resendAvailableAt,
           onResend: dw.action((_) => notifier.requestCode()),
@@ -43,7 +43,7 @@ class CodeEntryBlock extends ConsumerWidget {
           requireValidation: true,
           onTap: dw.action((_) => notifier.verifyCode()),
         ),
-        const Gap(8),
+        const Gap(AppSpace.s),
         AppButton.text(
           l10n.changeIdentifierAction,
           onTap: dw.action((_) => notifier.back()),

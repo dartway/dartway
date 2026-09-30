@@ -5,21 +5,23 @@ import 'package:dartway_analytics_server/dartway_analytics_server.dart';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
-import 'generated/dw_schema.dart';
-import 'src/core/auth.dart';
-import 'src/core/bootstrap.dart';
-import 'src/core/call_context.dart';
-import 'src/admin/admin_feature.dart';
-import 'src/core/files.dart';
-import 'src/profile/profile_feature.dart';
-import 'src/settings/settings_feature.dart';
-import 'src/migrations/migrations.dart';
+import 'package:dartway_starter_server/generated/dw_schema.dart';
+import 'package:dartway_starter_server/src/core/auth.dart';
+import 'package:dartway_starter_server/src/core/bootstrap.dart';
+import 'package:dartway_starter_server/src/core/call_context.dart';
+import 'package:dartway_starter_server/src/admin/admin_feature.dart';
+import 'package:dartway_starter_server/src/core/files.dart';
+import 'package:dartway_starter_server/src/profile/profile_feature.dart';
+import 'package:dartway_starter_server/src/settings/settings_feature.dart';
+import 'package:dartway_starter_server/src/migrations/migrations.dart';
 
-export 'generated/dw_schema.dart';
-export 'src/core/auth.dart' show AppAuth, CodeDelivery;
-export 'src/core/bootstrap.dart';
-export 'src/core/files.dart' show AppFiles;
-export 'src/migrations/migrations.dart' show appMigrations;
+export 'package:dartway_starter_server/generated/dw_schema.dart';
+export 'package:dartway_starter_server/src/core/auth.dart'
+    show AppAuth, CodeDelivery;
+export 'package:dartway_starter_server/src/core/bootstrap.dart';
+export 'package:dartway_starter_server/src/core/files.dart' show AppFiles;
+export 'package:dartway_starter_server/src/migrations/migrations.dart'
+    show appMigrations;
 
 /// The app's server, as `bin/server.dart` and the tests build it.
 abstract final class DartwayStarterServer {

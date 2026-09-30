@@ -40,12 +40,28 @@ the button being hidden is not the rule, the server's access rule is. An accepta
 that the button sends the right command. And a contract rule tested only through the server is
 tested on one of the two sides that apply it.
 
+**Where the file goes, in every package** — `dart run dartway_cli:dartway check` fails the rest
+(`testLayout`):
+
+- a test sits at the mirror of the `lib/` path it tests: `lib/<path>.dart` → `test/<path>_test.dart`
+  (`lib/src/core/auth.dart` → `test/src/core/auth_test.dart`);
+- a test of a whole folder — a server feature through its calls — is
+  `test/<path>/<folder>_acceptance_test.dart` for `lib/<path>/<folder>/`
+  (`lib/src/invoices/` → `test/src/invoices/invoices_acceptance_test.dart`); what the server's library
+  wires (a module) is tested at the mirror of that library, and the contract at the mirror of the
+  shared package's (`test/<shared package>_test.dart`);
+- helpers and the harness live in `test/support/`, and nothing else does. A test imports them
+  relatively (`../../support/app_harness.dart`) — the one relative import a project has;
+- a test builds no server, no fake server and no `ProviderScope` of its own: the harness does
+  (`testHarnessBypassed`). A configuration a test needs is a method on the harness.
+
 ---
 
 ## 1. The contract — `dart test` in `__SHARED_PKG__`
 
-The shared package is pure Dart, so its tests need nothing running. The skeleton ships them in
-`__SHARED_PKG__/test/`; extend that file's lists rather than starting a new style.
+The shared package is pure Dart, so its tests need nothing running. The skeleton ships them in one
+file, `__SHARED_PKG__/test/<shared package>_test.dart` — the mirror of the package's library; extend
+that file's lists rather than starting a new style.
 
 **Every DTO travels and comes back equal.** One test lists a value of every data object, request and
 command — with the optional fields set, and once more without them — and decodes each through the
@@ -151,7 +167,8 @@ tearDownAll(() async {
 - **`DwTestServer.start`** starts the server on a free loopback port without signal handling. Build
   it with the **same factory `bin/server.dart` uses**, overriding only what a test must: the database,
   the storage, and the auth config's code delivery (capture the codes instead of printing them) and
-  resend delay. A server assembled separately for tests drifts from the one that ships.
+  resend delay. A server assembled separately for tests drifts from the one that ships. This is the
+  harness's code, in `test/support/`; a test file that calls it itself fails `testHarnessBypassed`.
 - **Tests in one file share the database**, so each test creates its own members with distinct
   identifiers and asserts on what it created — never on table-wide counts it did not set up.
 

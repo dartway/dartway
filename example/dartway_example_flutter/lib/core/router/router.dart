@@ -2,21 +2,21 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../dw_core.dart';
-import '../../admin/dashboard/admin_dashboard_page.dart';
-import '../../admin/settings/admin_settings_page.dart';
-import '../../admin/users/admin_users_page.dart';
-import '../../app/bookings/my_bookings_page.dart';
-import '../../app/chat/staff_chat_page.dart';
-import '../../app/news/news_page.dart';
-import '../../app/profile/profile_page/profile_page.dart';
-import '../../app/schedule/schedule_page.dart';
-import '../../app/services/services_page.dart';
-import '../../app/workouts/workouts_page.dart';
-import '../../auth/auth_page.dart';
-import 'app_router_state.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/admin/dashboard/admin_dashboard_page.dart';
+import 'package:dartway_example_flutter/admin/settings/admin_settings_page.dart';
+import 'package:dartway_example_flutter/admin/users/admin_users_page.dart';
+import 'package:dartway_example_flutter/app/bookings/my_bookings_page.dart';
+import 'package:dartway_example_flutter/app/chat/staff_chat_page.dart';
+import 'package:dartway_example_flutter/app/news/news_page.dart';
+import 'package:dartway_example_flutter/app/profile/profile_page/profile_page.dart';
+import 'package:dartway_example_flutter/app/schedule/schedule_page.dart';
+import 'package:dartway_example_flutter/app/services/services_page.dart';
+import 'package:dartway_example_flutter/app/workouts/workouts_page.dart';
+import 'package:dartway_example_flutter/auth/auth_page.dart';
+import 'package:dartway_example_flutter/core/router/app_router_state.dart';
 
-export 'app_router_state.dart';
+export 'package:dartway_example_flutter/core/router/app_router_state.dart';
 
 part 'navigation_zones/admin_navigation_zone.dart';
 part 'navigation_zones/app_navigation_zone.dart';

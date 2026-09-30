@@ -2,9 +2,9 @@ import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../l10n/gen/app_localizations.dart';
+import 'package:dartway_example_flutter/l10n/gen/app_localizations.dart';
 
-export '../l10n/gen/app_localizations.dart';
+export 'package:dartway_example_flutter/l10n/gen/app_localizations.dart';
 
 /// Current translations for code that runs outside the widget tree (refusal
 /// texts and error toasts, which the core renders). Kept in sync by

@@ -59,7 +59,7 @@ class HomePage extends ConsumerWidget implements DwFeatureWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppText.title(l10n.helloUser(context.profile.firstName)),
-                  const Gap(8),
+                  const Gap(AppSpace.s),
                   ref
                       .watch(settings)
                       .section(
@@ -71,18 +71,18 @@ class HomePage extends ConsumerWidget implements DwFeatureWidget {
                           ),
                         ),
                       ),
-                  const Gap(8),
+                  const Gap(AppSpace.s),
                   AppText.caption(l10n.homeLiveHint),
                 ],
               ),
             ),
-            const Gap(16),
+            const Gap(AppSpace.l),
             AppCard(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   AppText.body(l10n.homeNextStepTitle),
-                  const Gap(8),
+                  const Gap(AppSpace.s),
                   AppText.caption(l10n.homeNextStepBody),
                 ],
               ),

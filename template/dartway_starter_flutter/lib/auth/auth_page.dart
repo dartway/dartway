@@ -4,11 +4,11 @@ import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import 'logic/auth_state.dart';
-import 'logic/auth_step.dart';
-import 'widgets/code_entry_block.dart';
-import 'widgets/consents_block.dart';
-import 'widgets/identifier_entry_block.dart';
+import 'package:dartway_starter_flutter/auth/logic/auth_state.dart';
+import 'package:dartway_starter_flutter/auth/logic/auth_step.dart';
+import 'package:dartway_starter_flutter/auth/widgets/code_entry_block.dart';
+import 'package:dartway_starter_flutter/auth/widgets/consents_block.dart';
+import 'package:dartway_starter_flutter/auth/widgets/identifier_entry_block.dart';
 
 class AuthPage extends ConsumerWidget implements DwFeatureWidget {
   const AuthPage({super.key});

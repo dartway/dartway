@@ -168,7 +168,7 @@ class AnalyticsDashboardGrid extends HookWidget {
             ),
             if (editing &&
                 widgets.length < DwAnalyticsDashboard.maxWidgets) ...[
-              const Gap(12),
+              const Gap(AppSpace.m),
               Align(
                 alignment: Alignment.centerLeft,
                 child: AppButton.secondary(

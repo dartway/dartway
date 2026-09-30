@@ -1,8 +1,8 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'dartway_example_channel.dart';
-import 'dartway_example_refusal.dart';
-import 'people.dart';
+import 'package:dartway_example_shared/src/dartway_example_channel.dart';
+import 'package:dartway_example_shared/src/dartway_example_refusal.dart';
+import 'package:dartway_example_shared/src/people.dart';
 
 part 'news.dw.dart';
 

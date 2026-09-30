@@ -51,9 +51,9 @@ class ServicesPage extends ConsumerWidget implements DwFeatureWidget {
               }
 
               return ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: 8),
+                padding: const EdgeInsets.symmetric(vertical: AppSpace.s),
                 itemCount: services.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
+                separatorBuilder: (_, _) => const SizedBox(height: AppSpace.s),
                 itemBuilder: (context, index) =>
                     ServiceCard(service: services[index]),
               );

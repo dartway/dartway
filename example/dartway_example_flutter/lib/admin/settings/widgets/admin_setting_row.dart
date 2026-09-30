@@ -39,7 +39,7 @@ class AdminSettingRow extends StatelessWidget {
     final value = setting.parse(storedValue);
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.only(bottom: AppSpace.l),
       child: switch (setting.type) {
         AppSettingType.toggle => _ToggleRow(
           label: label,
@@ -118,7 +118,7 @@ class _TextRow extends HookWidget {
             keyboardType: isNumeric ? TextInputType.number : null,
           ),
         ),
-        const Gap(12),
+        const Gap(AppSpace.m),
         AppButton.primary(
           context.l10n.saveAction,
           onTap: canSave ? onSave(trimmed) : null,

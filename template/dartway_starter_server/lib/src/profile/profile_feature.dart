@@ -1,7 +1,7 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
-import 'profile_handlers.dart';
+import 'package:dartway_starter_server/src/profile/profile_handlers.dart';
 
 /// A member's own profile: reading and changing it, and hearing it change.
 final profileFeature = DwServerFeature(

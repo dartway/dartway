@@ -6,9 +6,9 @@ import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:flutter/foundation.dart';
 
-import 'app_l10n.dart';
-import 'refusal_text.dart';
-import 'update_required_page.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
+import 'package:dartway_example_flutter/core/refusal_text.dart';
+import 'package:dartway_example_flutter/core/update_required_page.dart';
 
 /// The app's DartWay core: `dw.request`, `dw.table`, `dw.window`,
 /// `dw.command`, `dw.action`, `dw.notify` — reachable from anywhere in the app.

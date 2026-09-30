@@ -6,9 +6,9 @@ import 'package:dartway_example_flutter/auth/widgets/verify_otp_block.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 
-import '../core/router/app_scaffold.dart';
-import 'logic/auth_state.dart';
-import 'widgets/greeting_block.dart';
+import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
+import 'package:dartway_example_flutter/auth/logic/auth_state.dart';
+import 'package:dartway_example_flutter/auth/widgets/greeting_block.dart';
 
 class AuthPage extends ConsumerWidget {
   const AuthPage({super.key});
@@ -34,7 +34,7 @@ class AuthPage extends ConsumerWidget {
       ),
       body: SizedBox.expand(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(AppSpace.l),
           child: Form(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 200),

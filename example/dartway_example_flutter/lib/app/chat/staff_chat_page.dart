@@ -157,13 +157,13 @@ class StaffChatPage extends HookConsumerWidget implements DwFeatureWidget {
                     child: ListView(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+                        horizontal: AppSpace.m,
+                        vertical: AppSpace.xs,
                       ),
                       children: [
                         for (final item in channels)
                           Padding(
-                            padding: const EdgeInsets.only(right: 8),
+                            padding: const EdgeInsets.only(right: AppSpace.s),
                             child: ChatChannelChip(
                               key: ValueKey('chat-channel-${item.id}'),
                               title: item.title,

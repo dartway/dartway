@@ -12,6 +12,7 @@ import '../checker/dw_l10n_wiring.dart';
 import '../checker/dw_local_environment.dart';
 import '../checker/dw_layout.dart';
 import '../checker/dw_server_contract.dart';
+import '../checker/dw_uniformity_rules.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
 import '../checker/dw_check_tally.dart';
@@ -38,6 +39,13 @@ class CheckCommand extends Command<int> {
       ..addOption(
         'dir',
         help: 'Validate a single folder (relative to the Flutter package).',
+      )
+      ..addFlag(
+        'fix',
+        negatable: false,
+        help:
+            'Rewrite relative imports in lib/ to package: imports '
+            '(relativeImport) before checking.',
       );
   }
 
@@ -51,7 +59,8 @@ class CheckCommand extends Command<int> {
 
   @override
   String get invocation =>
-      'dartway check [--type <check>] [--level <severity>] [--dir <folder>]';
+      'dartway check [--type <check>] [--level <severity>] [--dir <folder>] '
+      '[--fix]';
 
   @override
   Future<int> run() async {
@@ -76,6 +85,19 @@ class CheckCommand extends Command<int> {
     final layout = _detectLayout();
     final flutterPackageDir = layout?.flutterPackageDir ?? Directory.current;
     stdout.writeln('Checking ${flutterPackageDir.path} ...');
+
+    // Before any section reads an import: the feature and kit import rules
+    // read `package:` imports only, so a relative one they would have missed
+    // is judged once it is rewritten.
+    if (results.flag('fix')) {
+      for (final line in DwUniformityInspector.fixRelativeImports([
+        flutterPackageDir,
+        ?layout?.sharedPackageDir,
+        ?layout?.serverPackageDir,
+      ])) {
+        stdout.writeln('🔧 rewritten to package: — $line');
+      }
+    }
 
     var errorCount = 0;
     final tally = DwCheckTally();
@@ -146,6 +168,15 @@ class CheckCommand extends Command<int> {
 
     errorCount += await DwFlutterInspector(
       packageDir: flutterPackageDir,
+      filterType: filterType,
+      filterSeverity: filterSeverity,
+      targetDirPath: results.option('dir'),
+    ).run(tally: tally);
+    errorCount += DwUniformityInspector(
+      projectRoot: layout?.root ?? flutterPackageDir,
+      flutterPackageDir: flutterPackageDir,
+      serverPackageDir: layout?.serverPackageDir,
+      sharedPackageDir: layout?.sharedPackageDir,
       filterType: filterType,
       filterSeverity: filterSeverity,
       targetDirPath: results.option('dir'),

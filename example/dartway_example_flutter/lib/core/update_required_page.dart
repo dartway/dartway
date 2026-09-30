@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../ui_kit/ui_kit.dart';
-import 'app_l10n.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
+import 'package:dartway_example_flutter/core/app_l10n.dart';
 
 /// Shown over the whole app once this build can no longer talk to its server.
 ///
@@ -31,19 +31,19 @@ class UpdateRequiredPage extends ConsumerWidget {
           return Scaffold(
             body: Center(
               child: Padding(
-                padding: const EdgeInsets.all(32),
+                padding: const EdgeInsets.all(AppSpace.xxl),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     const AppIconView(AppIcon.brandMark, size: 64),
-                    const SizedBox(height: 24),
+                    const SizedBox(height: AppSpace.xl),
                     AppText.title(
                       updateRequired
                           ? l10n.updateRequiredTitle
                           : l10n.serverMismatchTitle,
                       textAlign: TextAlign.center,
                     ),
-                    const SizedBox(height: 12),
+                    const SizedBox(height: AppSpace.m),
                     AppText.body(
                       updateRequired
                           ? l10n.updateRequiredBody

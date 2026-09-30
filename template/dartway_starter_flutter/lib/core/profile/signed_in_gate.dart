@@ -7,8 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../dw_core.dart';
-import 'my_profile.dart';
+import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
 
 /// Lets the app through once the signed-in user's profile is loaded and
 /// complete, and hands it down as [SignedInProfile].

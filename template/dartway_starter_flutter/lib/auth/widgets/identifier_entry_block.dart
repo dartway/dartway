@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../logic/auth_state.dart';
+import 'package:dartway_starter_flutter/auth/logic/auth_state.dart';
 
 /// Phone or e-mail, and the button that asks for a code.
 class IdentifierEntryBlock extends ConsumerWidget {
@@ -21,13 +21,13 @@ class IdentifierEntryBlock extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        const Gap(24),
+        const Gap(AppSpace.xl),
         // The mark a new project replaces first. The screen names an icon,
         // not a file: swap the asset and the path in `AppIcon`.
         const Center(child: AppIconView(AppIcon.brandMark, size: 64)),
-        const Gap(24),
+        const Gap(AppSpace.xl),
         AppText.body(l10n.authIntro, textAlign: TextAlign.center),
-        const Gap(24),
+        const Gap(AppSpace.xl),
         SegmentedButton<DwIdentifierKind>(
           segments: [
             for (final kind in DwIdentifierKind.values)
@@ -44,7 +44,7 @@ class IdentifierEntryBlock extends ConsumerWidget {
           onSelectionChanged: (selected) =>
               notifier.update(kind: selected.single),
         ),
-        const Gap(16),
+        const Gap(AppSpace.l),
         switch (state.kind) {
           DwIdentifierKind.phone => PhoneTextField(
             key: const ValueKey(DwIdentifierKind.phone),
@@ -78,7 +78,7 @@ class IdentifierEntryBlock extends ConsumerWidget {
           requireValidation: true,
           onTap: dw.action((_) => notifier.requestCode()),
         ),
-        const Gap(16),
+        const Gap(AppSpace.l),
       ],
     );
   }

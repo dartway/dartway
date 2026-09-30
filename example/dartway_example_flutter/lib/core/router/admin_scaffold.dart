@@ -81,7 +81,7 @@ class AdminScaffold extends StatelessWidget {
                 const VerticalDivider(width: 1, thickness: 1),
                 Expanded(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
+                    padding: const EdgeInsets.all(AppSpace.xl),
                     child: body,
                   ),
                 ),
@@ -92,7 +92,7 @@ class AdminScaffold extends StatelessWidget {
 
         return Scaffold(
           appBar: appBar,
-          body: Padding(padding: const EdgeInsets.all(16), child: body),
+          body: Padding(padding: const EdgeInsets.all(AppSpace.l), child: body),
           bottomNavigationBar: NavigationBar(
             selectedIndex: activeIndex,
             onDestinationSelected: goToSection,

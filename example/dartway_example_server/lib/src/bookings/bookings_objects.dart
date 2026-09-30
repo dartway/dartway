@@ -1,11 +1,11 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
-import '../../generated/dw_schema.dart';
-import '../profile/profile_objects.dart';
-import '../profile/profile_rows.dart';
-import '../schedule/schedule_objects.dart';
-import 'bookings_rows.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/profile/profile_objects.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
+import 'package:dartway_example_server/src/schedule/schedule_objects.dart';
+import 'package:dartway_example_server/src/bookings/bookings_rows.dart';
 
 /// Booking rows → the data objects clients see. Related rows are loaded in one
 /// query per relation for the whole batch, never per row, and not at all when

@@ -122,6 +122,24 @@ where the theme is assembled, and a seed colour has to be written down somewhere
 
 One theme in a project means a palette with one set of colours, not the absence of `of(context)`.
 
+### Spacing is one scale
+
+A gap or an inset is a design decision like a colour, and left to each screen it becomes one project
+with fourteen values of `Gap` — which is what the audit of three real projects found. The skeleton's
+kit ships the scale as `AppSpace` (`ui_kit/theme/app_space.dart`: `xxs` 2, `xs` 4, `s` 8, `m` 12,
+`l` 16, `xl` 24, `xxl` 32), and outside the kit a gap or an inset is written with it:
+
+```dart
+const Gap(AppSpace.m),
+Padding(padding: const EdgeInsets.symmetric(horizontal: AppSpace.l), child: ...),
+```
+
+`dart run dartway_cli:dartway check` fails a number in those positions outside `ui_kit/`
+(`rawSpacing`): a spacer `SizedBox(height:|width:)`, a `Gap`, an `EdgeInsets.*`. Zero passes — it is
+the absence of a step, not one — and a `SizedBox` with a `child:` sizes that child, which is a
+component's dimension rather than spacing; a dimension that belongs to one component lives in that
+component, in the kit.
+
 ## The rule that makes the previous one hold
 
 **A kit widget's public API accepts no visual types.** No `Color`, `TextStyle`, `EdgeInsets`,

@@ -5,7 +5,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/testing.dart';
 import 'package:test/test.dart';
 
-import 'support/app_harness.dart';
+import '../../support/app_harness.dart';
 
 void main() {
   late AppHarness club;

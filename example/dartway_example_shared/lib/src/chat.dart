@@ -1,8 +1,8 @@
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
-import 'dartway_example_channel.dart';
-import 'dartway_example_refusal.dart';
-import 'people.dart';
+import 'package:dartway_example_shared/src/dartway_example_channel.dart';
+import 'package:dartway_example_shared/src/dartway_example_refusal.dart';
+import 'package:dartway_example_shared/src/people.dart';
 
 part 'chat.dw.dart';
 
@@ -248,7 +248,10 @@ final class ListPinnedChatMessages extends DwListRequest<ChatMessage>
 final class ListChatMessagesMatching extends DwListRequest<ChatMessage>
     with _$ListChatMessagesMatching
     implements DwSelfValidating {
-  const ListChatMessagesMatching({required this.channelId, required this.query});
+  const ListChatMessagesMatching({
+    required this.channelId,
+    required this.query,
+  });
 
   static const int minQueryLength = 2;
   static const int maxResults = 100;

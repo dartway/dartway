@@ -4,7 +4,7 @@ import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
-import 'support/app_harness.dart';
+import '../../support/app_harness.dart';
 
 /// Booking the club's sessions, on real clients over real HTTP and the
 /// live socket, against the real server and database.

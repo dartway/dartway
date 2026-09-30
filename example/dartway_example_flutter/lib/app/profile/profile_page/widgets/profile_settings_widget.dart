@@ -45,7 +45,7 @@ class _ProfileForm extends HookWidget {
     final imageUrl = profile.imageUrl;
 
     return Padding(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(AppSpace.l),
       child: Form(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,7 +60,7 @@ class _ProfileForm extends HookWidget {
               ),
             ),
 
-            const Gap(24),
+            const Gap(AppSpace.xl),
 
             AppTextFormField(
               value: firstName.value,
@@ -71,10 +71,10 @@ class _ProfileForm extends HookWidget {
                   (value ?? '').trim().isEmpty ? l10n.firstNameRequired : null,
             ),
 
-            const Gap(16),
+            const Gap(AppSpace.l),
 
             AppText.body(l10n.genderLabel),
-            const Gap(8),
+            const Gap(AppSpace.s),
             DropdownButtonFormField<UserGender>(
               initialValue: gender.value,
               onChanged: (value) => gender.value = value,
@@ -92,7 +92,7 @@ class _ProfileForm extends HookWidget {
               ],
             ),
 
-            const Gap(24),
+            const Gap(AppSpace.xl),
 
             if (change != null) ...[
               AppButton.primary(
@@ -103,7 +103,7 @@ class _ProfileForm extends HookWidget {
                   onSuccessNotification: l10n.profileUpdated,
                 ),
               ),
-              const Gap(16),
+              const Gap(AppSpace.l),
             ],
           ],
         ),

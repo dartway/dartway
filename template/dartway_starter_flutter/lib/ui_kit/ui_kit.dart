@@ -40,6 +40,7 @@ part '3_special/common/connection_status_indicator.dart';
 part 'layout/device_frame_shell.dart';
 part 'theme/app_button.dart';
 part 'theme/app_context.dart';
+part 'theme/app_space.dart';
 part 'theme/app_text.dart';
 part 'theme/app_theme.dart';
 part 'utils/app_keyboard_inset.dart';

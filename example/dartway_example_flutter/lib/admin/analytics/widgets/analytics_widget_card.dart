@@ -35,7 +35,7 @@ class AnalyticsWidgetCard extends ConsumerWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
           ),
-          const Gap(12),
+          const Gap(AppSpace.m),
           ref
               .watch(dw.request(request))
               .section(
@@ -48,7 +48,7 @@ class AnalyticsWidgetCard extends ConsumerWidget {
                 ),
               ),
           if (actions.isNotEmpty) ...[
-            const Gap(8),
+            const Gap(AppSpace.s),
             Row(mainAxisAlignment: MainAxisAlignment.end, children: actions),
           ],
         ],

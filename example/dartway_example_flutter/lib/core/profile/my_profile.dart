@@ -2,7 +2,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/widgets.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-import '../dw_core.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
 
 /// The signed-in member's profile, live: `AsyncData(null)` while signed out.
 ///

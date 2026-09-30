@@ -4,7 +4,7 @@ import 'package:gap/gap.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
-import 'widgets/admin_settings_form.dart';
+import 'package:dartway_starter_flutter/admin/settings/widgets/admin_settings_form.dart';
 
 /// Application settings, one row per key the app declares — write access is
 /// admin-only on the server. A key added to `AppSettingKey` appears here.
@@ -44,7 +44,7 @@ class AdminSettingsPage extends StatelessWidget implements DwFeatureWidget {
       body: ListView(
         children: [
           AppText.title(context.l10n.appSettingsTitle),
-          const Gap(8),
+          const Gap(AppSpace.s),
           const AdminSettingsForm(),
         ],
       ),

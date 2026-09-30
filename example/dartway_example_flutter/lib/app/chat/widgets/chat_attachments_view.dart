@@ -32,7 +32,7 @@ class ChatAttachmentsView extends StatelessWidget {
       children: [
         for (final image in images)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.only(bottom: AppSpace.xs),
             child: ChatImageFrame(
               aspectRatio: switch ((image.width, image.height)) {
                 (final w?, final h?) when w > 0 && h > 0 => (w / h).clamp(
@@ -53,7 +53,7 @@ class ChatAttachmentsView extends StatelessWidget {
           ),
         for (final file in files)
           Padding(
-            padding: const EdgeInsets.only(bottom: 4),
+            padding: const EdgeInsets.only(bottom: AppSpace.xs),
             child: _FileLinkTile(file: file),
           ),
       ],

@@ -1,13 +1,13 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
-import '../../generated/dw_schema.dart';
-import '../core/call_context.dart';
-import 'bookings_jobs.dart';
-import 'bookings_objects.dart';
-import 'bookings_publications.dart';
-import '../schedule/schedule_rows.dart';
-import 'bookings_rows.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/core/call_context.dart';
+import 'package:dartway_example_server/src/bookings/bookings_jobs.dart';
+import 'package:dartway_example_server/src/bookings/bookings_objects.dart';
+import 'package:dartway_example_server/src/bookings/bookings_publications.dart';
+import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
+import 'package:dartway_example_server/src/bookings/bookings_rows.dart';
 
 final bookingsHandlers = <DwCallHandler>[
   /// The caller's bookings, newest first. "My" bookings name no account: the

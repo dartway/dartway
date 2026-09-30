@@ -32,7 +32,7 @@ class AnalyticsTitleSheet extends HookWidget {
           labelText: l10n.analyticsDashboardTitle,
           maxLength: DwAnalyticsDashboard.maxTitleLength,
         ),
-        const Gap(12),
+        const Gap(AppSpace.m),
         AppButton.primary(
           l10n.saveAction,
           onTap: valid

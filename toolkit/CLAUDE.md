@@ -6,7 +6,7 @@ A fullstack Dart project on **DartWay**: a server and a Flutter app that speak o
 >
 > **A rule that let you down is not fixed here** — the fix would be overwritten on the next update. File it as an issue in the framework tracker instead (`dartway-framework-notes`).
 
-**This project writes in __PROJECT_LANGUAGE__.** That covers what the project owns — `DwFeatureSpec` texts, doc comments, `docs/dev_notes/` — and is set at install time (`dartway setup-ai --language`). What ships to other people is English regardless: package APIs, error strings, and anything going back into the framework.
+**This project writes in __PROJECT_LANGUAGE__.** That covers what the project owns — `DwFeatureSpec` texts, doc comments, `docs/dev_notes/` — and is set at install time (`dartway setup-ai --language`). What ships to other people is English regardless: package APIs, log and error strings, and anything going back into the framework. `dart run dartway_cli:dartway check` warns on a doc comment in another script (`docCommentLanguage`).
 
 ## The project
 
@@ -49,7 +49,7 @@ There is no client package: the shared package *is* the client contract, and bot
 
 **Law is what makes it DartWay** — the seven rules above; a project does not override a law. **Default is everything else** here and in the skills — the commit format, the base branch, how a decision is recorded, the language of the project's own texts — and a project may replace it. **Precedence:** a default yields to the project's own root `CLAUDE.md`; a law does not; where both are silent, this file stands. A project records an override in its root `CLAUDE.md`, under "Project conventions", **with the reason** — `.claude/CLAUDE.md` is overwritten on update, and a README beside the code is where an override goes to die.
 
-**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Fifteen checks fail today:
+**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Twenty checks fail today:
 
 | What it holds | Checks that fail |
 |---|---|
@@ -61,8 +61,10 @@ There is no client package: the shared package *is* the client contract, and bot
 | The contract's names are its wire names (law 5) | `contractNameInvalid` |
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
 | Derived code is derived (law 6) | `generatedCodeStale`, `migrationsDrift` |
+| One way to write the ordinary things | `relativeImport`, `testLayout`, `testHarnessBypassed`, `rawSpacing` |
+| The framework's lint rules are on | `lintsPluginMissing` |
 
-Ten further checks are warnings and one is a nudge. Anything this table and the types do not hold is a default. Not held yet: the naming law beyond the contract's DTO names, a `DwHttpRoute` the app calls instead of a request, and "done" (only the `featureSpecMissing` warning); `migrationsDrift` needs a Postgres and says when it did not run.
+Eleven further checks are warnings and one is a nudge. Anything this table and the types do not hold is a default. Not held yet: the naming law beyond the contract's DTO names, a `DwHttpRoute` the app calls instead of a request, and "done" (only the `featureSpecMissing` warning); `migrationsDrift` needs a Postgres and says when it did not run.
 
 ## The project's `dartway` is `dart run dartway_cli:dartway`
 
@@ -86,6 +88,8 @@ Everything else is written by hand: providers (`Provider` / `NotifierProvider`, 
 ## Cleanliness and finishing
 
 For **any** Dart/Flutter code the cleanliness contract applies: naming, single responsibility, no `BuildContext`/`WidgetRef` in services, no `_buildXxx()` (widget or data), a re-read only as a user command, `copyWith` over field-by-field rebuilds, no environment default for a deployment credential, and the rest — spelled out in full, with the detectors that check it, in `dartway-finish` and `/dartway-checkup`, plus a boundary's own silent-rejection rule in `dartway-server`. This is a style contract — check against it while writing, refactoring and reviewing.
+
+**One shape for the ordinary things, held by `check`:** `lib/` of all three packages imports by `package:` only (`dart run dartway_cli:dartway check --fix` rewrites a relative one; under `test/`, `test/support/` is imported relatively); a test sits at the mirror of the `lib/` path it tests and starts what it needs through the harness in `test/support/` (`dartway-testing`); a gap or an inset outside the kit is an `AppSpace` token, never a number (`dartway-ui-kit`).
 
 **`dartway-testing` decides what deserves a test and where it goes** — a rule of the contract is a test in `__SHARED_PKG__`, a handler's rule is an acceptance test on a real database (`dart run dartway_cli:dartway test`), a feature is a widget test on the in-memory server. The skeleton ships a worked example of each.
 

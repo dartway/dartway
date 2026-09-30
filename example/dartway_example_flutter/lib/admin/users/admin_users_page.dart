@@ -6,7 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
 
-import 'widgets/admin_users_table.dart';
+import 'package:dartway_example_flutter/admin/users/widgets/admin_users_table.dart';
 
 /// Member management: search, role filter, numbered pages and inline role
 /// editing. Listing profiles and changing a role are both admin-only on the
@@ -68,7 +68,7 @@ class AdminUsersPage extends HookWidget implements DwFeatureWidget {
             labelText: l10n.searchLabel,
             hintText: l10n.searchHint,
           ),
-          const Gap(12),
+          const Gap(AppSpace.m),
           Wrap(
             spacing: 8,
             children: [
@@ -85,7 +85,7 @@ class AdminUsersPage extends HookWidget implements DwFeatureWidget {
                 ),
             ],
           ),
-          const Gap(12),
+          const Gap(AppSpace.m),
           Expanded(
             child: AdminUsersTable(
               request: ListUserProfiles(

@@ -4,7 +4,7 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
-import '../../generated/dw_schema.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
 
 /// Push notifications: the module, and the providers the environment enables.
 abstract final class AppPush {

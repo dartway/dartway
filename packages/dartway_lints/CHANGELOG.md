@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.5.0
+
+**BREAKING: `deep_relative_import` is removed** (dartway/dartway#391, #396). `lib/` of every package
+of a project now imports by `package:` only, held by `dartway check` (`relativeImport`) in the server
+and shared packages as well, which an analyzer plugin enabled in the Flutter package never reached.
+The depth limit had nothing left to judge: in `lib/` every relative import is already a finding, and
+under `test/` a relative import of `test/support/` is the only form there is — it fired on every
+mirrored test of a feature inside a group. A `// ignore: dartway_lints/deep_relative_import` left in
+a project can go.
+
 ## 0.4.0
 
 **BREAKING: an analyzer plugin, not a `custom_lint` plugin** (#295). On Dart 3.13 (Flutter 3.47) the legacy plugin `custom_lint` rode on crashed inside the analysis server (`Unknown request: analysis.setAnalysisRoots`): the CLI run still passed, and the rules silently stopped showing in the IDE. The same three rules now run in the analysis server's own plugin system — enabled by `plugins: dartway_lints: ^0.4.0` in `analysis_options.yaml`, fetched by the server itself, shown in the IDE and in `dart analyze`. A project no longer depends on this package or on `custom_lint`. Migration note: `docs/migrations/2026-09-23-lints-analyzer-plugin.md`.

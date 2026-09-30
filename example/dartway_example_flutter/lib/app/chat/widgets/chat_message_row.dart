@@ -62,7 +62,7 @@ class ChatMessageRow extends StatelessWidget {
           if (!isMine && first) ChatAuthorName(message.authorNameIn(l10n)),
           if (message.replyTo case final quote?)
             Padding(
-              padding: const EdgeInsets.only(bottom: 4),
+              padding: const EdgeInsets.only(bottom: AppSpace.xs),
               child: ChatQuoteBlock(
                 title: quote.authorDeleted
                     ? l10n.chatDeletedMember
@@ -88,7 +88,7 @@ class ChatMessageRow extends StatelessWidget {
             ChatAttachmentsView(attachments: message.attachments),
           if (message.text.isNotEmpty)
             ChatHighlightedText(message.text, query: searchQuery),
-          const SizedBox(height: 2),
+          const SizedBox(height: AppSpace.xxs),
           Wrap(
             alignment: WrapAlignment.end,
             crossAxisAlignment: WrapCrossAlignment.center,
@@ -112,12 +112,12 @@ class ChatMessageRow extends StatelessWidget {
       children: [
         if (startsDay)
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AppSpace.s),
             child: ChatDateChip(message.sentAt.chatDayLabel(l10n)),
           ),
         if (firstUnread) ChatUnreadDivider(l10n.chatUnreadDivider),
         Padding(
-          padding: EdgeInsets.only(top: first ? 6 : 2),
+          padding: EdgeInsets.only(top: first ? AppSpace.xs : AppSpace.xxs),
           child: Row(
             mainAxisAlignment: isMine
                 ? MainAxisAlignment.end
@@ -129,7 +129,7 @@ class ChatMessageRow extends StatelessWidget {
                   name: message.authorNameIn(l10n),
                   visible: last,
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: AppSpace.xs),
               ],
               Flexible(
                 child: GestureDetector(
