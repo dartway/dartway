@@ -1,40 +1,50 @@
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
+import 'package:dartway_starter_flutter/admin/settings/logic/settings_commands.dart';
 import 'package:dartway_starter_flutter/admin/settings/widgets/admin_setting_row.dart';
-import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_flutter/core/async_section.dart';
 
-/// Every setting the app declares, one row each.
+/// Every field of `AppSettings`, one row each, showing the stored value or its
+/// default. A setting added to the contract gets its row here.
 ///
-/// The screen is a loop over the catalogue rather than a hand-written field per
-/// setting: adding an entry to `AppSettingKey` makes it appear here, and there
-/// is no second place to forget. Write access is admin-only on the server.
-class AdminSettingsForm extends ConsumerWidget {
+/// Write access is admin-only on the server.
+class AdminSettingsForm extends StatelessWidget {
   const AdminSettingsForm({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return ref
-        .watch(dw.request(const ListAppSettings()))
-        .section(
-          loadingValue: const <AppSetting>[],
-          onRetry: () =>
-              ref.read(dw.request(const ListAppSettings()).notifier).refetch(),
-          builder: (stored) {
-            final storedValues = {for (final s in stored) s.id: s.value};
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                for (final setting in AppSettingKey.values)
-                  AdminSettingRow(
-                    setting: setting,
-                    storedValue: storedValues[setting.key],
-                  ),
-              ],
-            );
-          },
+  Widget build(BuildContext context) {
+    final l10n = context.l10n;
+
+    DwUiAction<DwCallResult<AppSettings>> save(SaveAppSettings command) =>
+        dw.action(
+          (_) => SettingsCommands.save(command),
+          onSuccessNotification: l10n.settingsSaved,
         );
+
+    return DwReadBuilder(
+      dw.request(const GetAppSettings()),
+      placeholder: const AppSettings(),
+      builder: (context, stored) => Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          AdminTextSettingRow(
+            // A value saved elsewhere restarts the draft from it.
+            key: ValueKey(stored.appName),
+            label: l10n.appNameLabel,
+            value: stored.appName,
+            onSave: (name) => save(SaveAppSettings(appName: name)),
+          ),
+          AdminToggleSettingRow(
+            label: l10n.signUpEnabledLabel,
+            value: stored.signUpEnabled,
+            onChanged: (isEnabled) =>
+                save(SaveAppSettings(signUpEnabled: isEnabled)),
+          ),
+        ],
+      ),
+    );
   }
 }

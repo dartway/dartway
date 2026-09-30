@@ -1,6 +1,6 @@
+import 'package:dartway_starter_flutter/admin/user_card/logic/user_card_name.dart';
 import 'package:dartway_starter_flutter/admin/user_card/widgets/user_card_view.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
-import 'package:dartway_starter_flutter/core/async_section.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/router/admin_scaffold.dart';
 import 'package:dartway_starter_flutter/core/router/router.dart';
@@ -48,26 +48,18 @@ class AdminUserCardPage extends ConsumerWidget implements DwFeatureWidget {
         body: AppText.body(l10n.userCardNotFound),
       );
     }
-    final request = dw.request(GetUserCard(profileId: id));
-    final card = ref.watch(request);
-
-    if (card case AsyncError(
-      error: DwRefusalException(:final refusal),
-    ) when refusal.isCode(DwCoreRefusal.notFound)) {
-      return AdminScaffold(
-        title: l10n.adminUsers,
-        body: AppText.body(l10n.userCardNotFound),
-      );
-    }
-
     return AdminScaffold(
-      title: card.value?.profile.displayName ?? l10n.adminUsers,
-      body: card.section(
-        // Not a skeleton of the card: drawn over stand-in data it would show
-        // a stranger's identifiers for a moment.
-        loadingWidget: const Center(child: CircularProgressIndicator()),
-        onRetry: () => ref.read(request.notifier).refetch(),
-        builder: (card) => UserCardView(card: card),
+      // The chrome's value comes from logic/; the body is the builder's.
+      title: ref.watch(userCardNameProvider(id)) ?? l10n.adminUsers,
+      body: DwReadBuilder(
+        dw.request(GetUserCard(profileId: id)),
+        // No placeholder: a skeleton of the card drawn over stand-in data
+        // would show a stranger's identifiers for a moment.
+        onRefused: {
+          DwCoreRefusal.notFound: (context, _) =>
+              AppText.body(l10n.userCardNotFound),
+        },
+        builder: (context, card) => UserCardView(card: card),
       ),
     );
   }

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -226,6 +228,59 @@ void main() {
     expect(find.text('1 of 1'), findsOneWidget);
     expect(world.windowQueries, contains(containsPair('anchor', cursorOf(7))));
     expect(find.textContaining('are out at the pool'), findsOneWidget);
+
+    await app.stop(tester);
+  });
+
+  testWidgets('the unread badges are chrome: their read on its way neither '
+      'holds nor skeletonises the channels, and they fill in when it '
+      'answers', (tester) async {
+    final world = ChatClub(10);
+    final badges = Completer<void>();
+    world.club.server.onRequest<ListMyChatReadStates>((request, call) async {
+      await badges.future;
+      return const DwCallOk(<ChatReadState>[
+        ChatReadState(id: 1, unreadCount: 0),
+        ChatReadState(id: 2, unreadCount: 4),
+      ]);
+    });
+    final app = await TestApp.start(tester, world.club);
+    await app.tap(tester, find.text('Team chat'));
+
+    expect(find.text('Front desk'), findsOneWidget);
+    expect(find.text('Coaches'), findsOneWidget);
+    expect(find.text('4'), findsNothing);
+    final toggle = tester.widget<IconButton>(
+      find.byKey(const ValueKey('chat-search-toggle')),
+    );
+    expect(toggle.onPressed, isNotNull);
+
+    badges.complete();
+    await app.settle(tester);
+    expect(find.text('4'), findsOneWidget);
+    expect(find.text('Coaches'), findsOneWidget);
+
+    await app.stop(tester);
+  });
+
+  testWidgets('a failed badge read leaves the channels and the search on '
+      'screen', (tester) async {
+    final world = ChatClub(10);
+    world.club.server.onRequest<ListMyChatReadStates>(
+      (request, call) =>
+          const DwCallFailed<List<ChatReadState>>('incident-badges'),
+    );
+    final app = await TestApp.start(tester, world.club);
+    await app.tap(tester, find.text('Team chat'));
+
+    expect(find.text('Front desk'), findsOneWidget);
+    expect(find.text('Coaches'), findsOneWidget);
+    expect(
+      tester
+          .widget<IconButton>(find.byKey(const ValueKey('chat-search-toggle')))
+          .onPressed,
+      isNotNull,
+    );
 
     await app.stop(tester);
   });

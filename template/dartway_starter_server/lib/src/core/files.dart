@@ -1,8 +1,7 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 
-/// File storage: the upload rules, and the storage configuration read from
-/// the environment.
+/// File storage: the upload rules, and the default names of its buckets.
 abstract final class AppFiles {
   /// The app's uploaded files: one rule per [DartwayStarterUpload].
   ///
@@ -29,42 +28,9 @@ abstract final class AppFiles {
       DwFileStorage(config, rules: uploadRules);
 
   /// The default bucket names: `dartway create` names them after the project,
-  /// as `dartway deploy` names the buckets of its bundled storage.
+  /// as `dartway deploy` names the buckets of its bundled storage. Read by
+  /// `AppEnvironment` when `DW_STORAGE_PUBLIC_BUCKET` / `_PRIVATE_BUCKET` are
+  /// not set.
   static const defaultPublicBucket = 'dartway-starter-public';
   static const defaultPrivateBucket = 'dartway-starter-private';
-
-  /// The storage configuration from [environment]: `DW_STORAGE_*` as
-  /// [DwFileStorageConfig.fromEnvironment] reads it, with the defaults of a
-  /// development storage filled in — buckets [AppFiles.defaultPublicBucket] and
-  /// [AppFiles.defaultPrivateBucket], the public one served from itself on the endpoint
-  /// (`<DW_STORAGE_ENDPOINT>/<public bucket>`, path style). `null` when
-  /// `DW_STORAGE_ENDPOINT` is not set: the server then runs without uploads.
-  ///
-  /// A default that is wrong for a real storage does not pass silently: the
-  /// server checks at startup that the public bucket reads anonymously at its
-  /// base URL and the private one does not (`DW_STORAGE_VERIFY_BUCKETS`).
-  static DwFileStorageConfig? storageConfig(Map<String, String> environment) {
-    String? set(String key) => switch (environment[key]) {
-      final value? when value.isNotEmpty => value,
-      _ => null,
-    };
-    final endpoint = set('DW_STORAGE_ENDPOINT');
-    if (endpoint == null) return null;
-    final publicBucket =
-        set('DW_STORAGE_PUBLIC_BUCKET') ?? AppFiles.defaultPublicBucket;
-    final pathStyle = set('DW_STORAGE_PATH_STYLE')?.toLowerCase() != 'false';
-    final base = endpoint.endsWith('/')
-        ? endpoint.substring(0, endpoint.length - 1)
-        : endpoint;
-    return DwFileStorageConfig.fromEnvironment({
-      ...environment,
-      'DW_STORAGE_PUBLIC_BUCKET': publicBucket,
-      'DW_STORAGE_PRIVATE_BUCKET':
-          set('DW_STORAGE_PRIVATE_BUCKET') ?? AppFiles.defaultPrivateBucket,
-      // Path style only: a virtual-hosted base depends on DNS nobody set up for
-      // a development storage.
-      if (set('DW_STORAGE_PUBLIC_BASE_URL') == null && pathStyle)
-        'DW_STORAGE_PUBLIC_BASE_URL': '$base/$publicBucket',
-    });
-  }
 }

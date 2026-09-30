@@ -64,7 +64,7 @@ extension NewsPostCopyWith on NewsPost {
   );
 }
 
-mixin _$ListNews on DwListRequest<NewsPost> {
+mixin _$ListNews on DwPageRequest<NewsPost> {
   @override
   String get dwTypeName => 'ListNews';
 

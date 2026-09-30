@@ -1,9 +1,118 @@
 # Changelog
 
-## 0.21.0-dev.9
+## 0.21.0-dev.16
 
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
   test layout and spacing checks of `dartway check` (dartway/dartway#391).
+
+## 0.21.0-dev.15
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
+  (dartway/dartway#390).
+
+## 0.21.0-dev.14
+
+- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
+  state and command checks of `dartway check` (dartway/dartway#389).
+
+## 0.21.0-dev.13
+
+- **Seeds are startup steps: `DwSeedRows(name, table: <Row>.tableDef, key:, rows:)`**
+  (dartway/dartway#388). At every start, before the port opens, a declared row missing from its
+  table is inserted, a changed one is written over the stored row with the same key (keeping its
+  id), an unchanged one is not touched and a row the declaration drops is left alone. A nullable or
+  non-unique key and two declared rows with one key refuse the start. **`DwServerFeature(startup:
+  [...])`**: a feature declares its own steps, run after the server's.
+- **`ctx.settings` (`DwSettingsStore`): the app's settings as one typed data object** (#388, #394).
+  `read<S>()` answers the stored value or the object's defaults, never `null`; `save(value)` is one
+  upsert; `update<S>(change)` locks the one row between the read and the write. Stored in the new
+  framework table `dw_setting` as the wire JSON — only what differs from the defaults. Reading is
+  per field: a stored field that no longer decodes reads as its default and is logged once, so a
+  read never fails over what is stored. **New framework migration `20260930_000000_dw_setting`**,
+  applied at the next start.
+- **`m.carrySettings(area, fromSql:)`** (`DwSettingsMigration` on `DwMigrationContext`): the
+  migration that drops a project's own settings table merges its values into `dw_setting`.
+- Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
+
+## 0.21.0-dev.12
+
+- **BREAKING (re-exported from `dartway_orm`): a row's `id` is `int`; inserts take the generated
+  draft `New<Entity>Row`** (dartway/dartway#384). Nothing of the server's own changed: the
+  framework's `dw_*` tables are written in SQL, not through row classes.
+
+## 0.21.0-dev.11
+
+- **`DwAccessRule.resource` takes `visible:` — a row the caller may see but not act on is refused
+  `dw.forbidden`** (dartway/dartway#387, D-112). When `allows` answers `false` and `visible` answers
+  `true`, the refusal is `dw.forbidden` instead of `dw.notFound`; a missing row, and one `visible`
+  does not admit, stay `dw.notFound`. Ends the second check a handler wrote in its body after the
+  rule for "a message of my chat that someone else wrote". `allows` carries the whole permission;
+  `visible` is not a gate, it only picks the refusal code. Additive; the recipe for moving inline
+  owner checks into rules is `docs/migrations/2026-09-30-ownership-through-access-rules.md`. The rule's
+  resource may be a record (`(MessageRow, ConversationMemberRow)`) for a row reached through its
+  parent — documented, and now tested.
+
+## 0.21.0-dev.10
+
+- **BREAKING: the environment is read one way — typed, once, at start** (dartway/dartway#386,
+  D-111). `DwEnvironmentReader.read(variables, (read) => …)` builds a project's `AppEnvironment` in
+  `lib/src/core/environment.dart` with `read.required`, `optional`, `integer`, `flag`, `list` and
+  `report`, and throws `DwEnvironmentException` listing **every** missing and malformed variable
+  once the object is built; a text value is never repeated, a number or flag read with
+  `secret: true` neither. `DwServerEnvironment.read(read, defaultPublicBucket:,
+  defaultPrivateBucket:)` is the framework's own variables — `DW_DATABASE_*`, `DW_STORAGE_*` with
+  the development defaults the skeleton used to compute in `AppFiles.storageConfig`,
+  `DW_STORAGE_PROVISION`, `PORT`, `DW_ALLOWED_ORIGINS` — so `bin/server.dart` parses nothing by
+  hand. It also reads `DW_ADMIN_IDENTIFIER` (`adminIdentifier`) and `DW_MIGRATE_ONLY`
+  (`migrateOnly`), so the local overlay reaches both (dartway/dartway#402): **BREAKING**,
+  `DwFirstAdministrator` takes a required `identifier:` instead of reading `Platform.environment`
+  (`variable:`, `environment:` and `defaultVariable` are gone), and `DwAppServer.start({required bool
+  migrateOnly})` replaces
+  its own read of `DW_MIGRATE_ONLY` (`DwAppServer.migrateOnlyVariable` moved to
+  `DwServerEnvironment`). `DwFileStorageConfig` no longer repeats the user info of a URL in a
+  problem. `AppFiles.storageConfig` is gone from the template. Migration note: `docs/migrations/2026-09-29-environment-and-outbound-http.md`.
+- **BREAKING: `ctx.http` — one outbound HTTP client, `DwOutboundHttp`, over `package:http`**
+  (dartway/dartway#386, D-111). `get`/`post`/`put`/`patch`/`delete`/`send`, a body as `json:` or
+  `body:` (text, bytes, a form map); the whole exchange bounded by the new
+  `DwServerSettings.outboundTimeout` (30 s) or the call's `timeout:`; every exchange logged through
+  `ctx.log` by method, origin, status and time (never the user info, path, query, headers or body);
+  only `http`/`https` URLs (`ArgumentError` otherwise); a body capped by the new
+  `DwServerSettings.outboundMaxResponseBytes` (10 MiB) or the call's `maxResponseBytes:`; any status
+  answered as a `DwOutboundResponse`, no answer thrown as `DwOutboundException` (`timedOut`).
+  `DwCallContext` gains the abstract `http` — breaking for a class that implements it. In
+  `testing.dart`, `DwFakeOutboundHttp`: every `DwTestServer` answers `ctx.http` from its own,
+  `server.http`, which records requests, answers from `when(matches, respond)` rules (the last added
+  first) and refuses anything unscripted with a `StateError` — a test server never reaches the
+  network through `ctx.http`; `fake.client()` is a `DwOutboundHttp` over it for a unit test without
+  a server. `dartway_core_server` now depends on `http` directly.
+
+## 0.21.0-dev.9
+
+- **BREAKING: `ctx.now` — the server's clock — is the time, and `DwTestClock` sets it in tests
+  (dartway/dartway#385, D-110).** `DwAppServer(clock:)` takes a `DwServerClock`
+  (`DwServerClock.system` by default); every context reads it as `ctx.now` (UTC, read anew on each
+  access) — handlers, jobs, routes, channel rules, startup steps, `runInContext`. The job queue runs
+  by the same clock rather than the database's `now()`: a job's default `runAt`, whether it is due,
+  its retry backoff, a non-transactional job's lease, `failed_at`, a recurring job's schedule, and
+  `dw.cleanup`'s age of failed jobs. `DwServerClock.jumps` is the event a server wakes its job
+  executor on; `DwTestClock(at)` (in `testing.dart`) is one implementation — it stands still until
+  the test calls `advance`/`moveTo`, and each move is a jump, so a job due tomorrow is tested by
+  moving the clock to tomorrow. While it stands, a retry or a recurring job's next run waits for the
+  test to move it. `DwCallContext` gains abstract `now` and `callerUtcOffset`: a class implementing
+  it (a test double) has to add them. Migration note:
+  `docs/migrations/2026-09-29-server-clock-and-caller-offset.md`.
+- **`ctx.callerUtcOffset` and `ctx.callerLocalTime`: the caller's UTC offset, carried by the
+  framework.** A call's `Dw-Utc-Offset` header (whole minutes, within 18 hours) becomes
+  `ctx.callerUtcOffset` on requests and commands. `ctx.callerLocalTime` is a `DwCallerLocalTime` —
+  what the caller's clock reads now (`year`, `month`, `day`, `hour`, `minute`, `weekday`) and
+  `startOfDayUtc`, the instant their day began; a reading, not a `DateTime`, so it cannot be stored
+  or compared as an instant by mistake. Both are `null` when the header is absent and in contexts
+  with no device behind them (jobs, routes, startup steps, subscription checks, `callAs`); a
+  malformed header is a malformed call (`400`). An offset, not a time zone: nothing is stored.
+- **Tests pin the caller's offset.** `DwTestServer.utcOffset` (`Duration.zero` by default) is what
+  every `caller()` and `connectClient()` reports; `connectClient(utcOffset:)` names another, and a
+  raw `DwTestCaller` with `utcOffset: null` or `headers: {DwHttpContract.utcOffsetHeader: null}`
+  sends none.
 
 ## 0.21.0-dev.8
 

@@ -10,6 +10,7 @@ import 'package:dartway_orm/dartway_orm.dart';
 
 import '../context/dw_call_context.dart';
 import '../server/dw_app_server.dart';
+import 'dw_fake_outbound_http.dart';
 
 /// A throwaway database for one test file: created empty, dropped after.
 final class DwTestDatabase {
@@ -65,21 +66,36 @@ final class DwTestDatabase {
 /// wire through [caller] and [openLive], or use the app's own client through
 /// [connectClient].
 final class DwTestServer {
-  DwTestServer._(this.server);
+  DwTestServer._(this.server, this.http);
 
   final DwAppServer server;
+
+  /// What the server's `ctx.http` talks to: records every request and
+  /// answers from the rules the test gives it, and refuses the rest — a test
+  /// server never reaches the network through `ctx.http`.
+  final DwFakeOutboundHttp http;
+  /// The UTC offset every caller of this test server reports
+  /// (`Dw-Utc-Offset`, the handler's `ctx.callerUtcOffset`): [caller]s and
+  /// [connectClient]s made after it is set use it. Zero by default, so what a
+  /// test asserts about the caller's day does not depend on the zone of the
+  /// machine it runs on. `null` makes a raw [caller] send no offset, and a
+  /// [connectClient] report the machine's, as a real app would.
+  Duration? utcOffset = Duration.zero;
 
   final List<DwAppClient> _clients = [];
 
   /// Starts [server] on port 0 of the loopback interface, without signal
-  /// handling (the test runner owns the process).
+  /// handling (the test runner owns the process), its outbound requests
+  /// answered by [http].
   static Future<DwTestServer> start(DwAppServer server) async {
+    final http = DwFakeOutboundHttp();
     await server.startOn(
       port: 0,
       address: InternetAddress.loopbackIPv4,
       handleSignals: false,
+      outbound: http,
     );
-    return DwTestServer._(server);
+    return DwTestServer._(server, http);
   }
 
   int get port => server.boundPort;
@@ -128,7 +144,7 @@ final class DwTestServer {
 
   /// A raw HTTP caller of this server, optionally signed in with [token].
   DwTestCaller caller({String? token}) =>
-      DwTestCaller(httpBase, protocol, token: token);
+      DwTestCaller(httpBase, protocol, token: token, utcOffset: utcOffset);
 
   /// Opens a raw live socket. With [awaitHello] (the default) the returned
   /// socket has read its `hello` and knows its [DwTestLiveSocket.connectionId].
@@ -155,7 +171,8 @@ final class DwTestServer {
   /// once. [httpTransport], [liveConnector] and [storageTransport] wrap the
   /// real ones when a test needs to lose an answer or watch the frames; [onError] receives what the
   /// client reports (by default the zone's uncaught-error handler, which
-  /// fails the test).
+  /// fails the test). [utcOffset] is the offset its calls report — this
+  /// server's [utcOffset] unless named; with both `null`, the machine's.
   Future<DwAppClient> connectClient({
     DwTokenStore? tokenStore,
     DwClientOptions options = dwTestClientOptions,
@@ -164,6 +181,7 @@ final class DwTestServer {
     DwLiveConnector? liveConnector,
     DwStorageTransport? storageTransport,
     void Function(Object error, StackTrace stackTrace)? onError,
+    Duration? utcOffset,
   }) async {
     final client = DwAppClient(
       protocol: protocol,
@@ -175,6 +193,7 @@ final class DwTestServer {
       storageTransport: storageTransport,
       options: options,
       onError: onError,
+      utcOffset: utcOffset ?? this.utcOffset,
     );
     _clients.add(client);
     await client.start();
@@ -258,7 +277,13 @@ final class DwTestAnswer {
 /// and the body of `docs/2-core/wire-and-versions.md` — and reads what comes back, without a client
 /// library: the tests check the wire itself.
 final class DwTestCaller {
-  DwTestCaller(this.base, this.protocol, {this.token, this.liveConnection});
+  DwTestCaller(
+    this.base,
+    this.protocol, {
+    this.token,
+    this.liveConnection,
+    this.utcOffset = Duration.zero,
+  });
 
   /// The app version a current client sends.
   static const String defaultAppVersion = '1.0.0+1';
@@ -271,6 +296,11 @@ final class DwTestCaller {
 
   /// The live connection id sent with every call; `null` sends none.
   String? liveConnection;
+
+  /// The UTC offset sent with every call (`Dw-Utc-Offset`); `null` sends
+  /// none. Zero unless set: a test's answer does not depend on the zone of
+  /// the machine it runs on.
+  Duration? utcOffset;
 
   final HttpClient _client = HttpClient();
 
@@ -305,6 +335,10 @@ final class DwTestCaller {
       if (call is DwActionCommand<Object?>)
         DwHttpContract.idempotencyKeyHeader: key ?? newKey(),
       DwHttpContract.liveConnectionHeader: ?liveConnection,
+      DwHttpContract.utcOffsetHeader: ?switch (utcOffset) {
+        final offset? => DwHttpContract.utcOffsetValue(offset),
+        null => null,
+      },
       ...headers,
     },
     body: body ?? utf8.encode(jsonEncode(call.toJson())),

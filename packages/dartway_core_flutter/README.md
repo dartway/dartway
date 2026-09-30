@@ -6,9 +6,10 @@ Around the data layer it is the app's skeleton:
 
 - 🚀 **App bootstrap** — `DwAppRunner`: ProviderScope, native splash handling,
   app initializers and zone-level error handling in one place.
-- ⚡ **The async-UI contract** — `dwBuildAsync` / `dwBuildListAsync` render
-  loading, error and data uniformly, with skeleton loading states derived from
-  your real widget.
+- ⚡ **Reads on screen** — `DwReadBuilder` renders any read (loading, a branch
+  per refusal code, failure with retry, data), `DwPagedListView` a feed that
+  loads its next page as the end comes near; skeletons are drawn from your real
+  widget, and the loading and failed views are the app's, configured once.
 - 🎬 **Guarded actions** — `DwUiAction` describes *what* an action does
   (confirmation, notifications, follow-up, error reporting); `DwActionBuilder`
   binds it to *any* tappable widget and handles the rest: no re-entrant taps,

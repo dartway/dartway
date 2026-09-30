@@ -110,12 +110,13 @@ Run the detectors **over the changed files only** (not over the whole repo). For
   between screens. Under a gesture (retry, pull-to-refresh) it is correct and not a finding. After a
   command it usually means the request does not listen on the channel the command publishes to — fix
   the channel, not the screen (`dartway-realtime`).
-- A **load-bearing** `dwBuildAsync`/`dwBuildListAsync` — the section its screen exists for — left on
-  the default `errorWidget` (`SizedBox.shrink()`), so a failed read renders as blank; and
-  `asData?.value` / `.value ??` used to combine several `AsyncValue`s, which shows a failure as an
-  endless spinner.
+- A read a screen shows without `DwReadBuilder`/`DwPagedListView` — `dart run dartway_cli:dartway check` fails the
+  widget that takes it apart (`forbiddenRequestRead`), but not one handed an `AsyncValue` through a
+  provider of the project's own; and `asData?.value` / `.value ??` used in `logic/` to combine several
+  `AsyncValue`s, which shows a failure as an endless spinner.
 - Server data copied into widget `State` or a hand-written notifier — it stops following updates.
-  Reads are `ref.watch(dw.request(...))`, `dw.pages`, `dw.table`, `dw.window` (`dartway-data-layer`).
+  Reads are `DwReadBuilder(dw.request(...))`, `DwPagedListView`, `dw.table`, `DwWindowListView`
+  (`dartway-data-layer`).
 - A raw `onPressed: () async { await dw.command(...) }` instead of `dw.action`; a `dw.command` outside
   the feature's `logic/`; a `DwFeatureSpec` on a file that is not the feature's entry; a refusal turned
   into words anywhere but the app's refusal text (the function `DwFlutterConfig.refusalText` is given).
@@ -276,6 +277,8 @@ run and why.
   every row, and the file looks ordinary. Every `backfill:` is a data decision: check the expression is
   what existing rows should hold. A migration file that **existed on the base branch and is modified**
   in the diff is a stop, not a note: an applied migration is never edited (`dartway-migrations`).
+  So is a diff that changes `migrations` > `dataChecksAfter` in `deploy/config.yaml`: moving it
+  exempts migrations from `migrationChangesData` — ask the human.
 
 ### A.6 Findings that outlive this task
 

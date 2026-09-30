@@ -3,6 +3,8 @@ import 'dart:ui' as ui;
 
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_commands.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_composing_controller.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_files.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_session.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -88,8 +90,12 @@ class ChatComposer extends HookConsumerWidget {
     final drafts = ref.read(chatDraftsProvider);
     final controller = useTextEditingController(text: drafts[channelId] ?? '');
     final focus = useFocusNode();
-    final replyTo = useValueListenable(session.replyTo);
-    final editing = useValueListenable(session.editing);
+    final composing = ref.read(chatComposingProvider(channelId).notifier);
+    final ChatComposing(:replyTo, :editing) = ref.watch(
+      chatComposingProvider(channelId),
+    );
+    // Read by the cleanup below, which runs after the last build.
+    final editingNow = useRef(editing)..value = editing;
     final files = useState<List<ChatComposerFile>>(const []);
     final text = useValueListenable(controller).text;
     final sending = useState(false);
@@ -114,7 +120,7 @@ class ChatComposer extends HookConsumerWidget {
     }, [replyTo?.id]);
     useEffect(
       () => () {
-        if (session.editing.value == null) {
+        if (editingNow.value == null) {
           drafts[channelId] = controller.text;
         }
       },
@@ -156,13 +162,13 @@ class ChatComposer extends HookConsumerWidget {
         if (result == null || !context.mounted) return;
         if (editing != null) {
           draftBeforeEdit.value = null;
-          session.editing.value = null;
+          composing.clear();
           controller.clear();
         } else {
           controller.clear();
           drafts.remove(channelId);
           files.value = const [];
-          session.replyTo.value = null;
+          composing.clear();
           unawaited(session.list.jumpToNewest());
         }
       } finally {
@@ -239,7 +245,7 @@ class ChatComposer extends HookConsumerWidget {
                 title: l10n.chatEditingMessage,
                 text: editing.text,
                 cancelTooltip: l10n.cancel,
-                onCancel: () => session.editing.value = null,
+                onCancel: composing.clear,
               ),
             )
           else if (replyTo != null)
@@ -251,7 +257,7 @@ class ChatComposer extends HookConsumerWidget {
                 text: replyTo.text.isEmpty ? l10n.chatPhoto : replyTo.text,
                 cancelTooltip: l10n.cancel,
                 onTap: () => session.showMessage(replyTo.id, replyTo.sentAt),
-                onCancel: () => session.replyTo.value = null,
+                onCancel: composing.clear,
               ),
             ),
           if (files.value.isNotEmpty && editing == null)
@@ -303,10 +309,7 @@ class ChatComposer extends HookConsumerWidget {
                 tooltip: l10n.sendMessage,
                 onPressed: canSend ? send : null,
                 icon: sending.value
-                    ? const SizedBox.square(
-                        dimension: 18,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
+                    ? const AppProgressIndicator(size: 18)
                     : Icon(editing == null ? Icons.send : Icons.check),
               ),
             ],
@@ -356,26 +359,22 @@ class ChatComposer extends HookConsumerWidget {
       ];
     }
 
-    final result = await dw.files
-        .upload(
-          DartwayExampleUpload.chatAttachment,
-          DwUploadSource.bytes(bytes),
-          fileName: name,
-          contentType: contentType,
-          onProgress: (sent, total) => update(
-            (file) => file.copyWith(progress: total == 0 ? 1 : sent / total),
-          ),
-        )
-        .catchError((Object _) => const DwCallFailed<DwStoredFile>('upload'));
-    switch (result) {
-      case DwCallOk(:final value):
-        update((file) => file.copyWith(progress: 1, stored: value));
-      default:
-        files.value = [
-          for (final file in files.value)
-            if (file.key != key) file,
-        ];
-        onFailed();
+    final stored = await ChatFiles.upload(
+      name,
+      contentType,
+      bytes,
+      onProgress: (sent, total) => update(
+        (file) => file.copyWith(progress: total == 0 ? 1 : sent / total),
+      ),
+    );
+    if (stored != null) {
+      update((file) => file.copyWith(progress: 1, stored: stored));
+    } else {
+      files.value = [
+        for (final file in files.value)
+          if (file.key != key) file,
+      ];
+      onFailed();
     }
   }
 }

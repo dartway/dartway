@@ -22,16 +22,16 @@ final profileHandlers = <DwCallHandler>[
     access: DwAccessRule.signedIn,
     handle: (ctx, command) async {
       final current = (await ctx.db.userProfiles.findById(
-        (await ctx.profile).id!,
+        (await ctx.profile).id,
         lock: DwRowLock.forUpdate,
       ))!;
       final previousAvatar = current.avatarFileId;
       final avatar = command.avatarFileId;
-      if (avatar case DwSetField(:final value)) {
+      if (avatar.newValue case final fileId?) {
         // Only the caller's own finished avatar upload: a file id is a number
         // anyone can type.
         await ctx.files.requireOwned(
-          value,
+          fileId,
           DartwayStarterUpload.avatar,
           field: 'avatarFileId',
         );
@@ -39,12 +39,7 @@ final profileHandlers = <DwCallHandler>[
       final updated = await ctx.db.userProfiles.update(
         current.copyWith(
           firstName: command.firstName?.trim(),
-          lastName: switch (command.lastName) {
-            DwSetField(:final value) when value.trim().isEmpty =>
-              const DwFieldPatch.clear(),
-            DwSetField(:final value) => DwFieldPatch.set(value.trim()),
-            final other => other,
-          },
+          lastName: command.lastName.trimmedOrCleared,
           gender: command.gender,
           avatarFileId: avatar,
         ),

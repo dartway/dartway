@@ -1,4 +1,4 @@
-import 'package:dartway_example_flutter/app/schedule/logic/today_provider.dart';
+import 'package:dartway_example_flutter/app/schedule/logic/today_controller.dart';
 import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -7,9 +7,6 @@ import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/core/async_section.dart';
-
-typedef _Schedule = ({List<ClubSession> sessions, List<SessionBooking> mine});
 
 /// Upcoming sessions grouped by day, each card knowing whether you hold a
 /// place on it. Both reads are live: a place someone else takes changes the
@@ -20,73 +17,58 @@ class ScheduleSessionList extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sessionsRequest = ListUpcomingSessions(
-      from: ref.watch(todayProvider),
+    // Two reads, one nested in the other: the list waits for both, and each
+    // fails, retries and follows the server on its own.
+    return DwReadBuilder(
+      dw.request(
+        ListUpcomingSessions(from: ref.watch(todayControllerProvider)),
+      ),
+      placeholder: PlaceholderObjects.listOf(PlaceholderObjects.session, 5),
+      builder: (context, sessions) => DwReadBuilder(
+        dw.request(const ListMyBookings()),
+        placeholder: const <SessionBooking>[],
+        builder: (context, mine) =>
+            _ScheduleDays(sessions: sessions, mine: mine),
+      ),
     );
-    const bookingsRequest = ListMyBookings();
-    final sessions = ref.watch(dw.request(sessionsRequest));
-    final bookings = ref.watch(dw.request(bookingsRequest));
+  }
+}
 
-    final AsyncValue<_Schedule> schedule = switch ((sessions, bookings)) {
-      (AsyncError(:final error, :final stackTrace), _) ||
-      (
-        _,
-        AsyncError(:final error, :final stackTrace),
-      ) => AsyncError(error, stackTrace),
-      (AsyncData(value: final sessions), AsyncData(value: final mine)) =>
-        AsyncData((sessions: sessions, mine: mine)),
-      _ => const AsyncLoading(),
+class _ScheduleDays extends StatelessWidget {
+  const _ScheduleDays({required this.sessions, required this.mine});
+
+  final List<ClubSession> sessions;
+  final List<SessionBooking> mine;
+
+  @override
+  Widget build(BuildContext context) {
+    if (sessions.isEmpty) {
+      return Center(child: AppText.body(context.l10n.noUpcomingSessions));
+    }
+
+    // A cancelled booking stays in the list with its status; only an
+    // active one holds a place.
+    final activeBySession = {
+      for (final booking in mine)
+        if (booking.status == BookingStatus.booked) booking.session.id: booking,
     };
 
-    return schedule.section(
-      loadingValue: (
-        sessions: PlaceholderObjects.listOf(PlaceholderObjects.session, 5),
-        mine: const [],
-      ),
-      onRetry: () => Future.wait([
-        if (sessions.hasError)
-          ref.read(dw.request(sessionsRequest).notifier).refetch(),
-        if (bookings.hasError)
-          ref.read(dw.request(bookingsRequest).notifier).refetch(),
-      ]),
-      builder: (schedule) {
-        if (schedule.sessions.isEmpty) {
-          return Center(child: AppText.body(context.l10n.noUpcomingSessions));
-        }
-
-        // A cancelled booking stays in the list with its status; only an
-        // active one holds a place.
-        final activeBySession = {
-          for (final booking in schedule.mine)
-            if (booking.status == BookingStatus.booked)
-              booking.session.id: booking,
-        };
-
-        return ListView(
-          padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
-          children: [
-            for (final (index, session) in schedule.sessions.indexed) ...[
-              if (index == 0 ||
-                  !session.startsAt.isSameDayAs(
-                    schedule.sessions[index - 1].startsAt,
-                  ))
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(
-                    AppSpace.s4,
-                    AppSpace.s16,
-                    AppSpace.s4,
-                    AppSpace.s8,
-                  ),
-                  child: AppText.caption(session.startsAt.dayLabel),
-                ),
-              SessionCard(
-                session: session,
-                activeBooking: activeBySession[session.id],
-              ),
-            ],
-          ],
-        );
-      },
+    return ListView(
+      padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
+      children: [
+        for (final (index, session) in sessions.indexed) ...[
+          if (index == 0 ||
+              !session.startsAt.isSameDayAs(sessions[index - 1].startsAt))
+            Padding(
+              padding: const EdgeInsets.fromLTRB(AppSpace.s4, AppSpace.s16, AppSpace.s4, AppSpace.s8),
+              child: AppText.caption(session.startsAt.dayLabel),
+            ),
+          SessionCard(
+            session: session,
+            activeBooking: activeBySession[session.id],
+          ),
+        ],
+      ],
     );
   }
 }

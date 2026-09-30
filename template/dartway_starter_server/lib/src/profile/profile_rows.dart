@@ -17,7 +17,7 @@ part 'profile_rows.dw.dart';
 )
 final class UserProfileRow extends DwTableRow with _$UserProfileRow {
   const UserProfileRow({
-    this.id,
+    required this.id,
     required this.accountId,
     this.firstName = '',
     this.lastName,
@@ -31,7 +31,7 @@ final class UserProfileRow extends DwTableRow with _$UserProfileRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwUniqueColumn()
   @DwForeignKey('dw_account', onDelete: DwOnDelete.cascade)

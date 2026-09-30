@@ -4,35 +4,35 @@ import 'package:dartway_starter_shared/src/dartway_starter_refusal.dart';
 
 part 'settings.dw.dart';
 
-/// The setting keys the app has. A key outside this set is refused: settings
-/// are configuration the app reads, not a free-form store. The app's typed
-/// catalogue (`AppSettingKey`) is held to this set by a test.
-abstract final class AppSettingKeys {
-  /// The name the app shows for itself.
-  static const String appName = 'appName';
+/// The app's settings: one value, edited by admins, read live by every
+/// signed-in member.
+///
+/// Every field has a default, and the default is the value while nobody has
+/// saved one — the server stores only what differs from it
+/// (`ctx.settings`), so a setting added here needs nothing but its field.
+final class AppSettings extends DwDataObject with _$AppSettings {
+  const AppSettings({
+    this.appName = 'DartwayStarter',
+    this.signUpEnabled = true,
+  });
 
-  /// Whether a new visitor may create an account (`'true'`/`'false'`); the
-  /// server refuses a sign-up with `signUpClosed` while it is off.
-  static const String signUpEnabled = 'signUpEnabled';
-
-  static const Set<String> all = {appName, signUpEnabled};
-}
-
-/// One app setting. Its key is its identity.
-final class AppSetting extends DwDataObject with _$AppSetting {
-  const AppSetting({required this.id, required this.value});
-
-  /// The setting key.
+  /// There is one: its identity is fixed.
   @override
-  final String id;
-  final String value;
+  String get id => 'app';
+
+  /// The name the app shows for itself.
+  final String appName;
+
+  /// Whether a new visitor may create an account; the server refuses a
+  /// sign-up with `signUpClosed` while it is off.
+  final bool signUpEnabled;
 }
 
-/// Every stored setting, live for every signed-in member: an admin renames the
+/// The app's settings, live for every signed-in member: an admin renames the
 /// app and every open screen follows.
-final class ListAppSettings extends DwListRequest<AppSetting>
-    with _$ListAppSettings {
-  const ListAppSettings();
+final class GetAppSettings extends DwSingleRequest<AppSettings>
+    with _$GetAppSettings {
+  const GetAppSettings();
 
   @override
   List<DwLiveChannel> get channels => const [
@@ -40,19 +40,19 @@ final class ListAppSettings extends DwListRequest<AppSetting>
   ];
 }
 
-/// Sets one setting — its own row, so two admins editing different settings
-/// cannot overwrite each other. Admins only.
-final class SaveAppSetting extends DwActionCommand<AppSetting>
-    with _$SaveAppSetting
+/// Changes the settings it names and leaves the rest: two admins editing
+/// different settings cannot overwrite each other. Admins only.
+final class SaveAppSettings extends DwActionCommand<AppSettings>
+    with _$SaveAppSettings
     implements DwSelfValidating {
-  const SaveAppSetting({required this.key, required this.value});
+  const SaveAppSettings({this.appName, this.signUpEnabled});
 
-  final String key;
-  final String value;
+  final String? appName;
+  final bool? signUpEnabled;
 
   @override
   List<DwCallRefusal> validate() => [
-    if (!AppSettingKeys.all.contains(key))
-      DwCallRefusal(DartwayStarterRefusal.settingKeyUnknown, field: 'key'),
+    if (appName case final name? when name.trim().isEmpty)
+      DwCallRefusal(DartwayStarterRefusal.appNameRequired, field: 'appName'),
   ];
 }

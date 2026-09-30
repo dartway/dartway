@@ -6,8 +6,9 @@ description: >-
   codes; (2) the server in __SERVER_PKG__ — row class, `dart run dartway_cli:dartway generate`, a reviewed migration
   draft, one handler per call with its access rule, rows mapped to data objects in batch, publishing
   what a command changed; (3) the Flutter feature in __FLUTTER_PKG__ — a folder with one public file
-  declaring its DwFeatureSpec, widgets/ and logic/, ref.watch(dw.request(...)), commands sent from
-  logic/ inside dw.action, texts in l10n including refusal texts; (4) tests and checks.
+  declaring its DwFeatureSpec, widgets/ and logic/, ref.watch(dw.request(...)), local state in
+  hooks and shared state in a <Thing>Controller Notifier, commands sent from logic/ inside
+  dw.action, texts in l10n including refusal texts; (4) tests and checks.
   Also the Flutter feature law: what a feature, a group and a building block are, isolation (import
   the public file only), where logic lives, and that a feature must be constructible from its address
   (identifiers and data objects), never from lists and callbacks its parent assembled. Use when
@@ -59,9 +60,10 @@ If the change alters a DTO that installed app builds already use, check the tabl
 ## Step 2 — the server (`__SERVER_PKG__/lib/src/<feature>/`)
 
 Everything of the feature goes into its own folder under `lib/src/` — rows, handlers, objects,
-publications, jobs — in files named after it (`invoices_rows.dart`, `invoices_handlers.dart`, …), and
-it declares itself in `<feature>_feature.dart`. Never a file at the top of `src/`, never a layer folder
-(`handlers/`, `rows/`, `domain/`); `dart run dartway_cli:dartway check` refuses both. Details in `dartway-server`; the order:
+publications, jobs — in the closed set of files named after it (`invoices_rows.dart`,
+`invoices_handlers.dart`, …, anything else in its `logic/`), and it declares itself in
+`<feature>_feature.dart`. Never a file at the top of `src/`, never a layer-named folder
+(`dartway-server` §1); `dart run dartway_cli:dartway check` refuses both. Details in `dartway-server`; the order:
 
 1. **Row class** (`InvoiceRow extends DwTableRow`, `@DwSqlTable`, foreign keys, indexes for the
    queries the handlers will make). Nullable only when the domain allows absence.
@@ -101,7 +103,7 @@ lib/app/<feature>/
   widgets/                   // the feature's private layout
     <feature>_row.dart
   logic/                     // state, rules and commands of this feature only
-    <feature>_commands.dart  // every dw.command the feature sends
+    <feature>_commands.dart  // <Feature>Commands: every dw.command the feature sends, and nothing else
     <feature>_filter.dart
 ```
 
@@ -148,9 +150,39 @@ the tell is that you cannot write `purpose` and `behaviors` for it without resta
 2. **A provider plus a decision on the state type** — when state is derived from several sources or
    carries a rule. The provider says where the data comes from, a factory on the state type decides
    what follows (time passed in, not read). Written by hand (`dartway-data-layer`).
-3. **A `Notifier`** — when the feature owns mutable state: a draft, a multi-select, a step-by-step
-   flow. First check it does not duplicate what the server already holds: a command's result is in
-   the watched requests without any local copy.
+3. **A `Notifier` named `<Thing>Controller`** in `logic/` — when state is shared between widgets or
+   a flow has logic: a draft two widgets edit, a multi-select, a multi-step sign-in, a form with an
+   async submit. First check it does not duplicate what the server already holds: a command's result
+   is in the watched requests without any local copy.
+
+**State is held one way** (law, `forbiddenStateHolder`, anywhere in `lib/` — `core/` and `ui_kit/`
+included). A widget's own state is a hook in a `HookWidget`/`HookConsumerWidget`; there is no
+`StatefulWidget`, no `setState`, no `StatefulBuilder`, and no `ChangeNotifier`/`ValueNotifier` held
+as state:
+
+| What `State` held | The hook |
+|---|---|
+| a `TextEditingController`, `ScrollController`, `FocusNode`, `TabController` | `useTextEditingController`, `useScrollController`, `useFocusNode`, `useTabController` |
+| an `AnimationController` with its ticker mixin | `useAnimationController` |
+| a flag, a selection, a draft | `useState` |
+| a `Timer`, a `StreamSubscription`, a `WidgetsBindingObserver` | `useEffect` returning its cleanup; `useOnAppLifecycleStateChange` |
+| `didUpdateWidget` resyncing from a prop | `useEffect(…, [prop])`, or `useValueChanged(prop, …)` for the old value |
+| an object built once and disposed | `useMemoized` plus a `useEffect` cleanup |
+| a `StatefulBuilder` around part of a tree | `HookBuilder` (`HookConsumer` with a `ref`) |
+| a mixin or extension `on State` that calls `setState` | a `use…` function of your own that calls hooks and returns what the widget needs |
+
+A callback registered once that must see the widget's latest props reads them through
+`final latest = useRef(this)..value = this;`. A shared controller the provider owns lives exactly as
+long as someone watches it (`NotifierProvider.autoDispose`, `.family` keyed by what it is about).
+
+**The one way out** is an API that needs a `State` subclass or a `Listenable` of its own — the
+skeleton's router refresh listenable is the case. It takes one line on the class, with the reason,
+and `dart run dartway_cli:dartway check` lists it on every run:
+
+```dart
+// dw:allow-stateful DwAppRouter re-runs its guards on a Listenable
+class AppRouterState extends ChangeNotifier { … }
+```
 
 State used by two features is a feature whose public surface is a provider: the provider in the root
 file, the state class and the notifier in `logic/`. State only one feature uses may keep notifier and
@@ -161,8 +193,9 @@ provider in one file — provider first.
 1. **Navigation** — the entry and exit points; a route if needed (`dartway-navigation`).
 2. **The public widget**, `implements DwFeatureWidget` with its `DwFeatureSpec` (below). Without it
    `dart run dartway_cli:dartway check` warns `featureSpecMissing`.
-3. **Reads:** `ref.watch(dw.request(...))` (or `dw.pages` / `dw.table` / `dw.window`), with the section
-   it exists for rendering its error — the skeleton's section extension in `lib/core/` (`dartway-data-layer`).
+3. **Reads:** `DwReadBuilder(dw.request(...), builder: …)` (or `dw.table`), `DwPagedListView` for a
+   feed, `DwWindowListView` for a chat — loading, refusal branches and the failed view in one place;
+   the `AsyncValue` is never taken apart in a widget (`dartway-data-layer`).
 4. **Changes:** `dw.command` in the feature's `logic/<feature>_commands.dart`, run by
    `dw.action((_) => <Feature>Commands.x(...))` on the button of the widget that owns it; a refusal is
    shown by itself (`dartway-data-layer`).
@@ -190,7 +223,7 @@ public entities, hides the widget, and leaves the spec nowhere to live.
 ### A feature is constructible from its address
 
 **The test, one attempt:** write the call. Can the widget be constructed in the router, in a
-`showDialog`, in a `ListView.builder` — with nothing in hand but identifiers and data objects?
+kit dialog, in a `ListView.builder` — with nothing in hand but identifiers and data objects?
 
 - yes → a feature; it reads the rest itself;
 - no → it is part of its parent's layout; fold it back, or take the assembled data out of its
@@ -204,7 +237,7 @@ list the parent had to compute is.
 
 ```dart
 // lib/app/invoices/my_invoices/my_invoices_page.dart
-class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
+class MyInvoicesPage extends StatelessWidget implements DwFeatureWidget {
   const MyInvoicesPage({super.key});
 
   @override
@@ -224,19 +257,14 @@ class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
-    final request = dw.request(const ListMyInvoices());
 
     return Scaffold(
-      body: ref.watch(request).dwBuildAsync(
-        loadingWidget: const Center(child: CircularProgressIndicator()),
-        errorBuilder: (_, _) => LoadFailedMessage(
-          message: l10n.loadFailed,
-          retryLabel: l10n.retry,
-          onRetry: dw.action((_) => ref.read(request.notifier).refetch()),
-        ),
-        childBuilder: (invoices) => invoices.isEmpty
+      body: DwReadBuilder(
+        dw.request(const ListMyInvoices()),
+        placeholder: List.filled(4, placeholderInvoice),
+        builder: (context, invoices) => invoices.isEmpty
             ? AppText.body(l10n.noInvoicesYet)
             : ListView(
                 children: [
@@ -251,9 +279,9 @@ class MyInvoicesPage extends ConsumerWidget implements DwFeatureWidget {
 
 `InvoiceCard` decides by the invoice (a pay button only while it is unpaid) — so it is a feature of
 its own (`lib/app/invoices/invoice_card/invoice_card.dart`), constructible from the invoice alone, and
-it sends `PayInvoice` from its own button through `logic/invoice_card_commands.dart`. `AppText` and
-`LoadFailedMessage` stand for the project's kit; in a real screen the skeleton's section extension replaces the manual
-`dwBuildAsync` call.
+it sends `PayInvoice` from its own button through `logic/invoice_card_commands.dart`. `AppText`
+stands for the project's kit; the loading and failed views are the app's, configured once in
+`lib/core/dw_core.dart`.
 
 ## The feature spec — `DwFeatureSpec`
 

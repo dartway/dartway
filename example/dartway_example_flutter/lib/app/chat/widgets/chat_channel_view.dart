@@ -1,10 +1,12 @@
 import 'dart:async';
 
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_composing_controller.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_session.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_composer.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_message_row.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_pinned_section.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_counts.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -12,12 +14,11 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// One channel of the staff chat: its history, the pinned bar, the floating
 /// date, the "↓" button, and the composer — or, while searching, the way
 /// through the matches.
-class ChatChannelView extends HookConsumerWidget {
+class ChatChannelView extends HookWidget {
   const ChatChannelView({
     required this.channel,
     required this.searchQuery,
@@ -30,15 +31,12 @@ class ChatChannelView extends HookConsumerWidget {
   final String? searchQuery;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final readStates = ref.watch(dw.request(const ListMyChatReadStates()));
-    return readStates.section(
+  Widget build(BuildContext context) {
+    return DwReadBuilder(
+      dw.request(const ListMyChatReadStates()),
       // Not a skeleton: the list opens at the read position, so it waits for
       // it rather than opening elsewhere and moving.
-      loadingWidget: const Center(child: CircularProgressIndicator()),
-      onRetry: () =>
-          ref.read(dw.request(const ListMyChatReadStates()).notifier).refetch(),
-      builder: (states) => _ChannelBody(
+      builder: (context, states) => _ChannelBody(
         channel: channel,
         // Read once: the list opens here, and a later position is where the
         // member has scrolled to since, not where to go.
@@ -83,12 +81,10 @@ class _ChannelBody extends HookConsumerWidget {
       },
       const [],
     );
-    final hasPinned =
-        ref
-            .watch(dw.request(ListPinnedChatMessages(channelId: channel.id)))
-            .value
-            ?.isNotEmpty ??
-        false;
+    // The reply or edit under way belongs to the channel on screen: held for
+    // as long as it is, whether or not the composer is showing.
+    ref.listen(chatComposingProvider(channel.id), (_, _) {});
+    final hasPinned = ref.watch(chatHasPinnedProvider(channel.id));
     final query = searchQuery?.trim();
     final searching = query != null;
 
@@ -163,14 +159,7 @@ class _JumpToNewest extends HookConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final atNewest = useValueListenable(session.list.isAtNewest);
     final below = useValueListenable(session.list.newerCount);
-    final unread =
-        ref
-            .watch(dw.request(const ListMyChatReadStates()))
-            .value
-            ?.where((state) => state.id == session.channel.id)
-            .firstOrNull
-            ?.unreadCount ??
-        0;
+    final unread = ref.watch(chatUnreadCountProvider(session.channel.id));
     return ChatJumpButton(
       visible: !atNewest,
       count: below > unread ? below : unread,

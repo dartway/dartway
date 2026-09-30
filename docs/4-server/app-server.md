@@ -16,6 +16,7 @@ abstract final class DartwayExampleServer {
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
     DwPushModule? push,
+    DwServerClock clock = DwServerClock.system, // a DwTestClock in tests
   }) => DwAppServer(
     protocol: appProtocol,
     schema: dartwayExampleSchema,
@@ -34,6 +35,7 @@ abstract final class DartwayExampleServer {
     modules: [push ?? AppPush.module()],
     port: port,
     settings: settings,
+    clock: clock,
   );
 }
 ```
@@ -57,6 +59,7 @@ build it on a free port against their own database.
 | `alerts` | no | a `DwAlertSink`; the log by default — [alerts](alerts.md) |
 | `logger` | no | a `DwServerLogger`; `DwConsoleLogger` by default |
 | `settings` | no | `DwServerSettings`, below |
+| `clock` | no | a `DwServerClock`, `DwServerClock.system` by default: what every context reads as `ctx.now` and what the job queue decides due times by; a test passes a `DwTestClock` — [time](handlers-and-context.md#time-ctxnow-and-the-callers-offset) |
 
 ## What `start()` does, in order
 
@@ -145,11 +148,66 @@ app on one server process.
 | `failedJobRetention` | 30 days | How long a job out of attempts stays in `dw_job` for the operator, from when it failed; `dw.cleanup` removes it after. |
 | `alertsPerSignature` | 5 | Alerts of one failure signature per `alertWindow` ([alerts](alerts.md)). |
 | `alertWindow` | 1 h | The window of that ceiling. |
+| `outboundTimeout` | 30 s | How long one outbound request (`ctx.http`) may take, connecting to last byte, unless the call names its own ([handlers](handlers-and-context.md#outbound-http)). |
+| `outboundMaxResponseBytes` | 10 MiB | The largest response body one outbound request reads, unless the call names its own; past it the exchange fails with `DwOutboundException`. |
 
 ## Configuration comes from the environment
 
-There is no configuration file. The framework reads exactly two groups of variables itself, and
-only when the project asks it to:
+There is no configuration file. The server is configured by its environment, read **once, at start,
+in one file**: `lib/src/core/environment.dart` declares the project's typed `AppEnvironment`, and
+`bin/server.dart` reads it through `DwLocalEnvironment.overlay` (which adds `deploy/config.yaml >
+local` and `deploy/secrets.yaml > local` on a developer's machine):
+
+```dart
+// lib/src/core/environment.dart
+final class AppEnvironment {
+  const AppEnvironment({required this.server, required this.sms});
+
+  static AppEnvironment read(Map<String, String> variables) =>
+      DwEnvironmentReader.read(variables, (read) => AppEnvironment(
+        server: DwServerEnvironment.read(
+          read,
+          defaultPublicBucket: AppFiles.defaultPublicBucket,
+          defaultPrivateBucket: AppFiles.defaultPrivateBucket,
+        ),
+        sms: AppSmsEnvironment(
+          login: read.required('SMS_LOGIN'),
+          password: read.required('SMS_PASSWORD'),
+          retries: read.integer('SMS_RETRIES', fallback: 3),
+        ),
+      ));
+
+  final DwServerEnvironment server;
+  final AppSmsEnvironment sms;
+}
+
+// bin/server.dart
+final env = AppEnvironment.read(DwLocalEnvironment.overlay(Platform.environment));
+```
+
+`DwEnvironmentReader` has `required`, `optional`, `integer` (with a `fallback`), `flag` (`true` /
+`false`), `list` (comma-separated) and `report` for a problem no single variable shows (two that go
+together). Each answers at once and records what is wrong; `read` throws `DwEnvironmentException`
+with **every** missing and malformed variable once the object is built, so a deploy that forgot three
+hears about all three in one start. A problem never repeats a text value; a number or flag read with
+`secret: true` is not repeated either. `Platform.environment` anywhere else in `lib/` is an error of
+`dart run dartway_cli:dartway check` (`forbiddenEnvironmentRead`).
+
+`DwServerEnvironment.read` is the framework's own variables, typed:
+
+| Variable | Becomes |
+|---|---|
+| `DW_DATABASE_*` | `database`, as `DwDatabaseConfig.fromEnvironment` reads it (below) |
+| `DW_STORAGE_*` | `storage`, as `DwFileStorageConfig.fromEnvironment` reads it, the buckets defaulting to the names given and the public base URL to the public bucket on the endpoint (path style); `null` without `DW_STORAGE_ENDPOINT` — the server runs without uploads |
+| `DW_STORAGE_PROVISION=true` | `provisionStorage`: `DwFileStorageSetup.provision` before starting — for a storage the project owns; a problem without an endpoint |
+| `PORT` | `port`, 8080 by default |
+| `DW_ALLOWED_ORIGINS` | `allowedOrigins`, comma-separated, for `DwServerSettings.allowedOrigins` |
+| `DW_ADMIN_IDENTIFIER` | `adminIdentifier`, for `DwFirstAdministrator(identifier:)` (below) |
+| `DW_MIGRATE_ONLY=true` | `migrateOnly`, for `DwAppServer.start(migrateOnly:)`: apply the migrations and exit |
+
+Every one of them comes through the local overlay and into the one error list — nothing of the
+framework's reads `Platform.environment` behind the project's back. The two groups above that have
+parsers of their own are:
 
 - `DwDatabaseConfig.fromEnvironment(env)` reads `DW_DATABASE_HOST`, `_PORT` (5432), `_NAME`,
   `_USER`, `_PASSWORD`, `_SSL` (`true` unless `false`), `_CA_FILE` (unset) and `_MAX_CONNECTIONS`
@@ -161,20 +219,8 @@ only when the project asks it to:
   connection — with an error naming the setting.
 - `DwFileStorageConfig.fromEnvironment(env)` reads `DW_STORAGE_*` ([uploads](uploads.md#configuration)).
 
-Everything else is the project's `bin/server.dart` reading `Platform.environment` and passing
-values in. The skeleton's (`template/dartway_starter_server/bin/server.dart`) reads:
-
-| Variable | Becomes |
-|---|---|
-| `DW_DATABASE_*` | `DwDatabaseConfig.fromEnvironment` |
-| `PORT` | `port`, 8080 by default |
-| `DW_STORAGE_*` | the storage configuration; without `DW_STORAGE_ENDPOINT` the server runs without uploads |
-| `DW_STORAGE_PROVISION=true` | `DwFileStorageSetup.provision` before starting — for a storage the project owns |
-| `DW_ALLOWED_ORIGINS` | `DwServerSettings.allowedOrigins`, comma-separated |
-| `DW_ADMIN_IDENTIFIER` | the first administrator, below |
-
-The example's `bin/server.dart` is the same without the administrator. A value the project wants
-configurable is one more line there; the framework does not grow a settings loader for it.
+A value the project wants configurable is one more field of a sub-config in `AppEnvironment`,
+handed to what uses it by `bin/server.dart` through the project's server factory.
 
 ## One process, one isolate
 
@@ -213,42 +259,101 @@ A script with no server running builds `DwAccountService(db, auth)` over a bare 
 see [auth and identity](auth-identity.md#dwaccountservice). A script that has a server (the seed
 starts one on port `0`) uses `ctx.accounts` and needs no such thing.
 
-## Startup steps
+## Startup steps and seeds
 
-**`DwAppServer(startup: [...])` is work done at every start, after the migrations and before the
-port opens.** The lifecycle is the concept: a step is idempotent by construction — it states what
-must be true and makes it so — and nothing has been served when it runs, so a step that throws
-stops the start with the previous version still serving.
+**`DwAppServer(startup: [...])` and `DwServerFeature(startup: [...])` are work done at every start,
+after the migrations and before the port opens** — the server's steps first, then each feature's, in
+the order the features are listed. The lifecycle is the concept: a step is idempotent by
+construction — it states what must be true and makes it so — and nothing has been served when it
+runs, so a step that throws stops the start with the previous version still serving.
 
-It runs in a background context, in one transaction, so `ctx.db`, `ctx.accounts`, `ctx.publish`
+Each runs in a background context, in one transaction, so `ctx.db`, `ctx.accounts`, `ctx.publish`
 and `ctx.jobs` are the ones a handler has. `DwStartupStep.problems(auth)` is judged with the
 server's own, before the database is even opened: a value read from the environment is checked
 there.
 
+**Nothing but logging comes after `server.start()` in `bin/server.dart`.** By then the port is open:
+work there races the first calls, and when it fails the server is up with half of it. `dartway
+check` fails an `await`, or a reach into `server.db`, `server.accounts` or `runInContext`, after
+`start()` (`workAfterServerStart`).
+
 What goes where, and this is the whole of it:
 
-| Lifecycle | Where |
+| What | Where |
 |---|---|
-| once per database, recorded, in every environment | a **migration** |
-| at every start, in every environment, idempotent | a **startup step** |
-| whenever a developer feels like it, never in production | a **script** (`bin/seed_dev.dart`) |
+| the schema, once per database | a **migration** ([migrations](migrations.md)) |
+| existing rows carried across a schema change | `m.backfill` in that migration |
+| rows the code declares — a catalogue, a questionnaire, the reasons a project refuses something | a **seed**: `DwSeedRows` |
+| one value per app, with a default for every field | a **settings object**: `ctx.settings` ([database](database.md#settings)) |
+| anything else that must be true before the first call | a **startup step** |
+| development data, whenever a developer feels like it, never in production | a **script** (`bin/seed_dev.dart`) |
 
-The rule for data that is neither obviously one nor the other is **who owns the row afterwards**.
-Rows the operators own from the moment they exist — the first settings, a starting price list —
-are seeded once by a migration and never touched by code again. Rows that must agree with the code
-— notification templates, the reasons a project refuses something — are a startup step: change the
-declaration and the next start of every environment converges on it, with no applied migration to
-edit and no `down` that would delete rows somebody has since corrected.
+Rows the operators own once they exist are none of these: a seed would write the declaration back
+over their edit at the next start. Their starting values are defaults in the code, and the rows are
+made in the admin panel.
+
+### `DwSeedRows`
+
+Rows the code declares, written into their table by a key at every start. The example's staff chat
+declares its channels (`example/dartway_example_server/lib/src/chat/`):
+
+```dart
+// chat_rows.dart
+const staffChannels = [
+  NewChatChannelRow(slug: 'front-desk', title: 'Front desk'),
+  NewChatChannelRow(slug: 'coaches', title: 'Coaches'),
+  NewChatChannelRow(slug: 'maintenance', title: 'Maintenance'),
+];
+
+// chat_feature.dart
+final chatFeature = DwServerFeature(
+  'chat',
+  handlers: chatHandlers,
+  startup: [
+    DwSeedRows(
+      'staff channels',
+      table: ChatChannelRow.tableDef,
+      key: (t) => [t.slug],
+      rows: staffChannels,
+    ),
+  ],
+);
+```
+
+At every start, in one statement (`DwTableRepository.upsertAll`):
+
+- a declared row that is missing is inserted;
+- a stored row with the same key and other values is written over, keeping its id — an edit of the
+  declaration reaches every environment on its next start;
+- a stored row that already holds the declared values is not touched, so a start with nothing new
+  writes nothing and logs nothing;
+- a stored row the declaration does not name is left alone. Retiring one is a column of its own
+  (`isPublished: false`), declared like any other value, since other rows may point at it.
+
+**A seed owns its rows: only rows nobody edits outside the code are a seed** — the next start
+writes the declaration back over an edit made in an admin panel.
+
+The key names unique, `NOT NULL` columns — a natural key, never the `id`, which differs between
+databases; one `@DwUniqueColumn` or exactly a unique index. A nullable key column (a conflict never
+matches a null, so every start would insert the row again), a key that is not unique and two declared
+rows with one key are refused before the database is opened. The rows are constants: a value
+computed at start (`DateTime.now()`) rewrites the row at every start. During a rolling deploy the
+old and the new server each converge the table at their own start — the last one to start wins, and
+a row the new version dropped stays as the old one wrote it. A seed whose rows point at another
+seed's is listed after it.
 
 ### `DwFirstAdministrator`
 
 The case every project has. The admin role is granted by an admin, which leaves the first one
 nowhere to come from; `DW_ADMIN_IDENTIFIER` names it per environment, and there is no default
-because whoever receives the codes sent to that identifier *is* the administrator.
+because whoever receives the codes sent to that identifier *is* the administrator. It is read into
+`DwServerEnvironment.adminIdentifier`, and `bin/server.dart` hands it to the server factory:
 
 ```dart
 DwAppServer(
-  startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+  startup: [
+    DwFirstAdministrator(grant: AppBootstrap.grantAdmin, identifier: adminIdentifier),
+  ],
   ...
 );
 

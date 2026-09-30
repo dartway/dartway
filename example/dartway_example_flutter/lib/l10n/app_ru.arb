@@ -177,7 +177,7 @@
   "refusalTooManyAttachments": "Не больше {max} файлов в одном сообщении.",
   "refusalEditWindowClosed": "Сообщение нельзя изменить через сутки после отправки.",
   "refusalSearchQueryTooShort": "Для поиска нужно хотя бы {min} символа.",
-  "refusalSettingKeyUnknown": "Такой настройки нет.",
+  "refusalClubNameRequired": "Название клуба не может быть пустым.",
   "refusalFirstNameRequired": "Введите имя.",
   "refusalForbidden": "У вас нет прав на это действие.",
   "refusalNotFound": "Этого больше не существует.",

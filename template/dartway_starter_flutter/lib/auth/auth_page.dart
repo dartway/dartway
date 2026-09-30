@@ -1,4 +1,4 @@
-import 'package:dartway_starter_flutter/auth/logic/auth_state.dart';
+import 'package:dartway_starter_flutter/auth/logic/auth_controller.dart';
 import 'package:dartway_starter_flutter/auth/logic/auth_step.dart';
 import 'package:dartway_starter_flutter/auth/widgets/code_entry_block.dart';
 import 'package:dartway_starter_flutter/auth/widgets/consents_block.dart';
@@ -37,13 +37,16 @@ class AuthPage extends ConsumerWidget implements DwFeatureWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final step = ref.watch(authStateProvider.select((state) => state.step));
+    final step = ref.watch(
+      authControllerProvider.select((state) => state.step),
+    );
 
     return AppScaffold.inner(
       appBar: AppBar(
         leading: step.previousStep != null
             ? IconButton(
-                onPressed: () => ref.read(authStateProvider.notifier).back(),
+                onPressed: () =>
+                    ref.read(authControllerProvider.notifier).back(),
                 icon: const Icon(Icons.arrow_back),
               )
             : null,

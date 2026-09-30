@@ -2,7 +2,6 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_server/dartway_starter_server.dart';
 import 'package:dartway_starter_server/src/profile/profile_rows.dart';
-import 'package:dartway_starter_server/src/settings/settings_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 
@@ -55,7 +54,8 @@ void main() {
     expect(profile.role, UserRole.user);
     expect(profile.agreedForMarketing, isTrue);
     final row = (await app.db.userProfiles.findById(profile.id))!;
-    expect(row.termsAcceptedAt, isNotNull);
+    // Stamped by the server's clock, which the test holds still.
+    expect(row.termsAcceptedAt, app.clock.now());
   });
 
   test('signing up by e-mail, then signing in again without the consent: an '
@@ -125,12 +125,12 @@ void main() {
   test('with sign-up switched off a new identifier is refused and an existing '
       'account still signs in', () async {
     final member = await app.signUp('79990000020', firstName: 'Oleg');
-    await app.db.appSettings.insert(
-      const AppSettingRow(key: AppSettingKeys.signUpEnabled, value: 'false'),
+    await app.server.runInContext(
+      (ctx) => ctx.settings.save(const AppSettings(signUpEnabled: false)),
     );
     addTearDown(
-      () => app.db.appSettings.deleteWhere(
-        where: (t) => t.key.equals(AppSettingKeys.signUpEnabled),
+      () => app.server.runInContext(
+        (ctx) => ctx.settings.save(const AppSettings()),
       ),
     );
 
@@ -182,17 +182,16 @@ void main() {
     final server = app.server.server;
     DwFirstAdministrator declaring(String identifier) => DwFirstAdministrator(
       grant: AppBootstrap.grantAdmin,
-      environment: {DwFirstAdministrator.defaultVariable: identifier},
+      identifier: identifier,
     );
     Future<void> start(String identifier) =>
         server.runInContext(declaring(identifier).run);
 
     // A mistyped identifier is a server that does not start, judged before
     // anything opens.
-    expect(
-      declaring('not an identifier').problems(AppAuth.config()),
-      [contains(DwFirstAdministrator.defaultVariable)],
-    );
+    expect(declaring('not an identifier').problems(AppAuth.config()), [
+      contains('DW_ADMIN_IDENTIFIER'),
+    ]);
     expect(declaring('Admin@Example.com').problems(AppAuth.config()), isEmpty);
 
     await start('Admin@Example.com');
@@ -215,7 +214,7 @@ void main() {
     await app.db.userProfiles.update(created.copyWith(role: UserRole.user));
     await start('admin@example.com');
     expect(
-      (await app.db.userProfiles.findById(created.id!))!.role,
+      (await app.db.userProfiles.findById(created.id))!.role,
       UserRole.admin,
     );
 

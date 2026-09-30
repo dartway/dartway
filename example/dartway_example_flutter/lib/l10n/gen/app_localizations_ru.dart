@@ -582,7 +582,7 @@ class AppLocalizationsRu extends AppLocalizations {
   }
 
   @override
-  String get refusalSettingKeyUnknown => 'Такой настройки нет.';
+  String get refusalClubNameRequired => 'Название клуба не может быть пустым.';
 
   @override
   String get refusalFirstNameRequired => 'Введите имя.';

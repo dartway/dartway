@@ -1,4 +1,4 @@
-import 'package:dartway_starter_flutter/auth/logic/auth_state.dart';
+import 'package:dartway_starter_flutter/auth/logic/auth_controller.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
@@ -13,8 +13,8 @@ class ConsentsBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(authStateProvider);
-    final notifier = ref.read(authStateProvider.notifier);
+    final state = ref.watch(authControllerProvider);
+    final notifier = ref.read(authControllerProvider.notifier);
     final l10n = context.l10n;
 
     return SingleChildScrollView(

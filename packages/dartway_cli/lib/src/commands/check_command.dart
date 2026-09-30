@@ -3,15 +3,23 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
+import '../checker/dw_analysis_options.dart';
 import '../checker/dw_contract_names.dart';
+import '../checker/dw_data_lifecycle.dart';
 import '../checker/dw_check_type.dart';
 import '../checker/dw_flutter_inspector.dart';
+import '../checker/dw_flutter_state_rules.dart';
+import '../checker/dw_flutter_ui_rules.dart';
 import '../checker/dw_framework_lock.dart';
 import '../checker/dw_framework_overrides.dart';
 import '../checker/dw_l10n_wiring.dart';
 import '../checker/dw_local_environment.dart';
 import '../checker/dw_layout.dart';
+import '../checker/dw_server_clock_use.dart';
 import '../checker/dw_server_contract.dart';
+import '../checker/dw_server_features.dart';
+import '../checker/dw_server_outside_world.dart';
+import '../checker/dw_inline_ownership.dart';
 import '../checker/dw_project_template.dart';
 import '../checker/dw_uniformity_rules.dart';
 import '../deploy/local_environment.dart';
@@ -138,6 +146,15 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
 
+      // Inside the server's features: which files a feature may have, and
+      // which of them declares what. The server's, like the layout above.
+      errorCount += DwServerFeatureInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        sharedPackageDir: layout?.sharedPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+
       // Judges the package's wiring rather than any file in it, so it has
       // nothing to say about a run narrowed to a folder either.
       errorCount += DwL10nWiringInspector(
@@ -154,8 +171,30 @@ class CheckCommand extends Command<int> {
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);
+      errorCount += DwAnalysisOptionsInspector(
+        packageDirs: [layout?.serverPackageDir, layout?.sharedPackageDir],
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
       errorCount += DwGeneratedCodeInspector(
         serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwServerClockInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwServerOutsideWorldInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwDataLifecycleInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        sharedPackageDir: layout?.sharedPackageDir,
+        flutterPackageDir: layout?.flutterPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);
@@ -189,10 +228,27 @@ class CheckCommand extends Command<int> {
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);
+      errorCount += DwInlineOwnershipInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
     }
 
     errorCount += await DwFlutterInspector(
       packageDir: flutterPackageDir,
+      filterType: filterType,
+      filterSeverity: filterSeverity,
+      targetDirPath: results.option('dir'),
+    ).run(tally: tally);
+    errorCount += DwFlutterStateInspector(
+      flutterPackageDir: flutterPackageDir,
+      filterType: filterType,
+      filterSeverity: filterSeverity,
+      targetDirPath: results.option('dir'),
+    ).run(tally: tally);
+    errorCount += DwFlutterUiInspector(
+      flutterPackageDir: flutterPackageDir,
       filterType: filterType,
       filterSeverity: filterSeverity,
       targetDirPath: results.option('dir'),

@@ -11,7 +11,11 @@ import '../calls/dw_idempotency_ledger.dart';
 import '../channels/dw_channel_rules.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
+import '../outbound/dw_outbound_http.dart';
+import '../server/dw_server_clock.dart';
 import '../server/dw_server_module.dart';
+import '../settings/dw_settings_store.dart';
+import 'dw_caller_local_time.dart';
 
 /// Thrown when a call needs a signed-in account and has none. The framework
 /// answers `unauthenticated` (HTTP 401).
@@ -57,6 +61,36 @@ abstract class DwCallContext {
   /// The protocol both sides speak (for
   /// `DwDeletedObject.of<T>(id, ctx.protocol)`).
   DwWireProtocol get protocol;
+
+  /// The current instant, in UTC, from the server's clock
+  /// (`DwAppServer(clock: …)`, the system's by default): every time a handler,
+  /// a job, a route or a startup step decides something by, read here rather
+  /// than from `DateTime.now()`, so a test that sets the clock (`DwTestClock`)
+  /// sets it for all of them. Read anew on every access.
+  DateTime get now;
+
+  /// The caller's UTC offset at the moment of the call, as its app sent it
+  /// (`Dw-Utc-Offset`, read from the device on every call) — or `null` when
+  /// unknown: a client that sent none, and every context without a caller's
+  /// device behind it (jobs, routes, startup steps, channel subscription
+  /// checks, `DwAppServer.callAs`).
+  ///
+  /// An offset, not a time zone: it says what the caller's clock reads now,
+  /// not what it will read after the next daylight-saving change. Work that
+  /// runs later for this person — a job, a reminder — needs an offset the
+  /// project stored itself; the framework keeps none.
+  Duration? get callerUtcOffset;
+
+  /// The caller's wall clock now — [now] read on a clock [callerUtcOffset]
+  /// east of UTC: their date, hour, weekday and the instant their day began
+  /// ([DwCallerLocalTime.startOfDayUtc]). `null` when the offset is unknown.
+  ///
+  /// A reading, not an instant: it has no way to be stored or compared as
+  /// one.
+  DwCallerLocalTime? get callerLocalTime => switch (callerUtcOffset) {
+    final offset? => DwCallerLocalTime(now, offset),
+    null => null,
+  };
 
   /// Runs [body] in a transaction (a savepoint when already inside one).
   /// Publications, revocations and jobs made inside it take effect only when
@@ -124,6 +158,16 @@ abstract class DwCallContext {
   DwFileService get files;
 
   DwServerLogger get log;
+
+  /// Requests to other services' HTTP APIs: bounded by a timeout, logged,
+  /// and answered by the test's `DwFakeOutboundHttp` under a `DwTestServer`.
+  /// See [DwOutboundHttp].
+  DwOutboundHttp get http;
+
+  /// The app's settings: `await ctx.settings.read<SignInSettings>()` answers
+  /// the stored value or its defaults, never `null`; `save` and `update`
+  /// write it without a lock of the project's own. See [DwSettingsStore].
+  DwSettingsStore get settings => DwSettingsStore(db, protocol, log);
 
   /// The server's module of class [M] — how a module's context extension
   /// (`ctx.push`) reaches its runtime. Throws [StateError] when the server
@@ -195,6 +239,7 @@ final class DwRuntimeContext extends DwCallContext {
     required this.protocol,
     required this.log,
     required DwJobQueue Function(DwRuntimeContext ctx) jobs,
+    required DwOutboundHttp Function(DwRuntimeContext ctx) http,
     required DwAccountService Function(DwRuntimeContext ctx) accounts,
     DwFileService Function(DwRuntimeContext ctx)? files,
     Map<Type, DwServerModule> modules = const {},
@@ -204,9 +249,13 @@ final class DwRuntimeContext extends DwCallContext {
     void Function(DwRuntimeContext ctx)? deliverOnCommit,
     String? clientAppVersion,
     String? clientUserAgent,
+    required DwServerClock clock,
+    this.callerUtcOffset,
   }) : _root = _Scope(db),
+       _clock = clock,
        _deliverOnCommit = deliverOnCommit,
        _jobs = jobs,
+       _http = http,
        _accounts = accounts,
        _clientAppVersion = clientAppVersion,
        _clientUserAgent = clientUserAgent,
@@ -218,12 +267,20 @@ final class DwRuntimeContext extends DwCallContext {
   final Object _zoneKey = Object();
   final Map<Object, Object?> _memo = {};
   final DwJobQueue Function(DwRuntimeContext ctx) _jobs;
+  final DwOutboundHttp Function(DwRuntimeContext ctx) _http;
   final DwAccountService Function(DwRuntimeContext ctx) _accounts;
   final DwFileService Function(DwRuntimeContext ctx) _files;
   final Map<Type, DwServerModule> _modules;
   final DwChannelRules _channelRules;
+  final DwServerClock _clock;
 
   final DwContextKind kind;
+
+  @override
+  DateTime get now => _clock.now();
+
+  @override
+  final Duration? callerUtcOffset;
 
   @override
   final DwJobAttempt? job;
@@ -340,7 +397,10 @@ final class DwRuntimeContext extends DwCallContext {
   @override
   final DwServerLogger log;
 
-  // Both built on first use: most calls touch neither.
+  // Built on first use: most calls touch none of them.
+  @override
+  late final DwOutboundHttp http = _http(this);
+
   @override
   late final DwJobQueue jobs = _jobs(this);
 

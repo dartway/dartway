@@ -1,4 +1,4 @@
-import 'package:dartway_example_flutter/auth/logic/auth_state.dart';
+import 'package:dartway_example_flutter/auth/logic/auth_controller.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -11,7 +11,7 @@ class VerifyOtpBlock extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(authStateProvider);
+    final state = ref.watch(authControllerProvider);
 
     return Padding(
       padding: const EdgeInsets.only(top: AppSpace.s16),
@@ -37,7 +37,7 @@ class VerifyOtpBlock extends ConsumerWidget {
               child: PinCodeTextFieldWidget(
                 pinCode: state.otpRaw,
                 onChanged: (pinCode) => ref
-                    .read(authStateProvider.notifier)
+                    .read(authControllerProvider.notifier)
                     .update(otpRaw: pinCode),
               ),
             ),
@@ -49,7 +49,7 @@ class VerifyOtpBlock extends ConsumerWidget {
               context.l10n.continueAction,
               requireValidation: true,
               onTap: dw.action(
-                (_) => ref.read(authStateProvider.notifier).verifyCode(),
+                (_) => ref.read(authControllerProvider.notifier).verifyCode(),
               ),
             ),
           ),

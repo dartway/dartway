@@ -39,20 +39,24 @@ const dwServerLibFolders = {'generated', 'src'};
 /// `migrations/` is written and read by `bin/migrate.dart` by that path.
 const dwServerSrcLayers = {'core', 'migrations'};
 
-/// Folders a server's `lib/src/` may not have: layers named for what a file
-/// is rather than which area it serves. A feature split over `handlers/`,
-/// `rows/` and `domain/` lives in four places, and in one project it did —
-/// with two folders called `chat/` and `domain/chat/` and two different
-/// rules for who is in a chat.
+/// Folders a server's `lib/src/` may not have, at any depth: layers named for
+/// what a file is rather than which area it serves. A feature split over
+/// `handlers/`, `rows/` and `domain/` lives in four places, and in one project
+/// it did — with two folders called `chat/` and `domain/chat/` and two
+/// different rules for who is in a chat. At the top of `src/` this is the
+/// layout's finding; below it, [DwCheckType.invalidServerFeatureFile]'s.
 const dwServerForbiddenFolders = {
   'domain',
   'entities',
   'handlers',
+  'helpers',
   'models',
   'objects',
   'publications',
+  'repositories',
   'rows',
   'services',
+  'utils',
 };
 
 /// Validates the declared top level of a DartWay project: the folders that may

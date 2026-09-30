@@ -13,7 +13,7 @@ void main() {
   final database = useTestDatabase();
   DwDatabaseHandle db() => database().db;
 
-  ClubServiceRow service({
+  NewClubServiceRow service({
     String title = 'Yoga',
     ClubServiceKind kind = ClubServiceKind.group,
     double? price,
@@ -24,7 +24,7 @@ void main() {
     DateTime? archivedAt,
     Uint8List? cover,
     bool active = true,
-  }) => ClubServiceRow(
+  }) => NewClubServiceRow(
     title: title,
     kind: kind,
     price: price,
@@ -68,7 +68,7 @@ void main() {
       expect(stored.kind, ClubServiceKind.personal);
       expect(stored.active, isFalse);
 
-      final read = await db().clubServices.findById(stored.id!);
+      final read = await db().clubServices.findById(stored.id);
       expect(read, stored);
     });
 
@@ -99,17 +99,10 @@ void main() {
       expect(raw.single.get<int>('duration'), 2000000);
     });
 
-    test('an explicit id is written', () async {
-      final stored = await db().clubServices.insert(
-        service().copyWith(id: const DwFieldPatch.set(42)),
-      );
-      expect(stored.id, 42);
-    });
-
     test('jsonb map, keyword-named columns, unique foreign key', () async {
       final yoga = await db().clubServices.insert(service());
       final setting = await db().appSettings.insert(
-        AppSettingRow(
+        NewAppSettingRow(
           key: 'limits',
           value: 'text value',
           limits: {'daily': 3, 'weekly': 10},
@@ -132,12 +125,12 @@ void main() {
         service(title: 'Empty'),
         service(title: 'One', offeredAs: [ClubServiceKind.personal]),
       ]);
-      expect(await db().clubServices.findById(one.id!), one);
+      expect(await db().clubServices.findById(one.id), one);
       expect(one.offeredAs, [ClubServiceKind.personal, ClubServiceKind.group]);
       expect(
         [
           for (final row in many)
-            (await db().clubServices.findById(row.id!))!.offeredAs,
+            (await db().clubServices.findById(row.id))!.offeredAs,
         ],
         [
           const <ClubServiceKind>[],
@@ -250,7 +243,7 @@ void main() {
     });
 
     test('comparisons on int, double, DateTime, Duration and String', () async {
-      expect(await titles((t) => t.id.gt(services[0].id!)), ['beta', 'Gamma']);
+      expect(await titles((t) => t.id.gt(services[0].id)), ['beta', 'Gamma']);
       expect(await titles((t) => t.price.gte(20)), ['beta']);
       expect(await titles((t) => t.price.lt(20)), ['Alpha']);
       expect(await titles((t) => t.createdAt.lte(DateTime.utc(2026, 9, 2))), [
@@ -340,9 +333,9 @@ void main() {
     test('findById and findByIds', () async {
       expect(await db().clubServices.findById(999), isNull);
       final found = await db().clubServices.findByIds([
-        services[2].id!,
-        services[0].id!,
-        services[0].id!,
+        services[2].id,
+        services[0].id,
+        services[0].id,
         999,
       ]);
       expect(found.map((s) => s.id).toSet(), {services[0].id, services[2].id});
@@ -380,7 +373,7 @@ void main() {
       expect(inserted.map((s) => s.id), [for (var i = 1; i <= 50; i++) i]);
       expect(inserted[2].tags, ['t2']);
       expect(inserted[1].price, isNull);
-      expect(await db().clubServices.findById(inserted[3].id!), inserted[3]);
+      expect(await db().clubServices.findById(inserted[3].id), inserted[3]);
       final nulls = await db().query(
         'SELECT count(*) FILTER (WHERE price IS NULL) AS price, '
         'count(*) FILTER (WHERE archived_at IS NULL) AS archived, '
@@ -393,8 +386,8 @@ void main() {
       final yoga = await db().clubServices.insert(service());
       final sessions = await db().clubSessions.insertAll([
         for (var i = 0; i < 4; i++)
-          ClubSessionRow(
-            serviceId: yoga.id!,
+          NewClubSessionRow(
+            serviceId: yoga.id,
             startsAt: DateTime.utc(2026, 1, i + 1),
             capacity: i,
             labels: i.isEven ? null : ['odd', '"$i"'],
@@ -407,9 +400,10 @@ void main() {
         ['odd', '"3"'],
       ]);
       final single = await db().clubSessions.insert(
-        sessions.first.copyWith(
-          id: const DwFieldPatch.clear(),
+        NewClubSessionRow(
+          serviceId: yoga.id,
           startsAt: DateTime.utc(2030),
+          capacity: 0,
         ),
       );
       expect(single.labels, isNull);
@@ -430,8 +424,8 @@ void main() {
     test('nullable columns in insertAll are SQL NULL', () async {
       final yoga = await db().clubServices.insert(service());
       await db().appSettings.insertAll([
-        AppSettingRow(key: 'a', value: 'x', updatedAt: DateTime.utc(2026)),
-        AppSettingRow(
+        NewAppSettingRow(key: 'a', value: 'x', updatedAt: DateTime.utc(2026)),
+        NewAppSettingRow(
           key: 'b',
           value: 'y',
           limits: {'n': 1},
@@ -450,21 +444,14 @@ void main() {
       ]);
     });
 
-    test('empty input sends nothing; mixed ids are refused', () async {
+    test('empty input sends nothing', () async {
       expect(await db().clubServices.insertAll(const []), isEmpty);
-      expect(
-        () => db().clubServices.insertAll([
-          service(),
-          service().copyWith(id: const DwFieldPatch.set(7)),
-        ]),
-        throwsArgumentError,
-      );
     });
   });
 
   group('tryInsert', () {
     test('returns null when the unique key conflicts', () async {
-      final setting = AppSettingRow(
+      final setting = NewAppSettingRow(
         key: 'k',
         value: '1',
         updatedAt: DateTime.utc(2026),
@@ -489,8 +476,8 @@ void main() {
 
     test('a multi-column unique index is a conflict target', () async {
       final yoga = await db().clubServices.insert(service());
-      final session = ClubSessionRow(
-        serviceId: yoga.id!,
+      final session = NewClubSessionRow(
+        serviceId: yoga.id,
         startsAt: DateTime.utc(2026, 10, 1, 9),
         capacity: 10,
       );
@@ -510,7 +497,7 @@ void main() {
     test(
       'an empty target accepts a conflict on any unique constraint',
       () async {
-        final setting = AppSettingRow(
+        final setting = NewAppSettingRow(
           key: 'k',
           value: '1',
           updatedAt: DateTime.utc(2026),
@@ -538,11 +525,11 @@ void main() {
       );
       final updated = await db().clubServices.update(changed);
       expect(updated, changed);
-      expect(await db().clubServices.findById(stored.id!), changed);
+      expect(await db().clubServices.findById(stored.id), changed);
     });
 
     test('update of a missing row throws DwRowNotFound', () async {
-      final ghost = service().copyWith(id: const DwFieldPatch.set(12345));
+      final ghost = service().withId(12345);
       await expectLater(
         db().clubServices.update(ghost),
         throwsA(
@@ -551,7 +538,6 @@ void main() {
               .having((e) => e.table, 'table', 'club_service'),
         ),
       );
-      expect(() => db().clubServices.update(service()), throwsArgumentError);
     });
 
     test('updateWhere sets columns on matching rows', () async {
@@ -586,8 +572,8 @@ void main() {
         final yoga = await db().clubServices.insert(service());
         final rows = await db().clubSessions.insertAll([
           for (final capacity in [5, 7])
-            ClubSessionRow(
-              serviceId: yoga.id!,
+            NewClubSessionRow(
+              serviceId: yoga.id,
               startsAt: DateTime.utc(2026, 1, capacity),
               capacity: capacity,
             ),
@@ -598,7 +584,7 @@ void main() {
           for (var i = 0; i < 20; i++)
             db().transaction(
               (tx) => tx.clubSessions.updateWhere(
-                where: (t) => t.serviceId.equals(yoga.id!),
+                where: (t) => t.serviceId.equals(yoga.id),
                 set: (t) => [t.capacity.increment(1)],
               ),
             ),
@@ -606,18 +592,18 @@ void main() {
         expect(
           [
             for (final row in rows)
-              (await db().clubSessions.findById(row.id!))!.capacity,
+              (await db().clubSessions.findById(row.id))!.capacity,
           ],
           [25, 27],
         );
         expect(
           await db().clubSessions.updateWhere(
-            where: (t) => t.id.equals(rows.first.id!),
+            where: (t) => t.id.equals(rows.first.id),
             set: (t) => [t.capacity.increment(-5), t.note.set('fewer')],
           ),
           1,
         );
-        final changed = (await db().clubSessions.findById(rows.first.id!))!;
+        final changed = (await db().clubSessions.findById(rows.first.id))!;
         expect((changed.capacity, changed.note), (20, 'fewer'));
       },
     );
@@ -626,8 +612,8 @@ void main() {
       final yoga = await db().clubServices.insert(service());
       final rows = await db().clubSessions.insertAll([
         for (final note in [null, 'kept'])
-          ClubSessionRow(
-            serviceId: yoga.id!,
+          NewClubSessionRow(
+            serviceId: yoga.id,
             startsAt: DateTime.utc(2026, 2, note == null ? 1 : 2),
             capacity: 1,
             note: note,
@@ -635,7 +621,7 @@ void main() {
       ]);
       expect(
         await db().clubSessions.updateWhere(
-          where: (t) => t.serviceId.equals(yoga.id!),
+          where: (t) => t.serviceId.equals(yoga.id),
           set: (t) => [t.note.setIfNull('filled'), t.capacity.increment(1)],
         ),
         2,
@@ -643,7 +629,7 @@ void main() {
       expect(
         [
           for (final row in rows)
-            ((await db().clubSessions.findById(row.id!))!).note,
+            ((await db().clubSessions.findById(row.id))!).note,
         ],
         ['filled', 'kept'],
       );
@@ -655,8 +641,8 @@ void main() {
         service(title: 'b'),
         service(title: 'c'),
       ]);
-      expect(await db().clubServices.delete(rows[0].id!), 1);
-      expect(await db().clubServices.delete(rows[0].id!), 0);
+      expect(await db().clubServices.delete(rows[0].id), 1);
+      expect(await db().clubServices.delete(rows[0].id), 0);
       expect(
         await db().clubServices.deleteWhere(
           where: (t) => t.title.inList(['b', 'c']),
@@ -668,33 +654,112 @@ void main() {
     test('a cascading reference deletes children; set null clears', () async {
       final yoga = await db().clubServices.insert(service());
       final first = await db().clubSessions.insert(
-        ClubSessionRow(
-          serviceId: yoga.id!,
+        NewClubSessionRow(
+          serviceId: yoga.id,
           startsAt: DateTime.utc(2026),
           capacity: 1,
         ),
       );
       final other = await db().clubServices.insert(service(title: 'other'));
       final second = await db().clubSessions.insert(
-        ClubSessionRow(
-          serviceId: other.id!,
+        NewClubSessionRow(
+          serviceId: other.id,
           previousSessionId: first.id,
           startsAt: DateTime.utc(2026),
           capacity: 1,
           note: 'follow-up',
         ),
       );
-      await db().clubServices.delete(yoga.id!);
-      expect(await db().clubSessions.findById(first.id!), isNull);
-      final reloaded = await db().clubSessions.findById(second.id!);
+      await db().clubServices.delete(yoga.id);
+      expect(await db().clubSessions.findById(first.id), isNull);
+      final reloaded = await db().clubSessions.findById(second.id);
       expect(reloaded!.previousSessionId, isNull);
       expect(reloaded.note, 'follow-up');
     });
   });
 
+  group('a row always carries the id the database assigned', () {
+    // `id` is `int`: every path that answers rows reads it back, and a draft
+    // never has one. The ids below are the sequence's, in insert order.
+    test('insert, insertAll, tryInsert and upsert answer stored ids', () async {
+      final one = await db().clubServices.insert(service(title: 'a'));
+      final many = await db().clubServices.insertAll([
+        service(title: 'b'),
+        service(title: 'c'),
+      ]);
+      final tried = await db().clubServices.tryInsert(
+        service(title: 'd'),
+        onConflict: DwOnConflict.doNothing((t) => []),
+      );
+      final upserted = await db().appSettings.upsert(
+        NewAppSettingRow(key: 'k', value: 'v', updatedAt: DateTime.utc(2026)),
+        conflictOn: (t) => [t.key],
+      );
+      expect([one.id, ...many.map((row) => row.id), tried!.id], [1, 2, 3, 4]);
+      expect(upserted.id, 1);
+      final raw = await db().query('SELECT id FROM club_service ORDER BY id');
+      expect(raw.map((row) => row.get<int>('id')), [1, 2, 3, 4]);
+    });
+
+    test(
+      'every read and every returning write answers the stored id',
+      () async {
+        final stored = await db().clubServices.insertAll([
+          for (final title in ['a', 'b', 'c']) service(title: title),
+        ]);
+        final ids = [for (final row in stored) row.id];
+        expect(
+          (await db().clubServices.find(
+            orderBy: (t) => [t.id.asc()],
+          )).map((row) => row.id),
+          ids,
+        );
+        expect(
+          (await db().clubServices.findFirst(
+            where: (t) => t.title.equals('b'),
+          ))?.id,
+          ids[1],
+        );
+        expect((await db().clubServices.findById(ids[2]))?.id, ids[2]);
+        expect(
+          (await db().clubServices.findByIds(ids)).map((row) => row.id).toSet(),
+          ids.toSet(),
+        );
+        expect(
+          (await db().clubServices.findFirstPer(
+            (t) => t.title,
+            orderBy: (t) => [t.id.asc()],
+          )).map((title, row) => MapEntry(title, row.id)),
+          {'a': ids[0], 'b': ids[1], 'c': ids[2]},
+        );
+        expect(
+          (await db().clubServices.update(stored[0].copyWith(title: 'a2'))).id,
+          ids[0],
+        );
+        expect(
+          (await db().clubServices.updateWhereReturning(
+            where: (t) => t.title.inList(['b', 'c']),
+            set: (t) => [t.active.set(false)],
+          )).map((row) => row.id).toSet(),
+          {ids[1], ids[2]},
+        );
+      },
+    );
+
+    test('a draft with an id known is the row update writes', () async {
+      final stored = await db().clubServices.insert(service(title: 'a'));
+      final rewritten = await db().clubServices.update(
+        service(title: 'b').withId(stored.id),
+      );
+      expect(rewritten.id, stored.id);
+      expect(rewritten.title, 'b');
+      expect(await db().clubServices.count(), 1);
+    });
+  });
+
   group('errors', () {
     test('a unique violation names its constraint', () async {
-      final setting = AppSettingRow(
+      final setting = NewAppSettingRow(
         key: 'dup',
         value: '1',
         updatedAt: DateTime.utc(2026),
@@ -713,7 +778,7 @@ void main() {
     test('a foreign key violation names its constraint', () async {
       await expectLater(
         db().clubSessions.insert(
-          ClubSessionRow(
+          NewClubSessionRow(
             serviceId: 404,
             startsAt: DateTime.utc(2026),
             capacity: 1,

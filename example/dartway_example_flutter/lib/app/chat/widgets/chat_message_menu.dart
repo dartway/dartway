@@ -1,6 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
-import 'package:dartway_example_flutter/app/chat/logic/chat_session.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_composing_controller.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/profile/profile_roles.dart';
@@ -21,7 +21,7 @@ abstract final class ChatMessageMenu {
   static Future<void> show(
     BuildContext context, {
     required ChatMessage message,
-    required ChatSession session,
+    required ChatComposingController composing,
     required UserProfile me,
   }) {
     final l10n = context.l10n;
@@ -54,7 +54,7 @@ abstract final class ChatMessageMenu {
                 title: Text(l10n.chatReply),
                 onTap: () {
                   close();
-                  session.startReply(message);
+                  composing.startReply(message);
                 },
               ),
               if (message.editableBy(me.id))
@@ -63,7 +63,7 @@ abstract final class ChatMessageMenu {
                   title: Text(l10n.chatEdit),
                   onTap: () {
                     close();
-                    session.startEdit(message);
+                    composing.startEdit(message);
                   },
                 ),
               if (message.text.isNotEmpty)
@@ -92,30 +92,18 @@ abstract final class ChatMessageMenu {
                 ListTile(
                   leading: const Icon(Icons.delete_outline),
                   title: Text(l10n.chatDelete),
-                  onTap: () async {
+                  onTap: () {
                     close();
-                    final sure = await showDialog<bool>(
-                      context: context,
-                      builder: (dialog) => AlertDialog(
-                        title: Text(l10n.chatDeleteQuestion),
-                        content: Text(l10n.chatDeleteExplanation),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.of(dialog).pop(false),
-                            child: Text(l10n.cancel),
-                          ),
-                          TextButton(
-                            onPressed: () => Navigator.of(dialog).pop(true),
-                            child: Text(l10n.chatDelete),
-                          ),
-                        ],
+                    dw.action(
+                      (_) => ChatCommands.delete(message),
+                      confirmation: DwUiConfirmation(
+                        l10n.chatDeleteExplanation,
+                        title: l10n.chatDeleteQuestion,
+                        confirmLabel: l10n.chatDelete,
+                        cancelLabel: l10n.cancel,
+                        isDestructive: true,
                       ),
-                    );
-                    if (sure == true && context.mounted) {
-                      await dw.action((_) => ChatCommands.delete(message))(
-                        context,
-                      );
-                    }
+                    )(context);
                   },
                 ),
             ],

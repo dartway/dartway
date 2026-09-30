@@ -1,4 +1,5 @@
 import 'package:collection/collection.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_composing_controller.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_session.dart';
 import 'package:dartway_example_flutter/app/chat/widgets/chat_attachments_view.dart';
@@ -9,12 +10,13 @@ import 'package:dartway_example_flutter/core/profile/my_profile.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
+import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/app/chat/logic/chat_commands.dart';
 
 /// One message of the list with what stands above it: the day it starts, the
 /// unread divider, the author's name and avatar for the first and last of a
 /// run.
-class ChatMessageRow extends StatelessWidget {
+class ChatMessageRow extends ConsumerWidget {
   const ChatMessageRow({
     required this.row,
     required this.session,
@@ -27,9 +29,12 @@ class ChatMessageRow extends StatelessWidget {
   final String? searchQuery;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
     final message = row.item;
+    final composing = ref.read(
+      chatComposingProvider(session.channel.id).notifier,
+    );
     final me = context.profile;
     final isMine = message.author.id == me.id;
     final older = row.older;
@@ -137,13 +142,13 @@ class ChatMessageRow extends StatelessWidget {
                   onLongPress: () => ChatMessageMenu.show(
                     context,
                     message: message,
-                    session: session,
+                    composing: composing,
                     me: me,
                   ),
                   onSecondaryTap: () => ChatMessageMenu.show(
                     context,
                     message: message,
-                    session: session,
+                    composing: composing,
                     me: me,
                   ),
                   child: bubble,

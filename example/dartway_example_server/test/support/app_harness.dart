@@ -14,29 +14,38 @@ import 'package:test/test.dart';
 /// The skeleton's harness, extended: the club starts with push and settings
 /// of its own, signs in by phone, and has staff besides admins.
 final class AppHarness {
-  AppHarness._(this.database, this.server);
+  AppHarness._(this.database, this.server, this.clock);
 
   final DwTestDatabase database;
   final DwTestServer server;
 
+  /// The server's clock, which the test sets and moves: it stands where it
+  /// was started until the test moves it.
+  final DwTestClock clock;
+
   /// The codes the server delivered, by normalized phone.
   final Map<String, String> delivered = {};
 
-  /// With [storage], the server takes uploads on its buckets.
+  /// With [storage], the server takes uploads on its buckets. Its clock
+  /// starts at [now], the real time by default.
   static Future<AppHarness> start({
     DwServerSettings settings = const DwServerSettings(),
     DwFileStorageConfig? storage,
     DwPushModule? push,
+    DateTime? now,
   }) async {
     final database = await DwTestDatabase.create(prefix: 'dw_example_test');
+    final clock = DwTestClock(now ?? DateTime.now());
     late final AppHarness harness;
     final server = await DwTestServer.start(
       DartwayExampleServer.build(
+        adminIdentifier: null,
         database: database.config,
         storage: storage,
         port: 0,
         settings: settings,
         push: push,
+        clock: clock,
         auth: DwAuthConfig(
           accountDeletion: DwAccountDeletion.byMember,
           normalize: AppAuth.config.normalize,
@@ -48,7 +57,7 @@ final class AppHarness {
         ),
       ),
     );
-    return harness = AppHarness._(database, server);
+    return harness = AppHarness._(database, server, clock);
   }
 
   /// Starts and stops a second server on this harness's database with
@@ -72,6 +81,28 @@ final class AppHarness {
       ),
     );
     await bare.stop();
+  }
+
+  /// Runs [body] on the club's server started on [database] — one the test
+  /// prepared itself (migrated part way, rows written by hand) — and stops
+  /// it: the proof of what a start does to a database that already holds
+  /// something.
+  static Future<T> onDatabase<T>(
+    DwTestDatabase database,
+    Future<T> Function(DwTestServer server) body,
+  ) async {
+    final server = await DwTestServer.start(
+      DartwayExampleServer.build(
+        database: database.config,
+        port: 0,
+        adminIdentifier: null,
+      ),
+    );
+    try {
+      return await body(server);
+    } finally {
+      await server.stop();
+    }
   }
 
   Future<void> stop() async {
@@ -165,7 +196,7 @@ final class AppMember {
   Future<UserProfileRow> profileRow() async => (await _harness.db.userProfiles
       .findFirst(where: (t) => t.accountId.equals(accountId)))!;
 
-  Future<int> get profileId async => (await profileRow()).id!;
+  Future<int> get profileId async => (await profileRow()).id;
 }
 
 /// The data of a watched request, when it has data.

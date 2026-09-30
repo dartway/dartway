@@ -7,19 +7,33 @@ import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_hooks/flutter_hooks.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Builds one dashboard widget: what it shows and how. Pops with the spec.
 ///
 /// Events and property keys are offered from the catalog of [period] — what
 /// was actually recorded — rather than typed: a misspelt name is an empty
 /// report nobody can tell from a quiet week. Only a filter's value is typed.
-class AnalyticsWidgetEditor extends HookConsumerWidget {
+class AnalyticsWidgetEditor extends StatelessWidget {
   const AnalyticsWidgetEditor({super.key, this.initial, required this.period});
 
   /// The widget edited; `null` for a new one.
   final DwAnalyticsWidgetSpec? initial;
   final DwAnalyticsPeriod period;
+
+  @override
+  Widget build(BuildContext context) => DwReadBuilder(
+    dw.request(DwGetAnalyticsCatalog(period: period)),
+    builder: (context, catalog) =>
+        _AnalyticsWidgetForm(initial: initial, catalog: catalog),
+  );
+}
+
+/// The editor's form over the catalog it offers from.
+class _AnalyticsWidgetForm extends HookWidget {
+  const _AnalyticsWidgetForm({required this.initial, required this.catalog});
+
+  final DwAnalyticsWidgetSpec? initial;
+  final DwAnalyticsCatalog catalog;
 
   static const Set<int> _topChoices = {
     3,
@@ -55,7 +69,7 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final start = initial;
     final type = useState(start?.type ?? DwAnalyticsWidgetType.indicator);
@@ -68,9 +82,6 @@ class AnalyticsWidgetEditor extends HookConsumerWidget {
     );
     final comparePrevious = useState(start?.comparePrevious ?? false);
 
-    final catalog =
-        ref.watch(dw.request(DwGetAnalyticsCatalog(period: period))).value ??
-        const DwAnalyticsCatalog();
     final events = catalog.events;
     final keys = eventName.value == null
         ? {for (final e in events) ...e.propertyKeys}.sorted()

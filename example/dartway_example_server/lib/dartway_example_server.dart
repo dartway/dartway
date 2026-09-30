@@ -21,12 +21,11 @@ import 'package:dartway_push_server/dartway_push_server.dart';
 
 export 'package:dartway_example_server/generated/dw_schema.dart';
 export 'package:dartway_example_server/src/core/auth.dart' show AppAuth;
-export 'package:dartway_example_server/src/core/bootstrap.dart'
-    show AppBootstrap;
+export 'package:dartway_example_server/src/core/bootstrap.dart' show AppBootstrap;
+export 'package:dartway_example_server/src/core/environment.dart' show AppEnvironment, AppPushEnvironment;
 export 'package:dartway_example_server/src/core/files.dart' show AppFiles;
 export 'package:dartway_example_server/src/core/push.dart' show AppPush;
-export 'package:dartway_example_server/src/migrations/migrations.dart'
-    show appMigrations;
+export 'package:dartway_example_server/src/migrations/migrations.dart' show appMigrations;
 
 /// The club's server, as `bin/server.dart` and the tests build it.
 abstract final class DartwayExampleServer {
@@ -39,13 +38,21 @@ abstract final class DartwayExampleServer {
   ///
   /// [push] sends notifications (`AppPush.module`); by default it has no providers
   /// and records deliveries it has nobody to send through.
+  ///
+  /// [adminIdentifier] is made an administrator at every start
+  /// (`DwFirstAdministrator`): `bin/server.dart` passes `DW_ADMIN_IDENTIFIER`,
+  /// read into `DwServerEnvironment.adminIdentifier`.
+  /// [clock] is the time every handler and job reads as `ctx.now` — the
+  /// system's, unless a test sets its own (`DwTestClock`).
   static DwAppServer build({
     required DwDatabaseConfig database,
     DwFileStorageConfig? storage,
     int port = 8080,
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
+    required String? adminIdentifier,
     DwPushModule? push,
+    DwServerClock clock = DwServerClock.system,
   }) => DwAppServer(
     protocol: appProtocol,
     schema: dartwayExampleSchema,
@@ -61,7 +68,12 @@ abstract final class DartwayExampleServer {
       chatFeature,
       adminFeature,
     ],
-    startup: [DwFirstAdministrator(grant: AppBootstrap.grantAdmin)],
+    startup: [
+      DwFirstAdministrator(
+        grant: AppBootstrap.grantAdmin,
+        identifier: adminIdentifier,
+      ),
+    ],
     files: storage == null ? null : AppFiles.storage(storage),
     modules: [
       push ?? AppPush.module(),
@@ -71,5 +83,6 @@ abstract final class DartwayExampleServer {
     ],
     port: port,
     settings: settings,
+    clock: clock,
   );
 }

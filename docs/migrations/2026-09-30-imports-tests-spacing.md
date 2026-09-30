@@ -1,8 +1,8 @@
 ---
 title: "package: imports, tests that mirror lib/, spacing tokens and the lint plugin: dartway check fails the rest"
 affects:
-  dartway_core_flutter: "0.21.0-dev.9"
-  dartway_cli: "0.13.0"
+  dartway_core_flutter: "0.21.0-dev.16"
+  dartway_cli: "0.22.0"
 ---
 
 ## Who is affected

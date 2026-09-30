@@ -94,19 +94,23 @@ final class DwPushWorker {
 
   // --- claim ----------------------------------------------------------------
 
+  // Every time of a delivery — due, leased, finished — is read against the
+  // server's clock (`ctx.now`), the one the `dw.push.deliver` job becomes due
+  // by: on two clocks a job could run before the delivery it covers is due,
+  // claim nothing, and leave it without a job.
   Future<_Claim> _claim(DwCallContext ctx) => ctx.transaction((tx) async {
+    final now = ctx.now;
     final rows = await tx.query(
       'SELECT d.id, d.account_id, d.message_id, d.attempts, d.done_devices, '
       'd.sent, m.category, m.title, m.body, m.image_url, m.data, '
-      'm.expires_at, m.created_at AS message_created_at, now() AS now '
+      'm.expires_at, m.created_at AS message_created_at '
       'FROM dw_push_delivery d JOIN dw_push_message m ON m.id = d.message_id '
-      'WHERE d.finished_at IS NULL AND d.run_at <= now() '
-      'AND (d.locked_until IS NULL OR d.locked_until <= now()) '
+      'WHERE d.finished_at IS NULL AND d.run_at <= @now::timestamptz '
+      'AND (d.locked_until IS NULL OR d.locked_until <= @now::timestamptz) '
       'ORDER BY d.run_at, d.id LIMIT @limit FOR UPDATE OF d SKIP LOCKED',
-      params: {'limit': module.settings.batchSize},
+      params: {'limit': module.settings.batchSize, 'now': now},
     );
     if (rows.isEmpty) return _Claim.empty();
-    final now = rows.first.get<DateTime>('now');
     final finished = <(int, String)>[];
     final delayed = <(int, DateTime)>[];
     final candidates = <_Delivery>[];
@@ -173,10 +177,12 @@ final class DwPushWorker {
     if (finished.isNotEmpty) {
       await tx.execute(
         'UPDATE dw_push_delivery AS d SET outcome = u.outcome, '
-        'finished_at = now(), locked_until = NULL, lease_id = NULL '
+        'finished_at = @now::timestamptz, locked_until = NULL, '
+        'lease_id = NULL '
         'FROM unnest(@ids::int8[], @outcomes::text[]) AS u(id, outcome) '
         'WHERE d.id = u.id',
         params: {
+          'now': now,
           'ids': [for (final (id, _) in finished) id],
           'outcomes': [for (final (_, outcome) in finished) outcome],
         },
@@ -202,9 +208,10 @@ final class DwPushWorker {
     if (leased.isNotEmpty) {
       await tx.execute(
         'UPDATE dw_push_delivery SET lease_id = @lease, '
-        "locked_until = now() + @micros::int8 * interval '1 microsecond' "
+        "locked_until = @now::timestamptz + @micros::int8 * interval '1 microsecond' "
         'WHERE id = ANY(@ids::int8[])',
         params: {
+          'now': now,
           'lease': leaseId,
           'micros': module.settings.lease.inMicroseconds,
           'ids': [for (final d in leased) d.id],
@@ -352,9 +359,9 @@ final class DwPushWorker {
     final invalidDevices = <int>[];
     final retryTimes = <DateTime>[];
     var released = false;
-    // The claim's database clock, moved on by the time sending took: retry
-    // times and the job covering them are both on it.
-    final now = claim.now.add(claim.age.elapsed);
+    // The server's clock after sending: retry times and the job covering
+    // them are both on it.
+    final now = ctx.now;
 
     for (final delivery in claim.leased) {
       final settled = <int>[];
@@ -430,7 +437,8 @@ final class DwPushWorker {
         'run_at = CASE WHEN u.run_at < 0 THEN d.run_at '
         "ELSE timestamptz 'epoch' + u.run_at * interval '1 microsecond' END, "
         "outcome = NULLIF(u.outcome, ''), "
-        "finished_at = CASE WHEN u.outcome = '' THEN NULL ELSE now() END, "
+        "finished_at = CASE WHEN u.outcome = '' THEN NULL "
+        'ELSE @now::timestamptz END, '
         'locked_until = NULL, lease_id = NULL '
         'FROM unnest(@ids::int8[], @done::text[], @sent::bool[], '
         '@attempts::int4[], @errors::text[], @run_ats::int8[], '
@@ -446,6 +454,7 @@ final class DwPushWorker {
           'run_ats': runAts,
           'outcomes': results,
           'lease': claim.leaseId,
+          'now': now,
         },
       );
       if (recorded.length != ids.length) {
@@ -495,25 +504,20 @@ final class DwPushWorker {
 }
 
 final class _Claim {
-  _Claim(this.claimed, this.leaseId, this.leased, this.now)
-    : age = Stopwatch()..start();
+  _Claim(this.claimed, this.leaseId, this.leased, this.now);
 
   _Claim.empty()
     : claimed = 0,
       leaseId = '',
       leased = const [],
-      now = DateTime.utc(1970),
-      age = Stopwatch();
+      now = DateTime.utc(1970);
 
   final int claimed;
   final String leaseId;
   final List<_Delivery> leased;
 
-  /// The database's clock when the claim was read.
+  /// The server's clock when the claim was read.
   final DateTime now;
-
-  /// Time since [now]: the claim's clock moved on.
-  final Stopwatch age;
 }
 
 final class _Message {

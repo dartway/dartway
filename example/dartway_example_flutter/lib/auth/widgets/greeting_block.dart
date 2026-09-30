@@ -2,7 +2,7 @@ import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/auth/logic/auth_state.dart';
+import 'package:dartway_example_flutter/auth/logic/auth_controller.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -31,7 +31,7 @@ class GreetingBlock extends ConsumerWidget {
           width: 250,
           onTap: dw.action(
             (_) => ref
-                .read(authStateProvider.notifier)
+                .read(authControllerProvider.notifier)
                 .goTo(AuthStep.registration),
           ),
         ),
@@ -41,7 +41,8 @@ class GreetingBlock extends ConsumerWidget {
           height: 40,
           width: 250,
           onTap: dw.action(
-            (_) => ref.read(authStateProvider.notifier).goTo(AuthStep.login),
+            (_) =>
+                ref.read(authControllerProvider.notifier).goTo(AuthStep.login),
           ),
         ),
         const Spacer(flex: 3),

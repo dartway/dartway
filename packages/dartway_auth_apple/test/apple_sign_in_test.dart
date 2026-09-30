@@ -2,6 +2,7 @@ import 'package:dartway_auth_apple/dartway_auth_apple.dart';
 import 'package:dartway_auth_providers_shared/dartway_auth_providers_shared.dart';
 import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The app's half of Sign in with Apple: what reaches the server, and what
@@ -36,6 +37,8 @@ void main() {
       config: DwFlutterConfig(
         appVersion: '1.0.0+1',
         refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (context) => const SizedBox(),
+        readFailedBuilder: (context, error, retry) => const SizedBox(),
       ),
       protocol: protocol,
       baseUrl: server.baseUrl,

@@ -44,7 +44,7 @@ final bookingsJobs = <DwJobDefinition>[
       final session = (await ctx.db.clubSessions.findById(booking.sessionId))!;
       // A job can run late — the server was down, the queue behind. A
       // reminder of a session already under way is noise.
-      if (!session.startsAt.isAfter(DateTime.now().toUtc())) return;
+      if (!session.startsAt.isAfter(ctx.now)) return;
       final service = (await ctx.db.clubServices.findById(session.serviceId))!;
       final client = (await ctx.db.userProfiles.findById(
         booking.clientProfileId,
@@ -54,7 +54,7 @@ final bookingsJobs = <DwJobDefinition>[
         [client.ownerAccountId],
         message: DwPushMessage(title: service.title, link: '/bookings'),
         category: DartwayExamplePushCategory.bookingReminder,
-        dedupKey: BookingsJobs.remindKey(booking.id!),
+        dedupKey: BookingsJobs.remindKey(booking.id),
       );
     },
   ),

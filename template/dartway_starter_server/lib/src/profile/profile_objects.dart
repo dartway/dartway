@@ -37,7 +37,7 @@ abstract final class ProfileObjects {
   static Future<UserCard> card(DwCallContext ctx, UserProfileRow row) async {
     final identities = await ctx.accounts.listIdentities(row.accountId);
     return UserCard(
-      id: row.id!,
+      id: row.id,
       profile: await profile(ctx, row),
       identifiers: [
         for (final identity in identities)
@@ -71,7 +71,7 @@ abstract final class ProfileObjects {
     List<DwIdentityInfo> identities,
     String? avatarUrl,
   ) => UserProfile(
-    id: row.id!,
+    id: row.id,
     accountId: row.accountId,
     firstName: row.firstName,
     lastName: row.lastName,

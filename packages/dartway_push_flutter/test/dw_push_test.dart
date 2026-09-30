@@ -5,6 +5,7 @@ import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
 import 'package:dartway_push_flutter/testing.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 const alice = DwAuthSession(id: 7, token: 'token-7', isNewAccount: false);
@@ -68,6 +69,8 @@ final class World {
       config: DwFlutterConfig(
         appVersion: '1.0.0+1',
         refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (context) => const SizedBox(),
+        readFailedBuilder: (context, error, retry) => const SizedBox(),
         onErrorReport: reports.add,
       ),
       protocol: appProtocol ?? protocol,

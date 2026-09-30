@@ -180,7 +180,8 @@ learns nothing about files that are not theirs. Skip it and one member can put a
 private document on their own row and read it through the row's rules.
 
 An optional file on an update command travels as `DwFieldPatch<int>` (keep / set / clear), as the
-skeleton's profile photo does; check `requireOwned` only on `DwSetField`.
+skeleton's profile photo does; check `requireOwned` only on a new value:
+`if (command.photoFileId.newValue case final fileId?)`.
 
 ## 5. Showing files
 
@@ -205,10 +206,15 @@ network image.
 the app asks for a link **when the file is about to be opened**:
 
 ```dart
-final link = await dw.files.getLink(invoice.scanFileId!);
-if (link case DwCallOk(:final value)) {
-  // value.url, valid until value.expiresAt
-}
+// logic/<feature>_files.dart — valid until the link's expiresAt
+static Future<String> scanLinkOf(Invoice invoice) async =>
+    (await dw.files.getLink(invoice.scanFileId!)).valueOrThrow.url;
+
+// the widget opens it inside dw.action, which shows a refusal
+onTap: () => dw.action(
+  (_) => InvoiceFiles.scanLinkOf(invoice),
+  followUpIfMountedAction: (_, url) => launchUrl(Uri.parse(url)), // url_launcher
+)(context),
 ```
 
 A private link is short-lived (`DwFileStorage.linkLifetime`, ten minutes by default). Do not store

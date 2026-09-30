@@ -10,13 +10,15 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_server/dartway_push_server.dart';
 
 final contentHandlers = <DwCallHandler>[
-  /// The news feed, newest first. Every signed-in member.
-  DwCallHandler.list<ListNews, NewsPost>(
+  /// The news feed, newest first, a page at a time. Every signed-in member.
+  DwCallHandler.page<ListNews, NewsPost>(
     access: DwAccessRule.signedIn,
-    handle: (ctx, request) async => ContentObjects.news(
+    handle: (ctx, request, page) async => ContentObjects.news(
       ctx.db,
       await ctx.db.newsPosts.find(
         orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
+        limit: page.fetchLimit,
+        offset: page.offset,
       ),
     ),
   ),
@@ -28,11 +30,11 @@ final contentHandlers = <DwCallHandler>[
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final row = await ctx.db.newsPosts.insert(
-        NewsPostRow(
-          authorProfileId: me.id!,
+        NewNewsPostRow(
+          authorProfileId: me.id,
           title: command.title.trim(),
           text: command.text.trim(),
-          createdAt: DateTime.now(),
+          createdAt: ctx.now,
         ),
       );
       final post = (await ContentObjects.news(ctx.db, [
@@ -81,35 +83,27 @@ final contentHandlers = <DwCallHandler>[
     },
   ),
 
-  /// Every app setting. Every signed-in member.
-  DwCallHandler.list<ListAppSettings, AppSetting>(
+  /// The club's settings, their defaults while nobody has saved them. Every
+  /// signed-in member.
+  DwCallHandler.single<GetClubSettings, ClubSettings>(
     access: DwAccessRule.signedIn,
-    handle: (ctx, request) async => [
-      for (final row in await ctx.db.appSettings.find(
-        orderBy: (t) => [t.key.asc()],
-      ))
-        ContentObjects.setting(row),
-    ],
+    handle: (ctx, request) => ctx.settings.read<ClubSettings>(),
   ),
 
-  /// Writes an app setting. Admins only; published to every member.
-  DwCallHandler.command<SaveAppSetting, AppSetting>(
+  /// Changes the settings the command names, the rest as they are. Admins
+  /// only; published to every member.
+  DwCallHandler.command<SaveClubSettings, ClubSettings>(
     access: AppAccess.admin,
     handle: (ctx, command) async {
-      final existing = await ctx.db.appSettings.findFirst(
-        where: (t) => t.key.equals(command.key),
-        lock: DwRowLock.forUpdate,
+      final saved = await ctx.settings.update<ClubSettings>(
+        (current) => current.copyWith(
+          clubName: command.clubName?.trim(),
+          bookingEnabled: command.bookingEnabled,
+          supportPhone: command.supportPhone.trimmedOrCleared,
+        ),
       );
-      final saved = existing == null
-          ? await ctx.db.appSettings.insert(
-              AppSettingRow(key: command.key, value: command.value),
-            )
-          : await ctx.db.appSettings.update(
-              existing.copyWith(value: command.value),
-            );
-      final setting = ContentObjects.setting(saved);
-      ctx.publish(AppChannels.settings, setting);
-      return setting;
+      ctx.publish(AppChannels.settings, saved);
+      return saved;
     },
   ),
 ];

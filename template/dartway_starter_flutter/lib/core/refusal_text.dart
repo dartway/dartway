@@ -36,7 +36,7 @@ extension AppRefusalText on AppLocalizations {
     DartwayStarterRefusal.consentsRequired => refusalConsentsRequired,
     DartwayStarterRefusal.signUpClosed => refusalSignUpClosed,
     DartwayStarterRefusal.firstNameRequired => refusalFirstNameRequired,
-    DartwayStarterRefusal.settingKeyUnknown => refusalSettingKeyUnknown,
+    DartwayStarterRefusal.appNameRequired => refusalAppNameRequired,
     DartwayStarterRefusal.ownRoleLocked => refusalOwnRoleLocked,
   };
 

@@ -4,14 +4,12 @@ import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:dartway_example_flutter/admin/users/logic/users_commands.dart';
-import 'package:dartway_example_flutter/core/async_section.dart';
 
 /// One page of members, with the role editable inline and the pager under
 /// it. The page is live: rows change in place, and a new member reads it
 /// again.
-class AdminUsersTable extends ConsumerWidget {
+class AdminUsersTable extends StatelessWidget {
   const AdminUsersTable({
     required this.request,
     required this.onPage,
@@ -24,66 +22,60 @@ class AdminUsersTable extends ConsumerWidget {
   final void Function(int page) onPage;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
     final table = dw.table(request);
 
-    return ref
-        .watch(table)
-        .section(
-          loadingValue: DwTablePage(
-            PlaceholderObjects.listOf(PlaceholderObjects.profile, 4),
-            total: 4,
-            page: 1,
-            pageSize: request.pageSize,
-          ),
-          onRetry: () => ref.read(table.notifier).refetch(),
-          builder: (page) {
-            if (page.items.isEmpty) {
-              return AppText.body(
-                request.search.isEmpty && request.role == null
-                    ? l10n.noMembersYet
-                    : l10n.noMembersMatch,
-              );
-            }
-            return Column(
+    return DwReadBuilder(
+      table,
+      placeholder: DwTablePage(
+        PlaceholderObjects.listOf(PlaceholderObjects.profile, 4),
+        total: 4,
+        page: 1,
+        pageSize: request.pageSize,
+      ),
+      builder: (context, page) {
+        if (page.items.isEmpty) {
+          return AppText.body(
+            request.search.isEmpty && request.role == null
+                ? l10n.noMembersYet
+                : l10n.noMembersMatch,
+          );
+        }
+        return Column(
+          children: [
+            Expanded(
+              child: ListView(
+                children: [for (final user in page.items) _UserRow(user: user)],
+              ),
+            ),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Expanded(
-                  child: ListView(
-                    children: [
-                      for (final user in page.items) _UserRow(user: user),
-                    ],
+                IconButton(
+                  tooltip: l10n.previousPage,
+                  icon: const Icon(Icons.chevron_left),
+                  onPressed: page.page > 1 ? () => onPage(page.page - 1) : null,
+                ),
+                Flexible(
+                  child: AppText.body(
+                    l10n.membersPage(page.page, page.pageCount, page.total),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      tooltip: l10n.previousPage,
-                      icon: const Icon(Icons.chevron_left),
-                      onPressed: page.page > 1
-                          ? () => onPage(page.page - 1)
-                          : null,
-                    ),
-                    Flexible(
-                      child: AppText.body(
-                        l10n.membersPage(page.page, page.pageCount, page.total),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: l10n.nextPage,
-                      icon: const Icon(Icons.chevron_right),
-                      onPressed: page.page < page.pageCount
-                          ? () => onPage(page.page + 1)
-                          : null,
-                    ),
-                  ],
+                IconButton(
+                  tooltip: l10n.nextPage,
+                  icon: const Icon(Icons.chevron_right),
+                  onPressed: page.page < page.pageCount
+                      ? () => onPage(page.page + 1)
+                      : null,
                 ),
               ],
-            );
-          },
+            ),
+          ],
         );
+      },
+    );
   }
 }
 

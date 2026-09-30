@@ -2,6 +2,7 @@ import '../channels/dw_channel_rule.dart';
 import '../handlers/dw_call_handler.dart';
 import '../jobs/dw_job_queue.dart';
 import '../routes/dw_http_route.dart';
+import 'dw_startup_step.dart';
 
 /// One area of a project's server — its calls, live channels, jobs and
 /// doors, declared together in the folder the area lives in.
@@ -23,6 +24,7 @@ final class DwServerFeature {
     this.channels = const [],
     this.jobs = const [],
     this.routes = const [],
+    this.startup = const [],
   });
 
   /// Lower-case letters, digits and `_`, starting with a letter.
@@ -31,6 +33,10 @@ final class DwServerFeature {
   final List<DwChannelRule> channels;
   final List<DwJobDefinition> jobs;
   final List<DwHttpRoute> routes;
+
+  /// Work this area does at every start: its seeds ([DwSeedRows]), run after
+  /// the server's own steps. See [DwStartupStep].
+  final List<DwStartupStep> startup;
 
   /// Whether [name] is a feature name.
   static bool isValidName(String name) =>

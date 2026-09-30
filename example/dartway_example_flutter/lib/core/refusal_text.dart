@@ -60,7 +60,7 @@ extension AppRefusalText on AppLocalizations {
       DartwayExampleRefusal.searchQueryTooShort => refusalSearchQueryTooShort(
         param('min', ListChatMessagesMatching.minQueryLength),
       ),
-      DartwayExampleRefusal.settingKeyUnknown => refusalSettingKeyUnknown,
+      DartwayExampleRefusal.clubNameRequired => refusalClubNameRequired,
       DartwayExampleRefusal.firstNameRequired => refusalFirstNameRequired,
     };
   }

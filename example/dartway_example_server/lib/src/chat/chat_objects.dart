@@ -10,7 +10,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 /// files, reactions — whatever the number of messages.
 abstract final class ChatObjects {
   static ChatChannel channel(ChatChannelRow row) =>
-      ChatChannel(id: row.id!, title: row.title);
+      ChatChannel(id: row.id, title: row.title);
 
   /// [rows] must not be deleted messages: a deleted message leaves every
   /// list, and is announced as `DwDeletedObject` instead. [author] is the
@@ -22,13 +22,13 @@ abstract final class ChatObjects {
   }) async {
     if (rows.isEmpty) return const [];
     final db = ctx.db;
-    final ids = [for (final row in rows) row.id!];
+    final ids = [for (final row in rows) row.id];
 
     final quoted = {
       for (final row in await db.chatMessages.findByIds(
         rows.map((m) => m.replyToMessageId).whereType<int>(),
       ))
-        row.id!: row,
+        row.id: row,
     };
 
     final wantedAuthors = {
@@ -39,9 +39,9 @@ abstract final class ChatObjects {
     // An empty set asks nothing of the database.
     final authors = {
       for (final row in await db.userProfiles.findByIds(wantedAuthors))
-        row.id!: row,
+        row.id: row,
     };
-    if (author != null) authors[author.id!] = author;
+    if (author != null) authors[author.id] = author;
 
     // The quotes' attachments only tell whether a quote has any; they are
     // read in the same query as the messages' own.
@@ -89,7 +89,7 @@ abstract final class ChatObjects {
     return [
       for (final row in rows)
         ChatMessage(
-          id: row.id!,
+          id: row.id,
           channelId: row.channelId,
           text: row.text,
           author: ProfileObjects.person(authors[row.authorProfileId]!),
@@ -98,7 +98,7 @@ abstract final class ChatObjects {
           pinnedAt: row.pinnedAt,
           replyTo: switch (quoted[row.replyToMessageId]) {
             final quote? => ChatMessageQuote(
-              id: quote.id!,
+              id: quote.id,
               sentAt: quote.sentAt,
               authorName: _nameOf(authors[quote.authorProfileId]!),
               authorDeleted: authors[quote.authorProfileId]!.deletedAt != null,

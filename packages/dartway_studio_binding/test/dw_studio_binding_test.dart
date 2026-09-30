@@ -120,6 +120,8 @@ void main() {
       config: DwFlutterConfig(
         appVersion: '1.0.0+1',
         refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (context) => const SizedBox(),
+        readFailedBuilder: (context, error, retry) => const SizedBox(),
         onErrorReport: (_) {},
       ),
       protocol: DwWireProtocol.core,

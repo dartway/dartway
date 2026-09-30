@@ -12,7 +12,7 @@ part 'bookings_rows.dw.dart';
 )
 final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
   const SessionBookingRow({
-    this.id,
+    required this.id,
     required this.sessionId,
     required this.clientProfileId,
     required this.status,
@@ -20,7 +20,7 @@ final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('club_session', onDelete: DwOnDelete.cascade)
   final int sessionId;
@@ -37,7 +37,7 @@ final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
 @DwSqlTable('session_review')
 final class SessionReviewRow extends DwTableRow with _$SessionReviewRow {
   const SessionReviewRow({
-    this.id,
+    required this.id,
     required this.bookingId,
     required this.rating,
     this.text,
@@ -45,7 +45,7 @@ final class SessionReviewRow extends DwTableRow with _$SessionReviewRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   /// One review per visit, held by the schema rather than by a check.
   @DwUniqueColumn()

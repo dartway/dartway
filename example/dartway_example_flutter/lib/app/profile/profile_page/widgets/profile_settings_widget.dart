@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/app/profile/profile_page/logic/profile_change.dart';
 import 'package:dartway_example_flutter/app/profile/profile_page/logic/profile_page_commands.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -37,7 +38,7 @@ class _ProfileForm extends HookWidget {
     final firstName = useState(profile.firstName);
     final gender = useState(profile.gender);
 
-    final change = ProfilePageCommands.changeOf(
+    final change = profileChangeOf(
       profile,
       firstName: firstName.value,
       gender: gender.value,

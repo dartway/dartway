@@ -1,19 +1,20 @@
-import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../../support/app_test_app.dart';
 
-/// The app settings over a fake server: saved one row at a time, and live.
+/// The app settings over a fake server: a row saves its own field, and a
+/// value saved elsewhere arrives live.
 void main() {
-  testWidgets('a setting saves its own row, and one saved elsewhere arrives '
+  testWidgets('a setting saves its own field, and one saved elsewhere arrives '
       'live', (tester) async {
     final fake = adminWith(const []);
-    fake.server.onCommand<SaveAppSetting>((command, call) {
-      final saved = AppSetting(id: command.key, value: command.value);
-      fake.settings
-        ..removeWhere((s) => s.id == saved.id)
-        ..add(saved);
+    fake.server.onCommand<SaveAppSettings>((command, call) {
+      final saved = fake.settings.copyWith(
+        appName: command.appName,
+        signUpEnabled: command.signUpEnabled,
+      );
+      fake.settings = saved;
       call.publish(settingsChannel, [saved]);
       return DwCallOk(saved);
     });
@@ -23,17 +24,18 @@ void main() {
     await app.tap(tester, find.text('Settings'));
 
     expect(
-      find.widgetWithText(TextField, AppSettingKey.appName.defaultValue),
+      find.widgetWithText(TextField, const AppSettings().appName),
       findsOneWidget,
+      reason: 'nothing saved: the default',
     );
     await app.tap(tester, find.byType(Checkbox));
     expect(
-      app.server.callsOf<SaveAppSetting>().single.call,
-      const SaveAppSetting(key: AppSettingKeys.signUpEnabled, value: 'false'),
+      app.server.callsOf<SaveAppSettings>().single.call,
+      const SaveAppSettings(signUpEnabled: false),
     );
 
     app.server.publish(settingsChannel, [
-      const AppSetting(id: AppSettingKeys.appName, value: 'Acme'),
+      const AppSettings(appName: 'Acme', signUpEnabled: false),
     ]);
     await app.settle(tester);
     expect(find.widgetWithText(TextField, 'Acme'), findsOneWidget);

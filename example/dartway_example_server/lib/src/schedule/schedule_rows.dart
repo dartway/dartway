@@ -5,7 +5,7 @@ part 'schedule_rows.dw.dart';
 @DwSqlTable('club_service')
 final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   const ClubServiceRow({
-    this.id,
+    required this.id,
     required this.title,
     required this.description,
     required this.durationMinutes,
@@ -14,7 +14,7 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   });
 
   @override
-  final int? id;
+  final int id;
   final String title;
   final String description;
   final int durationMinutes;
@@ -32,7 +32,7 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
 )
 final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
   const ClubSessionRow({
-    this.id,
+    required this.id,
     required this.serviceId,
     this.coachProfileId,
     required this.startsAt,
@@ -41,7 +41,7 @@ final class ClubSessionRow extends DwTableRow with _$ClubSessionRow {
   });
 
   @override
-  final int? id;
+  final int id;
 
   @DwForeignKey('club_service', onDelete: DwOnDelete.cascade)
   final int serviceId;

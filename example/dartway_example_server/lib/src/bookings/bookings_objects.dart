@@ -31,12 +31,12 @@ abstract final class BookingsObjects {
               s.id: s,
           };
     final clients = client != null
-        ? {client.id!: client}
+        ? {client.id: client}
         : await ProfileObjects.rowsById(db, rows.map((b) => b.clientProfileId));
     // Only an attended visit can have been reviewed.
     final attended = [
       for (final row in rows)
-        if (row.status == BookingStatus.attended) row.id!,
+        if (row.status == BookingStatus.attended) row.id,
     ];
     final reviews = attended.isEmpty
         ? const <int, SessionReview>{}
@@ -45,7 +45,7 @@ abstract final class BookingsObjects {
               where: (t) => t.bookingId.inList(attended),
             ))
               r.bookingId: SessionReview(
-                id: r.id!,
+                id: r.id,
                 rating: r.rating,
                 text: r.text,
                 createdAt: r.createdAt,
@@ -54,7 +54,7 @@ abstract final class BookingsObjects {
     return [
       for (final row in rows)
         SessionBooking(
-          id: row.id!,
+          id: row.id,
           // A booking always belongs to someone who is here: the last thing
           // a member's deletion does is cancel the ones still ahead, and the
           // ones behind are read by nobody but them.

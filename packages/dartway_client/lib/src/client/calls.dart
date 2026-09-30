@@ -309,6 +309,11 @@ extension on DwAppClient {
           '${DwHttpContract.bearerPrefix}$token',
     DwHttpContract.idempotencyKeyHeader: ?call.idempotencyKey,
     DwHttpContract.liveConnectionHeader: ?_liveConnectionIdFor(token),
+    // Read at every send: a device that crossed a zone, or a clock that moved
+    // to or from daylight saving time, says so on its next call.
+    DwHttpContract.utcOffsetHeader: DwHttpContract.utcOffsetValue(
+      utcOffset ?? DateTime.now().timeZoneOffset,
+    ),
   };
 
   /// Applies what a response means beyond its result.

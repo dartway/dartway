@@ -1,4 +1,5 @@
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
+import 'package:dartway_example_flutter/admin/analytics/logic/analytics_dashboard_commands.dart';
 import 'package:dartway_example_flutter/admin/analytics/widgets/analytics_widget_card.dart';
 import 'package:dartway_example_flutter/admin/analytics/widgets/analytics_widget_editor.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
@@ -59,20 +60,18 @@ class AnalyticsDashboardGrid extends HookWidget {
       busy.value = true;
       onSaving(true);
       try {
-        final result = await dw.action(
-          (_) => dw.plugins.analytics.saveDashboard(
-            id: dashboard.id,
+        await dw.action(
+          (_) => AnalyticsDashboardCommands.save(
+            dashboard: dashboard,
             title: dashboard.title,
             widgets: change(latest.value),
           ),
+          // Not run once unmounted: the viewer switched to another
+          // dashboard, whose grid is a new one; this answer is dropped.
+          followUpIfMountedAction: (_, stored) {
+            if (stored.id == dashboard.id) saved.value = stored.widgets;
+          },
         )(context);
-        // Unmounted: the viewer switched to another dashboard, whose grid
-        // is a new one; this answer is this dashboard's and is dropped.
-        if (result case DwCallOk(
-          :final value,
-        ) when context.mounted && value.id == dashboard.id) {
-          saved.value = value.widgets;
-        }
       } finally {
         busy.value = false;
         onSaving(false);

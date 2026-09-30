@@ -20,7 +20,7 @@ context snapshot and dispatches a `DwErrorReport`. `DwErrorSource` names where i
 |---|---|
 | `zone` | `DwAppRunner`'s global handlers — `FlutterError.onError` and the platform dispatcher's `onError` — for anything uncaught, and an app initializer that threw at start. |
 | `uiAction` | `dw.action`, for a callback that threw or a result that was not a success. |
-| `asyncBuild` | the error branch of `dwBuildAsync` / `dwBuildListAsync`. |
+| `asyncBuild` | a read's failed branch — `DwReadBuilder`, `DwPagedListView`, `DwWindowListView` — once per failure; never a refusal, a signed-out read or an unreachable server. |
 | `client` | the data client, with no caller to throw to: a server answer it could not read, a request's `onUpdate` that threw, a channel the server does not declare, a sign-out that did not revoke the key; and `dw.uploader()` for an upload failure worth an operator's attention. |
 | `manual` | an explicit `dw.handleError(...)` from app code — and a plugin whose `init` failed with `blocksStartup` false. |
 | `failedCall` | declared, and not used by the framework's own interception points today. |

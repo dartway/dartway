@@ -1,5 +1,6 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/src/chat/chat_handlers.dart';
+import 'package:dartway_example_server/src/chat/chat_rows.dart';
 import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
@@ -7,6 +8,14 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 final chatFeature = DwServerFeature(
   'chat',
   handlers: chatHandlers,
+  startup: [
+    DwSeedRows(
+      'staff channels',
+      table: ChatChannelRow.tableDef,
+      key: (t) => [t.slug],
+      rows: staffChannels,
+    ),
+  ],
   channels: [
     DwChannelRule.single(
       DartwayExampleChannel.staffChannels,

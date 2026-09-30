@@ -1,11 +1,11 @@
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
-import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_shared_preferences/dartway_shared_preferences.dart';
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
 import 'package:dartway_starter_flutter/core/refusal_text.dart';
 import 'package:dartway_starter_flutter/core/update_required_page.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 
 /// The app's DartWay core: `dw.request`, `dw.table`, `dw.window`,
 /// `dw.command`, `dw.uploader`, `dw.action`, `dw.notify` — reachable from
@@ -44,6 +44,16 @@ abstract final class AppDwCore {
       updateRequiredScreen: (context, refusal) =>
           UpdateRequiredPage(refusal: refusal),
       onErrorReport: _onErrorReport,
+      readLoadingBuilder: (context) =>
+          const Center(child: AppProgressIndicator()),
+      readFailedBuilder: (context, error, retry) => LoadFailedMessage(
+        message: switch (error) {
+          DwRefusalException(:final refusal) => appL10n.refusalText(refusal),
+          _ => appL10n.loadFailed,
+        },
+        retryLabel: appL10n.retry,
+        onRetry: dw.action((_) => retry()),
+      ),
     ),
     protocol: appProtocol,
     baseUrl: baseUrl,

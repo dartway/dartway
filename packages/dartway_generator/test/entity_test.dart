@@ -86,10 +86,10 @@ part 'memo_row.dw.dart';
 
 @DwSqlTable('memo')
 final class MemoRow extends DwTableRow with _\$MemoRow {
-  const MemoRow({this.id, required this.text});
+  const MemoRow({required this.id, required this.text});
 
   @override
-  final int? id;
+  final int id;
 
   final String text;
 

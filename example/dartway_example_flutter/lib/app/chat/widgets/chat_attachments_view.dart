@@ -1,4 +1,5 @@
 import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
+import 'package:dartway_example_flutter/app/chat/logic/chat_files.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -41,12 +42,8 @@ class ChatAttachmentsView extends StatelessWidget {
                 ),
                 _ => 4 / 3,
               },
-              onTap: () => showDialog<void>(
-                context: context,
-                builder: (context) => Dialog(
-                  clipBehavior: Clip.antiAlias,
-                  child: InteractiveViewer(child: ChatLinkedImage(image.id)),
-                ),
+              onTap: () => context.showAppDialog<void>(
+                child: InteractiveViewer(child: ChatLinkedImage(image.id)),
               ),
               child: ChatLinkedImage(image.id),
             ),
@@ -71,12 +68,20 @@ class ChatLinkedImage extends HookConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final provider = dw.request(DwGetFileLink(fileId: fileId));
-    final link = ref.watch(provider);
     final retried = useRef(false);
-    return switch (link) {
-      AsyncData(:final value) => Image.network(
-        value.url,
-        key: ValueKey(value.url),
+    // A picture this member may not see, or one that is gone, is a lock
+    // rather than a failure to retry.
+    Widget locked(BuildContext context, DwCallRefusal _) =>
+        const Center(child: Icon(Icons.lock_outline));
+    return DwReadBuilder(
+      provider,
+      onRefused: {
+        DwCoreRefusal.forbidden: locked,
+        DwCoreRefusal.notFound: locked,
+      },
+      builder: (context, link) => Image.network(
+        link.url,
+        key: ValueKey(link.url),
         fit: BoxFit.cover,
         gaplessPlayback: true,
         errorBuilder: (context, error, stackTrace) {
@@ -90,28 +95,26 @@ class ChatLinkedImage extends HookConsumerWidget {
           return const Center(child: Icon(Icons.broken_image_outlined));
         },
       ),
-      AsyncError() => const Center(child: Icon(Icons.lock_outline)),
-      _ => const SizedBox.expand(),
-    };
+    );
   }
 }
 
-class _FileLinkTile extends ConsumerWidget {
+class _FileLinkTile extends StatelessWidget {
   const _FileLinkTile({required this.file});
 
   final ChatAttachment file;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => ChatFileTile(
+  Widget build(BuildContext context) => ChatFileTile(
     name: file.fileName,
     sizeLabel: file.byteSize.fileSizeLabel,
-    onTap: () async {
-      // No browser or viewer plugin in the example: the link is handed over.
-      final link = await dw.files.getLink(file.id);
-      if (link case DwCallOk(:final value)) {
-        await Clipboard.setData(ClipboardData(text: value.url));
+    // No browser or viewer plugin in the example: the link is handed over.
+    onTap: () => dw.action(
+      (_) => ChatFiles.linkOf(file),
+      followUpIfMountedAction: (context, url) async {
+        await Clipboard.setData(ClipboardData(text: url));
         if (context.mounted) dw.notify.info(context.l10n.chatCopied);
-      }
-    },
+      },
+    )(context),
   );
 }

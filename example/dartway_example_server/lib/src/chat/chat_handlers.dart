@@ -35,7 +35,7 @@ final chatHandlers = <DwCallHandler>[
   DwCallHandler.list<ListMyChatReadStates, ChatReadState>(
     access: AppAccess.staff,
     handle: (ctx, request) async =>
-        ChatObjects.readStates(ctx.db, (await ctx.profile).id!),
+        ChatObjects.readStates(ctx.db, (await ctx.profile).id),
   ),
 
   /// A window over a channel's messages, deleted ones left out. Staff only; a
@@ -106,7 +106,7 @@ final chatHandlers = <DwCallHandler>[
         for (final row in await ctx.db.userProfiles.find(
           where: (t) => t.firstName.ilike(pattern) | t.lastName.ilike(pattern),
         ))
-          row.id!,
+          row.id,
       ];
       final rows = await ctx.db.chatMessages.find(
         where: (t) {
@@ -162,19 +162,19 @@ final chatHandlers = <DwCallHandler>[
       }
 
       final row = await ctx.db.chatMessages.insert(
-        ChatMessageRow(
+        NewChatMessageRow(
           channelId: command.channelId,
-          authorProfileId: me.id!,
+          authorProfileId: me.id,
           text: command.text.trim(),
-          sentAt: DateTime.now(),
+          sentAt: ctx.now,
           replyToMessageId: command.replyToMessageId,
         ),
       );
       try {
         await ctx.db.chatMessageAttachments.insertAll([
           for (final (position, draft) in drafts.indexed)
-            ChatMessageAttachmentRow(
-              messageId: row.id!,
+            NewChatMessageAttachmentRow(
+              messageId: row.id,
               fileId: draft.id,
               position: position,
               width: draft.width,
@@ -186,7 +186,7 @@ final chatHandlers = <DwCallHandler>[
         ctx.refuse(DwUploadRefusal.notOwned, field: 'attachments');
       }
       // Sending is having read up to one's own message.
-      await ctx._moveReadForward(me.id!, row);
+      await ctx._moveReadForward(me.id, row);
 
       final message = (await ChatObjects.messages(ctx, [
         row,
@@ -198,26 +198,32 @@ final chatHandlers = <DwCallHandler>[
   ),
 
   /// Rewrites a message within its edit window. Staff only, and only its
-  /// author (`dw.forbidden` for anyone else: the message is visible to them).
-  /// Published with every message quoting it.
+  /// author: other staff are refused `dw.forbidden` (the message is visible to
+  /// them), anyone else — a demoted author too — `dw.notFound`. Published with
+  /// every message quoting it.
   DwCallHandler.command<EditChatMessage, ChatMessage>(
-    access: AppAccess.staff,
+    access: DwAccessRule.resource<EditChatMessage, ChatMessageRow>(
+      load: (ctx, command) => ctx._staffMessage(command.messageId),
+      // The whole permission: `visible` only picks the refusal.
+      allows: (ctx, command, row) async =>
+          await ctx.isStaff && row.authorProfileId == (await ctx.profile).id,
+      visible: (ctx, command, row) => ctx.isStaff,
+    ),
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      final row = await ctx._requireMessage(command.messageId, lock: true);
-      if (row.authorProfileId != me.id) ctx.refuse(DwCoreRefusal.forbidden);
-      if (DateTime.now().isAfter(row.sentAt.add(ChatMessage.editWindow))) {
+      final row = ctx.accessed<ChatMessageRow>();
+      if (ctx.now.isAfter(row.sentAt.add(ChatMessage.editWindow))) {
         ctx.refuse(DartwayExampleRefusal.editWindowClosed);
       }
       final text = command.text.trim();
       if (text.isEmpty &&
           !await ctx.db.chatMessageAttachments.exists(
-            where: (t) => t.messageId.equals(row.id!),
+            where: (t) => t.messageId.equals(row.id),
           )) {
         ctx.refuse(DartwayExampleRefusal.messageEmpty, field: 'text');
       }
       final edited = await ctx.db.chatMessages.update(
-        row.copyWith(text: text, editedAt: DwFieldPatch.set(DateTime.now())),
+        row.copyWith(text: text, editedAt: DwFieldPatch.set(ctx.now)),
       );
       final message = (await ChatObjects.messages(ctx, [
         edited,
@@ -228,22 +234,25 @@ final chatHandlers = <DwCallHandler>[
     },
   ),
 
-  /// Deletes a message. Its author or an admin. Gone from its channel; the
-  /// messages quoting it and the unread counts follow.
+  /// Deletes a message. Staff only: its author or an admin; other staff are
+  /// refused `dw.forbidden`, anyone else `dw.notFound`. Gone from its channel;
+  /// the messages quoting it and the unread counts follow.
   DwCallHandler.command<DeleteChatMessage, void>(
-    access: AppAccess.staff,
+    access: DwAccessRule.resource<DeleteChatMessage, ChatMessageRow>(
+      load: (ctx, command) => ctx._staffMessage(command.messageId),
+      allows: (ctx, command, row) async =>
+          await ctx.isStaff &&
+          (row.authorProfileId == (await ctx.profile).id || await ctx.isAdmin),
+      visible: (ctx, command, row) => ctx.isStaff,
+    ),
     handle: (ctx, command) async {
-      final me = await ctx.profile;
-      final row = await ctx._requireMessage(command.messageId, lock: true);
-      if (row.authorProfileId != me.id && !await ctx.isAdmin) {
-        ctx.refuse(DwCoreRefusal.forbidden);
-      }
+      final row = ctx.accessed<ChatMessageRow>();
       final deleted = await ctx.db.chatMessages.update(
-        row.copyWith(deletedAt: DwFieldPatch.set(DateTime.now())),
+        row.copyWith(deletedAt: DwFieldPatch.set(ctx.now)),
       );
       ctx.publish(
         AppChannels.chatOf(deleted.channelId),
-        DwDeletedObject.of<ChatMessage>(deleted.id!, ctx.protocol),
+        DwDeletedObject.of<ChatMessage>(deleted.id, ctx.protocol),
       );
       await ChatPublications.quoting(ctx, deleted);
       // Someone who had not read it counts one message fewer.
@@ -263,8 +272,8 @@ final chatHandlers = <DwCallHandler>[
           : await ctx.db.chatMessages.update(
               command.pinned
                   ? row.copyWith(
-                      pinnedAt: DwFieldPatch.set(DateTime.now()),
-                      pinnedByProfileId: DwFieldPatch.set(me.id!),
+                      pinnedAt: DwFieldPatch.set(ctx.now),
+                      pinnedByProfileId: DwFieldPatch.set(me.id),
                     )
                   : row.copyWith(
                       pinnedAt: const DwFieldPatch.clear(),
@@ -288,15 +297,15 @@ final chatHandlers = <DwCallHandler>[
       // delete nothing and both insert, and the unique pair refuses one of
       // them as a database error. Under it the second sees the first's
       // reaction and replaces it.
-      await ctx.db.advisoryLock(_reactionLocks, row.id!.toSigned(32));
+      await ctx.db.advisoryLock(_reactionLocks, row.id.toSigned(32));
       await ctx.db.chatMessageReactions.deleteWhere(
-        where: (t) => t.messageId.equals(row.id!) & t.profileId.equals(me.id!),
+        where: (t) => t.messageId.equals(row.id) & t.profileId.equals(me.id),
       );
       if (command.reaction case final reaction?) {
         await ctx.db.chatMessageReactions.insert(
-          ChatMessageReactionRow(
-            messageId: row.id!,
-            profileId: me.id!,
+          NewChatMessageReactionRow(
+            messageId: row.id,
+            profileId: me.id,
             reaction: reaction,
           ),
         );
@@ -317,10 +326,10 @@ final chatHandlers = <DwCallHandler>[
       if (message == null || message.channelId != command.channelId) {
         ctx.refuse(DwCoreRefusal.notFound);
       }
-      await ctx._moveReadForward(me.id!, message);
+      await ctx._moveReadForward(me.id, message);
       final state = await ChatObjects.readStateIn(
         ctx.db,
-        me.id!,
+        me.id,
         command.channelId,
       );
       // The caller's other devices: their unread badges follow.
@@ -338,9 +347,22 @@ extension on DwCallContext {
   }
 
   /// The message [messageId] unless it is deleted; otherwise `dw.notFound`.
+  Future<ChatMessageRow> _requireMessage(
+    int messageId, {
+    bool lock = false,
+  }) async =>
+      await _liveMessage(messageId, lock: lock) ??
+      refuse(DwCoreRefusal.notFound);
+
+  /// The message [messageId], locked for a change, to staff; `null` — and no
+  /// lock taken — for anyone else, or when there is none or it is deleted.
+  Future<ChatMessageRow?> _staffMessage(int messageId) async =>
+      await isStaff ? await _liveMessage(messageId, lock: true) : null;
+
+  /// The message [messageId], or `null` when there is none or it is deleted.
   /// With [lock], held until the command commits: edits, deletions and pins of
   /// one message queue instead of overwriting each other's row.
-  Future<ChatMessageRow> _requireMessage(
+  Future<ChatMessageRow?> _liveMessage(
     int messageId, {
     bool lock = false,
   }) async {
@@ -348,8 +370,7 @@ extension on DwCallContext {
       messageId,
       lock: lock ? DwRowLock.forUpdate : null,
     );
-    if (row == null || row.isDeleted) refuse(DwCoreRefusal.notFound);
-    return row;
+    return row == null || row.isDeleted ? null : row;
   }
 
   /// Moves [profileId]'s position in [message]'s channel forward to
@@ -362,10 +383,10 @@ extension on DwCallContext {
   /// they commit in.
   Future<void> _moveReadForward(int profileId, ChatMessageRow message) async {
     final inserted = await db.chatReadPositions.tryInsert(
-      ChatReadPositionRow(
+      NewChatReadPositionRow(
         profileId: profileId,
         channelId: message.channelId,
-        messageId: message.id!,
+        messageId: message.id,
         sentAt: message.sentAt,
       ),
       onConflict: DwOnConflict.doNothing((t) => [t.profileId, t.channelId]),
@@ -376,8 +397,8 @@ extension on DwCallContext {
           t.profileId.equals(profileId) &
           t.channelId.equals(message.channelId) &
           (t.sentAt.lt(message.sentAt) |
-              (t.sentAt.equals(message.sentAt) & t.messageId.lt(message.id!))),
-      set: (t) => [t.messageId.set(message.id!), t.sentAt.set(message.sentAt)],
+              (t.sentAt.equals(message.sentAt) & t.messageId.lt(message.id))),
+      set: (t) => [t.messageId.set(message.id), t.sentAt.set(message.sentAt)],
     );
   }
 }

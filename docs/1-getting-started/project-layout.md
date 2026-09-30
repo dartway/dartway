@@ -87,6 +87,9 @@ my_app_server/
       profile_objects.dart rows → the data objects clients see, related data in batches
       profile_publications.dart what a change publishes, and to whom
       profile_jobs.dart    its job kinds and definitions, when it has jobs
+      profile_access.dart  its access rules, when they outgrow the handlers
+      profile_routes.dart  its DwHttpRoute doors, when it has them
+      logic/               everything else the feature needs, flat, when it needs it
     admin/, settings/      the skeleton's other features, the same shape
   test/                    acceptance tests on a real server, database and storage
   docker-compose.yaml      development Postgres and RustFS
@@ -95,13 +98,49 @@ my_app_server/
 
 **`lib/src/` is folders: `core/`, `migrations/`, and one per feature** — a law, held by `dartway
 check` as the Flutter package's top level is. A feature's folder holds everything of its area — its
-rows, handlers, objects, publications and jobs, each in a file named `<feature>_*.dart` — and
+rows, handlers, objects, publications and jobs, each in a file of its kind (below) — and
 declares itself in `<feature>_feature.dart` as a `DwServerFeature` the server
-lists. No file sits at the top of `src/`, and no folder there is named for a layer (`handlers/`,
-`rows/`, `entities/`, `domain/`, `objects/`, `services/`): a feature split across layers lives in
+lists. No file sits at the top of `src/`, and no folder anywhere under it is named for a layer (the
+list is below): a feature split across layers lives in
 four places, and a project that grew that way ended with a `chat/` beside a `domain/chat/` and two
 rules for who is in a chat. `src/migrations/migrations.dart` is a fixed name — `bin/migrate.dart`
 writes and reads migrations by that path.
+
+**Inside a feature the file set is closed**, so that one question has one answer in every
+project. A feature folder `<feature>/` holds:
+
+- files named `<feature>_<kind>.dart`, the kind one of `feature`, `rows`, `handlers`, `objects`,
+  `publications`, `jobs`, `access`, `routes` — exactly one `<feature>_feature.dart`, the rest when the
+  feature has them;
+- `<feature>_<part>_<kind>.dart` when a kind outgrows one file — `orders_refunds_handlers.dart` beside
+  `orders_handlers.dart`. This is the only way a feature splits;
+- one optional subfolder, `logic/`, for everything that is none of the kinds: a client of an
+  outside service, a calculator, the rules of a domain. Names inside it are free, but none ends in
+  a kind (`logic/send_handlers.dart` is a handlers file in hiding), and it is **flat**: logic that
+  needs folders of its own is a feature too big for one folder, and it splits into features, or
+  into `<part>` files.
+
+No other subfolder, and no folder anywhere under `src/` — `core/` included — named for
+a layer: `domain`, `rows`, `handlers`, `services`, `models`, `objects`, `repositories`, `utils`,
+`helpers`, `entities`, `publications` (`invalidServerFeatureFile`).
+
+**And each kind is held by what the file declares**, not by its name alone
+(`misplacedServerCode`):
+
+| Declared | Only in |
+|---|---|
+| a handler — `DwCallHandler.…(`, a `<DwCallHandler>[…]` list | `*_handlers.dart` |
+| a row class — `@DwSqlTable`, `extends DwTableRow` | `*_rows.dart` |
+| a job — `DwQueuedJob`, `DwRecurringJob`, a `DwJobKind` constructed | `*_jobs.dart` |
+| a route — `DwHttpRoute.…(`, a `<DwHttpRoute>[…]` list | `*_routes.dart` |
+| `DwServerFeature(` | `<feature>_feature.dart` |
+| a publication — a named function, method or closure-holding field that calls `ctx.publish(`, in closures it runs too (`forEach`, `transaction`) — but not in a hook it hands to a constructor by name (`DwAuthConfig(onAccountCreated: …)`) | `*_publications.dart` |
+| a mapping — a named function, method or closure-holding field that takes a row (a `…Row` parameter, or a member of a row class or of an extension on one), returns a data object of the shared package, and builds one | `*_objects.dart` |
+
+`core/` holds none of them. What is not a declaration is not judged: a handler or a sign-in hook
+publishing inline (`ctx.publish` inside its closure) is a call, not a publication, and a mapping
+written as a closure inside a handler is not seen — keep it in `_objects` anyway, since that is
+where the next reader looks for it.
 
 **A row is not a data object.** `UserProfileRow` is a table; `UserProfile` is what a client receives.
 The server builds one from the other in `profile_objects.dart` — the profile's phone and e-mail come from
@@ -131,8 +170,7 @@ my_app_flutter/lib/
 
   LAYERS — everything that is not a feature
   core/                  app-wide wiring: dw_core.dart, router/ (with the zones' shells),
-                         refusal_text.dart, update_required_page.dart, profile/,
-                         app_settings/, dev/
+                         refusal_text.dart, update_required_page.dart, profile/, dev/
   shared/                non-visual helpers several features use: extensions, formatters
   ui_kit/                your design system, as source — styles and every visual building block
   l10n/                  ARB files and their generated output

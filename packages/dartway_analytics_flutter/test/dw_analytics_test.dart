@@ -51,6 +51,8 @@ final class World {
       config: DwFlutterConfig(
         appVersion: '2.1.0+40',
         refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (context) => const SizedBox(),
+        readFailedBuilder: (context, error, retry) => const SizedBox(),
         onErrorReport: reports.add,
       ),
       protocol: appProtocol ?? protocol,
@@ -298,6 +300,8 @@ void main() {
       config: DwFlutterConfig(
         appVersion: '2.1.0+40',
         refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (context) => const SizedBox(),
+        readFailedBuilder: (context, error, retry) => const SizedBox(),
       ),
       protocol: protocol,
       baseUrl: server.baseUrl,

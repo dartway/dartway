@@ -22,10 +22,10 @@ final class NewsPost extends DwDataObject with _$NewsPost {
   final DateTime createdAt;
 }
 
-/// The news feed, newest first and live: a post published anywhere is put in
-/// its place, a removed one disappears.
-final class ListNews extends DwListRequest<NewsPost> with _$ListNews {
-  const ListNews();
+/// The news feed, newest first, read page by page and live: a post published
+/// anywhere is put in its place, a removed one disappears.
+final class ListNews extends DwPageRequest<NewsPost> with _$ListNews {
+  const ListNews() : super(pageSize: 20);
 
   @override
   List<DwLiveChannel> get channels => const [

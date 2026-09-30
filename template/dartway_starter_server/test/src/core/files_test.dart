@@ -1,5 +1,6 @@
 import 'dart:typed_data';
 
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_server/dartway_starter_server.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
@@ -15,26 +16,25 @@ import '../../support/app_harness.dart';
 /// that the server verifies at startup as in production.
 void main() {
   group('configuration from the environment', () {
-    const credentials = {
+    const required = {
+      'DW_DATABASE_HOST': '127.0.0.1',
+      'DW_DATABASE_NAME': 'app',
+      'DW_DATABASE_USER': 'app',
+      'DW_DATABASE_PASSWORD': 'app',
       'DW_STORAGE_ACCESS_KEY': 'app',
       'DW_STORAGE_SECRET_KEY': 'app-secret',
     };
+    DwFileStorageConfig? storageOf(Map<String, String> variables) =>
+        AppEnvironment.read({...required, ...variables}).server.storage;
 
     test('without an endpoint there is no storage', () {
-      expect(AppFiles.storageConfig(const {}), isNull);
-      expect(
-        AppFiles.storageConfig(const {
-          'DW_STORAGE_ENDPOINT': '',
-          ...credentials,
-        }),
-        isNull,
-      );
+      expect(storageOf(const {}), isNull);
+      expect(storageOf(const {'DW_STORAGE_ENDPOINT': ''}), isNull);
     });
 
     test('a development storage needs only its endpoint and keys', () {
-      final config = AppFiles.storageConfig(const {
+      final config = storageOf(const {
         'DW_STORAGE_ENDPOINT': 'http://127.0.0.1:8100/',
-        ...credentials,
       })!;
       expect(config.publicBucket, AppFiles.defaultPublicBucket);
       expect(config.privateBucket, AppFiles.defaultPrivateBucket);
@@ -46,18 +46,33 @@ void main() {
     });
 
     test('what the environment names wins over every default', () {
-      final config = AppFiles.storageConfig(const {
+      final config = storageOf(const {
         'DW_STORAGE_ENDPOINT': 'https://storage.example.net',
         'DW_STORAGE_PUBLIC_BUCKET': 'files',
         'DW_STORAGE_PUBLIC_BASE_URL': 'https://cdn.example.net',
         'DW_STORAGE_PRIVATE_BUCKET': 'documents',
         'DW_STORAGE_VERIFY_BUCKETS': 'false',
-        ...credentials,
       })!;
       expect(config.publicBucket, 'files');
       expect(config.publicBaseUrl, Uri.parse('https://cdn.example.net'));
       expect(config.privateBucket, 'documents');
       expect(config.verifyBuckets, isFalse);
+    });
+
+    test('a start missing variables hears about all of them', () {
+      expect(
+        () => AppEnvironment.read(const {'DW_STORAGE_PROVISION': 'true'}),
+        throwsA(
+          isA<DwEnvironmentException>().having(
+            (e) => e.problems.join('\n'),
+            'problems',
+            allOf(
+              contains('DW_DATABASE_HOST is not set'),
+              contains('DW_STORAGE_PROVISION is true'),
+            ),
+          ),
+        ),
+      );
     });
   });
 

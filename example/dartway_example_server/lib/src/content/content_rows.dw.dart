@@ -30,17 +30,82 @@ mixin _$NewsPostRow on DwTableRow {
 
 extension NewsPostRowCopyWith on NewsPostRow {
   NewsPostRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
     int? authorProfileId,
     String? title,
     String? text,
     DateTime? createdAt,
   }) => NewsPostRow(
-    id: id.apply(this.id),
+    id: id,
     authorProfileId: authorProfileId ?? this.authorProfileId,
     title: title ?? this.title,
     text: text ?? this.text,
     createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+mixin _$NewNewsPostRow on DwRowDraft<NewsPostRow> {
+  NewNewsPostRow get _self => this as NewNewsPostRow;
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is NewNewsPostRow &&
+          other.authorProfileId == _self.authorProfileId &&
+          other.title == _self.title &&
+          other.text == _self.text &&
+          other.createdAt == _self.createdAt;
+
+  @override
+  int get hashCode => Object.hash(
+    _self.authorProfileId,
+    _self.title,
+    _self.text,
+    _self.createdAt,
+  );
+
+  @override
+  String toString() =>
+      'NewNewsPostRow(authorProfileId: ${_self.authorProfileId}, title: ${_self.title}, text: ${_self.text}, createdAt: ${_self.createdAt})';
+}
+
+/// A [NewsPostRow] before insert: every column but the id.
+final class NewNewsPostRow extends DwRowDraft<NewsPostRow>
+    with _$NewNewsPostRow {
+  const NewNewsPostRow({
+    required this.authorProfileId,
+    required this.title,
+    required this.text,
+    required this.createdAt,
+  });
+
+  final int authorProfileId;
+  final String title;
+  final String text;
+  final DateTime createdAt;
+}
+
+extension NewNewsPostRowCopyWith on NewNewsPostRow {
+  NewNewsPostRow copyWith({
+    int? authorProfileId,
+    String? title,
+    String? text,
+    DateTime? createdAt,
+  }) => NewNewsPostRow(
+    authorProfileId: authorProfileId ?? this.authorProfileId,
+    title: title ?? this.title,
+    text: text ?? this.text,
+    createdAt: createdAt ?? this.createdAt,
+  );
+}
+
+extension NewNewsPostRowWithId on NewNewsPostRow {
+  /// The row stored under [id], for `update`.
+  NewsPostRow withId(int id) => NewsPostRow(
+    id: id,
+    authorProfileId: authorProfileId,
+    title: title,
+    text: text,
+    createdAt: createdAt,
   );
 }
 
@@ -87,68 +152,17 @@ final class NewsPostTable extends DwTableDef<NewsPostRow> {
 
   @override
   Map<String, Object?> toRow(NewsPostRow row) => {
-    if (row.id != null) 'id': row.id,
     'author_profile_id': row.authorProfileId,
     'title': row.title,
     'text': row.text,
     'created_at': row.createdAt,
   };
-}
-
-mixin _$AppSettingRow on DwTableRow {
-  AppSettingRow get _self => this as AppSettingRow;
 
   @override
-  bool operator ==(Object other) =>
-      identical(this, other) ||
-      other is AppSettingRow &&
-          other.id == _self.id &&
-          other.key == _self.key &&
-          other.value == _self.value;
-
-  @override
-  int get hashCode => Object.hash(_self.id, _self.key, _self.value);
-
-  @override
-  String toString() =>
-      'AppSettingRow(id: ${_self.id}, key: ${_self.key}, value: ${_self.value})';
-}
-
-extension AppSettingRowCopyWith on AppSettingRow {
-  AppSettingRow copyWith({
-    DwFieldPatch<int> id = const DwFieldPatch.keep(),
-    String? key,
-    String? value,
-  }) => AppSettingRow(
-    id: id.apply(this.id),
-    key: key ?? this.key,
-    value: value ?? this.value,
-  );
-}
-
-final class AppSettingTable extends DwTableDef<AppSettingRow> {
-  const AppSettingTable() : super('app_setting');
-
-  DwTableColumn<String> get key =>
-      const DwTableColumn('key', DwColumnType.text, unique: true);
-
-  DwTableColumn<String> get value =>
-      const DwTableColumn('value', DwColumnType.text);
-
-  @override
-  List<DwTableColumn<Object?>> get tableColumns => [id, key, value];
-
-  @override
-  AppSettingRow fromRow(DwResultRow row) => AppSettingRow(
-    id: row.decode(id),
-    key: row.decode(key),
-    value: row.decode(value),
-  );
-
-  @override
-  Map<String, Object?> toRow(AppSettingRow row) => {
-    if (row.id != null) 'id': row.id,
-    'key': row.key,
-    'value': row.value,
+  Map<String, Object?> toDraftRow(NewNewsPostRow draft) => {
+    'author_profile_id': draft.authorProfileId,
+    'title': draft.title,
+    'text': draft.text,
+    'created_at': draft.createdAt,
   };
 }

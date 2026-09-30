@@ -2,17 +2,12 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 
 import '../src/profile/profile_rows.dart';
-import '../src/settings/settings_rows.dart';
 
 final DwDatabaseSchema dartwayStarterSchema = DwDatabaseSchema([
-  AppSettingRow.tableDef,
   UserProfileRow.tableDef,
 ]);
 
 extension DartwayStarterDb on DwDatabaseHandle {
-  DwTableRepository<AppSettingRow, AppSettingTable> get appSettings =>
-      repository(AppSettingRow.tableDef);
-
   DwTableRepository<UserProfileRow, UserProfileTable> get userProfiles =>
       repository(UserProfileRow.tableDef);
 }

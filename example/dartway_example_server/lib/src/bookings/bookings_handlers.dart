@@ -18,7 +18,7 @@ final bookingsHandlers = <DwCallHandler>[
       return BookingsObjects.bookings(
         ctx.db,
         await ctx.db.sessionBookings.find(
-          where: (t) => t.clientProfileId.equals(me.id!),
+          where: (t) => t.clientProfileId.equals(me.id),
           orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
         ),
         client: me,
@@ -40,7 +40,7 @@ final bookingsHandlers = <DwCallHandler>[
         lock: DwRowLock.forUpdate,
       );
       if (session == null) ctx.refuse(DwCoreRefusal.notFound);
-      final now = DateTime.now();
+      final now = ctx.now;
       if (session.startsAt.isBefore(now)) {
         ctx.refuse(DartwayExampleRefusal.sessionStarted);
       }
@@ -49,16 +49,16 @@ final bookingsHandlers = <DwCallHandler>[
       }
       final alreadyBooked = await ctx.db.sessionBookings.exists(
         where: (t) =>
-            t.sessionId.equals(session.id!) &
-            t.clientProfileId.equals(me.id!) &
+            t.sessionId.equals(session.id) &
+            t.clientProfileId.equals(me.id) &
             t.status.equals(BookingStatus.booked),
       );
       if (alreadyBooked) ctx.refuse(DartwayExampleRefusal.alreadyBooked);
 
       final booking = await ctx.db.sessionBookings.insert(
-        SessionBookingRow(
-          sessionId: session.id!,
-          clientProfileId: me.id!,
+        NewSessionBookingRow(
+          sessionId: session.id,
+          clientProfileId: me.id,
           status: BookingStatus.booked,
           createdAt: now,
         ),
@@ -70,9 +70,9 @@ final bookingsHandlers = <DwCallHandler>[
       // A session closer than the lead is reminded of right away.
       await ctx.jobs.enqueue(
         BookingsJobs.remind,
-        (bookingId: booking.id!),
+        (bookingId: booking.id),
         runAt: session.startsAt.subtract(BookingsJobs.reminderLead),
-        key: BookingsJobs.remindKey(booking.id!),
+        key: BookingsJobs.remindKey(booking.id),
       );
       return BookingsPublications.bookingAndSession(ctx, booking, updated, me);
     },
@@ -151,11 +151,11 @@ final bookingsHandlers = <DwCallHandler>[
         ctx.refuse(DartwayExampleRefusal.reviewNeedsAttendance);
       }
       final inserted = await ctx.db.sessionReviews.tryInsert(
-        SessionReviewRow(
-          bookingId: booking.id!,
+        NewSessionReviewRow(
+          bookingId: booking.id,
           rating: command.rating,
           text: command.text,
-          createdAt: DateTime.now(),
+          createdAt: ctx.now,
         ),
         onConflict: DwOnConflict.doNothing((t) => [t.bookingId]),
       );

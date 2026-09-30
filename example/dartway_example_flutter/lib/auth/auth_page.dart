@@ -1,4 +1,4 @@
-import 'package:dartway_example_flutter/auth/logic/auth_state.dart';
+import 'package:dartway_example_flutter/auth/logic/auth_controller.dart';
 import 'package:dartway_example_flutter/auth/logic/auth_step.dart';
 import 'package:dartway_example_flutter/auth/widgets/greeting_block.dart';
 import 'package:dartway_example_flutter/auth/widgets/phone_entry_block.dart';
@@ -14,14 +14,14 @@ class AuthPage extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(authStateProvider);
+    final state = ref.watch(authControllerProvider);
 
     return AppScaffold.inner(
       appBar: AppBar(
         leading: state.currentStep.previousStep != null
             ? IconButton(
                 onPressed: () => ref
-                    .read(authStateProvider.notifier)
+                    .read(authControllerProvider.notifier)
                     .goTo(state.currentStep.previousStep!),
                 icon: const Icon(Icons.arrow_back),
               )

@@ -15,23 +15,34 @@ import 'package:test/test.dart';
 /// (`DW_DATABASE_NAME=postgres`); each file creates and drops its own.
 /// `dartway test` provides both.
 final class AppHarness {
-  AppHarness._(this.database, this.server);
+  AppHarness._(this.database, this.server, this.clock);
 
   final DwTestDatabase database;
   final DwTestServer server;
 
+  /// The server's clock, which the test sets and moves: it stands where it
+  /// was started until the test moves it.
+  final DwTestClock clock;
+
   /// The codes the server delivered, by stored identifier.
   final Map<String, String> delivered = {};
 
-  /// With [storage], the server takes uploads on its buckets.
-  static Future<AppHarness> start({DwFileStorageConfig? storage}) async {
+  /// With [storage], the server takes uploads on its buckets. Its clock
+  /// starts at [now], the real time by default.
+  static Future<AppHarness> start({
+    DwFileStorageConfig? storage,
+    DateTime? now,
+  }) async {
     final database = await DwTestDatabase.create(prefix: 'app_test');
+    final clock = DwTestClock(now ?? DateTime.now());
     late final AppHarness harness;
     final server = await DwTestServer.start(
       DartwayStarterServer.build(
+        adminIdentifier: null,
         database: database.config,
         storage: storage,
         port: 0,
+        clock: clock,
         auth: AppAuth.config(
           // Tests ask one identifier for several codes within a minute.
           resendDelay: Duration.zero,
@@ -40,7 +51,7 @@ final class AppHarness {
         ),
       ),
     );
-    return harness = AppHarness._(database, server);
+    return harness = AppHarness._(database, server, clock);
   }
 
   Future<void> stop() async {
@@ -137,7 +148,7 @@ final class AppMember {
   Future<UserProfileRow> profileRow() async => (await _harness.db.userProfiles
       .findFirst(where: (t) => t.accountId.equals(accountId)))!;
 
-  Future<int> get profileId async => (await profileRow()).id!;
+  Future<int> get profileId async => (await profileRow()).id;
 
   /// Watches [request] and waits until it is live.
   Future<DwRequestWatch<R>> watch<R>(DwDataRequest<R> request) async {

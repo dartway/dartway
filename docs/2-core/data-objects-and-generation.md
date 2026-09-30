@@ -138,9 +138,37 @@ final class UpdateMyProfile extends DwActionCommand<UserProfile>
 ```
 
 On the wire a kept field is absent, `DwFieldPatch.set(value)` carries the value and
-`DwFieldPatch.clear()` carries `null`; the handler reads it with `patch.apply(current)`. The patch
-itself is never nullable and never patches a nullable type (`DwFieldPatch<String>`, not
-`DwFieldPatch<String?>`) — clearing is already `clear()`.
+`DwFieldPatch.clear()` carries `null`. The patch itself is never nullable and never patches a
+nullable type (`DwFieldPatch<String>`, not `DwFieldPatch<String?>`) — clearing is already `clear()`.
+
+**Code reads a patch through its helpers and never matches `DwSetField`, `DwClearField` or
+`DwKeepField`** — `dart run dartway_cli:dartway check` fails such a match in a project (`fieldPatchMatched`), because
+hand matching is how each handler grew its own idea of what a blank text or a kept field on insert
+means:
+
+| Need | Write |
+|---|---|
+| the value over an existing one | `patch.apply(current)`, or the row's generated `copyWith(field: patch)` |
+| the value of a row being inserted | `patch.apply(null)` — or `apply(theDefault)`: kept means the column's default — or the new row's `copyWith` |
+| a text a person typed: trimmed, a blank one clears | `patch.trimmedOrCleared` |
+| a check that concerns only a new value (an owned file, a length) | `if (patch.newValue case final value?) …` |
+| which it is | `isSet`, `isCleared`, `isKept` |
+| the patch of another field (a file id becoming a URL) | `patch.map((id) => urlOf(id))` |
+
+The skeleton's `UpdateMyProfile` handler uses three of them:
+
+```dart
+if (command.avatarFileId.newValue case final fileId?) {
+  await ctx.files.requireOwned(fileId, DartwayStarterUpload.avatar, field: 'avatarFileId');
+}
+final updated = await ctx.db.userProfiles.update(
+  current.copyWith(
+    firstName: command.firstName?.trim(),
+    lastName: command.lastName.trimmedOrCleared,
+    avatarFileId: command.avatarFileId,
+  ),
+);
+```
 
 The same problem exists in memory, so the generated `copyWith` of a data object takes a patch for
 every nullable field and a plain nullable parameter for every other
@@ -203,7 +231,7 @@ anywhere else; a DTO field cannot be a row. A handler reads rows and maps them t
 
 ```dart
 static PersonCard person(UserProfileRow row) => PersonCard(
-  id: row.id!,
+  id: row.id,
   firstName: row.firstName,
   lastName: row.lastName,
   imageUrl: row.imageUrl,

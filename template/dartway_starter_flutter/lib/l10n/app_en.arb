@@ -237,7 +237,7 @@
   "refusalConsentsRequired": "Accept the terms to create an account.",
   "refusalSignUpClosed": "New accounts cannot sign up right now.",
   "refusalFirstNameRequired": "Enter your name.",
-  "refusalSettingKeyUnknown": "This setting does not exist.",
+  "refusalAppNameRequired": "The app name cannot be blank.",
   "refusalOwnRoleLocked": "Your own role is changed by another admin.",
   "refusalForbidden": "You are not allowed to do this.",
   "refusalNotFound": "It no longer exists.",

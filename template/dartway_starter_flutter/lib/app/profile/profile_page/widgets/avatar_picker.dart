@@ -40,7 +40,7 @@ class AvatarPicker extends HookWidget {
               radius: 48,
               placeholder: Icons.photo_camera_outlined,
               child: busy || running
-                  ? CircularProgressIndicator(
+                  ? AppProgressIndicator(
                       value: switch (upload) {
                         DwUploadProgress(:final fraction) when fraction > 0 =>
                           fraction,

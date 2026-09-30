@@ -49,7 +49,7 @@ class SignedInGate extends HookConsumerWidget {
     if (current == null) {
       return AppScaffold.inner(
         body: profile.isLoading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(child: AppProgressIndicator())
             : LoadFailedMessage(
                 message: context.l10n.loadFailed,
                 retryLabel: context.l10n.retry,
