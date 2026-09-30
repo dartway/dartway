@@ -68,7 +68,10 @@ final class DwFileStorageConfig {
       if (parsed == null ||
           (parsed.scheme != 'http' && parsed.scheme != 'https') ||
           parsed.host.isEmpty) {
-        problems.add('$prefix$key must be an http or https URL, got "$raw"');
+        problems.add(
+          '$prefix$key must be an http or https URL, got '
+          '"${_withoutUserInfo(raw)}"',
+        );
         return null;
       }
       return parsed;
@@ -159,7 +162,8 @@ final class DwFileStorageConfig {
         endpoint.hasQuery ||
         endpoint.hasFragment ||
         (endpoint.path.isNotEmpty && endpoint.path != '/'))
-      'file storage endpoint $endpoint must be an http or https URL without '
+      'file storage endpoint ${_withoutUserInfo('$endpoint')} must be an '
+          'http or https URL without '
           'a path, query or fragment',
     for (final (label, bucket) in [
       ('public', publicBucket),
@@ -174,7 +178,8 @@ final class DwFileStorageConfig {
       'file storage public bucket "$publicBucket" has no publicBaseUrl to '
           'serve its files from',
     if (publicBucket == null && publicBaseUrl != null)
-      'file storage publicBaseUrl $publicBaseUrl is set without a public '
+      'file storage publicBaseUrl ${_withoutUserInfo('$publicBaseUrl')} is '
+          'set without a public '
           'bucket',
     if (region.isEmpty) 'file storage region is empty',
     if (accessKey.isEmpty || secretKey.isEmpty)
@@ -184,9 +189,15 @@ final class DwFileStorageConfig {
             base.host.isEmpty ||
             base.hasQuery ||
             base.hasFragment)
-      'file storage publicBaseUrl $base must be an http or https URL without '
+      'file storage publicBaseUrl ${_withoutUserInfo('$base')} must be an '
+          'http or https URL without '
           'a query or fragment',
   ];
+
+  /// [url] with anything between `://` and an `@` of its authority taken
+  /// out: a URL in an error names where, never with what credentials.
+  static String _withoutUserInfo(String url) =>
+      url.replaceFirst(RegExp(r'(?<=://)[^/?#@]*@'), '');
 
   static final RegExp _bucketName = RegExp(
     r'^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$',

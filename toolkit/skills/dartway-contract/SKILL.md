@@ -194,8 +194,8 @@ A request is a value: the client caches its state under the request itself (equa
 from the fields) and keeps it live. So:
 
 - **everything that changes the answer is a field.** A status filter, a search string, a page, a
-  date. "Today" is a `DateTime day` field the widget fills in — not `DateTime.now()` in the handler,
-  which would answer differently for two equal requests;
+  date. "Today" is a `DateTime day` field the widget fills in — not `ctx.now` or
+  `ctx.callerLocalTime` in the handler, which would answer differently for two equal requests;
 - **the caller is not a field.** "My" requests carry no account or profile id: the handler reads the
   caller from its context, and the client already keeps state per signed-in account. A field holding
   the caller's own id is a field anyone can change to someone else's (`dartway-access`);
@@ -207,7 +207,8 @@ from the fields) and keeps it live. So:
 A command carries **what the user decided**: the ids of the things it acts on and the values typed
 in. It never carries what the server decides — the owner, the caller's id, timestamps, a status
 the server moves, a price the server computes, a storage key. The handler derives those from its
-context; a field for them is an invitation to forge them.
+context; a field for them is an invitation to forge them. Nor the caller's UTC offset: the app sends
+it with every call, and the handler reads `ctx.callerUtcOffset` (`dartway-server`).
 
 The answer `R` is **one value** (D-006): a data object, a JSON primitive (`int`, `double`, `num`,
 `String`, `bool`), or nothing (`DwActionCommand<void>`; a nullable `R` may answer `null`). A

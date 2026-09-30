@@ -124,6 +124,30 @@ enum DwCheckType {
   /// apart: an undeclared folder is where the next divergence starts.
   invalidTopLevelLayout,
 
+  /// A file or folder inside a server feature outside its closed set:
+  /// `<feature>_<kind>.dart` or `<feature>_<part>_<kind>.dart` with kind one
+  /// of `feature`, `rows`, `handlers`, `objects`, `publications`, `jobs`,
+  /// `access`, `routes`, and one flat `logic/` subfolder for everything else —
+  /// no folders inside it, and no kind-suffixed file. A layer name (`domain/`, `rows/`, `services/`, …) is
+  /// refused at any depth of `lib/src/`, `core/` included.
+  ///
+  /// Every live project had grown its own layout inside a feature — layer
+  /// subfolders in one, a folder of free names in the next — and an agent
+  /// copying any of them spread it (#381).
+  invalidServerFeatureFile,
+
+  /// Server code declared in a file of the wrong kind: handlers outside
+  /// `*_handlers.dart`, row classes outside `*_rows.dart`, jobs and job kinds
+  /// outside `*_jobs.dart`, a `DwHttpRoute` outside `*_routes.dart`, a
+  /// `DwServerFeature` outside `<feature>_feature.dart`,
+  /// a function that publishes outside `*_publications.dart`, a function
+  /// mapping a row to a data object outside `*_objects.dart`. `core/` and
+  /// `logic/` hold none of them.
+  ///
+  /// The name of a file says where a reader looks; this is what makes the
+  /// name true (#381).
+  misplacedServerCode,
+
   /// Generated code that no longer matches its sources: a `*.dw.dart` part,
   /// the protocol registry or the schema that `dartway generate` would write
   /// differently, or a generated file whose source is gone —
@@ -180,6 +204,53 @@ enum DwCheckType {
   /// worse, on this one after the volume is recreated.
   devComposeDrifted,
 
+  /// `DateTime.now()` (or `DateTime.timestamp()`, or `package:clock`'s
+  /// `clock.now()`) anywhere in the server package's `lib/` — the time is
+  /// `ctx.now`, read from the server's clock (dartway/dartway#385).
+  ///
+  /// An error, because the two are not interchangeable spellings: the
+  /// server's clock is the one a test sets (`DwTestClock`) and the one the job
+  /// queue decides due times by, so a handler that reads the system clock is
+  /// a handler no test can pin, and disagrees with its own jobs as soon as a
+  /// test moves time.
+  forbiddenDateTimeNow,
+
+  /// `Platform.environment` in the server package's `lib/` outside
+  /// `lib/src/core/environment.dart`; in its `bin/`, `Platform.environment`
+  /// anywhere but inside `DwLocalEnvironment.overlay(…)`, or a map read by a
+  /// variable's name (`env['PORT']`) (dartway/dartway#386).
+  ///
+  /// The project's variables are read in that one file, into a typed
+  /// `AppEnvironment` at start (`DwEnvironmentReader`), and the framework's
+  /// with it (`DwServerEnvironment`). A variable read anywhere else is read
+  /// on first use — a missing one surfaces as a failure hours after a deploy
+  /// that looked fine — and past the local overlay, so a value in
+  /// `deploy/config.yaml > local` never reaches it. An entry point in `bin/`
+  /// hands the environment in — `AppEnvironment.read(DwLocalEnvironment
+  /// .overlay(Platform.environment))` — and parses nothing itself.
+  forbiddenEnvironmentRead,
+
+  /// `dart:io`'s `HttpClient(` or an import of `package:http/…` in the
+  /// server package's `lib/` (dartway/dartway#386).
+  ///
+  /// An outbound request is `ctx.http`: bounded by a timeout, logged through
+  /// the server's log, and answered by the test server's fake. A client of a
+  /// project's own has none of the three unless someone writes them again —
+  /// and every project did, differently, with a test seam of its own
+  /// threaded through the server's factory.
+  forbiddenHttpClient,
+
+  /// A handler in a `*_handlers.dart` under any rule but a resource rule
+  /// (`signedIn`, a role check, …) that compares a row's owner field with the
+  /// caller and refuses `notFound`/`forbidden` — in its body or in a helper of
+  /// the same file it calls. Whether a row is the caller's
+  /// is `DwAccessRule.resource`'s question, answered once, with the row
+  /// handed to the handler (D-090, D-112).
+  ///
+  /// A warning: it reads the shape of the code, not its meaning, and a
+  /// comparison it matches may be something else.
+  inlineOwnershipCheck,
+
   /// The server or the shared package's `analysis_options.yaml` does not raise
   /// `unnecessary_non_null_assertion` to an error (D-113). A stored row's id is
   /// `int`, so `row.id!` is a `!` that means nothing — and one that means
@@ -208,6 +279,7 @@ enum DwCheckType {
     DwCheckType.frameworkOverrideOutlived ||
     DwCheckType.localSecretMissing ||
     DwCheckType.devComposeDrifted ||
+    DwCheckType.inlineOwnershipCheck ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,
   };

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.21.0-dev.9
+## 0.21.0-dev.12
 
 - **BREAKING: a row class declares `required this.id` and `final int id;`**, and the generator
   writes its draft beside it: `New<Entity>Row` — the same constructor without `id`, defaults
@@ -8,6 +8,18 @@
   `withId(id)`, and the table's `toDraftRow`. The row's own `copyWith` keeps the id. Reported: a
   row class named like another's draft (`NewPlanRow` beside `PlanRow`), an id with a default
   (`this.id = 0`), and a constructor default the draft cannot repeat (dartway/dartway#384).
+
+## 0.21.0-dev.11
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
+
+## 0.21.0-dev.10
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
+
+## 0.21.0-dev.9
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#385).
 
 ## 0.21.0-dev.8
 

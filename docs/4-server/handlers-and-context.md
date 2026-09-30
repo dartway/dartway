@@ -16,7 +16,8 @@ is known to be well-formed:
 1. **Compatibility** — `Dw-Protocol` and `Dw-App-Version` (`426` when the client cannot talk to
    this server);
 2. **Shape** — method, wire name (`404` for an unknown one), content type, idempotency key
-   (required for a command, forbidden for a request), headers, query and body — each a malformed
+   (required for a command, forbidden for a request), headers (a `Dw-Utc-Offset` that is not whole
+   minutes within 18 hours included), query and body — each a malformed
    call (`400`) when wrong, logged with an incident id and never alerted;
 3. **The token** — unknown or revoked is `401` on any call, even one that needs no account: a
    client holding a dead token must learn it;
@@ -198,6 +199,9 @@ One context per call. Everything a handler may touch is on it.
 | `sessionKey` | the `DwSessionKeyInfo` that authenticated the call — the server's record, never the client's word ([keys](auth-identity.md#session-keys)) |
 | `db` | the `DwDatabaseHandle`: the transaction inside a transactional command or `ctx.transaction`, the pool otherwise |
 | `protocol` | the `DwWireProtocol` (for `DwDeletedObject.of<T>(id, ctx.protocol)`) |
+| `now` | the current instant, UTC, from the server's clock — the one way server code reads the time ([below](#time-ctxnow-and-the-callers-offset)) |
+| `callerUtcOffset` | the caller's UTC offset as its app sent it, a `Duration`, or `null` when unknown |
+| `callerLocalTime` | a `DwCallerLocalTime`: what the caller's clock reads now — date, hour, weekday, the instant their day began — or `null` when the offset is unknown |
 | `transaction(body)` | runs `body` in a transaction, a savepoint when already inside one; publications, revocations and jobs made inside take effect only if it commits |
 | `publish(channel, item)` | sends a data object or a `DwDeletedObject` to a channel after commit ([channels](../2-core/channels-and-realtime.md)) |
 | `revoke(channel, accountId)` | closes an account's subscriptions to a channel after commit |
@@ -206,7 +210,44 @@ One context per call. Everything a handler may touch is on it.
 | `accounts` | a `DwAccountService` bound to this call ([auth](auth-identity.md#dwaccountservice)) |
 | `files` | the `DwFileService` ([uploads](uploads.md#ctxfiles)) |
 | `log` | a `DwServerLogger` scoped to the call (`command BookSession`) |
+| `http` | the `DwOutboundHttp`: requests to other services' HTTP APIs, [below](#outbound-http) |
 | `memo(key, create)` | a per-call cache: `create` runs at most once per key per call |
+
+### Time: `ctx.now` and the caller's offset
+
+**`ctx.now` is the time.** It reads the server's clock — `DwAppServer(clock: …)`, the system's by
+default — on every access, in UTC, the same way in a handler, a job, a route, a channel rule and a
+startup step. A test gives the server a `DwTestClock` and sets or moves it; the job queue decides due
+times by the same clock, so a job enqueued for tomorrow runs when the test moves the clock to
+tomorrow ([jobs](jobs.md#time-is-the-servers-clock)). `DateTime.now()` anywhere in a server's `lib/` is
+refused by `dart run dartway_cli:dartway check` (`forbiddenDateTimeNow`): a time no test can set, and one that disagrees
+with the job queue the moment a test moves the clock.
+
+**The caller's offset travels with every call.** The app reads its device's UTC offset at each call
+and sends it as `Dw-Utc-Offset`, whole minutes east of UTC
+([the wire](../2-core/wire-and-versions.md#a-call)); the handler reads `ctx.callerUtcOffset`, and
+`ctx.callerLocalTime` for what the caller's clock reads — `year`, `month`, `day`, `hour`, `minute`,
+`weekday`, and `startOfDayUtc`, the instant their day began:
+
+```dart
+final local = ctx.callerLocalTime;
+if (local == null) ctx.refuse(DwCoreRefusal.invalid);   // an app too old to send it
+// "The caller's today" as instants, for a query:
+final from = local.startOfDayUtc;
+final to = from.add(const Duration(days: 1));
+```
+
+`DwCallerLocalTime` is a reading, not an instant, and deliberately not a `DateTime`: a `DateTime`
+holding local fields would pass for an instant in a DTO field, a `timestamptz` column or `isBefore`
+and be wrong by the offset each time. `startOfDayUtc` is its one way back to an instant. A command
+does not carry the offset as a field of its own — the framework already does.
+
+It is `null` wherever no device stands behind the context: in jobs, routes, startup steps, channel
+subscription checks and `DwAppServer.callAs`, and on a call from an app that sent none. It is an
+**offset, not a time zone**: there are no IANA zones, so the offset says what the caller's clock
+reads now, not what it will read after the next daylight-saving change. Work that runs later for a
+person — a job, a reminder at their 8 a.m. — needs an offset the project stored itself (the last one
+a call of theirs carried, say); the framework keeps none.
 
 ### A request cannot publish
 
@@ -220,6 +261,63 @@ Both open a transaction, but only `ctx.transaction` ties the call's effects to i
 the transaction inside the body. Inside `ctx.db.transaction((tx) …)`, `ctx.db` is still the outer
 handle — a write through it escapes the transaction — and a publication made there is delivered
 even when that transaction rolls back.
+
+## Outbound HTTP
+
+A request to somebody else's API — an SMS gateway, a CRM, a model provider — is `ctx.http`, in a
+handler, a job, a route or a startup step alike. There is no second client: `dart run dartway_cli:dartway check` refuses
+`HttpClient(` and `package:http` in `lib/src/` (`forbiddenHttpClient`).
+
+```dart
+final response = await ctx.http.post(
+  Uri.parse('https://sms.example.com/send'),
+  headers: {'authorization': 'Bearer ${sms.token}'},
+  json: {'phone': phone, 'text': text},
+);
+if (!response.isSuccess) throw SmsException(response.statusCode, response.body);
+```
+
+- `get`, `post`, `put`, `patch`, `delete` and `send(method, url)` to an `http` or `https` URL (anything
+  else is an `ArgumentError`); a body is `json:` (encoded, with its content type) or `body:` — a
+  `String`, bytes, or a `Map<String, String>` sent as a form.
+- **Bounded.** The whole exchange, from connecting to the last byte of the answer, by
+  `DwServerSettings.outboundTimeout` (30 s), or the call's own `timeout:`.
+- **Capped.** A response body larger than `DwServerSettings.outboundMaxResponseBytes` (10 MiB), or the
+  call's `maxResponseBytes:`, is not read further: `DwOutboundException`.
+- **Logged** through `ctx.log`: method, origin, status and time. Never the user info, the path, the
+  query, a header or a body — that is where credentials travel (`/bot<token>/`, `?psw=`).
+- **An answer is an answer.** Any status comes back as a `DwOutboundResponse` (`statusCode`,
+  `isSuccess`, `body`, `json`, `headers`). What throws is not getting one: `DwOutboundException`,
+  with `timedOut` telling a timeout from an unreachable host.
+- `followRedirects: false` for a request whose headers carry a credential, which a redirect would
+  carry to wherever it points.
+- **Not inside a transaction.** The transaction holds its locks and its connection for as long as the
+  other side takes. Commit first — a `transactional: false` command or a job — then call out.
+
+**In a test**, every `DwTestServer` answers `ctx.http` from its `DwFakeOutboundHttp`, `server.http`,
+and refuses a request no rule answers with a `StateError` — no test reaches the network by accident,
+and nothing is threaded through the project's server factory to arrange it:
+
+```dart
+server.http.when(
+  (request) => request.url.host == 'sms.example.com',
+  (request) => DwOutboundResponse(200, json: {'id': 7}),
+);
+// … the command that sends the SMS
+expect(server.http.requests.single.json, {'phone': '79990000001', 'text': 'Code: 1234'});
+```
+
+The rule added last is asked first, so a test overrides what its harness scripted; a rule that throws
+`DwOutboundException` makes the provider unreachable. A class that talks to a provider takes a
+`DwOutboundHttp` (`ctx.http`) per call, so it is unit-tested without a server over the same fake:
+`DwFakeOutboundHttp().client()`.
+
+A client used only by a command-line entry point, with no server and no context, is not the server's:
+it lives in `bin/` (or a tool package of its own), where the checker does not look for one.
+
+Framework satellites keep their own clients for now — push delivery (`dartway_push_server`) and the
+sign-in providers' key fetches (`dartway_auth_providers_server`) — as does the storage client inside the
+core.
 
 ## A project's own notions of the caller
 

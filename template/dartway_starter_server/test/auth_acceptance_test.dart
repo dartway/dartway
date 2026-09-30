@@ -55,7 +55,8 @@ void main() {
     expect(profile.role, UserRole.user);
     expect(profile.agreedForMarketing, isTrue);
     final row = (await app.db.userProfiles.findById(profile.id))!;
-    expect(row.termsAcceptedAt, isNotNull);
+    // Stamped by the server's clock, which the test holds still.
+    expect(row.termsAcceptedAt, app.clock.now());
   });
 
   test('signing up by e-mail, then signing in again without the consent: an '
@@ -182,7 +183,7 @@ void main() {
     final server = app.server.server;
     DwFirstAdministrator declaring(String identifier) => DwFirstAdministrator(
       grant: AppBootstrap.grantAdmin,
-      environment: {DwFirstAdministrator.defaultVariable: identifier},
+      identifier: identifier,
     );
     Future<void> start(String identifier) =>
         server.runInContext(declaring(identifier).run);
@@ -190,7 +191,7 @@ void main() {
     // A mistyped identifier is a server that does not start, judged before
     // anything opens.
     expect(declaring('not an identifier').problems(AppAuth.config()), [
-      contains(DwFirstAdministrator.defaultVariable),
+      contains('DW_ADMIN_IDENTIFIER'),
     ]);
     expect(declaring('Admin@Example.com').problems(AppAuth.config()), isEmpty);
 

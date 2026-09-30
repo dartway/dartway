@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.21.0-dev.9
+## 0.21.0-dev.12
 
 - **BREAKING: a row's `id` is `int`, and a row not stored yet is its draft.** `DwTableRow.id` is
   non-null — every row comes out of the database, which assigned it — so a stored row's id is read
@@ -9,6 +9,18 @@
   longer carries the id. An insert with an id of one's own is gone, with `insertAll`'s "every row
   has an id or none has" (it also left the `bigserial` sequence behind the rows). `update(row)`
   needs no id check: the type holds it (dartway/dartway#384).
+
+## 0.21.0-dev.11
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
+
+## 0.21.0-dev.10
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
+
+## 0.21.0-dev.9
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#385).
 
 ## 0.21.0-dev.8
 

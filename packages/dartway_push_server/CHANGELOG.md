@@ -1,3 +1,16 @@
+## 0.5.1
+
+- **A delivery is due by the server's clock, the one its job runs by** (dartway/dartway#385).
+  `ctx.push.send` schedules on `ctx.now` (a missing `scheduledAt` is `ctx.now`, not the database's
+  `now()`) and stamps the message's `created_at` with it, so `DwPushNotice.createdAt` compares with
+  `ctx.now` in an eligibility rule; and the worker claims, leases, delays, retries and finishes deliveries against it; the
+  `dw.push.cleanup` job ages finished deliveries and finds uncovered ones by it too. Before, the
+  `dw.push.deliver` job became due by the server's clock while the deliveries it covers were due by
+  the database's: with skew between the two, or a `DwTestClock`, a job could run before its
+  delivery was due, claim nothing and leave it without a job, and a retry never ran under a clock
+  that stood still. Needs `dartway_core_server` `0.21.0-dev.9` (`ctx.now`). Nothing to change in a
+  project; a test on a `DwTestClock` moves the clock to send a scheduled push or run a retry.
+
 ## 0.5.0
 
 - This package now targets the rewritten DartWay framework (`dartway_core_server` 0.20.0). The previously published `0.4.0` was built on the old, Serverpod-based stack.

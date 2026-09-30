@@ -26,7 +26,7 @@ void main() {
     return club.db.clubSessions.insert(
       NewClubSessionRow(
         serviceId: service.id,
-        startsAt: DateTime.now().add(const Duration(days: 1)),
+        startsAt: club.clock.now().add(const Duration(days: 1)),
         capacity: capacity,
       ),
     );
@@ -37,7 +37,7 @@ void main() {
     final session = await sessionWithSpots(1);
     final vera = await club.signUp('79990000011', firstName: 'Vera');
     final oleg = await club.signUp('79990000012', firstName: 'Oleg');
-    final from = DateTime.now().subtract(const Duration(hours: 1));
+    final from = club.clock.now().subtract(const Duration(hours: 1));
 
     final olegSchedule = oleg.client.watch(ListUpcomingSessions(from: from));
     final veraBookings = vera.client.watch(const ListMyBookings());

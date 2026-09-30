@@ -12,7 +12,11 @@ import '../checker/dw_framework_overrides.dart';
 import '../checker/dw_l10n_wiring.dart';
 import '../checker/dw_local_environment.dart';
 import '../checker/dw_layout.dart';
+import '../checker/dw_server_clock_use.dart';
 import '../checker/dw_server_contract.dart';
+import '../checker/dw_server_features.dart';
+import '../checker/dw_server_outside_world.dart';
+import '../checker/dw_inline_ownership.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
 import '../checker/dw_check_tally.dart';
@@ -92,6 +96,15 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
 
+      // Inside the server's features: which files a feature may have, and
+      // which of them declares what. The server's, like the layout above.
+      errorCount += DwServerFeatureInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        sharedPackageDir: layout?.sharedPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+
       // Judges the package's wiring rather than any file in it, so it has
       // nothing to say about a run narrowed to a folder either.
       errorCount += DwL10nWiringInspector(
@@ -114,6 +127,16 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
       errorCount += DwGeneratedCodeInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwServerClockInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwServerOutsideWorldInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,
@@ -144,6 +167,11 @@ class CheckCommand extends Command<int> {
       ).run(tally: tally);
       errorCount += DwLocalEnvironmentInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwInlineOwnershipInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

@@ -307,6 +307,29 @@ List<_WireShape> _wireShapes() {
       () => DwContractVersion('0.7.2').toString(),
       readBack: (json) => DwContractVersion.parse(json! as String).toString(),
     ),
+    // Recorded apart from `http.contract` (D-110): an optional header an
+    // older client simply does not send, so the envelope is unchanged.
+    _WireShape(
+      'http.utcOffset',
+      () => {
+        'header': DwHttpContract.utcOffsetHeader,
+        'moscow': DwHttpContract.utcOffsetValue(const Duration(hours: 3)),
+        'newYorkWinter': DwHttpContract.utcOffsetValue(
+          const Duration(hours: -5),
+        ),
+        'kathmandu': DwHttpContract.utcOffsetValue(
+          const Duration(hours: 5, minutes: 45),
+        ),
+      },
+      readBack: (json) => {
+        for (final MapEntry(:key, :value) in (json! as Map).entries)
+          key: key == 'header'
+              ? value
+              : DwHttpContract.utcOffsetValue(
+                  DwHttpContract.parseUtcOffset(value as String),
+                ),
+      },
+    ),
     _WireShape(
       'http.appVersion',
       () => DwAppVersion('1.4.2', 87).toString(),

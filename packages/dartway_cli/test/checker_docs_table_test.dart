@@ -69,6 +69,16 @@ void main() {
       'Eighteen',
       'Nineteen',
       'Twenty',
+      'Twenty-one',
+      'Twenty-two',
+      'Twenty-three',
+      'Twenty-four',
+      'Twenty-five',
+      'Twenty-six',
+      'Twenty-seven',
+      'Twenty-eight',
+      'Twenty-nine',
+      'Thirty',
     ][count].toLowerCase();
     int of(DwCheckSeverity level) =>
         DwCheckType.values.where((check) => check.severity == level).length;

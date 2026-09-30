@@ -237,7 +237,7 @@ final inserted = await ctx.db.sessionReviews.tryInsert(
     bookingId: booking.id,
     rating: command.rating,
     text: command.text,
-    createdAt: DateTime.now(),
+    createdAt: ctx.now,
   ),
   onConflict: DwOnConflict.doNothing((t) => [t.bookingId]),
 );

@@ -1,9 +1,9 @@
 ---
 title: "A row's id is int; an insert takes the generated draft New<Entity>Row"
 affects:
-  dartway_orm: "0.21.0-dev.9"
-  dartway_generator: "0.21.0-dev.9"
-  dartway_core_server: "0.21.0-dev.9"
+  dartway_orm: "0.21.0-dev.12"
+  dartway_generator: "0.21.0-dev.12"
+  dartway_core_server: "0.21.0-dev.12"
 ---
 
 ## Who is affected

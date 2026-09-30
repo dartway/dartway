@@ -1,11 +1,64 @@
 # Changelog
 
-## 0.13.0
+## 0.18.0
 
 - **BREAKING: new error check `redundantBangAllowed`** — the server and the shared package's
   `analysis_options.yaml` (or a local file it includes) must raise the analyzer's
   `unnecessary_non_null_assertion` to an error. A stored row's id is `int` now, and `row.id!` hides
   the `!` that guards a real null (dartway/dartway#384, D-113).
+
+## 0.17.0
+
+- **A new warning in `dartway check`: `inlineOwnershipCheck`** (dartway/dartway#387, D-112). In a
+  server `*_handlers.dart`, a handler under any rule but a resource rule (`signedIn`, a role check)
+  — or a helper of the same file it calls — that compares a row's owner field (`…ProfileId`,
+  `authorId`, `ownerId`, `senderId`, `accountId`, …) with the caller and refuses
+  `notFound`/`forbidden` (or answers `null` from a `single` handler) is the check
+  `DwAccessRule.resource` makes once. A project rule that builds a resource rule counts as one. A
+  warning: it reads the shape of the code, and does not fail the run. Migration note:
+  `docs/migrations/2026-09-30-ownership-through-access-rules.md`.
+
+## 0.16.0
+
+- **Two new errors in `dartway check`: `forbiddenEnvironmentRead` and `forbiddenHttpClient`**
+  (dartway/dartway#386). `Platform.environment` in a server package's `lib/` outside
+  `lib/src/core/environment.dart` — and in its `bin/` outside `DwLocalEnvironment.overlay(…)`, or a
+  map read there by a variable's name (`env['PORT']`) — and `HttpClient(` or an import of
+  `package:http/…` in its `lib/`, fail the check: the environment is read once into
+  `AppEnvironment` (`DwEnvironmentReader`), and an outbound request is `ctx.http`. Comments and
+  strings are passed over, interpolations are not; `test/` is not judged. A project with either fails
+  `dartway check` until it moves — see `docs/migrations/2026-09-29-environment-and-outbound-http.md`.
+
+## 0.15.0
+
+- **New error, `forbiddenDateTimeNow`: the server's `lib/` reads the time as `ctx.now`**
+  (dartway/dartway#385). `DateTime.now` and `DateTime.timestamp` — called, torn off or inside an
+  interpolation — and `package:clock`'s `clock.now()` where it is imported, prefixed or not, fail
+  `dartway check` anywhere under `lib/`, the factory file included; comments and strings are passed
+  over, `bin/` and `test/` are not judged. The server's clock is the
+  one tests set (`DwTestClock`) and the job queue runs by. Migration note:
+  `docs/migrations/2026-09-29-server-clock-and-caller-offset.md`.
+
+## 0.14.0
+
+- **BREAKING: `dartway check` holds the inside of a server feature** (dartway/dartway#381, D-109).
+  A feature folder `lib/src/<feature>/` holds `<feature>_<kind>.dart` or
+  `<feature>_<part>_<kind>.dart`, the kind one of `feature`, `rows`, `handlers`, `objects`,
+  `publications`, `jobs`, `access`, `routes`, and one optional, flat `logic/` subfolder for
+  everything else, whose files carry no kind's suffix; a layer-named folder (`domain`, `rows`, `handlers`, `services`,
+  `models`, `objects`, `repositories`, `utils`, `helpers`, …) is refused at any depth of `lib/src/`
+  (`invalidServerFeatureFile`, new error). And each kind is held by what a file declares: handlers
+  only in `*_handlers.dart`, row classes only in `*_rows.dart`, job kinds and definitions only in
+  `*_jobs.dart`, `DwHttpRoute`s only in `*_routes.dart`, `DwServerFeature` only in `<feature>_feature.dart`, a named function that publishes
+  only in `*_publications.dart`, a named function that takes a row and builds a data object only in
+  `*_objects.dart` — and none of them in `core/` (`misplacedServerCode`, new error). Read from the
+  source with comments and strings blanked; a closure a handler or a hook runs is not a
+  declaration, so publishing inline from a handler stays legal. `helpers`, `repositories` and
+  `utils` join the layer names refused at the top of `src/` too (`invalidTopLevelLayout`).
+  Migration note: `docs/migrations/2026-09-29-server-feature-closed-file-set.md`.
+
+## 0.13.0
+
 - **The checker's advice names `lib/ui_kit/` for a visual building block** (`notAFeature`,
   `unusedFeatureFile`): `lib/shared/` now holds non-visual helpers only, as the toolkit's feature
   law says (dartway/dartway#380). Wording only; no check changed.
