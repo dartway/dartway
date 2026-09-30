@@ -351,15 +351,22 @@ void main() {
 
     test('with no answer within callTimeout a call completes with '
         'DwTimeoutException naming the last error', () async {
+      // The retries wait until the deadline, so the last attempt gets a
+      // sliver of it — on dart2js shorter than the fake network's latency
+      // (#400). The error named is the failure, whatever the sliver was.
       final h = Harness(
         options: const DwClientOptions(
-          callTimeout: Duration(milliseconds: 60),
+          callTimeout: Duration(milliseconds: 200),
           retryDelay: Duration(milliseconds: 5),
           maxRetryDelay: Duration(milliseconds: 10),
         ),
       )..serveRooms();
       await h.start();
-      h.server.reachable = false;
+      var attempts = 0;
+      h.server.interceptPost = (post) {
+        attempts++;
+        throw const DwFakeNetworkException();
+      };
       await expectLater(
         h.client.command(const RenameRoom(roomId: 1, name: 'x')),
         throwsA(
@@ -370,6 +377,57 @@ void main() {
                 'lastError',
                 isA<DwFakeNetworkException>(),
               ),
+        ),
+      );
+      expect(attempts, greaterThan(1), reason: 'retried within callTimeout');
+    });
+
+    test('an attempt that hangs until the deadline leaves the failure '
+        'before it as the last error', () async {
+      final h = Harness(
+        options: const DwClientOptions(
+          callTimeout: Duration(milliseconds: 60),
+          retryDelay: Duration(milliseconds: 5),
+          maxRetryDelay: Duration(milliseconds: 10),
+        ),
+      )..serveRooms();
+      await h.start();
+      var attempts = 0;
+      h.server.interceptPost = (post) {
+        if (attempts++ == 0) throw const DwFakeNetworkException();
+        return Completer<DwHttpReply?>().future;
+      };
+      await expectLater(
+        h.client.command(const RenameRoom(roomId: 1, name: 'x')),
+        throwsA(
+          isA<DwTimeoutException>().having(
+            (e) => e.lastError,
+            'lastError',
+            isA<DwFakeNetworkException>(),
+          ),
+        ),
+      );
+      expect(attempts, 2);
+    });
+
+    test('a server that never answers times out naming no error', () async {
+      final h = Harness(
+        options: const DwClientOptions(
+          callTimeout: Duration(milliseconds: 60),
+          retryDelay: Duration(milliseconds: 5),
+          maxRetryDelay: Duration(milliseconds: 10),
+        ),
+      )..serveRooms();
+      await h.start();
+      h.server.interceptPost = (post) => Completer<DwHttpReply?>().future;
+      await expectLater(
+        h.client.command(const RenameRoom(roomId: 1, name: 'x')),
+        throwsA(
+          isA<DwTimeoutException>().having(
+            (e) => e.lastError,
+            'lastError',
+            isNull,
+          ),
         ),
       );
     });

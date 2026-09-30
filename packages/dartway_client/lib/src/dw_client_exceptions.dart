@@ -60,8 +60,8 @@ final class DwTimeoutException implements Exception {
 
   final Duration timeout;
 
-  /// What the last attempt failed with — a socket error, a proxy's `503` —
-  /// when an attempt failed rather than hung.
+  /// What the last failed attempt failed with — a socket error, a proxy's
+  /// `503`; `null` when every attempt hung rather than failed.
   final Object? lastError;
 
   @override
