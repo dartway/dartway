@@ -126,15 +126,7 @@ class LocalShell extends DwSshRunner {
       '-c',
       command,
     ], environment: environment);
-    process.stdin.write(input);
-    await process.stdin.close();
-    final out = utf8.decodeStream(process.stdout);
-    final err = utf8.decodeStream(process.stderr);
-    return DwSshResult(
-      exitCode: await process.exitCode,
-      stdout: await out,
-      stderr: await err,
-    );
+    return DwSshRunner.feedInput(process, input);
   }
 }
 

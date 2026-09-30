@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:test/test.dart';
 
@@ -12,5 +14,25 @@ void main() {
     expect(options, contains('-o ServerAliveInterval=30'));
     expect(options, contains('-o ServerAliveCountMax=4'));
     expect(options, contains('-o BatchMode=yes'));
+  });
+
+  test('a command that exits without reading its input is answered by its '
+      'exit code, not a broken pipe', () async {
+    // More than a pipe holds, so the write outlives the process for certain:
+    // `ssh` that could not connect, a script stopped by `set -e` early.
+    final process = await Process.start('sh', [
+      '-c',
+      'echo refused >&2; exit 3',
+    ]);
+    final result = await DwSshRunner.feedInput(process, 'x' * (1 << 20));
+    expect(result.exitCode, 3);
+    expect(result.stderr, contains('refused'));
+  });
+
+  test('a command that reads its input answers with what it read', () async {
+    final process = await Process.start('sh', ['-c', 'wc -c']);
+    final result = await DwSshRunner.feedInput(process, 'x' * (1 << 20));
+    expect(result.exitCode, 0);
+    expect(result.stdout.trim(), '${1 << 20}');
   });
 }
