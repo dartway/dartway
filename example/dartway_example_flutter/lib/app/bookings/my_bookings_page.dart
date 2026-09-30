@@ -6,10 +6,8 @@ import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_example_flutter/core/async_section.dart';
 
-class MyBookingsPage extends ConsumerWidget implements DwFeatureWidget {
+class MyBookingsPage extends StatelessWidget implements DwFeatureWidget {
   const MyBookingsPage({super.key});
 
   @override
@@ -40,33 +38,28 @@ class MyBookingsPage extends ConsumerWidget implements DwFeatureWidget {
   );
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     const request = ListMyBookings();
 
     return AppScaffold.main(
       appBar: AppBar(title: AppText.title(context.l10n.tabBookings)),
-      body: ref
-          .watch(dw.request(request))
-          .section(
-            loadingValue: PlaceholderObjects.listOf(
-              PlaceholderObjects.booking,
-              3,
-            ),
-            onRetry: () => ref.read(dw.request(request).notifier).refetch(),
-            builder: (bookings) {
-              if (bookings.isEmpty) {
-                return Center(child: AppText.body(context.l10n.noBookingsYet));
-              }
+      body: DwReadBuilder(
+        dw.request(request),
+        placeholder: PlaceholderObjects.listOf(PlaceholderObjects.booking, 3),
+        builder: (context, bookings) {
+          if (bookings.isEmpty) {
+            return Center(child: AppText.body(context.l10n.noBookingsYet));
+          }
 
-              return ListView.separated(
-                padding: const EdgeInsets.symmetric(vertical: 8),
-                itemCount: bookings.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 8),
-                itemBuilder: (context, index) =>
-                    BookingCard(booking: bookings[index]),
-              );
-            },
-          ),
+          return ListView.separated(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: bookings.length,
+            separatorBuilder: (_, _) => const SizedBox(height: 8),
+            itemBuilder: (context, index) =>
+                BookingCard(booking: bookings[index]),
+          );
+        },
+      ),
     );
   }
 }

@@ -1,14 +1,10 @@
 part of '../ui_kit.dart';
 
-/// What a section shows when its read did not answer — a sentence and a way out
-/// of it.
+/// What a read shows when it did not answer — a sentence and a way out of it.
 ///
-/// `dwBuildAsync` defaults its error widget to `SizedBox.shrink()`, which is
-/// correct for a decoration and wrong for the section its screen exists for:
-/// an empty page already means "nothing has been created yet", and a failed
-/// read means "go and look at the backend". Sections get this through the
-/// app's `section(...)` extension in `lib/core/`, so none of them can forget
-/// it.
+/// The app's `DwFlutterConfig.readFailedBuilder` (`lib/core/dw_core.dart`), so
+/// every `DwReadBuilder` shows it and none can forget to: an empty page means
+/// "nothing has been created yet", and a failed read must not look like one.
 ///
 /// The texts are the app's, handed in: the kit knows no language.
 class LoadFailedMessage extends StatelessWidget {

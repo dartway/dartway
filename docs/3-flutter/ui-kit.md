@@ -22,8 +22,16 @@ Exactly the mechanisms a kit should not have to reinvent, and nothing that has a
 
 - **`DwActionBuilder`** — the action guard: the in-flight flag, the suppressed second tap, optional
   `Form` validation, focus handling. See [actions](actions-and-refusal-texts.md).
-- **`dwBuildAsync` / `dwBuildListAsync`** — one rendering of loading / error / data, with skeletons
-  built from your own widget. See [the data layer](data-layer.md).
+- **`DwReadBuilder` / `DwPagedListView`** — one rendering of a read's loading / refusal / failure /
+  data, with skeletons built from your own widget; the loading and failed views are the kit's,
+  handed to `DwFlutterConfig` once. See [the data layer](data-layer.md#showing-a-read-dwreadbuilder).
+
+**Loading, dialogs and sheets live in the kit.** `AppProgressIndicator` is the one spinner,
+`context.showAppDialog(…)` and `context.showAppBottomSheet(…)` the one frame for a dialog and a sheet;
+`dart run dartway_cli:dartway check` refuses `CircularProgressIndicator` (`forbiddenProgressIndicator`) and `showDialog`,
+`showModalBottomSheet`, `showCupertino…`, `Navigator.push…` and page routes
+(`forbiddenNavigationCall`) outside `ui_kit/` — a screen is a route of a zone, and a question before
+an action is `dw.action(confirmation: …)`.
 
 Both are widget-agnostic on purpose. `DwActionBuilder` hands you `onPressed` and `busy` and lets you
 build anything with them — a button, a list tile, an icon, a card. It has no idea what a button

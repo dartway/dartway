@@ -97,6 +97,8 @@ final class World {
       refusalText: (refusal) => refusal.isCode(RoomRefusal.nameTaken)
           ? 'The name ${refusal.params['name']} is taken'
           : 'Refused (${refusal.code})',
+      readLoadingBuilder: (context) => const SizedBox(),
+      readFailedBuilder: (context, error, retry) => const SizedBox(),
       updateRequiredScreen: updateRequiredScreen,
     ),
     protocol: roomsProtocol,
@@ -620,8 +622,8 @@ void main() {
     expect(world.server.errors, isEmpty);
   });
 
-  test('a config that cannot render refusals or name its build is refused, '
-      'claiming nothing', () async {
+  test('a config that cannot render refusals, show a read or name its build '
+      'is refused, claiming nothing', () async {
     final world = World();
     expect(
       () => DwFlutterCore(
@@ -642,8 +644,28 @@ void main() {
     expect(
       () => DwFlutterCore(
         config: DwFlutterConfig(
+          appVersion: '1.0.0+1',
+          refusalText: (refusal) => refusal.code,
+          readLoadingBuilder: (context) => const SizedBox(),
+        ),
+        protocol: roomsProtocol,
+        baseUrl: world.server.baseUrl,
+      ),
+      throwsA(
+        isA<ArgumentError>().having(
+          (error) => '${error.message}',
+          'message',
+          contains('readFailedBuilder'),
+        ),
+      ),
+    );
+    expect(
+      () => DwFlutterCore(
+        config: DwFlutterConfig(
           appVersion: 'one',
           refusalText: (refusal) => refusal.code,
+          readLoadingBuilder: (context) => const SizedBox(),
+          readFailedBuilder: (context, error, retry) => const SizedBox(),
         ),
         protocol: roomsProtocol,
         baseUrl: world.server.baseUrl,
@@ -660,6 +682,8 @@ void main() {
       config: DwFlutterConfig(
         appVersion: '1.0.0+1',
         refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (context) => const SizedBox(),
+        readFailedBuilder: (context, error, retry) => const SizedBox(),
       ),
       protocol: roomsProtocol,
       baseUrl: world.server.baseUrl,

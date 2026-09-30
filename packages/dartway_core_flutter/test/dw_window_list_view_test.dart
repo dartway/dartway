@@ -101,6 +101,8 @@ final class LogWorld {
     config: DwFlutterConfig(
       appVersion: '1.0.0+1',
       refusalText: (refusal) => refusal.code,
+      readLoadingBuilder: (context) => const SizedBox(),
+      readFailedBuilder: (context, error, retry) => const SizedBox(),
     ),
     protocol: logProtocol,
     baseUrl: server.baseUrl,
@@ -137,6 +139,7 @@ Widget logList({
           child: DwWindowListView<LogLine>(
             request: const ReadLog(),
             controller: controller,
+            emptyBuilder: (context) => const SizedBox.expand(),
             initialAnchor: anchor,
             anchorAlignment: anchorAlignment,
             onVisibleItemsChanged: onVisible,

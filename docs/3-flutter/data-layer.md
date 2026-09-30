@@ -8,19 +8,28 @@ behind `dw`, and a screen writes none of it.
 What requests and commands *are* on the wire is [requests and updates](../2-core/requests-and-updates.md)
 and [commands and idempotency](../2-core/commands-and-idempotency.md). This page is the Flutter side.
 
-| You want | You write | You get |
+| You want | A screen writes | The read underneath |
 |---|---|---|
-| one object, an optional one, a list | `ref.watch(dw.request(request))` | `AsyncValue<T>`, `AsyncValue<T?>`, `AsyncValue<List<T>>` |
-| a feed that grows as it scrolls | `ref.watch(dw.pages(request))` | `AsyncValue<DwPagedData<T>>` |
-| numbered pages with a total | `ref.watch(dw.table(request))` | `AsyncValue<DwTablePage<T>>` |
-| a chat-like window around a point | `ref.watch(dw.window(request, anchor: ...))` | `AsyncValue<DwWindowData<T>>` |
-| to change something | `await dw.command(command)` | `DwCallResult<R>` |
-| a value once, outside any widget | `await dw.client.fetch(request)` | `DwCallResult<R>` |
+| one object, an optional one, a list | `DwReadBuilder(dw.request(request), builder: …)` | `dw.request(request)`: `AsyncValue<T>`, `AsyncValue<T?>`, `AsyncValue<List<T>>` |
+| a feed that grows as it scrolls | `DwPagedListView(request: request, itemBuilder: …)` | `dw.pages(request)`: `AsyncValue<DwPagedData<T>>` |
+| numbered pages with a total | `DwReadBuilder(dw.table(request), builder: …)` | `dw.table(request)`: `AsyncValue<DwTablePage<T>>` |
+| a chat-like window around a point | `DwWindowListView(request: request, …)` | `dw.window(request, anchor: ...)`: `AsyncValue<DwWindowData<T>>` |
+| to change something | `dw.action((_) => <Feature>Commands.x(…))` | `dw.command(command)`: `DwCallResult<R>` |
+| a value once, outside any widget | — | `await dw.client.fetch(request)`: `DwCallResult<R>` |
+
+**A screen shows a read through one of the three widgets, and nothing else.** Taking the
+`AsyncValue` of `ref.watch(dw.request(…))` apart in a widget — `.value`, `.when(`, `.hasError`, a
+`switch` over `AsyncError(…)` — is what `dart run dartway_cli:dartway check` refuses (`forbiddenRequestRead`); a
+controller in a feature's `logic/`, or wiring in `core/`, may watch a read to derive its own state.
 
 ## Reading: `dw.request`
 
 ```dart
-final bookings = ref.watch(dw.request(const ListMyBookings()));
+DwReadBuilder(
+  dw.request(const ListMyBookings()),
+  placeholder: PlaceholderObjects.listOf(PlaceholderObjects.booking, 4),
+  builder: (context, bookings) => BookingList(bookings),
+)
 ```
 
 The request kind decides the value: a `DwSingleRequest<T>` gives `T` (an absent object is a
@@ -81,10 +90,11 @@ A request that is running again — a pull to refresh, an update that asked for 
 reconnected socket — **keeps its last value as `AsyncData`**. The screen does not flash back to a
 skeleton, and a list does not lose its scroll position because the socket blinked.
 
-Pull to refresh is the notifier's `refetch()`, which completes when answered:
+Pull to refresh is the notifier's `refetch()`, which completes when answered — and the retry of
+`DwReadBuilder`'s failed view is the same call:
 
 ```dart
-onRetry: () => ref.read(dw.request(const ListNews()).notifier).refetch(),
+onRefresh: () => ref.read(dw.request(const ListMyBookings()).notifier).refetch(),
 ```
 
 Use `refetch()`, not `ref.invalidate`: the client keeps a request alive for the release delay after
@@ -93,32 +103,41 @@ asking again.
 
 ## Feeds: `dw.pages`
 
-A `DwPageRequest<T>` is an offset feed. `dw.pages` accumulates its pages into one list. From
-`packages/dartway_core_flutter/test/dw_flutter_core_test.dart`:
+A `DwPageRequest<T>` is an offset feed. `dw.pages` accumulates its pages into one list, and a
+screen shows it as `DwPagedListView`. From
+`example/dartway_example_flutter/lib/app/news/widgets/news_post_list.dart`:
 
 ```dart
-final pages = ref.watch(dw.pages(const FeedRooms()));
-return Column(
-  children: [
-    if (pages case AsyncData(:final value)) ...[
-      for (final room in value.items) Text(room.name),
-      if (value.hasMore)
-        TextButton(
-          onPressed: () =>
-              ref.read(dw.pages(const FeedRooms()).notifier).loadMore(),
-          child: const Text('more'),
-        ),
-    ],
-  ],
-);
+DwPagedListView<NewsPost>(
+  request: const ListNews(),
+  placeholder: PlaceholderObjects.newsPost,
+  placeholderCount: 5,
+  emptyBuilder: (context) => Center(child: AppText.body(context.l10n.noNewsYet)),
+  itemBuilder: (context, post) => NewsPostCard(post: post),
+)
 ```
 
-`DwPagedData<T>` carries `items` (every loaded object, updates applied), `hasMore`, `loadingMore` and
-`loadMoreError` — why the last `loadMore` did not load. A failed next page is **not** an error of the
-`AsyncValue`: the loaded items stay, and the error sits beside them for the footer to show.
+**The next page is asked for as the end comes near, and the screen writes no trigger.** The slot
+after the last loaded row is built lazily, like the rows — when it comes within the scroll view's
+cache extent — and building it asks for the next page. A first page too short to fill the screen
+fills it page by page; no scroll listener, pixel threshold or "more" button is written by hand.
+While a page loads the slot shows the app's `readLoadingBuilder`; after a failed page it shows a
+retry (`edgeBuilder` to draw your own, at a constant height) and asks nothing by itself. A page
+that came back with no rows while more follow is not an empty feed: the list keeps loading. The first answer is `DwReadBuilder`'s: a skeleton of `placeholder` rows
+or the app's loading view, `onRefused` branches, the app's failed view with a retry. `header`
+scrolls with the rows.
 
-`loadMore()` is safe to call from every scroll event: one request while one is in flight, none when
-there is no more. `refetch()` reloads from the top, as many rows as are loaded.
+**Its own scroll view, or a sliver in yours.** `DwPagedListView` is a `CustomScrollView`. A feed that
+is one part of a page scrolling as a whole — a profile above it — is `DwPagedListView.sliver(…)`
+inside the page's own `CustomScrollView`, and pages as the end of the feed comes into that scroll
+view's cache extent. Inside a `Column` or a `ListView` of the page's own it would not scroll by
+itself, and its end — always built — would page to the end at once.
+
+Underneath, `DwPagedData<T>` carries `items` (every loaded object, updates applied), `hasMore`,
+`loadingMore` and `loadMoreError` — why the last `loadMore` did not load. A failed next page is
+**not** an error of the `AsyncValue`: the loaded items stay, and the error sits beside them for the
+slot to show. `loadMore()` is safe to call as often as you like: one request while one is in
+flight, none when there is no more. `refetch()` reloads from the top, as many rows as are loaded.
 
 ## Tables: `dw.table`
 
@@ -127,20 +146,16 @@ watching another request, and the previous page is released like any other. From
 `example/dartway_example_flutter/lib/admin/users/widgets/admin_users_table.dart`:
 
 ```dart
-final table = dw.table(request);
-
-return ref
-    .watch(table)
-    .section(
-      loadingValue: DwTablePage(
-        PlaceholderObjects.listOf(PlaceholderObjects.profile, 4),
-        total: 4,
-        page: 1,
-        pageSize: request.pageSize,
-      ),
-      onRetry: () => ref.read(table.notifier).refetch(),
-      builder: (page) => UsersPage(page), // rows, and a pager over page.page / page.pageCount
-    );
+return DwReadBuilder(
+  dw.table(request),
+  placeholder: DwTablePage(
+    PlaceholderObjects.listOf(PlaceholderObjects.profile, 4),
+    total: 4,
+    page: 1,
+    pageSize: request.pageSize,
+  ),
+  builder: (context, page) => UsersPage(page), // rows, and a pager over page.page / page.pageCount
+);
 ```
 
 `DwTablePage<T>` carries `items`, `total`, `page`, `pageSize` and `pageCount`. A row on the page is
@@ -293,37 +308,75 @@ When the socket comes back:
 A subscription the server refused is tried again after a reconnect; one the server **closed** (access
 revoked) stays closed for that account.
 
-## Rendering an `AsyncValue`
+## Showing a read: `DwReadBuilder`
 
-`dwBuildAsync` (on `AsyncValue<T>`) and `dwBuildListAsync` (on `AsyncValue<List<T>>`) render the
-three branches uniformly:
+`DwReadBuilder` takes any read — `dw.request`, `dw.table`, `dw.pages`, `dw.window` — and renders
+every answer it can give:
 
 ```dart
-ref.watch(dw.request(const ListNews())).dwBuildListAsync(
-  loadingItem: placeholderPost,
-  loadingItemsCount: 5,
-  childBuilder: (posts) => NewsList(posts),
-  errorBuilder: (_, _) => AppText.body(context.l10n.loadFailed),
-);
+DwReadBuilder(
+  dw.request(GetCourse(courseId: id)),
+  placeholder: placeholderCourse,
+  onRefused: {
+    DwCoreRefusal.notFound: (context, _) => const CourseUnavailable(),
+    AcmeRefusal.courseClosed: (context, refusal) => CourseClosed(refusal),
+  },
+  builder: (context, course) => CourseView(course),
+)
 ```
 
-- **loading** is a skeleton of your real widget, built over placeholder data — `loadingValue` /
-  `loadingItem` — and wrapped in `Skeletonizer` (`SliverSkeletonizer` when the builder returned a
-  sliver); pass neither and the loading branch renders nothing, never an error block.
-  `loadingWidget` replaces the skeleton where a skeleton over stand-in data would itself mislead;
-- **error** goes to the error pipeline with `DwErrorSource.asyncBuild`, and is replaced by
-  `errorBuilder`'s widget, or by `errorWidget` (default `SizedBox.shrink()`);
-- **data** is `childBuilder`. `skipLoadingOnRefresh` is on by default.
+- **data** is `builder`;
+- **loading** is `builder` over `placeholder`, drawn as a skeleton (`Skeletonizer`, or
+  `SliverSkeletonizer` when the builder returned a sliver); without a placeholder it is the app's
+  `DwFlutterConfig.readLoadingBuilder` — the right choice where drawing the builder over stand-in
+  data would itself mislead (a card showing a stranger's identifiers for a moment);
+- **a refusal whose code `onRefused` names** is that branch — the "unavailable" screen of a thing
+  that is gone or not yours, the "closed" screen of a thing with a rule of its own;
+- **any other refusal, a failure, or a server out of reach** is the app's
+  `DwFlutterConfig.readFailedBuilder`, handed a retry that runs `refetch()`. A failure (not a
+  refusal, which is an answer, and not an unreachable server, which the client keeps asking) goes
+  to the error pipeline with `DwErrorSource.asyncBuild` — once per failure, however often the
+  screen rebuilds over it;
+- **not signed in** renders nothing: the session ended under a screen on its way out, and the
+  sign-in screen is the message.
 
-**The error default is blank, and the caller decides.** A decoration may fail silently; the section a
-screen exists for may not — an empty page reads as "nothing here yet", not "the read failed". The
-example and the skeleton wrap this in one app extension, `section(...)`, which always renders a
-message with a retry and skips the not-authenticated case, where the sign-in screen is already the
-message (`lib/core/async_section.dart` in both, drawing the kit's
-`ui_kit/2_frequent/load_failed_message.dart` with the app's texts).
+**The app says once how a read looks while it loads and when it fails.** `readLoadingBuilder` and
+`readFailedBuilder` are required by `DwFlutterCore`; the skeleton passes the kit's
+`AppProgressIndicator` and `LoadFailedMessage` (`lib/core/dw_core.dart`), and every
+`DwReadBuilder`, `DwPagedListView` and `DwWindowListView` shows them. No screen spells its own
+spinner — `CircularProgressIndicator` outside `ui_kit/` is `forbiddenProgressIndicator`.
 
-A refusal or a not-authenticated answer rendered this way still reaches `DwFlutterConfig.onErrorReport`; the
-app's policy is what keeps it out of the incident log — see [error reporting](error-reporting.md).
+**Several reads nest.** The inner builder stands in the outer one's `builder`; each loads, fails and
+retries on its own.
+
+**A box, not a sliver.** `DwReadBuilder`'s branches are box widgets: in a `CustomScrollView`'s
+`slivers` it goes inside a `SliverToBoxAdapter`, and a feed there is `DwPagedListView.sliver`.
+
+**The body comes from a builder; the chrome from `logic/`.** A value the screen's chrome needs
+whatever the read answers — a title, whether a button is enabled, a badge, whether to leave room for
+a bar — is a provider in the feature's `logic/` answering a plain value with a fallback (a `.select`
+of the read inside it), and the widget watches that provider. A `DwReadBuilder` never stands in an
+app bar, and a badge's read never gates or skeletonises the page it sits on. From
+`template/dartway_starter_flutter/lib/admin/user_card/`:
+
+```dart
+// logic/user_card_name.dart
+final userCardNameProvider = Provider.autoDispose.family<String?, int>(
+  (ref, profileId) => ref.watch(
+    dw.request(GetUserCard(profileId: profileId)).select((card) => card.value?.profile.displayName),
+  ),
+);
+
+// admin_user_card_page.dart
+AdminScaffold(
+  title: ref.watch(userCardNameProvider(id)) ?? l10n.adminUsers,
+  body: DwReadBuilder(dw.request(GetUserCard(profileId: id)), onRefused: {…}, builder: …),
+)
+```
+
+**A value derived from reads as an `AsyncValue`** — a `logic/` provider combining two reads into the
+body of a section — is shown with `DwReadBuilder.derived(provider, retry: (ref) => …)`: the same
+branches, the provider's errors being the reads', and a retry that names the reads to ask again.
 
 ## State beside the server's: hooks, or a controller
 

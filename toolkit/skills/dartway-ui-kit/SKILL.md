@@ -6,7 +6,9 @@ description: >-
   constructors, AppTextStyle is a token for places where Flutter demands a TextStyle; the theme
   (AppTheme) is in the kit too. DwActionBuilder from the framework guards the action (busy, double tap,
   form validation). Inside features Color/TextStyle/BorderRadius/Theme.of/context.textTheme/colorScheme
-  are forbidden; the only import is ui_kit.dart; part-of structure. Use when creating/editing UI
+  are forbidden; the only import is ui_kit.dart; part-of structure. The kit owns the app's loading and
+  failed views for reads (handed to DwFlutterConfig once), the one spinner (AppProgressIndicator) and
+  the frames of dialogs and sheets (showAppDialog, showAppBottomSheet). Use when creating/editing UI
   components, styles, colors, themes, buttons, or when adding widgets to the kit.
 ---
 
@@ -22,7 +24,8 @@ would end up with two kits — ours in dependencies and its own in `lib/` — an
 raise the question "whose is this".
 
 The framework gives exactly what the app should not reinvent: **`DwActionBuilder`**
-(action mechanics) and **`dwBuildAsync`** (a single render of loading/error/data).
+(action mechanics) and **`DwReadBuilder`** / **`DwPagedListView`** (a single render of a read's
+loading/refusal/failure/data) — whose loading and failed views are the kit's (below).
 
 **Naming convention.** `Dw*` — framework: comes from outside, gets updated, don't edit. The kit is app
 code, it has no `Dw` prefix: `App*` where it would otherwise collide with Flutter (`AppText`,
@@ -182,6 +185,26 @@ Two consequences that are easy to get wrong:
   arithmetic, and one day it will forget it.
 - **Sizes are published by the kit, not by the feature.** The card height a feed needs is a kit constant
   (`AppEventCard.compactHeight`), not a public field of the feature. A feature may read the size, but not assign it.
+
+## Waiting, failing, dialogs and sheets are the kit's
+
+Four things every screen needs and none may draw for itself — each is decided once, here:
+
+- **`AppProgressIndicator`** (`1_essentials/`) is the one spinner: a read without a placeholder, an
+  upload, a busy button. `CircularProgressIndicator`, `LinearProgressIndicator`,
+  `RefreshProgressIndicator` or `CupertinoActivityIndicator` outside
+  `ui_kit/` fails `dart run dartway_cli:dartway check` (`forbiddenProgressIndicator`).
+- **The read views.** `lib/core/dw_core.dart` hands the kit to the framework once:
+  `DwFlutterConfig(readLoadingBuilder: (context) => const Center(child: AppProgressIndicator()),
+  readFailedBuilder: (context, error, retry) => LoadFailedMessage(…, onRetry: dw.action((_) =>
+  retry())))`. Every `DwReadBuilder`, `DwPagedListView` and `DwWindowListView` shows them; a screen
+  never builds its own "could not load".
+- **`context.showAppDialog(child: …)`** and **`context.showAppBottomSheet(child: …)`**
+  (`2_frequent/`) are the frames of a dialog and a sheet. `showDialog`, `showModalBottomSheet`,
+  `showCupertino…` outside `ui_kit/` fail the check (`forbiddenNavigationCall`). A yes/no before an
+  action is not a dialog at all: `dw.action(…, confirmation: DwUiConfirmation(…))`.
+- **Closing** a dialog or a sheet is `Navigator.of(context).pop(value)` with the builder's own
+  context; a page goes back through the router (`dartway-navigation`).
 
 ## A kit widget's own state is hooks
 
@@ -345,7 +368,7 @@ DwActionBuilder(
   action: deleteAction,
   builder: (context, onPressed, busy) => ListTile(
     onTap: onPressed,
-    trailing: busy ? const CircularProgressIndicator() : const Icon(Icons.delete),
+    trailing: busy ? const AppProgressIndicator(size: 20) : const Icon(Icons.delete),
   ),
 )
 ```

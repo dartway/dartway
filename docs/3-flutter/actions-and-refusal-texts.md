@@ -112,7 +112,7 @@ DwActionBuilder(
   action: deleteAction,
   builder: (context, onPressed, busy) => ListTile(
     onTap: onPressed,
-    trailing: busy ? const CircularProgressIndicator() : const Icon(Icons.delete),
+    trailing: busy ? const AppProgressIndicator(size: 20) : const Icon(Icons.delete),
   ),
 )
 ```

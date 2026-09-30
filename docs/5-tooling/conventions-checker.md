@@ -87,9 +87,12 @@ From the project root or from inside the `*_flutter` package, in this order:
    in the zones and `shared/` — sixteen more checks;
 10. **state and commands** over every file of the Flutter package's `lib/` but generated code
    (`forbiddenStateHolder`, `forbiddenCommandCall`), and the classes a `dw:allow-stateful` marker
-   passes over, listed after the tally.
+   passes over, listed after the tally;
+11. **reads, loading, dialogs and routes** over every file of the Flutter package's `lib/` but
+   generated code (`forbiddenRequestRead`, `forbiddenProgressIndicator`, `forbiddenNavigationCall`,
+   `sentinelId`).
 
-`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of steps 9–10 and skips
+`--dir <folder>` (relative to the Flutter package) narrows the run to that folder of steps 9–11 and skips
 steps 1–8 and the UI kit pass: each of those judges a whole package or the whole project, and has
 nothing to say about one folder. `--type <check>` runs one check by name; `--level
 info|warning|error` runs the checks of one severity.
@@ -117,7 +120,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Twenty-seven errors, eleven warnings, one info — `DwCheckType` and its `severity` in
+Thirty-one errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -147,6 +150,10 @@ Twenty-seven errors, eleven warnings, one info — `DwCheckType` and its `severi
 | `fieldPatchMatched` | error | `DwSetField`, `DwClearField` or `DwKeepField` named in the code of the server, shared or Flutter package (`lib/`, `bin/`, `test/`; generated files exempt) — read a patch through its helpers ([Clearing a field](../2-core/data-objects-and-generation.md#clearing-a-field-dwfieldpatch)) |
 | `forbiddenStateHolder` | error | A `StatefulWidget` (its `State`, `setState`, a `StatefulBuilder`), a `ChangeNotifier` or a `ValueNotifier` held as state, anywhere in the app's `lib/` but generated code — local state is hooks, shared state a `Notifier`. A class marked `// dw:allow-stateful <reason>` is passed over and listed |
 | `forbiddenCommandCall` | error | `dw.command` outside a feature's `logic/` and `core/`, or inside a `try` that catches; a widget running `<Feature>Commands` outside `dw.action`, or reading a result (`DwCallOk`, `DwCallRefused`, `DwCallFailed`, `valueOrThrow`) outside `logic/` and `core/` |
+| `forbiddenRequestRead` | error | The `AsyncValue` of `ref.watch/read(dw.request/pages/table/window(…))` taken apart outside `logic/` and widget-free files of `core/` — a member (`.value`, `.when(`, `.hasError`, …), a `switch` or `case` over it, a `.select` of the read, the values of a `ref.listen` over it. A screen shows a read through `DwReadBuilder`, `DwPagedListView` or `DwWindowListView`; its chrome through a `logic/` provider answering a plain value |
+| `forbiddenProgressIndicator` | error | `CircularProgressIndicator`, `LinearProgressIndicator`, `RefreshProgressIndicator` or `CupertinoActivityIndicator` outside `ui_kit/` |
+| `forbiddenNavigationCall` | error | `showDialog`, `showModalBottomSheet`, `showCupertino…` and their siblings, `Navigator.push…` or a page route (`MaterialPageRoute`, …) outside `ui_kit/` and `core/router/`; `Navigator.pop`, `GoRouter.of(…).pop` or `context.pop` anywhere |
+| `sentinelId` | error | A route parameter set to `0` or `-1` — `…Params.<name>.set(0)` |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |
@@ -166,6 +173,39 @@ Twenty-seven errors, eleven warnings, one info — `DwCheckType` and its `severi
 `context.theme`, `context.textTheme`, `context.colorScheme`. The long spelling is on the list on
 purpose: `Theme.of(context).textTheme.bodySmall` reads as ordinary Flutter and means exactly what
 `context.textTheme` means — a screen deciding how it looks.
+
+## Reads, loading, dialogs and routes: one way each
+
+A screen shows a read through **`DwReadBuilder`** — loading as a skeleton or the app's loading view,
+a branch per refusal code (`onRefused`), the app's failed view with a retry, data — or, for a feed
+read page by page, **`DwPagedListView`**, and for a chat, `DwWindowListView`. What
+`forbiddenRequestRead` refuses is the `AsyncValue` of a read taken apart by hand in a widget: a
+member of `ref.watch(dw.request(…))`, chained or through the name it is bound to — with or without
+`final`, typed or not, the same name in every block it is bound in (`.value`, `.when(`, `.hasError`,
+`.section(` of a project's own extension) — a `switch` or a `case` over it (`AsyncError(…)`), the
+values a `ref.listen` over it hands its callback, and a `.select` of the read. `logic/` is passed
+over, and so is a file of `core/` that declares no widget: a controller or a provider may watch a
+read to derive its own state — a plain value with a fallback for the chrome, an `AsyncValue` for
+`DwReadBuilder.derived` — and the widget watches that. A widget in `core/` is judged like any other.
+
+Loading is the kit's: `forbiddenProgressIndicator` refuses Flutter's progress indicators outside
+`ui_kit/`. A dialog or a sheet is opened through the kit and a screen is a route of a zone:
+`forbiddenNavigationCall` refuses the raw `show…` functions, `Navigator.push…` and the page routes
+outside `ui_kit/` and `core/router/`. A page goes back with `goNamed(<parent>)` or the `AppBar`'s
+leading button, and `Navigator.of(context).pop(…)` closes a dialog or a sheet with the builder's own
+context; `Navigator.pop(context)`, `GoRouter.of(context).pop()` and `context.pop()` are findings
+everywhere, while `Navigator.of(context).pop` on a page is not told apart from one in a dialog and
+is left to reading. `sentinelId` refuses a route parameter set to `0` or `-1`
+(`AdminParams.courseId.set(0)` — the parameter enums are `…Params`, which is what tells them from
+`DwFieldPatch.set(0)`): a new thing is a route of its own, "none" is `null`.
+
+All four read the source with comments and strings blanked, so they see what a text can show. Left
+out on purpose: a read reached through a provider of the project's own (`myProfileProvider` over
+`dw.request`) or handed to a function before it is taken apart; a closure parameter named like the
+read is not the read; an id in a command's constructor (`SaveCourse(id: 0)`) reads the same as the
+stand-in data a skeleton is drawn from, and an id compared with `0` in a page reads the same as a
+count, so both are prose, not checks; and a one-shot "focus" notifier standing in for a route
+parameter has no shape a text can tell.
 
 ## The declared top level
 

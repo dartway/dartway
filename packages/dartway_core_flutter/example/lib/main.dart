@@ -2,9 +2,8 @@
 // this file top to bottom — each section demonstrates one feature of the
 // skeleton, in the order an app meets them.
 //
-// It depends on nothing but dartway_core_flutter: no server, no data layer. The
-// async examples use a fake `Future`; in a real app the same widgets render a
-// live list from the DartWay data layer.
+// It depends on nothing but dartway_core_flutter: no server, no data layer —
+// so reads from a server, which need the data layer, are named but not shown.
 
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter/material.dart';
@@ -80,18 +79,6 @@ class _ExampleApp extends StatelessWidget {
   }
 }
 
-// Fake async sources, so the async-UI sections have something to render. In a
-// real app these are providers from the DartWay data layer.
-final _greetingProvider = FutureProvider<String>((ref) async {
-  await Future<void>.delayed(const Duration(seconds: 1));
-  return 'Loaded from an async source';
-});
-
-final _itemsProvider = FutureProvider<List<String>>((ref) async {
-  await Future<void>.delayed(const Duration(seconds: 1));
-  return ['First item', 'Second item', 'Third item'];
-});
-
 class _TourScreen extends ConsumerWidget {
   const _TourScreen();
 
@@ -151,42 +138,11 @@ class _TourScreen extends ConsumerWidget {
           ]),
 
           // -------------------------------------------------------------------
-          // 5. The async-UI contract. `dwBuildAsync` renders loading / error /
-          //    data uniformly. `dwBuildListAsync` does the same for a list, with
-          //    skeleton items derived from your real widget.
+          // 5. Reads. A read from the server is shown by `DwReadBuilder`, a feed
+          //    read page by page by `DwPagedListView` — both need the data layer
+          //    (`DwFlutterCore`), which this tour leaves out. See `example/` at
+          //    the repository root.
           // -------------------------------------------------------------------
-          _Section('Async rendering', [
-            ref
-                .watch(_greetingProvider)
-                .dwBuildAsync(
-                  childBuilder: (value) => Text(value),
-                  loadingWidget: const Text('Loading…'),
-                ),
-            FilledButton.tonal(
-              onPressed: () => ref.invalidate(_greetingProvider),
-              child: const Text('Reload'),
-            ),
-          ]),
-
-          // -------------------------------------------------------------------
-          //    A list variant: `dwBuildListAsync` renders skeleton rows while
-          //    loading, built from an explicit `loadingItem`. Pass none and the
-          //    loading branch renders nothing, never an error block.
-          // -------------------------------------------------------------------
-          _Section('Async list', [
-            SizedBox(
-              width: double.infinity,
-              child: ref
-                  .watch(_itemsProvider)
-                  .dwBuildListAsync(
-                    loadingItem: 'Loading…',
-                    childBuilder: (items) => Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [for (final item in items) Text('• $item')],
-                    ),
-                  ),
-            ),
-          ]),
 
           // -------------------------------------------------------------------
           //    Plugins. Declared at startup, resolved by type. A plugin package

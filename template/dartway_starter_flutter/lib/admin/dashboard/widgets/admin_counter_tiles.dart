@@ -4,57 +4,52 @@ import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:flutter/material.dart';
 import 'package:gap/gap.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
-import 'package:dartway_starter_flutter/core/async_section.dart';
 
 /// Headline counters: one live view the server counts, republished by every
 /// command that changes what it counts.
-class AdminCounterTiles extends ConsumerWidget {
+class AdminCounterTiles extends StatelessWidget {
   const AdminCounterTiles({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final l10n = context.l10n;
 
-    return ref
-        .watch(dw.request(const GetAdminCounters()))
-        .section(
-          loadingValue: const AdminCounters(
-            members: 0,
-            admins: 0,
-            marketingOptIns: 0,
-          ),
-          onRetry: () =>
-              ref.read(dw.request(const GetAdminCounters()).notifier).refetch(),
-          // Equal tiles, whichever label wraps.
-          builder: (counters) => IntrinsicHeight(
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Expanded(
-                  child: _CounterTile(
-                    label: l10n.countMembers,
-                    count: counters.members,
-                  ),
-                ),
-                const Gap(12),
-                Expanded(
-                  child: _CounterTile(
-                    label: l10n.countAdmins,
-                    count: counters.admins,
-                  ),
-                ),
-                const Gap(12),
-                Expanded(
-                  child: _CounterTile(
-                    label: l10n.countMarketingOptIns,
-                    count: counters.marketingOptIns,
-                  ),
-                ),
-              ],
+    return DwReadBuilder(
+      dw.request(const GetAdminCounters()),
+      placeholder: const AdminCounters(
+        members: 0,
+        admins: 0,
+        marketingOptIns: 0,
+      ),
+      // Equal tiles, whichever label wraps.
+      builder: (context, counters) => IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              child: _CounterTile(
+                label: l10n.countMembers,
+                count: counters.members,
+              ),
             ),
-          ),
-        );
+            const Gap(12),
+            Expanded(
+              child: _CounterTile(
+                label: l10n.countAdmins,
+                count: counters.admins,
+              ),
+            ),
+            const Gap(12),
+            Expanded(
+              child: _CounterTile(
+                label: l10n.countMarketingOptIns,
+                count: counters.marketingOptIns,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 

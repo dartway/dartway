@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.21.0-dev.15
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
+  (dartway/dartway#390).
+
 ## 0.21.0-dev.14
 
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the new

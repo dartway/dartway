@@ -1,6 +1,6 @@
 name: dartway_core_server
 description: The DartWay application server — HTTP calls per DTO, the live update socket, handlers, auth, channels and jobs, on dart:io.
-version: 0.21.0-dev.14
+version: 0.21.0-dev.15
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 resolution: workspace
@@ -11,9 +11,9 @@ dependencies:
   # For `testing.dart` only: `DwTestServer.connectClient` hands a test the real
   # client over real HTTP and the real socket. Pure Dart, so a server that
   # never runs a test carries nothing platform-bound.
-  dartway_client: ^0.21.0-dev.14
-  dartway_core_shared: ^0.21.0-dev.14
-  dartway_orm: ^0.21.0-dev.14
+  dartway_client: ^0.21.0-dev.15
+  dartway_core_shared: ^0.21.0-dev.15
+  dartway_orm: ^0.21.0-dev.15
   # `ctx.http`: requests to other services' HTTP APIs (`DwOutboundHttp`).
   http: ^1.6.0
   meta: ^1.16.0

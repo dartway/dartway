@@ -11,13 +11,15 @@ import 'content_objects.dart';
 import 'content_rows.dart';
 
 final contentHandlers = <DwCallHandler>[
-  /// The news feed, newest first. Every signed-in member.
-  DwCallHandler.list<ListNews, NewsPost>(
+  /// The news feed, newest first, a page at a time. Every signed-in member.
+  DwCallHandler.page<ListNews, NewsPost>(
     access: DwAccessRule.signedIn,
-    handle: (ctx, request) async => ContentObjects.news(
+    handle: (ctx, request, page) async => ContentObjects.news(
       ctx.db,
       await ctx.db.newsPosts.find(
         orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
+        limit: page.fetchLimit,
+        offset: page.offset,
       ),
     ),
   ),
