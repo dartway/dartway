@@ -2,7 +2,7 @@
 title: "The server's time is ctx.now, and the caller's UTC offset arrives with every call"
 affects:
   dartway_core_server: "0.21.0-dev.9"
-  dartway_cli: "0.13.0"
+  dartway_cli: "0.15.0"
 ---
 
 ## Who is affected

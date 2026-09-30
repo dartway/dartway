@@ -49,7 +49,7 @@ There is no client package: the shared package *is* the client contract, and bot
 
 **Law is what makes it DartWay** — the seven rules above; a project does not override a law. **Default is everything else** here and in the skills — the commit format, the base branch, how a decision is recorded, the language of the project's own texts — and a project may replace it. **Precedence:** a default yields to the project's own root `CLAUDE.md`; a law does not; where both are silent, this file stands. A project records an override in its root `CLAUDE.md`, under "Project conventions", **with the reason** — `.claude/CLAUDE.md` is overwritten on update, and a README beside the code is where an override goes to die.
 
-**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Sixteen checks fail today:
+**Law is what fails**: much of it in the types and at the server's start, the rest as an `error` of `dart run dartway_cli:dartway check`. A warning is a strong default, an `info` a nudge. The law list is therefore derived — `DwCheckType.severity`, not how firmly a sentence is written. Eighteen checks fail today:
 
 | What it holds | Checks that fail |
 |---|---|
@@ -57,6 +57,7 @@ There is no client package: the shared package *is* the client contract, and bot
 | The UI kit boundary | `uiKitPartMissing`, `forbiddenUiUsage`, `forbiddenUiKitImport` |
 | The widget's contract with its parent | `widgetSizesItself` |
 | The declared top-level layout | `invalidTopLevelLayout` |
+| The closed file set inside a server feature | `invalidServerFeatureFile`, `misplacedServerCode` |
 | What the router refuses on the first frame | `routeNameDuplicated` |
 | The contract's names are its wire names (law 5) | `contractNameInvalid` |
 | What ships broken with nothing to notice | `assetPathMissing`, `l10nNotWired` |
@@ -130,10 +131,10 @@ PRs and diffs go against the `__BASE_BRANCH__` branch. The first line of a commi
 
 ## Server (`__SERVER_PKG__`)
 
-**The top level of `lib/` is a closed list:** `__SERVER_PKG__.dart`, `generated/` (**do not edit**) and `src/`. **`src/` is folders only: `core/`, `migrations/`, and one folder per feature** declaring its `DwServerFeature` in `<feature>_feature.dart`. No layer folders (`handlers/`, `rows/`, `domain/`) (`invalidTopLevelLayout`).
+**The top level of `lib/` is a closed list:** `__SERVER_PKG__.dart`, `generated/` (**do not edit**) and `src/`. **`src/` is folders only: `core/`, `migrations/`, and one folder per feature** declaring its `DwServerFeature` in `<feature>_feature.dart`. No layer-named folders at any depth — the list is `dartway-server` §1's (`invalidTopLevelLayout`, `invalidServerFeatureFile`).
 
 - **`core/` has fixed file names, without the project's name:** `auth.dart` (`AppAuth`), `call_context.dart` (the caller and `AppAccess`), `channels.dart` (`AppChannels`), `files.dart` (`AppFiles`, every upload rule), `bootstrap.dart` (`AppBootstrap`), and `push.dart` with push.
-- **Every file of a feature is `<feature>_*.dart`:** `_feature`, `_rows`, `_handlers`, `_objects` (rows → data objects), `_publications` (what a change is published as, and to whom), `_jobs`. A feature imports another's `_rows`, `_objects` and `_publications`, never its `_handlers`.
+- **A feature's file set is closed:** `<feature>_<kind>.dart` or `<feature>_<part>_<kind>.dart`, kind one of `feature`, `rows`, `handlers`, `objects` (rows → data objects), `publications` (what a change is published as, and to whom), `jobs`, `access`, `routes`, plus one flat `logic/` for everything else; what a file declares matches its kind, and `core/` holds none of them (`invalidServerFeatureFile`, `misplacedServerCode`; `dartway-server` §1). A feature imports another's `_rows`, `_objects` and `_publications`, never its `_handlers`.
 
 - **Handlers:** one per request and command, each with an explicit `DwAccessRule`; commands are transactional — lock the rows a decision depends on before deciding; refuse with `ctx.refuse(<Package>Refusal.…)`; someone else's row does not exist for the caller. Playbook — `dartway-server`.
 - **Rows → data objects in batch**: one query per relation for the whole batch (`findByIds`), never per row; one mapping for reads and publications.
