@@ -10,6 +10,7 @@ export 'package:dartway_core_shared/dartway_core_shared.dart'
         DwFieldPatch,
         DwFieldPatchApply,
         DwSetField,
+        DwTextFieldPatch,
         dwListEquals,
         dwMapEquals;
 

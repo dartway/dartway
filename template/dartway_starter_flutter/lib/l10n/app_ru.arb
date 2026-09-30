@@ -107,7 +107,7 @@
   "refusalConsentsRequired": "Чтобы создать учётную запись, примите условия.",
   "refusalSignUpClosed": "Регистрация новых учётных записей сейчас закрыта.",
   "refusalFirstNameRequired": "Введите имя.",
-  "refusalSettingKeyUnknown": "Такой настройки нет.",
+  "refusalAppNameRequired": "Название приложения не может быть пустым.",
   "refusalOwnRoleLocked": "Свою роль меняет другой администратор.",
   "refusalForbidden": "Недостаточно прав.",
   "refusalNotFound": "Этого больше нет.",

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.19.0
+
+- **Four new errors: a project's data has one pattern per problem** (dartway/dartway#388).
+  `migrationChangesData` — an `INSERT`, `UPDATE` or `DELETE` in `lib/src/migrations/m*.dart` outside
+  `m.backfill(…)`; `workAfterServerStart` — `bin/server.dart` awaiting, or reaching `.db`,
+  `.accounts` or `runInContext`, after `start()`; `settingsKeyValueTable` — a row class with a unique
+  `String key` beside a `String value`; `fieldPatchMatched` — `DwSetField`, `DwClearField` or
+  `DwKeepField` named in the server, shared or Flutter package (`lib/`, `bin/`, `test/`). Migration
+  note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
+  A project adopting these names its latest migration under `deploy/config.yaml` > `migrations` >
+  `dataChecksAfter` (a new project-level key of that file); only later migrations are judged. A
+  write into a framework `dw_*` table is refused in any migration, `m.backfill` included.
+
 ## 0.18.0
 
 - **BREAKING: new error check `redundantBangAllowed`** — the server and the shared package's

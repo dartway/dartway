@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.21.0-dev.13
+
+- **`DwFieldPatch` is read through helpers** (dartway/dartway#388): `isSet` and `isCleared` beside
+  `isKept`; `newValue` (the value a set patch writes, `null` otherwise) and `map` (the same patch
+  over another type) beside `apply`; and `DwTextFieldPatch.trimmedOrCleared`, which trims a set text
+  and turns a blank one into a clear. A kept field on insert is `apply(theDefault)`. `dartway check`
+  now fails a project that matches `DwSetField`/`DwClearField`/`DwKeepField` by hand
+  (`fieldPatchMatched`). Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
+
 ## 0.21.0-dev.12
 
 - Nothing changed here; the family moves in lockstep with `dartway_orm` (dartway/dartway#384).

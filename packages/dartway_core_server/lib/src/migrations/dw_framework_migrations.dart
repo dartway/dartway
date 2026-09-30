@@ -34,6 +34,7 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _keysAndIdentitiesUp,
     _keysAndIdentitiesDown,
   ),
+  const _DwSqlMigration('20260930_000000_dw_setting', _settingUp, _settingDown),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
@@ -263,6 +264,20 @@ const List<String> _keysAndIdentitiesDown = [
   'ALTER TABLE dw_auth_key DROP COLUMN label',
   'ALTER TABLE dw_auth_key DROP COLUMN kind',
 ];
+
+// The app's settings (`ctx.settings`): one row per settings object, named by
+// its wire name, holding the JSON the wire carries — only what differs from
+// the object's defaults.
+const List<String> _settingUp = [
+  '''
+CREATE TABLE dw_setting (
+  area text PRIMARY KEY,
+  value jsonb NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now()
+)''',
+];
+
+const List<String> _settingDown = ['DROP TABLE dw_setting'];
 
 const List<String> _initialDown = [
   'DROP TABLE dw_recurring_job',

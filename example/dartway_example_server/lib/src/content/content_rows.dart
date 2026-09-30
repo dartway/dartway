@@ -29,22 +29,3 @@ final class NewsPostRow extends DwTableRow with _$NewsPostRow {
 
   static const tableDef = NewsPostTable();
 }
-
-@DwSqlTable('app_setting')
-final class AppSettingRow extends DwTableRow with _$AppSettingRow {
-  const AppSettingRow({
-    required this.id,
-    required this.key,
-    required this.value,
-  });
-
-  @override
-  final int id;
-
-  @DwUniqueColumn()
-  final String key;
-
-  final String value;
-
-  static const tableDef = AppSettingTable();
-}

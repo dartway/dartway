@@ -27,7 +27,4 @@ abstract final class ContentObjects {
         ),
     ];
   }
-
-  static AppSetting setting(AppSettingRow row) =>
-      AppSetting(id: row.key, value: row.value);
 }

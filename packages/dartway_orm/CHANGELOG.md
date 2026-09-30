@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.21.0-dev.13
+
+- **`DwTableRepository.upsertAll(drafts, conflictOn:)`** (dartway/dartway#388): every draft
+  inserted, or written over the row with the same unique key unless that row already holds exactly
+  these values, in one statement; answers how many rows were inserted or changed, so a second run with
+  the same drafts writes nothing. Refuses two drafts with one key (compared by value) and a nullable
+  conflict column. What `DwSeedRows` runs.
+- **`DwMigrationContext.backfill(sql)`**: runs like `sql`, and is the one place `dartway check`
+  accepts an `INSERT`, `UPDATE` or `DELETE` in a project migration (`migrationChangesData`) — for
+  rows a schema change strands. Content is a seed step. Re-exports `DwTextFieldPatch`.
+
 ## 0.21.0-dev.12
 
 - **BREAKING: a row's `id` is `int`, and a row not stored yet is its draft.** `DwTableRow.id` is

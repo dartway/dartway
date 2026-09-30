@@ -409,7 +409,8 @@ class AppLocalizationsRu extends AppLocalizations {
   String get refusalFirstNameRequired => 'Введите имя.';
 
   @override
-  String get refusalSettingKeyUnknown => 'Такой настройки нет.';
+  String get refusalAppNameRequired =>
+      'Название приложения не может быть пустым.';
 
   @override
   String get refusalOwnRoleLocked => 'Свою роль меняет другой администратор.';

@@ -13,12 +13,10 @@ void main() {
       reason: 'nothing stored: the default',
     );
 
-    app.server.publish(settingsChannel, [
-      const AppSetting(id: AppSettingKeys.appName, value: 'Acme'),
-    ]);
+    app.server.publish(settingsChannel, [const AppSettings(appName: 'Acme')]);
     await app.settle(tester);
     expect(find.text('You are in Acme'), findsOneWidget);
-    expect(app.server.requestsOf<ListAppSettings>(), hasLength(1));
+    expect(app.server.requestsOf<GetAppSettings>(), hasLength(1));
 
     await app.stop(tester);
   });

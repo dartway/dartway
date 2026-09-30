@@ -1,5 +1,4 @@
 import 'package:dartway_starter_flutter/core/app_l10n.dart';
-import 'package:dartway_starter_flutter/core/app_settings/app_setting_key.dart';
 import 'package:dartway_starter_flutter/core/dev/test_error_button.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/core/profile/my_profile.dart';
@@ -40,7 +39,7 @@ class HomePage extends ConsumerWidget implements DwFeatureWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final l10n = context.l10n;
-    final settings = dw.request(const ListAppSettings());
+    final settings = dw.request(const GetAppSettings());
 
     return AppScaffold.main(
       appBar: AppBar(
@@ -63,13 +62,10 @@ class HomePage extends ConsumerWidget implements DwFeatureWidget {
                   ref
                       .watch(settings)
                       .section(
-                        loadingValue: const <AppSetting>[],
+                        loadingValue: const AppSettings(),
                         onRetry: () => ref.read(settings.notifier).refetch(),
-                        builder: (stored) => AppText.body(
-                          l10n.homeAppName(
-                            stored.valueOf(AppSettingKey.appName),
-                          ),
-                        ),
+                        builder: (stored) =>
+                            AppText.body(l10n.homeAppName(stored.appName)),
                       ),
                   const Gap(8),
                   AppText.caption(l10n.homeLiveHint),

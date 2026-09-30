@@ -153,12 +153,10 @@ testWidgets('the app name comes from the server settings, and a name saved '
   final app = await TestApp.start(tester, fake);
   expect(find.text('You are in DartwayStarter'), findsOneWidget);
 
-  app.server.publish(AppChannels.settings, [
-    const AppSetting(id: AppSettingKeys.appName, value: 'Acme'),
-  ]);
+  app.server.publish(AppChannels.settings, [const AppSettings(appName: 'Acme')]);
   await app.settle(tester);
   expect(find.text('You are in Acme'), findsOneWidget);
-  expect(app.server.requestsOf<ListAppSettings>(), hasLength(1));
+  expect(app.server.requestsOf<GetAppSettings>(), hasLength(1));
 
   await app.stop(tester);
 });

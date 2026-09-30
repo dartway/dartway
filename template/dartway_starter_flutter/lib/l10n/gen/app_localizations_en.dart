@@ -409,7 +409,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get refusalFirstNameRequired => 'Enter your name.';
 
   @override
-  String get refusalSettingKeyUnknown => 'This setting does not exist.';
+  String get refusalAppNameRequired => 'The app name cannot be blank.';
 
   @override
   String get refusalOwnRoleLocked =>

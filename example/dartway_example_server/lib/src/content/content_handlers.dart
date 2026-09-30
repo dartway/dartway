@@ -82,35 +82,27 @@ final contentHandlers = <DwCallHandler>[
     },
   ),
 
-  /// Every app setting. Every signed-in member.
-  DwCallHandler.list<ListAppSettings, AppSetting>(
+  /// The club's settings, their defaults while nobody has saved them. Every
+  /// signed-in member.
+  DwCallHandler.single<GetClubSettings, ClubSettings>(
     access: DwAccessRule.signedIn,
-    handle: (ctx, request) async => [
-      for (final row in await ctx.db.appSettings.find(
-        orderBy: (t) => [t.key.asc()],
-      ))
-        ContentObjects.setting(row),
-    ],
+    handle: (ctx, request) => ctx.settings.read<ClubSettings>(),
   ),
 
-  /// Writes an app setting. Admins only; published to every member.
-  DwCallHandler.command<SaveAppSetting, AppSetting>(
+  /// Changes the settings the command names, the rest as they are. Admins
+  /// only; published to every member.
+  DwCallHandler.command<SaveClubSettings, ClubSettings>(
     access: AppAccess.admin,
     handle: (ctx, command) async {
-      final existing = await ctx.db.appSettings.findFirst(
-        where: (t) => t.key.equals(command.key),
-        lock: DwRowLock.forUpdate,
+      final saved = await ctx.settings.update<ClubSettings>(
+        (current) => current.copyWith(
+          clubName: command.clubName?.trim(),
+          bookingEnabled: command.bookingEnabled,
+          supportPhone: command.supportPhone.trimmedOrCleared,
+        ),
       );
-      final saved = existing == null
-          ? await ctx.db.appSettings.insert(
-              NewAppSettingRow(key: command.key, value: command.value),
-            )
-          : await ctx.db.appSettings.update(
-              existing.copyWith(value: command.value),
-            );
-      final setting = ContentObjects.setting(saved);
-      ctx.publish(AppChannels.settings, setting);
-      return setting;
+      ctx.publish(AppChannels.settings, saved);
+      return saved;
     },
   ),
 ];

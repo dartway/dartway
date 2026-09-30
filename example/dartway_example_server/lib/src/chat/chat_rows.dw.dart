@@ -9,18 +9,23 @@ mixin _$ChatChannelRow on DwTableRow {
       identical(this, other) ||
       other is ChatChannelRow &&
           other.id == _self.id &&
+          other.slug == _self.slug &&
           other.title == _self.title;
 
   @override
-  int get hashCode => Object.hash(_self.id, _self.title);
+  int get hashCode => Object.hash(_self.id, _self.slug, _self.title);
 
   @override
-  String toString() => 'ChatChannelRow(id: ${_self.id}, title: ${_self.title})';
+  String toString() =>
+      'ChatChannelRow(id: ${_self.id}, slug: ${_self.slug}, title: ${_self.title})';
 }
 
 extension ChatChannelRowCopyWith on ChatChannelRow {
-  ChatChannelRow copyWith({String? title}) =>
-      ChatChannelRow(id: id, title: title ?? this.title);
+  ChatChannelRow copyWith({String? slug, String? title}) => ChatChannelRow(
+    id: id,
+    slug: slug ?? this.slug,
+    title: title ?? this.title,
+  );
 }
 
 mixin _$NewChatChannelRow on DwRowDraft<ChatChannelRow> {
@@ -29,51 +34,66 @@ mixin _$NewChatChannelRow on DwRowDraft<ChatChannelRow> {
   @override
   bool operator ==(Object other) =>
       identical(this, other) ||
-      other is NewChatChannelRow && other.title == _self.title;
+      other is NewChatChannelRow &&
+          other.slug == _self.slug &&
+          other.title == _self.title;
 
   @override
-  int get hashCode => _self.title.hashCode;
+  int get hashCode => Object.hash(_self.slug, _self.title);
 
   @override
-  String toString() => 'NewChatChannelRow(title: ${_self.title})';
+  String toString() =>
+      'NewChatChannelRow(slug: ${_self.slug}, title: ${_self.title})';
 }
 
 /// A [ChatChannelRow] before insert: every column but the id.
 final class NewChatChannelRow extends DwRowDraft<ChatChannelRow>
     with _$NewChatChannelRow {
-  const NewChatChannelRow({required this.title});
+  const NewChatChannelRow({required this.slug, required this.title});
 
+  final String slug;
   final String title;
 }
 
 extension NewChatChannelRowCopyWith on NewChatChannelRow {
-  NewChatChannelRow copyWith({String? title}) =>
-      NewChatChannelRow(title: title ?? this.title);
+  NewChatChannelRow copyWith({String? slug, String? title}) =>
+      NewChatChannelRow(slug: slug ?? this.slug, title: title ?? this.title);
 }
 
 extension NewChatChannelRowWithId on NewChatChannelRow {
   /// The row stored under [id], for `update`.
-  ChatChannelRow withId(int id) => ChatChannelRow(id: id, title: title);
+  ChatChannelRow withId(int id) =>
+      ChatChannelRow(id: id, slug: slug, title: title);
 }
 
 final class ChatChannelTable extends DwTableDef<ChatChannelRow> {
   const ChatChannelTable() : super('chat_channel');
 
+  DwTableColumn<String> get slug =>
+      const DwTableColumn('slug', DwColumnType.text, unique: true);
+
   DwTableColumn<String> get title =>
       const DwTableColumn('title', DwColumnType.text);
 
   @override
-  List<DwTableColumn<Object?>> get tableColumns => [id, title];
+  List<DwTableColumn<Object?>> get tableColumns => [id, slug, title];
 
   @override
-  ChatChannelRow fromRow(DwResultRow row) =>
-      ChatChannelRow(id: row.decode(id), title: row.decode(title));
+  ChatChannelRow fromRow(DwResultRow row) => ChatChannelRow(
+    id: row.decode(id),
+    slug: row.decode(slug),
+    title: row.decode(title),
+  );
 
   @override
-  Map<String, Object?> toRow(ChatChannelRow row) => {'title': row.title};
+  Map<String, Object?> toRow(ChatChannelRow row) => {
+    'slug': row.slug,
+    'title': row.title,
+  };
 
   @override
   Map<String, Object?> toDraftRow(NewChatChannelRow draft) => {
+    'slug': draft.slug,
     'title': draft.title,
   };
 }

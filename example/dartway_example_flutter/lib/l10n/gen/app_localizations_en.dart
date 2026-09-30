@@ -582,7 +582,7 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
-  String get refusalSettingKeyUnknown => 'This setting does not exist.';
+  String get refusalClubNameRequired => 'The club name cannot be blank.';
 
   @override
   String get refusalFirstNameRequired => 'Enter your name.';

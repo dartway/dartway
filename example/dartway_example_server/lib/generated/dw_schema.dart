@@ -8,7 +8,6 @@ import '../src/profile/profile_rows.dart';
 import '../src/schedule/schedule_rows.dart';
 
 final DwDatabaseSchema dartwayExampleSchema = DwDatabaseSchema([
-  AppSettingRow.tableDef,
   ChatChannelRow.tableDef,
   ChatMessageAttachmentRow.tableDef,
   ChatMessageReactionRow.tableDef,
@@ -23,9 +22,6 @@ final DwDatabaseSchema dartwayExampleSchema = DwDatabaseSchema([
 ]);
 
 extension DartwayExampleDb on DwDatabaseHandle {
-  DwTableRepository<AppSettingRow, AppSettingTable> get appSettings =>
-      repository(AppSettingRow.tableDef);
-
   DwTableRepository<ChatChannelRow, ChatChannelTable> get chatChannels =>
       repository(ChatChannelRow.tableDef);
 

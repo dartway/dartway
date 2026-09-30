@@ -18,8 +18,8 @@ abstract class DwTableRow {
 }
 
 /// A row before it is inserted: every column of [R] but the id, which the
-/// database assigns. What `insert`, `tryInsert`, `insertAll` and `upsert`
-/// take; each answers the stored [R].
+/// database assigns. What `insert`, `tryInsert`, `insertAll`, `upsert` and
+/// `upsertAll` take; each answers the stored [R] (`upsertAll` a count).
 ///
 /// Generated for every row class as `New<Name>Row`, with a `copyWith` and a
 /// `withId` that turns it into the row stored under an id already known.

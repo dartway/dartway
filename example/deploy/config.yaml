@@ -9,6 +9,12 @@
 #   dartway secret list --env local       what is set and what is missing
 #   dartway secret set <KEY> --env local  a value that is yours alone
 
+# The migrations up to this one ran before `dartway check` judged the data a
+# migration writes (`migrationChangesData`); an applied migration is never
+# edited, so only the ones after it are judged.
+migrations:
+  dataChecksAfter: 20260918_062959_member_tombstone
+
 local:
   DW_DATABASE_HOST: 127.0.0.1
   DW_DATABASE_PORT: 5432

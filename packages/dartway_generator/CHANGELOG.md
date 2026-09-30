@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.0-dev.13
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#388).
+
 ## 0.21.0-dev.12
 
 - **BREAKING: a row class declares `required this.id` and `final int id;`**, and the generator

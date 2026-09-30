@@ -12,8 +12,10 @@ description: >-
   the caller's profile and role, ctx.refuse, ctx.publish after commit, ctx.transaction, jobs,
   accounts, files); background jobs (DwJobKind, DwQueuedJob, DwRecurringJob); DwHttpRoute for external doors
   only; auth hooks in DwAuthConfig (onAccountCreated creates the profile in the same transaction,
-  onIdentifierChanged); DwAccountService instead of SQL on dw_* tables; the fixed lib/ layout.
-  Use when writing or changing a handler, a row class, a query, a job, a route or sign-in hooks.
+  onIdentifierChanged); DwAccountService instead of SQL on dw_* tables; startup steps and seeds
+  (DwSeedRows), migrations as schema only (m.backfill), typed settings (ctx.settings); the fixed
+  lib/ layout. Use when writing or changing a handler, a row class, a query, a job, a route, a seed,
+  a setting or sign-in hooks.
 ---
 
 # DartWay — the server (`__SERVER_PKG__`)
@@ -48,7 +50,7 @@ __SERVER_PKG__/
     push.dart                  AppPush — with push only
   lib/src/migrations/      fixed: migration files and migrations.dart
   lib/src/<feature>/       one folder per area of the app; a closed set of files:
-    <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes
+    <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes, seeds
     <feature>_rows.dart        its row classes
     <feature>_handlers.dart    one handler per request and command
     <feature>_objects.dart     rows → data objects, in batch
@@ -158,7 +160,7 @@ accepts input and nothing visible happens, which is worse than a disabled form. 
 state" revisions were wanted for already exists as an entity (a cycle, an order, a document version),
 and copying a few fields into it is cheaper than a history nobody reads.
 
-Insert a draft, `New<Entity>Row(...)`: `insert`, `tryInsert`, `insertAll` and `upsert` take drafts
+Insert a draft, `New<Entity>Row(...)`: `insert`, `tryInsert`, `insertAll`, `upsert` and `upsertAll` take drafts
 and answer stored rows; a draft compares by value like the row. "Create or save" by an optional id:
 `update(draft.withId(id))` **only when the command carries every column of the row**; otherwise —
 the usual case, a row with an owner, a creation time, columns other commands set — read it by id
@@ -637,11 +639,12 @@ It offers `ensure`, `find`, `listIdentities`, `listIdentitiesOf` (batch), `accou
 search box), `moveIdentities`, `removeIdentities`, `issueKey`, `listKeys`, `revokeKey`, `revokeKeys`
 — keys and revocation in `dartway-access`.
 
-## 9a. Startup steps — what must be true before the first call
+## 9a. Startup steps and seeds — what must be true before the first call
 
-`DwAppServer(startup: [...])` runs after the migrations and before the port opens, in a background
-context and one transaction (`ctx.db`, `ctx.accounts`, `ctx.publish`, `ctx.jobs`). A step that
-throws stops the start — in a deployment, with the previous server still serving.
+`DwAppServer(startup: [...])` and `DwServerFeature(startup: [...])` run after the migrations and
+before the port opens — the server's steps first, then each feature's — in a background context and
+one transaction per step (`ctx.db`, `ctx.accounts`, `ctx.publish`, `ctx.jobs`). A step that throws
+stops the start — in a deployment, with the previous server still serving.
 
 ```dart
 startup: [
@@ -654,18 +657,79 @@ startup: [
 it to `grant`, which is where the project gives its own admin role — the framework knows accounts,
 not roles.
 
-**Where data goes, and it is decided by who owns the row afterwards:**
+**Seeds are `DwSeedRows`, on the feature they belong to.** The rows sit beside the row class in
+`<feature>_rows.dart`:
 
-| Lifecycle | Where |
+```dart
+final catalogFeature = DwServerFeature(
+  'catalog',
+  handlers: catalogHandlers,
+  startup: [
+    DwSeedRows(
+      'exercise catalogue',
+      table: ExerciseRow.tableDef,
+      key: (t) => [t.slug],
+      rows: exerciseCatalogue,
+    ),
+  ],
+);
+```
+
+Every start inserts a declared row that is missing, writes a changed one over the stored row with
+the same key (keeping its id), touches nothing unchanged, and leaves rows it does not declare alone —
+retire one with a column (`isPublished: false`), since other rows may point at it. **A seed owns its
+rows: only rows nobody edits outside the code are a seed** — the next start writes the declaration
+back over an edit. The key is a unique, `NOT NULL` natural key, never the `id` (a nullable or
+non-unique key refuses the start). The rows are constants — no `DateTime.now()`. A seed whose rows
+point at another seed's comes after it.
+
+**Where data goes:**
+
+| What | Where |
 |---|---|
-| once per database, in every environment | a migration (write it in SQL, never through row classes) |
-| at every start, in every environment, idempotent | a startup step |
-| whenever a developer wants it, never in production | `bin/seed_dev.dart` |
+| existing rows carried across a schema change (a renamed value, a split column) | `m.backfill(sql)` in that migration |
+| rows the code declares (a catalogue, a questionnaire, refusal reasons) | a `DwSeedRows` step |
+| one value per app with a default for every field | a settings object (section 9b) |
+| anything else that must be true before the first call | a `DwStartupStep` |
+| development data, never in production | `bin/seed_dev.dart` |
 
-Rows the operators own once they exist (the first settings) are a migration. Rows that must keep
-agreeing with the code (notification templates, a lookup a `switch` reads) are a **startup step**:
-an applied migration cannot be edited, and a `down` for data deletes what somebody has since
-corrected.
+A migration changes the schema: `dart run dartway_cli:dartway check` fails an `INSERT`, `UPDATE` or
+`DELETE` in one outside `m.backfill` (`migrationChangesData`), and anything but logging after
+`server.start()` in `bin/server.dart` (`workAfterServerStart`). Migrations older than
+`deploy/config.yaml` > `migrations` > `dataChecksAfter` are not judged — an applied migration is
+never edited. Rows operators own after they exist are not a seed: their starting values are
+defaults in the code, and the rows are made in the admin panel.
+
+## 9b. Settings — one typed value per app
+
+A settings object is a data object of `__SHARED_PKG__` with a default for every field and a fixed
+`id` (`dartway-contract`). The server reads and writes it through `ctx.settings`; the project
+declares no table, no row and no lock for it.
+
+```dart
+final settings = await ctx.settings.read<BillingSettings>();   // the defaults until saved; never null
+
+// An edit of some fields: the row is locked between the read and the write.
+// A nullable field arrives as a DwFieldPatch, so it can be cleared.
+final saved = await ctx.settings.update<BillingSettings>(
+  (current) => current.copyWith(
+    dueDays: command.dueDays,
+    invoiceFooter: command.invoiceFooter.trimmedOrCleared,
+  ),
+);
+ctx.publish(AppChannels.settings, saved);
+
+await ctx.settings.save(const BillingSettings(dueDays: 30));   // the whole value, one upsert
+```
+
+Stored is only what differs from the defaults: a field added later reads as its default, and a
+default changed in the code changes every value that equalled the old one. Renaming the class
+resets it to its defaults. A stored field that no longer decodes (an enum value removed, a type
+changed) reads as its default and is logged once; a read never fails over what is stored. A
+key/value table of strings is refused (`settingsKeyValueTable`); the migration that drops one
+carries its values with `m.carrySettings('BillingSettings', fromSql: …)` — a project never writes
+`dw_*` tables itself. A preference **per member** stays a row of the member's table;
+without the row, the reader maps to the data object's own defaults (`const NotificationPrefs()`).
 
 **A setting whose value belongs to this deployment has no default.** `DW_ADMIN_IDENTIFIER` above,
 a sender address, a provider key, a webhook URL, a bucket name — each is a credential of this

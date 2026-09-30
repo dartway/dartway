@@ -14,6 +14,7 @@ import '../jobs/dw_job_queue.dart';
 import '../outbound/dw_outbound_http.dart';
 import '../server/dw_server_clock.dart';
 import '../server/dw_server_module.dart';
+import '../settings/dw_settings_store.dart';
 import 'dw_caller_local_time.dart';
 
 /// Thrown when a call needs a signed-in account and has none. The framework
@@ -162,6 +163,11 @@ abstract class DwCallContext {
   /// and answered by the test's `DwFakeOutboundHttp` under a `DwTestServer`.
   /// See [DwOutboundHttp].
   DwOutboundHttp get http;
+
+  /// The app's settings: `await ctx.settings.read<SignInSettings>()` answers
+  /// the stored value or its defaults, never `null`; `save` and `update`
+  /// write it without a lock of the project's own. See [DwSettingsStore].
+  DwSettingsStore get settings => DwSettingsStore(db, protocol, log);
 
   /// The server's module of class [M] — how a module's context extension
   /// (`ctx.push`) reaches its runtime. Throws [StateError] when the server

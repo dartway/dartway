@@ -75,7 +75,9 @@ From the project root or from inside the `*_flutter` package, in this order:
    `lib/src/core/environment.dart`, and in `bin/` anything but `DwLocalEnvironment.overlay(Platform.environment)`
    or a map read by a variable's name (`forbiddenEnvironmentRead`); an `HttpClient(` or a
    `package:http` import in `lib/` (`forbiddenHttpClient`);
-6. **migrations**: `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
+6. **the data lifecycle** of the server, shared and Flutter packages (`migrationChangesData`,
+   `workAfterServerStart`, `settingsKeyValueTable`, `fieldPatchMatched`), and **migrations**:
+   `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
 7. **framework locks** across the project's `pubspec.lock` files (`frameworkRefsDiverged`);
    and **framework overrides** that the framework has caught up with (`frameworkOverrideOutlived`);
 8. **the `local` environment**: a declared secret it has no value for (`localSecretMissing`), and the
@@ -112,7 +114,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Twenty-one errors, eleven warnings, one info — `DwCheckType` and its `severity` in
+Twenty-five errors, eleven warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -136,6 +138,10 @@ Twenty-one errors, eleven warnings, one info — `DwCheckType` and its `severity
 | `forbiddenDateTimeNow` | error | `DateTime.now` or `DateTime.timestamp` (called or torn off, interpolations included), or `package:clock`'s `clock.now()` where it is imported (prefixed or not), anywhere in the server's `lib/` — the factory file included — the time there is `ctx.now`, the server's clock, which tests set and the job queue runs by. Comments and strings are passed over; `bin/` and `test/` are not judged |
 | `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
 | `redundantBangAllowed` | error | The server or the shared package's `analysis_options.yaml` (or a local file it includes) does not set `analyzer: errors: unnecessary_non_null_assertion: error` — a stored row's id is `int`, and `row.id!` hides the `!` that guards a real null (D-113) |
+| `migrationChangesData` | error | An `INSERT`, `UPDATE` or `DELETE` in a migration (`lib/src/migrations/m*.dart`) that is not an argument of `m.backfill(…)` — content is a seed step. Reads the SQL strings: adjacent literals as one string, `--` comments dropped, an interpolated table name still a table; only the dollar-quoted body of a function or procedure being defined passes. Migrations up to `deploy/config.yaml` > `migrations` > `dataChecksAfter` are not judged — and moving that key forward exempts whatever it passes, which no check can see: the agent's skills make a diff that moves it a stop for the human. A write into a `dw_*` table is refused even through `backfill`; `m.carrySettings` is the one way ([Migrations](../4-server/migrations.md#a-migration-changes-the-schema)) |
+| `workAfterServerStart` | error | `bin/server.dart` awaiting anything, or reaching `.db`, `.accounts` or `runInContext`, after the server's `start()` — the variable a `DwAppServer(…)` or `…Server.build(…)` was assigned to — in the same function; awaiting `stop()`/`close()` or a `ProcessSignal` passes ([Startup steps and seeds](../4-server/app-server.md#startup-steps-and-seeds)) |
+| `settingsKeyValueTable` | error | A row class whose own body has a unique `String key` beside a `String value`: settings are a data object read through `ctx.settings` ([Settings](../4-server/database.md#settings)) |
+| `fieldPatchMatched` | error | `DwSetField`, `DwClearField` or `DwKeepField` named in the code of the server, shared or Flutter package (`lib/`, `bin/`, `test/`; generated files exempt) — read a patch through its helpers ([Clearing a field](../2-core/data-objects-and-generation.md#clearing-a-field-dwfieldpatch)) |
 | `uiKitContainsText` | warning | A text constant in the kit; texts belong to features and l10n |
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines |

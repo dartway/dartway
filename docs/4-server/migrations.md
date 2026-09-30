@@ -1,7 +1,7 @@
 # Migrations: how does a schema change reach every database?
 
-A migration is Dart code in the server package that moves the schema — and data, when it must —
-one step. The project's migrations live in `lib/src/migrations/`, one file each, registered in
+A migration is Dart code in the server package that moves the schema one step — carrying the rows
+already there across it, when it must. The project's migrations live in `lib/src/migrations/`, one file each, registered in
 `lib/src/migrations/migrations.dart`. The server applies them when it starts; `bin/migrate.dart`
 applies, rolls back, inspects and drafts them.
 
@@ -105,28 +105,52 @@ project created from an older template has an initial migration older than frame
 it relies on, and it still runs after them. Within the project, declare `dependsOn` when a
 migration must follow one with a later id.
 
-## Data in a migration, and data that does not belong in one
+## A migration changes the schema
 
-A migration may write rows — seeding the first settings, backfilling a column it just added — and
-the ledger makes that exactly-once in every environment. **The question to ask first is who owns
-those rows afterwards.**
+A migration runs once per database. That is right for the schema and wrong for content: rows put
+there reach only the databases that had not applied it yet, and the day they change, an applied
+migration cannot be edited — its checksum stops every server that ran it — while a second one that
+rewrites them has to guess which rows somebody has since corrected by hand.
 
-Rows the operators own from the moment they exist — a starting price list, the first settings,
-which they then edit in the admin panel — belong in a migration. The code put them there once and
-never looks again.
+So a migration writes rows for one reason only: **to carry the rows already there across its own
+schema change** — a renamed enum value, a column split in two, rows a new constraint forbids. It
+says so by passing that statement to `m.backfill(sql)`:
 
-Rows that have to keep agreeing with the code do **not**. Notification templates, the reasons a
-project refuses something, a lookup table a `switch` in the code reads: the day one of them
-changes, a migration leaves no good move. Editing the applied one is refused by its checksum (and
-would stop every server that applied it); a new migration that updates rows has to guess which of
-them somebody has since corrected by hand; and `down` deletes rows nobody asked it to. Declare
-them in a **startup step** instead ([app server](app-server.md#startup-steps)) and the next start
-of every environment converges on the declaration.
+```dart
+@override
+Future<void> up(DwMigrationContext m) async {
+  await m.addColumn('project_issue', DwColumnSchema('stage', 'text'), backfill: "'development'");
+  await m.backfill("UPDATE project_issue SET stage = 'review' WHERE stage = 'validation'");
+}
+```
+
+`backfill` runs like `sql`; what it adds is the statement's purpose, and `dart run dartway_cli:dartway check` holds it:
+an `INSERT`, `UPDATE` or `DELETE` anywhere else in a project migration fails the build
+(`migrationChangesData`). The check reads the migration's string literals — adjacent literals as
+one string — and passes function, procedure and trigger bodies, which are definitions rather than
+statements; a statement held in a variable is judged where it is written, so pass it to `backfill`
+directly.
+
+Everything else has a place of its own ([app server](app-server.md#startup-steps-and-seeds)):
+rows the code declares are a `DwSeedRows` step that every start converges on, and a value per app
+with defaults is a settings object ([database](database.md#settings)).
 
 **Write data in SQL, not through row classes.** A migration is read against the schema of its own
 day, forever; written through today's row classes it silently changes meaning the next time a
 field is renamed, while its checksum says nothing happened. That is why `DwMigrationContext`
-offers `sql` and `query` and no typed tables.
+offers `sql`, `query` and `backfill` and no typed tables.
+
+**Migrations written before a project adopted the rule stay as they are** — an applied migration is
+never edited. The project names its latest migration once, in `deploy/config.yaml`, and only the
+migrations after it are judged:
+
+```yaml
+migrations:
+  dataChecksAfter: 20260918_062959_member_tombstone
+```
+
+A project that never set it — every new one — has all its migrations judged. A value that is not a
+migration id, or names none in `lib/src/migrations/`, is a finding of its own.
 
 ## Namespaces
 

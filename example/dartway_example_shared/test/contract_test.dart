@@ -160,9 +160,10 @@ void main() {
     expect(codes(const ListChatMessagesMatching(channelId: 1, query: ' a ')), [
       'searchQueryTooShort@query',
     ]);
-    expect(codes(const SaveAppSetting(key: 'colour', value: 'red')), [
-      'settingKeyUnknown@key',
+    expect(codes(const SaveClubSettings(clubName: ' ')), [
+      'clubNameRequired@clubName',
     ]);
+    expect(codes(const SaveClubSettings(bookingEnabled: false)), isEmpty);
     expect(
       codes(
         ScheduleSession(
