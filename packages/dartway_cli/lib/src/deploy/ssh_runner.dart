@@ -174,7 +174,8 @@ class DwSshRunner {
     final stderrText = process.stderr
         .transform(const SystemEncoding().decoder)
         .join();
-    // The same failure also completes `done`; it is answered below.
+    // A failed write surfaces from flush or close below; `done` fails with
+    // it too, and would be reported unhandled.
     process.stdin.done.ignore();
     try {
       process.stdin.write(input);

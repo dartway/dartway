@@ -29,10 +29,15 @@ void main() {
     expect(result.stderr, contains('refused'));
   });
 
-  test('a command that reads its input answers with what it read', () async {
-    final process = await Process.start('sh', ['-c', 'wc -c']);
-    final result = await DwSshRunner.feedInput(process, 'x' * (1 << 20));
+  test('a command that echoes its input gets all of it back — the output '
+      'is drained while the input is written', () async {
+    // More than both pipes hold: writing everything before reading anything
+    // deadlocks here, `cat` blocked on a full stdout and the write on a full
+    // stdin.
+    final input = 'x' * (1 << 20);
+    final process = await Process.start('cat', const []);
+    final result = await DwSshRunner.feedInput(process, input);
     expect(result.exitCode, 0);
-    expect(result.stdout.trim(), '${1 << 20}');
-  });
+    expect(result.stdout.length, input.length);
+  }, timeout: const Timeout(Duration(seconds: 20)));
 }
