@@ -149,21 +149,7 @@ class DwSshRunner {
         ..._baseArgs,
         _asUser(deployUser, command),
       ]);
-      process.stdin.write(input);
-      await process.stdin.flush();
-      await process.stdin.close();
-
-      final stdoutText = await process.stdout
-          .transform(const SystemEncoding().decoder)
-          .join();
-      final stderrText = await process.stderr
-          .transform(const SystemEncoding().decoder)
-          .join();
-      return DwSshResult(
-        exitCode: await process.exitCode,
-        stdout: stdoutText,
-        stderr: stderrText,
-      );
+      return await feedInput(process, input);
     } on ProcessException catch (exception) {
       return DwSshResult(
         exitCode: 127,
@@ -171,6 +157,38 @@ class DwSshRunner {
         stderr: 'Cannot run ssh: ${exception.message}',
       );
     }
+  }
+
+  /// Writes [input] to a started [process] and collects what it answered.
+  ///
+  /// A process may exit without reading its input — `ssh` that could not
+  /// connect, a script stopped by `set -e` before its `read`. Writing to it
+  /// then fails with a broken pipe, and that is not the failure: the exit
+  /// code and stderr say what happened, so they are what is returned. Its
+  /// output is read while the input is written, so neither side waits on a
+  /// full pipe.
+  static Future<DwSshResult> feedInput(Process process, String input) async {
+    final stdoutText = process.stdout
+        .transform(const SystemEncoding().decoder)
+        .join();
+    final stderrText = process.stderr
+        .transform(const SystemEncoding().decoder)
+        .join();
+    // A failed write surfaces from flush or close below; `done` fails with
+    // it too, and would be reported unhandled.
+    process.stdin.done.ignore();
+    try {
+      process.stdin.write(input);
+      await process.stdin.flush();
+      await process.stdin.close();
+    } on IOException {
+      // Exited without reading it all; the exit code below says why.
+    }
+    return DwSshResult(
+      exitCode: await process.exitCode,
+      stdout: await stdoutText,
+      stderr: await stderrText,
+    );
   }
 
   /// Copies a local file to [remotePath] on the target.

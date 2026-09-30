@@ -29,6 +29,12 @@
   `BookSession` takes the spot first (`ScheduleChanges.takeSpot` locks the session and refuses a
   missing or full one) and then checks the start and a spot already held, so a full session that
   already started is refused as full rather than as started.
+- What `deploy` sends over stdin — the values of the `secret` commands, the rendered compose and
+  nginx files of `deploy setup`, the script of every remote deploy step — no longer crashes on
+  `SocketException: Broken pipe` when the remote command exits without reading it (`ssh` that could
+  not connect, a script stopped by `set -e`): the command's own exit code and stderr are reported.
+  The output is read while the input is written, so a command that echoes a large input no longer
+  deadlocks (dartway/dartway#400).
 
 ## 0.23.0
 

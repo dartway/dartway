@@ -235,13 +235,19 @@ extension on DwAppClient {
       );
       // An attempt that hangs is a failure too: without a bound, a server
       // that accepted the connection and never answers would hold an entry
-      // forever.
+      // forever. It is retried as one, but it names no error: the timeout
+      // already says nothing answered, and the last attempt, cut to what is
+      // left of the deadline — often a sliver shorter than the network's
+      // own latency — would otherwise hide the failure before it.
       final attemptLimit = remaining == null || remaining > options.callTimeout
           ? options.callTimeout
           : remaining;
       DwHttpReply? reply;
       try {
-        reply = await httpTransport.post(post).timeout(attemptLimit);
+        reply = await httpTransport
+            .post(post)
+            .then<DwHttpReply?>((reply) => reply)
+            .timeout(attemptLimit, onTimeout: () => null);
       } catch (error) {
         lastError = error;
       }

@@ -7,6 +7,10 @@
 
 ## 0.21.0-dev.16
 
+- A call that times out names the failure of its attempts as `DwTimeoutException.lastError`, as
+  documented, and no longer an attempt that hung: the last attempt is cut to what is left of the
+  deadline, and on the web that sliver ended in its own `TimeoutException`, hiding the network error
+  before it (dartway/dartway#400). A server that never answers times out with no `lastError`.
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
   test layout and spacing checks of `dartway check` (dartway/dartway#391).
 
