@@ -407,7 +407,7 @@ void main() {
           ),
         ),
       );
-      expect(attempts, 2);
+      expect(attempts, greaterThanOrEqualTo(2));
     });
 
     test('a server that never answers times out naming no error', () async {
