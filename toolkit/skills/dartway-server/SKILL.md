@@ -38,16 +38,20 @@ __SERVER_PKG__/
   bin/seed_dev.dart        development data: starts this server on port 0 and
                            works in a real context, so the project's own auth
                            creates the accounts
-  lib/__SERVER_PKG__.dart  the library: builds the DwAppServer
+  lib/__SERVER_PKG__.dart  the library: builds the DwAppServer — lists the features, hands
+                           it the sign-in hooks, and the storage every purpose's upload rule
   lib/generated/           written by `dart run dartway_cli:dartway generate` — never edited
-  lib/src/core/            fixed names, no project prefix, classes App*:
-    auth.dart                  AppAuth — the DwAuthConfig and its hooks
-    call_context.dart          AppCallContext (ctx.profile, roles) and AppAccess
+  lib/src/core/            what every feature imports; imports no feature. Fixed names, no
+                           project prefix, classes App*:
     channels.dart              AppChannels — the channel addresses handlers publish to
-    files.dart                 AppFiles — every upload rule and who reads a file
-    bootstrap.dart             AppBootstrap — startup steps
+    files.dart                 AppFiles — the buckets' default names
     environment.dart           AppEnvironment — every variable, read once at start
     push.dart                  AppPush — with push only
+  lib/src/profile/         the sink every feature may import, importing no other feature:
+    profile_access.dart        ProfileCallContext (ctx.profile, roles), ProfileAccess: who the caller is
+    profile_changes.dart       ProfileChanges: every write of a profile from outside it
+  lib/src/account/         the feature at the top: AccountAuth (the DwAuthConfig and its hooks) in
+                           logic/, the first administrator in its startup; imported by nothing
   lib/src/migrations/      fixed: migration files and migrations.dart
   lib/src/<feature>/       one folder per area of the app; a closed set of files:
     <feature>_feature.dart     its DwServerFeature — handlers, channel rules, jobs, routes, seeds
@@ -58,6 +62,8 @@ __SERVER_PKG__/
     <feature>_jobs.dart        its job kinds and job definitions
     <feature>_access.dart      its access rules, when they outgrow the handlers
     <feature>_routes.dart      its DwHttpRoute doors, when it has them
+    <feature>_changes.dart     how another feature writes its rows: the invariants kept, the
+                               change published through its own _publications
     <feature>_<part>_<kind>.dart  a kind split in parts: the only way a feature splits
     logic/                     everything that is none of the kinds — clients, calculators,
                                domain rules; flat, free names, never a kind's suffix
@@ -77,10 +83,39 @@ mapping in `_objects`, and none of them in `core/` (`invalidServerFeatureFile`,
 [project layout](https://dartway.dev/1-getting-started/project-layout)). A feature split across layers ends up in four places, with a
 `chat/` beside a `domain/chat/` and two rules for who is in a chat: the whole area lives in its
 folder, and what two features share lives in the one that owns it (the profile's objects in
-`profile/`) or in `core/`. A feature imports another's `_rows`, `_objects` and `_publications` —
-never its `_handlers`: a handler file is where a feature ends. A number several features move,
-like an admin dashboard's counters, is a publication of the feature that owns it
-(`admin/admin_publications.dart`), and every command that moves it calls that one function.
+`profile/`).
+
+**Features import each other one way, and only through a surface** — errors of the check:
+
+- **Another feature's surface is five kinds**: its `_rows` (to read and join its tables — read
+  only), its `_access` (its rules — whose row it is, who is a member: one function per concept, in
+  the owning feature), its `_objects` (its rows shown the one way it shows them), its
+  `_publications` (its changes announced the one way it announces them) and its `_changes` (its
+  rows written the one way that keeps its invariants). **Never its `_feature`,
+  `_handlers`, `_jobs`, `_routes` or `logic/`**: they run it, and a second feature running them is
+  where one concept grows two definitions (`featureImportOutsideSurface`). A number several
+  features move, like an admin dashboard's counters, is a publication of the feature that owns it
+  (`admin/admin_publications.dart`), and every command that moves it calls that one function.
+- **A row is written only by the feature that owns its invariants** (`foreignRowWrite`):
+  `ctx.db.<table>.insert`/`update`/`delete`/`upsert` of another feature's table — from a feature
+  or from `core/` — fails. The other feature calls the owner's `_changes` (`ProfileChanges.changeRole`,
+  an order reserving stock through the catalogue's `reserve`), which writes, keeps the invariant and
+  publishes through the owner's `_publications`. Two writers of one row are two definitions of a
+  valid row.
+- **No cycles** (`featureImportCycle`), by any import: two features that import each other are one
+  feature in two folders. Break one by moving the rule both need into the `_access` of the feature
+  that owns the concept, a row class to the feature that owns its invariants, or what both need
+  into a feature both import.
+- **The profile imports no other feature**: every feature asks who the caller is, so the profile
+  is the sink of the graph; a profile that imported a feature would be in a cycle with it.
+- **`core/` imports no feature** (`coreImportsFeature`): every feature imports `core/`, so a
+  feature it imported would be imported by all of them, itself included. Who the caller is lives in
+  `profile/profile_access.dart`; an upload purpose's rule, or a push audience, in the `_access.dart`
+  of the feature it belongs to, handed in by the library; the sign-in hooks in `account/`, the one
+  feature above the ones an account's life touches. No file under `lib/src/` imports the package's
+  library either.
+
+`lib/__SERVER_PKG__.dart` sees every feature and is not judged: it is where they are assembled.
 
 **A file is held to the app's length**: over 200 lines is `fileLong` (a nudge), over 350
 `fileTooLong` (a warning) — generated code, migrations and seed data (§9a) excepted. A kind that
@@ -412,11 +447,12 @@ An offset is not a zone: work for a person later (a job at their 8 a.m.) uses an
 stored from one of their calls — the framework keeps none.
 
 **The project's notions of "the caller" are an extension, cached per call with `memo`** — the
-framework knows an account, the profile and the role are the project's. It is `AppCallContext` in
-`core/call_context.dart`, and the caller's profile is `ctx.profile`:
+framework knows an account, the profile and the role are the project's. It is `ProfileCallContext` in
+`profile/profile_access.dart` — the profile feature's, since `core/` imports no feature — and the
+caller's profile is `ctx.profile`:
 
 ```dart
-extension AppCallContext on DwCallContext {
+extension ProfileCallContext on DwCallContext {
   /// The caller's profile, read once per call.
   Future<MemberProfileRow> get profile => memo(#profile, () async {
     final accountId = requireAccountId;
@@ -575,7 +611,7 @@ it. `DwAuthConfig` in `lib/src/`:
     (name, phone, photo, a test code), the data objects carry `isDeleted`, and the screens say
     "member who left". That is a **tombstone**: what others wrote keeps an author, and the author
     carries nothing of the person. Worked out in full in the framework's example
-    ([`core/auth.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/core/auth.dart))
+    ([`account/logic/auth.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/account/logic/auth.dart))
     — hook, migration, flag, acceptance test.
 
   **The server checks this at startup and refuses to start when nobody has.** It follows every
@@ -653,12 +689,21 @@ one transaction per step (`ctx.db`, `ctx.accounts`, `ctx.publish`, `ctx.jobs`). 
 stops the start — in a deployment, with the previous server still serving.
 
 ```dart
-startup: [
-  DwFirstAdministrator(grant: AppBootstrap.grantAdmin, identifier: adminIdentifier),
-],
+// account/account_feature.dart
+DwServerFeature accountFeature({required String? adminIdentifier}) =>
+    DwServerFeature(
+      'account',
+      startup: [
+        DwFirstAdministrator(
+          grant: ProfileChanges.grantAdmin,
+          identifier: adminIdentifier,
+        ),
+      ],
+    );
 ```
 
-`adminIdentifier` is the factory's `required String? adminIdentifier`, from
+`adminIdentifier` is the factory's `required String? adminIdentifier`, handed to
+`accountFeature(adminIdentifier: …)` in the features list, from
 `env.server.adminIdentifier` (`DW_ADMIN_IDENTIFIER`). `DwFirstAdministrator` brings that account into existence and hands
 it to `grant`, which is where the project gives its own admin role — the framework knows accounts,
 not roles.

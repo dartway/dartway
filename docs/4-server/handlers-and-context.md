@@ -111,7 +111,7 @@ From `example/dartway_example_server/lib/src/admin/admin_handlers.dart`:
 
 ```dart
 DwCallHandler.table<ListUserProfiles, UserProfile>(
-  access: AppAccess.admin,
+  access: ProfileAccess.admin,
   rows: (ctx, request, table) async => [
     for (final row in await ctx.db.userProfiles.find(
       where: _membersFilter(request),
@@ -323,11 +323,12 @@ core.
 ## A project's own notions of the caller
 
 The framework knows an account. What the account is to the project — a profile, a role — is the
-project's, added by extension and cached per call with `memo`. From the skeleton
-(`template/dartway_starter_server/lib/src/core/call_context.dart`):
+project's, added by extension and cached per call with `memo`. It is the profile feature's surface
+every other feature imports — `core/` imports no feature. From the skeleton
+(`template/dartway_starter_server/lib/src/profile/profile_access.dart`):
 
 ```dart
-extension AppCallContext on DwCallContext {
+extension ProfileCallContext on DwCallContext {
   /// The caller's profile, read once per call.
   Future<UserProfileRow> get profile => memo(#profile, () async {
     final accountId = requireAccountId;
@@ -343,7 +344,7 @@ extension AppCallContext on DwCallContext {
 }
 
 /// Access rules of the app, in the words handlers read.
-abstract final class AppAccess {
+abstract final class ProfileAccess {
   static final DwAccessRule admin = DwAccessRule.check<DwServerCall<Object?>>(
     (ctx, _) => ctx.isAdmin,
   );

@@ -1,6 +1,7 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_starter_server/dartway_starter_server.dart';
+import 'package:dartway_starter_server/src/profile/profile_changes.dart';
 import 'package:dartway_starter_server/src/profile/profile_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
@@ -181,7 +182,7 @@ void main() {
       'promoted on a later start, quiet when nothing changed', () async {
     final server = app.server.server;
     DwFirstAdministrator declaring(String identifier) => DwFirstAdministrator(
-      grant: AppBootstrap.grantAdmin,
+      grant: ProfileChanges.grantAdmin,
       identifier: identifier,
     );
     Future<void> start(String identifier) =>
@@ -189,10 +190,10 @@ void main() {
 
     // A mistyped identifier is a server that does not start, judged before
     // anything opens.
-    expect(declaring('not an identifier').problems(AppAuth.config()), [
+    expect(declaring('not an identifier').problems(AccountAuth.config()), [
       contains('DW_ADMIN_IDENTIFIER'),
     ]);
-    expect(declaring('Admin@Example.com').problems(AppAuth.config()), isEmpty);
+    expect(declaring('Admin@Example.com').problems(AccountAuth.config()), isEmpty);
 
     await start('Admin@Example.com');
     final created = (await app.db.userProfiles.findFirst(

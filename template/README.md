@@ -76,7 +76,7 @@ with the code **111111**: the admin **79990000001**, the members
 **79990000002** and **boris@example.com**. `DW_ADMIN_IDENTIFIER` makes the
 phone or e-mail it names an administrator on every start — whoever receives
 its codes is the admin, so there is no default. A real delivery goes into
-`deliverCode` in `dartway_starter_server/lib/src/core/auth.dart`.
+`deliverCode` in `dartway_starter_server/lib/src/account/logic/auth.dart`.
 
 ## Build a feature
 

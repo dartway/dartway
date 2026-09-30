@@ -1,10 +1,10 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/admin/admin_publications.dart';
-import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_server/src/core/channels.dart';
+import 'package:dartway_example_server/src/profile/profile_access.dart';
+import 'package:dartway_example_server/src/profile/profile_changes.dart';
 import 'package:dartway_example_server/src/profile/profile_objects.dart';
-import 'package:dartway_example_server/src/profile/profile_publications.dart';
 import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
@@ -12,14 +12,14 @@ final adminHandlers = <DwCallHandler>[
   /// The dashboard numbers. Admins only; kept live by
   /// [AdminPublications.counters] from every command that moves them.
   DwCallHandler.single<GetAdminCounters, AdminCounters>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     handle: (ctx, request) => AdminPublications.countCounters(ctx),
   ),
 
   /// The members table: a page of profiles by name or phone, and by role.
   /// Admins only.
   DwCallHandler.table<ListUserProfiles, UserProfile>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     rows: (ctx, request, table) async => [
       for (final row in await ctx.db.userProfiles.find(
         where: request.membersFilter,
@@ -37,7 +37,7 @@ final adminHandlers = <DwCallHandler>[
   /// (`dw.notFound`). Publishes the profile to the member and the admins, and
   /// closes the channels a lost role opened.
   DwCallHandler.command<ChangeRole, UserProfile>(
-    access: AppAccess.admin,
+    access: ProfileAccess.admin,
     handle: (ctx, command) async {
       final row = await ctx.db.userProfiles.findById(
         command.profileId,
@@ -48,13 +48,10 @@ final adminHandlers = <DwCallHandler>[
       if (row == null || row.deletedAt != null) {
         ctx.refuse(DwCoreRefusal.notFound);
       }
-      final updated = await ctx.db.userProfiles.update(
-        row.copyWith(role: command.role),
-      );
-      final profile = ProfilePublications.profile(ctx, updated);
+      final profile = await ProfileChanges.changeRole(ctx, row, command.role);
       // Access is checked once, at subscription: a role taken away closes
       // what it opened.
-      final account = updated.ownerAccountId;
+      final account = row.ownerAccountId;
       if (row.role == UserRole.admin && command.role != UserRole.admin) {
         ctx.revoke(AppChannels.admin, account);
       }

@@ -3,22 +3,19 @@ import 'dart:io';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/admin/admin_publications.dart';
-import 'package:dartway_example_server/src/bookings/bookings_rows.dart';
+import 'package:dartway_example_server/src/bookings/bookings_changes.dart';
 import 'package:dartway_example_server/src/core/channels.dart';
+import 'package:dartway_example_server/src/profile/profile_changes.dart';
 import 'package:dartway_example_server/src/profile/profile_objects.dart';
-import 'package:dartway_example_server/src/profile/profile_publications.dart';
-import 'package:dartway_example_server/src/profile/profile_rows.dart';
-import 'package:dartway_example_server/src/schedule/schedule_objects.dart';
-import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 /// Signing in by a code to a phone, and the profile an account starts with.
-abstract final class AppAuth {
+abstract final class AccountAuth {
   /// Sign-in by a one-time code to a phone number.
   static final config = DwAuthConfig(
     accountDeletion: DwAccountDeletion.byMember,
     normalize: (kind, raw) => switch (kind) {
-      DwIdentifierKind.phone => AppAuth.normalizePhone(raw),
+      DwIdentifierKind.phone => AccountAuth.normalizePhone(raw),
       DwIdentifierKind.email => null, // the club signs in by phone only
     },
 
@@ -26,20 +23,20 @@ abstract final class AppAuth {
     // their profile; everyone else gets `null` — the framework's own
     // default, `codeLength` random digits (6, left unset here).
     generateCode: (ctx, kind, identifier, accountId) =>
-        AppAuth._testCode(ctx, accountId),
+        AccountAuth._testCode(ctx, accountId),
 
     // The example sends no SMS: the code is written to the server log, which
     // is enough to sign in locally. A real project delivers it here — except
     // a demo persona's or a store reviewer's fixed code, which goes nowhere.
     deliverCode: (ctx, kind, identifier, code, accountId) async {
-      if (await AppAuth._testCode(ctx, accountId) != null) return;
+      if (await AccountAuth._testCode(ctx, accountId) != null) return;
       stdout.writeln('Sign-in code for $identifier: $code');
     },
 
     // The profile is created with the account, in the same transaction: a
     // signed-in account without a profile cannot exist.
     onAccountCreated: (ctx, accountId, kind, identifier, origin) async {
-      final profile = await AppAuth.createProfile(
+      final profile = await ProfileChanges.create(
         ctx,
         accountId,
         identifier,
@@ -80,36 +77,9 @@ abstract final class AppAuth {
         lock: DwRowLock.forUpdate,
       );
       for (final booking in held) {
-        await ctx.db.sessionBookings.update(
-          booking.copyWith(status: BookingStatus.cancelled),
-        );
-        final session = (await ctx.db.clubSessions.findById(
-          booking.sessionId,
-          lock: DwRowLock.forUpdate,
-        ))!;
-        final freed = await ctx.db.clubSessions.update(
-          session.copyWith(bookedCount: session.bookedCount - 1),
-        );
-        ctx.publish(
-          AppChannels.schedule,
-          await ScheduleObjects.session(ctx.db, freed),
-        );
+        await BookingsChanges.cancel(ctx, booking, client: profile);
       }
-      final tombstone = await ctx.db.userProfiles.update(
-        profile.copyWith(
-          firstName: '',
-          lastName: const DwFieldPatch.clear(),
-          phone: '',
-          imageUrl: const DwFieldPatch.clear(),
-          gender: const DwFieldPatch.clear(),
-          testVerificationCode: const DwFieldPatch.clear(),
-          agreedForMarketing: false,
-          deletedAt: DwFieldPatch.set(ctx.now),
-        ),
-      );
-      // The admins' members table holds the row: it must show what it became,
-      // not what it was.
-      ctx.publish(AppChannels.admin, ProfileObjects.profile(tombstone));
+      await ProfileChanges.tombstone(ctx, profile);
       await AdminPublications.counters(ctx);
     },
 
@@ -123,10 +93,7 @@ abstract final class AppAuth {
         where: (t) => t.accountId.equals(change.accountId),
       );
       if (current == null || current.phone == phone) return;
-      ProfilePublications.profile(
-        ctx,
-        await ctx.db.userProfiles.update(current.copyWith(phone: phone)),
-      );
+      await ProfileChanges.changePhone(ctx, current, phone);
     },
   );
 
@@ -142,24 +109,6 @@ abstract final class AppAuth {
         );
         return profile?.testVerificationCode;
       });
-
-  /// The profile a new account starts with, its conditions accepted as of
-  /// `ctx.now`. Separate from the hook so tools that create accounts without a
-  /// running server (the dev seed) create the same row.
-  static Future<UserProfileRow> createProfile(
-    DwCallContext ctx,
-    int accountId,
-    String phone,
-    Map<String, String> registration,
-  ) => ctx.db.userProfiles.insert(
-    NewUserProfileRow(
-      accountId: accountId,
-      phone: phone,
-      firstName: registration['firstName']?.trim() ?? '',
-      agreedForMarketing: registration['marketing'] == 'true',
-      conditionsAcceptedAt: ctx.now,
-    ),
-  );
 
   /// Digits only; a Russian trunk prefix `8` becomes `7`. `null` for anything
   /// that is not a plausible phone number.

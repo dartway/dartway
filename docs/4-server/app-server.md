@@ -15,6 +15,7 @@ abstract final class DartwayExampleServer {
     int port = 8080,
     DwAuthConfig? auth,
     DwServerSettings settings = const DwServerSettings(),
+    required String? adminIdentifier,
     DwPushModule? push,
     DwServerClock clock = DwServerClock.system, // a DwTestClock in tests
   }) => DwAppServer(
@@ -23,16 +24,22 @@ abstract final class DartwayExampleServer {
     migrations: appMigrations,
     migrationsDirectory: 'lib/src/migrations',
     database: database,
-    auth: auth ?? AppAuth.config,
+    auth: auth ?? AccountAuth.config,
     features: [
       profileFeature,
-      clubFeature,
+      scheduleFeature,
+      bookingsFeature,
       contentFeature,
       chatFeature,
       adminFeature,
+      accountFeature(adminIdentifier: adminIdentifier),
     ],
-    files: storage == null ? null : AppFiles.storage(storage),
-    modules: [push ?? AppPush.module()],
+    files: storage == null
+        ? null
+        : DwFileStorage(storage, rules: uploadRules, canRead: canReadFile),
+    modules: [
+      push ?? AppPush.module(eligibility: ProfileAccess.pushEligibility),
+    ],
     port: port,
     settings: settings,
     clock: clock,
@@ -347,17 +354,23 @@ seed's is listed after it.
 The case every project has. The admin role is granted by an admin, which leaves the first one
 nowhere to come from; `DW_ADMIN_IDENTIFIER` names it per environment, and there is no default
 because whoever receives the codes sent to that identifier *is* the administrator. It is read into
-`DwServerEnvironment.adminIdentifier`, and `bin/server.dart` hands it to the server factory:
+`DwServerEnvironment.adminIdentifier`, and `bin/server.dart` hands it to the server factory, which
+hands it to the skeleton's `account` feature — the step is the account's; what it grants is the
+profile's, so `grant` is a change function of the profile feature:
 
 ```dart
-DwAppServer(
-  startup: [
-    DwFirstAdministrator(grant: AppBootstrap.grantAdmin, identifier: adminIdentifier),
-  ],
-  ...
-);
+DwServerFeature accountFeature({required String? adminIdentifier}) =>
+    DwServerFeature(
+      'account',
+      startup: [
+        DwFirstAdministrator(
+          grant: ProfileChanges.grantAdmin,
+          identifier: adminIdentifier,
+        ),
+      ],
+    );
 
-// AppBootstrap — the project's half: the framework goes as far as the account.
+// ProfileChanges — the project's half: the framework goes as far as the account.
 static Future<void> grantAdmin(DwCallContext ctx, int accountId) async {
   final profile = (await ctx.db.userProfiles.findFirst(
     where: (t) => t.accountId.equals(accountId),

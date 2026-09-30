@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.24.0
+
+- **BREAKING: `dartway check` holds how server features import and write one another**
+  (dartway/dartway#382, D-118). Four new errors, in their own inspector (`dw_feature_imports.dart`):
+  `coreImportsFeature` — a file of `core/` importing a feature or the package's library;
+  `featureImportCycle` — features importing each other in a cycle, by any `import`/`export`/`part`
+  (`package:` or relative, conditional alternatives included), one finding per knot with its
+  shortest cycle and the import behind each step; `featureImportOutsideSurface` — a feature
+  importing another's file that is not its `_rows`, `_access`, `_objects`, `_publications` or
+  `_changes` (or a `<part>` of one), or the package's library; `foreignRowWrite` — a
+  `<handle>.<table>.insert`/`update`/`delete`/`upsert`… (`ctx.db`, a transaction's handle, any
+  other) of a table whose row class another feature
+  declares (read from the generated schema and the row classes), from a feature or from `core/`.
+  `changes` joins the closed file set of a server feature: `<feature>_changes.dart` is how another
+  feature writes its rows. The server's library file, `migrations/`, `bin/` and `test/` are not
+  judged. The skeleton and the example follow: `ProfileCallContext`/`ProfileAccess` in
+  `profile/profile_access.dart`, the sign-in hooks (`AccountAuth`) and the first administrator in a
+  new `account/` feature, every foreign write through `ProfileChanges`, `ScheduleChanges`,
+  `BookingsChanges`, upload rules and the example's push audience in their features' `_access.dart`.
+  Migration note: `docs/migrations/2026-09-30-feature-import-graph.md`. In the example,
+  `BookSession` takes the spot first (`ScheduleChanges.takeSpot` locks the session and refuses a
+  missing or full one) and then checks the start and a spot already held, so a full session that
+  already started is refused as full rather than as started.
+
 ## 0.23.0
 
 - **BREAKING: `dartway check` holds the shared package to the server's features, and file length

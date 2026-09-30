@@ -2,8 +2,8 @@ import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/chat/chat_objects.dart';
 import 'package:dartway_example_server/src/chat/logic/chat_lookups.dart';
-import 'package:dartway_example_server/src/core/call_context.dart';
 import 'package:dartway_example_server/src/core/channels.dart';
+import 'package:dartway_example_server/src/profile/profile_access.dart';
 import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
@@ -18,7 +18,7 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 final chatHandlers = <DwCallHandler>[
   /// The chat channels, by title. Staff only.
   DwCallHandler.list<ListChatChannels, ChatChannel>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, request) async => [
       for (final row in await ctx.db.chatChannels.find(
         orderBy: (t) => [t.title.asc(), t.id.asc()],
@@ -29,7 +29,7 @@ final chatHandlers = <DwCallHandler>[
 
   /// The caller's read state of every channel. Staff only.
   DwCallHandler.list<ListMyChatReadStates, ChatReadState>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, request) async =>
         ChatObjects.readStates(ctx.db, (await ctx.profile).id),
   ),
@@ -37,7 +37,7 @@ final chatHandlers = <DwCallHandler>[
   /// A window over a channel's messages, deleted ones left out. Staff only; a
   /// channel that does not exist is `dw.notFound`.
   DwCallHandler.window<ListChatMessages, ChatMessage, DateTime, int>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, request, window) async {
       final position = window.position;
       final older = window.direction == DwWindowDirection.older;
@@ -75,7 +75,7 @@ final chatHandlers = <DwCallHandler>[
 
   /// A channel's pinned messages, newest first. Staff only.
   DwCallHandler.list<ListPinnedChatMessages, ChatMessage>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, request) async {
       final rows = await ctx.db.chatMessages.find(
         where: (t) =>
@@ -91,7 +91,7 @@ final chatHandlers = <DwCallHandler>[
 
   /// A channel's messages whose text or author matches the query. Staff only.
   DwCallHandler.list<ListChatMessagesMatching, ChatMessage>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, request) async {
       // LIKE's own characters in what was typed are matched literally.
       final pattern =
@@ -123,7 +123,7 @@ final chatHandlers = <DwCallHandler>[
   /// Moves the caller's read position forward to a message. Staff only;
   /// published to the caller's other devices.
   DwCallHandler.command<MarkChatRead, ChatReadState>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final message = await ctx.db.chatMessages.findById(command.messageId);

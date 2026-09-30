@@ -19,6 +19,7 @@ const dwServerFeatureFileKinds = [
   'jobs',
   'access',
   'routes',
+  'changes',
 ];
 
 /// The one subfolder a server feature may have.

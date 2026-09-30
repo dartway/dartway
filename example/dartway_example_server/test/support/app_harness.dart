@@ -48,10 +48,10 @@ final class AppHarness {
         clock: clock,
         auth: DwAuthConfig(
           accountDeletion: DwAccountDeletion.byMember,
-          normalize: AppAuth.config.normalize,
-          onAccountCreated: AppAuth.config.onAccountCreated,
-          onIdentifierChanged: AppAuth.config.onIdentifierChanged,
-          onAccountDeleting: AppAuth.config.onAccountDeleting,
+          normalize: AccountAuth.config.normalize,
+          onAccountCreated: AccountAuth.config.onAccountCreated,
+          onIdentifierChanged: AccountAuth.config.onIdentifierChanged,
+          onAccountDeleting: AccountAuth.config.onAccountDeleting,
           deliverCode: (ctx, kind, identifier, code, accountId) async =>
               harness.delivered[identifier] = code,
         ),
@@ -70,13 +70,13 @@ final class AppHarness {
         protocol: DwWireProtocol(const []),
         migrations: appMigrations,
         database: database.config,
-        auth: AppAuth.config,
+        auth: AccountAuth.config,
         features: const [],
         files: DwFileStorage(
           storage,
           // The club's own rules hold a private purpose (chat attachments),
           // and nothing else is needed for it.
-          rules: AppFiles.uploadRules,
+          rules: DartwayExampleServer.uploadRules,
         ),
       ),
     );
@@ -138,7 +138,7 @@ final class AppHarness {
     final session = (await member.client.command(
       DwVerifyCode(
         ticketId: ticket.valueOrThrow.id,
-        code: delivered[AppAuth.normalizePhone(phone)]!,
+        code: delivered[AccountAuth.normalizePhone(phone)]!,
         registration: {'firstName': firstName, 'marketing': '$marketing'},
       ),
     )).valueOrThrow;

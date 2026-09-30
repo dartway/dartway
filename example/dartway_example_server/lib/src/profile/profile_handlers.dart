@@ -1,6 +1,6 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
-import 'package:dartway_example_server/src/core/call_context.dart';
+import 'package:dartway_example_server/src/profile/profile_access.dart';
 import 'package:dartway_example_server/src/profile/profile_objects.dart';
 import 'package:dartway_example_server/src/profile/profile_publications.dart';
 import 'package:dartway_example_server/src/profile/profile_rows.dart';

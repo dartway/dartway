@@ -3,21 +3,31 @@
 The DartWay example server — a fitness club — on `dartway_core_server`. How to
 run it, seed it and test it: `../README.md`.
 
-- `lib/src/core/` — the server-wide wiring, fixed names, `App*` classes:
-  - `auth.dart` — `AppAuth`: sign-in by phone and code, the profile a new
-    account starts with, the tombstone a deleted one leaves
-  - `bootstrap.dart` — `AppBootstrap`: the first administrator
-  - `call_context.dart` — `AppCallContext` (`ctx.profile`) and `AppAccess`
+- `lib/dartway_example_server.dart` — the server: the features, the sign-in
+  hooks, every upload purpose's rule (`uploadRules`) and who reads a private
+  file (`canReadFile`)
+- `lib/src/core/` — what every feature imports, and which imports no feature;
+  fixed names, `App*` classes:
   - `channels.dart` — `AppChannels`: the channels handlers publish to
-  - `files.dart` — `AppFiles`: every upload rule, who reads a private file,
-    the storage configuration
+  - `environment.dart` — `AppEnvironment`: the configuration, read once
+  - `files.dart` — `AppFiles`: the storage's default bucket names
   - `push.dart` — `AppPush`: push notification wiring
-- `lib/src/<feature>/` — one folder per area (`admin/`, `bookings/`, `chat/`,
-  `content/`, `profile/`, `schedule/`), every file `<feature>_*.dart`:
-  `_feature` (its `DwServerFeature`: handlers, channel rules, jobs), `_rows`
-  (row classes, generated tables in `*.dw.dart`), `_handlers` (one per request
-  and command, with its access rule), `_objects` (rows → data objects),
-  `_publications` (what a change is published as, and to whom), `_jobs`
+- `lib/src/<feature>/` — one folder per area (`account/`, `admin/`,
+  `bookings/`, `chat/`, `content/`, `profile/`, `schedule/`), every file
+  `<feature>_*.dart`: `_feature` (its `DwServerFeature`: handlers, channel
+  rules, jobs), `_rows` (row classes, generated tables in `*.dw.dart`),
+  `_handlers` (one per request and command, with its access rule), `_access`
+  (whose row it is, who may upload and read its files), `_objects` (rows →
+  data objects), `_publications` (what a change is published as, and to
+  whom), `_changes` (how another feature writes its rows), `_jobs`.
+  `profile/profile_access.dart` is `ProfileCallContext` (`ctx.profile`) and
+  `ProfileAccess`, `profile/profile_changes.dart` the profile a new account
+  starts with and the tombstone a deleted one leaves; `account/` is
+  `AccountAuth` (sign-in by phone and code, and what an account's deletion
+  cancels through `BookingsChanges`) and the first administrator. Features
+  import each other without cycles, and only another's `_rows`, `_access`,
+  `_objects`, `_publications` and `_changes`; a booking takes a session's
+  spot through `ScheduleChanges`, never by writing `club_session`
 - `lib/src/migrations/` — migrations, written by `bin/migrate.dart create`
 - `bin/server.dart` · `bin/migrate.dart` · `bin/seed_dev.dart`
 
@@ -26,8 +36,9 @@ run it, seed it and test it: `../README.md`.
 Uploads go from the app straight to an S3-compatible storage in two buckets:
 a **public** one, whose objects anyone reads by URL (the avatar), and a
 **private** one, read only through short presigned links after the read rule
-(`AppFiles.canRead`). A rule's visibility picks the bucket; a new purpose is a
-new rule in `lib/src/core/files.dart` and nothing else.
+(`DartwayExampleServer.canReadFile`). A rule's visibility picks the bucket; a
+new purpose is a new rule in the `_access.dart` of the feature it belongs to,
+listed in `DartwayExampleServer.uploadRules`.
 
 Without `DW_STORAGE_ENDPOINT` the server runs without uploads. For development,
 a local RustFS:

@@ -43,9 +43,10 @@ my_app_shared/
   lib/generated/dw_protocol.dart the protocol registry — generated
   lib/src/
     profile.dart, admin.dart,    one file per feature of the server, named after its folder:
-    settings.dart                data objects, requests and commands, and the rules both sides
-                                 apply (profile.dart: the identifier's one form, the sign-up
-                                 keys); each with its generated *.dw.dart part
+    settings.dart, account.dart  data objects, requests and commands, and the rules both sides
+                                 apply (account.dart: the identifier's one form, the sign-up
+                                 keys); each with its generated *.dw.dart part when it
+                                 declares data objects
     my_app_channel.dart          enum MyAppChannel with DwChannelKind — the live channels
     my_app_refusal.dart          enum MyAppRefusal with DwRefusalCodes — why the server says no
     my_app_upload.dart           enum MyAppUpload with DwUploadPurpose — what a file is for
@@ -82,16 +83,16 @@ my_app_server/
   bin/migrate.dart         apply | rollback | status | create <name> | check | rehash
   bin/seed_dev.dart        development accounts and data; refuses to run twice
   lib/my_app_server.dart   builds the DwAppServer: protocol, schema, migrations, auth,
-                           the features, files
+                           the features, every upload purpose's rule — the one file
+                           that sees every feature
   lib/generated/
     dw_schema.dart         the schema and the db.<table> getters — generated
   lib/src/
-    core/                  the server-wide wiring: fixed names, App* classes
-      auth.dart            DwAuthConfig: code delivery, the profile made with each account
-      call_context.dart    what "the caller" means to this app: ctx.profile, the access rules
+    core/                  what every feature imports, and which imports no feature:
+                           fixed names, App* classes
       channels.dart        the channels handlers publish to
-      files.dart           one DwUploadRule per upload purpose
-      bootstrap.dart       the admin role granted to the first administrator (DwFirstAdministrator)
+      environment.dart     the configuration, read once at start
+      files.dart           the storage's default bucket names
     migrations/            migrations.dart and one file per migration — written by
                            migrate.dart create, then yours
     profile/               a feature: everything of one area of the app, in one folder
@@ -103,7 +104,17 @@ my_app_server/
       profile_jobs.dart    its job kinds and definitions, when it has jobs
       profile_access.dart  its access rules, when they outgrow the handlers
       profile_routes.dart  its DwHttpRoute doors, when it has them
+      profile_changes.dart how another feature writes its rows — the one place their
+                           invariants are kept, a change published through its own
+                           publications
       logic/               everything else the feature needs, flat, when it needs it
+    profile/               in the skeleton, the sink every feature imports: its
+                           profile_access.dart is what "the caller" means to this app
+                           (ctx.profile, the role rules, the avatar's upload rule), its
+                           profile_changes.dart every write of a profile from outside
+    account/               the feature at the top: the sign-in hooks (logic/auth.dart —
+                           code delivery, the profile made with each account) and the
+                           first administrator, made at every start
     admin/, settings/      the skeleton's other features, the same shape
   test/                    acceptance tests on a real server, database and storage
   docker-compose.yaml      development Postgres and RustFS
@@ -124,7 +135,7 @@ writes and reads migrations by that path.
 project. A feature folder `<feature>/` holds:
 
 - files named `<feature>_<kind>.dart`, the kind one of `feature`, `rows`, `handlers`, `objects`,
-  `publications`, `jobs`, `access`, `routes` — exactly one `<feature>_feature.dart`, the rest when the
+  `publications`, `jobs`, `access`, `routes`, `changes` — exactly one `<feature>_feature.dart`, the rest when the
   feature has them;
 - `<feature>_<part>_<kind>.dart` when a kind outgrows one file — `orders_refunds_handlers.dart` beside
   `orders_handlers.dart`. This is the only way a feature splits;
@@ -163,6 +174,35 @@ but `const`s, each a row draft or a collection of drafts for a `DwSeedRows` step
 hundreds of rows sits in a `<feature>_<part>_rows.dart` of its own. Tests are not
 measured; a long one splits by scenario (`<feature>_<scenario>_acceptance_test.dart`).
 
+**Features import each other one way, through a surface, and write only their own rows** — four
+errors of `dart run dartway_cli:dartway check`,
+so that "who defines this" has one answer:
+
+- **`core/` imports no feature** (`coreImportsFeature`). Every feature imports `core/`; a feature
+  `core/` imported would be imported by every feature, itself included. So who the caller is —
+  `ctx.profile` and the role rules — is the profile feature's (`profile/profile_access.dart`), each
+  upload purpose's rule is in the `_access.dart` of the feature it belongs to, and the sign-in hooks
+  are `account/`, the one feature above those an account's life touches. `lib/my_app_server.dart`
+  assembles them and is not judged; nothing under `src/` imports it.
+- **No cycles** (`featureImportCycle`), counting every import. Two features that import each other
+  are one feature in two folders: neither can be read, tested or removed alone, and a rule each
+  needs from the other ends up written in both — a project that grew that way had chat membership
+  defined in four places. The profile is the graph's sink: every feature asks who the caller is,
+  so the profile imports no other feature.
+- **A feature imports another only through its surface** (`featureImportOutsideSurface`): its
+  `_rows` (to read and join its tables), its `_access` (its rules — whose row, who is a member, one
+  function per concept), its `_objects` (its rows as it shows them), its `_publications` (its
+  changes as it announces them) and its `_changes` (its rows written the one way that keeps their
+  invariants), and their `<part>` files. Never its `_feature`, `_handlers`, `_jobs`, `_routes` or
+  `logic/`: those run the feature, and another feature running them is where a concept gets a
+  second definition.
+- **A row is written only by the feature that owns its invariants** (`foreignRowWrite`). Its
+  `_rows` are read by anyone who imports them, but `ctx.db.<table>.insert`, `update`, `delete`,
+  `upsert` of another feature's table fails, from a feature or from `core/`: the writer calls the
+  owner's `_changes` instead. The skeleton's admin panel changes a role through
+  `ProfileChanges.changeRole`, and its sign-in hook creates the profile through
+  `ProfileChanges.create`: one definition of a valid profile.
+
 **A row is not a data object.** `UserProfileRow` is a table; `UserProfile` is what a client receives.
 The server builds one from the other in `profile_objects.dart` — the profile's phone and e-mail come from
 the framework's identities, its photo URL from the file store — so a column added for the server's
@@ -170,7 +210,7 @@ own use never reaches a client by accident.
 
 **Accounts are the framework's, profiles are yours.** The framework keeps accounts, sign-in identifiers
 and session keys in its own tables; `UserProfileRow` references the account and is created in the
-same transaction, by `onAccountCreated` in `auth.dart`. A signed-in account without a profile cannot
+same transaction, by `onAccountCreated` in `account/logic/auth.dart`. A signed-in account without a profile cannot
 exist, and nothing about who a person is to your app lives in the framework.
 
 ## `my_app_flutter` — where the app is

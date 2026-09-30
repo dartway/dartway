@@ -1,11 +1,12 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/bookings/bookings_changes.dart';
 import 'package:dartway_example_server/src/bookings/bookings_jobs.dart';
 import 'package:dartway_example_server/src/bookings/bookings_objects.dart';
 import 'package:dartway_example_server/src/bookings/bookings_publications.dart';
 import 'package:dartway_example_server/src/bookings/bookings_rows.dart';
-import 'package:dartway_example_server/src/core/call_context.dart';
-import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
+import 'package:dartway_example_server/src/profile/profile_access.dart';
+import 'package:dartway_example_server/src/schedule/schedule_changes.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
 final bookingsHandlers = <DwCallHandler>[
@@ -26,26 +27,22 @@ final bookingsHandlers = <DwCallHandler>[
     },
   ),
 
-  /// Books the caller onto a session. Any signed-in member; refused once the
-  /// session started, when it is full, or when they already hold a spot.
+  /// Books the caller onto a session. Any signed-in member; refused when the
+  /// session is full, once it started, or when they already hold a spot — in
+  /// that order.
   /// Publishes the session's spots and the booking, and queues a reminder.
   DwCallHandler.command<BookSession, SessionBooking>(
     access: DwAccessRule.signedIn,
     handle: (ctx, command) async {
       final me = await ctx.profile;
-      // The session row is the lock every booking of it queues on: the count
-      // and the insert below cannot interleave with another member's.
-      final session = await ctx.db.clubSessions.findById(
-        command.sessionId,
-        lock: DwRowLock.forUpdate,
-      );
-      if (session == null) ctx.refuse(DwCoreRefusal.notFound);
+      // Taking the spot locks the session row, the lock every booking of it
+      // queues on: the checks and the insert below cannot interleave with
+      // another member's. A refusal after it rolls the spot back, and nothing
+      // it published is sent.
+      final session = await ScheduleChanges.takeSpot(ctx, command.sessionId);
       final now = ctx.now;
       if (session.startsAt.isBefore(now)) {
         ctx.refuse(DartwayExampleRefusal.sessionStarted);
-      }
-      if (session.bookedCount >= session.capacity) {
-        ctx.refuse(DartwayExampleRefusal.noSpotsLeft);
       }
       final alreadyBooked = await ctx.db.sessionBookings.exists(
         where: (t) =>
@@ -63,9 +60,6 @@ final bookingsHandlers = <DwCallHandler>[
           createdAt: now,
         ),
       );
-      final updated = await ctx.db.clubSessions.update(
-        session.copyWith(bookedCount: session.bookedCount + 1),
-      );
       // Joins this transaction: a refused or failed booking queues nothing.
       // A session closer than the lead is reminded of right away.
       await ctx.jobs.enqueue(
@@ -74,7 +68,12 @@ final bookingsHandlers = <DwCallHandler>[
         runAt: session.startsAt.subtract(BookingsJobs.reminderLead),
         key: BookingsJobs.remindKey(booking.id),
       );
-      return BookingsPublications.bookingAndSession(ctx, booking, updated, me);
+      return BookingsPublications.booking(
+        ctx,
+        booking,
+        client: me,
+        session: session,
+      );
     },
   ),
 
@@ -96,28 +95,13 @@ final bookingsHandlers = <DwCallHandler>[
       if (booking.status != BookingStatus.booked) {
         ctx.refuse(DartwayExampleRefusal.bookingNotActive);
       }
-      final session = (await ctx.db.clubSessions.findById(
-        booking.sessionId,
-        lock: DwRowLock.forUpdate,
-      ))!;
-      final cancelled = await ctx.db.sessionBookings.update(
-        booking.copyWith(status: BookingStatus.cancelled),
-      );
-      final updated = await ctx.db.clubSessions.update(
-        session.copyWith(bookedCount: session.bookedCount - 1),
-      );
-      return BookingsPublications.bookingAndSession(
-        ctx,
-        cancelled,
-        updated,
-        me,
-      );
+      return BookingsChanges.cancel(ctx, booking, client: me);
     },
   ),
 
   /// Marks an active booking attended. Staff only; published to the member.
   DwCallHandler.command<MarkAttended, SessionBooking>(
-    access: AppAccess.staff,
+    access: ProfileAccess.staff,
     handle: (ctx, command) async {
       final booking = await ctx.db.sessionBookings.findById(
         command.bookingId,

@@ -53,7 +53,10 @@ Future<void> main() async {
     database: env.server.database,
     storage: storage,
     port: env.server.port,
-    push: AppPush.module(providers: AppPush.providers(env.push)),
+    push: AppPush.module(
+      providers: AppPush.providers(env.push),
+      eligibility: ProfileAccess.pushEligibility,
+    ),
     settings: DwServerSettings(allowedOrigins: env.server.allowedOrigins),
     adminIdentifier: env.server.adminIdentifier,
   );

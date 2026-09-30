@@ -93,6 +93,12 @@ when there is none.
 
 ## Who receives it, and when: eligibility
 
+The rule reads the project's own rows — a consent on the profile, a member's notification settings —
+so it belongs to the feature that owns them, in its `_access.dart`; `core/` imports no feature, and
+the project's push module takes it as a required parameter (the example's
+`AppPush.module(eligibility: ProfileAccess.pushEligibility)`): a module built without it would send
+news to members who never agreed to it.
+
 ```dart
 Future<Map<int, DwPushDecision>> appPushEligibility(
   DwCallContext ctx,
@@ -219,7 +225,12 @@ and RuStore's send API, records what it was sent and answers what the test says.
 
 ```dart
 final fcm = await DwFakePushService.start();
-final server = await DwTestServer.start(buildServer(push: AppPush.module(providers: [fcm.fcmProvider()])));
+final server = await DwTestServer.start(buildServer(
+  push: AppPush.module(
+    providers: [fcm.fcmProvider()],
+    eligibility: ProfileAccess.pushEligibility,
+  ),
+));
 // ...
 fcm.answer = (send) => DwFakePushAnswer.fcmError(404, 'NOT_FOUND', 'Requested entity was not found.', fcmCode: 'UNREGISTERED');
 ```

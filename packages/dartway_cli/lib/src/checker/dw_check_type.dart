@@ -127,7 +127,7 @@ enum DwCheckType {
   /// A file or folder inside a server feature outside its closed set:
   /// `<feature>_<kind>.dart` or `<feature>_<part>_<kind>.dart` with kind one
   /// of `feature`, `rows`, `handlers`, `objects`, `publications`, `jobs`,
-  /// `access`, `routes`, and one flat `logic/` subfolder for everything else —
+  /// `access`, `routes`, `changes`, and one flat `logic/` subfolder for everything else —
   /// no folders inside it, and no kind-suffixed file. A layer name (`domain/`, `rows/`, `services/`, …) is
   /// refused at any depth of `lib/src/`, `core/` included.
   ///
@@ -417,7 +417,38 @@ enum DwCheckType {
   /// folders named after nothing on the server, one feature's data objects
   /// in another's file — so where a feature's contract lives had as many
   /// answers as projects.
-  invalidSharedLayout;
+  invalidSharedLayout,
+
+  /// Server features importing one another in a cycle — every import counts,
+  /// within the surface or not (dartway/dartway#382). Two features that
+  /// import each other are one feature in two folders: neither is read,
+  /// tested or removed alone, and a rule each needs from the other ends up
+  /// written in both. The finding prints a shortest cycle, with the import
+  /// that makes each step.
+  featureImportCycle,
+
+  /// A file of the server's `core/` importing a feature (#382). Every
+  /// feature imports `core/`, so a feature `core/` imports is imported by
+  /// every feature, itself included: what the caller is and its rules are
+  /// the profile feature's `_access`, the sign-in hooks a feature above the
+  /// ones they touch.
+  coreImportsFeature,
+
+  /// A server feature importing another's file outside its surface — its
+  /// `_rows`, `_access`, `_objects`, `_publications` and `_changes` (#382). Its
+  /// `_feature`, `_handlers`, `_jobs`, `_routes` and `logic/` run it, and a
+  /// second feature running them is where a concept gets two definitions.
+  /// A file under `lib/src/` importing the package's library is one too.
+  featureImportOutsideSurface,
+
+  /// A write — `<handle>.<table>.insert`, `update`, `delete`, `upsert` and
+  /// their siblings, through `ctx.db`, a transaction's handle or any other —
+  /// into a table whose row class another feature declares, from
+  /// a feature or from `core/` (#382). A row lives with the feature that owns
+  /// its invariants, and every other writer goes through that feature's
+  /// `_changes`: a second writer is a second definition of what a valid row
+  /// is, and the first to drift.
+  foreignRowWrite;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///

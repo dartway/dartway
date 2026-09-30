@@ -15,7 +15,7 @@ final appProtocol = DwWireProtocol(dwAnalyticsProtocolEntries, include: shopProt
 // server: who reads reports and dashboards is the project's rule
 DwAppServer(
   protocol: appProtocol,
-  modules: [DwAnalyticsModule(readAccess: AppAccess.admin)],
+  modules: [DwAnalyticsModule(readAccess: ProfileAccess.admin)],
   ...,
 );
 
@@ -148,8 +148,8 @@ The framework knows accounts, not roles, so the rule is the project's:
 
 ```dart
 DwAnalyticsModule(
-  readAccess: AppAccess.admin,      // reports, the catalog, the dashboard list
-  editAccess: AppAccess.admin,      // saving and deleting dashboards; readAccess when omitted
+  readAccess: ProfileAccess.admin,      // reports, the catalog, the dashboard list
+  editAccess: ProfileAccess.admin,      // saving and deleting dashboards; readAccess when omitted
 )
 ```
 
