@@ -521,21 +521,35 @@ void main() {
         expect(location(router), '/vault');
       });
 
-      testWidgets('a change that leaves the value equal does not re-run the '
-          'guards', (tester) async {
-        final router = vaultRouter(initialLocation: '/vault');
-        await tester.pumpWidget(
-          MaterialApp.router(routerConfig: router.router),
-        );
-        await tester.pumpAndSettle();
-        final asked = vaultTargets.length;
+      testWidgets(
+        'a change that leaves the value equal does not re-run the guards; '
+        'one that changes it does',
+        (tester) async {
+          signIn(1);
+          final router = vaultRouter(initialLocation: '/vault');
+          await tester.pumpWidget(
+            MaterialApp.router(routerConfig: router.router),
+          );
+          await tester.pumpAndSettle();
+          expect(location(router), '/vault');
+          final asked = vaultTargets.length;
+          expect(asked, greaterThan(0));
 
-        // The session is set to what it already is: the derived record is
-        // equal, so the router is not told anything changed.
-        signOut();
-        await tester.pumpAndSettle();
-        expect(vaultTargets.length, asked);
-      });
+          // Another account signs in: the session changed, but the record the
+          // guards decide by is equal, so the router is not told.
+          signIn(2);
+          await tester.pumpAndSettle();
+          expect(container.read(sessionProvider), 2);
+          expect(vaultTargets.length, asked);
+
+          // Positive control: signing out changes the record, the guards run
+          // again and send the person to sign-in.
+          signOut();
+          await tester.pumpAndSettle();
+          expect(vaultTargets.length, greaterThan(asked));
+          expect(location(router), '/sign-in?from=%2Fvault');
+        },
+      );
 
       test('the router is disposed with the provider that built it', () {
         final router = vaultRouter(initialLocation: '/vault');
