@@ -135,11 +135,34 @@ flight, and the position has moved past where playback started or the last seek 
   the app's: its fullscreen page sets them if it wants them hidden.
 - **The mini-player is mounted once, at the root** — `DwMiniPlayerHost(sessionManager:,
   builder:, onExpand:)` in `MaterialApp.builder`. It shows the active session while
-  `session.minimized` is true, drags, pinches within its scale bounds and snaps to a side; the
+  `session.minimized` is true; the
   `builder` draws it, and `onExpand(item)` navigates to the app's own player page — the package
   has no opinion on routes. The player page calls `session.minimize()` when it goes and
   `session.restore()` when it comes back, both safe from `initState`/`dispose`. It sits above the
   navigator, where there is no overlay: its buttons cannot carry tooltips.
+- **The mini-player stays where it is let go.** A drag moves it inside the visible area — the
+  viewport less the system padding — and it stays there; `miniPlayerSnapToEdges` settles it on an
+  edge instead. A free player is what a person expects of a window they moved; snapping suits a
+  phone layout that wants the content uncovered, and is one setting away. When the window shrinks
+  the player is pushed in, but the place it was put is kept: growing the window brings it back.
+- **Its size is a width**; the height follows the video's own aspect ratio, so the picture is never
+  letterboxed or stretched — 240 wide at first, between 160 and 60 % of the viewport, so on a
+  375 px phone it still resizes from 160 to 225. A pinch resizes it, and so — while a mouse, or a
+  stylus that hovers, is connected (`miniPlayerResize: pointer`; Flutter's `MouseTracker` counts
+  both) — does dragging the handle in the corner opposite the one it is
+  anchored to: in the right half of the screen it is anchored right, so the handle is on its left,
+  and the anchored corner stays put while the handle follows the pointer. A touch screen has no
+  handle by default — a corner the size of a fingertip would swallow the chrome's buttons.
+  Position and size live in the host, so they survive route changes and the player hiding and
+  showing again. While a resize runs the cursor is the resize one over the whole player, its
+  buttons included; outside the player it is not held. For a screen reader the handle's increase
+  and decrease actions step the width by the same rule as the drag — an action that would change
+  nothing is not offered; its label is the app's, `DwMiniPlayerHost(resizeHandleLabel:)`.
+- **The chrome is the app's, handle included.** The host owns the handle's square (a press in it
+  resizes and never reaches the chrome) and the cursor over it; the mark the person sees is drawn
+  by the chrome, at `DwMiniPlayerHost.resizeCornerOf(context)` — `null` while there is no handle —
+  which is also how the chrome keeps its own buttons off that corner. The example's chrome puts a
+  scrim under its controls so they read over a light frame.
 - `DwVideoSurface(session:)` draws the current video at its own aspect ratio — the one widget the
   package draws, a texture with no chrome.
 
@@ -217,10 +240,12 @@ The package's tests cover every row, default against changed, in
 | `fullscreenTransitionBuilder` | `null` (a fade) | the fullscreen route's transition |
 | `fallbackAspectRatio` | 16 / 9 | the ratio `DwVideoSurface` keeps while a video reports no size |
 | `miniPlayer` | `true` | whether `minimize()` hands the session to the mini-player |
-| `miniPlayerInitialSize` | 160 × 90 | the mini-player's size before any pinch |
+| `miniPlayerInitialWidth` | 240 | the mini-player's width before any resize, held within the bounds below; the height follows the video's ratio |
 | `miniPlayerInitialAlignment` | bottom right | where it first appears |
-| `miniPlayerMinScale` / `miniPlayerMaxScale` | 0.75 / 2.0 | pinch bounds, in multiples of the initial size |
-| `miniPlayerSnapToEdges` | `true` | a released mini-player settles on an edge |
+| `miniPlayerMinWidth` / `miniPlayerMaxWidthFraction` | 160 / 0.6 | resize bounds: a width in pixels, and a fraction of the viewport width (never under the minimum, never past the viewport) |
+| `miniPlayerResize` | `pointer` | a pinch, plus a corner handle while a mouse or a hovering stylus is connected; `always` shows the handle on touch too, `never` turns resizing off |
+| `miniPlayerResizeHandleExtent` | 32 | the side of the handle's square, in logical pixels |
+| `miniPlayerSnapToEdges` | `false` | a released mini-player settles on an edge; off, it stays where it was released |
 | `miniPlayerSnapEdges` | `horizontal` | which edges: the nearer side (`horizontal`) or the nearest of four (`all`) |
 | `miniPlayerSnapThreshold` | infinite | how close to that edge, in logical pixels, it must be released to settle |
 | `miniPlayerCloseStopsPlayback` | `true` | its close ends the session; off, it pauses and hides it (reachable by opening its item, ended by the next other open) |

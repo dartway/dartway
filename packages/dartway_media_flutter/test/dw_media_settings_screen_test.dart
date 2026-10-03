@@ -2,6 +2,7 @@
 // each shows the default and what turning it off or changing it does. The
 // table in docs/3-flutter/media.md lists the same settings.
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -449,6 +450,12 @@ void main() {
   const chrome = Key('chrome');
   const close = Key('close');
 
+  /// What `DwMiniPlayerHost.resizeCornerOf` told the chrome last time it
+  /// built.
+  Alignment? corner;
+  Alignment? cornerOf(WidgetTester tester) => corner;
+  setUp(() => corner = null);
+
   Future<(DwMediaSession, List<DwMediaItem>)> pumpMiniPlayer(
     WidgetTester tester, {
     DwMediaConfig config = const DwMediaConfig(),
@@ -463,19 +470,22 @@ void main() {
             DwMiniPlayerHost(
               sessionManager: manager,
               onExpand: expanded.add,
-              builder: (context, session, expand, onClose) => GestureDetector(
-                onTap: expand,
-                child: Container(
-                  key: chrome,
-                  color: const Color(0xFF000000),
-                  alignment: Alignment.topRight,
-                  child: GestureDetector(
-                    behavior: HitTestBehavior.opaque,
-                    onTap: onClose,
-                    child: const SizedBox(key: close, width: 20, height: 20),
+              builder: (context, session, expand, onClose) {
+                corner = DwMiniPlayerHost.resizeCornerOf(context);
+                return GestureDetector(
+                  onTap: expand,
+                  child: Container(
+                    key: chrome,
+                    color: const Color(0xFF000000),
+                    alignment: Alignment.topRight,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: onClose,
+                      child: const SizedBox(key: close, width: 20, height: 20),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             ),
           ],
         ),
@@ -518,19 +528,21 @@ void main() {
     });
   });
 
-  group('miniPlayerInitialSize', () {
-    testWidgets('160×90 (default)', (tester) async {
+  group('miniPlayerInitialWidth', () {
+    testWidgets('240 (default), the height from the video\'s 16:9', (
+      tester,
+    ) async {
       final (session, _) = await pumpMiniPlayer(tester);
-      expect(tester.getSize(find.byKey(chrome)), const Size(160, 90));
+      expect(tester.getSize(find.byKey(chrome)), const Size(240, 135));
       await endSession(tester, session);
     });
 
-    testWidgets('240×135', (tester) async {
+    testWidgets('320', (tester) async {
       final (session, _) = await pumpMiniPlayer(
         tester,
-        config: const DwMediaConfig(miniPlayerInitialSize: Size(240, 135)),
+        config: const DwMediaConfig(miniPlayerInitialWidth: 320),
       );
-      expect(tester.getSize(find.byKey(chrome)), const Size(240, 135));
+      expect(tester.getSize(find.byKey(chrome)), const Size(320, 180));
       await endSession(tester, session);
     });
   });
@@ -554,7 +566,33 @@ void main() {
     });
   });
 
-  group('miniPlayerMinScale / miniPlayerMaxScale', () {
+  /// Two fingers on the player, spread wide or pinched tight.
+  Future<void> pinchPlayer(WidgetTester tester, {required bool spread}) async {
+    final center = tester.getCenter(find.byKey(chrome));
+    final gap = spread ? 20.0 : 60.0;
+    final first = await tester.startGesture(
+      center - Offset(gap, 0),
+      pointer: 1,
+    );
+    final second = await tester.startGesture(
+      center + Offset(gap, 0),
+      pointer: 2,
+    );
+    await tester.pump();
+    // In steps: the recognizer takes its starting span only once the
+    // pointers have moved past the slop.
+    final step = (spread ? 300.0 : -55.0) / 10;
+    for (var i = 0; i < 10; i++) {
+      await first.moveBy(Offset(-step, 0));
+      await second.moveBy(Offset(step, 0));
+      await tester.pump();
+    }
+    await first.up();
+    await second.up();
+    await tester.pump();
+  }
+
+  group('miniPlayerMinWidth / miniPlayerMaxWidthFraction', () {
     Future<Size> pinch(
       WidgetTester tester,
       DwMediaConfig config, {
@@ -564,75 +602,169 @@ void main() {
         tester,
         config: DwMediaConfig(
           miniPlayerInitialAlignment: Alignment.center,
-          miniPlayerSnapToEdges: false,
-          miniPlayerMinScale: config.miniPlayerMinScale,
-          miniPlayerMaxScale: config.miniPlayerMaxScale,
+          miniPlayerInitialWidth: 320,
+          miniPlayerMinWidth: config.miniPlayerMinWidth,
+          miniPlayerMaxWidthFraction: config.miniPlayerMaxWidthFraction,
         ),
       );
-      final center = tester.getCenter(find.byKey(chrome));
-      final gap = spread ? 20.0 : 60.0;
-      final first = await tester.startGesture(
-        center - Offset(gap, 0),
-        pointer: 1,
-      );
-      final second = await tester.startGesture(
-        center + Offset(gap, 0),
-        pointer: 2,
-      );
-      await tester.pump();
-      // In steps: the recognizer takes its starting span only once the
-      // pointers have moved past the slop.
-      final step = (spread ? 300.0 : -55.0) / 10;
-      for (var i = 0; i < 10; i++) {
-        await first.moveBy(Offset(-step, 0));
-        await second.moveBy(Offset(step, 0));
-        await tester.pump();
-      }
-      await first.up();
-      await second.up();
-      await tester.pump();
+      await pinchPlayer(tester, spread: spread);
       final size = tester.getSize(find.byKey(chrome));
       await endSession(tester, session);
       return size;
     }
 
-    testWidgets('max 2 (default): a wide spread stops at twice the size', (
-      tester,
-    ) async {
+    testWidgets('max 0.6 (default): a wide spread stops at 60 % of the '
+        '800 px viewport', (tester) async {
       expect(
         await pinch(tester, const DwMediaConfig(), spread: true),
-        const Size(320, 180),
-      );
-    });
-
-    testWidgets('max 3: the same spread grows to three times', (tester) async {
-      expect(
-        await pinch(
-          tester,
-          const DwMediaConfig(miniPlayerMaxScale: 3),
-          spread: true,
-        ),
         const Size(480, 270),
       );
     });
 
-    testWidgets('min 0.75 (default): a tight pinch stops at three quarters', (
+    testWidgets('max 0.5: the same spread stops at half', (tester) async {
+      expect(
+        await pinch(
+          tester,
+          const DwMediaConfig(miniPlayerMaxWidthFraction: 0.5),
+          spread: true,
+        ),
+        const Size(400, 225),
+      );
+    });
+
+    testWidgets('min 160 (default): a tight pinch stops at 160 px', (
       tester,
     ) async {
       expect(
         await pinch(tester, const DwMediaConfig(), spread: false),
-        const Size(120, 67.5),
+        const Size(160, 90),
       );
     });
 
-    testWidgets('min 0.5: the same pinch shrinks to half', (tester) async {
+    testWidgets('min 200: the same pinch stops at 200 px', (tester) async {
       expect(
         await pinch(
           tester,
-          const DwMediaConfig(miniPlayerMinScale: 0.5),
+          const DwMediaConfig(miniPlayerMinWidth: 200),
           spread: false,
         ),
-        const Size(80, 45),
+        const Size(200, 112.5),
+      );
+    });
+  });
+
+  group('miniPlayerResize', () {
+    // Bottom right by default: anchored there, the handle is its top left.
+    Future<Size> dragHandle(
+      WidgetTester tester, {
+      PointerDeviceKind kind = PointerDeviceKind.touch,
+    }) async {
+      final gesture = await tester.startGesture(
+        tester.getTopLeft(find.byKey(chrome)) + const Offset(6, 6),
+        kind: kind,
+      );
+      for (var i = 0; i < 10; i++) {
+        await gesture.moveBy(const Offset(-16, 0));
+        await tester.pump();
+      }
+      await gesture.up();
+      await tester.pump();
+      return tester.getSize(find.byKey(chrome));
+    }
+
+    testWidgets('pointer (default): no handle without a mouse — the corner '
+        'drags the player instead', (tester) async {
+      final (session, _) = await pumpMiniPlayer(tester);
+      expect(cornerOf(tester), isNull);
+      expect(await dragHandle(tester), const Size(240, 135));
+      expect(tester.getTopLeft(find.byKey(chrome)).dx, lessThan(560));
+      await endSession(tester, session);
+    });
+
+    testWidgets('pointer (default): with a mouse connected, the handle '
+        'resizes', (tester) async {
+      final (session, _) = await pumpMiniPlayer(tester);
+      expect(cornerOf(tester), isNull);
+      final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+      await mouse.addPointer(location: Offset.zero);
+      addTearDown(mouse.removePointer);
+      await tester.pump();
+      expect(cornerOf(tester), Alignment.topLeft);
+      expect(
+        await dragHandle(tester, kind: PointerDeviceKind.mouse),
+        const Size(400, 225),
+      );
+      expect(tester.getBottomRight(find.byKey(chrome)), const Offset(800, 600));
+      await endSession(tester, session);
+    });
+
+    testWidgets('always: the handle resizes under a finger too', (
+      tester,
+    ) async {
+      final (session, _) = await pumpMiniPlayer(
+        tester,
+        config: const DwMediaConfig(
+          miniPlayerResize: DwMiniPlayerResize.always,
+        ),
+      );
+      expect(await dragHandle(tester), const Size(400, 225));
+      await endSession(tester, session);
+    });
+
+    testWidgets('never: no handle, and a pinch keeps the width', (
+      tester,
+    ) async {
+      final (session, _) = await pumpMiniPlayer(
+        tester,
+        config: const DwMediaConfig(
+          miniPlayerResize: DwMiniPlayerResize.never,
+          miniPlayerInitialAlignment: Alignment.center,
+        ),
+      );
+      expect(cornerOf(tester), isNull);
+      await pinchPlayer(tester, spread: true);
+      expect(tester.getSize(find.byKey(chrome)), const Size(240, 135));
+      await endSession(tester, session);
+    });
+  });
+
+  group('miniPlayerResizeHandleExtent', () {
+    // A press 40 px in from the corner: outside the default square, inside
+    // a 48 px one.
+    Future<double> widthAfterDragAt40(
+      WidgetTester tester,
+      DwMediaConfig config,
+    ) async {
+      final (session, _) = await pumpMiniPlayer(
+        tester,
+        config: DwMediaConfig(
+          miniPlayerResize: DwMiniPlayerResize.always,
+          miniPlayerResizeHandleExtent: config.miniPlayerResizeHandleExtent,
+        ),
+      );
+      await tester.dragFrom(
+        tester.getTopLeft(find.byKey(chrome)) + const Offset(40, 40),
+        const Offset(-100, 0),
+      );
+      await tester.pump();
+      final width = tester.getSize(find.byKey(chrome)).width;
+      await endSession(tester, session);
+      return width;
+    }
+
+    testWidgets('32 (default): 40 px in, the press moves the player', (
+      tester,
+    ) async {
+      expect(await widthAfterDragAt40(tester, const DwMediaConfig()), 240);
+    });
+
+    testWidgets('48: 40 px in, the press resizes', (tester) async {
+      expect(
+        await widthAfterDragAt40(
+          tester,
+          const DwMediaConfig(miniPlayerResizeHandleExtent: 48),
+        ),
+        greaterThan(300),
       );
     });
   });
@@ -653,24 +785,25 @@ void main() {
       return left;
     }
 
-    testWidgets('on (default): released left of the middle, it goes back to '
-        'the left edge', (tester) async {
-      expect(await leftAfterDrag(tester, true), 0);
+    testWidgets('off (default): it stays where it was dropped', (tester) async {
+      expect(await leftAfterDrag(tester, false), greaterThan(50));
     });
 
-    testWidgets('off: it stays where it was dropped', (tester) async {
-      expect(await leftAfterDrag(tester, false), greaterThan(50));
+    testWidgets('on: released left of the middle, it goes back to the left '
+        'edge', (tester) async {
+      expect(await leftAfterDrag(tester, true), 0);
     });
   });
 
   group('miniPlayerSnapEdges / miniPlayerSnapThreshold', () {
-    // 800×600 screen, 160×90 player: dropped at (300, 20) it is 300 from the
-    // left, 340 from the right, 20 from the top, 490 from the bottom.
+    // 800×600 screen, 240×135 player: dropped at (250, 20) it is 250 from
+    // the left, 310 from the right, 20 from the top, 445 from the bottom.
     Future<Offset> dropped(WidgetTester tester, DwMediaConfig config) async {
       final (session, _) = await pumpMiniPlayer(
         tester,
         config: DwMediaConfig(
           miniPlayerInitialAlignment: Alignment.topLeft,
+          miniPlayerSnapToEdges: true,
           miniPlayerSnapEdges: config.miniPlayerSnapEdges,
           miniPlayerSnapThreshold: config.miniPlayerSnapThreshold,
         ),
@@ -679,7 +812,7 @@ void main() {
         tester.getCenter(find.byKey(chrome)),
       );
       for (var i = 0; i < 10; i++) {
-        await gesture.moveBy(const Offset(30, 2));
+        await gesture.moveBy(const Offset(25, 2));
         await tester.pump();
       }
       await gesture.up();
@@ -703,17 +836,17 @@ void main() {
         const DwMediaConfig(miniPlayerSnapEdges: DwMiniPlayerSnapEdges.all),
       );
       expect(at.dy, 0);
-      expect(at.dx, greaterThan(250));
+      expect(at.dx, greaterThan(200));
     });
 
-    testWidgets('a 100 px threshold: 300 px from the side, it stays', (
+    testWidgets('a 100 px threshold: 250 px from the side, it stays', (
       tester,
     ) async {
       final at = await dropped(
         tester,
         const DwMediaConfig(miniPlayerSnapThreshold: 100),
       );
-      expect(at.dx, greaterThan(250));
+      expect(at.dx, greaterThan(200));
     });
   });
 

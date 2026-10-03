@@ -1556,6 +1556,12 @@ abstract class AppLocalizations {
   /// **'Close'**
   String get mediaClose;
 
+  /// No description provided for @mediaResize.
+  ///
+  /// In en, this message translates to:
+  /// **'Resize'**
+  String get mediaResize;
+
   /// No description provided for @mediaFailed.
   ///
   /// In en, this message translates to:

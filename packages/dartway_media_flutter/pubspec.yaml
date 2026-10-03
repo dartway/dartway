@@ -1,6 +1,6 @@
 name: dartway_media_flutter
 description: "A video/audio player for a DartWay app, reached as dw.plugins.media: one controller API over video_player and just_audio, a session that survives route changes, queue, resume, fullscreen and a mini-player — mechanism only, no chewie, no look."
-version: 0.1.0
+version: 0.2.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues

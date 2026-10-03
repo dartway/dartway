@@ -4,6 +4,7 @@ import 'package:dartway_media_flutter/dartway_media_flutter.dart';
 import 'package:dartway_media_flutter/src/controller/dw_media_controller.dart';
 import 'package:dartway_media_flutter/src/controller/dw_media_controller_factory.dart';
 import 'package:dartway_media_flutter/testing.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 export 'package:dartway_media_flutter/src/controller/dw_media_controller.dart';
@@ -38,11 +39,12 @@ final class MediaRig {
   Future<DwFakeVideo> loadVideo(
     WidgetTester tester, {
     Duration duration = const Duration(seconds: 100),
+    Size size = const Size(1280, 720),
   }) async {
     video.length = duration;
     await tester.pump();
     final opened = video.latest;
-    opened.ready(length: duration);
+    opened.ready(length: duration, size: size);
     await tester.pump();
     await tester.pump();
     return opened;

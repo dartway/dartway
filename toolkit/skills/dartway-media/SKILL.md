@@ -58,7 +58,10 @@ into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle 
 - **Fullscreen**: `DwMediaFullscreenHost(session:, builder:, child:)` around the inline player — the one
   way in; `enterFullscreen()`/`exitFullscreen()` and back gestures.
 - **Mini-player**: `DwMiniPlayerHost(sessionManager:, onExpand:, builder:)` once, in
-  `MaterialApp.builder` over the router's child; it has no `Overlay` above it (no tooltips).
+  `MaterialApp.builder` over the router's child; it has no `Overlay` above it (no tooltips). It
+  drags freely, resizes by a pinch and — with a mouse — by a corner handle; the chrome draws the
+  handle's mark at `DwMiniPlayerHost.resizeCornerOf(context)` and keeps its buttons off that corner.
+  Never re-implement the host to change placement or size: the `miniPlayer*` settings cover it.
 - **The player page** restores the session on entry and minimizes it on leaving, in a hook —
   `final media = dw.plugins.media.sessionManager;` then
   `useEffect(() { media.active.value?.restore(); return () => media.active.value?.minimize(); }, const [])`,

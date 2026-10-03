@@ -888,11 +888,13 @@ void main() {
         fullscreenTransitionBuilder: transition,
         fallbackAspectRatio: 4 / 3,
         miniPlayer: false,
-        miniPlayerInitialSize: const Size(200, 100),
+        miniPlayerInitialWidth: 200,
         miniPlayerInitialAlignment: Alignment.topLeft,
-        miniPlayerMinScale: 0.6,
-        miniPlayerMaxScale: 3,
-        miniPlayerSnapToEdges: false,
+        miniPlayerMinWidth: 180,
+        miniPlayerMaxWidthFraction: 0.4,
+        miniPlayerResize: DwMiniPlayerResize.never,
+        miniPlayerResizeHandleExtent: 44,
+        miniPlayerSnapToEdges: true,
         miniPlayerSnapEdges: DwMiniPlayerSnapEdges.all,
         miniPlayerSnapThreshold: 40,
         miniPlayerCloseStopsPlayback: false,
@@ -935,11 +937,13 @@ void main() {
       expect(r.fullscreenTransitionBuilder, same(transition));
       expect(r.fallbackAspectRatio, 4 / 3);
       expect(r.miniPlayer, isFalse);
-      expect(r.miniPlayerInitialSize, const Size(200, 100));
+      expect(r.miniPlayerInitialWidth, 200);
       expect(r.miniPlayerInitialAlignment, Alignment.topLeft);
-      expect(r.miniPlayerMinScale, 0.6);
-      expect(r.miniPlayerMaxScale, 3);
-      expect(r.miniPlayerSnapToEdges, isFalse);
+      expect(r.miniPlayerMinWidth, 180);
+      expect(r.miniPlayerMaxWidthFraction, 0.4);
+      expect(r.miniPlayerResize, DwMiniPlayerResize.never);
+      expect(r.miniPlayerResizeHandleExtent, 44);
+      expect(r.miniPlayerSnapToEdges, isTrue);
       expect(r.miniPlayerSnapEdges, DwMiniPlayerSnapEdges.all);
       expect(r.miniPlayerSnapThreshold, 40);
       expect(r.miniPlayerCloseStopsPlayback, isFalse);

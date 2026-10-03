@@ -257,6 +257,7 @@
   "mediaSpeed": "Скорость",
   "mediaFullscreen": "Во весь экран",
   "mediaClose": "Закрыть",
+  "mediaResize": "Изменить размер",
   "mediaFailed": "Не удалось воспроизвести.",
   "mediaUpNext": "Дальше",
   "mediaNextIn": "Дальше через {seconds} с",

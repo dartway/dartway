@@ -346,6 +346,7 @@
   "mediaSpeed": "Speed",
   "mediaFullscreen": "Fullscreen",
   "mediaClose": "Close",
+  "mediaResize": "Resize",
   "mediaFailed": "This could not be played.",
   "mediaUpNext": "Up next",
   "mediaNextIn": "Next in {seconds} s",
