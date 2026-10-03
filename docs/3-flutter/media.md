@@ -154,8 +154,10 @@ flight, and the position has moved past where playback started or the last seek 
   and the anchored corner stays put while the handle follows the pointer. A touch screen has no
   handle by default — a corner the size of a fingertip would swallow the chrome's buttons.
   Position and size live in the host, so they survive route changes and the player hiding and
-  showing again. For a screen reader the handle's increase and decrease actions step the width;
-  its label is the app's, `DwMiniPlayerHost(resizeHandleLabel:)`.
+  showing again. While a resize runs the cursor is the resize one over the whole player, its
+  buttons included; outside the player it is not held. For a screen reader the handle's increase
+  and decrease actions step the width by the same rule as the drag — an action that would change
+  nothing is not offered; its label is the app's, `DwMiniPlayerHost(resizeHandleLabel:)`.
 - **The chrome is the app's, handle included.** The host owns the handle's square (a press in it
   resizes and never reaches the chrome) and the cursor over it; the mark the person sees is drawn
   by the chrome, at `DwMiniPlayerHost.resizeCornerOf(context)` — `null` while there is no handle —

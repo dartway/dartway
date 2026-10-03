@@ -21,17 +21,23 @@ void main() {
   Alignment? corner;
   var builds = 0;
 
+  late DwMediaSessionManager manager;
+
   /// An 800×600 app with the host over its navigator, a minimized video
-  /// session (16:9) in it.
+  /// session (16:9 unless [videoSize] says otherwise) in it. With
+  /// [buttonChrome] the chrome is one `IconButton` over the whole player —
+  /// a chrome that sets a cursor of its own everywhere.
   Future<DwMediaSession> pumpHost(
     WidgetTester tester, {
     DwMediaConfig config = const DwMediaConfig(
       miniPlayerResize: DwMiniPlayerResize.always,
     ),
+    Size videoSize = const Size(1280, 720),
+    bool buttonChrome = false,
   }) async {
     corner = null;
     builds = 0;
-    final manager = DwMediaSessionManager(config: config);
+    manager = DwMediaSessionManager(config: config);
     await tester.pumpWidget(
       MaterialApp(
         navigatorKey: navigator,
@@ -45,7 +51,21 @@ void main() {
               builder: (context, session, expand, close) {
                 builds++;
                 corner = DwMiniPlayerHost.resizeCornerOf(context);
-                return const ColoredBox(key: chrome, color: Colors.black);
+                return ColoredBox(
+                  key: chrome,
+                  color: Colors.black,
+                  child: buttonChrome
+                      ? SizedBox.expand(
+                          child: IconButton(
+                            // Explicit: the test platform's own default is
+                            // the basic cursor.
+                            mouseCursor: SystemMouseCursors.click,
+                            onPressed: () {},
+                            icon: const Icon(Icons.play_arrow),
+                          ),
+                        )
+                      : null,
+                );
               },
             ),
           ],
@@ -54,7 +74,7 @@ void main() {
       ),
     );
     final session = manager.open(items: [videoItem('m')]);
-    await rig.loadVideo(tester);
+    await rig.loadVideo(tester, size: videoSize);
     session.minimize();
     await tester.pump();
     return session;
@@ -293,8 +313,8 @@ void main() {
   });
 
   testWidgets('the resize cursor holds over the whole player while a resize '
-      'runs', (tester) async {
-    final session = await pumpHost(tester);
+      'runs, over the chrome\'s own buttons too', (tester) async {
+    final session = await pumpHost(tester, buttonChrome: true);
     final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
     await mouse.addPointer(location: Offset.zero);
     addTearDown(mouse.removePointer);
@@ -323,33 +343,130 @@ void main() {
     await tester.pump();
     await mouse.moveTo(player(tester).center);
     await tester.pump();
-    expect(
-      tracker.debugDeviceActiveCursor(1),
-      isNot(SystemMouseCursors.resizeUpLeftDownRight),
-    );
+    // Released, the chrome's button has its cursor back.
+    expect(tracker.debugDeviceActiveCursor(1), SystemMouseCursors.click);
     await endSession(tester, session);
   });
 
-  testWidgets('hidden mid-resize, the player comes back with no gesture '
-      'stuck in it', (tester) async {
-    final session = await pumpHost(tester);
-    final gesture = await tester.startGesture(handle(tester));
+  /// A mouse that starts a resize on the handle and is part-way through it.
+  Future<TestGesture> startMouseResize(WidgetTester tester) async {
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await mouse.moveTo(handle(tester));
+    await mouse.down(handle(tester));
     for (var i = 0; i < 5; i++) {
-      await gesture.moveBy(const Offset(-20, 0));
+      await mouse.moveBy(const Offset(-20, 0));
       await tester.pump();
     }
+    return mouse;
+  }
+
+  /// The cursor the test mouse (device 1) shows.
+  MouseCursor? cursor() =>
+      RendererBinding.instance.mouseTracker.debugDeviceActiveCursor(1);
+
+  testWidgets('hidden mid-resize, the player comes back with no resize '
+      'stuck in it', (tester) async {
+    final session = await pumpHost(tester);
+    final mouse = await startMouseResize(tester);
+    expect(cursor(), SystemMouseCursors.resizeUpLeftDownRight);
     session.restore();
     await tester.pump();
-    await gesture.up();
+    await mouse.up();
     await tester.pump();
     session.minimize();
     await tester.pump();
-    final shown = player(tester);
-    expect(shown.size, const Size(340, 191.25));
-    await dragFrom(tester, shown.center, const Offset(-100, -100));
-    expect(player(tester).topLeft, shown.topLeft - const Offset(100, 100));
-    expect(player(tester).size, shown.size);
+    expect(player(tester).size, const Size(340, 191.25));
+    await mouse.moveTo(player(tester).center);
+    await tester.pump();
+    expect(cursor(), isNot(SystemMouseCursors.resizeUpLeftDownRight));
     await endSession(tester, session);
+  });
+
+  testWidgets('a session that ends mid-resize leaves no resize for the next '
+      'one', (tester) async {
+    final session = await pumpHost(tester);
+    final mouse = await startMouseResize(tester);
+    await endSession(tester, session);
+    await mouse.up();
+    await tester.pump();
+    final next = manager.open(items: [videoItem('n')]);
+    await rig.loadVideo(tester);
+    next.minimize();
+    await tester.pump();
+    await mouse.moveTo(player(tester).center);
+    await tester.pump();
+    expect(cursor(), isNot(SystemMouseCursors.resizeUpLeftDownRight));
+    await endSession(tester, next);
+  });
+
+  testWidgets('another session taking the player mid-resize leaves no '
+      'resize in it', (tester) async {
+    final session = await pumpHost(tester);
+    final mouse = await startMouseResize(tester);
+    // Minimized before the host rebuilds: the player never hides between
+    // the two sessions.
+    final next = manager.open(items: [videoItem('n')]);
+    next.minimize();
+    await tester.pump();
+    await mouse.up();
+    await tester.pump();
+    await mouse.moveTo(player(tester).center);
+    await tester.pump();
+    expect(cursor(), isNot(SystemMouseCursors.resizeUpLeftDownRight));
+    await endSession(tester, next);
+    await endSession(tester, session);
+  });
+
+  testWidgets('after a pinch, the finger left on the player moves it; the '
+      'width does not jump', (tester) async {
+    final session = await pumpHost(tester);
+    // The first finger on the handle, the second in the middle.
+    final first = await tester.startGesture(handle(tester), pointer: 1);
+    final second = await tester.startGesture(player(tester).center, pointer: 2);
+    for (var i = 0; i < 5; i++) {
+      await second.moveBy(const Offset(8, 0));
+      await tester.pump();
+    }
+    await first.up();
+    await tester.pump();
+    final pinched = player(tester).size;
+    for (var i = 0; i < 10; i++) {
+      await second.moveBy(const Offset(-10, -10));
+      await tester.pump();
+    }
+    await second.up();
+    await tester.pump();
+    expect(player(tester).size, pinched);
+    await endSession(tester, session);
+  });
+
+  testWidgets('a screen reader\'s steps are the resize\'s own: a tall video '
+      'stops where the height runs out, and no step is offered past it', (
+    tester,
+  ) async {
+    final semantics = tester.ensureSemantics();
+    // 9:16 in 800×600: 600 px of height allow 337.5 px of width. The
+    // video reports its size only when told, not on open.
+    rig = MediaRig(readyOnOpen: false);
+    final session = await pumpHost(tester, videoSize: const Size(720, 1280));
+    final resize = find.semantics.byLabel('Resize');
+    SemanticsData data() =>
+        tester.getSemantics(find.bySemanticsLabel('Resize')).getSemanticsData();
+    expect(player(tester).size, const Size(240, 426.6666666666667));
+    expect(data().increasedValue, '304');
+    tester.semantics.increase(resize);
+    await tester.pump();
+    expect(player(tester).width, 304);
+    expect(data().increasedValue, '338');
+    tester.semantics.increase(resize);
+    await tester.pump();
+    expect(player(tester), const Rect.fromLTWH(462.5, 0, 337.5, 600));
+    expect(data().hasAction(SemanticsAction.increase), isFalse);
+    expect(data().hasAction(SemanticsAction.decrease), isTrue);
+    await endSession(tester, session);
+    semantics.dispose();
   });
 
   testWidgets('a screen reader steps the width by the handle', (tester) async {

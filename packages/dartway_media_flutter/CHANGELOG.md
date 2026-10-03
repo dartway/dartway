@@ -13,8 +13,8 @@
   window pushes it in without forgetting where it was put or how wide, and both come back when
   the window grows; a gesture that only moves the player keeps the chosen width.
 - The resize handle carries semantics (increase/decrease step the width; its label is
-  `DwMiniPlayerHost.resizeHandleLabel`), and the resize cursor shows over the whole player while
-  a resize runs.
+  `DwMiniPlayerHost.resizeHandleLabel`; a step that would change nothing is not offered), and the
+  resize cursor shows over the whole player, chrome buttons included, while a resize runs.
 
 ## 0.1.0
 

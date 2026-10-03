@@ -111,8 +111,12 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
   /// the slop, so move-or-resize and how far the handle went are measured
   /// from here instead.
   final Set<int> _pointersDown = {};
+  int? _downPointer;
   Offset _downLocal = Offset.zero;
   Offset _downGlobal = Offset.zero;
+
+  /// Where the handle's travel is measured from in this resize.
+  Offset _resizeOrigin = Offset.zero;
 
   late final MouseTracker _mouseTracker;
   bool _mouseConnected = false;
@@ -149,6 +153,9 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
 
   void _watch(DwMediaSession? session, {bool rebuild = true}) {
     if (identical(session, _watched)) return;
+    // Another session, or none: whatever gesture ran was on a player that
+    // is gone.
+    _resetGesture();
     _watched?.videoView.removeListener(_onVideoView);
     _watched = session;
     session?.videoView.addListener(_onVideoView);
@@ -198,14 +205,16 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
     builder: (context, _) {
       final session = widget.sessionManager.active.value;
       _watch(session, rebuild: false);
-      if (session == null) return const SizedBox.shrink();
+      if (session == null) {
+        _resetGesture();
+        return const SizedBox.shrink();
+      }
       return ListenableBuilder(
         listenable: session.minimized,
         builder: (context, _) {
           if (!session.minimized.value || !session.options.miniPlayer) {
             // Hidden mid-gesture, the recognizer goes without an end.
-            _gesture = null;
-            _pointersDown.clear();
+            _resetGesture();
             return const SizedBox.shrink();
           }
           return _buildMiniPlayer(context, session);
@@ -238,6 +247,7 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
         child: Listener(
           onPointerDown: (event) {
             if (_pointersDown.isEmpty) {
+              _downPointer = event.pointer;
               _downLocal = event.localPosition;
               _downGlobal = event.position;
             }
@@ -249,48 +259,51 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
             onScaleStart: (details) => _onStart(details, rect, corner, extent),
             onScaleUpdate: (details) => _onUpdate(details, area, options),
             onScaleEnd: (_) => _onEnd(area, options),
-            // While a resize runs, the pointer may leave the handle's square;
-            // the cursor stays the resize one over the whole player.
-            child: MouseRegion(
-              cursor: _gesture == _GestureKind.resize
-                  ? resizeCursor
-                  : MouseCursor.defer,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Its own context, under the scope: `resizeCornerOf` answers
-                  // from the builder's `context` as well as from the chrome's.
-                  Builder(
-                    builder: (context) => widget.builder(context, session, () {
-                      session.restore();
-                      widget.onExpand(session.currentItem);
-                    }, () => unawaited(session.closeFromMiniPlayer())),
-                  ),
-                  if (corner != null)
-                    Align(
-                      alignment: corner,
-                      // Opaque: a press here resizes and never reaches the
-                      // chrome underneath — no expand at the end of a resize.
-                      child: Semantics(
-                        container: true,
-                        label: widget.resizeHandleLabel,
-                        value: '${rect.width.round()}',
-                        increasedValue:
-                            '${_steppedWidth(rect, area, options, 1).round()}',
-                        decreasedValue:
-                            '${_steppedWidth(rect, area, options, -1).round()}',
-                        onIncrease: () => _step(rect, corner, area, options, 1),
-                        onDecrease: () =>
-                            _step(rect, corner, area, options, -1),
-                        child: MouseRegion(
-                          cursor: resizeCursor,
-                          hitTestBehavior: HitTestBehavior.opaque,
-                          child: SizedBox.square(dimension: extent),
-                        ),
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Its own context, under the scope: `resizeCornerOf` answers
+                // from the builder's `context` as well as from the chrome's.
+                Builder(
+                  builder: (context) => widget.builder(context, session, () {
+                    session.restore();
+                    widget.onExpand(session.currentItem);
+                  }, () => unawaited(session.closeFromMiniPlayer())),
+                ),
+                if (corner != null)
+                  Align(
+                    alignment: corner,
+                    // Opaque: a press here resizes and never reaches the
+                    // chrome underneath — no expand at the end of a resize.
+                    child: Semantics(
+                      container: true,
+                      label: widget.resizeHandleLabel,
+                      value: '${rect.width.round()}',
+                      increasedValue:
+                          '${_stepped(rect, corner, area, options, 1).width.round()}',
+                      decreasedValue:
+                          '${_stepped(rect, corner, area, options, -1).width.round()}',
+                      onIncrease: _stepAction(rect, corner, area, options, 1),
+                      onDecrease: _stepAction(rect, corner, area, options, -1),
+                      child: MouseRegion(
+                        cursor: resizeCursor,
+                        hitTestBehavior: HitTestBehavior.opaque,
+                        child: SizedBox.square(dimension: extent),
                       ),
                     ),
-                ],
-              ),
+                  ),
+                // While a resize runs the pointer leaves the handle's
+                // square; over the whole player — above the chrome, whose
+                // buttons would set their own — the cursor stays the
+                // resize one. Outside the player it is not held.
+                if (_gesture == _GestureKind.resize)
+                  Positioned.fill(
+                    child: MouseRegion(
+                      cursor: resizeCursor,
+                      hitTestBehavior: HitTestBehavior.opaque,
+                    ),
+                  ),
+              ],
             ),
           ),
         ),
@@ -311,14 +324,35 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
     // a window that grows back still gets it.
     _position = rect.topLeft;
     _gestureStartRect = rect;
+    // The recorded press counts only while its pointer is the one and only
+    // down: after a pinch the finger left is not the one recorded, and a
+    // resize measured from the lifted one would jump.
+    final fromDown =
+        details.pointerCount == 1 &&
+        _pointersDown.length == 1 &&
+        _pointersDown.contains(_downPointer);
     final onHandle =
         corner != null &&
-        details.pointerCount == 1 &&
+        fromDown &&
         corner
             .inscribe(Size.square(extent), Offset.zero & rect.size)
             .contains(_downLocal);
-    _gesture = onHandle ? _GestureKind.resize : _GestureKind.move;
-    if (onHandle) _gestureCorner = corner;
+    _resizeOrigin = fromDown ? _downGlobal : details.focalPoint;
+    if (onHandle) {
+      // A rebuild: the cursor overlay goes up for the length of the resize.
+      setState(() {
+        _gesture = _GestureKind.resize;
+        _gestureCorner = corner;
+      });
+    } else {
+      _gesture = _GestureKind.move;
+    }
+  }
+
+  void _resetGesture() {
+    _gesture = null;
+    _pointersDown.clear();
+    _downPointer = null;
   }
 
   void _onUpdate(ScaleUpdateDetails details, Rect area, DwMediaConfig options) {
@@ -359,16 +393,13 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
     final start = _gestureStartRect;
     final corner = _gestureCorner;
     final aspect = _aspect(options);
-    final moved = focal - _downGlobal;
+    final moved = focal - _resizeOrigin;
     final width = moved.dx.abs() >= (moved.dy * aspect).abs()
         ? start.width + moved.dx * corner.x
         : (start.height + moved.dy * corner.y) * aspect;
     _resizeFrom(start, corner, width, area, options);
   }
 
-  /// Sets the width to [wanted], within its bounds and the room the
-  /// visible area leaves, keeping the corner opposite [corner] of [start]
-  /// where it is.
   void _resizeFrom(
     Rect start,
     Alignment corner,
@@ -376,24 +407,43 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
     Rect area,
     DwMediaConfig options,
   ) {
+    final resized = _resizedRect(start, corner, wanted, area, options);
+    _width = resized.width;
+    _position = resized.topLeft;
+  }
+
+  /// [start] resized to [wanted] — within the width bounds and the room the
+  /// visible area leaves from the corner opposite [corner], which stays
+  /// where it is — exactly as it will be drawn. One function for the
+  /// handle, the pinch-free steps a screen reader takes, and what those
+  /// steps announce.
+  Rect _resizedRect(
+    Rect start,
+    Alignment corner,
+    double wanted,
+    Rect area,
+    DwMediaConfig options,
+  ) {
     final aspect = _aspect(options);
-    var width = wanted.clamp(
-      options.miniPlayerMinWidth,
-      _maxWidth(area, options),
-    );
+    final low = options.miniPlayerMinWidth;
     final anchor = Offset(
       corner.x < 0 ? start.right : start.left,
       corner.y < 0 ? start.bottom : start.top,
     );
     final roomX = corner.x < 0 ? anchor.dx - area.left : area.right - anchor.dx;
     final roomY = corner.y < 0 ? anchor.dy - area.top : area.bottom - anchor.dy;
-    width = min(width, min(roomX, roomY * aspect));
+    var width = wanted.clamp(low, _maxWidth(area, options));
+    // The room from the anchor, but never under the minimum — the drawn
+    // size does not go under it either; the anchor gives way instead.
+    width = max(min(width, min(roomX, roomY * aspect)), low);
+    // And never past the area itself, which wins over the minimum.
+    width = max(0.0, min(width, min(area.width, area.height * aspect)));
     final height = width / aspect;
-    _width = width;
-    _position = Offset(
+    final position = Offset(
       corner.x < 0 ? anchor.dx - width : anchor.dx,
       corner.y < 0 ? anchor.dy - height : anchor.dy,
     );
+    return _clamp(position, area, Size(width, height)) & Size(width, height);
   }
 
   void _onEnd(Rect area, DwMediaConfig options) {
@@ -404,36 +454,45 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
     if (wasMove && options.miniPlayerSnapToEdges) _snapToEdge(area, options);
   }
 
-  /// One step of the handle's increase or decrease action: a fifth of the
-  /// range between the bounds.
-  double _steppedWidth(
-    Rect rect,
-    Rect area,
-    DwMediaConfig options,
-    int direction,
-  ) {
-    final low = options.miniPlayerMinWidth;
-    final high = _maxWidth(area, options);
-    final step = max((high - low) / 5, 1.0);
-    return min((rect.width + step * direction).clamp(low, high), area.width);
-  }
-
-  void _step(
+  /// One step of the handle's increase or decrease action — a fifth of the
+  /// range between the bounds — as the resize would draw it.
+  Rect _stepped(
     Rect rect,
     Alignment corner,
     Rect area,
     DwMediaConfig options,
     int direction,
   ) {
-    final before = (_position, _width);
-    _resizeFrom(
+    final step = max(
+      (_maxWidth(area, options) - options.miniPlayerMinWidth) / 5,
+      1.0,
+    );
+    return _resizedRect(
       rect,
       corner,
-      _steppedWidth(rect, area, options, direction),
+      rect.width + step * direction,
       area,
       options,
     );
-    _setStateIfMoved(before);
+  }
+
+  /// The handle's increase or decrease action, or `null` when the step
+  /// would change nothing — a screen reader then offers no such action.
+  VoidCallback? _stepAction(
+    Rect rect,
+    Alignment corner,
+    Rect area,
+    DwMediaConfig options,
+    int direction,
+  ) {
+    final stepped = _stepped(rect, corner, area, options, direction);
+    if (stepped.width == rect.width) return null;
+    return () {
+      final before = (_position, _width);
+      _width = stepped.width;
+      _position = stepped.topLeft;
+      _setStateIfMoved(before);
+    };
   }
 
   /// Settles a released mini-player on an edge: the nearer side, or the
