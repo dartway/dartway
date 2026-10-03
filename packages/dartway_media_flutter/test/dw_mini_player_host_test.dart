@@ -33,7 +33,7 @@ void main() {
         navigatorKey: navigator,
         builder: (context, child) => Stack(
           children: [
-            if (child != null) child,
+            ?child,
             DwMiniPlayerHost(
               sessionManager: manager,
               onExpand: (_) {},
