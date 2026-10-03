@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show DeviceOrientation;
-import 'package:flutter/widgets.dart'
-    show Alignment, RouteTransitionsBuilder, Size;
+import 'package:flutter/widgets.dart' show Alignment, RouteTransitionsBuilder;
 
 import '../resume/dw_media_position_store.dart';
 
@@ -46,6 +45,19 @@ enum DwMiniPlayerSnapEdges {
 
   /// The nearest of all four.
   all,
+}
+
+/// How the mini-player is resized (`DwMediaConfig.miniPlayerResize`).
+enum DwMiniPlayerResize {
+  /// A pinch on touch; a handle in the corner opposite the one the player
+  /// is anchored to while a mouse is connected.
+  pointer,
+
+  /// A pinch, and the handle whatever the input device.
+  always,
+
+  /// Neither: the player keeps its initial width.
+  never,
 }
 
 /// What happens to a session when its page goes and there is no mini-player
@@ -100,11 +112,13 @@ final class DwMediaConfig {
     this.fullscreenTransitionBuilder,
     this.fallbackAspectRatio = 16 / 9,
     this.miniPlayer = true,
-    this.miniPlayerInitialSize = const Size(160, 90),
+    this.miniPlayerInitialWidth = 240,
     this.miniPlayerInitialAlignment = Alignment.bottomRight,
-    this.miniPlayerMinScale = 0.75,
-    this.miniPlayerMaxScale = 2.0,
-    this.miniPlayerSnapToEdges = true,
+    this.miniPlayerMinWidth = 240,
+    this.miniPlayerMaxWidthFraction = 0.6,
+    this.miniPlayerResize = DwMiniPlayerResize.pointer,
+    this.miniPlayerResizeHandleExtent = 32,
+    this.miniPlayerSnapToEdges = false,
     this.miniPlayerSnapEdges = DwMiniPlayerSnapEdges.horizontal,
     this.miniPlayerSnapThreshold = double.infinity,
     this.miniPlayerCloseStopsPlayback = true,
@@ -125,8 +139,16 @@ final class DwMediaConfig {
          'completedThreshold must be in (0, 1]',
        ),
        assert(
-         miniPlayerMinScale > 0 && miniPlayerMinScale <= miniPlayerMaxScale,
-         'miniPlayerMinScale must be positive and not above miniPlayerMaxScale',
+         miniPlayerInitialWidth > 0 && miniPlayerMinWidth > 0,
+         'miniPlayerInitialWidth and miniPlayerMinWidth must be positive',
+       ),
+       assert(
+         miniPlayerMaxWidthFraction > 0 && miniPlayerMaxWidthFraction <= 1,
+         'miniPlayerMaxWidthFraction must be in (0, 1]',
+       ),
+       assert(
+         miniPlayerResizeHandleExtent > 0,
+         'miniPlayerResizeHandleExtent must be positive',
        ),
        assert(autoRetryCount >= 0, 'autoRetryCount must not be negative'),
        assert(fallbackAspectRatio > 0, 'fallbackAspectRatio must be positive'),
@@ -225,14 +247,30 @@ final class DwMediaConfig {
   /// `DwMiniPlayerHost`. Off, minimize does nothing.
   final bool miniPlayer;
 
-  final Size miniPlayerInitialSize;
+  /// The mini-player's width before anyone resizes it; its height follows
+  /// the video's aspect ratio ([fallbackAspectRatio] until the video reports
+  /// one). Held within [miniPlayerMinWidth] and the maximum.
+  final double miniPlayerInitialWidth;
+
+  /// Where it first appears.
   final Alignment miniPlayerInitialAlignment;
 
-  /// Pinch bounds, as multiples of [miniPlayerInitialSize].
-  final double miniPlayerMinScale;
-  final double miniPlayerMaxScale;
+  /// The narrowest a resize or a pinch makes it.
+  final double miniPlayerMinWidth;
 
-  /// A released mini-player settles on an edge of the screen.
+  /// The widest a resize or a pinch makes it, as a fraction of the viewport
+  /// width — never under [miniPlayerMinWidth], and never past the viewport.
+  final double miniPlayerMaxWidthFraction;
+
+  /// How it is resized: a pinch, and a corner handle for a mouse.
+  final DwMiniPlayerResize miniPlayerResize;
+
+  /// The side of the square, in the corner opposite the anchor, that
+  /// starts a resize instead of a move.
+  final double miniPlayerResizeHandleExtent;
+
+  /// A released mini-player settles on an edge of the screen. Off (the
+  /// default), it stays where it was released.
   final bool miniPlayerSnapToEdges;
 
   /// Which edges it settles on.
@@ -338,12 +376,16 @@ final class DwMediaConfig {
           options.fullscreenTransitionBuilder ?? fullscreenTransitionBuilder,
       fallbackAspectRatio: options.fallbackAspectRatio ?? fallbackAspectRatio,
       miniPlayer: options.miniPlayer ?? miniPlayer,
-      miniPlayerInitialSize:
-          options.miniPlayerInitialSize ?? miniPlayerInitialSize,
+      miniPlayerInitialWidth:
+          options.miniPlayerInitialWidth ?? miniPlayerInitialWidth,
       miniPlayerInitialAlignment:
           options.miniPlayerInitialAlignment ?? miniPlayerInitialAlignment,
-      miniPlayerMinScale: options.miniPlayerMinScale ?? miniPlayerMinScale,
-      miniPlayerMaxScale: options.miniPlayerMaxScale ?? miniPlayerMaxScale,
+      miniPlayerMinWidth: options.miniPlayerMinWidth ?? miniPlayerMinWidth,
+      miniPlayerMaxWidthFraction:
+          options.miniPlayerMaxWidthFraction ?? miniPlayerMaxWidthFraction,
+      miniPlayerResize: options.miniPlayerResize ?? miniPlayerResize,
+      miniPlayerResizeHandleExtent:
+          options.miniPlayerResizeHandleExtent ?? miniPlayerResizeHandleExtent,
       miniPlayerSnapToEdges:
           options.miniPlayerSnapToEdges ?? miniPlayerSnapToEdges,
       miniPlayerSnapEdges: options.miniPlayerSnapEdges ?? miniPlayerSnapEdges,
@@ -405,10 +447,12 @@ final class DwMediaOpenOptions {
     this.fullscreenTransitionBuilder,
     this.fallbackAspectRatio,
     this.miniPlayer,
-    this.miniPlayerInitialSize,
+    this.miniPlayerInitialWidth,
     this.miniPlayerInitialAlignment,
-    this.miniPlayerMinScale,
-    this.miniPlayerMaxScale,
+    this.miniPlayerMinWidth,
+    this.miniPlayerMaxWidthFraction,
+    this.miniPlayerResize,
+    this.miniPlayerResizeHandleExtent,
     this.miniPlayerSnapToEdges,
     this.miniPlayerSnapEdges,
     this.miniPlayerSnapThreshold,
@@ -467,10 +511,12 @@ final class DwMediaOpenOptions {
   final RouteTransitionsBuilder? fullscreenTransitionBuilder;
   final double? fallbackAspectRatio;
   final bool? miniPlayer;
-  final Size? miniPlayerInitialSize;
+  final double? miniPlayerInitialWidth;
   final Alignment? miniPlayerInitialAlignment;
-  final double? miniPlayerMinScale;
-  final double? miniPlayerMaxScale;
+  final double? miniPlayerMinWidth;
+  final double? miniPlayerMaxWidthFraction;
+  final DwMiniPlayerResize? miniPlayerResize;
+  final double? miniPlayerResizeHandleExtent;
   final bool? miniPlayerSnapToEdges;
   final DwMiniPlayerSnapEdges? miniPlayerSnapEdges;
   final double? miniPlayerSnapThreshold;

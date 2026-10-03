@@ -1,3 +1,18 @@
+## 0.2.0
+
+- **Breaking** (#425): the mini-player stays where it is released — `miniPlayerSnapToEdges` now
+  defaults to `false` (snapping is kept, opt-in). Its size is a width with the height from the
+  video's aspect ratio: `miniPlayerInitialSize` became `miniPlayerInitialWidth` (240), and the
+  pinch bounds `miniPlayerMinScale`/`miniPlayerMaxScale` became `miniPlayerMinWidth` (240) and
+  `miniPlayerMaxWidthFraction` (0.6 of the viewport). Migration: `docs/migrations/2026-10-03-mini-player-free-placement-and-width.md`.
+- `DwMiniPlayerHost` resizes by a handle in the corner opposite the one the player is anchored to,
+  while a mouse is connected (`miniPlayerResize`: `pointer`, `always`, `never`;
+  `miniPlayerResizeHandleExtent`), keeping the aspect ratio and the anchored corner; the pinch
+  stays. `DwMiniPlayerHost.resizeCornerOf(context)` tells the chrome where the handle is.
+- The player is held inside the visible area (the viewport less the system padding); a shrinking
+  window pushes it in without forgetting where it was put or how wide, and both come back when
+  the window grows.
+
 ## 0.1.0
 
 - First version (D-107): `DwMedia` (`dw.plugins.media`), `DwMediaSession` and its manager — one

@@ -40,7 +40,7 @@ dependencies:
   dartway_push_firebase: ^0.5.0
   # Video and audio: workout videos, the mini-player (`dw.plugins.media`).
   # The controls are this app's own, in `ui_kit/3_special/media/`.
-  dartway_media_flutter: ^0.1.0
+  dartway_media_flutter: ^0.2.0
   firebase_core: ">=3.13.1 <5.0.0"
 
   flutter_hooks: ^0.21.2
