@@ -632,23 +632,23 @@ void main() {
       );
     });
 
-    testWidgets('min 240 (default): a tight pinch stops at 240 px', (
+    testWidgets('min 160 (default): a tight pinch stops at 160 px', (
       tester,
     ) async {
       expect(
         await pinch(tester, const DwMediaConfig(), spread: false),
-        const Size(240, 135),
+        const Size(160, 90),
       );
     });
 
-    testWidgets('min 160: the same pinch shrinks to 160 px', (tester) async {
+    testWidgets('min 200: the same pinch stops at 200 px', (tester) async {
       expect(
         await pinch(
           tester,
-          const DwMediaConfig(miniPlayerMinWidth: 160),
+          const DwMediaConfig(miniPlayerMinWidth: 200),
           spread: false,
         ),
-        const Size(160, 90),
+        const Size(200, 112.5),
       );
     });
   });

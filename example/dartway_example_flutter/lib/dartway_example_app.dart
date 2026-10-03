@@ -79,6 +79,7 @@ class AppRoot extends ConsumerWidget {
                   sessionManager: dw.plugins.media.sessionManager,
                   onExpand: (_) =>
                       router.router.goNamed(AppNavigationZone.workouts.name),
+                  resizeHandleLabel: context.l10n.mediaResize,
                   builder: (context, session, expand, close) =>
                       AppMiniPlayerChrome(
                         session: session,

@@ -50,7 +50,8 @@ enum DwMiniPlayerSnapEdges {
 /// How the mini-player is resized (`DwMediaConfig.miniPlayerResize`).
 enum DwMiniPlayerResize {
   /// A pinch on touch; a handle in the corner opposite the one the player
-  /// is anchored to while a mouse is connected.
+  /// is anchored to while a mouse or a hovering stylus is connected
+  /// (`MouseTracker.mouseIsConnected` counts both).
   pointer,
 
   /// A pinch, and the handle whatever the input device.
@@ -114,7 +115,7 @@ final class DwMediaConfig {
     this.miniPlayer = true,
     this.miniPlayerInitialWidth = 240,
     this.miniPlayerInitialAlignment = Alignment.bottomRight,
-    this.miniPlayerMinWidth = 240,
+    this.miniPlayerMinWidth = 160,
     this.miniPlayerMaxWidthFraction = 0.6,
     this.miniPlayerResize = DwMiniPlayerResize.pointer,
     this.miniPlayerResizeHandleExtent = 32,
@@ -262,7 +263,7 @@ final class DwMediaConfig {
   /// width — never under [miniPlayerMinWidth], and never past the viewport.
   final double miniPlayerMaxWidthFraction;
 
-  /// How it is resized: a pinch, and a corner handle for a mouse.
+  /// How it is resized: a pinch, and a corner handle for a mouse or a stylus.
   final DwMiniPlayerResize miniPlayerResize;
 
   /// The side of the square, in the corner opposite the anchor, that

@@ -873,6 +873,9 @@ class AppLocalizationsEn extends AppLocalizations {
   String get mediaClose => 'Close';
 
   @override
+  String get mediaResize => 'Resize';
+
+  @override
   String get mediaFailed => 'This could not be played.';
 
   @override

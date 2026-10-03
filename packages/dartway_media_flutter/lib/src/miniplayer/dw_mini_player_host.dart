@@ -41,9 +41,10 @@ typedef DwMiniPlayerBuilder =
 ///   in, and it returns there when the window grows again.
 /// - **Size.** A width within `miniPlayerMinWidth` and
 ///   `miniPlayerMaxWidthFraction` of the viewport; the height follows the
-///   video's aspect ratio. Resized by a pinch and, while a mouse is connected
-///   (`miniPlayerResize`), by dragging the corner opposite the one it is
-///   anchored to — the corner nearest the viewport's own stays put.
+///   video's aspect ratio. Resized by a pinch and, while a mouse or a
+///   hovering stylus is connected (`miniPlayerResize`), by dragging the
+///   corner opposite the one it is anchored to — the corner nearest the
+///   viewport's own stays put.
 /// - Both live in this widget's state, so they survive route changes and the
 ///   player hiding and showing again for as long as the host is mounted.
 ///
@@ -68,11 +69,17 @@ final class DwMiniPlayerHost extends StatefulWidget {
     required this.sessionManager,
     required this.builder,
     required this.onExpand,
+    this.resizeHandleLabel,
   });
 
   final DwMediaSessionManager sessionManager;
   final DwMiniPlayerBuilder builder;
   final void Function(DwMediaItem item) onExpand;
+
+  /// What a screen reader calls the resize handle — the package carries no
+  /// text, so the app passes its own, localized. The handle's increase and
+  /// decrease actions step the width either way.
+  final String? resizeHandleLabel;
 
   /// The corner of the mini-player where its resize handle sits — the one
   /// opposite the corner it is anchored to — or `null` while no handle is
@@ -97,8 +104,15 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
 
   _GestureKind? _gesture;
   Rect _gestureStartRect = Rect.zero;
-  Offset _gestureStartFocal = Offset.zero;
   Alignment _gestureCorner = Alignment.topLeft;
+
+  /// Where the first finger or the pointer went down, in the player's own
+  /// coordinates and globally: the recognizer reports its start only past
+  /// the slop, so move-or-resize and how far the handle went are measured
+  /// from here instead.
+  final Set<int> _pointersDown = {};
+  Offset _downLocal = Offset.zero;
+  Offset _downGlobal = Offset.zero;
 
   late final MouseTracker _mouseTracker;
   bool _mouseConnected = false;
@@ -189,6 +203,9 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
         listenable: session.minimized,
         builder: (context, _) {
           if (!session.minimized.value || !session.options.miniPlayer) {
+            // Hidden mid-gesture, the recognizer goes without an end.
+            _gesture = null;
+            _pointersDown.clear();
             return const SizedBox.shrink();
           }
           return _buildMiniPlayer(context, session);
@@ -208,40 +225,73 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
         ? _gestureCorner
         : _handleCorner(rect, area);
     final extent = options.miniPlayerResizeHandleExtent;
+    final resizeCursor = corner == null
+        ? MouseCursor.defer
+        : corner.x == corner.y
+        ? SystemMouseCursors.resizeUpLeftDownRight
+        : SystemMouseCursors.resizeUpRightDownLeft;
 
     return Positioned.fromRect(
       rect: rect,
       child: _DwMiniPlayerScope(
         resizeCorner: corner,
-        child: GestureDetector(
-          onScaleStart: (details) => _onStart(details, rect, corner, extent),
-          onScaleUpdate: (details) => _onUpdate(details, area, options),
-          onScaleEnd: (_) => _onEnd(area, options),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // Its own context, under the scope: `resizeCornerOf` answers
-              // from the builder's `context` as well as from the chrome's.
-              Builder(
-                builder: (context) => widget.builder(context, session, () {
-                  session.restore();
-                  widget.onExpand(session.currentItem);
-                }, () => unawaited(session.closeFromMiniPlayer())),
-              ),
-              if (corner != null)
-                Align(
-                  alignment: corner,
-                  // Opaque: a press here resizes and never reaches the
-                  // chrome underneath — no expand at the end of a resize.
-                  child: MouseRegion(
-                    cursor: corner.x == corner.y
-                        ? SystemMouseCursors.resizeUpLeftDownRight
-                        : SystemMouseCursors.resizeUpRightDownLeft,
-                    hitTestBehavior: HitTestBehavior.opaque,
-                    child: SizedBox.square(dimension: extent),
+        child: Listener(
+          onPointerDown: (event) {
+            if (_pointersDown.isEmpty) {
+              _downLocal = event.localPosition;
+              _downGlobal = event.position;
+            }
+            _pointersDown.add(event.pointer);
+          },
+          onPointerUp: (event) => _pointersDown.remove(event.pointer),
+          onPointerCancel: (event) => _pointersDown.remove(event.pointer),
+          child: GestureDetector(
+            onScaleStart: (details) => _onStart(details, rect, corner, extent),
+            onScaleUpdate: (details) => _onUpdate(details, area, options),
+            onScaleEnd: (_) => _onEnd(area, options),
+            // While a resize runs, the pointer may leave the handle's square;
+            // the cursor stays the resize one over the whole player.
+            child: MouseRegion(
+              cursor: _gesture == _GestureKind.resize
+                  ? resizeCursor
+                  : MouseCursor.defer,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Its own context, under the scope: `resizeCornerOf` answers
+                  // from the builder's `context` as well as from the chrome's.
+                  Builder(
+                    builder: (context) => widget.builder(context, session, () {
+                      session.restore();
+                      widget.onExpand(session.currentItem);
+                    }, () => unawaited(session.closeFromMiniPlayer())),
                   ),
-                ),
-            ],
+                  if (corner != null)
+                    Align(
+                      alignment: corner,
+                      // Opaque: a press here resizes and never reaches the
+                      // chrome underneath — no expand at the end of a resize.
+                      child: Semantics(
+                        container: true,
+                        label: widget.resizeHandleLabel,
+                        value: '${rect.width.round()}',
+                        increasedValue:
+                            '${_steppedWidth(rect, area, options, 1).round()}',
+                        decreasedValue:
+                            '${_steppedWidth(rect, area, options, -1).round()}',
+                        onIncrease: () => _step(rect, corner, area, options, 1),
+                        onDecrease: () =>
+                            _step(rect, corner, area, options, -1),
+                        child: MouseRegion(
+                          cursor: resizeCursor,
+                          hitTestBehavior: HitTestBehavior.opaque,
+                          child: SizedBox.square(dimension: extent),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -256,17 +306,17 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
     Alignment? corner,
     double extent,
   ) {
-    // What is drawn becomes what is kept: the person moves what they see.
+    // Where it is drawn becomes where it is kept: the person moves what
+    // they see. The width stays the chosen one unless this gesture resizes —
+    // a window that grows back still gets it.
     _position = rect.topLeft;
-    _width = rect.width;
     _gestureStartRect = rect;
-    _gestureStartFocal = details.focalPoint;
     final onHandle =
         corner != null &&
         details.pointerCount == 1 &&
         corner
             .inscribe(Size.square(extent), Offset.zero & rect.size)
-            .contains(details.localFocalPoint);
+            .contains(_downLocal);
     _gesture = onHandle ? _GestureKind.resize : _GestureKind.move;
     if (onHandle) _gestureCorner = corner;
   }
@@ -276,23 +326,31 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
       case null:
         return;
       case _GestureKind.move:
-        setState(() {
-          if (details.pointerCount > 1 &&
-              options.miniPlayerResize != DwMiniPlayerResize.never) {
-            _width = (_gestureStartRect.width * details.scale).clamp(
-              options.miniPlayerMinWidth,
-              _maxWidth(area, options),
-            );
-          }
-          _position = _clamp(
-            (_position ?? _gestureStartRect.topLeft) + details.focalPointDelta,
-            area,
-            _sizeIn(area, options),
+        final before = (_position, _width);
+        if (details.pointerCount > 1 &&
+            options.miniPlayerResize != DwMiniPlayerResize.never) {
+          _width = (_gestureStartRect.width * details.scale).clamp(
+            options.miniPlayerMinWidth,
+            _maxWidth(area, options),
           );
-        });
+        }
+        _position = _clamp(
+          (_position ?? _gestureStartRect.topLeft) + details.focalPointDelta,
+          area,
+          _sizeIn(area, options),
+        );
+        _setStateIfMoved(before);
       case _GestureKind.resize:
-        setState(() => _resize(details.focalPoint, area, options));
+        final before = (_position, _width);
+        _resize(details.focalPoint, area, options);
+        _setStateIfMoved(before);
     }
+  }
+
+  /// Against an edge or a bound, a gesture keeps reporting movement that
+  /// changes nothing; no rebuild for it.
+  void _setStateIfMoved((Offset?, double?) before) {
+    if (before != (_position, _width)) setState(() {});
   }
 
   /// The handle follows the pointer along whichever axis it moved further;
@@ -301,11 +359,28 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
     final start = _gestureStartRect;
     final corner = _gestureCorner;
     final aspect = _aspect(options);
-    final moved = focal - _gestureStartFocal;
-    var width = moved.dx.abs() >= (moved.dy * aspect).abs()
+    final moved = focal - _downGlobal;
+    final width = moved.dx.abs() >= (moved.dy * aspect).abs()
         ? start.width + moved.dx * corner.x
         : (start.height + moved.dy * corner.y) * aspect;
-    width = width.clamp(options.miniPlayerMinWidth, _maxWidth(area, options));
+    _resizeFrom(start, corner, width, area, options);
+  }
+
+  /// Sets the width to [wanted], within its bounds and the room the
+  /// visible area leaves, keeping the corner opposite [corner] of [start]
+  /// where it is.
+  void _resizeFrom(
+    Rect start,
+    Alignment corner,
+    double wanted,
+    Rect area,
+    DwMediaConfig options,
+  ) {
+    final aspect = _aspect(options);
+    var width = wanted.clamp(
+      options.miniPlayerMinWidth,
+      _maxWidth(area, options),
+    );
     final anchor = Offset(
       corner.x < 0 ? start.right : start.left,
       corner.y < 0 ? start.bottom : start.top,
@@ -323,8 +398,42 @@ final class _DwMiniPlayerHostState extends State<DwMiniPlayerHost> {
 
   void _onEnd(Rect area, DwMediaConfig options) {
     final wasMove = _gesture == _GestureKind.move;
-    _gesture = null;
+    // A rebuild: the handle goes to the corner the new place calls for, and
+    // the cursor stops being a resize one.
+    setState(() => _gesture = null);
     if (wasMove && options.miniPlayerSnapToEdges) _snapToEdge(area, options);
+  }
+
+  /// One step of the handle's increase or decrease action: a fifth of the
+  /// range between the bounds.
+  double _steppedWidth(
+    Rect rect,
+    Rect area,
+    DwMediaConfig options,
+    int direction,
+  ) {
+    final low = options.miniPlayerMinWidth;
+    final high = _maxWidth(area, options);
+    final step = max((high - low) / 5, 1.0);
+    return min((rect.width + step * direction).clamp(low, high), area.width);
+  }
+
+  void _step(
+    Rect rect,
+    Alignment corner,
+    Rect area,
+    DwMediaConfig options,
+    int direction,
+  ) {
+    final before = (_position, _width);
+    _resizeFrom(
+      rect,
+      corner,
+      _steppedWidth(rect, area, options, direction),
+      area,
+      options,
+    );
+    _setStateIfMoved(before);
   }
 
   /// Settles a released mini-player on an edge: the nearer side, or the

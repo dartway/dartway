@@ -872,6 +872,9 @@ class AppLocalizationsRu extends AppLocalizations {
   String get mediaClose => 'Закрыть';
 
   @override
+  String get mediaResize => 'Изменить размер';
+
+  @override
   String get mediaFailed => 'Не удалось воспроизвести.';
 
   @override

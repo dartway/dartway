@@ -4,7 +4,9 @@
 import 'dart:async';
 
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/media_test_kit.dart';
@@ -17,6 +19,7 @@ void main() {
   const chrome = Key('chrome');
   final navigator = GlobalKey<NavigatorState>();
   Alignment? corner;
+  var builds = 0;
 
   /// An 800×600 app with the host over its navigator, a minimized video
   /// session (16:9) in it.
@@ -27,6 +30,7 @@ void main() {
     ),
   }) async {
     corner = null;
+    builds = 0;
     final manager = DwMediaSessionManager(config: config);
     await tester.pumpWidget(
       MaterialApp(
@@ -37,7 +41,9 @@ void main() {
             DwMiniPlayerHost(
               sessionManager: manager,
               onExpand: (_) {},
+              resizeHandleLabel: 'Resize',
               builder: (context, session, expand, close) {
+                builds++;
                 corner = DwMiniPlayerHost.resizeCornerOf(context);
                 return const ColoredBox(key: chrome, color: Colors.black);
               },
@@ -133,7 +139,7 @@ void main() {
       await endSession(tester, session);
     });
 
-    testWidgets('stops at the minimum, 240 px', (tester) async {
+    testWidgets('stops at the minimum, 160 px', (tester) async {
       final session = await pumpHost(
         tester,
         config: const DwMediaConfig(
@@ -142,7 +148,7 @@ void main() {
         ),
       );
       await dragFrom(tester, handle(tester), const Offset(400, 0));
-      expect(player(tester).size, const Size(240, 135));
+      expect(player(tester).size, const Size(160, 90));
       expect(player(tester).bottomRight, const Offset(800, 600));
       await endSession(tester, session);
     });
@@ -198,8 +204,8 @@ void main() {
     ) async {
       addTearDown(tester.view.reset);
       final session = await pumpHost(tester);
-      await setViewport(tester, const Size(200, 400));
-      expect(player(tester), const Rect.fromLTWH(0, 287.5, 200, 112.5));
+      await setViewport(tester, const Size(150, 400));
+      expect(player(tester), const Rect.fromLTWH(0, 315.625, 150, 84.375));
       await endSession(tester, session);
     });
   });
@@ -229,6 +235,147 @@ void main() {
     session.minimize();
     await tester.pump();
     expect(player(tester), placed);
+    await endSession(tester, session);
+  });
+
+  testWidgets('a drag after a narrow window does not forget the chosen '
+      'width: growing back restores it', (tester) async {
+    addTearDown(tester.view.reset);
+    final session = await pumpHost(tester);
+    await dragFrom(tester, handle(tester), const Offset(-240, 0));
+    expect(player(tester).size, const Size(480, 270));
+    await setViewport(tester, const Size(500, 400));
+    expect(player(tester).width, 300);
+    await dragFrom(tester, player(tester).center, const Offset(-50, -50));
+    await setViewport(tester, const Size(800, 600));
+    expect(player(tester).size, const Size(480, 270));
+    await endSession(tester, session);
+  });
+
+  testWidgets('on release the handle moves to the corner the new place '
+      'calls for', (tester) async {
+    final session = await pumpHost(
+      tester,
+      config: const DwMediaConfig(
+        miniPlayerResize: DwMiniPlayerResize.always,
+        miniPlayerMaxWidthFraction: 1,
+      ),
+    );
+    final gesture = await tester.startGesture(handle(tester));
+    for (var i = 0; i < 10; i++) {
+      await gesture.moveBy(const Offset(-60, 0));
+      await tester.pump();
+    }
+    // Mid-resize the handle stays where the pointer took it…
+    expect(player(tester), const Rect.fromLTWH(0, 150, 800, 450));
+    expect(corner, Alignment.topLeft);
+    await gesture.up();
+    await tester.pump();
+    // …and its centre is no longer in the right half: anchored left now.
+    expect(corner, Alignment.topRight);
+    await endSession(tester, session);
+  });
+
+  testWidgets('move-or-resize is decided where the pointer went down, not '
+      'where the slop left it', (tester) async {
+    final session = await pumpHost(tester);
+    // 2 px inside the handle's inner edge, then one long move inward: past
+    // the slop the pointer is far outside the square.
+    final gesture = await tester.startGesture(
+      player(tester).topLeft + const Offset(30, 30),
+    );
+    await gesture.moveBy(const Offset(40, 0));
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+    expect(player(tester), const Rect.fromLTWH(600, 487.5, 200, 112.5));
+    await endSession(tester, session);
+  });
+
+  testWidgets('the resize cursor holds over the whole player while a resize '
+      'runs', (tester) async {
+    final session = await pumpHost(tester);
+    final mouse = await tester.createGesture(kind: PointerDeviceKind.mouse);
+    await mouse.addPointer(location: Offset.zero);
+    addTearDown(mouse.removePointer);
+    await tester.pump();
+    await mouse.moveTo(handle(tester));
+    await tester.pump();
+    final tracker = RendererBinding.instance.mouseTracker;
+    // A test mouse is device 1.
+    expect(
+      tracker.debugDeviceActiveCursor(1),
+      SystemMouseCursors.resizeUpLeftDownRight,
+    );
+    await mouse.down(handle(tester));
+    await mouse.moveBy(const Offset(20, 0));
+    await tester.pump();
+    // Past the minimum the player stops shrinking while the pointer goes on,
+    // into the player and out of the handle's square.
+    await mouse.moveBy(const Offset(130, 60));
+    await tester.pump();
+    expect(player(tester), const Rect.fromLTWH(640, 510, 160, 90));
+    expect(
+      tracker.debugDeviceActiveCursor(1),
+      SystemMouseCursors.resizeUpLeftDownRight,
+    );
+    await mouse.up();
+    await tester.pump();
+    await mouse.moveTo(player(tester).center);
+    await tester.pump();
+    expect(
+      tracker.debugDeviceActiveCursor(1),
+      isNot(SystemMouseCursors.resizeUpLeftDownRight),
+    );
+    await endSession(tester, session);
+  });
+
+  testWidgets('hidden mid-resize, the player comes back with no gesture '
+      'stuck in it', (tester) async {
+    final session = await pumpHost(tester);
+    final gesture = await tester.startGesture(handle(tester));
+    for (var i = 0; i < 5; i++) {
+      await gesture.moveBy(const Offset(-20, 0));
+      await tester.pump();
+    }
+    session.restore();
+    await tester.pump();
+    await gesture.up();
+    await tester.pump();
+    session.minimize();
+    await tester.pump();
+    final shown = player(tester);
+    expect(shown.size, const Size(340, 191.25));
+    await dragFrom(tester, shown.center, const Offset(-100, -100));
+    expect(player(tester).topLeft, shown.topLeft - const Offset(100, 100));
+    expect(player(tester).size, shown.size);
+    await endSession(tester, session);
+  });
+
+  testWidgets('a screen reader steps the width by the handle', (tester) async {
+    final semantics = tester.ensureSemantics();
+    final session = await pumpHost(tester);
+    final node = tester.getSemantics(find.bySemanticsLabel('Resize'));
+    expect(node.value, '240');
+    // A fifth of 160…480.
+    expect(node.increasedValue, '304');
+    tester.semantics.increase(find.semantics.byLabel('Resize'));
+    await tester.pump();
+    expect(player(tester), const Rect.fromLTWH(496, 429, 304, 171));
+    tester.semantics.decrease(find.semantics.byLabel('Resize'));
+    await tester.pump();
+    expect(player(tester).size, const Size(240, 135));
+    await endSession(tester, session);
+    semantics.dispose();
+  });
+
+  testWidgets('dragging against an edge rebuilds nothing', (tester) async {
+    final session = await pumpHost(tester);
+    await dragFrom(tester, player(tester).center, const Offset(300, 300));
+    final before = builds;
+    await dragFrom(tester, player(tester).center, const Offset(300, 300));
+    // The release still rebuilds once — the handle's corner is recomputed.
+    expect(builds - before, lessThanOrEqualTo(1));
     await endSession(tester, session);
   });
 }
