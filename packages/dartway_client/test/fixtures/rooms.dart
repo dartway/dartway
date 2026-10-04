@@ -259,6 +259,37 @@ mixin _$ListRoomStats on DwListRequest<RoomView> {
 ListRoomStats $ListRoomStatsFromJson(Map<String, Object?> json) =>
     const ListRoomStats();
 
+/// Derived data with its own `onUpdate`, written for rooms only: a deletion
+/// removes, a room re-runs it, anything else is a bug it would report.
+final class ListRoomRanking extends DwListRequest<RoomView>
+    with _$ListRoomRanking {
+  const ListRoomRanking() : super.refetchOnUpdate();
+
+  @override
+  List<DwLiveChannel> get channels => const [roomsChannel];
+
+  @override
+  DwUpdateAction onUpdate(Object item) => switch (item) {
+    DwDeletedObject() => DwUpdateAction.remove,
+    RoomView() => DwUpdateAction.refetch,
+    _ => throw StateError('onUpdate was offered $item'),
+  };
+}
+
+mixin _$ListRoomRanking on DwListRequest<RoomView> {
+  @override
+  String get dwTypeName => 'ListRoomRanking';
+  @override
+  Map<String, Object?> toJson() => const {};
+  @override
+  bool operator ==(Object other) => other is ListRoomRanking;
+  @override
+  int get hashCode => (ListRoomRanking).hashCode;
+}
+
+ListRoomRanking $ListRoomRankingFromJson(Map<String, Object?> json) =>
+    const ListRoomRanking();
+
 /// The caller's own notes: "my" data, no account id in the request — its
 /// channel is the caller's (D-037).
 final class ListMyNotes extends DwListRequest<NoteView> with _$ListMyNotes {
@@ -509,6 +540,10 @@ final DwWireProtocol roomsProtocol = DwWireProtocol([
   const DwProtocolEntry<ListPinnedRooms>(
     'ListPinnedRooms',
     $ListPinnedRoomsFromJson,
+  ),
+  const DwProtocolEntry<ListRoomRanking>(
+    'ListRoomRanking',
+    $ListRoomRankingFromJson,
   ),
   const DwProtocolEntry<ListRoomStats>('ListRoomStats', $ListRoomStatsFromJson),
   const DwProtocolEntry<ListRooms>('ListRooms', $ListRoomsFromJson),

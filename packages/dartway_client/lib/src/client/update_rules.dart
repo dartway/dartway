@@ -25,9 +25,12 @@ const _refetch = _Refetch();
 /// The update actions of `DwUpdateAction`, applied to values
 /// (`docs/2-core/requests-and-updates.md`).
 ///
-/// Every object reaching here was accepted by the request (`acceptsItem` or
-/// `acceptsDeletion`), so an item is of the request's item type and a
-/// deletion names that type: matching by id is enough.
+/// Every object reaching here with an action that reads it was accepted by
+/// the request (`acceptsItem` or `acceptsDeletion`), so an item is of the
+/// request's item type and a deletion names that type: matching by id is
+/// enough. An object of another type arrives only on a
+/// `DwListRequest.refetchOnUpdate()` list, with `refetch`, which is returned
+/// before the object is read.
 ///
 /// **Values keep their reified types.** A list state is a `List<T>` built by
 /// the request's own decoder; every change copies it with `toList()`, which

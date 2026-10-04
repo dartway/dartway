@@ -72,6 +72,7 @@ final class Harness {
       ..onRequest<ListRoomsOffline>((request, call) => DwCallOk(rooms.toList()))
       ..onRequest<ListPinnedRooms>((request, call) => DwCallOk(rooms.toList()))
       ..onRequest<ListRoomStats>((request, call) => DwCallOk(rooms.toList()))
+      ..onRequest<ListRoomRanking>((request, call) => DwCallOk(rooms.toList()))
       ..onRequest<GetRoom>((request, call) {
         for (final room in rooms) {
           if (room.id == request.roomId) return DwCallOk(room);

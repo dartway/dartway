@@ -90,6 +90,55 @@ void main() {
       );
     });
 
+    group('refetchOnUpdate re-runs on any type on its channels (#428)', () {
+      for (final (what, update) in [
+        ('an object of another type', const NoteView(id: 1, text: 'n')),
+        (
+          'a deletion of another type',
+          DwDeletedObject.of<NoteView>(1, roomsProtocol),
+        ),
+      ]) {
+        test(what, () async {
+          final (h, watch) = await watched(const ListRoomStats());
+          expect(h.server.requestsOf<ListRoomStats>(), hasLength(1));
+          h.rooms = [c];
+          h.server.publish(roomsChannel, [update]);
+          await settle();
+          expect(h.server.requestsOf<ListRoomStats>(), hasLength(2));
+          expect(dataOf(watch.state), [c]);
+        });
+      }
+
+      // onUpdate keeps its contract: it sees only the item type. This one
+      // throws on anything else (reported, failing the harness) and removes
+      // on a deletion — a note's deletion with a room's id would remove `a`.
+      for (final (what, update) in [
+        ('an object of another type', const NoteView(id: 1, text: 'n')),
+        (
+          'a deletion of another type',
+          DwDeletedObject.of<NoteView>(1, roomsProtocol),
+        ),
+      ]) {
+        test(
+          '$what re-runs a list with its own onUpdate without reaching it',
+          () async {
+            final (h, watch) = await watched(const ListRoomRanking());
+            final states = DwStreamRecording(watch.states);
+            h.rooms = [a, b, c];
+            h.server.publish(roomsChannel, [update]);
+            await settle();
+            expect(h.server.requestsOf<ListRoomRanking>(), hasLength(2));
+            expect(
+              states.values.map(dataOf),
+              everyElement(contains(a)),
+              reason: 'nothing removed locally',
+            );
+            expect(dataOf(watch.state), [a, b, c]);
+          },
+        );
+      }
+    });
+
     test('objects of another type are not offered', () async {
       final (h, watch) = await watched(const ListRooms());
       final states = DwStreamRecording(watch.states);

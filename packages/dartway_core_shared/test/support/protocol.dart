@@ -120,6 +120,21 @@ final class ListBookingStats extends DwListRequest<ClubBooking> {
   Map<String, Object?> toJson() => _NoFields.json;
 }
 
+/// A refetching list that turns away its own type's cancelled bookings.
+final class ListBookedStats extends DwListRequest<ClubBooking> {
+  const ListBookedStats() : super.refetchOnUpdate();
+
+  @override
+  bool acceptsItem(Object? item) =>
+      item is ClubBooking && item.status == BookingStatus.booked;
+
+  @override
+  String get dwTypeName => 'ListBookedStats';
+
+  @override
+  Map<String, Object?> toJson() => _NoFields.json;
+}
+
 final class FeedBookings extends DwPageRequest<ClubBooking> {
   const FeedBookings() : super(pageSize: 20, maxPageSize: 100);
 

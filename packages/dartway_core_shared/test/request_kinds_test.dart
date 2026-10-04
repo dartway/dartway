@@ -152,6 +152,7 @@ void main() {
       const FindBooking(7),
       const ListMyBookings(),
       const ListBookingsUpdateOnly(),
+      const ListBookingStats(),
       const FeedBookings(),
       const ListBookingTable(),
       const BookingHistory(),
@@ -176,6 +177,64 @@ void main() {
           isFalse,
         );
       }
+    });
+  });
+
+  group('what an arrival does (updateActionFor)', () {
+    final foreignDeletion = DwDeletedObject.of<CoachNote>(7, protocol);
+
+    DwUpdateAction actionFor(DwDataRequest<Object?> request, DwWireObject o) =>
+        DwDataRequest.updateActionFor(request, o, protocol);
+
+    group('a refetchOnUpdate() list re-runs on any type on its channels '
+        '(#428)', () {
+      test('an object of another type re-runs it', () {
+        expect(
+          actionFor(const ListBookingStats(), note),
+          DwUpdateAction.refetch,
+        );
+      });
+
+      test('a deletion of another type re-runs it', () {
+        expect(
+          actionFor(const ListBookingStats(), foreignDeletion),
+          DwUpdateAction.refetch,
+        );
+      });
+    });
+
+    test('the item type is answered by onUpdate, another type is ignored, '
+        'in every other kind', () {
+      final requests = <DwDataRequest<Object?>>[
+        const GetBooking(),
+        const FindBooking(7),
+        const ListMyBookings(),
+        const ListBookingsUpdateOnly(),
+        const ListBookingStats(),
+        const FeedBookings(),
+        const ListBookingTable(),
+        const BookingHistory(),
+      ];
+      for (final request in requests) {
+        for (final own in [booking, cancelled, deletion]) {
+          expect(
+            actionFor(request, own),
+            request.onUpdate(own),
+            reason: '$request',
+          );
+        }
+        if (request is ListBookingStats) continue;
+        expect(actionFor(request, note), DwUpdateAction.ignore);
+        expect(actionFor(request, foreignDeletion), DwUpdateAction.ignore);
+      }
+    });
+
+    test('a refetching list that narrows acceptsItem keeps turning away its '
+        'own type; other types still re-run it', () {
+      const request = ListBookedStats();
+      expect(actionFor(request, cancelled), DwUpdateAction.ignore);
+      expect(actionFor(request, booking), DwUpdateAction.refetch);
+      expect(actionFor(request, note), DwUpdateAction.refetch);
     });
   });
 

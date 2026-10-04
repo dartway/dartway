@@ -397,22 +397,19 @@ sealed class _Entry implements _ChannelMember {
 
   // --- updates -------------------------------------------------------------
 
-  /// Offers objects that arrived on the entry's channels: takes those the
-  /// request accepts, asks the request what each does, and applies them.
+  /// Offers objects that arrived on the entry's channels: asks what each
+  /// does to the request (`DwDataRequest.updateActionFor` — `onUpdate` for
+  /// the item type, a re-run for any type on a `refetchOnUpdate()` list) and
+  /// applies them.
   @override
   void absorb(List<DwWireObject> objects) {
     if (disposed) return;
     final protocol = client.protocol;
     final accepted = <_Accepted>[];
     for (final object in objects) {
-      final concerns = switch (object) {
-        DwDeletedObject() => request.acceptsDeletion(object, protocol),
-        _ => request.acceptsItem(object),
-      };
-      if (!concerns) continue;
       final DwUpdateAction action;
       try {
-        action = request.onUpdate(object);
+        action = DwDataRequest.updateActionFor(request, object, protocol);
       } catch (error, stackTrace) {
         // One bad update must not stop the rest.
         client._report(error, stackTrace);
