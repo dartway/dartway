@@ -131,6 +131,6 @@ The feature's only description, on its public widget (`dwFeature`); without one,
 
 ## Step 4 — tests, then finish
 
-A contract test for the new DTOs, an acceptance test per handler with one refused call per rule and a
-second client hearing the publication, a widget test on the in-memory server (`dartway-testing`). Then
-`dartway-finish`.
+Past the gate of `dartway-testing`: the new DTOs in the contract test's list, an acceptance test for
+each handler whose rule is the point — one refused call per rule, a second client hearing the
+publication — and a widget test on the in-memory server. Then `dartway-finish`.

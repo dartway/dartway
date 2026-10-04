@@ -120,6 +120,8 @@ A new shape is recorded without a bump; a framework DTO without a recorded shape
 
 **"I ran the tests" means tier 1 green, both modes**, plus tier 2 for a wire or client change and tier 3 for a change that reaches a project's server. Running only the suites you touched is what lets a broken one reach the trunk.
 
+**Whether a test is written at all is the gate of `toolkit/skills/dartway-testing/SKILL.md` (§4, and §5 for a bugfix), and it binds this repository's suites too**: the owner boundary is the package whose behaviour it is, and what its suite proves is not restated in another package's.
+
 ## Standards
 
 - **Versioning: `0.x`, for at least a month after the rewrite runs in two projects and Studio (D-031).**

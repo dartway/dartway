@@ -5,16 +5,18 @@ description: >-
   (round trip, validate(), onUpdate, channels); server acceptance tests on a real Postgres and storage
   (`dart run dartway_cli:dartway test`, the skeleton's AppHarness, DwTestServer, real clients, raw
   calls, DwTestClock, server.http); widget tests on the in-memory DwFakeServer through the skeleton's
-  TestApp; where test files go; the timing traps; what not to test; proving a test by breaking the
-  code. Use when writing or reviewing tests, or when a test fails with "Dw is not initialized",
+  TestApp; where test files go; the timing traps; the gate a test passes before it is written (what it
+  protects, the regression that fails it, why existing coverage misses it, no seam only the test needs)
+  and the junk shapes that fail it; a bugfix's test red before the fix; proving a test by breaking the
+  code. Use when writing, adding or reviewing tests, or when a test fails with "Dw is not initialized",
   "Another dw core is alive", "found 0 widgets" or a pending Timer.
 ---
 
 # DartWay — how a project tests itself
 
-**What** deserves a test is the behaviour's complexity — rules, edge cases, rollback paths, and every
-non-trivial bugfix, starting red — never the fact that a line changed; not cosmetics. Assert the
-outcome, not that code ran. **Where** is decided by where the behaviour lives:
+A test is written for a behaviour — a rule, an edge case, a rollback path, a bug that happened — never
+for the fact that a line changed, and only past the gate (§4). **Where** it goes is decided by where the
+behaviour lives:
 
 | The behaviour | Its test | Runs with |
 |---|---|---|
@@ -83,8 +85,7 @@ it or an extension on it.
 
 ## 3. Screens — widget tests on the in-memory server
 
-A feature reads and writes through the ambient `dw`; nothing is added to make it spyable. The seam is
-the server, replaced by `DwFakeServer(protocol: appProtocol)` (`package:dartway_client/testing.dart`):
+A feature reads and writes through the ambient `dw`, so the seam is the server, replaced by `DwFakeServer(protocol: appProtocol)` (`package:dartway_client/testing.dart`):
 `onRequest<ListMyInvoices>((request, call) => DwCallOk(<CustomerInvoice>[…]))` — the exact result
 type, not `DwCallOk([])` — `onCommand<…>`,
 `call.publish(…)`; assert with `callsOf<PayInvoice>()`, `requestsOf<…>()`; push from outside with
@@ -113,17 +114,66 @@ Assert what the screen shows from the server's answer, that the action **sent th
 refusal renders as its text and nothing else changed, that a publication changed the screen without a
 re-read.
 
-## 4. Not tested here
+## 4. The gate — before a test is added
 
-The framework (calls, updates, reconnects, upload retries — tested in the DartWay repository);
-cosmetics; generated code (the round trip and `generate --check` cover it); a UI rule mirroring a server
-rule as proof of access. No coverage thresholds, and none reported.
+Four answers, a sentence each; a missing one means the test is not written yet.
+
+1. **What it protects** — an observable behaviour or contract: a refusal and its code, what a command
+   writes and publishes, what a screen shows from an answer, a calculation's result. Cosmetics protect
+   nothing.
+2. **Which credible regression turns it red** — a change someone could plausibly make, named; §5
+   proves it does.
+3. **Why existing coverage misses it.** Each contract has one owner test, at the tier the table above
+   gives it: a refusal is the acceptance test's, what a screen makes of the answer is the widget
+   test's, a DTO's shape the contract test's. Another tier only for a risk of its own there — the
+   refusal's text on screen, not the refusal again; a handler's predicate or a controller's helper is
+   not tested alone while the call proves each of its cases. Owned elsewhere: the framework (calls,
+   updates, reconnects, upload retries — tested in the DartWay repository) and generated code (the
+   round trip and `generate --check`). A new case is a row of the existing list or table, its setup a
+   method on the harness — not a near-duplicate beside it.
+4. **Whether it needs a seam no production caller uses** — a constructor parameter, a
+   `@visibleForTesting` export, a flag, a provider overridden to record calls. Then it is tested at the
+   real boundary instead — the server through its calls, the screen through the fake server; the
+   seams are the framework's (`DwTestClock`, `server.http`, `DwFakeServer`). Production code whose only
+   caller is a test is dead, not covered.
+
+**A test that breaks under a refactor that keeps the behaviour asserts the implementation** — it is
+rewritten at the boundary that owns the behaviour. No coverage thresholds, and none reported.
+
+**Junk** — each of these fails the gate:
+
+- **Runs, asserts nothing it produced**: a screen pumped or a handler called, ending on no exception,
+  `isNotNull`, or a widget that is there whatever the answer. Assert the outcome, not that code ran.
+- **A copy compared with the copy**: an expectation built by the code under test (the mapper making the
+  expected DTO), a hand list beside the one the code builds (refusal codes, routes, registered DTOs) —
+  red only when someone edits one side. The mutation of §5 does not find it; reading each side's source
+  does.
+- **The fake implements the assertion**: a `DwFakeServer` handler that filters, sorts or refuses by
+  logic of its own, and a widget test that then "proves" the filter, the order or the rule. It proves
+  the fake; the rule is the server's (§2).
+- **The setup does the subject's work**: a row inserted through `server.db` that the command should
+  write, a `server.publish` standing in for the command's publication, an outcome read from a table
+  the path never writes.
+- **A declaration read back**: a handler's access rule, a channel kind's rule, a `DwFeatureSpec` field
+  or a settings default asserted as declared. What a rule promises is proven by a call it refuses.
+- **A refusal for the wrong reason**: "another member is refused" with a caller who is not signed in,
+  stopped before the rule is reached. Assert the code (`refusedWith`) from a caller only the rule
+  stops.
+- **Structure by test**: a test reading `lib/` for an import, a call or a file. Structure is the
+  checker's (`dart run dartway_cli:dartway check`); a rule it lacks is a framework finding
+  (`dartway-framework-notes`).
+- **A name the test does not keep**: "hides archived invoices" over a list with no archived one,
+  "retries" with a single attempt.
 
 ## 5. A test is proved by breaking the code
 
 Before committing a test, **break the one thing it is about** — a comparison, a flag, one line — and
-watch it go red; name the change in the review ("removed `isDeleted` from the mapper — red"). Three
-shapes pass while testing nothing: the subject is inert where it stands (never mounted, never reached);
-**the test compares a copy with the copy** (an expectation built by the code under test, a hand list
-beside the one the code builds) — the mutation does not find this one, reading each side's source does;
-and a mutation that changed two things, going red for the wrong reason.
+watch it go red; name the change in the review ("removed `isDeleted` from the mapper — red"). Two
+shapes survive this proof while testing nothing: the subject is inert where it stands (never mounted,
+never reached), and a mutation that changed two things, going red for the wrong reason.
+
+**A bugfix starts with its test, red on the unfixed code for the reason the bug names** — the failure
+is the bug, not a compile error or a missing helper — and green after the fix; the review says so
+("red before the fix: expected `slotTaken`, got ok"). A regression test that never failed proves the
+fake, not the fix. One test, at the boundary that owns the bug — not the same scenario replayed at
+every tier it crossed.
