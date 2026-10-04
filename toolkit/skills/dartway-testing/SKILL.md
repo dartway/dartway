@@ -88,9 +88,9 @@ it or an extension on it.
 A feature reads and writes through the ambient `dw`, so the seam is the server, replaced by
 `DwFakeServer(protocol: appProtocol)` (`package:dartway_client/testing.dart`):
 `onRequest<ListMyInvoices>((request, call) => DwCallOk(<CustomerInvoice>[…]))` — the exact result
-type, not `DwCallOk([])` — `onCommand<…>`, `call.publish(…)`; assert with `callsOf<PayInvoice>()`, `requestsOf<…>()`; push from outside with
-`server.publish(channel, [object])`; page with `dwFakeTablePage`, `dwFakeOffsetPage`, `dwFakeWindow`;
-files with `DwFakeStorage`. **Every test ends asserting `server.errors` is empty.**
+type, not `DwCallOk([])` — `onCommand<…>`, `call.publish(…)`; assert with `callsOf<PayInvoice>()`,
+`requestsOf<…>()`; push from outside with `server.publish(channel, [object])`; page with
+`dwFakeTablePage`, `dwFakeOffsetPage`, `dwFakeWindow`; files with `DwFakeStorage`. **Every test ends asserting `server.errors` is empty.**
 
 **Start from the skeleton's `FakeApp` and `TestApp`** (`__FLUTTER_PKG__/test/support/app_test_app.dart`):
 they build the core through the app's own factory in `lib/core/dw_core.dart` with the fake's transports
@@ -116,7 +116,7 @@ re-read.
 
 ## 4. The gate — before a test is added
 
-Four answers, a sentence each; a missing one means the test is not written yet.
+Four answers, a sentence each; a question it cannot answer means the test is not written yet.
 
 1. **What it protects** — an observable behaviour or contract: a refusal and its code, what a command
    writes and publishes, what a screen shows from an answer, a calculation's result. Cosmetics protect
@@ -131,7 +131,7 @@ Four answers, a sentence each; a missing one means the test is not written yet.
    updates, reconnects, upload retries — tested in the DartWay repository) and generated code (the
    round trip and `generate --check`). A new case is a row of the existing list or table, its setup a
    method on the harness — not a near-duplicate beside it.
-4. **Which production caller uses the seam it needs** — a constructor parameter, a
+4. **Which production caller uses the seam it needs, if any** — a constructor parameter, a
    `@visibleForTesting` export, a flag, a provider overridden to record calls. None: it is tested at the
    real boundary instead — the server through its calls, the screen through the fake server; the
    seams are the framework's (`DwTestClock`, `server.http`, `DwFakeServer`). Production code whose only
