@@ -85,10 +85,10 @@ it or an extension on it.
 
 ## 3. Screens — widget tests on the in-memory server
 
-A feature reads and writes through the ambient `dw`, so the seam is the server, replaced by `DwFakeServer(protocol: appProtocol)` (`package:dartway_client/testing.dart`):
+A feature reads and writes through the ambient `dw`, so the seam is the server, replaced by
+`DwFakeServer(protocol: appProtocol)` (`package:dartway_client/testing.dart`):
 `onRequest<ListMyInvoices>((request, call) => DwCallOk(<CustomerInvoice>[…]))` — the exact result
-type, not `DwCallOk([])` — `onCommand<…>`,
-`call.publish(…)`; assert with `callsOf<PayInvoice>()`, `requestsOf<…>()`; push from outside with
+type, not `DwCallOk([])` — `onCommand<…>`, `call.publish(…)`; assert with `callsOf<PayInvoice>()`, `requestsOf<…>()`; push from outside with
 `server.publish(channel, [object])`; page with `dwFakeTablePage`, `dwFakeOffsetPage`, `dwFakeWindow`;
 files with `DwFakeStorage`. **Every test ends asserting `server.errors` is empty.**
 
@@ -131,8 +131,8 @@ Four answers, a sentence each; a missing one means the test is not written yet.
    updates, reconnects, upload retries — tested in the DartWay repository) and generated code (the
    round trip and `generate --check`). A new case is a row of the existing list or table, its setup a
    method on the harness — not a near-duplicate beside it.
-4. **Whether it needs a seam no production caller uses** — a constructor parameter, a
-   `@visibleForTesting` export, a flag, a provider overridden to record calls. Then it is tested at the
+4. **Which production caller uses the seam it needs** — a constructor parameter, a
+   `@visibleForTesting` export, a flag, a provider overridden to record calls. None: it is tested at the
    real boundary instead — the server through its calls, the screen through the fake server; the
    seams are the framework's (`DwTestClock`, `server.http`, `DwFakeServer`). Production code whose only
    caller is a test is dead, not covered.
