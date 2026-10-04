@@ -27,7 +27,9 @@ const _refetch = _Refetch();
 ///
 /// Every object reaching here was accepted by the request (`acceptsItem` or
 /// `acceptsDeletion`), so an item is of the request's item type and a
-/// deletion names that type: matching by id is enough.
+/// deletion names that type: matching by id is enough. The one request that
+/// accepts any type (`DwListRequest.refetchOnUpdate()`) answers `refetch`,
+/// which is returned before the object is read.
 ///
 /// **Values keep their reified types.** A list state is a `List<T>` built by
 /// the request's own decoder; every change copies it with `toList()`, which

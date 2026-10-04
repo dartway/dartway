@@ -2,6 +2,12 @@
 
 ## 0.21.0-dev.17
 
+- **`DwListRequest.refetchOnUpdate()` re-runs on every object and deletion on its channels, whatever
+  the type**, as documented (dartway/dartway#428). It accepted only its item type before, so a
+  derived list never heard the other types on its channels — often the objects it is derived from. The
+  channels are its only scope: under this policy `acceptsItem` and `acceptsDeletion` answer `true`,
+  and `onUpdate` answers `refetch` before asking the type. A project that overrode both to `true`
+  by hand may drop the override.
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the router
   that follows a provider (dartway/dartway#407).
 

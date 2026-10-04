@@ -90,6 +90,26 @@ void main() {
       );
     });
 
+    group('refetchOnUpdate re-runs on any type on its channels (#428)', () {
+      for (final (what, update) in [
+        ('an object of another type', const NoteView(id: 1, text: 'n')),
+        (
+          'a deletion of another type',
+          DwDeletedObject.of<NoteView>(1, roomsProtocol),
+        ),
+      ]) {
+        test(what, () async {
+          final (h, watch) = await watched(const ListRoomStats());
+          expect(h.server.requestsOf<ListRoomStats>(), hasLength(1));
+          h.rooms = [c];
+          h.server.publish(roomsChannel, [update]);
+          await settle();
+          expect(h.server.requestsOf<ListRoomStats>(), hasLength(2));
+          expect(dataOf(watch.state), [c]);
+        });
+      }
+    });
+
     test('objects of another type are not offered', () async {
       final (h, watch) = await watched(const ListRooms());
       final states = DwStreamRecording(watch.states);

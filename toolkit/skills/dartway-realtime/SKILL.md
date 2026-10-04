@@ -68,7 +68,8 @@ exact number comes from a request.
 
 ## 3. What an update does to a request
 
-An arriving object of the request's type gets one `DwUpdateAction` from the request's `onUpdate`:
+An arriving object of the request's type gets one `DwUpdateAction` from the request's `onUpdate`; a
+`.refetchOnUpdate()` list re-runs on every object and deletion on its channels, whatever the type:
 
 | Request | An object arrives | A deletion arrives |
 |---|---|---|

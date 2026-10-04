@@ -63,12 +63,19 @@ void main() {
     });
 
     test('list.refetchOnUpdate(): everything refetches', () {
-      expect(actions(const ListBookingStats()), {
+      const request = ListBookingStats();
+      expect(actions(request), {
         'matching': DwUpdateAction.refetch,
         'notMatching': DwUpdateAction.refetch,
         'deletion': DwUpdateAction.refetch,
-        'foreign': DwUpdateAction.ignore,
+        'foreign': DwUpdateAction.refetch,
       });
+      // Its channels are its only scope (#428): an object or a deletion of
+      // any type is offered, and re-runs it.
+      final foreignDeletion = DwDeletedObject.of<CoachNote>(7, protocol);
+      expect(request.acceptsItem(note), isTrue);
+      expect(request.acceptsDeletion(foreignDeletion, protocol), isTrue);
+      expect(request.onUpdate(foreignDeletion), DwUpdateAction.refetch);
     });
 
     test('page: matches ? upsert : remove; .updateOnly(): update', () {
@@ -147,6 +154,8 @@ void main() {
   });
 
   group('item type', () {
+    // Every kind that reads what arrives; a refetching list does not, and
+    // accepts anything on its channels ('list.refetchOnUpdate()' above).
     final requests = <DwDataRequest<Object?>>[
       const GetBooking(),
       const FindBooking(7),
