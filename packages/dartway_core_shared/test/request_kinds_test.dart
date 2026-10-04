@@ -63,19 +63,12 @@ void main() {
     });
 
     test('list.refetchOnUpdate(): everything refetches', () {
-      const request = ListBookingStats();
-      expect(actions(request), {
+      expect(actions(const ListBookingStats()), {
         'matching': DwUpdateAction.refetch,
         'notMatching': DwUpdateAction.refetch,
         'deletion': DwUpdateAction.refetch,
-        'foreign': DwUpdateAction.refetch,
+        'foreign': DwUpdateAction.ignore,
       });
-      // Its channels are its only scope (#428): an object or a deletion of
-      // any type is offered, and re-runs it.
-      final foreignDeletion = DwDeletedObject.of<CoachNote>(7, protocol);
-      expect(request.acceptsItem(note), isTrue);
-      expect(request.acceptsDeletion(foreignDeletion, protocol), isTrue);
-      expect(request.onUpdate(foreignDeletion), DwUpdateAction.refetch);
     });
 
     test('page: matches ? upsert : remove; .updateOnly(): update', () {
@@ -154,13 +147,12 @@ void main() {
   });
 
   group('item type', () {
-    // Every kind that reads what arrives; a refetching list does not, and
-    // accepts anything on its channels ('list.refetchOnUpdate()' above).
     final requests = <DwDataRequest<Object?>>[
       const GetBooking(),
       const FindBooking(7),
       const ListMyBookings(),
       const ListBookingsUpdateOnly(),
+      const ListBookingStats(),
       const FeedBookings(),
       const ListBookingTable(),
       const BookingHistory(),
@@ -184,6 +176,56 @@ void main() {
           ),
           isFalse,
         );
+      }
+    });
+  });
+
+  group('what an arrival does (updateActionFor)', () {
+    final foreignDeletion = DwDeletedObject.of<CoachNote>(7, protocol);
+
+    DwUpdateAction actionFor(DwDataRequest<Object?> request, DwWireObject o) =>
+        DwDataRequest.updateActionFor(request, o, protocol);
+
+    group('a refetchOnUpdate() list re-runs on any type on its channels '
+        '(#428)', () {
+      test('an object of another type re-runs it', () {
+        expect(
+          actionFor(const ListBookingStats(), note),
+          DwUpdateAction.refetch,
+        );
+      });
+
+      test('a deletion of another type re-runs it', () {
+        expect(
+          actionFor(const ListBookingStats(), foreignDeletion),
+          DwUpdateAction.refetch,
+        );
+      });
+    });
+
+    test('the item type is answered by onUpdate, another type is ignored, '
+        'in every other kind', () {
+      final requests = <DwDataRequest<Object?>>[
+        const GetBooking(),
+        const FindBooking(7),
+        const ListMyBookings(),
+        const ListBookingsUpdateOnly(),
+        const ListBookingStats(),
+        const FeedBookings(),
+        const ListBookingTable(),
+        const BookingHistory(),
+      ];
+      for (final request in requests) {
+        for (final own in [booking, cancelled, deletion]) {
+          expect(
+            actionFor(request, own),
+            request.onUpdate(own),
+            reason: '$request',
+          );
+        }
+        if (request is ListBookingStats) continue;
+        expect(actionFor(request, note), DwUpdateAction.ignore);
+        expect(actionFor(request, foreignDeletion), DwUpdateAction.ignore);
       }
     });
   });

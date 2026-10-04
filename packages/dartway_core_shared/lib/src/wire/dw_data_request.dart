@@ -79,49 +79,74 @@ sealed class DwDataRequest<R> extends DwServerCall<R> {
   /// watched. Subscriptions are reference-counted across requests.
   List<DwLiveChannel> get channels => const [];
 
-  /// Whether [item] concerns this request: an instance of its item type —
-  /// or, for a request that re-runs on every update
-  /// (`DwListRequest.refetchOnUpdate()`), any object on its channels, which
-  /// are then its only scope.
+  /// Whether [item] is an instance of this request's item type.
   ///
   /// Only the kind knows its type argument, so the question is put here
   /// rather than probed from outside. An explicit `is` test is kept by every
   /// compiler mode, including dart2js with implicit checks omitted.
   bool acceptsItem(Object? item);
 
-  /// Whether [deletion] concerns this request: it removes an object of the
-  /// request's item type — or, for a request that re-runs on every update,
-  /// it is any deletion on its channels.
+  /// Whether [deletion] removes an object of this request's item type.
   ///
   /// A deletion names its type by wire name, which only the protocol can
   /// relate to the kind's type argument.
   bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol);
 
-  /// Whether every update on the channels re-runs the request, whatever its
-  /// type: what arrives is never read, so the item type filters nothing.
-  bool get _refetchesAny => _policy == _DwUpdatePolicy.refetch;
-
   /// What an arrived object does to this request's state.
   ///
-  /// The client offers only what concerns the request: objects [acceptsItem]
-  /// is true for and deletions [acceptsDeletion] is true for. The kind's
-  /// answer is explicit (see the table on [DwDataRequest]); override for a
-  /// special case, keeping it a pure function of [item] and the fields.
-  DwUpdateAction onUpdate(Object item) => switch (_policy) {
-    // Answered before the type is asked: any object or deletion re-runs it.
-    _DwUpdatePolicy.refetch => DwUpdateAction.refetch,
-    _DwUpdatePolicy.table when item is DwDeletedObject =>
-      DwUpdateAction.refetch,
-    _ when item is DwDeletedObject => DwUpdateAction.remove,
-    _ when !acceptsItem(item) => DwUpdateAction.ignore,
-    _DwUpdatePolicy.update => DwUpdateAction.update,
-    _DwUpdatePolicy.matching || _DwUpdatePolicy.table =>
-      _matchesItem(item) ? DwUpdateAction.upsert : DwUpdateAction.remove,
-  };
+  /// The client offers only objects [acceptsItem] is true for and deletions
+  /// [acceptsDeletion] is true for — of the item type, also on a
+  /// `refetchOnUpdate()` list, whose other types re-run it without reaching
+  /// here ([updateActionFor]). The kind's answer is explicit (see the table
+  /// on [DwDataRequest]); override for a special case, keeping it a pure
+  /// function of [item] and the fields.
+  DwUpdateAction onUpdate(Object item) {
+    if (item is DwDeletedObject) {
+      return switch (_policy) {
+        _DwUpdatePolicy.refetch ||
+        _DwUpdatePolicy.table => DwUpdateAction.refetch,
+        _DwUpdatePolicy.update ||
+        _DwUpdatePolicy.matching => DwUpdateAction.remove,
+      };
+    }
+    if (!acceptsItem(item)) return DwUpdateAction.ignore;
+    return switch (_policy) {
+      _DwUpdatePolicy.update => DwUpdateAction.update,
+      _DwUpdatePolicy.matching || _DwUpdatePolicy.table =>
+        _matchesItem(item) ? DwUpdateAction.upsert : DwUpdateAction.remove,
+      _DwUpdatePolicy.refetch => DwUpdateAction.refetch,
+    };
+  }
+
+  /// What [object], arrived on one of [request]'s channels, does to its
+  /// state — the one question the client puts for every arrival.
+  ///
+  /// An object [acceptsItem] is true for, or a deletion [acceptsDeletion] is
+  /// true for, is answered by [onUpdate]. Any other object or deletion is
+  /// ignored — except by a request that re-runs on every update
+  /// (`DwListRequest.refetchOnUpdate()`): its channels are its only scope, so
+  /// an object of another type re-runs it too, without reaching [onUpdate],
+  /// which only ever sees the item type (#428).
+  ///
+  /// Static, so that it is not a point to override: a request says what it
+  /// wants through [acceptsItem], [acceptsDeletion] and [onUpdate].
+  static DwUpdateAction updateActionFor(
+    DwDataRequest<Object?> request,
+    DwWireObject object,
+    DwWireProtocol protocol,
+  ) {
+    final ofItemType = switch (object) {
+      DwDeletedObject() => request.acceptsDeletion(object, protocol),
+      _ => request.acceptsItem(object),
+    };
+    if (ofItemType) return request.onUpdate(object);
+    return request._policy == _DwUpdatePolicy.refetch
+        ? DwUpdateAction.refetch
+        : DwUpdateAction.ignore;
+  }
 
   /// `matches` of the kinds that declare it, reached without the type
-  /// argument; called only under a policy that reads the item, with an item
-  /// [acceptsItem] has shown to be of the item type.
+  /// argument; called only with an item [acceptsItem] is true for.
   bool _matchesItem(Object item) => true;
 }
 
@@ -200,7 +225,8 @@ abstract class DwMaybeRequest<T extends DwDataObject>
 /// `DwListRequest.refetchOnUpdate()`: every update re-runs the request — for
 /// derived lists the client cannot compute. Every object and deletion on the
 /// request's channels counts, whatever its type: a ranking re-runs on a score
-/// published beside it. The channels are its only scope.
+/// published beside it. [onUpdate] still sees only objects of type [T]; the
+/// other types re-run the request without reaching it.
 abstract class DwListRequest<T extends DwDataObject>
     extends DwDataRequest<List<T>> {
   const DwListRequest() : super._(_DwUpdatePolicy.matching);
@@ -210,11 +236,11 @@ abstract class DwListRequest<T extends DwDataObject>
   const DwListRequest.refetchOnUpdate() : super._(_DwUpdatePolicy.refetch);
 
   @override
-  bool acceptsItem(Object? item) => _refetchesAny || item is T;
+  bool acceptsItem(Object? item) => item is T;
 
   @override
   bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
-      _refetchesAny || deletion.isOf<T>(protocol);
+      deletion.isOf<T>(protocol);
 
   /// Whether [item] belongs to this list. By default every object of type [T]
   /// on the request's channels does.

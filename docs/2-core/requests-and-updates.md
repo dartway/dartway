@@ -84,9 +84,9 @@ than its handler keeps a row on the page that has left the filter.
    including the responses of its own app's commands — which is right for a snapshot such as a
    search (`ListChatMessagesMatching` in `example/dartway_example_shared/lib/src/chat/chat_messages.dart`).
 3. Only objects of the request's item type are offered (`acceptsItem`), and only deletions of that
-   type (`acceptsDeletion`). The exception is `.refetchOnUpdate()`: it never reads what arrives, so
-   every object and deletion on its channels re-runs it, whatever the type — its channels are its
-   whole scope.
+   type (`acceptsDeletion`). The exception is `.refetchOnUpdate()`: its channels are its whole
+   scope, so an object or a deletion of another type on them re-runs it as well — without reaching
+   `onUpdate`, which only ever sees the item type.
 4. `onUpdate` answers a `DwUpdateAction`, and the client applies it:
 
 | Action | What the client does |
