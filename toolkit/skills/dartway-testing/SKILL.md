@@ -90,7 +90,8 @@ A feature reads and writes through the ambient `dw`, so the seam is the server, 
 `onRequest<ListMyInvoices>((request, call) => DwCallOk(<CustomerInvoice>[…]))` — the exact result
 type, not `DwCallOk([])` — `onCommand<…>`, `call.publish(…)`; assert with `callsOf<PayInvoice>()`,
 `requestsOf<…>()`; push from outside with `server.publish(channel, [object])`; page with
-`dwFakeTablePage`, `dwFakeOffsetPage`, `dwFakeWindow`; files with `DwFakeStorage`. **Every test ends asserting `server.errors` is empty.**
+`dwFakeTablePage`, `dwFakeOffsetPage`, `dwFakeWindow`; files with `DwFakeStorage`.
+**Every test ends asserting `server.errors` is empty.**
 
 **Start from the skeleton's `FakeApp` and `TestApp`** (`__FLUTTER_PKG__/test/support/app_test_app.dart`):
 they build the core through the app's own factory in `lib/core/dw_core.dart` with the fake's transports
