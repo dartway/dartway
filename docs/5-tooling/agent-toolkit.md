@@ -76,7 +76,7 @@ skills → `dartway-finish`.
 | `dartway-access` | Access rules, channel rules, roles, identities and keys |
 | `dartway-migrations` | Writing, checking and applying migrations |
 | `dartway-uploads` | Files: upload purposes and their rules, the public and the private bucket, rows that store a file id |
-| `dartway-testing` | Where a test goes and how to write it, tier by tier |
+| `dartway-testing` | Whether a test is written, where it goes and how to write it, tier by tier |
 | `dartway-navigation` | The router: zones, route descriptors, guards |
 | `dartway-ui-kit` | The kit as source inside the app, and the ban on raw styles outside it |
 | `dartway-on-device` | What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |

@@ -2,6 +2,13 @@
 
 ## 0.24.0
 
+- **The toolkit `dartway update` installs asks four questions before a test is written**:
+  `dartway-testing` holds a gate — what the test protects, which credible regression turns it red, why
+  existing coverage misses it (one owner test per contract, at the tier that owns it), which production
+  caller uses the seam it needs — and the junk shapes that fail it; a bugfix's test is red on the unfixed
+  code for the bug's reason, once, at the owner boundary. `dartway-finish`, `dartway-plan` and
+  `dartway-feature-scaffold` point at the gate instead of asking for a test per layer or per handler.
+
 - **The toolkit `dartway update` installs states every rule once** (dartway/dartway#392, D-121):
   `CLAUDE.md` is the seven laws and a law table with one row per rule, naming its failing checks and
   the skill that owns it; each skill holds only its own topic, task-first, with pointers instead of

@@ -31,7 +31,7 @@ features, their specs and routes in `__FLUTTER_PKG__/lib/`. Name what is reused.
 5. Jobs, routes, upload rules — only if the option needs them.
 6. App — route, feature and spec, reads and commands, kit, texts and refusal texts
    (`dartway-navigation`, `dartway-feature-scaffold`, `dartway-data-layer`, `dartway-ui-kit`).
-7. Tests at each level; a bugfix starts with the failing test (`dartway-testing`).
+7. Tests, each behaviour once at the tier that owns it; a bugfix starts with the failing test (`dartway-testing`).
 8. Descriptions reconciled in the code (`dartway-documentation`).
 9. An ADR — only if the plan itself rejected a real alternative.
 

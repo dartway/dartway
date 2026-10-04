@@ -92,8 +92,9 @@ through the public kit widget.
   `dartway-documentation`. So is a statement in the root `CLAUDE.md` or a skill that the changed code now
   contradicts, either way; a managed file is a framework finding.
 - Non-trivial logic, money, a rule or a bugfix without a test is flagged; the test belongs where the
-  behaviour lives (`dartway-testing`). **Ask which one change proved each new test red**
-  (`dartway-testing` §5).
+  behaviour lives (`dartway-testing`). So is a new test that fails the gate — a question it cannot
+  answer, a junk shape it matches (`dartway-testing` §4). **Ask which one change proved each new test
+  red**, and for a bugfix that its test was red before the fix (§5).
 
 ## A.5 Workarounds whose framework moved
 
