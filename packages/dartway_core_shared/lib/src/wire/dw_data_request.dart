@@ -125,8 +125,10 @@ sealed class DwDataRequest<R> extends DwServerCall<R> {
   /// true for, is answered by [onUpdate]. Any other object or deletion is
   /// ignored — except by a request that re-runs on every update
   /// (`DwListRequest.refetchOnUpdate()`): its channels are its only scope, so
-  /// an object of another type re-runs it too, without reaching [onUpdate],
-  /// which only ever sees the item type (#428).
+  /// an object or a deletion of another type re-runs it too, without
+  /// reaching [onUpdate], which only ever sees the item type (#428). One of
+  /// the item type that [acceptsItem] or [acceptsDeletion] turned away stays
+  /// turned away.
   ///
   /// Static, so that it is not a point to override: a request says what it
   /// wants through [acceptsItem], [acceptsDeletion] and [onUpdate].
@@ -140,10 +142,16 @@ sealed class DwDataRequest<R> extends DwServerCall<R> {
       _ => request.acceptsItem(object),
     };
     if (ofItemType) return request.onUpdate(object);
-    return request._policy == _DwUpdatePolicy.refetch
+    return request._policy == _DwUpdatePolicy.refetch &&
+            request._isForeign(object, protocol)
         ? DwUpdateAction.refetch
         : DwUpdateAction.ignore;
   }
+
+  /// Whether [object] is of another type than the item type, read from the
+  /// kind's type argument rather than from an overridable [acceptsItem].
+  /// Asked only under the refetch policy, which only the list kind has.
+  bool _isForeign(DwWireObject object, DwWireProtocol protocol) => false;
 
   /// `matches` of the kinds that declare it, reached without the type
   /// argument; called only with an item [acceptsItem] is true for.
@@ -241,6 +249,13 @@ abstract class DwListRequest<T extends DwDataObject>
   @override
   bool acceptsDeletion(DwDeletedObject deletion, DwWireProtocol protocol) =>
       deletion.isOf<T>(protocol);
+
+  @override
+  bool _isForeign(DwWireObject object, DwWireProtocol protocol) =>
+      switch (object) {
+        DwDeletedObject() => !object.isOf<T>(protocol),
+        _ => object is! T,
+      };
 
   /// Whether [item] belongs to this list. By default every object of type [T]
   /// on the request's channels does.

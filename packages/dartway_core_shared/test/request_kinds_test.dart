@@ -228,6 +228,14 @@ void main() {
         expect(actionFor(request, foreignDeletion), DwUpdateAction.ignore);
       }
     });
+
+    test('a refetching list that narrows acceptsItem keeps turning away its '
+        'own type; other types still re-run it', () {
+      const request = ListBookedStats();
+      expect(actionFor(request, cancelled), DwUpdateAction.ignore);
+      expect(actionFor(request, booking), DwUpdateAction.refetch);
+      expect(actionFor(request, note), DwUpdateAction.refetch);
+    });
   });
 
   group('page sizes', () {
