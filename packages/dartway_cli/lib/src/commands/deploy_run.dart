@@ -15,7 +15,13 @@ import '../deploy/stack.dart';
 ///
 /// Lives beside the command rather than inside it so the orchestration reads
 /// top to bottom without the argument plumbing in the way.
-Future<int> runDeploy(DwStack stack, ArgResults results) async {
+Future<int> runDeploy(
+  DwStack stack,
+  ArgResults results, {
+  DwSshRunner? connection,
+  DwDeployProgress? progress,
+  Iterable<DwDeployCheck>? localChecks,
+}) async {
   // The root `deployProjectRoot()` already found and built [stack] from —
   // read once, not recomputed from `Directory.current` here, which silently
   // disagreed with it whenever the CLI ran from inside a package rather than
@@ -23,14 +29,16 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
   final projectRoot = stack.projectRoot;
   final target = stack.target;
   final environment = target.environment;
-  final progress = results.option('progress') == 'json'
-      ? DwDeployProgress.json()
-      : DwDeployProgress.text();
-  final out = progress.human;
+  final report =
+      progress ??
+      (results.option('progress') == 'json'
+          ? DwDeployProgress.json()
+          : DwDeployProgress.text());
+  final out = report.human;
   final resume = results.flag('resume');
 
   int finish(int code, {String? failedStep, String? reason}) {
-    progress.event('run_finished', {
+    report.event('run_finished', {
       'ok': code == 0,
       'exit_code': code,
       'failed_step': ?failedStep,
@@ -40,18 +48,20 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
   }
 
   final sshUser = results.option('as') ?? target.sshUser;
-  final ssh = DwSshRunner(
-    host: target.host,
-    user: sshUser,
-    identityFile: results.option('identity'),
-  );
+  final ssh =
+      connection ??
+      DwSshRunner(
+        host: target.host,
+        user: sshUser,
+        identityFile: results.option('identity'),
+      );
   final remote = DwRemoteSteps(
     ssh: ssh,
     deployUser: target.deployUser,
     directory: DwDeployRunner.remoteDirectoryOf(target),
     onNotice: (notice) {
       out.writeln(notice);
-      progress.event('notice', {'message': notice});
+      report.event('notice', {'message': notice});
     },
   );
   final runner = DwDeployRunner(ssh: ssh, stack: stack, remote: remote);
@@ -73,20 +83,21 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     ssh: ssh,
   );
   var blocking = 0;
-  for (final check in dwLocalDeployChecks.where((c) => c.partOfDeploy)) {
+  for (final check
+      in localChecks ?? dwLocalDeployChecks.where((c) => c.partOfDeploy)) {
     final verdict = await check.evaluate(context);
     if (verdict.passed || verdict.skipped) {
       continue;
     }
     if (check.severity == DwCheckSeverity.error) {
       blocking++;
-      progress.problems.writeln('  FAIL  ${check.title} — ${verdict.detail}');
+      report.problems.writeln('  FAIL  ${check.title} — ${verdict.detail}');
     } else {
       out.writeln('  warn  ${check.title} — ${verdict.detail}');
     }
   }
   if (blocking > 0) {
-    progress.problems.writeln(
+    report.problems.writeln(
       'Refusing to deploy: $blocking blocking issue(s). '
       'Run "dartway deploy check --env $environment --local" for the detail.',
     );
@@ -103,7 +114,7 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
       out.writeln('       $probe');
     }
     out.writeln('\nDry run — nothing executed.');
-    progress.event('plan', {'steps': _stepList(steps)});
+    report.event('plan', {'steps': _stepList(steps)});
     return finish(0);
   }
 
@@ -112,11 +123,11 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     try {
       record = await remote.read();
     } on StateError catch (error) {
-      progress.problems.writeln(error.message);
+      report.problems.writeln(error.message);
       return finish(1, reason: 'unreachable');
     }
     if (record == null) {
-      progress.problems.writeln(
+      report.problems.writeln(
         'Nothing to resume: the server keeps no record of a deployment. '
         'Run without --resume.',
       );
@@ -129,7 +140,7 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     steps = [for (final id in planned) ...steps.where((step) => step.id == id)];
   }
 
-  progress.event('run_started', {
+  report.event('run_started', {
     'environment': environment,
     'resume': resume,
     'steps': _stepList(steps),
@@ -140,7 +151,7 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     final lines = revision.stdout.trim().split('\n');
     if (!revision.ok || lines.length < 2) return;
     out.writeln('  now at ${lines[1].trim()}');
-    progress.event('revision', {
+    report.event('revision', {
       'commit': lines.first.trim(),
       'subject': lines[1].trim().split(' ').skip(1).join(' '),
     });
@@ -157,7 +168,7 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     remote: remote,
     resumeFrom: record,
     retryFailed: results.flag('retry-failed'),
-    progress: progress,
+    progress: report,
     onUpdated: reportRevision,
   );
   if (failedStep != null) {
@@ -173,11 +184,11 @@ Future<int> runDeploy(DwStack stack, ArgResults results) async {
     final [name, ...rest] = line.trim().split('\t');
     services.add({'name': name, 'status': rest.join(' ')});
   }
-  progress.event('services', {'services': services});
+  report.event('services', {'services': services});
 
   final code = reportOutsideVerification(
     await runner.verifyFromOutside(),
-    progress: progress,
+    progress: report,
   );
   return finish(code, reason: code == 0 ? null : 'verification');
 }

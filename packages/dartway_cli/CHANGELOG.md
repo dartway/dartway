@@ -2,6 +2,18 @@
 
 ## 0.24.0
 
+- **`deploy run` asks Let's Encrypt before it replaces anything** (dartway/dartway#433, D-123): the
+  `certificate` step runs right after the data volume guard, through the proxy the previous deploy
+  left running, so a Let's Encrypt failure stops the deploy with the previous version still serving
+  instead of after the server was replaced and before the proxy restart. With no proxy running — a
+  first deploy, a stand that is down — it asks nothing, and the new step `certificate-started-proxy`,
+  before the proxy restart, issues the certificate; on a routine deploy that step finds every host
+  covered and asks nothing either. **The coverage check works again**: it read `certbot certificates`
+  for a `Domains:` line that certbot 5 prints as `Identifiers:`, so every certificate looked empty and
+  every deploy asked to extend one that already named every host; the hosts are now read from the
+  served certificate itself with `openssl`. A host added to the configuration no longer needs `setup`
+  first. `deploy_certificate_docker_test.dart` proves both against the pinned images.
+
 - **The toolkit `dartway update` installs asks four questions before a test is written**:
   `dartway-testing` holds a gate — what the test protects, which credible regression turns it red, why
   existing coverage misses it (one owner test per contract, at the tier that owns it), which production

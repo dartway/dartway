@@ -60,7 +60,10 @@ a private bucket anyone can read or a public one nobody can.
 1. updates the checkout to the tip of the branch;
 2. renders `.env` from the secret store, refusing — by key name, never by value
    — when a required secret is missing or empty;
-3. asks Compose whether the merged stack is valid, then builds the images;
+3. asks Compose whether the merged stack is valid, makes the TLS certificate
+   cover every host through the proxy still serving — before anything is
+   replaced, so a Let's Encrypt failure leaves the previous version serving —
+   then builds the images;
 4. starts storage and the database;
 5. **starts the new server beside the running one**. It applies its migrations
    as it starts, and either answers `/health` or exits; on an exit its log is
@@ -68,8 +71,9 @@ a private bucket anyone can read or a public one nobody can.
    log *is* the migration outcome, in the server's own words;
 6. replaces the server and waits for it to be healthy, then the web image;
 7. checks that every upstream of the proxy is a service of the applied stack and
-   runs `nginx -t` inside the running proxy, issues the certificate once, and
-   restarts the proxy — and checks that it is still running afterwards;
+   runs `nginx -t` inside the running proxy, issues the certificate if no proxy
+   was running to ask through before (a first deploy), and restarts the proxy —
+   and checks that it is still running afterwards;
 8. verifies from outside, as a browser and an app would: `/health` answers 200
    through both hosts, the app host serves the Flutter `index.html` with a
    revalidating cache policy, `/dw/live` upgrades through both hosts and the

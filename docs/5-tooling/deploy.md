@@ -322,11 +322,21 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    rendered stack does not exist while another data volume of this project does — the shape of a
    config change (a rename, a different storage backend) about to serve fresh data next to the real
    one. One implementation, run from both commands;
-7. builds the images;
-8. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
+7. **makes the TLS certificate cover every served host, before anything is built or replaced**,
+   through the proxy the previous deploy left running. That proxy answers the ACME challenge for any
+   name, a host added to the configuration since included: its port-80 server is the only one, so
+   Nginx makes it the default. The hosts are read from the certificate Nginx serves, and one that
+   already names them all is left alone, so a routine deploy asks Let's Encrypt nothing; a host added
+   since (a storage domain, a site) extends the lineage with `--expand`, under the same name; the
+   self-signed certificate of `setup` is replaced by an issued one. Let's Encrypt fails for reasons of
+   its own, and a failure here stops the deploy with the previous version still serving. With no
+   proxy running — a first deploy, a stand that is down — nothing is serving that a failure could
+   take down, and the certificate is left to step 13;
+8. builds the images;
+9. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
    bundled`, starts Postgres — with `database: external` there is nothing of the database's to start,
    the server reaches it directly;
-9. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
+10. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
    flight are answered, live sockets close with "server stopping" — and from then on the proxy
    answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
    idempotency key, so a retry never runs it twice). The new image applies the migrations in a
@@ -337,16 +347,15 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    declares. When the migrations fail (they roll back) or the new server does not become healthy,
    the image that was serving is started again and the step fails with the server's own log; after
    a failure past the migrations the previous code runs on the new schema, and the message says so;
-10. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
-11. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
+11. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
+12. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
    the server — and runs `nginx -t` inside the running proxy. Nginx resolves an upstream once, when it
    starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this
    stops the deploy before that restart;
-12. issues the certificate for every served host under one name — only when certbot does not already
-   manage it, or when a host was added to the configuration since (a storage domain, a site): then
-   the lineage is extended with `--expand`. A routine deploy stays off the rate limit. A host added
-   to a live server needs `setup` first, so that nginx answers the ACME challenge for it;
-13. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
+13. makes the certificate cover every served host once more, through the proxy now running: what a
+   first deploy could not ask for at step 7 is issued here. On a routine deploy step 7 has already
+   covered every host, and this asks nothing;
+14. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
     a second later on its configuration.
 
 What keeps a push routine is not that the rendering is skipped but that it is idempotent and
@@ -363,7 +372,7 @@ Every step runs on the server **detached from the `ssh` session**: its script is
 routine deploy still makes one connection per step; when that connection breaks, fresh ones wait for
 the same step for up to fifteen minutes, and past that `run` stops waiting and says the step is still
 running. Nothing the invoking machine does — losing its network, or dying because it is a container
-of the stack whose server step 7 replaces — stops a step midway.
+of the stack whose server step 10 replaces — stops a step midway.
 
 That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
 steps after the interruption still need someone to run them: **`dart run dartway_cli:dartway deploy run --env <env>

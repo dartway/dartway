@@ -389,52 +389,123 @@ fi
   Future<DwSshResult> testProxyConfiguration() =>
       _compose('exec -T ${DwStack.nginxService} nginx -t');
 
-  /// Asks Let's Encrypt for the certificate of every served host.
+  /// What certbot manages under the certificate's name, in one word:
+  /// `unmanaged` when it manages nothing there yet (the self-signed bootstrap
+  /// certificate `deploy setup` writes has no renewal config), `covered` when
+  /// the certificate names every served host, `missing` followed by the hosts
+  /// it does not name otherwise. Fails when the question cannot be asked.
+  ///
+  /// The hosts are read from the certificate nginx serves, with `openssl`,
+  /// not from `certbot certificates`: that report is prose, and certbot 5
+  /// renamed its `Domains:` line to `Identifiers:`. Parsed for the old word,
+  /// every lineage read as covering nothing, and every deploy asked Let's
+  /// Encrypt to extend a certificate that already named every host
+  /// (dartway/dartway#433).
+  Future<DwSshResult> certificateCoverage() => _as('''
+set -e
+cd '$appDir'
+${DwComposeFiles.selectFiles}
+$_coverageFunction
+dw_certificate_coverage
+''');
+
+  /// Defines `dw_certificate_coverage`, which prints [certificateCoverage]'s
+  /// answer. Expects [DwComposeFiles.selectFiles] to have run.
+  String get _coverageFunction {
+    final certName = target.apiDomain;
+    final hosts = target.servedDomains.map((domain) => "'$domain'").join(' ');
+    // `-s` rather than `-f`: a failed attempt leaves the renewal config behind
+    // empty, and certbot then issues under `$certName-0001`, a path nginx
+    // never names.
+    return '''
+dw_certificate_coverage() {
+  dw_found=\$($_certbot "if [ -s /etc/letsencrypt/renewal/$certName.conf ]; then openssl x509 -in /etc/letsencrypt/live/$certName/fullchain.pem -noout -ext subjectAltName; else echo unmanaged; fi" </dev/null) || return 1
+  if [ "\$dw_found" = unmanaged ]; then
+    echo unmanaged
+    return 0
+  fi
+  dw_covered=" \$(printf '%s\\n' "\$dw_found" | tr ',' '\\n' | sed -n 's/^ *DNS://p' | tr '\\n' ' ')"
+  dw_missing=""
+  for dw_host in $hosts; do
+    case "\$dw_covered" in *" \$dw_host "*) ;; *) dw_missing="\$dw_missing \$dw_host" ;; esac
+  done
+  if [ -z "\$dw_missing" ]; then echo covered; else echo "missing\$dw_missing"; fi
+}''';
+  }
+
+  /// A one-off certbot container with a shell as its entrypoint; the script
+  /// it runs follows.
+  static const String _certbot =
+      '${DwComposeFiles.invoke} run --rm -T --entrypoint sh '
+      '${DwStack.certbotService} -c';
+
+  /// Makes the certificate cover every served host, asking Let's Encrypt only
+  /// when it does not.
   ///
   /// `deploy setup` writes a one-day self-signed certificate so that nginx can
-  /// start at all, and certbot's `renew` loop only renews lineages it manages.
-  /// Runs after the proxy answers the ACME challenge and before the restart
-  /// that makes nginx read what was issued. A lineage certbot already manages
-  /// is left alone when it covers every served host, which keeps a routine
-  /// deploy off the rate limit; a host added to the configuration since — a
-  /// storage domain, a site — extends it.
-  Future<DwSshResult> issueCertificate() {
+  /// start at all, and certbot's `renew` loop only renews lineages it manages:
+  /// this replaces the bootstrap certificate with a real one, and extends a
+  /// lineage certbot manages to a host added to the configuration since — a
+  /// storage domain, a site. A lineage that already names every host is left
+  /// alone, which keeps a routine deploy off the rate limit.
+  ///
+  /// Runs twice in a deployment ([steps]). First before anything is built or
+  /// replaced, through the proxy the previous deploy left running
+  /// ([throughServingProxy]): Let's Encrypt is an outside service that fails
+  /// for reasons of its own, and failing there stops the deploy with the
+  /// previous version still serving. That proxy answers the challenge for a
+  /// host it was never configured for too: its port-80 server is the only
+  /// one, so nginx makes it the default for every name. With no proxy running
+  /// — a first deploy, a stand that is down — nothing serves that a failure
+  /// could take down, and the first run leaves the issue to the second: after
+  /// the stack has started a proxy, before nginx is restarted to read what
+  /// was issued. On a routine deploy the second run finds every host covered
+  /// and asks nothing.
+  Future<DwSshResult> issueCertificate({bool throughServingProxy = false}) {
     final certName = target.apiDomain;
-    final served = target.servedDomains;
-    final domains = served.map((domain) => "-d '$domain'").join(' ');
-    final certbot =
-        '${DwComposeFiles.invoke} run --rm -T --entrypoint sh '
-        '${DwStack.certbotService} -c';
+    final domains = target.servedDomains
+        .map((domain) => "-d '$domain'")
+        .join(' ');
     final request =
         "certbot certonly --webroot -w /var/www/certbot \\\n"
         "    --cert-name '$certName' $domains \\\n"
         "    --email '${target.sslEmail}' --agree-tos --no-eff-email -n";
+    final deferral = throughServingProxy
+        ? '''
+# An assignment, so that Compose failing to answer fails the step instead of
+# reading as "no proxy" and putting the request after the point of no return.
+proxy=\$(${DwComposeFiles.invoke} ps -q --status running ${DwStack.nginxService})
+if [ -z "\$proxy" ]; then
+  echo "no proxy is running to answer Let's Encrypt, so nothing is serving that a failure could take down: the certificate is issued once this deploy has started one"
+  exit 0
+fi
+'''
+        : '';
     return _as('''
 set -e
 cd '$appDir'
 ${DwComposeFiles.selectFiles}
-# A renewal config is what certbot writes for a lineage it manages, and the
-# self-signed bootstrap certificate has none. `-s` rather than `-f`: a failed
-# attempt leaves that file behind empty, and certbot then issues under
-# `$certName-0001`, a path nginx never names.
-if managed=\$($certbot \\
-  "test -s /etc/letsencrypt/renewal/$certName.conf && certbot certificates --cert-name '$certName'" </dev/null); then
-  covered=\$(printf '%s\\n' "\$managed" | sed -n 's/^ *Domains: *//p')
-  missing=""
-  for domain in ${served.map((domain) => "'$domain'").join(' ')}; do
-    case " \$covered " in *" \$domain "*) ;; *) missing="\$missing \$domain" ;; esac
-  done
-  if [ -z "\$missing" ]; then
+$deferral$_coverageFunction
+coverage=\$(dw_certificate_coverage)
+case "\$coverage" in
+  covered)
     echo "certbot already manages $certName for every served host"
     exit 0
-  fi
-  echo "extending $certName to:\$missing"
-  $certbot "
+    ;;
+  missing\\ *)
+    echo "extending $certName to:\${coverage#missing}"
+    $_certbot "
   $request --expand
 " </dev/null
-  exit 0
-fi
-$certbot "
+    exit 0
+    ;;
+  unmanaged) ;;
+  *)
+    echo "ERROR: cannot tell which hosts the certificate covers: \$coverage" >&2
+    exit 1
+    ;;
+esac
+$_certbot "
   set -e
   # certonly refuses to write into an existing live directory, and that
   # directory is exactly what the bootstrap step created.
@@ -534,6 +605,19 @@ echo "nginx restarted and running"
       title: 'Check no data volume would start empty beside existing data',
       run: checkDataVolumes,
     ),
+    // Before anything is built, started or replaced: Let's Encrypt can fail
+    // for reasons of its own, and failing here leaves the previous version
+    // serving. A step later, the same failure strands a replaced server
+    // behind a proxy that was never restarted (#433).
+    if (_tls)
+      DwDeployStep(
+        id: 'certificate',
+        title:
+            'Make the TLS certificate cover every served host, through the '
+            'proxy still serving',
+        run: () => issueCertificate(throughServingProxy: true),
+        showOutput: true,
+      ),
     DwDeployStep(id: 'build', title: 'Build images', run: build),
     if (target.storage == DwStorageMode.bundled)
       DwDeployStep(
@@ -578,10 +662,14 @@ echo "nginx restarted and running"
       title: 'Test the proxy configuration inside the running proxy',
       run: testProxyConfiguration,
     ),
+    // Issues what the first certificate step could not, with no proxy running
+    // to answer the challenge then; asks nothing on a routine deploy.
     if (_tls)
       DwDeployStep(
-        id: 'certificate',
-        title: 'Issue the TLS certificate',
+        id: 'certificate-started-proxy',
+        title:
+            'Make the TLS certificate cover every served host, through the '
+            'proxy now running',
         run: issueCertificate,
         showOutput: true,
       ),
