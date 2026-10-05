@@ -193,7 +193,7 @@ Each item closes off a way for one session to destroy another's work.
 
 **A release is tagged `git tag -a stable-YYYY-MM-DD[.N]` — annotated, on the `master` commit, and applied last**, after publishing: the tag is what the next release measures from, and only an annotated tag records when it was applied. **`dart run tool/release_notes.dart`** writes the notes from the window since the previous tag, breaking changes first.
 
-**The promotion ritual for `stable`:** the testing tiers green + **example and template both build** + `dartway create` from a fresh clone produces a project that runs + `framework-finish` reporting no drift → publish → `git push origin master:stable`. No local `stable` branch — promotion travels by refspec.
+**The promotion ritual for `stable`:** the testing tiers green + **example and template both build** + `dartway create` from a fresh clone produces a project that runs + `framework-finish` reporting no drift → publish → `git push origin master:stable`. No local `stable` branch — promotion travels by refspec. A release that changes the certbot or nginx image pinned in `packages/dartway_cli/lib/src/deploy/stack.dart` also runs `dart test -t docker --run-skipped test/deploy_certificate_docker_test.dart` in `packages/dartway_cli`: the certificate step reads what those images print, and a fake answering from memory stays green while every deploy misreads it (dartway/dartway#433).
 
 **Protection.** `master` and `stable` are covered by the `protect-trunk` ruleset: force-pushes and deletion are forbidden, with no bypass. **Hygiene.** A branch is deleted when its PR merges. `user.email` is set locally to the work address, because the repository is public. Three local settings are expected; they live in `.git/config`, per clone:
 

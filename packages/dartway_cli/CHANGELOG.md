@@ -12,7 +12,9 @@
   for a `Domains:` line that certbot 5 prints as `Identifiers:`, so every certificate looked empty and
   every deploy asked to extend one that already named every host; the hosts are now read from the
   served certificate itself with `openssl`. A host added to the configuration no longer needs `setup`
-  first. `deploy_certificate_docker_test.dart` proves both against the pinned images.
+  first: the rendered port-80 server now comes before the `nginx.d/http` snippets, so it is the
+  default for any name a project's own port-80 server does not claim, from the deploy after the one
+  that renders it. `deploy_certificate_docker_test.dart` proves both against the pinned images.
 
 - **The toolkit `dartway update` installs asks four questions before a test is written**:
   `dartway-testing` holds a gate — what the test protects, which credible regression turns it red, why

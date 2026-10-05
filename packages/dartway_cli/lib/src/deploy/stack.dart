@@ -113,7 +113,9 @@ class DwStack {
   /// different proxy and call the regression "the deploy broke", and a
   /// client's list of third-party software needs a version, not "latest as
   /// of that day" (#269). nginx on its stable line; both raised deliberately,
-  /// with a framework release that says so.
+  /// with a framework release that says so. A raise runs
+  /// `dart test -t docker --run-skipped test/deploy_certificate_docker_test.dart`:
+  /// the certificate step reads what these images print (dartway/dartway#433).
   static const String nginxImage = 'nginx:1.30.5-alpine';
   static const String certbotImage = 'certbot/certbot:v5.8.0';
 

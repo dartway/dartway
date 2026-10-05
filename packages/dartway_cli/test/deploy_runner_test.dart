@@ -380,18 +380,34 @@ esac
         'files.example.com',
       ];
 
-      test('reads a certificate naming every served host as covered', () async {
-        final result = await runner(covered: every).certificateCoverage();
+      test('leaves a certificate covering every host alone', () async {
+        final result = await runner(covered: every).issueCertificate();
         expect(result.ok, isTrue, reason: result.stderr);
-        expect(result.stdout.trim(), 'covered');
+        expect(result.stdout, contains('already manages api.example.com'));
+        expect(
+          issued().where((call) => call.contains('certbot certonly')),
+          isEmpty,
+        );
       });
 
-      test('names exactly the hosts the certificate does not', () async {
+      test('extends it to exactly the hosts it does not name, keeping its '
+          'lineage', () async {
         final result = await runner(
           covered: ['app.example.com', 'api.example.com'],
-        ).certificateCoverage();
+        ).issueCertificate();
         expect(result.ok, isTrue, reason: result.stderr);
-        expect(result.stdout.trim(), 'missing example.com files.example.com');
+        expect(
+          result.stdout,
+          contains(
+            'extending api.example.com to: example.com files.example.com\n',
+          ),
+        );
+        final request = issued().last;
+        expect(request, contains('--expand'));
+        for (final host in every) {
+          expect(request, contains("-d '$host'"));
+        }
+        expect(request, isNot(contains('rm -rf')));
       });
 
       // A host is a whole name: `example.com` is not covered by a certificate
@@ -405,47 +421,19 @@ esac
               'app.example.com',
               'files.example.com',
             ],
-          ).certificateCoverage();
-          expect(result.stdout.trim(), 'missing example.com');
+          ).issueCertificate();
+          expect(
+            result.stdout,
+            contains('extending api.example.com to: example.com\n'),
+          );
         },
       );
-
-      test(
-        'reads the self-signed bootstrap certificate as unmanaged',
-        () async {
-          final result = await runner().certificateCoverage();
-          expect(result.stdout.trim(), 'unmanaged');
-        },
-      );
-
-      test('leaves a certificate covering every host alone', () async {
-        final result = await runner(covered: every).issueCertificate();
-        expect(result.ok, isTrue, reason: result.stderr);
-        expect(result.stdout, contains('already manages api.example.com'));
-        expect(
-          issued().where((call) => call.contains('certbot certonly')),
-          isEmpty,
-        );
-      });
-
-      test('extends it to a host added since, keeping its lineage', () async {
-        final result = await runner(
-          covered: ['api.example.com', 'app.example.com', 'example.com'],
-        ).issueCertificate();
-        expect(result.ok, isTrue, reason: result.stderr);
-        expect(
-          result.stdout,
-          contains('extending api.example.com to: files.example.com'),
-        );
-        final request = issued().last;
-        expect(request, contains('--expand'));
-        expect(request, contains("-d 'files.example.com'"));
-        expect(request, isNot(contains('rm -rf')));
-      });
 
       test('replaces the bootstrap certificate with an issued one', () async {
         final result = await runner().issueCertificate();
         expect(result.ok, isTrue, reason: result.stderr);
+        expect(result.stdout, isNot(contains('extending')));
+        expect(result.stdout, isNot(contains('already manages')));
         final request = issued().last;
         expect(
           request,

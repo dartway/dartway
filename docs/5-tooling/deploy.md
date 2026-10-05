@@ -323,9 +323,12 @@ First `run` evaluates the working-copy checks of `deploy check` and refuses on a
    config change (a rename, a different storage backend) about to serve fresh data next to the real
    one. One implementation, run from both commands;
 7. **makes the TLS certificate cover every served host, before anything is built or replaced**,
-   through the proxy the previous deploy left running. That proxy answers the ACME challenge for any
-   name, a host added to the configuration since included: its port-80 server is the only one, so
-   Nginx makes it the default. The hosts are read from the certificate Nginx serves, and one that
+   through the proxy the previous deploy left running. That proxy answers the ACME challenge for a
+   host added to the configuration since: its port-80 server comes before the `nginx.d/http`
+   snippets, so Nginx makes it the default for any name no project port-80 server claims. A snippet
+   that names a host with `server_name` on port 80 takes the challenge for that host. The order is
+   what the previous deploy rendered, so a configuration whose snippets came first gets it from the
+   deploy after the one that renders it. The hosts are read from the certificate Nginx serves, and one that
    already names them all is left alone, so a routine deploy asks Let's Encrypt nothing; a host added
    since (a storage domain, a site) extends the lineage with `--expand`, under the same name; the
    self-signed certificate of `setup` is replaced by an issued one. Let's Encrypt fails for reasons of

@@ -389,11 +389,13 @@ fi
   Future<DwSshResult> testProxyConfiguration() =>
       _compose('exec -T ${DwStack.nginxService} nginx -t');
 
-  /// What certbot manages under the certificate's name, in one word:
-  /// `unmanaged` when it manages nothing there yet (the self-signed bootstrap
-  /// certificate `deploy setup` writes has no renewal config), `covered` when
-  /// the certificate names every served host, `missing` followed by the hosts
-  /// it does not name otherwise. Fails when the question cannot be asked.
+  /// Defines `dw_certificate_coverage`, which prints what certbot manages
+  /// under the certificate's name, in one word: `unmanaged` when it manages
+  /// nothing there yet (the self-signed bootstrap certificate `deploy setup`
+  /// writes has no renewal config), `covered` when the certificate names every
+  /// served host, `missing` followed by the hosts it does not name otherwise.
+  /// Fails when the question cannot be asked. Expects
+  /// [DwComposeFiles.selectFiles] to have run.
   ///
   /// The hosts are read from the certificate nginx serves, with `openssl`,
   /// not from `certbot certificates`: that report is prose, and certbot 5
@@ -401,16 +403,6 @@ fi
   /// every lineage read as covering nothing, and every deploy asked Let's
   /// Encrypt to extend a certificate that already named every host
   /// (dartway/dartway#433).
-  Future<DwSshResult> certificateCoverage() => _as('''
-set -e
-cd '$appDir'
-${DwComposeFiles.selectFiles}
-$_coverageFunction
-dw_certificate_coverage
-''');
-
-  /// Defines `dw_certificate_coverage`, which prints [certificateCoverage]'s
-  /// answer. Expects [DwComposeFiles.selectFiles] to have run.
   String get _coverageFunction {
     final certName = target.apiDomain;
     final hosts = target.servedDomains.map((domain) => "'$domain'").join(' ');
@@ -454,10 +446,11 @@ dw_certificate_coverage() {
   /// ([throughServingProxy]): Let's Encrypt is an outside service that fails
   /// for reasons of its own, and failing there stops the deploy with the
   /// previous version still serving. That proxy answers the challenge for a
-  /// host it was never configured for too: its port-80 server is the only
-  /// one, so nginx makes it the default for every name. With no proxy running
-  /// — a first deploy, a stand that is down — nothing serves that a failure
-  /// could take down, and the first run leaves the issue to the second: after
+  /// host it was never configured for too: its port-80 server comes before
+  /// the project's http snippets, so nginx makes it the default for any name
+  /// no project port-80 server claims. With no proxy running — a first
+  /// deploy, a stand that is down — nothing serves that a failure could take
+  /// down, and the first run leaves the issue to the second: after
   /// the stack has started a proxy, before nginx is restarted to read what
   /// was issued. On a routine deploy the second run finds every host covered
   /// and asks nothing.

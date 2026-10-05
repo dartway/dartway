@@ -4,6 +4,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartway_cli/src/deploy/compose_files.dart';
 import 'package:dartway_cli/src/deploy/deploy_runner.dart';
 import 'package:dartway_cli/src/deploy/renderer.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
@@ -25,12 +26,29 @@ import 'support/deploy_fixtures.dart';
 ///   run before anything of the new deploy is started.
 ///
 /// Nothing here reaches Let's Encrypt: the lineages are made locally, and the
-/// one step run whole finds its certificate complete.
+/// one-off certbot container the step runs finds a recorder named `certbot`
+/// first on its `PATH` (through the project override the step names, as a
+/// project's own would be), so what the step would have asked is read back
+/// while everything before it — Compose, the image, `openssl` — is real.
 void main() {
   late Directory dir;
   late String project;
   late DwStack stack;
   late DwDeployRunner runner;
+  late File asked;
+  late File projectOverride;
+  late String fakeOverride;
+
+  /// What the step asked of certbot since the last call, one line per ask.
+  List<String> askedOfCertbot() {
+    if (!asked.existsSync()) return [];
+    final lines = asked
+        .readAsLinesSync()
+        .where((line) => line.isNotEmpty)
+        .toList();
+    asked.deleteSync();
+    return lines;
+  }
 
   ProcessResult compose(List<String> arguments) => Process.runSync('docker', [
     'compose',
@@ -105,6 +123,24 @@ CONF
     File(p.join(dir.path, '.env')).writeAsStringSync(
       stack.requiredSecretKeys.map((key) => "$key='dw-test'\n").join(),
     );
+    final fake = Directory(p.join(dir.path, 'fake'))..createSync();
+    asked = File(p.join(fake.path, 'asked'));
+    final certbot = File(p.join(fake.path, 'certbot'))
+      ..writeAsStringSync('#!/bin/sh\necho "\$*" >>/dw-fake/asked\n');
+    Process.runSync('chmod', ['+x', certbot.path]);
+    projectOverride = File(p.join(dir.path, DwComposeFiles.projectOverride))
+      ..createSync(recursive: true);
+    // The image's own PATH, with the recorder in front of it.
+    fakeOverride =
+        """
+services:
+  ${DwStack.certbotService}:
+    environment:
+      PATH: /dw-fake:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+    volumes:
+      - ${fake.path}:/dw-fake
+""";
+    projectOverride.writeAsStringSync(fakeOverride);
     runner = DwDeployRunner(ssh: LocalShell(), stack: stack, appDir: dir.path);
   });
 
@@ -113,40 +149,78 @@ CONF
     dir.deleteSync(recursive: true);
   });
 
-  group('the coverage read in ${DwStack.certbotImage}', () {
-    test('a certificate naming every served host is covered, and the step '
-        'asks nothing', () async {
-      lineage(stack.target.servedDomains);
+  // First, while nothing of the project exists: a first deploy, where
+  // `setup` has started no proxy.
+  group('through the proxy still serving, with no container of the project '
+      'at all', () {
+    test('the step exits 0 and asks nothing of certbot', () async {
+      final containers = Process.runSync('docker', [
+        'ps',
+        '-aq',
+        '--filter',
+        'label=com.docker.compose.project=$project',
+      ]);
+      expect((containers.stdout as String).trim(), isEmpty);
 
-      final coverage = await runner.certificateCoverage();
-      expect(coverage.stdout.trim(), 'covered', reason: coverage.stderr);
+      final step = await runner.issueCertificate(throughServingProxy: true);
+      expect(step.ok, isTrue, reason: step.stderr);
+      expect(step.stdout, contains('no proxy is running'));
+      expect(askedOfCertbot(), isEmpty);
+    });
+
+    test('a Compose that cannot answer fails the step instead', () async {
+      projectOverride.writeAsStringSync('services: [\n');
+      addTearDown(() => projectOverride.writeAsStringSync(fakeOverride));
+
+      final step = await runner.issueCertificate(throughServingProxy: true);
+      expect(step.ok, isFalse);
+      expect(step.stdout, isNot(contains('no proxy is running')));
+      expect(askedOfCertbot(), isEmpty);
+    });
+  });
+
+  group('the coverage read in ${DwStack.certbotImage}', () {
+    test('a certificate naming every served host asks nothing', () async {
+      lineage(stack.target.servedDomains);
 
       final step = await runner.issueCertificate();
       expect(step.ok, isTrue, reason: step.stderr);
       expect(step.stdout, contains('already manages'));
+      expect(askedOfCertbot(), isEmpty);
     });
 
-    test(
-      'a host the certificate does not name is named, and only it',
-      () async {
-        lineage([stack.target.apiDomain]);
+    test('a host the certificate does not name is asked for, and only '
+        'it', () async {
+      lineage([stack.target.apiDomain]);
 
-        final coverage = await runner.certificateCoverage();
-        expect(
-          coverage.stdout.trim(),
-          'missing ${stack.target.appDomain}',
-          reason: coverage.stderr,
-        );
-      },
-    );
+      final step = await runner.issueCertificate();
+      expect(step.ok, isTrue, reason: step.stderr);
+      expect(
+        step.stdout,
+        contains(
+          'extending ${stack.target.apiDomain} to: '
+          '${stack.target.appDomain}\n',
+        ),
+      );
+      final request = askedOfCertbot().single;
+      expect(request, startsWith('certonly'));
+      expect(request, contains('--expand'));
+      for (final host in stack.target.servedDomains) {
+        expect(request, contains('-d $host'));
+      }
+    });
 
-    test('the bootstrap certificate is not one certbot manages', () async {
+    test('the bootstrap certificate is replaced by an issued one', () async {
       inCertbot(
         'rm -f /etc/letsencrypt/renewal/${stack.target.apiDomain}.conf',
       );
 
-      final coverage = await runner.certificateCoverage();
-      expect(coverage.stdout.trim(), 'unmanaged', reason: coverage.stderr);
+      final step = await runner.issueCertificate();
+      expect(step.ok, isTrue, reason: step.stderr);
+      expect(step.stdout, isNot(contains('extending')));
+      final request = askedOfCertbot().single;
+      expect(request, startsWith('certonly'));
+      expect(request, isNot(contains('--expand')));
     });
   });
 
@@ -168,6 +242,15 @@ CONF
         p.join(dir.path, 'nginx.d', snippets),
       ).createSync(recursive: true);
     }
+    // A project's own port-80 server: it takes the hosts it names, and only
+    // those — it is included after ours, so it is not the default.
+    File(p.join(dir.path, 'nginx.d', 'http', 'legacy.conf')).writeAsStringSync(
+      'server {\n'
+      '    listen 80;\n'
+      '    server_name legacy.example.com;\n'
+      '    return 410;\n'
+      '}\n',
+    );
     final name = '$project-nginx';
     final started = Process.runSync('docker', [
       'run',
@@ -236,5 +319,7 @@ CONF
     // The same server block, not a fallback that happens to serve files.
     final (status, _) = await get('files.example.com', '/');
     expect(status, 301);
+    final (legacy, _) = await get('legacy.example.com', challenge);
+    expect(legacy, 410);
   });
 }
