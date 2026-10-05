@@ -642,6 +642,20 @@ void main() {
       expect(nginx, contains(r'return 301 https://$host$request_uri;'));
     });
 
+    // The first port-80 server is nginx's default for any name no port-80
+    // server claims: a project snippet with its own `listen 80` ahead of ours
+    // would answer a newly added host's ACME challenge with a redirect.
+    test('TLS: the challenge server comes before the project\'s http '
+        'snippets', () {
+      final challenge = nginx.indexOf('listen 80;');
+      expect(challenge, isNonNegative);
+      expect(
+        challenge,
+        lessThan(nginx.indexOf('include /etc/nginx/dartway/http/*.conf;')),
+      );
+      expect(nginx, isNot(contains('default_server')));
+    });
+
     test('an external site gets no server block', () {
       final external = DwStackRenderer(
         stack: stackVariants()['external storage, external site, files']!,

@@ -500,10 +500,13 @@ class DwStackRenderer {
       ..writeln('    default upgrade;')
       ..writeln('    ""      close;')
       ..writeln('}')
-      ..writeln()
-      ..writeln('include /etc/nginx/dartway/http/*.conf;')
       ..writeln();
 
+    // Above the project's http snippets: the first `listen 80` server is the
+    // default for every name no port-80 server claims, and a host added to
+    // the configuration since has to reach this one for its ACME challenge
+    // while the previous deploy's proxy still serves. Default by order, not
+    // `default_server`, which would collide with a snippet's own.
     final servedNames = _target.servedDomains.join(' ');
     if (_tls) {
       buffer
@@ -521,6 +524,9 @@ class DwStackRenderer {
         ..writeln('}')
         ..writeln();
     }
+    buffer
+      ..writeln('include /etc/nginx/dartway/http/*.conf;')
+      ..writeln();
 
     // --- app
     _openServer(buffer, _target.appDomain);

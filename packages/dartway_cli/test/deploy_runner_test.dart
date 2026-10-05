@@ -1,6 +1,9 @@
+import 'dart:async';
 import 'dart:io';
 
+import 'package:dartway_cli/src/commands/deploy_run.dart';
 import 'package:dartway_cli/src/deploy/compose_files.dart';
+import 'package:dartway_cli/src/deploy/deploy_progress.dart';
 import 'package:dartway_cli/src/deploy/deploy_runner.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
@@ -34,6 +37,7 @@ void main() {
         'render-env',
         'compose-config',
         'data-volumes',
+        'certificate',
         'build',
         'storage',
         'database',
@@ -42,7 +46,7 @@ void main() {
         'stack',
         'check-upstreams',
         'nginx-test',
-        'certificate',
+        'certificate-started-proxy',
         'restart-proxy',
       ]);
     });
@@ -65,11 +69,14 @@ void main() {
     // Catches an expected volume missing beside real data before the build,
     // not after the stack is already up and the outside checks are green on
     // an empty one (#331: storage: minio → storage: bundled).
-    test('the data volumes are checked before anything is built or started', () {
-      before('compose-config', 'data-volumes');
-      before('data-volumes', 'build');
-      before('data-volumes', 'database');
-    });
+    test(
+      'the data volumes are checked before anything is built or started',
+      () {
+        before('compose-config', 'data-volumes');
+        before('data-volumes', 'build');
+        before('data-volumes', 'database');
+      },
+    );
 
     // Migrations need the database, and the proxy is pointed at the server
     // only once it is the new one.
@@ -78,23 +85,82 @@ void main() {
       before('server', 'web');
     });
 
+    // Let's Encrypt fails for reasons of its own. Asked after the server was
+    // replaced, a failure stopped the deploy before the proxy restart, and
+    // nginx kept the address of a server container that was gone (#433).
+    test(
+      'the certificate is asked for before anything is built or replaced',
+      () {
+        before('compose-config', 'certificate');
+        for (final replacing in [
+          'build',
+          'storage',
+          'database',
+          'server',
+          'web',
+          'stack',
+        ]) {
+          before('certificate', replacing);
+        }
+      },
+    );
+
     test('the proxy is checked, then certified, then restarted', () {
       before('stack', 'check-upstreams');
       before('check-upstreams', 'nginx-test');
-      before('nginx-test', 'certificate');
-      before('certificate', 'restart-proxy');
+      before('nginx-test', 'certificate-started-proxy');
+      before('certificate-started-proxy', 'restart-proxy');
     });
 
-    test('no storage step without bundled storage, no certificate without TLS', () {
-      final plain = _ids(
-        DwDeployRunner(
-          ssh: RecordingSsh(),
-          stack: stackFrom(front: const DwPlainHttpFront(18080)),
+    test('a certificate that fails leaves every service as it was', () async {
+      final ssh = RecordingSsh([
+        (
+          'ps -q --status running nginx',
+          const DwSshResult(
+            exitCode: 1,
+            stdout: 'extending api.example.com to: files.example.com',
+            stderr: 'ConnectionResetError(104)',
+          ),
         ),
+      ]);
+      final steps = DwDeployRunner(
+        ssh: ssh,
+        stack: stackVariants()['bundled storage and a site']!,
+      ).steps(skipGitUpdate: false);
+      final quiet = IOSink(StreamController<List<int>>()..stream.drain<void>());
+
+      final failed = await executeDeploySteps(
+        steps,
+        progress: DwDeployProgress.into(human: quiet, events: quiet),
       );
-      expect(plain, isNot(contains('storage')));
-      expect(plain, isNot(contains('certificate')));
+
+      expect(failed, 'certificate');
+      final composeCalls = ssh.issued.where(
+        (command) => command.contains('docker compose'),
+      );
+      for (final changing in [' build', ' up ', ' stop ', ' restart ']) {
+        expect(
+          composeCalls.where((command) => command.contains(changing)),
+          isEmpty,
+          reason: 'nothing may be built, started or replaced: $changing',
+        );
+      }
     });
+
+    test(
+      'no storage step without bundled storage, no certificate without TLS',
+      () {
+        final plain = _ids(
+          DwDeployRunner(
+            ssh: RecordingSsh(),
+            stack: stackFrom(front: const DwPlainHttpFront(18080)),
+          ),
+        );
+        expect(plain, isNot(contains('storage')));
+        expect(plain, isNot(contains('certificate')));
+        expect(plain, isNot(contains('certificate-started-proxy')));
+      },
+    );
 
     // Left in, every external `deploy run` would try to start a `postgres`
     // service the rendered compose file no longer declares, and fail there.
@@ -151,7 +217,7 @@ void main() {
       // attempt leaves the renewal file behind empty.
       expect(
         command,
-        contains('test -s /etc/letsencrypt/renewal/api.example.com.conf'),
+        contains('[ -s /etc/letsencrypt/renewal/api.example.com.conf ]'),
       );
     });
 
@@ -249,7 +315,7 @@ exit 0
       );
     });
 
-    group('a certificate certbot already manages', () {
+    group('the certificate step', () {
       late Directory temp;
       late File calls;
 
@@ -260,21 +326,35 @@ exit 0
       });
       tearDown(() => temp.deleteSync(recursive: true));
 
-      /// Runs the step against a `docker` that answers as certbot managing a
-      /// lineage for [covered], and answers what it was asked to run.
-      Future<(DwSshResult, List<String>)> issue(String covered) async {
+      /// What `openssl x509 -noout -ext subjectAltName` prints in the pinned
+      /// certbot image (`certbot/certbot:v5.8.0`, OpenSSL 3.5) for a
+      /// certificate naming [hosts] — copied from a run, not written from
+      /// memory: the previous fake answered in a format certbot had stopped
+      /// printing, and stayed green while every real deploy misread it.
+      String subjectAltName(List<String> hosts) =>
+          'X509v3 Subject Alternative Name: \n'
+          '    ${hosts.map((host) => 'DNS:$host').join(', ')}\n';
+
+      /// A runner whose `docker` answers as a server where certbot manages a
+      /// certificate for [covered] (none when null), with a proxy running or
+      /// not, and records what it was asked to run.
+      DwDeployRunner runner({List<String>? covered, bool proxy = true}) {
         final bin = Directory(p.join(temp.path, 'bin'))..createSync();
+        final answer = covered == null
+            ? 'unmanaged\n'
+            : subjectAltName(covered);
+        File(p.join(temp.path, 'answer')).writeAsStringSync(answer);
         final docker = File(p.join(bin.path, 'docker'))
           ..writeAsStringSync('''
 #!/bin/sh
-last=""; for arg in "\$@"; do last="\$arg"; done
-printf '%s\\n---\\n' "\$last" >> '${calls.path}'
-case "\$last" in
-  *"certbot certificates"*) printf 'Found the following certs:\\n  Certificate Name: api.example.com\\n    Domains: $covered\\n' ;;
+printf '%s\\n---\\n' "\$*" >> '${calls.path}'
+case "\$*" in
+  *"ps -q --status running nginx"*) ${proxy ? "echo 4f1c2a9e" : ":"} ;;
+  *"openssl x509"*) cat '${p.join(temp.path, 'answer')}' ;;
 esac
 ''');
         Process.runSync('chmod', ['+x', docker.path]);
-        final runner = DwDeployRunner(
+        return DwDeployRunner(
           ssh: LocalShell(
             environment: {
               'PATH': '${bin.path}:${Platform.environment['PATH']}',
@@ -283,39 +363,134 @@ esac
           stack: stackVariants()['bundled storage and a site']!,
           appDir: p.join(temp.path, 'shop'),
         );
-        final result = await runner.issueCertificate();
-        return (
-          result,
-          calls
-              .readAsStringSync()
-              .split('\n---\n')
-              .where((call) => call.trim().isNotEmpty)
-              .toList(),
-        );
       }
 
-      test('covering every served host is left alone', () async {
-        final (result, calls) = await issue(
-          'api.example.com app.example.com example.com files.example.com',
-        );
+      List<String> issued() => calls.existsSync()
+          ? calls
+                .readAsStringSync()
+                .split('\n---\n')
+                .where((call) => call.trim().isNotEmpty)
+                .toList()
+          : [];
+
+      const every = [
+        'api.example.com',
+        'app.example.com',
+        'example.com',
+        'files.example.com',
+      ];
+
+      test('leaves a certificate covering every host alone', () async {
+        final result = await runner(covered: every).issueCertificate();
         expect(result.ok, isTrue, reason: result.stderr);
         expect(result.stdout, contains('already manages api.example.com'));
-        expect(calls, hasLength(1));
+        expect(
+          issued().where((call) => call.contains('certbot certonly')),
+          isEmpty,
+        );
       });
 
-      test('is extended to a host added since, keeping its lineage', () async {
-        final (result, calls) = await issue(
-          'api.example.com app.example.com example.com',
-        );
+      test('extends it to exactly the hosts it does not name, keeping its '
+          'lineage', () async {
+        final result = await runner(
+          covered: ['app.example.com', 'api.example.com'],
+        ).issueCertificate();
         expect(result.ok, isTrue, reason: result.stderr);
         expect(
           result.stdout,
-          contains('extending api.example.com to: files.example.com'),
+          contains(
+            'extending api.example.com to: example.com files.example.com\n',
+          ),
         );
-        expect(calls, hasLength(2));
-        expect(calls.last, contains('--expand'));
-        expect(calls.last, contains("-d 'files.example.com'"));
-        expect(calls.last, isNot(contains('rm -rf')));
+        final request = issued().last;
+        expect(request, contains('--expand'));
+        for (final host in every) {
+          expect(request, contains("-d '$host'"));
+        }
+        expect(request, isNot(contains('rm -rf')));
+      });
+
+      // A host is a whole name: `example.com` is not covered by a certificate
+      // for `api.example.com`.
+      test(
+        'does not take a host for covered by a name that contains it',
+        () async {
+          final result = await runner(
+            covered: [
+              'api.example.com',
+              'app.example.com',
+              'files.example.com',
+            ],
+          ).issueCertificate();
+          expect(
+            result.stdout,
+            contains('extending api.example.com to: example.com\n'),
+          );
+        },
+      );
+
+      test('replaces the bootstrap certificate with an issued one', () async {
+        final result = await runner().issueCertificate();
+        expect(result.ok, isTrue, reason: result.stderr);
+        expect(result.stdout, isNot(contains('extending')));
+        expect(result.stdout, isNot(contains('already manages')));
+        final request = issued().last;
+        expect(
+          request,
+          contains('rm -rf /etc/letsencrypt/live/api.example.com'),
+        );
+        expect(request, contains('certbot certonly'));
+        expect(request, isNot(contains('--expand')));
+      });
+
+      test('a coverage it cannot read fails rather than asks', () async {
+        final broken = runner(covered: every);
+        File(
+          p.join(temp.path, 'bin', 'docker'),
+        ).writeAsStringSync('#!/bin/sh\necho "no such service" >&2\nexit 1\n');
+        final result = await broken.issueCertificate();
+        expect(result.ok, isFalse);
+      });
+
+      group('through the proxy still serving', () {
+        test('asks nothing of certbot when no proxy is running', () async {
+          final result = await runner(
+            covered: ['api.example.com'],
+            proxy: false,
+          ).issueCertificate(throughServingProxy: true);
+          expect(result.ok, isTrue, reason: result.stderr);
+          expect(result.stdout, contains('no proxy is running'));
+          expect(issued(), hasLength(1));
+          expect(issued().single, contains('ps -q --status running nginx'));
+        });
+
+        test('fails when Compose cannot say whether a proxy runs', () async {
+          final unanswered = runner(covered: every);
+          File(p.join(temp.path, 'bin', 'docker')).writeAsStringSync(
+            '#!/bin/sh\necho "cannot connect to the Docker daemon" >&2\nexit 1\n',
+          );
+          final result = await unanswered.issueCertificate(
+            throughServingProxy: true,
+          );
+          expect(result.ok, isFalse);
+          expect(result.stdout, isNot(contains('no proxy is running')));
+        });
+
+        test('extends the certificate while a proxy serves', () async {
+          final result = await runner(
+            covered: ['api.example.com', 'app.example.com', 'example.com'],
+          ).issueCertificate(throughServingProxy: true);
+          expect(result.ok, isTrue, reason: result.stderr);
+          expect(issued().last, contains('--expand'));
+        });
+
+        test('asks nothing when every host is covered', () async {
+          final result = await runner(
+            covered: every,
+          ).issueCertificate(throughServingProxy: true);
+          expect(result.stdout, contains('already manages api.example.com'));
+          expect(issued().where((call) => call.contains('certonly')), isEmpty);
+        });
       });
     });
 
@@ -363,28 +538,35 @@ esac
     // renamed stack) with no `shop_storage_data` yet would start the latter
     // empty. This must exit non-zero, and say why, or every check above it
     // could be quietly removed without a test noticing.
-    test('exits non-zero and names both volumes when a rename is unsafe', () async {
-      final ssh = RecordingSsh([
-        (
-          'docker volume ls',
-          const DwSshResult(
-            exitCode: 0,
-            stdout: 'shop_postgres_data\nshop_minio_data\n',
-            stderr: '',
+    test(
+      'exits non-zero and names both volumes when a rename is unsafe',
+      () async {
+        final ssh = RecordingSsh([
+          (
+            'docker volume ls',
+            const DwSshResult(
+              exitCode: 0,
+              stdout: 'shop_postgres_data\nshop_minio_data\n',
+              stderr: '',
+            ),
           ),
-        ),
-      ]);
-      final result = await runnerWith(ssh).checkDataVolumes();
-      expect(result.ok, isFalse);
-      expect(result.stderr, contains('shop_minio_data'));
-      expect(result.stderr, contains('shop_storage_data'));
-    });
+        ]);
+        final result = await runnerWith(ssh).checkDataVolumes();
+        expect(result.ok, isFalse);
+        expect(result.stderr, contains('shop_minio_data'));
+        expect(result.stderr, contains('shop_storage_data'));
+      },
+    );
 
     test('exits non-zero when the server cannot even be asked', () async {
       final ssh = RecordingSsh([
         (
           'docker volume ls',
-          const DwSshResult(exitCode: 1, stdout: '', stderr: 'permission denied'),
+          const DwSshResult(
+            exitCode: 1,
+            stdout: '',
+            stderr: 'permission denied',
+          ),
         ),
       ]);
       final result = await runnerWith(ssh).checkDataVolumes();
@@ -544,7 +726,9 @@ esac
 
     test('a file rendered by an older version is replaced — the defect this '
         'step exists for', () async {
-      composeFile().writeAsStringSync('# rendered before the build arg existed\n');
+      composeFile().writeAsStringSync(
+        '# rendered before the build arg existed\n',
+      );
       final result = await runner.renderStack();
       expect(result.stdout, contains('docker-compose.yml: rendered again'));
       expect(
@@ -559,11 +743,11 @@ esac
       await runner.renderStack();
       // `ls -i` prints the inode on every Unix; `stat` spells its flags
       // differently on macOS and on Linux.
-      String inode() => (Process.runSync('ls', ['-i', nginxFile().path]).stdout
-              as String)
-          .trim()
-          .split(RegExp(r'\s+'))
-          .first;
+      String inode() =>
+          (Process.runSync('ls', ['-i', nginxFile().path]).stdout as String)
+              .trim()
+              .split(RegExp(r'\s+'))
+              .first;
       final before = inode();
       nginxFile().writeAsStringSync('# stale\n');
       await runner.renderStack();
