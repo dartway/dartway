@@ -9,6 +9,11 @@ This split is why a project writes no sign-in code: it states what an identifier
 code reaches a person, and what happens when an account is created. Everything between — tickets,
 rate limits, attempts, locks, tokens, revocation — is built in and the same in every project.
 
+Sign-in delivery preferences use wire protocol 3. Deploy a rebuilt client and server together;
+clients compiled against protocol 2 receive `426` and must update. Requests omitting `deliveryHint`
+still decode with a null preference and keep the project default delivery. No auth callback edit
+is required to keep using that default.
+
 ## The pieces
 
 | Table | What it holds |
@@ -31,6 +36,7 @@ DwAuthConfig({
     int? accountId,
   ) deliverCode,
   required DwAccountDeletion accountDeletion,
+  Set<String> allowedDeliveryHints = const {},
   Future<String?> Function(
     DwCallContext ctx, DwIdentifierKind kind, String identifier, int? accountId,
   )? generateCode,
@@ -54,6 +60,7 @@ DwAuthConfig({
 |---|---|
 | `normalize` | The canonical form of an identifier (`79991234567`, a lower-cased e-mail), or `null` when `raw` is not a valid one of that kind — answered `dw.invalid` on field `identifier`. Every lookup, lock and rate limit reads the normalized value, so `Ivan@` and `ivan@` cannot become two accounts or two rate-limit buckets. The app should normalize with the same function; the skeleton shares `AuthIdentifier.normalize` from its shared package. |
 | `deliverCode` | Sends `code`. Called **always**, after the ticket's own transaction has committed — whatever `code` is, generated or returned by `generateCode` — so deciding not to send (a store reviewer's or a test account's fixed code, most often) is this hook's own choice, not something withholding the call decides for it. Runs **outside** the transaction that records the ticket, on a fresh pooled `ctx.db`: the ticket is written, and already counted against the limit, before delivery is attempted, so a `deliverCode` that throws (an incident) or refuses no longer undoes it — the caller sees the failure and the next attempt waits out `resendDelay`, the same as any resend. This is deliberate: `deliverCode` is commonly an HTTP call to a provider, and running it under the identifier's advisory lock, inside the ticket's transaction, held a pooled connection (and that lock) for as long as the provider took to answer — a handful of slow sign-ins could exhaust the pool for the whole server. `ctx.memo` is how it avoids a second lookup of whatever `generateCode` already read, since the two no longer share one transaction's cache. `accountId` is the account `identifier` already belongs to, or `null` — the same value `generateCode` was asked with. Never log the code. |
+| `allowedDeliveryHints` | Project-defined preferences accepted from `DwRequestCode.deliveryHint`. Explicit hints outside this set are refused `dw.invalid` on `deliveryHint` before creating a ticket. Null uses the project default. Auth hooks read `ctx.deliveryHint`; their signatures stay unchanged. A hint requests a new ticket with the same identifier cooldown and window limits, never redelivery of an old code. |
 | `accountDeletion` | Who may delete an account, and required because either default is wrong for somebody: `byMember` answers `DwDeleteMyAccount` (an app store asks it of any app people sign up in); `byOperator` refuses it `dw.forbidden`, and only server code deletes, with `ctx.accounts.deleteAccount`. |
 | `generateCode` | The code this request gets, inside the ticket's transaction. `null` — whether `generateCode` is unset, or returns it for this call — draws `codeLength` random digits (`dwRandomCode`, exported for reuse); a project returns one of its own for a fixed code — a store reviewer, a test account, a default code out of its own settings — and `deliverCode` decides, independently, whether that code goes anywhere (issue #310: the two used to be coupled — a fixed code skipped `deliverCode` outright, so a fixed code that also had to be sent could not be expressed). |
 | `onAccountCreated` | Runs in the transaction that creates an account: the place to insert the profile. Refusing here refuses the sign-in, nothing is created, and the code stays usable. `origin` says who created the account (below). |

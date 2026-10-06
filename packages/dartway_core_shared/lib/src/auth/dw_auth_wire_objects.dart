@@ -24,10 +24,19 @@ enum DwIdentifierKind {
 /// attempt limits and answers with a ticket. Whether the identifier belongs to
 /// an account is not revealed.
 final class DwRequestCode extends DwActionCommand<DwCodeTicket> {
-  const DwRequestCode({required this.kind, required this.identifier});
+  const DwRequestCode({
+    required this.kind,
+    required this.identifier,
+    this.deliveryHint,
+  });
 
   final DwIdentifierKind kind;
   final String identifier;
+
+  /// An optional, project-defined delivery preference. The server accepts
+  /// only hints its auth configuration allows; null uses the project default.
+  /// This requests a new ticket and does not bypass resend or request limits.
+  final String? deliveryHint;
 
   @override
   String get dwTypeName => 'DwRequestCode';
@@ -36,21 +45,24 @@ final class DwRequestCode extends DwActionCommand<DwCodeTicket> {
   Map<String, Object?> toJson() => {
     'kind': kind.name,
     'identifier': identifier,
+    if (deliveryHint != null) 'deliveryHint': deliveryHint,
   };
 
   static DwRequestCode fromJson(Map<String, Object?> json) => DwRequestCode(
     kind: DwJsonCodec.decodeEnum(json['kind'], DwIdentifierKind.values),
     identifier: json['identifier']! as String,
+    deliveryHint: json['deliveryHint'] as String?,
   );
 
   @override
   bool operator ==(Object other) =>
       other is DwRequestCode &&
       other.kind == kind &&
-      other.identifier == identifier;
+      other.identifier == identifier &&
+      other.deliveryHint == deliveryHint;
 
   @override
-  int get hashCode => Object.hash(kind, identifier);
+  int get hashCode => Object.hash(kind, identifier, deliveryHint);
 }
 
 /// A sent code, identified by [id]; verification refers to it.

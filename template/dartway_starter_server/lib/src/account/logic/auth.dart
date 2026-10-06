@@ -26,6 +26,10 @@ typedef CodeDelivery =
 abstract final class AccountAuth {
   /// Sign-in by a one-time code to a phone number or an e-mail address.
   ///
+  /// [allowedDeliveryHints] accepts explicit project-defined sign-in delivery
+  /// preferences; [deliverCode] reads the accepted choice as `ctx.deliveryHint`.
+  /// A null hint selects the default.
+  ///
   /// [deliverCode] sends the code. By default it is written to the server log:
   /// the template sends no SMS and no e-mail, which is enough to sign in locally.
   /// **A deployed project delivers it here** — an SMS gateway for phones, a mail
@@ -38,9 +42,11 @@ abstract final class AccountAuth {
   /// identifier; the app counts it down from the ticket's `resendAfter`.
   static DwAuthConfig config({
     CodeDelivery? deliverCode,
+    Set<String> allowedDeliveryHints = const {},
     Duration resendDelay = const Duration(seconds: 60),
   }) => DwAuthConfig(
     accountDeletion: DwAccountDeletion.byMember,
+    allowedDeliveryHints: allowedDeliveryHints,
     // One rule on both sides: the app normalizes what it sends with the same
     // function.
     normalize: AuthIdentifier.normalize,

@@ -35,6 +35,11 @@ final class DwNotAuthenticatedException implements Exception {
 /// }
 /// ```
 abstract class DwCallContext {
+  /// The accepted, project-defined delivery preference of a sign-in code
+  /// request, visible to auth hooks. Null selects the project default and
+  /// is also returned outside a sign-in code request.
+  String? get deliveryHint => null;
+
   /// The signed-in account of the caller, or `null`.
   int? get accountId;
 
@@ -266,6 +271,12 @@ final class DwRuntimeContext extends DwCallContext {
   final _Scope _root;
   final Object _zoneKey = Object();
   final Map<Object, Object?> _memo = {};
+
+  @override
+  String? get deliveryHint => authDeliveryHint;
+
+  /// Set only by the built-in auth handler after allowlist validation.
+  String? authDeliveryHint;
   final DwJobQueue Function(DwRuntimeContext ctx) _jobs;
   final DwOutboundHttp Function(DwRuntimeContext ctx) _http;
   final DwAccountService Function(DwRuntimeContext ctx) _accounts;

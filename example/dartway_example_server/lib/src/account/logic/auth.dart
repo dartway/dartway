@@ -25,6 +25,8 @@ abstract final class AccountAuth {
     generateCode: (ctx, kind, identifier, accountId) =>
         AccountAuth._testCode(ctx, accountId),
 
+    // Explicit choices may be allowlisted with allowedDeliveryHints and read
+    // through ctx.deliveryHint here. This example uses the default only.
     // The example sends no SMS: the code is written to the server log, which
     // is enough to sign in locally. A real project delivers it here — except
     // a demo persona's or a store reviewer's fixed code, which goes nowhere.

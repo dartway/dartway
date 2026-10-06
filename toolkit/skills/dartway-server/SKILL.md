@@ -321,3 +321,10 @@ the server factory; `bin/` parses nothing itself — no `env['NAME']`.
 or body; `followRedirects: false` when a header carries a credential. Not inside a transaction (§4).
 A service class takes `ctx.http` per call — tests fake it (`dartway-testing`), nothing is threaded
 through the server factory for them.
+
+Sign-in delivery preferences: pass a project-defined `deliveryHint` on `DwRequestCode` only when
+requesting an explicit delivery choice. Allow accepted strings in `DwAuthConfig.allowedDeliveryHints`
+and read `ctx.deliveryHint` inside `generateCode` or `deliverCode`; null means the project default.
+Unknown hints refuse `dw.invalid` on `deliveryHint`. Every accepted choice requests a new ticket and
+shares the same identifier cooldown, request window and idempotency rules. Never implement a separate
+anonymous dispatcher or write framework ticket tables to route delivery.

@@ -2,7 +2,13 @@
 
 ## 0.21.0-dev.17
 
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the router
+- Sign-in code requests accept an optional project-defined `deliveryHint`. The server validates it
+  against `DwAuthConfig.allowedDeliveryHints` and auth hooks read `ctx.deliveryHint`, with unchanged
+  callback signatures and identifier cooldown, request-window and idempotency rules. Null retains
+  the project default. **BREAKING (wire): protocol 3 refuses clients compiled against protocol 2
+  with `426`; rebuild and deploy the client and server together.** No auth callback edit is required.
+
+- The family moves in lockstep to deliver the migration note for the router
   that follows a provider (dartway/dartway#407).
 
 ## 0.21.0-dev.16

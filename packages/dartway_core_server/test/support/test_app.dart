@@ -107,6 +107,9 @@ final class TestApp {
   final Map<String, String> delivered = {};
   final List<String> deliveredTo = [];
 
+  final Map<String, String?> deliveryHints = {};
+  final Map<String, String?> generatedHints = {};
+
   /// identifier → `ctx.accountId` on the last `deliverCode` for it: the
   /// caller attaching it, `null` for a sign-in.
   final Map<String, int?> codeCallers = {};
@@ -232,7 +235,9 @@ final class TestApp {
           RegExp(r'^\+\d{6,15}$').hasMatch(value) ? value : null,
       };
     },
+    allowedDeliveryHints: const {'sms'},
     deliverCode: (ctx, kind, identifier, code, accountId) async {
+      deliveryHints[identifier] = ctx.deliveryHint;
       // The caller attaching the identifier (null for a sign-in) — not
       // [accountId], which is who the identifier already belongs to.
       codeCallers[identifier] = ctx.accountId;
@@ -250,6 +255,7 @@ final class TestApp {
       deliveredTo.add(identifier);
     },
     generateCode: (ctx, kind, identifier, accountId) async {
+      generatedHints[identifier] = ctx.deliveryHint;
       generateCodeCalls++;
       // The caller attaching the identifier, the same as `deliverCode` sees
       // — not [accountId], which is who the identifier already belongs to.
