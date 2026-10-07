@@ -8,6 +8,9 @@
   choices and project rules survive. Migration completion is explicitly verified per note in
   `.dartway/migrations.json`, with applied/not-applicable dispositions and evidence. Locks and
   toolkit installs never complete notes; unknown baselines and partial completion remain visible.
+  Preflight preserves native diagnostic settings and resolves only the selected dependency
+  source using native dependency YAML; ambiguous sources, pub-only hosted map forms and sources
+  that fail native YAML resolution are rejected before project edits.
 
 - One toolkit supports Codex and Claude. `create`, `setup-ai` and `update`
   accept `--agent codex|claude|both` (default `both`, recorded for updates).

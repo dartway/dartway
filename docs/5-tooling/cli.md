@@ -232,6 +232,11 @@ be verified as already satisfied or not applicable; that requires an explicit di
 Before installing or editing `analysis_options.yaml`, the CLI resolves the proposed `dartway_lints`
 dependency through pub in a temporary package, including its transitive analyzer constraints.
 Hosted pins are raised only when resolvable; existing git and path choices are retained and checked.
+Diagnostic settings stay unchanged in the plugin configuration; only its dependency source is
+passed to pub, using the native analyzer's dependency YAML form. Choose exactly one `version`,
+`git` or `path` source. A custom `hosted` URL must be a
+string alongside `version`. Ambiguous or invalid native source forms fail before installation,
+because pub and the native analyzer can otherwise select different sources from the same map.
 An unpublished plugin version, invalid source or resolution failure returns a nonzero exit code
 and leaves project files untouched. Choose a resolvable hosted target or project-owned git/path
 configuration. `--framework-path` supplies a local plugin path when adding a missing plugin; it

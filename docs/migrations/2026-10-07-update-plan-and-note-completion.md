@@ -17,6 +17,9 @@ prints the target SHA. Local framework sources are read from their committed tre
 
 If plugin preflight fails because a hosted version is unpublished, select a published target or
 configure a resolvable project-owned git/path plugin source. Do not accept an unresolvable pin.
+Keep diagnostic settings, but select exactly one `version`, `git` or `path` source; a custom
+`hosted` URL is a string beside `version`. Remove ambiguous source fields rather than relying on
+pub and the native analyzer to choose the same source.
 
 Review every unconfirmed migration note. An unknown baseline does not say that nothing was
 migrated; it says no verified note dispositions were recorded. For each note, inspect usage,

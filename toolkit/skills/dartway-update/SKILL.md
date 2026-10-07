@@ -21,10 +21,14 @@ caret is the last step, not the task; the update is its own branch and PR, never
    Keep the target SHA and all selected options for the rest of the update. Repeat planning with
    `--plan --target <sha>` to stay on that target when the channel moves.
 4. **Preflight the plugin:** the plan asks pub to resolve the proposed `dartway_lints` dependency,
-   including analyzer constraints, before configuration can be edited. Existing git/path choices
-   stay choices; hosted pins may be raised only when they resolve. An unpublished development
-   version or unreachable source is an explicit failure. Choose a published target or a resolvable
-   path/git source in the project's own `analysis_options.yaml`; `--framework-path <checkout>`
+   using native dependency YAML and including analyzer constraints, before configuration can be
+   edited. Existing git/path choices
+   stay choices and diagnostic settings stay unchanged; hosted pins may be raised only when they
+   resolve. Choose exactly one version/git/path source, with a string hosted URL only beside a
+   version. Mixed source maps are refused rather than interpreted differently by pub and native
+   analysis. An unpublished development version or unreachable source is an explicit failure.
+   Choose a published target or a resolvable path/git source in the project's own
+   `analysis_options.yaml`; `--framework-path <checkout>`
    supplies a path for a missing plugin. Do not write an unresolvable hosted pin to get past this step.
 5. **Install the target:** `dartway update --target <sha>` with the same source and installer options.
    It rechecks resolution, installs the selected Codex/Claude integrations, preserves owner rules

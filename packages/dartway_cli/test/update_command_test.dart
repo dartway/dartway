@@ -49,6 +49,90 @@ void main() {
         entity.readAsBytesSync(),
       ),
   };
+
+  // Copy the plugin's real Flutter fixture: its intentional diagnostics prove
+  // that the native analyzer loaded the plugin and applied the owner's settings.
+  Future<ProcessResult> nativeAnalyze(
+    String options, {
+    Map<String, String>? environment,
+  }) async {
+    final source = Directory(
+      p.join(repository.path, 'packages/dartway_lints/example'),
+    );
+    final fixture = Directory(p.join(sandbox.path, 'native-fixture'))
+      ..createSync();
+    for (final entry in ['pubspec.yaml', 'lib', 'test']) {
+      final origin = p.join(source.path, entry);
+      if (File(origin).existsSync()) {
+        File(origin).copySync(p.join(fixture.path, entry));
+      } else {
+        for (final file in Directory(
+          origin,
+        ).listSync(recursive: true).whereType<File>()) {
+          final destination = File(
+            p.join(fixture.path, p.relative(file.path, from: source.path)),
+          );
+          destination.parent.createSync(recursive: true);
+          file.copySync(destination.path);
+        }
+      }
+    }
+    File(
+      p.join(fixture.path, 'analysis_options.yaml'),
+    ).writeAsStringSync(options);
+    succeeds(
+      await Process.run('flutter', [
+        'pub',
+        'get',
+      ], workingDirectory: fixture.path),
+    );
+    return Process.run(
+      Platform.resolvedExecutable,
+      ['analyze', '--format=machine'],
+      workingDirectory: fixture.path,
+      environment: {
+        'ANALYZER_STATE_LOCATION_OVERRIDE': p.join(
+          sandbox.path,
+          'native-state',
+        ),
+        ...?environment,
+      },
+    );
+  }
+
+  Future<Directory> rootPluginRepository() async {
+    final source = Directory(p.join(repository.path, 'packages/dartway_lints'));
+    final plugin = Directory(p.join(sandbox.path, 'root-plugin'))..createSync();
+    File(
+      p.join(source.path, 'pubspec.yaml'),
+    ).copySync(p.join(plugin.path, 'pubspec.yaml'));
+    for (final file in Directory(
+      p.join(source.path, 'lib'),
+    ).listSync(recursive: true).whereType<File>()) {
+      final destination = File(
+        p.join(plugin.path, p.relative(file.path, from: source.path)),
+      );
+      destination.parent.createSync(recursive: true);
+      file.copySync(destination.path);
+    }
+    for (final args in [
+      ['init', '-b', 'true'],
+      ['add', 'pubspec.yaml', 'lib'],
+      [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.com',
+        'commit',
+        '-qm',
+        'Real plugin at repository root',
+      ],
+    ]) {
+      succeeds(await Process.run('git', args, workingDirectory: plugin.path));
+    }
+    return plugin;
+  }
+
   setUp(() async {
     sandbox = Directory.systemTemp.createTempSync('dw-update-test-');
     target =
@@ -225,6 +309,92 @@ void main() {
     expect(files(), before);
   });
 
+  test('native path diagnostics survive plan and install', () async {
+    final options =
+        '# Owner settings\nplugins:\n  dartway_lints:\n'
+        '    path: ${repository.path}/packages/dartway_lints\n'
+        '    diagnostics:\n      forbidden_ui_style_usage: false\n';
+    file('shop_flutter/analysis_options.yaml').writeAsStringSync(options);
+    final native = await nativeAnalyze(options);
+    expect(native.exitCode, 2, reason: output(native));
+    expect(output(native), contains('FORBIDDEN_PROVIDER_SCOPE'));
+    expect(output(native), isNot(contains('FORBIDDEN_UI_STYLE_USAGE')));
+    expect(output(native), isNot(contains('ERROR|')));
+    final before = files();
+    succeeds(await update(['--plan']));
+    expect(files(), before);
+    succeeds(await update([]));
+    expect(
+      file('shop_flutter/analysis_options.yaml').readAsStringSync(),
+      options,
+    );
+    expect(file('.dartway/migrations.json').existsSync(), isFalse);
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
+  test(
+    'invalid native source forms fail without changing project choices',
+    () async {
+      for (final source in [
+        '    version: ^0.5.0\n    path: ${repository.path}/packages/dartway_lints\n',
+        '    git: ${repository.path}\n    path: ${repository.path}/packages/dartway_lints\n',
+        '    version: ^0.5.0\n    hosted:\n      url: https://pub.dev\n',
+        '    git:\n      url: ${repository.path}\n      ref: [wrong-shape]\n',
+        '    git:\n      url: ${repository.path}\n    hosted: https://pub.dev\n',
+      ]) {
+        file(
+          'shop_flutter/analysis_options.yaml',
+        ).writeAsStringSync('plugins:\n  dartway_lints:\n$source');
+        final before = files();
+        final result = await update([]);
+        expect(result.exitCode, 1, reason: output(result));
+        expect(output(result), contains('Invalid dartway_lints plugin source'));
+        expect(output(result), isNot(contains('Analyzer plugin: resolvable')));
+        expect(files(), before);
+      }
+    },
+  );
+
+  test(
+    'ambiguous version and git fail before native plugin success is reported',
+    () async {
+      final options =
+          'plugins:\n  dartway_lints:\n    version: ^0.5.0\n    git:\n'
+          '      url: ${repository.path}\n      ref: $target\n'
+          '      path: packages/dartway_lints\n';
+      file('shop_flutter/analysis_options.yaml').writeAsStringSync(options);
+      final registry = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => registry.close(force: true));
+      registry.listen((request) async {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({'name': 'dartway_lints', 'versions': []}),
+        );
+        await request.response.close();
+      });
+      // An empty hosted registry keeps native source selection observable even
+      // after 0.5.0 is published. Git still points at the real committed plugin.
+      final native = await nativeAnalyze(
+        options,
+        environment: {'PUB_HOSTED_URL': 'http://127.0.0.1:${registry.port}'},
+      );
+      expect(native.exitCode, isNot(0), reason: output(native));
+      expect(output(native), contains('depends on dartway_lints ^0.5.0'));
+      expect(output(native), contains('version solving failed'));
+      final before = files();
+      for (final flags in [
+        <String>['--plan'],
+        <String>[],
+      ]) {
+        final result = await update(flags);
+        expect(result.exitCode, 1, reason: output(result));
+        expect(output(result), contains('exactly one of version, git or path'));
+        expect(output(result), isNot(contains('Analyzer plugin: resolvable')));
+        expect(files(), before);
+      }
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
   test(
     'git choice, installer choices and owner rules survive reinstall',
     () async {
@@ -232,7 +402,8 @@ void main() {
         '# owner rule\nlinter:\n  rules:\n    avoid_print: true\n'
         'plugins:\n  dartway_lints:\n    git:\n'
         '      url: ${repository.path}\n      ref: $target\n'
-        '      path: packages/dartway_lints\n',
+        '      path: packages/dartway_lints\n'
+        '    diagnostics:\n      forbidden_ui_style_usage: false\n',
       );
       file('AGENTS.md').writeAsStringSync('Owner conventions\n');
       final options = file(
@@ -279,6 +450,59 @@ void main() {
       );
     },
   );
+
+  test('native empty git path selects the repository root unchanged', () async {
+    final plugin = await rootPluginRepository();
+    final options =
+        'plugins:\n  dartway_lints:\n    git:\n'
+        '      url: ${plugin.path}\n      path: ""\n'
+        '    diagnostics:\n      forbidden_ui_style_usage: false\n';
+    file('shop_flutter/analysis_options.yaml').writeAsStringSync(options);
+    final native = await nativeAnalyze(options);
+    expect(native.exitCode, 2, reason: output(native));
+    expect(output(native), contains('FORBIDDEN_PROVIDER_SCOPE'));
+    expect(output(native), isNot(contains('FORBIDDEN_UI_STYLE_USAGE')));
+    expect(output(native), isNot(contains('ERROR|')));
+    final before = files();
+    final planned = await update(['--plan']);
+    succeeds(planned);
+    expect(output(planned), contains('(git)'));
+    expect(files(), before);
+    succeeds(await update([]));
+    expect(
+      file('shop_flutter/analysis_options.yaml').readAsStringSync(),
+      options,
+    );
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
+  test('native YAML git ref coercion is refused without edits', () async {
+    final plugin = await rootPluginRepository();
+    // This branch exists and JSON pub preflight resolves it. The native
+    // analyzer emits ref: true into YAML, which pub rejects as a boolean.
+    final options =
+        'plugins:\n  dartway_lints:\n    git:\n'
+        '      url: ${plugin.path}\n      ref: "true"\n';
+    file('shop_flutter/analysis_options.yaml').writeAsStringSync(options);
+    final native = await nativeAnalyze(options);
+    expect(native.exitCode, isNot(0), reason: output(native));
+    expect(output(native), contains("The 'ref' field"));
+    expect(output(native), contains('must be a string'));
+    final before = files();
+    for (final flags in [
+      <String>['--plan'],
+      <String>[],
+    ]) {
+      final result = await update(flags);
+      expect(result.exitCode, 1, reason: output(result));
+      expect(
+        output(result),
+        contains('Analyzer plugin source is not resolvable'),
+      );
+      expect(output(result), contains("The 'ref' field"));
+      expect(output(result), isNot(contains('Analyzer plugin: resolvable')));
+      expect(files(), before);
+    }
+  }, timeout: const Timeout(Duration(minutes: 5)));
 
   test('missing path and git ref explicitly fail without edits', () async {
     for (final source in [
@@ -348,7 +572,8 @@ void main() {
     });
     file('shop_flutter/analysis_options.yaml').writeAsStringSync(
       '# owned rule\nplugins:\n  dartway_lints:\n'
-      '    hosted: $host\n    version: ^0.4.0\n',
+      '    hosted: $host\n    version: ^0.4.0\n'
+      '    diagnostics:\n      forbidden_ui_style_usage: false\n',
     );
     final before = files();
     final planned = await update(['--plan']);
@@ -359,7 +584,8 @@ void main() {
     expect(
       file('shop_flutter/analysis_options.yaml').readAsStringSync(),
       '# owned rule\nplugins:\n  dartway_lints:\n'
-      '    hosted: $host\n    version: ^$version\n',
+      '    hosted: $host\n    version: ^$version\n'
+      '    diagnostics:\n      forbidden_ui_style_usage: false\n',
     );
   });
 
