@@ -27,7 +27,7 @@ class SetupAiCommand extends Command<int> {
 
   @override
   String get description =>
-      'Install the DartWay AI toolkit (.claude/) in the current project.';
+      'Install the DartWay AI toolkit (Codex and Claude) in the current project.';
 
   @override
   Future<int> run() async {
@@ -44,8 +44,8 @@ class SetupAiCommand extends Command<int> {
     if (result == null) return 1;
 
     stdout.writeln(
-      'Done: .claude/CLAUDE.md, skills and commands installed. '
-      'Commit .claude/ to your repository.',
+      'Done: selected agent integrations installed. '
+      'Commit the toolkit, manifest and root instruction blocks.',
     );
     return 0;
   }

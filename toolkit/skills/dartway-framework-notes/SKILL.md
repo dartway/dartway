@@ -9,7 +9,7 @@ description: >-
 
 # DartWay — notes back to the framework (`dartway-framework-notes`)
 
-**Tracker:** `__NOTES_TRACKER__`. `.claude/` is overwritten on update, so a rule that let you down is
+**Tracker:** `__NOTES_TRACKER__`. Managed toolkit files are overwritten on update, so a rule that let you down is
 fixed there, not here.
 
 **File one without being asked when** the code broke a rule that does not exist or is too vague to have

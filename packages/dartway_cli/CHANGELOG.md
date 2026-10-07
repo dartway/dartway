@@ -2,6 +2,13 @@
 
 ## 0.24.0
 
+- One toolkit supports Codex and Claude. `create`, `setup-ai` and `update`
+  accept `--agent codex|claude|both` (default `both`, recorded for updates).
+  Root owner instructions are preserved; managed blocks connect both agents
+  to `.agents/DARTWAY.md`. Skills install for each selected agent from one source.
+  The common manifest is `.agents/dartway-toolkit.json`; old install choices
+  are retained. Claude permissions remain separate.
+
 - **`deploy run` asks Let's Encrypt before it replaces anything** (dartway/dartway#433, D-123): the
   `certificate` step runs right after the data volume guard, through the proxy the previous deploy
   left running, so a Let's Encrypt failure stops the deploy with the previous version still serving

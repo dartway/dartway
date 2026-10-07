@@ -39,6 +39,7 @@ class ToolkitProvenance {
   /// Named here rather than at each call site because the writer and the reader
   /// have to agree on the spelling, and a key misspelled on one side of that
   /// pair fails as a silently defaulted setting.
+  static const agentSetting = 'agent';
   static const baseBranchSetting = 'baseBranch';
   static const languageSetting = 'language';
   static const notesTrackerSetting = 'notesTracker';
@@ -60,7 +61,10 @@ class ToolkitProvenance {
   /// Reads the manifest a previous install left, or null when there is none —
   /// which is every project installed before this existed.
   static ToolkitProvenance? read(Directory projectRoot) {
-    final file = _fileIn(projectRoot);
+    final common = _fileIn(projectRoot);
+    final file = common.existsSync()
+        ? common
+        : File(p.join(projectRoot.path, '.claude', 'dartway-toolkit.json'));
     if (!file.existsSync()) return null;
     try {
       final decoded = jsonDecode(file.readAsStringSync());
@@ -115,9 +119,10 @@ class ToolkitProvenance {
   }
 
   static File _fileIn(Directory projectRoot) =>
-      File(p.join(projectRoot.path, '.claude', 'dartway-toolkit.json'));
+      File(p.join(projectRoot.path, '.agents', 'dartway-toolkit.json'));
 
   void write(Directory projectRoot) {
+    _fileIn(projectRoot).parent.createSync(recursive: true);
     _fileIn(projectRoot).writeAsStringSync(
       '${const JsonEncoder.withIndent('  ').convert({'source': source, if (channel != null) 'channel': channel, if (commit != null) 'commit': commit, 'cliVersion': cliVersion, 'installedAt': installedAt, if (settings.isNotEmpty) 'settings': settings})}\n',
     );

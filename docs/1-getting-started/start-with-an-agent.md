@@ -70,13 +70,15 @@ or an app setting in the admin panel, and watch the other window follow without 
 
 ## The toolkit the project carries
 
-`dartway create` installs the agent toolkit into `.claude/`; `dartway setup-ai` installs it into a
-project that has none. From then on you keep working in prompts, and the assistant works inside the
-project's conventions rather than guessing them — the constitution in `CLAUDE.md`, a `dartway-*`
-skill per step of the work, `/commit` and `/dartway-checkup`. What is installed, what is managed and
-overwritten versus yours to keep, and how `.claude/settings.json` merges: [What is the `.claude/`
-folder in a DartWay project?](../5-tooling/agent-toolkit.md) **Commit `.claude/`**, so the repository
-is self-contained and its history says which skills the code was written with.
+`dartway create` installs the toolkit for Codex and Claude by default;
+`dartway setup-ai --agent codex|claude|both` installs the selected integrations into
+an existing project without changing its framework dependencies. Both agents
+read `.agents/DARTWAY.md`; their skills are generated from one source. Root
+project instructions and custom skills survive updates. The commit and checkup
+procedures are skills, with `/commit` and `/dartway-checkup` wrappers for Claude.
+See [The agent toolkit](../5-tooling/agent-toolkit.md) for managed files and
+agent-specific settings. Commit the toolkit and root connection blocks so a clone
+comes with the same methodology.
 
 ## Keeping it current: `dartway update`
 
@@ -106,6 +108,6 @@ API is not, and a command that half-did it would leave a tree nobody can tell fr
 - [Quick start](quick-start.md) — the same path by hand, with the reason for each step.
 - [What DartWay is](what-is-dartway.md) — the ideas behind the contract, and the honest limits.
 - [Project layout](project-layout.md) — the three packages and every folder in them.
-- [The agent toolkit](../5-tooling/agent-toolkit.md) — what ships in `.claude/`, and how to customize
+- [The agent toolkit](../5-tooling/agent-toolkit.md) — what ships for Codex and Claude, and how to customize
   it without losing the change on the next update.
 - [The CLI](../5-tooling/cli.md) — `quickstart`, `doctor`, `create`, `setup-ai`, `update` and the rest.

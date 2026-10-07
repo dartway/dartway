@@ -61,7 +61,7 @@ void main() {
       isEmpty,
     );
     expect(
-      File(p.join(project.path, '.claude', 'CLAUDE.md')).readAsStringSync(),
+      File(p.join(project.path, '.agents', 'DARTWAY.md')).readAsStringSync(),
       contains('shop_shared'),
     );
   });

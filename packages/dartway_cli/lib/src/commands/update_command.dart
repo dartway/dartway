@@ -102,7 +102,7 @@ class UpdateCommand extends Command<int> {
     );
 
     stdout.writeln(
-      '\nCommit .claude/ with the rest of the update, so the history says '
+      '\nCommit the toolkit and root instruction blocks with the rest of the update, so the history says '
       'which skills the code was written with.',
     );
     return 0;

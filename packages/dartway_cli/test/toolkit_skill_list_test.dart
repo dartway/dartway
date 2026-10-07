@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
-/// The skills `toolkit/CLAUDE.md` names are the skills that exist.
+/// The skills `toolkit/AGENTS.md` names are the skills that exist.
 ///
 /// The harness constitution lists them so an agent knows what it may reach
 /// for, and the installer ships whatever directories are there — it walks
@@ -30,7 +30,7 @@ void main() {
     }
   }();
 
-  test('CLAUDE.md names every shipped skill, and only those', () {
+  test('AGENTS.md names every shipped skill, and only those', () {
     final onDisk = Directory(p.join(toolkit.path, 'skills'))
         .listSync()
         .whereType<Directory>()
@@ -39,12 +39,12 @@ void main() {
         .toSet();
 
     // The line that lists them: a run of `dartway-*` in backticks on the
-    // "Skills (`.claude/skills/`)" bullet.
-    final line = File(p.join(toolkit.path, 'CLAUDE.md'))
+    // "Skills (`.agents/skills/`" bullet.
+    final line = File(p.join(toolkit.path, 'AGENTS.md'))
         .readAsLinesSync()
         .firstWhere(
-          (line) => line.contains('Skills (`.claude/skills/`)'),
-          orElse: () => throw StateError('no skills line in toolkit/CLAUDE.md'),
+          (line) => line.contains('Skills (`.agents/skills/`'),
+          orElse: () => throw StateError('no skills line in toolkit/AGENTS.md'),
         );
     final named = RegExp(
       r'`(dartway-[a-z-]+)`',
@@ -53,13 +53,13 @@ void main() {
     expect(
       named.difference(onDisk),
       isEmpty,
-      reason: 'named in toolkit/CLAUDE.md but not shipped',
+      reason: 'named in toolkit/AGENTS.md but not shipped',
     );
     expect(
       onDisk.difference(named),
       isEmpty,
       reason:
-          'shipped but not named in toolkit/CLAUDE.md — an agent will not '
+          'shipped but not named in toolkit/AGENTS.md — an agent will not '
           'know it exists, and the installer ships it anyway',
     );
   });

@@ -59,7 +59,7 @@ So a CLI that has the framework beside it hands out the template and the toolkit
 revision: activated from a checkout ahead of `stable`, `dartway create` makes a project of that
 checkout rather than of whatever `stable` holds. A CLI with nothing beside it — installed from
 pub.dev — takes the channel. The install prints which source it used and records it in
-`.claude/dartway-toolkit.json`.
+`.agents/dartway-toolkit.json`.
 
 | Variable | Meaning |
 |---|---|
@@ -108,7 +108,7 @@ one-time code, profiles and roles, navigation with zone guards, an admin panel, 
 tests on both sides, and no domain models. The full application on the same framework lives in
 `example/` and is a reference to read, not a project to inherit.
 
-You get `my_app_shared`, `my_app_server` and `my_app_flutter`, the agent toolkit in `.claude/`
+You get `my_app_shared`, `my_app_server` and `my_app_flutter`, the agent toolkit in `.agents/` and the selected `.claude/` integration
 and `docs/dev_notes/`, and a git repository with an initial commit.
 
 What the copy does beyond copying:
@@ -163,7 +163,7 @@ whatever assistant you use to bring the project up. The manual sequence is in th
 dartway setup-ai --base-branch develop
 ```
 
-Installs the agent toolkit into the project: `.claude/CLAUDE.md`, the `dartway-*` skills, the
+Installs the agent toolkit into the project: `.agents/DARTWAY.md`, the `dartway-*` skills, the
 `/commit` and `/dartway-checkup` commands, a merged `.claude/settings.json`, and
 `docs/dev_notes/`. What each of those is, and which files the installer owns, is
 [The agent toolkit](agent-toolkit.md).
@@ -175,6 +175,7 @@ guess.
 
 | Option | Default | Meaning |
 |---|---|---|
+| `--agent` | `both` | Install `codex`, `claude` or `both`; later installs preserve the recorded choice |
 | `--base-branch` | `master` | Base branch of **this** project, used by the commit and PR instructions |
 | `--language` | `English` | The language the project writes its own texts in. Package APIs and error strings stay English |
 | `--notes-tracker` | `dartway/dartway` | Where framework findings are filed; `none` keeps them in the project |
@@ -182,7 +183,7 @@ guess.
 | `--local-repo` | `DARTWAY_MONOREPO_DIR` | A local checkout instead of a clone |
 
 **An explicit flag wins, what the project recorded comes next, the default comes last.** The install
-records its provenance and settings in `.claude/dartway-toolkit.json` — source, channel, commit, CLI
+records its provenance and settings in `.agents/dartway-toolkit.json` — source, channel, commit, CLI
 version, and the three settings above — and a re-run without `--base-branch`, `--language` or
 `--notes-tracker` replays the recorded ones. Without that, a plain re-run would reset a project's
 language and tracker, and the diff would look like any update.
@@ -194,7 +195,7 @@ in the command that ran. A named local checkout ignores the channel and records 
 refused. The checkout the CLI runs from is a default like `stable`, and is refused the same way for a
 project that recorded a channel: `--channel <recorded>` stays, `--local-repo <checkout>` switches.
 
-Commit `.claude/` and `docs/dev_notes/` afterwards.
+Commit `.agents/`, selected `.claude/` files, root instruction blocks and `docs/dev_notes/` afterwards.
 
 ## `dartway update` — carry the project onto a newer framework
 

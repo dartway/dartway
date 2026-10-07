@@ -56,7 +56,7 @@ and the folder names the project — `dartway-demo/` becomes `dartway_demo`:
 The name must be lower_snake_case: it becomes the package names, the type names and the
 storage bucket names. You get `my_app_shared` (the contract: data objects, requests,
 commands, channels, refusal codes), `my_app_server` (handlers, rows, migrations),
-`my_app_flutter` (the app), an AI toolkit in `.claude/`, and a git repository with an
+`my_app_flutter` (the app), an AI toolkit for Codex and Claude in `.agents/` and `.claude/`, and a git repository with an
 initial commit.
 
 What is inside is a skeleton, not somebody's product: sign-in by a one-time code to a

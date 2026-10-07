@@ -240,7 +240,7 @@ void main() {
     expect(created.exitCode, 0, reason: '${created.stdout}\n${created.stderr}');
     final manifest = read(
       Directory(p.join(sandbox.path, 'shop')),
-      '.claude/dartway-toolkit.json',
+      '.agents/dartway-toolkit.json',
     );
     expect(manifest, contains('"source": "${repository.path}"'));
     expect(manifest, isNot(contains('"channel"')));
@@ -259,7 +259,7 @@ void main() {
       '--notes-tracker',
       'github',
     ]);
-    final manifest = read(project, '.claude/dartway-toolkit.json');
+    final manifest = read(project, '.agents/dartway-toolkit.json');
 
     expect(manifest, contains('"language": "ru"'));
     expect(manifest, contains('"notesTracker": "github"'));

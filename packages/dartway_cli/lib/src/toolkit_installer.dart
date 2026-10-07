@@ -5,14 +5,9 @@ import 'package:path/path.dart' as p;
 
 import 'toolkit_manifest.dart';
 
-/// Installs the DartWay AI toolkit into a project's `.claude/` directory.
-///
-/// `.claude/` is a generated-but-committed artifact, like generated code
-/// elsewhere in this framework. Only MANAGED files are overwritten:
-/// `CLAUDE.md`, skills named `dartway-*` and the `commit` / `dartway-checkup`
-/// commands. Project-own skills and commands are never touched.
-/// `settings.json` is a third kind — a toolkit default the project extends —
-/// and is merged rather than overwritten or skipped; see [_installSettings].
+/// Installs one policy and shared skills for selected agent integrations.
+/// Managed files are regenerated; root owner instructions and custom skills
+/// survive updates. Claude settings are merged only when Claude is selected.
 class ToolkitInstaller {
   /// Removed before every install, then re-copied from the toolkit — so a
   /// command that has been retired disappears from a project instead of
@@ -28,10 +23,17 @@ class ToolkitInstaller {
     required Directory projectRoot,
     required Map<String, String> tokens,
     ToolkitProvenance? provenance,
+    String agent = 'both',
   }) async {
     final toolkitSkillsDir = Directory(p.join(toolkitDir.path, 'skills'));
     final toolkitCommandsDir = Directory(p.join(toolkitDir.path, 'commands'));
-    final toolkitClaudeMd = File(p.join(toolkitDir.path, 'CLAUDE.md'));
+    if (!const ['codex', 'claude', 'both'].contains(agent)) {
+      throw ArgumentError.value(agent, 'agent');
+    }
+    final policy = File(p.join(toolkitDir.path, 'AGENTS.md'));
+    final toolkitClaudeMd = policy.existsSync()
+        ? policy
+        : File(p.join(toolkitDir.path, 'CLAUDE.md'));
     if (!toolkitSkillsDir.existsSync() ||
         !toolkitCommandsDir.existsSync() ||
         !toolkitClaudeMd.existsSync()) {
@@ -55,40 +57,138 @@ class ToolkitInstaller {
       );
     }
 
+    for (final name in ['AGENTS.md', 'CLAUDE.md']) {
+      final file = File(p.join(projectRoot.path, name));
+      final text = file.existsSync() ? file.readAsStringSync() : '';
+      final start = text.indexOf(_entryStart);
+      final end = text.indexOf(_entryEnd);
+      if ((start < 0) != (end < 0) ||
+          (start >= 0 && end < start) ||
+          (start >= 0 &&
+              text.indexOf(_entryStart, start + _entryStart.length) >= 0) ||
+          (end >= 0 && text.indexOf(_entryEnd, end + _entryEnd.length) >= 0)) {
+        throw StateError(
+          'Malformed DartWay block in $name; installation stopped.',
+        );
+      }
+    }
+    final agentsDir = Directory(p.join(projectRoot.path, '.agents'))
+      ..createSync(recursive: true);
+    final sharedPolicy = File(p.join(agentsDir.path, 'DARTWAY.md'));
+    toolkitClaudeMd.copySync(sharedPolicy.path);
+    _substituteTokens([sharedPolicy], tokens);
+    if (agent != 'claude') {
+      final codexSkills = Directory(p.join(agentsDir.path, 'skills'));
+      _removeSkills(codexSkills);
+      final copied = <File>[];
+      for (final skill in toolkitSkillsDir.listSync().whereType<Directory>()) {
+        copied.addAll(
+          _copyDirectory(
+            skill,
+            Directory(p.join(codexSkills.path, p.basename(skill.path))),
+          ),
+        );
+      }
+      _substituteTokens(copied, tokens);
+    }
+    _installEntry(projectRoot, 'AGENTS.md', enabled: agent != 'claude');
+    _installEntry(projectRoot, 'CLAUDE.md', enabled: agent != 'codex');
+    if (agent == 'claude')
+      _removeSkills(Directory(p.join(agentsDir.path, 'skills')));
+
     final claudeDir = Directory(p.join(projectRoot.path, '.claude'));
     final skillsDir = Directory(p.join(claudeDir.path, 'skills'));
     final commandsDir = Directory(p.join(claudeDir.path, 'commands'));
 
     _removeManagedFiles(claudeDir, skillsDir, commandsDir);
-    skillsDir.createSync(recursive: true);
-    commandsDir.createSync(recursive: true);
+    if (agent != 'codex') {
+      skillsDir.createSync(recursive: true);
+      commandsDir.createSync(recursive: true);
 
-    final managedFiles = <File>[];
-    for (final skillDir in toolkitSkillsDir.listSync().whereType<Directory>()) {
-      final installedDir = Directory(
-        p.join(skillsDir.path, p.basename(skillDir.path)),
+      final managedFiles = <File>[];
+      for (final skillDir
+          in toolkitSkillsDir.listSync().whereType<Directory>()) {
+        final installedDir = Directory(
+          p.join(skillsDir.path, p.basename(skillDir.path)),
+        );
+        managedFiles.addAll(_copyDirectory(skillDir, installedDir));
+      }
+      for (final commandFile
+          in toolkitCommandsDir.listSync().whereType<File>()) {
+        final installedFile = File(
+          p.join(commandsDir.path, p.basename(commandFile.path)),
+        );
+        commandFile.copySync(installedFile.path);
+        managedFiles.add(installedFile);
+      }
+      final installedClaudeMd = File(p.join(claudeDir.path, 'CLAUDE.md'));
+      installedClaudeMd.writeAsStringSync(
+        'Read `.agents/DARTWAY.md` before working on this project.\n',
       );
-      managedFiles.addAll(_copyDirectory(skillDir, installedDir));
-    }
-    for (final commandFile in toolkitCommandsDir.listSync().whereType<File>()) {
-      final installedFile = File(
-        p.join(commandsDir.path, p.basename(commandFile.path)),
-      );
-      commandFile.copySync(installedFile.path);
-      managedFiles.add(installedFile);
-    }
-    final installedClaudeMd = File(p.join(claudeDir.path, 'CLAUDE.md'));
-    toolkitClaudeMd.copySync(installedClaudeMd.path);
-    managedFiles.add(installedClaudeMd);
+      managedFiles.add(installedClaudeMd);
 
-    _substituteTokens(managedFiles, tokens);
+      _substituteTokens(managedFiles, tokens);
 
-    _installSettings(toolkitDir, claudeDir);
+      _installSettings(toolkitDir, claudeDir);
+    }
     _installDevNotes(toolkitDir, projectRoot, tokens);
+    stdout.writeln('Agent integrations installed: $agent');
 
     if (provenance != null) {
       provenance.write(projectRoot);
+      final legacy = File(
+        p.join(projectRoot.path, '.claude', 'dartway-toolkit.json'),
+      );
+      if (legacy.existsSync()) legacy.deleteSync();
       stdout.writeln('Toolkit: ${provenance.describe()}');
+    }
+  }
+
+  static const _entryStart = '<!-- dartway-toolkit:start -->';
+  static const _entryEnd = '<!-- dartway-toolkit:end -->';
+
+  static void _installEntry(
+    Directory root,
+    String name, {
+    required bool enabled,
+  }) {
+    final file = File(p.join(root.path, name));
+    var content = file.existsSync() ? file.readAsStringSync() : '';
+    final start = content.indexOf(_entryStart);
+    final end = content.indexOf(_entryEnd);
+    if ((start < 0) != (end < 0) || (start >= 0 && end < start)) {
+      throw StateError(
+        'Malformed DartWay block in $name; file left untouched.',
+      );
+    }
+    final block =
+        '$_entryStart\n'
+        'Read `.agents/DARTWAY.md` before working on this project.\n'
+        '$_entryEnd';
+    if (start >= 0) {
+      content = content.replaceRange(
+        start,
+        end + _entryEnd.length,
+        enabled ? block : '',
+      );
+    } else if (enabled) {
+      final separator = content.isEmpty
+          ? ''
+          : content.endsWith('\n')
+          ? '\n'
+          : '\n\n';
+      content = '$content$separator$block\n';
+    } else {
+      return;
+    }
+    file.writeAsStringSync(content);
+  }
+
+  static void _removeSkills(Directory skills) {
+    if (!skills.existsSync()) return;
+    for (final dir in skills.listSync().whereType<Directory>()) {
+      if (p.basename(dir.path).startsWith('dartway-'))
+        dir.deleteSync(recursive: true);
     }
   }
 
@@ -338,7 +438,7 @@ class ToolkitInstaller {
           ...Directory(
             p.join(toolkitDir.path, folder),
           ).listSync(recursive: true).whereType<File>(),
-      for (final name in const ['CLAUDE.md', 'settings.json'])
+      for (final name in const ['AGENTS.md', 'CLAUDE.md', 'settings.json'])
         if (File(p.join(toolkitDir.path, name)).existsSync())
           File(p.join(toolkitDir.path, name)),
     ];

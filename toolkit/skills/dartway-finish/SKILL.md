@@ -89,7 +89,7 @@ through the public kit widget.
   doc comment where it is enforced; a changed DTO: its doc comments. An outdated description is worse
   than none. Forms: `dartway-feature-scaffold`, `dartway-documentation`.
 - Something wrong noticed on the way that this task does not fix is placed now — the routing is
-  `dartway-documentation`. So is a statement in the root `CLAUDE.md` or a skill that the changed code now
+  `dartway-documentation`. So is a statement in the root instruction file (`AGENTS.md` or `CLAUDE.md`) or a skill that the changed code now
   contradicts, either way; a managed file is a framework finding.
 - Non-trivial logic, money, a rule or a bugfix without a test is flagged; the test belongs where the
   behaviour lives (`dartway-testing`). So is a new test that fails the gate — a question it cannot

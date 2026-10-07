@@ -4,7 +4,7 @@ import 'package:dartway_cli/src/checker/dw_check_type.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
-/// The law list `toolkit/CLAUDE.md` publishes is the checker's `error` set.
+/// The law list `toolkit/AGENTS.md` publishes is the checker's `error` set.
 ///
 /// The harness draws its one hard line there — a law is not a project's to
 /// override, a default is — and it draws it by naming checks. The naming is a
@@ -34,7 +34,7 @@ void main() {
     }
   }();
 
-  final claudeMd = File(p.join(toolkit.path, 'CLAUDE.md')).readAsLinesSync();
+  final claudeMd = File(p.join(toolkit.path, 'AGENTS.md')).readAsLinesSync();
 
   /// The rows of the table headed "Checks that fail", as one string.
   String lawTable() {
@@ -42,7 +42,7 @@ void main() {
       (line) => line.startsWith('|') && line.contains('Checks that fail'),
     );
     if (header < 0) {
-      throw StateError('no law table in toolkit/CLAUDE.md');
+      throw StateError('no law table in toolkit/AGENTS.md');
     }
     // Past the header and its `|---|---|` separator, up to the blank line.
     final rows = claudeMd
@@ -66,7 +66,7 @@ void main() {
       named.difference(failing),
       isEmpty,
       reason:
-          'named as law in toolkit/CLAUDE.md, but the checker does not fail '
+          'named as law in toolkit/AGENTS.md, but the checker does not fail '
           'on it — a project is being forbidden to decide something the '
           'framework only warns about',
     );
@@ -74,7 +74,7 @@ void main() {
       failing.difference(named),
       isEmpty,
       reason:
-          'the checker fails on it and toolkit/CLAUDE.md does not name it — '
+          'the checker fails on it and toolkit/AGENTS.md does not name it — '
           'a law a project first meets as a red build',
     );
   });
@@ -145,7 +145,7 @@ void main() {
         word != null && RegExp('\\b$word\\b').hasMatch(section),
         isTrue,
         reason:
-            'toolkit/CLAUDE.md does not say "$word" anywhere around the law '
+            'toolkit/AGENTS.md does not say "$word" anywhere around the law '
             'table, and that is how many checks are ${severity.name}',
       );
     }
