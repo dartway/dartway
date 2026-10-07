@@ -27,7 +27,8 @@ class SetupAiCommand extends Command<int> {
 
   @override
   String get description =>
-      'Install the DartWay AI toolkit (Codex and Claude) in the current project.';
+      'Install the DartWay AI toolkit (Codex and Claude) '
+      'in the current project.';
 
   @override
   Future<int> run() async {

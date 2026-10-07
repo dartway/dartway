@@ -93,8 +93,9 @@ class ToolkitInstaller {
     }
     _installEntry(projectRoot, 'AGENTS.md', enabled: agent != 'claude');
     _installEntry(projectRoot, 'CLAUDE.md', enabled: agent != 'codex');
-    if (agent == 'claude')
+    if (agent == 'claude') {
       _removeSkills(Directory(p.join(agentsDir.path, 'skills')));
+    }
 
     final claudeDir = Directory(p.join(projectRoot.path, '.claude'));
     final skillsDir = Directory(p.join(claudeDir.path, 'skills'));
@@ -187,8 +188,9 @@ class ToolkitInstaller {
   static void _removeSkills(Directory skills) {
     if (!skills.existsSync()) return;
     for (final dir in skills.listSync().whereType<Directory>()) {
-      if (p.basename(dir.path).startsWith('dartway-'))
+      if (p.basename(dir.path).startsWith('dartway-')) {
         dir.deleteSync(recursive: true);
+      }
     }
   }
 
@@ -383,13 +385,7 @@ class ToolkitInstaller {
     Directory skillsDir,
     Directory commandsDir,
   ) {
-    if (skillsDir.existsSync()) {
-      for (final skillDir in skillsDir.listSync().whereType<Directory>()) {
-        if (p.basename(skillDir.path).startsWith('dartway-')) {
-          skillDir.deleteSync(recursive: true);
-        }
-      }
-    }
+    _removeSkills(skillsDir);
     for (final commandFileName in managedCommandFiles) {
       final commandFile = File(p.join(commandsDir.path, commandFileName));
       if (commandFile.existsSync()) {
