@@ -4,6 +4,7 @@ import 'package:args/args.dart';
 
 import '../deploy/compose_files.dart';
 import '../deploy/data_volumes.dart';
+import '../deploy/output_mask.dart';
 import '../deploy/renderer.dart';
 import '../deploy/secret_store.dart';
 import '../deploy/ssh_runner.dart';
@@ -29,13 +30,16 @@ Future<int> runSetup(
   final target = stack.target;
   final environment = target.environment;
 
-  final ssh =
-      connection ??
-      DwSshRunner(
-        host: target.host,
-        user: results.option('as') ?? target.sshUser,
-        identityFile: results.option('identity'),
-      );
+  final ssh = DwMaskedSshRunner(
+    connection ??
+        DwSshRunner(
+          host: target.host,
+          user: results.option('as') ?? target.sshUser,
+          identityFile: results.option('identity'),
+        ),
+    deployUser: target.deployUser,
+    storeFile: '${target.runtimeConfigDir}/${DwSecretStore.fileName}',
+  );
   final store = DwSecretStore(ssh: ssh, target: target);
   final renderer = DwStackRenderer(stack: stack, projectRoot: projectRoot);
 

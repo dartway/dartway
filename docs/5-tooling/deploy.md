@@ -513,6 +513,13 @@ something surprising.
 
 ### On a server
 
+Output of `deploy run` (including resumed steps), `deploy setup` and `deploy check` is masked
+on the target before it leaves over SSH. The filter reads `secrets.env` as the deployment user
+and replaces literal occurrences of stored values with `***`, including their URL percent-encoded
+forms. Values shorter than **6 characters** remain visible, so common values such as `true` and
+`5432` do not obscure unrelated output. Both stdout and stderr are filtered, including the output
+in JSON progress events. Before the store exists, output passes through unchanged.
+
 **The store** is one file on the server, `/home/<deploy_user>/.config/<project>/secrets.env`, mode
 600, outside the checkout so the `git reset --hard` of a deploy cannot touch it. Lines are
 `KEY='value'`, single-quoted so nothing in a value is interpreted — which is why a value cannot hold a

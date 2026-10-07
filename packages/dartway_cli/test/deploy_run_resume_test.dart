@@ -63,6 +63,68 @@ void main() {
     progress: progress,
   );
 
+  for (final resume in [false, true]) {
+    test(
+      'failed output is masked in prose and events (resume=$resume)',
+      () async {
+        const secret = r'pass.*[]\/&$word';
+        final encoded = Uri.encodeComponent(secret);
+        File(p.join(temp.path, 'secrets.env'))
+            .writeAsStringSync("TOKEN='$secret'\n");
+        final plan = [
+          step(
+            'leaks',
+            script:
+                "printf '%s\\n' 'before $secret after' 'url=$encoded'\n"
+                "printf '%s' 'error $secret url=$encoded end' >&2\nexit 7",
+          ),
+        ];
+        if (resume) {
+          remote.beginFresh(['leaks']);
+          await plan.single.run();
+        }
+        expect(await execute(plan, resume: resume), 'leaks');
+        await human.settle();
+        await events.settle();
+        final failed = events.lines
+            .map((line) => jsonDecode(line) as Map<String, Object?>)
+            .singleWhere((event) => event['event'] == 'step_failed');
+        expect(failed['stdout'], 'before *** after\nurl=***\n');
+        expect(failed['stderr'], 'error *** url=*** end');
+        expect(human.lines.join('\n'), contains('before *** after'));
+        for (final output in [
+          human.lines.join('\n'),
+          events.lines.join('\n'),
+        ]) {
+          expect(output, isNot(contains(secret)));
+          expect(output, isNot(contains(encoded)));
+        }
+      },
+    );
+  }
+
+  test('successful step output is masked in prose and step_finished', () async {
+    File(p.join(temp.path, 'secrets.env'))
+        .writeAsStringSync("TOKEN='stored-secret'\n");
+    final plan = [
+      DwDeployStep(
+        id: 'prints',
+        title: 'Print output',
+        showOutput: true,
+        run: () => remote.run('prints', "echo 'before stored-secret after'"),
+      ),
+    ];
+    expect(await execute(plan), isNull);
+    await human.settle();
+    await events.settle();
+    final finished = events.lines
+        .map((line) => jsonDecode(line) as Map<String, Object?>)
+        .singleWhere((event) => event['event'] == 'step_finished');
+    expect(finished['stdout'], 'before *** after\n');
+    expect(human.text, contains('before *** after'));
+    expect(events.text, isNot(contains('stored-secret')));
+  });
+
   test(
     'a resumed deployment runs only what the first one did not finish',
     () async {

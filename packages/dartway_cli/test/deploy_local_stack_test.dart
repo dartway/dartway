@@ -151,7 +151,7 @@ void main() {
           ).readAsStringSync(),
         )!
         .group(1)!;
-    exampleAppVersion = RegExp(r"exampleAppVersion = '([^']+)'")
+    exampleAppVersion = RegExp(r"appBuildVersion = '([^']+)'")
         .firstMatch(
           File(
             p.join(

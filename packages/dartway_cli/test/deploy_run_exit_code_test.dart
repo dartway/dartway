@@ -68,7 +68,7 @@ class _ServerWhereEveryStepExits extends RecordingSsh {
       exitCode: 0,
       stdout:
           '$nonce exited $code\n\n$nonce stderr\nfatal: the step failed\n\n'
-          '$nonce end\n',
+          '$nonce end 0\n',
       stderr: '',
     );
   }

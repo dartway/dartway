@@ -192,7 +192,10 @@ void main() {
 
       expect(ssh.issued, hasLength(7));
       for (final command in ssh.issued) {
-        expect(command, contains("cd '/home/deployer/shop'"));
+        expect(
+          command.replaceAll("'\\''", "'"),
+          contains("cd '/home/deployer/shop'"),
+        );
         expect(command, contains(DwComposeFiles.projectOverride));
       }
     });
@@ -203,7 +206,7 @@ void main() {
         ssh: ssh,
         stack: stackVariants()['bundled storage and a site']!,
       ).issueCertificate();
-      final command = ssh.issued.single;
+      final command = ssh.issued.single.replaceAll("'\\''", "'");
       expect(command, contains("--cert-name 'api.example.com'"));
       for (final domain in [
         'api.example.com',

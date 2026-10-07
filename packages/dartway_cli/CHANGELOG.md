@@ -2,6 +2,10 @@
 
 ## 0.24.0
 
+- Deploy output is masked on the target by literal stored secret value (at least 6 characters),
+  including URL percent-encoded forms, before stdout/stderr reach human logs or JSON progress.
+  Covers fresh and resumed steps, direct runs, setup and checks (#437).
+
 - **Breaking — safe framework updates** (#427, #441): `update --plan` reads an exact committed target
   without project edits; writes require its full `--target` SHA. The proposed analyzer plugin
   source must resolve through pub before installation or configuration edits. Existing git/path

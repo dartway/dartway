@@ -1,5 +1,9 @@
 import 'dart:math';
 
+import 'package:path/path.dart' as p;
+
+import 'output_mask.dart';
+import 'secret_store.dart';
 import 'ssh_runner.dart';
 
 /// What the server knows about one step of the last deployment.
@@ -228,11 +232,14 @@ ${_waitScript(id, nonce)}''';
   }
 
   /// Waits for `<id>.exit` and prints the step's end in a frame [_settle]
-  /// reads: `<nonce> exited <code>`, its stdout, `<nonce> stderr`, its stderr.
+  /// reads: `<nonce> exited <code>`, its stdout, `<nonce> stderr`, its stderr,
+  /// then `<nonce> end <mask-code>`. A complete frame survives SSH disconnecting
+  /// after it; its mask status, rather than SSH's exit code, judges the filter.
   String _waitScript(String id, String nonce) =>
       '''
 d='$directory'
 id='$id'
+${dwSecretMaskFunction('${p.posix.dirname(directory)}/${DwSecretStore.fileName}')}
 while :; do
   $_stateOf
   case "\$state" in
@@ -242,13 +249,15 @@ while :; do
   esac
 done
 if [ -f "\$d/$id.exit" ]; then
+  dw_mask_code=0
   echo "$nonce exited \$(cat "\$d/$id.exit")"
-  cat "\$d/$id.out" 2>/dev/null || true
+  ${dwMaskOutputFile('"\$d/$id.out"')} || dw_mask_code=1
   echo
   echo "$nonce stderr"
-  cat "\$d/$id.err" 2>/dev/null || true
+  ${dwMaskOutputFile('"\$d/$id.err"')} || dw_mask_code=1
   echo
-  echo "$nonce end"
+  echo "$nonce end \$dw_mask_code"
+  exit "\$dw_mask_code"
 else
   echo "$nonce vanished"
 fi
@@ -324,12 +333,19 @@ fi
         case 'exited':
           final rest = lines.sublist(index + 1).join('\n');
           final split = rest.indexOf('\n$nonce stderr\n');
-          final end = rest.lastIndexOf('\n$nonce end');
+          final endMarker = '\n$nonce end ';
+          final end = rest.lastIndexOf(endMarker);
           if (split < 0 || end < split) return null;
+          final maskCode = int.tryParse(
+            rest.substring(end + endMarker.length).split('\n').first.trim(),
+          );
+          if (maskCode == null) return null;
           return DwSshResult(
-            exitCode: int.tryParse(words.last) ?? 1,
+            exitCode: maskCode == 0 ? int.tryParse(words.last) ?? 1 : maskCode,
             stdout: rest.substring(0, split),
-            stderr: rest.substring(split + '\n$nonce stderr\n'.length, end),
+            stderr:
+                rest.substring(split + '\n$nonce stderr\n'.length, end) +
+                (maskCode == 0 ? '' : answer.stderr),
           );
       }
     }
