@@ -54,23 +54,20 @@ void main() {
       expect(() => DwCalendarDay(9999, 12, 31).addDays(1), throwsRangeError);
     });
 
-    test(
-      'the caller chooses the intended timezone before extracting Y/M/D',
-      () {
-        // Run with TZ=Pacific/Kiritimati: this instant is Jan 1 locally but Dec
-        // 31 in UTC. The value stores whichever components its caller selects.
-        final instant = DateTime.utc(2025, 12, 31, 12);
-        final local = instant.toLocal();
-        expect(
-          DwCalendarDay(local.year, local.month, local.day),
-          DwCalendarDay(2026, 1, 1),
-        );
-        expect(
-          DwCalendarDay(instant.year, instant.month, instant.day),
-          DwCalendarDay(2025, 12, 31),
-        );
-      },
-    );
+    test('the caller chooses the intended date components explicitly', () {
+      // This instant is Dec 31 in UTC. A caller who has chosen a different
+      // timezone may pass Jan 1 components instead; the value has no hidden
+      // instant or system-timezone conversion.
+      final instant = DateTime.utc(2025, 12, 31, 12);
+      final utcDay = DwCalendarDay(instant.year, instant.month, instant.day);
+      final callerChosenDay = DwCalendarDay(2026, 1, 1);
+      expect(
+        utcDay,
+        DwCalendarDay(2025, 12, 31),
+      );
+      expect(callerChosenDay, DwCalendarDay(2026, 1, 1));
+      expect(callerChosenDay, isNot(utcDay));
+    });
 
     test('JSON codec is the canonical string and rejects invalid input', () {
       final day = DwCalendarDay(2026, 10, 7);

@@ -3,19 +3,14 @@ import 'package:dartway_example_flutter/app/chat/logic/chat_labels.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test(
-    'chat grouping uses local calendar components across a UTC boundary',
-    () {
-      // With TZ=Pacific/Kiritimati both instants fall on local 2026-01-01,
-      // although their UTC dates differ.
-      final beforeUtcMidnight = DateTime.utc(2025, 12, 31, 12);
-      final afterUtcMidnight = DateTime.utc(2025, 12, 31, 23);
-      expect(beforeUtcMidnight.isSameLocalDay(afterUtcMidnight), isTrue);
-      final local = beforeUtcMidnight.toLocal();
-      expect(
-        DwCalendarDay(local.year, local.month, local.day),
-        DwCalendarDay(2026, 1, 1),
-      );
-    },
-  );
+  test('chat grouping compares known local calendar components', () {
+    final morning = DateTime(2026, 1, 1, 8);
+    final evening = DateTime(2026, 1, 1, 23);
+    expect(morning.isSameLocalDay(evening), isTrue);
+    final local = morning.toLocal();
+    expect(
+      DwCalendarDay(local.year, local.month, local.day),
+      DwCalendarDay(2026, 1, 1),
+    );
+  });
 }

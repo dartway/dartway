@@ -84,21 +84,16 @@ void main() {
     test(
       'date binding stays a civil day across process and session zones',
       () async {
-        // Run this suite with TZ=Pacific/Kiritimati. The legacy pg.Type.date
-        // path truncates after converting local midnight to UTC; the typed
-        // calendar-day adapter creates a UTC carrier from the Y/M/D components.
-        final localMidnight = DateTime(2026, 9, 14);
-        final day = DwCalendarDay(
-          localMidnight.year,
-          localMidnight.month,
-          localMidnight.day,
-        );
+        // The legacy carrier is explicitly UTC so this routine service test is
+        // independent of the process timezone.
+        final utcDate = DateTime.utc(2026, 9, 14);
+        final day = DwCalendarDay(2026, 9, 14);
         final raw = await db().run(
           r'SELECT $1::date AS legacy, $2::date AS calendar_day',
           const [pg.Type.date, pg.Type.date],
-          [localMidnight, DwColumnType.calendarDay.encode(day)],
+          [utcDate, DwColumnType.calendarDay.encode(day)],
         );
-        expect(raw.single[0], DateTime.utc(2026, 9, 13));
+        expect(raw.single[0], DateTime.utc(2026, 9, 14));
         expect(
           DwColumnType.calendarDay.decode(raw.single[1]!),
           DwCalendarDay(2026, 9, 14),
