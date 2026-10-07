@@ -91,7 +91,18 @@ A feature reads and writes through the ambient `dw`, so the seam is the server, 
 type, not `DwCallOk([])` — `onCommand<…>`, `call.publish(…)`; assert with `callsOf<PayInvoice>()`,
 `requestsOf<…>()`; push from outside with `server.publish(channel, [object])`; page with
 `dwFakeTablePage`, `dwFakeOffsetPage`, `dwFakeWindow`; files with `DwFakeStorage`.
-**Every test ends asserting `server.errors` is empty.**
+**Every test ends asserting `server.errors` is empty.** A successful fake-server call can still hide an
+application exception caught by `dw.action`, so `TestApp.stop()` also fails on every unaccounted
+`DwErrorReport`. The harness captures reports through the app factory's existing
+`DwFlutterConfig.onErrorReport` hook and keeps Flutter's global error hooks active through unmount
+and disposal. It restores the hooks and disposes the core before asserting, even when the assertion
+fails. Normal `DwRefusalException` and `DwNotAuthenticatedException` reports remain business
+outcomes and do not count as incidents.
+
+An error-path test that expects an incident asserts the captured report's error and interception
+metadata, then consumes that exact report instance with `app.consumeErrorReport(report)`. A report
+that was not captured cannot be consumed, and consuming one report leaves every other report fatal
+at teardown.
 
 **Start from the skeleton's `FakeApp` and `TestApp`** (`__FLUTTER_PKG__/test/support/app_test_app.dart`):
 they build the core through the app's own factory in `lib/core/dw_core.dart` with the fake's transports
@@ -107,6 +118,9 @@ surprise. A widget test lives at `test/<zone>/<feature>/<entry>_test.dart`. Samp
   language overrides that provider.
 - **Never `await` a core call directly** (`core.signOut()`): fake time moves only with pumped frames —
   `await app.run(tester, …)`.
+- The widget harness defaults to `dwFakeClientOptions`, including an immediate `releaseDelay` for
+  fast unrelated screens. A test of cache or navigation lifecycle passes
+  `clientOptions: const DwClientOptions()` to `TestApp.start` to use the production release delay.
 - **No `pumpAndSettle` over a spinner**; settle as the harness does. A success notification holds a
   timer — `app.waitOutNotifications(tester)` before unmounting, and before tapping what it covers. A failed read is retried: assert what was asked,
   never how many times. Settle after `enterText` before asserting a button enabled.

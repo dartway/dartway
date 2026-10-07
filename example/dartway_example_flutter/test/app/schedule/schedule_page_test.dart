@@ -1,8 +1,28 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 
 import '../../support/app_test_app.dart';
 
 void main() {
+  testWidgets(
+    'returning to the schedule within the release window keeps its request live',
+    (tester) async {
+      final club = FakeApp();
+      final app = await TestApp.start(
+        tester,
+        club,
+        clientOptions: const DwClientOptions(),
+      );
+      expect(app.server.requestsOf<ListUpcomingSessions>(), hasLength(1));
+
+      await app.tap(tester, find.text('Profile'));
+      await app.tap(tester, find.text('Schedule'));
+
+      expect(app.server.requestsOf<ListUpcomingSessions>(), hasLength(1));
+      await app.stop(tester);
+    },
+  );
+
   testWidgets('booking a session flips its card and its spots from the answer '
       'alone', (tester) async {
     final startsAt = DateTime.now().add(const Duration(days: 1));

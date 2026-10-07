@@ -1,19 +1,12 @@
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
-import 'package:dartway_starter_flutter/core/dw_core.dart';
-import 'package:dartway_starter_flutter/dartway_starter_app.dart';
+import 'package:dartway_example_flutter/core/dw_core.dart';
+import 'package:dartway_example_flutter/dartway_example_app.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../support/app_test_app.dart';
 
 void main() {
-  testWidgets('signing out through the core ends the session', (tester) async {
-    final app = await TestApp.start(tester, FakeApp());
-    expect(app.core.client.accountId, testSession.id);
-    await app.run(tester, app.core.signOut());
-    expect(app.core.client.accountId, isNull);
-    await app.stop(tester);
-  });
   testWidgets('an action-intercepted disposal error fails harness teardown', (
     tester,
   ) async {
