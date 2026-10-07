@@ -13,6 +13,7 @@ import '../controller/dw_video_media_controller.dart';
 import '../model/dw_media_callbacks.dart';
 import '../model/dw_media_item.dart';
 import '../model/dw_media_playback_state.dart';
+import '../observation/dw_media_played_interval.dart';
 import '../platform/dw_media_platform.dart';
 import 'dw_media_queue_state.dart';
 
@@ -41,6 +42,73 @@ final class DwMediaSessionManager {
   final ValueNotifier<DwMediaSession?> _active = ValueNotifier(null);
 
   final List<DwMediaSession> _sessions = [];
+  int _nextSessionId = 0;
+  int _nextBatchId = 0;
+  final Map<DwMediaPlaybackReport, _PendingPlaybackDelivery> _pendingPlayback =
+      {};
+
+  /// Sealed confirmed windows awaiting adapter acknowledgement. These have
+  /// no engine references and remain after session/plugin disposal, only for
+  /// the lifetime of this manager. No framework persistence is provided.
+  List<DwMediaPlaybackReport> get pendingPlaybackReports =>
+      List.unmodifiable(_pendingPlayback.keys);
+
+  /// Last delivery failure, or null while new/in flight/acknowledged.
+  Object? playbackDeliveryError(DwMediaPlaybackReport report) =>
+      _pendingPlayback[report]?.error;
+
+  /// Delivers the exact batch through its captured adapter. Concurrent calls
+  /// join one attempt. Future success acknowledges only this batch; failure
+  /// throws to this caller and leaves its identity/payload pending for retry.
+  /// Unknown or already acknowledged reports fail with ArgumentError.
+  Future<void> retryPlaybackReport(DwMediaPlaybackReport report) {
+    final pending = _pendingPlayback[report];
+    if (pending == null)
+      throw ArgumentError('report is not pending in this manager');
+    final running = pending.attempt;
+    if (running != null) return running;
+    final completion = Completer<void>();
+    pending.attempt = completion.future;
+    pending.error = null;
+    // Schedule adapter invocation after the sealing/engine transition returns;
+    // an adapter may itself reenter the plugin.
+    Future<void>.value()
+        .then((_) => pending.deliver(report))
+        .then(
+          (_) {
+            _pendingPlayback.remove(report);
+            pending.attempt = null;
+            completion.complete();
+          },
+          onError: (Object error, StackTrace stack) {
+            pending.error = error;
+            pending.attempt = null;
+            completion.completeError(error, stack);
+          },
+        );
+    return completion.future;
+  }
+
+  DwMediaPlaybackReport _sealPlayback({
+    required int sessionId,
+    required String itemId,
+    required int sourceGeneration,
+    required List<DwMediaPlayedInterval> intervals,
+    required DwMediaPlaybackDelivery delivery,
+  }) {
+    final report = DwMediaPlaybackReport(
+      batchId: ++_nextBatchId,
+      sessionId: sessionId,
+      itemId: itemId,
+      sourceGeneration: sourceGeneration,
+      intervals: intervals,
+    );
+    _pendingPlayback[report] = _PendingPlaybackDelivery(delivery);
+    // Lifecycle-driven delivery failures are inspectable/retryable, never
+    // unhandled asynchronous errors during engine teardown.
+    unawaited(retryPlaybackReport(report).catchError((Object _) {}));
+    return report;
+  }
 
   /// The person's last mute choice, under `DwMediaConfig.rememberSound`.
   bool? _rememberedMuted;
@@ -98,6 +166,7 @@ final class DwMediaSessionManager {
       callbacks: callbacks,
       options: resolved,
       manager: this,
+      sessionId: ++_nextSessionId,
     );
     _sessions.add(session);
     // Autoplay claims the session through `play()`. Without it the new
@@ -169,4 +238,11 @@ final class DwMediaSessionManager {
       await session.dispose();
     }
   }
+}
+
+final class _PendingPlaybackDelivery {
+  _PendingPlaybackDelivery(this.deliver);
+  final DwMediaPlaybackDelivery deliver;
+  Future<void>? attempt;
+  Object? error;
 }

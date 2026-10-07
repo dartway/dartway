@@ -1,5 +1,14 @@
 ## 0.2.0
 
+- Optional explicit confirmed-playback intervals: sorted union and unique covered
+  duration, session/source-bound observation handles, and immutable reports.
+  Progress and seek position changes never infer coverage. Known playback/command
+  boundaries invalidate handles; callers must confirm platform discontinuities.
+- `playbackDelivery` seals windows into manager-owned pending batches. In-flight
+  retry joins one attempt; failures retain the same payload for explicit retry;
+  acknowledgement removes only that batch. Engine disposal never awaits delivery.
+  No persistence or lesson-completion policy; unconfigured sessions record nothing.
+
 - **Breaking** (#425): the mini-player stays where it is released — `miniPlayerSnapToEdges` now
   defaults to `false` (snapping is kept, opt-in). Its size is a width with the height from the
   video's aspect ratio: `miniPlayerInitialSize` became `miniPlayerInitialWidth` (240), and the

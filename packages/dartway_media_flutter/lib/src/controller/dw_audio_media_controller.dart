@@ -20,6 +20,9 @@ final class DwAudioMediaController extends DwMediaEngineController {
     super.initialSpeed,
     super.initialMuted,
     super.onPlaybackEnd,
+    super.onObservationBreak,
+    super.onSourceChange,
+    super.onObservationEnd,
   });
 
   AudioPlayer? _player;

@@ -15,6 +15,9 @@ DwMediaController createDwMediaController({
   double? initialSpeed,
   bool? initialMuted,
   void Function()? onPlaybackEnd,
+  void Function()? onObservationBreak,
+  void Function()? onSourceChange,
+  void Function()? onObservationEnd,
 }) => switch (item.kind) {
   DwMediaKind.video => DwVideoMediaController(
     item: item,
@@ -23,6 +26,9 @@ DwMediaController createDwMediaController({
     initialSpeed: initialSpeed,
     initialMuted: initialMuted,
     onPlaybackEnd: onPlaybackEnd,
+    onObservationBreak: onObservationBreak,
+    onSourceChange: onSourceChange,
+    onObservationEnd: onObservationEnd,
   ),
   DwMediaKind.audio => DwAudioMediaController(
     item: item,
@@ -31,5 +37,8 @@ DwMediaController createDwMediaController({
     initialSpeed: initialSpeed,
     initialMuted: initialMuted,
     onPlaybackEnd: onPlaybackEnd,
+    onObservationBreak: onObservationBreak,
+    onSourceChange: onSourceChange,
+    onObservationEnd: onObservationEnd,
   ),
 };

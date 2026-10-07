@@ -3,6 +3,7 @@ import 'package:flutter/services.dart' show DeviceOrientation;
 import 'package:flutter/widgets.dart' show Alignment, RouteTransitionsBuilder;
 
 import '../resume/dw_media_position_store.dart';
+import '../observation/dw_media_played_interval.dart';
 
 /// When a controller saves the position it plays, and when it gives up on the
 /// item entirely. `DwMediaConfig.resume: null` turns resume off altogether.
@@ -135,6 +136,7 @@ final class DwMediaConfig {
     this.loadTimeout = const Duration(seconds: 30),
     this.controlsAutoHideDelay = const Duration(seconds: 3),
     this.positionStore,
+    this.playbackDelivery,
   }) : assert(
          completedThreshold > 0 && completedThreshold <= 1,
          'completedThreshold must be in (0, 1]',
@@ -330,6 +332,11 @@ final class DwMediaConfig {
   /// storage to resume across launches.
   final DwMediaPositionStore? positionStore;
 
+  /// Opts into explicit confirmed intervals. No automatic accounting from
+  /// positions/progress. Pending batches survive engine disposal while this
+  /// manager exists; delivery success acknowledges only the sealed batch.
+  final DwMediaPlaybackDelivery? playbackDelivery;
+
   /// This config with [options] laid over it — what `DwMedia.open()` hands
   /// the session. A field left `null` in [options] keeps this config's value.
   DwMediaConfig merge(DwMediaOpenOptions? options) {
@@ -412,6 +419,9 @@ final class DwMediaConfig {
       controlsAutoHideDelay:
           options.controlsAutoHideDelay ?? controlsAutoHideDelay,
       positionStore: options.positionStore ?? positionStore,
+      playbackDelivery: options.withoutPlaybackDelivery
+          ? null
+          : options.playbackDelivery ?? playbackDelivery,
     );
   }
 }
@@ -471,7 +481,13 @@ final class DwMediaOpenOptions {
     this.withoutLoadTimeout = false,
     this.controlsAutoHideDelay,
     this.positionStore,
+    this.playbackDelivery,
+    this.withoutPlaybackDelivery = false,
   }) : assert(
+         !withoutPlaybackDelivery || playbackDelivery == null,
+         'withoutPlaybackDelivery and playbackDelivery contradict each other',
+       ),
+       assert(
          !withoutLoadTimeout || loadTimeout == null,
          'withoutLoadTimeout and loadTimeout contradict each other',
        ),
@@ -538,4 +554,8 @@ final class DwMediaOpenOptions {
   final bool withoutLoadTimeout;
   final Duration? controlsAutoHideDelay;
   final DwMediaPositionStore? positionStore;
+  final DwMediaPlaybackDelivery? playbackDelivery;
+
+  /// Disable explicit recording/delivery for this session.
+  final bool withoutPlaybackDelivery;
 }

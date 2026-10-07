@@ -17,3 +17,5 @@ export 'src/resume/dw_media_position_store.dart';
 export 'src/session/dw_media_queue_state.dart';
 export 'src/session/dw_media_session_manager.dart';
 export 'src/widgets/dw_video_surface.dart';
+
+export 'src/observation/dw_media_played_interval.dart';

@@ -43,8 +43,14 @@ abstract class DwMediaEngineController extends DwMediaController {
     double? initialSpeed,
     bool? initialMuted,
     VoidCallback? onPlaybackEnd,
+    VoidCallback? onObservationBreak,
+    VoidCallback? onSourceChange,
+    VoidCallback? onObservationEnd,
   }) : _callbacks = callbacks,
        _onPlaybackEnd = onPlaybackEnd,
+       _onObservationBreak = onObservationBreak,
+       _onSourceChange = onSourceChange,
+       _onObservationEnd = onObservationEnd,
        _speed = initialSpeed ?? options.defaultSpeed,
        _muted = initialMuted,
        _autoRetriesLeft = options.autoRetryCount {
@@ -62,6 +68,19 @@ abstract class DwMediaEngineController extends DwMediaController {
 
   final DwMediaCallbacks _callbacks;
   final VoidCallback? _onPlaybackEnd;
+  final VoidCallback? _onObservationBreak;
+  final VoidCallback? _onSourceChange;
+  final VoidCallback? _onObservationEnd;
+  int _observationCommands = 0;
+
+  @override
+  bool get canObservePlayback =>
+      !_disposed &&
+      _loaded &&
+      !_failed &&
+      _state.value.isPlaying &&
+      _seeksInFlight == 0 &&
+      _observationCommands == 0;
 
   final ValueNotifier<DwMediaPlaybackState> _state = ValueNotifier(
     const DwMediaPlaybackState(),
@@ -144,6 +163,7 @@ abstract class DwMediaEngineController extends DwMediaController {
     final generation = ++_loadGeneration;
     bool stale() => _disposed || generation != _loadGeneration;
     _loaded = false;
+    _onSourceChange?.call();
     _failed = false;
     var overran = false;
     try {
@@ -266,6 +286,10 @@ abstract class DwMediaEngineController extends DwMediaController {
     if (next.playState == DwMediaPlayState.paused && !_everPlayed) {
       next = next.copyWith(playState: DwMediaPlayState.ready);
     }
+    if (next.playState != previous.playState || next.speed != previous.speed) {
+      _onObservationBreak?.call();
+    }
+    if (next.isEnded && !previous.isEnded) _onObservationEnd?.call();
     _state.value = next;
     _afterUpdate(previous, next);
   }
@@ -376,8 +400,14 @@ abstract class DwMediaEngineController extends DwMediaController {
   Future<void> pause() async {
     if (_disposed) return;
     _playWhenLoaded = false;
-    await _quietly(enginePause);
-    if (options.resume?.saveOnPause ?? false) await savePosition();
+    _observationCommands++;
+    _onObservationBreak?.call();
+    try {
+      await _quietly(enginePause);
+      if (options.resume?.saveOnPause ?? false) await savePosition();
+    } finally {
+      _observationCommands--;
+    }
   }
 
   @override
@@ -387,6 +417,7 @@ abstract class DwMediaEngineController extends DwMediaController {
     var target = position < Duration.zero ? Duration.zero : position;
     if (duration > Duration.zero && target > duration) target = duration;
     _seeksInFlight++;
+    _onObservationBreak?.call();
     _playedSinceSeek = false;
     _endedByPlayback = false;
     try {
@@ -403,9 +434,15 @@ abstract class DwMediaEngineController extends DwMediaController {
   @override
   Future<void> setSpeed(double speed) async {
     if (_disposed) return;
-    _speed = speed;
-    await _quietly(() => engineSetSpeed(speed));
-    updateState((current) => current.copyWith(speed: speed));
+    _observationCommands++;
+    _onObservationBreak?.call();
+    try {
+      _speed = speed;
+      await _quietly(() => engineSetSpeed(speed));
+      updateState((current) => current.copyWith(speed: speed));
+    } finally {
+      _observationCommands--;
+    }
   }
 
   @override
