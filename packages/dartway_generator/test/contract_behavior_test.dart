@@ -818,6 +818,54 @@ void main() {
     );
   }
 
+  test(
+    'descriptor-free submodule baseline names the unsupported shared source',
+    () async {
+      final project = TempProject.create(['app_shared']);
+      project.writeFile('app_shared/lib/src/item.dart', itemSource());
+      await project.generateClean();
+      File(
+        project.path('app_shared/lib/generated/dw_contract.json'),
+      ).deleteSync();
+      final base = baseline(project);
+      git(project, [
+        'update-index',
+        '--add',
+        '--cacheinfo',
+        '160000,$base,app_shared/vendor',
+      ]);
+      git(project, [
+        '-c',
+        'user.name=Fixture',
+        '-c',
+        'user.email=fixture@example.test',
+        'commit',
+        '-m',
+        'shared source submodule',
+      ]);
+      final submoduleBase = git(project, ['rev-parse', 'HEAD']);
+      await project.generateClean();
+      final snapshot = bytes(project);
+      final result = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        submoduleBase,
+      ]);
+      expect(result.exitCode, 3, reason: output(result));
+      expect(
+        output(result),
+        allOf(
+          contains(
+            'shared contract source submodule is unsupported: app_shared/vendor',
+          ),
+          contains('tracked files'),
+        ),
+      );
+      expect(bytes(project), snapshot);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
   for (final edit in ['modify', 'delete', 'add', 'binary', 'manual-part']) {
     test(
       'descriptor-free adoption blocks $edit of hand-written shared files',

@@ -203,6 +203,13 @@ Future<ContractBaseline> readContractBaseline({
   for (final path in paths) {
     if (path == 'pubspec.yaml' || path == 'pubspec.lock') continue;
     final entry = baseFiles[path];
+    if (entry?.$1 == '160000') {
+      throw FormatException(
+        'baseline shared contract source submodule is unsupported: '
+        '${p.posix.join(headPackage, path)}; keep the shared contract source '
+        'in tracked files so its bytes can be compared',
+      );
+    }
     final before = entry == null
         ? null
         : _gitBytes(gitRoot, ['cat-file', 'blob', entry.$2]);
