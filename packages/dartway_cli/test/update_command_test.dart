@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:crypto/crypto.dart';
+import 'package:dartway_cli/src/checker/dw_uniformity_rules.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -135,13 +136,14 @@ void main() {
 
   setUp(() async {
     sandbox = Directory.systemTemp.createTempSync('dw-update-test-');
-    target =
-        ((await Process.run('git', [
-                  'rev-parse',
-                  'origin/master',
-                ], workingDirectory: repository.path)).stdout
-                as String)
-            .trim();
+    // Actions checks out a shallow PR merge, which has no origin/master.
+    // This fixture targets the exact source tree checked out, not another ref.
+    final revision = await Process.run('git', [
+      'rev-parse',
+      'HEAD',
+    ], workingDirectory: repository.path);
+    succeeds(revision);
+    target = (revision.stdout as String).trim();
     succeeds(
       await invoke([
         'create',
@@ -463,6 +465,14 @@ void main() {
     expect(output(native), contains('FORBIDDEN_PROVIDER_SCOPE'));
     expect(output(native), isNot(contains('FORBIDDEN_UI_STYLE_USAGE')));
     expect(output(native), isNot(contains('ERROR|')));
+    expect(
+      DwUniformityInspector.lintsPluginProblem(
+        Directory(p.join(project.path, 'shop_flutter')),
+      ),
+      isNull,
+      reason:
+          'the checker must accept the same root source the native analyzer loaded',
+    );
     final before = files();
     final planned = await update(['--plan']);
     succeeds(planned);

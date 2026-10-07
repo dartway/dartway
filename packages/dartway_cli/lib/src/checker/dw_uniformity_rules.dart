@@ -881,7 +881,8 @@ class DwUniformityInspector {
         ['ref', 'path'].every(
           (key) =>
               !git.containsKey(key) ||
-              (git[key] is String && (git[key] as String).trim().isNotEmpty),
+              (git[key] is String &&
+                  (key == 'path' || (git[key] as String).trim().isNotEmpty)),
         )) {
       return null;
     }
