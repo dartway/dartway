@@ -109,6 +109,39 @@ final class MemoRow extends DwTableRow with _\$MemoRow {
   });
 
   test(
+    'DwCalendarDay is a direct date column, not a jsonb collection value',
+    () async {
+      final project = TempProject.create(['app_server']);
+      project.writeFile('app_server/lib/calendar_day_row.dart', '''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+import 'package:dartway_orm/dartway_orm.dart';
+
+part 'calendar_day_row.dw.dart';
+
+@DwSqlTable('calendar_day_row')
+final class CalendarDayRow extends DwTableRow with _\$CalendarDayRow {
+  const CalendarDayRow({required this.id, required this.day, required this.days});
+  @override
+  final int id;
+  final DwCalendarDay day;
+  final List<DwCalendarDay> days;
+  static const tableDef = CalendarDayTable();
+}
+''');
+      final report = await project.generate();
+      expect(report.hasErrors, isTrue);
+      expect(
+        report.diagnostics.map((diagnostic) => diagnostic.message).join('\n'),
+        contains('DwCalendarDay is supported as a direct column'),
+      );
+      expect(
+        project.exists('app_server/lib/calendar_day_row.dw.dart'),
+        isFalse,
+      );
+    },
+  );
+
+  test(
     'entity problems are reported, located, and nothing is written',
     () async {
       final project = TempProject.create(['app_server', 'app_shared']);

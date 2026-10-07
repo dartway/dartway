@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- Add opt-in `DwCalendarDay`, a validated Gregorian Y/M/D value (`0001`–`9999`) with canonical
+  `YYYY-MM-DD` JSON, civil arithmetic and ordering. Window cursors accept it with a distinct `d`
+  discriminator; existing timestamp, cursor and runtime protocol encodings are unchanged.
+
 - Sign-in code requests accept an optional project-defined `deliveryHint`. The server validates it
   against `DwAuthConfig.allowedDeliveryHints` and auth hooks read `ctx.deliveryHint`, with unchanged
   callback signatures and identifier cooldown, request-window and idempotency rules. Null retains

@@ -42,6 +42,17 @@ mixin _$Item on Named {
     'dimensions': _self.dimensions.toJson(),
     if (_self.allDimensions.isNotEmpty)
       'allDimensions': [for (final e in _self.allDimensions) e?.toJson()],
+    if (_self.calendarDays.isNotEmpty)
+      'calendarDays': [
+        for (final e in _self.calendarDays) DwJsonCodec.encodeCalendarDay(e),
+      ],
+    if (_self.dayMap != null)
+      'dayMap': _self.dayMap!.map(
+        (k, v) =>
+            MapEntry(k, v == null ? null : DwJsonCodec.encodeCalendarDay(v)),
+      ),
+    if (_self.discontinuedOn != null)
+      'discontinuedOn': DwJsonCodec.encodeCalendarDay(_self.discontinuedOn!),
   };
 
   @override
@@ -70,7 +81,10 @@ mixin _$Item on Named {
           dwMapEquals(other.history, _self.history) &&
           dwListEquals(other.maybeColors, _self.maybeColors) &&
           other.dimensions == _self.dimensions &&
-          dwListEquals(other.allDimensions, _self.allDimensions);
+          dwListEquals(other.allDimensions, _self.allDimensions) &&
+          dwListEquals(other.calendarDays, _self.calendarDays) &&
+          dwMapEquals(other.dayMap, _self.dayMap) &&
+          other.discontinuedOn == _self.discontinuedOn;
 
   @override
   int get hashCode => Object.hashAll([
@@ -105,11 +119,18 @@ mixin _$Item on Named {
     Object.hashAll(_self.maybeColors),
     _self.dimensions,
     Object.hashAll(_self.allDimensions),
+    Object.hashAll(_self.calendarDays),
+    _self.dayMap == null
+        ? null
+        : Object.hashAllUnordered(
+            _self.dayMap!.entries.map((e) => Object.hash(e.key, e.value)),
+          ),
+    _self.discontinuedOn,
   ]);
 
   @override
   String toString() =>
-      'Item(title: ${_self.title}, id: ${_self.id}, price: ${_self.price}, discount: ${_self.discount}, duration: ${_self.duration}, timeout: ${_self.timeout}, image: ${_self.image}, thumbnail: ${_self.thumbnail}, color: ${_self.color}, colors: ${_self.colors}, labels: ${_self.labels}, createdAt: ${_self.createdAt}, updatedAt: ${_self.updatedAt}, weight: ${_self.weight}, unit: ${_self.unit}, parent: ${_self.parent}, children: ${_self.children}, ratings: ${_self.ratings}, scores: ${_self.scores}, history: ${_self.history}, maybeColors: ${_self.maybeColors}, dimensions: ${_self.dimensions}, allDimensions: ${_self.allDimensions})';
+      'Item(title: ${_self.title}, id: ${_self.id}, price: ${_self.price}, discount: ${_self.discount}, duration: ${_self.duration}, timeout: ${_self.timeout}, image: ${_self.image}, thumbnail: ${_self.thumbnail}, color: ${_self.color}, colors: ${_self.colors}, labels: ${_self.labels}, createdAt: ${_self.createdAt}, updatedAt: ${_self.updatedAt}, weight: ${_self.weight}, unit: ${_self.unit}, parent: ${_self.parent}, children: ${_self.children}, ratings: ${_self.ratings}, scores: ${_self.scores}, history: ${_self.history}, maybeColors: ${_self.maybeColors}, dimensions: ${_self.dimensions}, allDimensions: ${_self.allDimensions}, calendarDays: ${_self.calendarDays}, dayMap: ${_self.dayMap}, discontinuedOn: ${_self.discontinuedOn})';
 }
 
 Item $ItemFromJson(Map<String, Object?> json) => Item(
@@ -182,6 +203,21 @@ Item $ItemFromJson(Map<String, Object?> json) => Item(
               ? null
               : units.$DimensionsFromJson(e as Map<String, Object?>),
         ),
+  calendarDays: json['calendarDays'] == null
+      ? const []
+      : DwJsonCodec.decodeList(
+          json['calendarDays'],
+          (e) => DwJsonCodec.decodeCalendarDay(e),
+        ),
+  dayMap: json['dayMap'] == null
+      ? null
+      : DwJsonCodec.decodeMap(
+          json['dayMap'],
+          (v) => v == null ? null : DwJsonCodec.decodeCalendarDay(v),
+        ),
+  discontinuedOn: json['discontinuedOn'] == null
+      ? null
+      : DwJsonCodec.decodeCalendarDay(json['discontinuedOn']),
 );
 
 extension ItemCopyWith on Item {
@@ -209,6 +245,10 @@ extension ItemCopyWith on Item {
     List<Color?>? maybeColors,
     units.Dimensions? dimensions,
     List<units.Dimensions?>? allDimensions,
+    List<DwCalendarDay>? calendarDays,
+    DwFieldPatch<Map<String, DwCalendarDay?>> dayMap =
+        const DwFieldPatch.keep(),
+    DwFieldPatch<DwCalendarDay> discontinuedOn = const DwFieldPatch.keep(),
   }) => Item(
     title: title ?? this.title,
     id: id ?? this.id,
@@ -233,6 +273,9 @@ extension ItemCopyWith on Item {
     maybeColors: maybeColors ?? this.maybeColors,
     dimensions: dimensions ?? this.dimensions,
     allDimensions: allDimensions ?? this.allDimensions,
+    calendarDays: calendarDays ?? this.calendarDays,
+    dayMap: dayMap.apply(this.dayMap),
+    discontinuedOn: discontinuedOn.apply(this.discontinuedOn),
   );
 }
 
@@ -556,6 +599,30 @@ mixin _$ItemHistory on DwWindowRequest<Item, DateTime, int> {
 
 ItemHistory $ItemHistoryFromJson(Map<String, Object?> json) =>
     ItemHistory(itemId: json['itemId']! as int);
+
+mixin _$CalendarHistory on DwWindowRequest<Item, DwCalendarDay, int> {
+  CalendarHistory get _self => this as CalendarHistory;
+
+  @override
+  String get dwTypeName => 'CalendarHistory';
+
+  @override
+  Map<String, Object?> toJson() => {'itemId': _self.itemId};
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is CalendarHistory && other.itemId == _self.itemId;
+
+  @override
+  int get hashCode => Object.hash(CalendarHistory, _self.itemId);
+
+  @override
+  String toString() => 'CalendarHistory(itemId: ${_self.itemId})';
+}
+
+CalendarHistory $CalendarHistoryFromJson(Map<String, Object?> json) =>
+    CalendarHistory(itemId: json['itemId']! as int);
 
 mixin _$EditItem on DwActionCommand<Item> {
   EditItem get _self => this as EditItem;

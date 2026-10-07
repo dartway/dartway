@@ -388,6 +388,7 @@ final class EntityReader {
     ScalarWire() => 'DwColumnType.boolean',
     DoubleWire() => 'DwColumnType.doublePrecision',
     DateTimeWire() => 'DwColumnType.timestamptz',
+    CalendarDayWire() => 'DwColumnType.calendarDay',
     DurationWire() => 'DwColumnType.duration',
     BytesWire() => 'DwColumnType.bytea',
     EnumWire(:final spelling) => 'DwEnumType($spelling.values)',

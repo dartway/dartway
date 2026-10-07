@@ -7,6 +7,10 @@ import '../src/units.dart';
 
 final DwWireProtocol appProtocol = DwWireProtocol(
   [
+    DwProtocolEntry<CalendarHistory>(
+      'CalendarHistory',
+      $CalendarHistoryFromJson,
+    ),
     DwProtocolEntry<Dimensions>('Dimensions', $DimensionsFromJson),
     DwProtocolEntry<EditItem>('EditItem', $EditItemFromJson),
     DwProtocolEntry<FeedItems>('FeedItems', $FeedItemsFromJson),

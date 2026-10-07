@@ -9,7 +9,7 @@ enum ClubServiceKind { group, personal }
 /// Hand-written in the exact shape `dartway generate` produces, so the ORM's
 /// contract with generated code is exercised without the generator.
 ///
-/// Covers every column type: enum, nullable double, `Duration`, a `jsonb`
+/// Covers every column type: enum, nullable double, `Duration`, `DwCalendarDay`, a `jsonb`
 /// list, a `jsonb` list of an enum, a `now()` default, a nullable `DateTime`, nullable bytes, and a
 /// boolean with an SQL default.
 @DwSqlTable('club_service')
@@ -20,6 +20,8 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
     required this.kind,
     this.price,
     required this.duration,
+    required this.availableOn,
+    this.discontinuedOn,
     this.tags = const [],
     this.offeredAs = const [],
     required this.createdAt,
@@ -35,6 +37,8 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
   final ClubServiceKind kind;
   final double? price;
   final Duration duration;
+  final DwCalendarDay availableOn;
+  final DwCalendarDay? discontinuedOn;
   final List<String> tags;
 
   /// The kinds this service is also sold as: a list of an enum, stored as

@@ -2,12 +2,20 @@ import 'dart:convert';
 import 'dart:typed_data';
 
 import '../wire/dw_field_patch.dart';
+import '../value/dw_calendar_day.dart';
 import 'dw_open_enum.dart';
 
 /// Conversions the generated codecs call. One place decides how each Dart type
 /// looks on the wire, so a generator change never has to agree with a second
 /// copy of the rule.
 abstract final class DwJsonCodec {
+  /// The canonical, time-zone-free `YYYY-MM-DD` JSON representation.
+  static String encodeCalendarDay(DwCalendarDay value) => value.toString();
+
+  /// Reads a canonical Gregorian `YYYY-MM-DD` JSON value.
+  static DwCalendarDay decodeCalendarDay(Object? json) =>
+      DwCalendarDay.parse(json! as String);
+
   /// `DateTime` travels as UTC microseconds since the epoch: exact, compact and
   /// free of time-zone text.
   static int encodeDateTime(DateTime value) =>

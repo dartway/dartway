@@ -91,6 +91,7 @@ nothing until all are fixed:
 |---|---|
 | `int`, `double`, `String`, `bool` | themselves (a whole `double` may arrive as an integer; the decoder converts) |
 | `DateTime` | UTC microseconds since the epoch (`DwJsonCodec.encodeDateTime`) |
+| `DwCalendarDay` | canonical `YYYY-MM-DD` string; a Gregorian date with no time zone |
 | `Duration` | microseconds |
 | `Uint8List` | base64 |
 | an enum | the value's name |

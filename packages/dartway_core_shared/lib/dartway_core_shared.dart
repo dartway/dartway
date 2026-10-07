@@ -11,6 +11,7 @@ export 'src/wire/dw_page_results.dart';
 export 'src/wire/dw_field_patch.dart';
 export 'src/wire/dw_self_validating.dart';
 export 'src/wire/dw_window_cursor.dart';
+export 'src/value/dw_calendar_day.dart';
 export 'src/protocol/dw_api_response.dart';
 export 'src/protocol/dw_close_code.dart';
 export 'src/protocol/dw_http_contract.dart';

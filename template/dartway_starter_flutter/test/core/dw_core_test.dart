@@ -7,6 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 import '../support/app_test_app.dart';
 
 void main() {
+  test('calendar dates are strict canonical civil values', () {
+    final leapDay = DwCalendarDay.parse('2024-02-29');
+    expect(DwJsonCodec.encodeCalendarDay(leapDay), '2024-02-29');
+    expect(leapDay.addDays(1), DwCalendarDay(2024, 3, 1));
+    expect(() => DwCalendarDay.parse('2023-02-29'), throwsFormatException);
+  });
+
   testWidgets('signing out through the core ends the session', (tester) async {
     final app = await TestApp.start(tester, FakeApp());
     expect(app.core.client.accountId, testSession.id);

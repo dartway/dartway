@@ -81,6 +81,7 @@ value a new row gets in Dart comes from the constructor's default (`this.bookedC
 | `bool` | `boolean` | |
 | `String` | `text` | |
 | `DateTime` | `timestamp with time zone` | read back in UTC; connections run in UTC |
+| `DwCalendarDay` | `date` | canonical `YYYY-MM-DD`; Gregorian years 0001–9999; no time or zone |
 | `Duration` | `bigint` | microseconds: exact and sortable |
 | `Uint8List` | `bytea` | |
 | an enum | `text` | its `name` (D-008): adding a value needs no migration |
@@ -215,7 +216,7 @@ final alreadyBooked = await ctx.db.sessionBookings.exists(
 |---|---|
 | any | `equals(v)` (`null` matches null cells), `notEquals(v)`, `isNull()`, `isNotNull()`, `asc()`, `desc()`, `set(v)` for `updateWhere` |
 | non-null values | `inList(values)`, `notInList(values)` — one array parameter, so one prepared statement for every list length |
-| comparable (`int`, `double`, `String`, `DateTime`, `Duration`) | `gt`, `gte`, `lt`, `lte`, `between(low, high)` (inclusive) |
+| comparable (`int`, `double`, `String`, `DateTime`, `DwCalendarDay`, `Duration`) | `gt`, `gte`, `lt`, `lte`, `between(low, high)` (inclusive) |
 | `String` | `like(pattern)`, `ilike(pattern)` |
 | non-null `int` or `double` | `increment(n)` for `updateWhere`: `column = column + n`, a negative `n` decrements |
 | nullable | `setIfNull(v)` for `updateWhere`: `column = COALESCE(column, v)` — fills a null cell, keeps a value |
@@ -226,6 +227,18 @@ compile: no `gt` on a `bool`, no `like` on a `DateTime`. Null follows Dart, not 
 logic: a comparison against a null cell is false, and its `not()` is true.
 
 Values are always bound parameters; nothing passed to a condition is spliced into SQL.
+
+`DwCalendarDay` is a date, not midnight UTC and not a `DateTime`. It can be used directly as a
+row field, including nullable fields, and supports equality, ordering, range queries, `inList`, and
+indexes like other scalar columns. Lists and maps of `DwCalendarDay` are not supported as `jsonb`
+columns because JSONB reads back plain JSON values rather than framework value objects. Choose the
+intended calendar zone in application code, then pass its year, month, and day to the constructor.
+
+A repository insert binds every column, so a SQL `DEFAULT CURRENT_DATE` does not supply a missing
+date through the generated repository. Pass the day explicitly or use SQL that omits the column.
+Existing `timestamp with time zone` columns remain instants. Converting one is an explicit project
+migration: choose the civil zone, for example `ALTER TABLE events ALTER COLUMN starts_at TYPE date
+USING (starts_at AT TIME ZONE 'America/Los_Angeles')::date;`. The selected zone determines the day.
 
 ### `tryInsert` and `DwOnConflict`
 

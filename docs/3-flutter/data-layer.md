@@ -170,6 +170,10 @@ log. `dw.window(request, anchor: cursor)` opens it around the row of `cursor` (a
 `request.cursorOf(item)` or `DwWindowCursor.encode(sortValue, id)`), or at the newest rows when
 `anchor` is `null`. Windows of one request opened at different anchors are different entries.
 
+Window sort values may be `int`, `String`, `DateTime` or `DwCalendarDay`, followed by an `int` or
+`String` id to make the position total. A calendar-day cursor carries the canonical `YYYY-MM-DD`
+string and compares by civil date; it is not converted to a midnight instant.
+
 ```dart
 final provider = dw.window(request, anchor: request.cursorOf(lastRead));
 ref.watch(provider);                     // AsyncValue<DwWindowData<T>>

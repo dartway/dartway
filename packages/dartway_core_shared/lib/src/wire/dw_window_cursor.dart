@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import '../value/dw_calendar_day.dart';
+
 /// A position in a window's sequence, typed as the request declares it: the
 /// sort value [S] and the id [I] of a row.
 typedef DwWindowPosition<S extends Object, I extends Object> = ({
@@ -17,13 +19,17 @@ typedef DwWindowPosition<S extends Object, I extends Object> = ({
 /// never learns which column the sequence is sorted by.
 final class DwWindowCursor {
   /// Throws [ArgumentError] for a sort value that is not an `int`, a
-  /// `String` or a `DateTime`, or an id that is not an `int` or a `String`.
+  /// `String`, a `DateTime` or a [DwCalendarDay], or an id that is not an
+  /// `int` or a `String`.
   DwWindowCursor(this.sortValue, this.id) {
-    if (sortValue is! int && sortValue is! String && sortValue is! DateTime) {
+    if (sortValue is! int &&
+        sortValue is! String &&
+        sortValue is! DateTime &&
+        sortValue is! DwCalendarDay) {
       throw ArgumentError.value(
         sortValue,
         'sortValue',
-        'a window cursor sorts by an int, a String or a DateTime',
+        'a window cursor sorts by an int, a String, a DateTime or a DwCalendarDay',
       );
     }
     if (id is! int && id is! String) {
@@ -46,6 +52,7 @@ final class DwWindowCursor {
     (final int x, final int y) => x.compareTo(y),
     (final String x, final String y) => x.compareTo(y),
     (final DateTime x, final DateTime y) => x.compareTo(y),
+    (final DwCalendarDay x, final DwCalendarDay y) => x.compareTo(y),
     _ => throw ArgumentError(
       'Window positions of different types cannot be compared: '
       '${a.runtimeType} and ${b.runtimeType}',
@@ -81,13 +88,13 @@ final class DwWindowCursor {
         v,
         isUtc: true,
       ),
+      (_tagCalendarDay, final String v) => _decodeCalendarDay(v, malformed),
       _ => throw malformed(),
     };
     return DwWindowCursor(sortValue, id!);
   }
 
-  /// An `int`, a `String` or a UTC `DateTime` (a decoded cursor's time is
-  /// always UTC: the cursor carries the instant).
+  /// An `int`, a `String`, a UTC `DateTime`, or a [DwCalendarDay].
   final Object sortValue;
 
   /// An `int` or a `String`.
@@ -96,6 +103,7 @@ final class DwWindowCursor {
   static const _tagInt = 'i';
   static const _tagString = 's';
   static const _tagDateTime = 't';
+  static const _tagCalendarDay = 'd';
 
   /// base64url without padding.
   static final _alphabet = RegExp(r'^[A-Za-z0-9_-]+$');
@@ -108,6 +116,7 @@ final class DwWindowCursor {
       int() => [_tagInt, value, id],
       String() => [_tagString, value, id],
       DateTime() => [_tagDateTime, value.toUtc().microsecondsSinceEpoch, id],
+      DwCalendarDay() => [_tagCalendarDay, value.toString(), id],
       _ => throw StateError('unreachable: checked by the constructor'),
     };
     return base64Url.encode(utf8.encode(jsonEncode(json))).replaceAll('=', '');
@@ -126,4 +135,15 @@ final class DwWindowCursor {
 
   @override
   String toString() => 'DwWindowCursor($sortValue, $id)';
+}
+
+DwCalendarDay _decodeCalendarDay(
+  String value,
+  FormatException Function() malformed,
+) {
+  try {
+    return DwCalendarDay.parse(value);
+  } on FormatException {
+    throw malformed();
+  }
 }

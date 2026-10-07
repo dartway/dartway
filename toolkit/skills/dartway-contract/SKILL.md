@@ -56,7 +56,7 @@ final class CustomerInvoice extends DwDataObject with _$CustomerInvoice {
 The generator refuses anything else, naming the reason: one `part '<file>.dw.dart'`, `with _$Class`,
 the class `extends` its kind and has no type parameters, every serialised field `final` and set by a
 named constructor parameter of the same name (declare the class `final` with a `const` constructor);
-field types `int`, `double`, `String`, `bool`, `DateTime` (UTC), `Duration`, `Uint8List`, an enum, a
+field types `int`, `double`, `String`, `bool`, `DateTime` (UTC), `DwCalendarDay` (canonical `YYYY-MM-DD`), `Duration`, `Uint8List`, an enum, a
 DTO, `List`, `Map<String, T>`, `DwFieldPatch<T>`, or nullable. A single object with a fixed identity
 uses an `id` getter (`String get id => 'invoice-totals';`).
 
@@ -92,7 +92,8 @@ A request is a value: the client caches and shares its live state under the requ
 What an update does to each kind is `dartway-realtime`. The order a page, table or window handler reads
 in is total (`createdAt, id`). A window names a row's place for both sides:
 `DwWindowPosition<DateTime, int> positionOf(InvoiceEvent item) => (sortValue: item.happenedAt, id: item.id);`
-(`S` is `int`, `String` or `DateTime`; `I` is `int` or `String`).
+(`S` is `int`, `String`, `DateTime` or `DwCalendarDay`; `I` is `int` or `String`). A calendar day
+sorts by its components and its cursor uses the canonical date string.
 
 ```dart
 /// The caller's invoices, newest first, live on the caller's own channel.

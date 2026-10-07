@@ -22,6 +22,7 @@ void main() {
     kind: kind,
     price: price,
     duration: const Duration(hours: 1),
+    availableOn: DwCalendarDay(2026, 9, 1),
     tags: tags,
     offeredAs: offeredAs,
     createdAt: DateTime.utc(2026, 9, 1),

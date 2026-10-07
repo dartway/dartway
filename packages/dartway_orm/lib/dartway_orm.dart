@@ -11,6 +11,7 @@ export 'package:dartway_core_shared/dartway_core_shared.dart'
         DwFieldPatchApply,
         DwSetField,
         DwTextFieldPatch,
+        DwCalendarDay,
         dwListEquals,
         dwMapEquals;
 

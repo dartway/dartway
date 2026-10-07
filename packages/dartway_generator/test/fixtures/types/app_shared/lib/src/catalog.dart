@@ -40,6 +40,9 @@ final class Item extends Named with _$Item {
     this.maybeColors = const <Color?>[],
     required this.dimensions,
     this.allDimensions = const [],
+    this.calendarDays = const [],
+    this.dayMap,
+    this.discontinuedOn,
   });
 
   @override
@@ -65,6 +68,9 @@ final class Item extends Named with _$Item {
   final List<Color?> maybeColors;
   final units.Dimensions dimensions;
   final List<units.Dimensions?> allDimensions;
+  final List<DwCalendarDay> calendarDays;
+  final Map<String, DwCalendarDay?>? dayMap;
+  final DwCalendarDay? discontinuedOn;
 
   /// Not serialised: a getter.
   bool get isDiscounted => discount != null;
@@ -165,6 +171,17 @@ final class ItemHistory extends DwWindowRequest<Item, DateTime, int>
   @override
   DwWindowPosition<DateTime, int> positionOf(Item item) =>
       (sortValue: item.createdAt, id: item.id);
+}
+
+final class CalendarHistory extends DwWindowRequest<Item, DwCalendarDay, int>
+    with _$CalendarHistory {
+  const CalendarHistory({required this.itemId}) : super(pageSize: 20);
+
+  final int itemId;
+
+  @override
+  DwWindowPosition<DwCalendarDay, int> positionOf(Item item) =>
+      (sortValue: item.calendarDays.first, id: item.id);
 }
 
 final class EditItem extends DwActionCommand<Item> with _$EditItem {
