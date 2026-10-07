@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:dartway_cli/src/checker/dw_check_type.dart';
 import 'package:dartway_cli/src/checker/dw_server_contract.dart';
@@ -20,6 +21,19 @@ void main() {
     File(p.join(server.path, 'bin', 'migrate.dart'))
       ..parent.createSync(recursive: true)
       ..writeAsStringSync('');
+    File(p.join(server.path, '.dart_tool/package_config.json'))
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'configVersion': 2,
+          'packages': [
+            {
+              'name': 'dartway_generator',
+              'rootUri': p.toUri(p.absolute('../dartway_generator')).toString(),
+            },
+          ],
+        }),
+      );
   });
 
   tearDown(() => sandbox.deleteSync(recursive: true));
@@ -47,8 +61,10 @@ void main() {
       );
       expect(inspector.run(), 0);
       expect(ran, [
-        'run',
-        'dartway_generator',
+        '--packages=${p.join(server.path, '.dart_tool/package_config.json')}',
+        p.normalize(
+          p.absolute('../dartway_generator/bin/dartway_generator.dart'),
+        ),
         '--project',
         sandbox.path,
         '--check',
@@ -75,7 +91,7 @@ void main() {
       ]);
     });
 
-    test('a generator that could not judge is a note, not a finding', () {
+    test('an unverified project contract is an error', () {
       final inspector = DwGeneratedCodeInspector(
         serverPackageDir: server,
         probe: answering(
@@ -84,9 +100,9 @@ void main() {
           'shop_server has no resolved package config; run `dart pub get`',
         ),
       );
-      expect(inspector.run(), 0);
+      expect(inspector.run(), 1);
       expect(inspector.findings, isEmpty);
-      expect(inspector.notes.single, contains('dart pub get'));
+      expect(inspector.notes, isEmpty);
     });
 
     test('filtered to another check, it runs nothing', () {

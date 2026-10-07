@@ -231,9 +231,16 @@ CHECKED_PROJECTS="template/dartway_starter_flutter example/dartway_example_flutt
 
 project_checks() {
   echo "══ dartway check"
+  local contract_args=()
+  if [ -n "${DW_CONTRACT_BASE:-}" ]; then
+    local contract_sha
+    contract_sha="$(git rev-parse --verify --end-of-options "${DW_CONTRACT_BASE}^{commit}")" || return 1
+    contract_args=(--contract-base "$contract_sha")
+    echo "Project contract baseline: $contract_sha (explicit trusted revision)"
+  fi
   for project in $CHECKED_PROJECTS; do
     run "dartway check: $project" \
-      bash -c "cd '$project' && dart run dartway_cli:dartway check"
+      bash -c 'cd "$1" && dart run dartway_cli:dartway check "${@:2}"' _ "$project" "${contract_args[@]}"
   done
 }
 

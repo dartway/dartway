@@ -218,6 +218,9 @@ class DwSharedLayoutInspector {
     for (final file in files) {
       final rel = p.relative(file.path, from: dir.path).replaceAll(r'\', '/');
       if (rel.split('/').any((s) => s.startsWith('.'))) continue;
+      // This reserved JSON artifact has no Dart comment header. Freshness and
+      // compatibility are judged by the resolved generator, never this file.
+      if (rel == 'dw_contract.json') continue;
       if (dwHasGeneratedHeader(file.readAsStringSync())) continue;
       _findings.add(
         '$label/$rel is hand-written — generated/ holds only what '

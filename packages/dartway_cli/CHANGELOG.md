@@ -2,6 +2,10 @@
 
 ## 0.24.0
 
+- `generate`/`check` carry `--contract-base` through one resolved generator invocation;
+  `projectContractVersion` is an error for incompatible or unverified generated project contracts.
+  Direct execution of the resolved generator prevents implicit pub/lock writes during checks.
+
 - One toolkit supports Codex and Claude. `create`, `setup-ai` and `update`
   accept `--agent codex|claude|both` (default `both`, recorded for updates).
   Root owner instructions are preserved; managed blocks connect both agents

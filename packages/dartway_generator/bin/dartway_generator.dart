@@ -22,6 +22,11 @@ Future<void> main(List<String> arguments) async {
           'For CI.',
     )
     ..addOption(
+      'contract-base',
+      help:
+          'Trusted committed project baseline; resolved once to a SHA. Check defaults to the project base-branch merge-base.',
+    )
+    ..addOption(
       'sdk',
       help: 'The Dart SDK to analyze against (default: the running dart).',
     )
@@ -50,10 +55,22 @@ Future<void> main(List<String> arguments) async {
     options.option('project')!,
     sdkPath: options.option('sdk'),
     check: options.flag('check'),
+    contractBase: options.option('contract-base'),
+    verifyContract: options.flag('check'),
   );
 
   for (final diagnostic in report.diagnostics) {
     stderr.writeln(diagnostic.format(report.root));
+  }
+  if (report.contractBase != null) {
+    stdout.writeln(
+      'Project contract baseline: ${report.contractBase} — ${report.contractProof ?? 'not verified'}',
+    );
+  }
+  if (report.contractVerdict != null) {
+    stdout.writeln(
+      '${report.contractVerdict}; coverage: generated project codecs/registry, excluding handlers/domain semantics and manually composed external modules.',
+    );
   }
   if (options.flag('verbose') || report.check) {
     final verb = report.check ? 'out of date' : 'wrote';
@@ -68,7 +85,9 @@ Future<void> main(List<String> arguments) async {
   (report.hasErrors ? stderr : stdout).writeln(report.summary);
 
   if (report.hasErrors) {
-    exitCode = 1;
+    exitCode = report.diagnostics.any((d) => d.code == 'projectContractVersion')
+        ? 3
+        : 1;
   } else if (report.check && !report.isUpToDate) {
     exitCode = 1;
   }

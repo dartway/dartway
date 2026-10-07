@@ -2,7 +2,12 @@
 
 ## 0.21.0-dev.17
 
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the router
+- Emit a deterministic project wire descriptor and verify source-derived contracts against a fixed
+  committed Git baseline. Breaking edits require the shared package breaking line to advance;
+  unsupported/custom or unreproducible baselines block the check. Descriptor-free commits require
+  exact codec/registry reproduction with existing resolved dependencies, without project writes.
+
+- The family also moves in lockstep to deliver the migration note for the router
   that follows a provider (dartway/dartway#407).
 
 ## 0.21.0-dev.16

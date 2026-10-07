@@ -115,7 +115,7 @@ between app and server, which the operator resolves.
 shared package's `version:`, written by `dart run dartway_cli:dartway generate` into the protocol both sides are built
 with (`DwWireProtocol.contractVersion`), and sent as `?contract=` on the socket. Semantic versioning
 decides compatibility: a change that removes or renames anything an installed app sends or reads
-raises the **breaking line** — the major version, or the minor one below 1.0 — and anything additive
+raises the **breaking line** — the major version, or the minor one below 1.0 — and codec-compatible additions
 does not. A client of an older line than the server's, or one that sends none, is answered `426`
 with `dw.updateRequired`. That is the lever for a project's own incompatible change: a renamed field
 of a project DTO is not a protocol change, and old builds are turned away by the version raised in the
@@ -150,7 +150,7 @@ from a sandboxed page, is refused.
 ## A wire change is a protocol change (D-052)
 
 An app build on a phone keeps speaking the wire it was compiled with. If the framework changes how a
-call, an `ApiResponse`, an update transport, a live message or generated DTO JSON looks on the wire,
+call, an `ApiResponse`, an update transport, a live message or framework-generated DTO JSON looks on the wire,
 that build gets no compile error — it gets a body it cannot decode, and its user a broken screen. The
 protocol version is what turns that into an honest "update the app".
 
@@ -168,3 +168,35 @@ What an installed app may simply not send is not such a change. `Dw-Utc-Offset` 
 bump (D-110): an older build sends no header and its caller's offset is unknown, a newer build's
 header is ignored by an older server — neither side meets a body it cannot read. The header is
 recorded as a shape of its own (`http.utcOffset`), not by changing an existing one.
+
+### The generated project contract gate
+
+The generator emits sorted `lib/generated/dw_contract.json` (descriptor format and codec format 1)
+from the same resolved models as the codecs. `generate --check` and `check` compare the current
+source-derived shape with a fixed committed Git baseline. Pass `--contract-base <revision>`; it is
+resolved once to a commit SHA and reported. Normal project check uses the configured base branch
+merge-base (including main/master); CI supplies a trusted base SHA explicitly. Working JSON edits,
+regeneration and feature commits do not replace that baseline.
+
+Field/wire-name removals and renames, recursive type/nullability/patch/default changes, resolved
+request/result-kind changes, strict-enum additions/removals and enum openness changes are breaking.
+New data-object update groups are conservatively breaking because an installed client cannot decode
+an unknown group. New calls and nullable/defaulted/patch fields are codec-compatible: the new decoder
+accepts missing keys and the old decoder ignores extra keys. Dart `required` on a nullable field does
+not make it wire-required. An already-open enum may gain values while retaining all old names and
+`unknown`. A changed default is breaking even when both codecs omit the same JSON key.
+
+For example, changing `CustomerCard({required this.id})` to
+`CustomerCard({required this.id, required this.title})` rejects the old `{ "id": 1 }` payload.
+Regenerating at shared version `0.7.2` or `0.7.3` remains red; change it to `0.8.0` and regenerate.
+The existing runtime then refuses an older client line with 426/`dw.updateRequired`. A nullable
+`String? title` addition accepts the old payload and can stay on `0.7`.
+
+Missing descriptors are bootstrapped only from committed sources in disposable scratch, using
+existing resolved dependency information and matching committed locks, with exact reproduction of
+the committed codecs/registry. External path dependencies cannot establish a descriptor-free baseline: their historical bytes are not committed in the project tree. Unsupported formats, custom codecs, custom enum `name` encoders or default-equality overrides, missing dependencies or failed
+reproduction produce blocking `contract not verified` diagnostics; establish a regenerated baseline
+on the trusted base first. No feature-tree snapshot seed, historical dependency upgrade or setup
+script is used. Coverage is generated project codecs/registry, excluding handler/domain semantics
+and manually composed external modules. The descriptor is tooling metadata; it adds no runtime
+compatibility negotiation and does not change the framework `dwProtocolVersion`.

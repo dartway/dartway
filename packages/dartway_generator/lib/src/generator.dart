@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:analyzer/dart/analysis/analysis_context.dart';
 import 'package:analyzer/dart/analysis/analysis_context_collection.dart';
@@ -8,9 +9,12 @@ import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import 'analysis/framework.dart';
 import 'analysis/library_names.dart';
+import 'contract/baseline.dart';
+import 'contract/descriptor.dart';
 import 'diagnostic.dart';
 import 'dto/dto_emitter.dart';
 import 'dto/dto_model.dart';
@@ -36,6 +40,9 @@ final class DwGenerationReport {
     required this.elapsed,
     required this.check,
     this.skipped = const [],
+    this.contractBase,
+    this.contractProof,
+    this.contractVerdict,
   });
 
   final String root;
@@ -56,6 +63,11 @@ final class DwGenerationReport {
   final List<DwGenerationDiagnostic> diagnostics;
   final Duration elapsed;
   final bool check;
+
+  /// Fixed committed Git baseline used by this run, when assessed.
+  final String? contractBase;
+  final String? contractProof;
+  final String? contractVerdict;
 
   bool get hasErrors => diagnostics.isNotEmpty;
 
@@ -101,6 +113,8 @@ abstract final class DwCodeGenerator {
     String projectRoot, {
     String? sdkPath,
     bool check = false,
+    String? contractBase,
+    bool verifyContract = false,
   }) async {
     final stopwatch = Stopwatch()..start();
     // Resolved, because the analyzer reports resolved paths and every path
@@ -111,6 +125,9 @@ abstract final class DwCodeGenerator {
     }
     final diagnostics = <DwGenerationDiagnostic>[];
     final skipped = <String>[];
+    String? baselineSha;
+    String? proof;
+    String? verdict;
 
     DwGenerationReport finish({OutputPlan? plan}) {
       diagnostics.sort();
@@ -123,6 +140,9 @@ abstract final class DwCodeGenerator {
         elapsed: stopwatch.elapsed,
         check: check,
         skipped: List.unmodifiable(skipped),
+        contractBase: baselineSha,
+        contractProof: proof,
+        contractVerdict: verdict,
       );
     }
 
@@ -134,6 +154,19 @@ abstract final class DwCodeGenerator {
       skipped: check ? null : skipped,
     );
     if (diagnostics.isNotEmpty) return finish();
+    if (verifyContract || contractBase != null) {
+      try {
+        baselineSha = resolveContractBase(root, contractBase);
+      } on Exception catch (error) {
+        diagnostics.add(
+          DwGenerationDiagnostic(
+            'contract not verified: $error. Supply --contract-base with a trusted committed revision; no feature-tree seed is accepted.',
+            code: 'projectContractVersion',
+          ),
+        );
+        return finish();
+      }
+    }
 
     final collection = AnalysisContextCollection(
       includedPaths: [for (final package in packages) package.root],
@@ -146,9 +179,98 @@ abstract final class DwCodeGenerator {
       }
       final files = run.emit();
       if (diagnostics.isNotEmpty) return finish();
+      if (baselineSha != null) {
+        try {
+          final shared = packages
+              .where((p) => p.role == DwPackageRole.shared)
+              .single;
+          final current =
+              jsonDecode(
+                    files
+                        .where((f) => p.basename(f.path) == 'dw_contract.json')
+                        .single
+                        .content,
+                  )
+                  as Map<String, dynamic>;
+          validateContract(current);
+          final baseline = await readContractBaseline(
+            root: root,
+            sha: baselineSha,
+            shared: shared,
+            generate: (target) => _baselineOutput(target, sdkPath),
+          );
+          proof = baseline.proof;
+          final previousVersion = DwContractVersion.parse(
+            baseline.descriptor['contractVersion'] as String,
+          );
+          final nextVersion = DwContractVersion.parse(
+            current['contractVersion'] as String,
+          );
+          final changes = compareContracts(baseline.descriptor, current);
+          if (nextVersion.isOlderLineThan(previousVersion)) {
+            throw const FormatException(
+              'shared package contract line moved backwards',
+            );
+          }
+          if (changes.isNotEmpty &&
+              !previousVersion.isOlderLineThan(nextVersion)) {
+            diagnostics.add(
+              DwGenerationDiagnostic(
+                'project contract incompatible: ${changes.join('; ')}. Baseline $baselineSha has ${previousVersion.text} (line ${previousVersion.line}); current ${nextVersion.text} keeps that line. Raise the shared package breaking line and regenerate; a patch/prerelease bump is insufficient.',
+                code: 'projectContractVersion',
+              ),
+            );
+          } else {
+            verdict = changes.isEmpty
+                ? 'generated project contracts compatible'
+                : 'breaking generated project contracts isolated by line ${nextVersion.line} (${changes.join('; ')})';
+          }
+        } catch (error) {
+          diagnostics.add(
+            DwGenerationDiagnostic(
+              'contract not verified: baseline $baselineSha: $error. Establish a supported, regenerated descriptor/codecs on the trusted base revision first; never seed it from the feature tree.',
+              code: 'projectContractVersion',
+            ),
+          );
+        }
+        if (diagnostics.isNotEmpty) return finish();
+      }
       final plan = planOutput(files, packages);
       if (!check) plan.apply();
       return finish(plan: plan);
+    } finally {
+      await collection.dispose();
+    }
+  }
+
+  static Future<List<GeneratedFile>> _baselineOutput(
+    String root,
+    String? sdkPath,
+  ) async {
+    final diagnostics = <DwGenerationDiagnostic>[];
+    final packages = detectPackages(root, diagnostics);
+    if (diagnostics.isNotEmpty) {
+      throw FormatException(diagnostics.map((d) => d.message).join('; '));
+    }
+    final collection = AnalysisContextCollection(
+      includedPaths: [for (final package in packages) package.root],
+      sdkPath: sdkPath ?? findDartSdk(),
+    );
+    try {
+      final run = _Run(diagnostics);
+      for (final package in packages) {
+        await run.scanPackage(package, collection.contextFor(package.root));
+      }
+      final files = run.emit();
+      if (diagnostics.isNotEmpty) {
+        throw FormatException(diagnostics.map((d) => d.message).join('; '));
+      }
+      if (planOutput(files, packages).removed.isNotEmpty) {
+        throw const FormatException(
+          'committed generated output contains stale codecs',
+        );
+      }
+      return files;
     } finally {
       await collection.dispose();
     }
@@ -341,6 +463,26 @@ final class _Run {
         case DwPackageRole.shared
             when _resolves(package, 'dartway_core_shared'):
           files.add(_emitProtocol(package));
+          final version =
+              (loadYaml(
+                    File(
+                      p.join(package.root, 'pubspec.yaml'),
+                    ).readAsStringSync(),
+                  )
+                  as Map)['version'];
+          files.add(
+            GeneratedFile(
+              p.join(package.lib, 'generated', 'dw_contract.json'),
+              contractJson(
+                describeContract('$version', [
+                  for (final library in libraries)
+                    if (library.package == package)
+                      for (final (element, dto, _) in library.classes)
+                        if (dto != null) (element, dto),
+                ]),
+              ),
+            ),
+          );
         case DwPackageRole.server when _resolves(package, 'dartway_orm'):
           files.add(_emitSchema(package));
         default:

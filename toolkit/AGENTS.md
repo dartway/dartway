@@ -32,7 +32,7 @@ The shared package *is* the client contract; there is no client package. A new p
 
 **Law is the seven rules above and the checks below** — held in the types, at the server's start, or as an `error` of `dart run dartway_cli:dartway check`. A project does not override a law. **Everything else is a default** (commit format, base branch, how a decision is recorded) and a project may replace it in its root instruction file (`AGENTS.md` or `CLAUDE.md`), under "Project conventions", with the reason; a default yields to it, a law does not.
 
-The law list is therefore derived from `DwCheckType.severity`, not from how firmly a sentence is worded. Forty-two checks fail today; twelve more are warnings and one is a nudge, each named in the skill that owns its topic. Each check's message says what to write instead; the skill named beside it shows the pattern where the message is not enough.
+The law list is therefore derived from `DwCheckType.severity`, not from how firmly a sentence is worded. Forty-three checks fail today; twelve more are warnings and one is a nudge, each named in the skill that owns its topic. Each check's message says what to write instead; the skill named beside it shows the pattern where the message is not enough.
 
 | Rule | Checks that fail | Skill |
 |---|---|---|
@@ -49,7 +49,7 @@ The law list is therefore derived from `DwCheckType.severity`, not from how firm
 | Time is `ctx.now`; the environment is read in `core/environment.dart`; other services through `ctx.http` | `forbiddenDateTimeNow`, `forbiddenEnvironmentRead`, `forbiddenHttpClient` | `dartway-server` |
 | Startup work is a step before the port opens; settings are a typed object; a `!` on a row id is an error | `workAfterServerStart`, `settingsKeyValueTable`, `redundantBangAllowed` | `dartway-server` |
 | The shared package mirrors the server's features; DTO names follow law 5; a patch is read through its helpers | `invalidSharedLayout`, `contractNameInvalid`, `fieldPatchMatched` | `dartway-contract` |
-| Generated code matches its sources | `generatedCodeStale` | `dartway-contract` |
+| Generated code matches its sources and installed clients are protected by the shared package breaking line | `generatedCodeStale`, `projectContractVersion` | `dartway-contract` |
 | Migrations produce the declared schema and change rows only through `m.backfill` | `migrationsDrift`, `migrationChangesData` | `dartway-migrations` |
 | A test mirrors a `lib/` path and starts through `test/support/` | `testLayout`, `testHarnessBypassed` | `dartway-testing` |
 | `lib/` imports by `package:` only (`check --fix` rewrites) | `relativeImport` | — |
