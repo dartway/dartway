@@ -35,6 +35,7 @@ final class DwAuthConfig {
     required this.deliverCode,
     required this.accountDeletion,
     this.generateCode,
+    this.allowedDeliveryHints = const {},
     this.onAccountCreated,
     this.onIdentifierChanged,
     this.onAccountDeleting,
@@ -55,6 +56,12 @@ final class DwAuthConfig {
   /// e-mail), or `null` when [raw] is not a valid identifier of [kind]
   /// (answered `dw.invalid` on field `identifier`).
   final String? Function(DwIdentifierKind kind, String raw) normalize;
+
+  /// Project-defined preferences accepted on sign-in code requests.
+  /// An explicit hint outside this set is refused on `deliveryHint` before
+  /// creating a ticket. Null always selects the project default. Read the
+  /// accepted preference as [DwCallContext.deliveryHint] in auth hooks.
+  final Set<String> allowedDeliveryHints;
 
   /// Called **always**, whatever [code] is — generated or returned by
   /// [generateCode]. Never log the code.

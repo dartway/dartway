@@ -62,6 +62,7 @@ final class DwAuthService {
         command.kind,
         command.identifier,
         _CodePurpose.signIn,
+        deliveryHint: command.deliveryHint,
       ),
     ),
     // Not transactional at the framework level: a wrong code must commit its
@@ -213,8 +214,15 @@ final class DwAuthService {
     DwCallContext ctx,
     DwIdentifierKind kind,
     String rawIdentifier,
-    _CodePurpose purpose,
-  ) async {
+    _CodePurpose purpose, {
+    String? deliveryHint,
+  }) async {
+    if (deliveryHint != null &&
+        !auth.allowedDeliveryHints.contains(deliveryHint)) {
+      ctx.refuse(DwCoreRefusal.invalid, field: 'deliveryHint');
+    }
+    final runtimeContext = ctx as DwRuntimeContext;
+    runtimeContext.authDeliveryHint = deliveryHint;
     final identifier = _identifierOrRefuse(ctx, kind, rawIdentifier);
     final attachingAccount = switch (purpose) {
       _CodePurpose.signIn => null,
@@ -297,7 +305,7 @@ final class DwAuthService {
       // not, in general, a promise every `DwCallContext` this file sees is
       // one, only that this particular handler, wired through
       // `DwCallHandler.command`, always is.
-      await (ctx as DwRuntimeContext).recordProvisionalOutcome(ticket);
+      await runtimeContext.recordProvisionalOutcome(ticket);
       return (ticket, code, accountId);
     });
     await auth.deliverCode(ctx, kind, identifier, code, accountId);

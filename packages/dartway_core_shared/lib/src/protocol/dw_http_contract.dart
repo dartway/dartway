@@ -2,7 +2,7 @@
 /// `DwApiResponse` body, the transport, the live messages. A client sends it
 /// on every call (`Dw-Protocol`) and on the live upgrade (`?protocol=`); a
 /// server that does not speak it answers `426` with `dw.protocolUnsupported`.
-const int dwProtocolVersion = 2;
+const int dwProtocolVersion = 3;
 
 /// The HTTP contract between a DartWay client and its server, declared once
 /// for both sides:

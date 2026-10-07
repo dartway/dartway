@@ -596,6 +596,14 @@ List<_WireShape> _wireShapes() {
       ),
     ),
     dto(
+      'dto.requestCode.deliveryHint',
+      const DwRequestCode(
+        kind: DwIdentifierKind.phone,
+        identifier: '79990000001',
+        deliveryHint: 'sms',
+      ),
+    ),
+    dto(
       'dto.codeTicket',
       DwCodeTicket(id: 't-1', expiresAt: later, resendAfter: at),
     ),

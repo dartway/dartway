@@ -47,6 +47,70 @@ void main() {
     params: {'identifier': identifier, 'by': by.inMicroseconds},
   );
 
+  test(
+    'delivery preference preserves defaults, idempotency and identifier limits',
+    () async {
+      const plain = DwRequestCode(
+        kind: DwIdentifierKind.email,
+        identifier: 'hint-default@example.com',
+      );
+      (await caller.call(plain)).value(anyRequest);
+      expect(app().deliveryHints[plain.identifier], isNull);
+      expect(app().generatedHints[plain.identifier], isNull);
+      const sms = DwRequestCode(
+        kind: DwIdentifierKind.email,
+        identifier: 'hint-sms@example.com',
+        deliveryHint: 'sms',
+      );
+      final first = (await caller.call(
+        sms,
+        key: 'delivery-hint-idempotency',
+      )).value(anyRequest);
+      expect(app().deliveryHints[sms.identifier], 'sms');
+      expect(app().generatedHints[sms.identifier], 'sms');
+      final replay = (await caller.call(
+        sms,
+        key: 'delivery-hint-idempotency',
+      )).value(anyRequest);
+      expect(replay, first);
+      expect(
+        app().deliveredTo.where((id) => id == sms.identifier),
+        hasLength(1),
+      );
+      final early = await caller.call(
+        DwRequestCode(kind: sms.kind, identifier: sms.identifier),
+      );
+      expect(early.refusal.code, 'dw.tooManyRequests');
+      await age(sms.identifier, const Duration(seconds: 31));
+      final next = (await caller.call(sms)).value(anyRequest);
+      expect(next.id, isNot(first.id));
+      await age(sms.identifier, const Duration(seconds: 31));
+      (await caller.call(sms)).value(anyRequest);
+      await age(sms.identifier, const Duration(seconds: 31));
+      final limited = await caller.call(sms);
+      expect(limited.refusal.code, 'dw.tooManyRequests');
+    },
+  );
+
+  test('unapproved hints refuse before delivery or ticket creation', () async {
+    const request = DwRequestCode(
+      kind: DwIdentifierKind.email,
+      identifier: 'hint-invalid@example.com',
+      deliveryHint: 'unsupported',
+    );
+    final answer = await caller.call(request);
+    expect(
+      answer.refusal,
+      DwCallRefusal(DwCoreRefusal.invalid, field: 'deliveryHint'),
+    );
+    expect(app().delivered, isNot(contains(request.identifier)));
+    final rows = await harness().db.query(
+      'SELECT id FROM dw_code_ticket WHERE identifier = @id',
+      params: {'id': request.identifier},
+    );
+    expect(rows, isEmpty);
+  });
+
   test('a new identifier: code delivered, account and profile created in the '
       'sign-in transaction, a session that authenticates calls', () async {
     final ticket = (await requestCode('  New@Example.com ')).value(anyRequest);
@@ -244,12 +308,21 @@ void main() {
         app().gatedDelivery.add(id);
         app().deliveryGate = Completer();
         final firstFuture = caller.call(
-          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          const DwRequestCode(
+            kind: DwIdentifierKind.email,
+            identifier: id,
+            deliveryHint: 'sms',
+          ),
           key: 'dup-key-ok',
         );
         await waitForDeliveryToStart(id);
+        expect(app().deliveryHints[id], 'sms');
         final during = await caller.call(
-          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          const DwRequestCode(
+            kind: DwIdentifierKind.email,
+            identifier: id,
+            deliveryHint: 'sms',
+          ),
           key: 'dup-key-ok',
         );
         expect(during.status, 200);
@@ -276,7 +349,11 @@ void main() {
         // while delivery is still in flight: a send after everything has
         // settled still replays the same ticket.
         final after = await caller.call(
-          const DwRequestCode(kind: DwIdentifierKind.email, identifier: id),
+          const DwRequestCode(
+            kind: DwIdentifierKind.email,
+            identifier: id,
+            deliveryHint: 'sms',
+          ),
           key: 'dup-key-ok',
         );
         expect(after.value(anyRequest).id, duringTicket.id);
@@ -477,6 +554,7 @@ void main() {
           accountDeletion: DwAccountDeletion.byMember,
           normalize: (kind, raw) => raw.trim().toLowerCase(),
           deliverCode: (ctx, kind, identifier, code, accountId) async {
+            expect(ctx.deliveryHint, isNull);
             delivered[identifier] = code;
           },
           codeLength: 8,
@@ -485,6 +563,16 @@ void main() {
     );
     try {
       final isolatedCaller = isolated.caller();
+      final explicit = await isolatedCaller.call(
+        const DwRequestCode(
+          kind: DwIdentifierKind.email,
+          identifier: 'default-hints@example.com',
+          deliveryHint: 'sms',
+        ),
+      );
+      expect(explicit.refusal,
+        DwCallRefusal(DwCoreRefusal.invalid, field: 'deliveryHint'));
+      expect(delivered, isEmpty);
       final codes = <String>{};
       for (var i = 0; i < 5; i++) {
         final identifier = 'nogenerate$i@example.com';

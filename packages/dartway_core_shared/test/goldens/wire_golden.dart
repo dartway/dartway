@@ -7,7 +7,7 @@
 
 const String wireGolden = r'''
 {
-  "protocolVersion": 2,
+  "protocolVersion": 3,
   "shapes": {
     "http.contract": {
       "callPath": "/dw/RenameBooking",
@@ -506,6 +506,11 @@ const String wireGolden = r'''
     "dto.requestCode": {
       "kind": "phone",
       "identifier": "79990000001"
+    },
+    "dto.requestCode.deliveryHint": {
+      "kind": "phone",
+      "identifier": "79990000001",
+      "deliveryHint": "sms"
     },
     "dto.codeTicket": {
       "id": "t-1",
