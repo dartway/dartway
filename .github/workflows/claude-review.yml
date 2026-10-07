@@ -38,8 +38,13 @@ jobs:
             This repository is the DartWay framework itself — a Dart monorepo of
             the framework's server, client and Flutter packages, its CLI, the
             project template, a reference example, the docs and the agent
-            toolkit — not an application built on it. Read `CLAUDE.md` at the
-            repository root for the conventions that apply; `docs/DESIGN.md` is
+            toolkit — not an application built on it. Read the canonical `AGENTS.md`
+            at the repository root (the Claude entry point imports it) for
+            conventions. When this PR changes repository policy, read those
+            changes in the full PR diff before judging compliance; distinguish
+            an intentional policy change recorded in DECISIONS.md from a
+            violation of an unchanged rule. Do not rely only on earlier review
+            comments or an older CLAUDE.md snapshot; `docs/DESIGN.md` is
             the law for public API design, and `docs/1.0/DECISIONS.md` records
             the decisions of the rewrite (the latest entry wins).
 
@@ -61,7 +66,7 @@ jobs:
             1. **The synchronisation law.** A change to the public API of any package
                (what its `lib/<library>.dart` exports) is incomplete until the same
                PR updates `example/`, `template/`, the affected skills in
-               `toolkit/skills/` and `toolkit/CLAUDE.md`, the affected pages in
+               `toolkit/skills/` and `toolkit/AGENTS.md`, the affected pages in
                `docs/`, and the package `CHANGELOG.md`; a version bump brings the
                carets in `example/` and `template/` along (the core family —
                `dartway_core_shared`, `dartway_core_server`, `dartway_core_flutter`,
