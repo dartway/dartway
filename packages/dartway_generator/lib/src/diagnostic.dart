@@ -13,6 +13,7 @@ final class DwGenerationDiagnostic
     this.path,
     this.line,
     this.column,
+    this.code,
   });
 
   /// A diagnostic pointing at the name of [element] (or at [offset] in its
@@ -51,6 +52,9 @@ final class DwGenerationDiagnostic
   }
 
   final String message;
+
+  /// Stable error category for command/check boundaries.
+  final String? code;
   final String? path;
   final int? line;
   final int? column;

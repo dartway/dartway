@@ -38,6 +38,11 @@ class CheckCommand extends Command<int> {
   CheckCommand() {
     argParser
       ..addOption(
+        'contract-base',
+        help:
+            'Trusted committed Git baseline (default: merge-base with the configured project base branch).',
+      )
+      ..addOption(
         'type',
         help:
             'Run a single check by name '
@@ -204,6 +209,7 @@ class CheckCommand extends Command<int> {
       ).run(tally: tally);
       errorCount += DwGeneratedCodeInspector(
         serverPackageDir: layout?.serverPackageDir,
+        contractBase: results.option('contract-base'),
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);

@@ -192,7 +192,7 @@ screen, so settling by frames waits out the timeout instead of the traffic.
 The order the setup brief (`dartway quickstart`) gives an agent, from the project root:
 
 ```bash
-(cd <project>_flutter && dart run dartway_cli:dartway generate --check)
+(cd <project>_flutter && dart run dartway_cli:dartway generate --check --contract-base <trusted-SHA>)
 (cd <project>_flutter && dart run dartway_cli:dartway test)
 (cd my_app_shared && dart test)
 (cd my_app_flutter && flutter test)
@@ -266,3 +266,9 @@ an encoding without bumping the protocol version fails it (D-052): an app built 
 format is then answered `426` and shows "update the app" instead of failing to decode. After a deliberate
 bump, refresh the recordings with `DW_UPDATE_GOLDENS=1 dart test test/wire_golden_test.dart`. See
 [The wire and versions](../2-core/wire-and-versions.md).
+
+The generated project contract gate is separate from the core wire golden. CI passes its trusted
+base SHA to `generate --check`/`check --contract-base`; regeneration cannot silently approve a breaking
+DTO edit. Fixture tests exercise old/new generated codecs and real CLI/Git baselines, including
+read-only project byte identity and blocking unsupported/bootstrap failures. Tooling metadata alone
+does not trigger a core wire bump or runtime interoperability tier.

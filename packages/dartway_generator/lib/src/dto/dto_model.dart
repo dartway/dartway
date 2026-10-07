@@ -26,10 +26,17 @@ final class DtoField implements ValueField {
 
 /// A constructor default, written as a Dart expression.
 final class DtoDefault {
-  const DtoDefault(this.expression, {required this.isEmptyCollection});
+  const DtoDefault(
+    this.expression, {
+    required this.isEmptyCollection,
+    required this.value,
+  });
 
   /// Constant wherever the value can be (`const <int>[1, 2]`, `Color.red`).
   final String expression;
+
+  /// Evaluated value, independent of imports and constant spelling.
+  final Object? value;
 
   /// `const []` or `const {}`: emptiness is tested without the literal.
   final bool isEmptyCollection;

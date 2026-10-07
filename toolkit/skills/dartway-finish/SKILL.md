@@ -27,18 +27,22 @@ In this order; report each as run with its result, or not run and why. This is t
 every other skill refers to.
 
 ```bash
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check)
+CONTRACT_BASE="$(git merge-base HEAD origin/__BASE_BRANCH__)"  # resolve once; CI supplies its trusted SHA
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check --contract-base "$CONTRACT_BASE")
 (cd __SERVER_PKG__ && dart run bin/migrate.dart check)      # row classes or migrations changed; needs a database
 (cd __SHARED_PKG__ && dart analyze && dart test)
 (cd __SERVER_PKG__ && dart analyze)
 (cd __FLUTTER_PKG__ && dart analyze --fatal-infos)          # not flutter analyze: it skips the dartway_lints plugin
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)   # server acceptance on a real Postgres and storage
 (cd __FLUTTER_PKG__ && flutter test)
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check)
+(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check --contract-base "$CONTRACT_BASE")
 ```
 
 - Analyze whole packages: `dart analyze lib` skips `test/`, where moves and API changes break.
 - A test red after a refactor is "I broke it" until the base branch shows otherwise.
+- `projectContractVersion`: incompatible or unverified is an error, never a skipped gate. Keep the
+  baseline SHA fixed after regeneration/feature commits; advance the shared breaking line for an
+  incompatible generated shape. Custom/domain/manual module behavior still needs its own review.
 - `check`: read the features the task touched in its per-feature report, not only the counter;
   "migrations not checked" is not a pass.
 - `frameworkRefsDiverged` is fixed as its own change (`dartway-update`), not in this diff.

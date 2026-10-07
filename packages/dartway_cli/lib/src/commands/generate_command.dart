@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
+import '../generator_invocation.dart';
 
 /// Runs `dartway_generator` over the project: DTO codecs and the protocol
 /// registry in `*_shared`, entity tables and the schema in `*_server`.
@@ -16,6 +17,11 @@ import 'package:path/path.dart' as p;
 /// the project declares none.
 class GenerateCommand extends Command<int> {
   GenerateCommand() {
+    argParser.addOption(
+      'contract-base',
+      help:
+          'Trusted committed Git baseline for generated project contract compatibility.',
+    );
     argParser.addFlag(
       'check',
       negatable: false,
@@ -60,13 +66,17 @@ class GenerateCommand extends Command<int> {
       root,
       if (argResults!.flag('check')) '--check',
       if (argResults!.flag('verbose')) '--verbose',
+      if (argResults!.option('contract-base') case final String base) ...[
+        '--contract-base',
+        base,
+      ],
     ];
 
     final host = _packagesOf(root).where(_resolvesGenerator).firstOrNull;
     final List<String> command;
     final String workingDirectory;
     if (host != null) {
-      command = ['run', _generator, ...forwarded];
+      command = resolvedGeneratorArguments(host, forwarded)!;
       workingDirectory = host;
     } else if (await _isGloballyActivated()) {
       command = ['pub', 'global', 'run', _generator, ...forwarded];

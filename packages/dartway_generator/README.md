@@ -2,11 +2,19 @@
 
 Code generation for [DartWay](https://dartway.dev) projects — DTO codecs, registries, entity
 tables and schema. It reads and writes a project's shared and server package in one run: DTO parts
-and the protocol registry in the shared package, row parts and the database schema in the server
+the protocol registry and sorted `lib/generated/dw_contract.json` in the shared package, row parts and the database schema in the server
 package.
 
-Run as `dartway generate` (add `--check` to verify without writing), or directly as
+Run as `dartway generate` (add `--check --contract-base <trusted-SHA>` to verify without writing), or directly as
 `dart run dartway_generator --project <dir>` from a project's server package.
+
+The compatibility gate compares source-derived codec models with Git objects at a fixed committed
+baseline, reusing the shared package breaking line. Incompatible or unverified results fail;
+regeneration cannot silently approve a breaking contract. Missing descriptors require exact
+committed shared codec/registry reproduction with existing resolved dependency locks. No project
+setup scripts, historical dependency upgrades or runtime negotiation are added. Coverage excludes
+handler/domain semantics and manually composed external modules. Checks default to the configured
+project base-branch merge-base; CI supplies its trusted base SHA explicitly.
 
 ## Where it sits
 

@@ -1,0 +1,1555 @@
+{
+  "codec": 1,
+  "contractVersion": "1.0.0",
+  "format": 1,
+  "objects": {
+    "AdminCounters": {
+      "fields": {
+        "members": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "newsPosts": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "upcomingSessions": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "String",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "BookSession": {
+      "fields": {
+        "sessionId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "SessionBooking",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "CancelBooking": {
+      "fields": {
+        "bookingId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "SessionBooking",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "CancelSession": {
+      "fields": {
+        "sessionId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "kind": "void",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "ChangeRole": {
+      "fields": {
+        "profileId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "role": {
+          "type": {
+            "kind": "enum",
+            "nullable": false,
+            "open": false,
+            "values": [
+              "admin",
+              "client",
+              "staff"
+            ]
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "ChatAttachment": {
+      "fields": {
+        "byteSize": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "contentType": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "fileName": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "height": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "width": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ChatAttachmentDraft": {
+      "fields": {
+        "height": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "width": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ChatChannel": {
+      "fields": {
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "title": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ChatMessage": {
+      "fields": {
+        "attachments": {
+          "default": [],
+          "type": {
+            "element": {
+              "core": false,
+              "kind": "dto",
+              "name": "ChatAttachment",
+              "nullable": false
+            },
+            "kind": "list",
+            "nullable": false
+          }
+        },
+        "author": {
+          "type": {
+            "core": false,
+            "kind": "dto",
+            "name": "PersonCard",
+            "nullable": false
+          }
+        },
+        "channelId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "editedAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": true
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "pinnedAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": true
+          }
+        },
+        "reactions": {
+          "default": [],
+          "type": {
+            "element": {
+              "core": false,
+              "kind": "dto",
+              "name": "ChatMessageReaction",
+              "nullable": false
+            },
+            "kind": "list",
+            "nullable": false
+          }
+        },
+        "replyTo": {
+          "type": {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatMessageQuote",
+            "nullable": true
+          }
+        },
+        "sentAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        },
+        "text": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ChatMessageQuote": {
+      "fields": {
+        "authorDeleted": {
+          "default": false,
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        },
+        "authorName": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "hasAttachments": {
+          "default": false,
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "isDeleted": {
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        },
+        "sentAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        },
+        "text": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ChatMessageReaction": {
+      "fields": {
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "reaction": {
+          "type": {
+            "kind": "enum",
+            "nullable": false,
+            "open": false,
+            "values": [
+              "fire",
+              "heart",
+              "money",
+              "thumbsDown",
+              "thumbsUp"
+            ]
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ChatReadState": {
+      "fields": {
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "lastReadMessageId": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        },
+        "lastReadSentAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": true
+          }
+        },
+        "unreadCount": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ClubService": {
+      "fields": {
+        "description": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "durationMinutes": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "imageUrl": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "price": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "title": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ClubSession": {
+      "fields": {
+        "bookedCount": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "capacity": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "coach": {
+          "type": {
+            "core": false,
+            "kind": "dto",
+            "name": "PersonCard",
+            "nullable": true
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "service": {
+          "type": {
+            "core": false,
+            "kind": "dto",
+            "name": "ClubService",
+            "nullable": false
+          }
+        },
+        "startsAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ClubSettings": {
+      "fields": {
+        "bookingEnabled": {
+          "default": true,
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        },
+        "clubName": {
+          "default": "DartWay Fitness",
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "supportPhone": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        }
+      },
+      "identity": {
+        "kind": "String",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "DeleteChatMessage": {
+      "fields": {
+        "messageId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "kind": "void",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "EditChatMessage": {
+      "fields": {
+        "messageId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "text": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatMessage",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "GetAdminCounters": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "AdminCounters",
+            "nullable": false
+          }
+        ],
+        "kind": "DwSingleRequest"
+      }
+    },
+    "GetClubSettings": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ClubSettings",
+            "nullable": false
+          }
+        ],
+        "kind": "DwSingleRequest"
+      }
+    },
+    "GetMyProfile": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        ],
+        "kind": "DwSingleRequest"
+      }
+    },
+    "ListChatChannels": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatChannel",
+            "nullable": false
+          }
+        ],
+        "kind": "DwListRequest"
+      }
+    },
+    "ListChatMessages": {
+      "fields": {
+        "channelId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatMessage",
+            "nullable": false
+          },
+          {
+            "kind": "dateTime",
+            "nullable": false
+          },
+          {
+            "kind": "int",
+            "nullable": false
+          }
+        ],
+        "kind": "DwWindowRequest"
+      }
+    },
+    "ListChatMessagesMatching": {
+      "fields": {
+        "channelId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "query": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatMessage",
+            "nullable": false
+          }
+        ],
+        "kind": "DwListRequest"
+      }
+    },
+    "ListClubServices": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ClubService",
+            "nullable": false
+          }
+        ],
+        "kind": "DwListRequest"
+      }
+    },
+    "ListMyBookings": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "SessionBooking",
+            "nullable": false
+          }
+        ],
+        "kind": "DwListRequest"
+      }
+    },
+    "ListMyChatReadStates": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatReadState",
+            "nullable": false
+          }
+        ],
+        "kind": "DwListRequest"
+      }
+    },
+    "ListNews": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "NewsPost",
+            "nullable": false
+          }
+        ],
+        "kind": "DwPageRequest"
+      }
+    },
+    "ListPinnedChatMessages": {
+      "fields": {
+        "channelId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatMessage",
+            "nullable": false
+          }
+        ],
+        "kind": "DwListRequest"
+      }
+    },
+    "ListUpcomingSessions": {
+      "fields": {
+        "from": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ClubSession",
+            "nullable": false
+          }
+        ],
+        "kind": "DwListRequest"
+      }
+    },
+    "ListUserProfiles": {
+      "fields": {
+        "page": {
+          "default": 1,
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "pageSize": {
+          "default": 10,
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "role": {
+          "type": {
+            "kind": "enum",
+            "nullable": true,
+            "open": false,
+            "values": [
+              "admin",
+              "client",
+              "staff"
+            ]
+          }
+        },
+        "search": {
+          "default": "",
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        ],
+        "kind": "DwTableRequest"
+      }
+    },
+    "MarkAttended": {
+      "fields": {
+        "bookingId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "SessionBooking",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "MarkChatRead": {
+      "fields": {
+        "channelId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "messageId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatReadState",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "NewsAlert": {
+      "fields": {
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "NewsPost": {
+      "fields": {
+        "author": {
+          "type": {
+            "core": false,
+            "kind": "dto",
+            "name": "PersonCard",
+            "nullable": false
+          }
+        },
+        "createdAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "text": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "title": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "PersonCard": {
+      "fields": {
+        "firstName": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "imageUrl": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "isDeleted": {
+          "default": false,
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        },
+        "lastName": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "PinChatMessage": {
+      "fields": {
+        "messageId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "pinned": {
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatMessage",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "PublishNews": {
+      "fields": {
+        "text": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "title": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "NewsPost",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "ReactToChatMessage": {
+      "fields": {
+        "messageId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "reaction": {
+          "type": {
+            "kind": "enum",
+            "nullable": true,
+            "open": false,
+            "values": [
+              "fire",
+              "heart",
+              "money",
+              "thumbsDown",
+              "thumbsUp"
+            ]
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatMessage",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "RemoveNews": {
+      "fields": {
+        "postId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "kind": "void",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "ReviewVisit": {
+      "fields": {
+        "bookingId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "rating": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "text": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "SessionBooking",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "SaveClubService": {
+      "fields": {
+        "description": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "durationMinutes": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        },
+        "imageUrl": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "price": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "title": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ClubService",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "SaveClubSettings": {
+      "fields": {
+        "bookingEnabled": {
+          "type": {
+            "kind": "bool",
+            "nullable": true
+          }
+        },
+        "clubName": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "supportPhone": {
+          "type": {
+            "kind": "patch",
+            "nullable": false,
+            "value": {
+              "kind": "String",
+              "nullable": false
+            }
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ClubSettings",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "ScheduleSession": {
+      "fields": {
+        "capacity": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "coachProfileId": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        },
+        "serviceId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "startsAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ClubSession",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "SendChatMessage": {
+      "fields": {
+        "attachments": {
+          "default": [],
+          "type": {
+            "element": {
+              "core": false,
+              "kind": "dto",
+              "name": "ChatAttachmentDraft",
+              "nullable": false
+            },
+            "kind": "list",
+            "nullable": false
+          }
+        },
+        "channelId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "replyToMessageId": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        },
+        "text": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "ChatMessage",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "SessionBooking": {
+      "fields": {
+        "accountId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "createdAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "review": {
+          "type": {
+            "core": false,
+            "kind": "dto",
+            "name": "SessionReview",
+            "nullable": true
+          }
+        },
+        "session": {
+          "type": {
+            "core": false,
+            "kind": "dto",
+            "name": "ClubSession",
+            "nullable": false
+          }
+        },
+        "status": {
+          "type": {
+            "kind": "enum",
+            "nullable": false,
+            "open": false,
+            "values": [
+              "attended",
+              "booked",
+              "cancelled"
+            ]
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "SessionReview": {
+      "fields": {
+        "createdAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "rating": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "text": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "UpdateMyProfile": {
+      "fields": {
+        "firstName": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "gender": {
+          "type": {
+            "kind": "patch",
+            "nullable": false,
+            "value": {
+              "kind": "enum",
+              "nullable": false,
+              "open": false,
+              "values": [
+                "female",
+                "male"
+              ]
+            }
+          }
+        },
+        "lastName": {
+          "type": {
+            "kind": "patch",
+            "nullable": false,
+            "value": {
+              "kind": "String",
+              "nullable": false
+            }
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "UserProfile": {
+      "fields": {
+        "accountId": {
+          "type": {
+            "kind": "int",
+            "nullable": true
+          }
+        },
+        "agreedForMarketing": {
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        },
+        "firstName": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "gender": {
+          "type": {
+            "kind": "enum",
+            "nullable": true,
+            "open": false,
+            "values": [
+              "female",
+              "male"
+            ]
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "imageUrl": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "isDeleted": {
+          "default": false,
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        },
+        "lastName": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "phone": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "role": {
+          "type": {
+            "kind": "enum",
+            "nullable": false,
+            "open": false,
+            "values": [
+              "admin",
+              "client",
+              "staff"
+            ]
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    }
+  },
+  "unverified": []
+}

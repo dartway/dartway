@@ -144,6 +144,17 @@ void main() {
     final inspector = inspect({
       'generated/dw_protocol.dart': generated,
       'generated/helpers.dart': 'const x = 1;',
+      'generated/dw_contract.json': File(
+        p.join(
+          '..',
+          '..',
+          'template',
+          'dartway_starter_shared',
+          'lib',
+          'generated',
+          'dw_contract.json',
+        ),
+      ).readAsStringSync(),
       'src/profile.dart': '',
       'src/profile.dw.dart': 'const handWritten = 1;',
       'src/chat/chat_messages.g.dart': 'const handWritten = 1;',

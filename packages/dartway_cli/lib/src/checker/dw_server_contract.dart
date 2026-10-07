@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import '../generator_invocation.dart';
 
 import 'dw_check_type.dart';
 import 'dw_check_tally.dart';
@@ -45,21 +46,30 @@ bool _enabledFor(
 class DwGeneratedCodeInspector {
   DwGeneratedCodeInspector({
     required this.serverPackageDir,
+    this.contractBase,
     DwDartProbe? probe,
     DwCheckType? filterType,
     DwCheckSeverity? filterSeverity,
   }) : _probe = probe ?? _runDart,
-       _enabled = _enabledFor(
+       _freshnessEnabled = _enabledFor(
          DwCheckType.generatedCodeStale,
+         filterType,
+         filterSeverity,
+       ),
+       _contractEnabled = _enabledFor(
+         DwCheckType.projectContractVersion,
          filterType,
          filterSeverity,
        );
 
   final Directory? serverPackageDir;
+  final String? contractBase;
 
   final DwDartProbe _probe;
-  final bool _enabled;
+  final bool _freshnessEnabled;
+  final bool _contractEnabled;
   final _findings = <String>[];
+  final _contractFindings = <String>[];
   final _notes = <String>[];
 
   List<String> get findings => List.unmodifiable(_findings);
@@ -71,15 +81,19 @@ class DwGeneratedCodeInspector {
   /// error-severity findings.
   int run({DwCheckTally? tally}) {
     final serverDir = serverPackageDir;
-    if (!_enabled || serverDir == null || !serverDir.existsSync()) return 0;
+    if ((!_freshnessEnabled && !_contractEnabled) ||
+        serverDir == null ||
+        !serverDir.existsSync()) {
+      return 0;
+    }
 
-    final result = _probe([
-      'run',
-      'dartway_generator',
+    final arguments = resolvedGeneratorArguments(serverDir.path, [
       '--project',
       serverDir.parent.path,
       '--check',
-    ], serverDir.path);
+      if (contractBase != null) ...['--contract-base', contractBase!],
+    ]);
+    final result = arguments == null ? null : _probe(arguments, serverDir.path);
     final output = [
       ...LineSplitter.split('${result?.stdout ?? ''}'),
       ...LineSplitter.split('${result?.stderr ?? ''}'),
@@ -94,26 +108,57 @@ class DwGeneratedCodeInspector {
                 line.trimLeft().startsWith('out of date ') ||
                 line.trimLeft().startsWith('stale '),
           ):
-        _findings.addAll([
-          for (final line in output)
-            if (line.trimLeft().startsWith('out of date ') ||
-                line.trimLeft().startsWith('stale '))
-              line.trim(),
-        ]);
+        if (_freshnessEnabled) {
+          _findings.addAll([
+            for (final line in output)
+              if (line.trimLeft().startsWith('out of date ') ||
+                  line.trimLeft().startsWith('stale '))
+                line.trim(),
+          ]);
+        }
       case null:
-        _notes.add('`dart` could not be started');
+        if (_contractEnabled) {
+          _contractFindings.add(
+            arguments == null
+                ? 'contract not verified: no resolved generator entry point; run dart pub get separately in the server package'
+                : 'contract not verified: `dart` could not be started',
+          );
+        } else {
+          _notes.add('`dart` could not be started');
+        }
       default:
         // A generation error (a declaration the generator refuses) or an
         // unresolved package: the generator's own words say which.
-        _notes.addAll(output.where((line) => line.trim().isNotEmpty).take(5));
+        if (_contractEnabled) {
+          _contractFindings.add(
+            'contract not verified or incompatible — ${output.where((line) => line.trim().isNotEmpty).take(8).join('\n    ')}',
+          );
+        } else {
+          _notes.addAll(output.where((line) => line.trim().isNotEmpty).take(5));
+        }
     }
 
-    if (_findings.isEmpty && _notes.isEmpty) return 0;
+    if (result?.exitCode == 0) {
+      for (final line in output.where(
+        (line) =>
+            line.startsWith('Project contract baseline:') ||
+            line.contains('coverage: generated project'),
+      )) {
+        print(line);
+      }
+    }
+    if (_findings.isEmpty && _contractFindings.isEmpty && _notes.isEmpty) {
+      return 0;
+    }
     print('\n🧬 Generated code:\n');
     for (final finding in _findings) {
       print('  ${DwCheckType.generatedCodeStale.reportLabel}: $finding');
     }
     tally?.add(DwCheckType.generatedCodeStale, _findings.length);
+    for (final finding in _contractFindings) {
+      print('  ${DwCheckType.projectContractVersion.reportLabel}: $finding');
+    }
+    tally?.add(DwCheckType.projectContractVersion, _contractFindings.length);
     if (_findings.isNotEmpty) {
       print(
         '\n  Fix — in the Flutter package of ${serverDir.parent.path}:\n'
@@ -129,7 +174,7 @@ class DwGeneratedCodeInspector {
       }
     }
     return DwCheckType.generatedCodeStale.severity == DwCheckSeverity.error
-        ? _findings.length
+        ? _findings.length + _contractFindings.length
         : 0;
   }
 }
