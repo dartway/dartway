@@ -71,7 +71,7 @@ The monorepo exists so that its parts evolve together. A change to the **public 
 5. **`docs/`** — the affected pages;
 6. **the package's `CHANGELOG.md`**;
 7. **the carets**, by the versioning rules below: the family in lockstep, satellites by D-032;
-8. **the wire** — a change to how anything travels bumps `dwProtocolVersion` and refreshes the wire golden (see "The wire is a protocol");
+8. **the wire** — a framework runtime wire change bumps `dwProtocolVersion` and refreshes the core wire golden; generated application contracts use the shared package breaking line and committed project descriptor, not a second runtime negotiation;
 9. **`docs/migrations/`** — a note whenever the change asks a project to edit its own code, written in the same pull request, with no exemption for the rewrite (D-080). A note is shown when the target reaches the version it names, until a verified disposition is recorded; locks and toolkit installs do not complete it (D-126). Use the release version that delivers the change, following the versioning policy below: a prerelease of the family's next version in lockstep (`0.21.0-dev.1`, then `dev.2`, … after `0.20.0`; pub.dev receives the plain version when the release is cut, D-086), or the satellite's own, with the carets in `template/` and `example/`. The one journey without a note is a project coming from 0.x — it is recreated on the rewrite rather than migrated (D-031).
 
 Four of these are held by checks rather than by memory, and they are the reason the list can be trusted:
@@ -90,14 +90,14 @@ Run the `framework-finish` skill before committing framework changes — it look
 ## Generation
 
 - **One generator, `dartway_generator`, run as `dartway generate`** — a dev dependency of the project's server package, pinned by the lock file (D-019). No global generator, no `build_runner`. The CLI finds the generator the project resolved and runs that one, so the generator always matches the `dartway_core_shared` and `dartway_orm` the project builds against.
-- **It reads and writes the shared and the server package in one run** — DTO parts (`*.dw.dart`) and `lib/generated/dw_protocol.dart` in `*_shared`, row parts and `lib/generated/dw_schema.dart` in `*_server`. Regenerate both together; half a regeneration is a server whose registry disagrees with its app.
+- **It reads and writes the shared and the server package in one run** — DTO parts (`*.dw.dart`) and `lib/generated/dw_protocol.dart` in `*_shared`, the deterministic `lib/generated/dw_contract.json` descriptor, row parts and `lib/generated/dw_schema.dart` in `*_server`. Regenerate both together; half a regeneration is a server whose registry disagrees with its app.
 - **Generated files are never edited by hand.** The output is deterministic and formatted; a hand edit is overwritten by the next run and reported as stale by `--check` until then. The one exception proves the rule: `packages/dartway_core_shared/test/fixtures/club_booking.dw.dart` is hand-written in the generator's exact shape so the shared package tests the contract without the generator, and `packages/dartway_generator/test/dto_test.dart` regenerates it and fails on any difference — change the two together.
 - **In this repository** the generator resolves inside `example/` and `template/` through their `dependency_overrides`: from a project's server package, `dart run dartway_generator --project ..` (add `--check` to verify), or `dartway generate` from the project root with a CLI activated from this tree.
 - **A row class change is a migration**: `dart run bin/migrate.dart create <name>` in the server package, with `DW_DATABASE_*` set, then review the draft. The framework's own tables migrate in `packages/dartway_core_server/lib/src/migrations/dw_framework_migrations.dart` under the `dw` namespace, **appended, never rewritten** — an applied migration whose checksum changes stops every server that has applied it (D-050). The one exception is a migration that could not apply on databases holding rows: it is corrected with the same outcome where it did apply, and declares the text it replaces in `supersededChecksums` (D-056).
 
 ### The wire is a protocol
 
-**A change of how calls, `DwApiResponse`, update transports, live messages or generated DTO JSON look on the wire bumps `dwProtocolVersion`** (D-052). An installed app keeps speaking the wire it was compiled with; with the bump it is answered `426` and shows "update the app", without it it fails to decode.
+**A change of how calls, `DwApiResponse`, update transports, live messages or framework-generated DTO JSON look on the wire bumps `dwProtocolVersion`** (D-052). An installed app keeps speaking the wire it was compiled with; with the bump it is answered `426` and shows "update the app", without it it fails to decode.
 
 `packages/dartway_core_shared/test/wire_golden_test.dart` records the canonical encoding of every wire shape together with the protocol version it was taken at (`test/goldens/wire_golden.dart`), and reads each recorded encoding back. It fails when an encoding differs while the version is unchanged. The procedure, in order:
 

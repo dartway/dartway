@@ -93,7 +93,7 @@ void main() {
       final project = TempProject.create(['app_shared']);
       project.copyFixture('types');
       final first = await project.generateClean();
-      expect(first.written, hasLength(5));
+      expect(first.written, hasLength(6));
       final stamps = {
         for (final path in first.written) path: File(path).lastModifiedSync(),
       };
@@ -107,7 +107,7 @@ void main() {
       }
       expect(
         second.summary,
-        startsWith('dartway generate: 0 written, 5 unchanged, 0 removed'),
+        startsWith('dartway generate: 0 written, 6 unchanged, 0 removed'),
       );
     });
 
@@ -130,7 +130,7 @@ void main() {
       final dryRun = await project.generate(check: true);
       expect(dryRun.diagnostics, isEmpty);
       expect(dryRun.isUpToDate, isFalse);
-      expect(dryRun.written, hasLength(5));
+      expect(dryRun.written, hasLength(6));
       expect(project.exists('app_shared/lib/src/catalog.dw.dart'), isFalse);
 
       await project.generateClean();

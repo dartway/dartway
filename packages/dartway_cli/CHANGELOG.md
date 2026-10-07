@@ -11,6 +11,9 @@
   Preflight preserves native diagnostic settings and resolves only the selected dependency
   source using native dependency YAML; ambiguous sources, pub-only hosted map forms and sources
   that fail native YAML resolution are rejected before project edits.
+- `generate`/`check` carry `--contract-base` through one resolved generator invocation;
+  `projectContractVersion` is an error for incompatible or unverified generated project contracts.
+  Direct execution of the resolved generator prevents implicit pub/lock writes during checks.
 
 - One toolkit supports Codex and Claude. `create`, `setup-ai` and `update`
   accept `--agent codex|claude|both` (default `both`, recorded for updates).

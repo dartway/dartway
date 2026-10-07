@@ -159,6 +159,11 @@ enum DwCheckType {
   /// refused as unknown by a server that has its handler.
   generatedCodeStale,
 
+  /// Generated project contracts changed incompatibly without advancing the
+  /// shared package breaking line, or compatibility could not be verified
+  /// against a trusted committed Git baseline.
+  projectContractVersion,
+
   /// Migrations that do not produce the schema the row classes declare, a
   /// migration edited after its checksum was sealed or left unregistered, or
   /// a down that does not undo its up — `dart run bin/migrate.dart check` in

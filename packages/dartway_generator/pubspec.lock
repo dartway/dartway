@@ -127,7 +127,7 @@ packages:
     source: path
     version: "0.21.0-dev.17"
   dartway_core_shared:
-    dependency: "direct dev"
+    dependency: "direct main"
     description:
       path: "../dartway_core_shared"
       relative: true

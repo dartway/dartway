@@ -1,0 +1,463 @@
+{
+  "codec": 1,
+  "contractVersion": "0.1.0",
+  "format": 1,
+  "objects": {
+    "AdminCounters": {
+      "fields": {
+        "admins": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "marketingOptIns": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "members": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "String",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "AppSettings": {
+      "fields": {
+        "appName": {
+          "default": "DartwayStarter",
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "signUpEnabled": {
+          "default": true,
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        }
+      },
+      "identity": {
+        "kind": "String",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "ChangeUserRole": {
+      "fields": {
+        "profileId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "role": {
+          "type": {
+            "kind": "enum",
+            "nullable": false,
+            "open": false,
+            "values": [
+              "admin",
+              "user"
+            ]
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "GetAdminCounters": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "AdminCounters",
+            "nullable": false
+          }
+        ],
+        "kind": "DwSingleRequest"
+      }
+    },
+    "GetAppSettings": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "AppSettings",
+            "nullable": false
+          }
+        ],
+        "kind": "DwSingleRequest"
+      }
+    },
+    "GetMyProfile": {
+      "fields": {},
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        ],
+        "kind": "DwSingleRequest"
+      }
+    },
+    "GetUserCard": {
+      "fields": {
+        "profileId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserCard",
+            "nullable": false
+          }
+        ],
+        "kind": "DwSingleRequest"
+      }
+    },
+    "ListUserProfiles": {
+      "fields": {
+        "page": {
+          "default": 1,
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "pageSize": {
+          "default": 10,
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "role": {
+          "type": {
+            "kind": "enum",
+            "nullable": true,
+            "open": false,
+            "values": [
+              "admin",
+              "user"
+            ]
+          }
+        },
+        "search": {
+          "default": "",
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        ],
+        "kind": "DwTableRequest"
+      }
+    },
+    "SaveAppSettings": {
+      "fields": {
+        "appName": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "signUpEnabled": {
+          "type": {
+            "kind": "bool",
+            "nullable": true
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "AppSettings",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "UpdateMyProfile": {
+      "fields": {
+        "avatarFileId": {
+          "type": {
+            "kind": "patch",
+            "nullable": false,
+            "value": {
+              "kind": "int",
+              "nullable": false
+            }
+          }
+        },
+        "firstName": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "gender": {
+          "type": {
+            "kind": "patch",
+            "nullable": false,
+            "value": {
+              "kind": "enum",
+              "nullable": false,
+              "open": false,
+              "values": [
+                "female",
+                "male"
+              ]
+            }
+          }
+        },
+        "lastName": {
+          "type": {
+            "kind": "patch",
+            "nullable": false,
+            "value": {
+              "kind": "String",
+              "nullable": false
+            }
+          }
+        }
+      },
+      "kind": "command",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        ],
+        "kind": "DwActionCommand"
+      }
+    },
+    "UserCard": {
+      "fields": {
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "identifiers": {
+          "default": [],
+          "type": {
+            "element": {
+              "core": false,
+              "kind": "dto",
+              "name": "UserIdentifier",
+              "nullable": false
+            },
+            "kind": "list",
+            "nullable": false
+          }
+        },
+        "profile": {
+          "type": {
+            "core": false,
+            "kind": "dto",
+            "name": "UserProfile",
+            "nullable": false
+          }
+        },
+        "termsAcceptedAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": true
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "UserIdentifier": {
+      "fields": {
+        "addedAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "kind": {
+          "type": {
+            "kind": "enum",
+            "nullable": false,
+            "open": false,
+            "values": [
+              "email",
+              "phone"
+            ]
+          }
+        },
+        "value": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "verifiedAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": true
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    },
+    "UserProfile": {
+      "fields": {
+        "accountId": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "agreedForMarketing": {
+          "default": false,
+          "type": {
+            "kind": "bool",
+            "nullable": false
+          }
+        },
+        "avatarUrl": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "email": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "firstName": {
+          "type": {
+            "kind": "String",
+            "nullable": false
+          }
+        },
+        "gender": {
+          "type": {
+            "kind": "enum",
+            "nullable": true,
+            "open": false,
+            "values": [
+              "female",
+              "male"
+            ]
+          }
+        },
+        "id": {
+          "type": {
+            "kind": "int",
+            "nullable": false
+          }
+        },
+        "joinedAt": {
+          "type": {
+            "kind": "dateTime",
+            "nullable": false
+          }
+        },
+        "lastName": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "phone": {
+          "type": {
+            "kind": "String",
+            "nullable": true
+          }
+        },
+        "role": {
+          "type": {
+            "kind": "enum",
+            "nullable": false,
+            "open": false,
+            "values": [
+              "admin",
+              "user"
+            ]
+          }
+        }
+      },
+      "identity": {
+        "kind": "int",
+        "nullable": false
+      },
+      "kind": "data"
+    }
+  },
+  "unverified": []
+}

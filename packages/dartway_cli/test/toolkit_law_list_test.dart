@@ -125,6 +125,7 @@ void main() {
       40: 'forty',
       41: 'forty-one',
       42: 'forty-two',
+      43: 'forty-three',
     };
 
     int countOf(DwCheckSeverity severity) =>

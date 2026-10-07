@@ -74,7 +74,7 @@ From the project root or from inside the `*_flutter` package, in this order:
 3. **analysis options**: the server and the shared package raise `unnecessary_non_null_assertion` to
    an error (`redundantBangAllowed`);
 4. **generated code**: `dart run dartway_generator --project <root> --check` in the server package
-   (`generatedCodeStale`);
+   (`generatedCodeStale`, `projectContractVersion`);
 5. **the environment and outbound HTTP** in the server package: `Platform.environment` outside
    `lib/src/core/environment.dart`, and in `bin/` anything but `DwLocalEnvironment.overlay(Platform.environment)`
    or a map read by a variable's name (`forbiddenEnvironmentRead`); an `HttpClient(` or a
@@ -133,7 +133,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-two errors, twelve warnings, one info — `DwCheckType` and its `severity` in
+Forty-three errors, twelve warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -156,6 +156,7 @@ Forty-two errors, twelve warnings, one info — `DwCheckType` and its `severity`
 | `featureImportOutsideSurface` | error | A server feature importing another's file outside its surface: only `<feature>_rows`, `_access`, `_objects`, `_publications`, `_changes` (and their `<part>` files) may be imported — never `_feature`, `_handlers`, `_jobs`, `_routes` or `logic/`; nor may any file under `lib/src/` import the package's library. `import`, `export` and `part` count. `lib/<project>_server.dart`, `migrations/`, `bin/` and `test/` are not judged |
 | `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
 | `generatedCodeStale` | error | A generated file that `dart run dartway_cli:dartway generate` would write differently, or whose source is gone |
+| `projectContractVersion` | error | Generated project contract is incompatible at the same breaking line, or cannot be verified against its fixed committed Git baseline. `--contract-base <revision>` supplies a trusted baseline; see the wire/version guidance |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `forbiddenDateTimeNow` | error | `DateTime.now` or `DateTime.timestamp` (called or torn off, interpolations included), or `package:clock`'s `clock.now()` where it is imported (prefixed or not), anywhere in the server's `lib/` — the factory file included — the time there is `ctx.now`, the server's clock, which tests set and the job queue runs by. Comments and strings are passed over; `bin/` and `test/` are not judged |
@@ -254,7 +255,7 @@ from the generated schema and the row classes it knows which feature owns each `
 fails a write into it from anywhere else (`foreignRowWrite`).
 
 The shared package's top level is `dw_shared_layout.dart`'s (`invalidSharedLayout`): `lib/` holds
-`<project>_shared.dart` (directives only), `generated/` (only files with a generator's header) and
+`<project>_shared.dart` (directives only), `generated/` (Dart files with a generator header and the reserved `dw_contract.json` descriptor) and
 `src/`, and `src/` mirrors the server — a file or a flat folder of parts per feature folder of the
 server's `lib/src/`, read from the server package in the same run, plus the files named after the
 package. There is no shared `core/`. Without a server package the names are not matched, and the
@@ -560,3 +561,10 @@ for each.
   Log and error strings are English either way.
 - **The lint plugin is on** (`lintsPluginMissing`): a project created before `dartway create` wired
   `dartway_lints` never had its rules, and nothing said so — `flutter analyze` runs no plugins.
+
+`projectContractVersion` shares one resolved generator invocation with `generatedCodeStale`,
+assessing current source models in memory. It reads baseline descriptors from Git objects and
+reports the fixed SHA and descriptor/bootstrap proof. Incompatible, unsupported and unverified
+results block the check, including an unavailable generator. Resolve dependencies separately;
+checks launch the resolved generator directly and never run pub, setup or historical SDK scripts.
+See [project contract compatibility](../2-core/wire-and-versions.md#the-generated-project-contract-gate).

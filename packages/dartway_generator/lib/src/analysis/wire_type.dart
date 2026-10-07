@@ -50,16 +50,32 @@ final class BytesWire extends WireType {
 }
 
 final class EnumWire extends WireType {
-  const EnumWire(this.spelling, {required super.nullable});
+  const EnumWire(
+    this.spelling, {
+    required super.nullable,
+    required this.values,
+    required this.open,
+    this.customNameEncoding = false,
+  });
 
   final String spelling;
+  final List<String> values;
+  final bool open;
+  final bool customNameEncoding;
 }
 
 final class DtoWire extends WireType {
-  const DtoWire(this.decoder, {required super.nullable});
+  const DtoWire(
+    this.decoder, {
+    required super.nullable,
+    required this.wireName,
+    required this.core,
+  });
 
   /// `$NameFromJson` or `Name.fromJson`, spelled for the owning library.
   final String decoder;
+  final String wireName;
+  final bool core;
 }
 
 final class ListWire extends WireType {
@@ -193,7 +209,38 @@ final class WireTypeReader {
           'the names of a newer build as',
         );
       }
-      return EnumWire(_requireVisible(type), nullable: nullable);
+      return EnumWire(
+        _requireVisible(type),
+        nullable: nullable,
+        values: [
+          for (final field in element.fields)
+            if (field.isEnumConstant) field.name!,
+        ],
+        open: open,
+        // The generated part evaluates `.name` in this library. A custom
+        // member or applicable visible extension can change that encoding;
+        // enum constants alone then cannot prove the wire contract.
+        customNameEncoding:
+            [element, ...element.allSupertypes.map((t) => t.element)].any(
+              (owner) =>
+                  owner.library.uri.scheme != 'dart' &&
+                  owner.getGetter('name') != null,
+            ) ||
+            names.library.firstFragment.accessibleExtensions.any(
+              (extension) =>
+                  extension.library.uri.scheme != 'dart' &&
+                  extension.getGetter('name') != null &&
+                  (extension.typeParameters.isNotEmpty ||
+                      names.library.typeSystem.isSubtypeOf(
+                        element.thisType,
+                        extension.extendedType,
+                      ) ||
+                      names.library.typeSystem.isSubtypeOf(
+                        type,
+                        extension.extendedType,
+                      )),
+            ),
+      );
     }
     if (type.isDartCoreList || type.isDartCoreMap) {
       if (position != _Position.field) {
@@ -265,7 +312,12 @@ final class WireTypeReader {
           '`show` list',
         );
       }
-      return DtoWire(decoder, nullable: nullable);
+      return DtoWire(
+        decoder,
+        nullable: nullable,
+        wireName: element.name!,
+        core: DwFrameworkTypes.isFrom(element, DwFrameworkTypes.corePackage),
+      );
     }
     throw UnsupportedType(
       '`$display` cannot be ${forEntity ? 'stored' : 'serialised'}; supported: '

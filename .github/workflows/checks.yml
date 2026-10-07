@@ -48,8 +48,12 @@ jobs:
         # log, and so the faster of the two answers first.
         mode: [analyze, test]
     name: ${{ matrix.mode }}
+    env:
+      DW_CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:

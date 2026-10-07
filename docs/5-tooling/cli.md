@@ -265,12 +265,12 @@ no implicit fully-migrated baseline or bulk version marker. See [Migration notes
 ```bash
 cd <project>_flutter
 dart run dartway_cli:dartway generate            # write
-dart run dartway_cli:dartway generate --check    # write nothing; exit 1 when a generated file is out of date or stale
+dart run dartway_cli:dartway generate --check --contract-base <trusted-SHA>  # read-only freshness and compatibility
 dart run dartway_cli:dartway generate -v         # list every file written or removed
 ```
 
 Runs `dartway_generator` over the project: DTO codecs (`*.dw.dart` parts) and the protocol registry
-(`lib/generated/dw_protocol.dart`) in `*_shared`, table definitions and the schema
+(`lib/generated/dw_protocol.dart`) and sorted `lib/generated/dw_contract.json` in `*_shared`, table definitions and the schema
 (`lib/generated/dw_schema.dart`) in `*_server`. What is generated from what is
 [Data objects and generation](../2-core/data-objects-and-generation.md).
 
@@ -279,13 +279,12 @@ pins an `analyzer`, and a globally activated CLI carrying it would force one ana
 project it touches — while the generator has to match the `dartway_core_shared` and `dartway_orm`
 the project builds against. So the command walks up to the directory holding the `*_server` and
 `*_shared` packages, looks for `dartway_generator` in their package config (the server package
-first, where the skeleton declares it as a dev dependency), and runs `dart run dartway_generator`
-there. Only when no package resolves it does it fall back to a globally activated
+first, where the skeleton declares it as a dev dependency), and launches its resolved entry point directly with the server package config. Only when no package resolves it does it fall back to a globally activated
 `dartway_generator`; without either it stops and says how to add one. Run `dart pub get` first: an
 unresolved package has no package config to find the generator in.
 
 The exit code is the generator's. `--check` is what CI runs, and what `dart run dartway_cli:dartway check` reports as
-`generatedCodeStale`.
+`generatedCodeStale` and `projectContractVersion`.
 
 ## `dartway check` — the conventions, enforced
 
@@ -426,3 +425,13 @@ Files, total lines, average, maximum and minimum per top-level folder of the Flu
 `lib/` whose name starts with `app`, `auth`, `common` or `admin`, plus a total. No grades and no
 opinions: the counter you read before and after a refactor. Run it from the project root or inside
 the `*_flutter` package.
+
+`generate` and `check` accept `--contract-base <revision>`, resolved once to a reported commit SHA.
+`generate --check` defaults to the project base-branch merge-base; CI explicitly supplies its trusted
+base revision. Generation with a baseline refuses incompatible/unverified results before writing.
+Generation without a baseline only emits artifacts; it makes no compatibility claim.
+The CLI launches the already-resolved generator with its package config directly, avoiding implicit
+pub resolution or lock edits during checks. Resolve dependencies separately first.
+Generator exit 1 means stale output or a generation error, exit 3 means a contract incompatibility
+or unverified comparison. CLI `check` exposes the latter as error-severity `projectContractVersion`
+and exits 1. See [the codec-based rules and strict bootstrap](../2-core/wire-and-versions.md#the-generated-project-contract-gate).

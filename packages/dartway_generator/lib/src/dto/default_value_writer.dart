@@ -38,9 +38,50 @@ final class DefaultValueWriter {
     final map = value.toMapValue();
     return DtoDefault(
       _write(value).standalone,
+      value: _value(value),
       isEmptyCollection:
           (list != null && list.isEmpty) || (map != null && map.isEmpty),
     );
+  }
+
+  Object? _value(DartObject value) {
+    if (value.isNull) return null;
+    final type = value.type as InterfaceType;
+    if (type.isDartCoreBool) return value.toBoolValue();
+    if (type.isDartCoreInt) return value.toIntValue();
+    if (type.isDartCoreDouble) return {'double': _double(value)};
+    if (type.isDartCoreString) return value.toStringValue();
+    if (type.element is EnumElement) {
+      return {'enum': _field(value, '_name')!.toStringValue()};
+    }
+    if (type.element.name == 'Duration' &&
+        type.element.library.uri.toString() == 'dart:core') {
+      return {
+        'duration':
+            (_field(value, 'inMicroseconds') ?? _field(value, '_duration'))!
+                .toIntValue(),
+      };
+    }
+    if (type.isDartCoreList) {
+      return [for (final item in value.toListValue()!) _value(item)];
+    }
+    if (type.isDartCoreMap) {
+      return {
+        for (final entry in value.toMapValue()!.entries)
+          entry.key!.toStringValue()!: _value(entry.value!),
+      };
+    }
+    final element = type.element as ClassElement;
+    return {
+      'dto': element.name,
+      'fields': {
+        for (final field in readConstructorFields(
+          element,
+          <DwGenerationDiagnostic>[],
+        )!)
+          field.name: _value(_field(value, field.name)!),
+      },
+    };
   }
 
   _Source _write(DartObject value) {

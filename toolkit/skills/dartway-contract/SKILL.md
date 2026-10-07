@@ -202,7 +202,10 @@ enum AcmeUpload with DwUploadPurpose {
 ## 7. Generation
 
 After any DTO (or row class) change: `dart run dartway_cli:dartway generate` from `__FLUTTER_PKG__`,
-commit the output with the change. It writes `*.dw.dart` and `lib/generated/dw_protocol.dart` here, row
+commit the output with the change. Resolve a trusted baseline once with
+`git merge-base HEAD origin/__BASE_BRANCH__` and pass that SHA as `--contract-base <SHA>` to generation
+and checks. It writes `*.dw.dart`, `lib/generated/dw_protocol.dart` and the sorted
+`lib/generated/dw_contract.json` here, row
 parts and `lib/generated/dw_schema.dart` in the server. Never edit them; a refused declaration is fixed
 in the declaration.
 
@@ -212,11 +215,12 @@ An installed build keeps calling with the contract it was built with, for weeks.
 
 | Change | An old build |
 |---|---|
-| an optional field with a default on a request/command; a field on a data object; a new call | keeps working |
-| a required field without a default on a request/command | its calls fail `400` |
-| a data-object field renamed or removed | its answers do not decode |
-| a value added to an enum in a data object | shows its update screen (an open enum reads `unknown`) |
-| a new data object type on a channel old builds listen to | refetches that channel's requests on every update |
+| a nullable, defaulted or patch field; a new call | generated codecs accept omitted fields and ignore extra keys |
+| a required non-null field without a default | old input or stored-client answers fail decoding |
+| a wire name/field removed or renamed; a type, nullability, patch or default changed | may reject or discard installed-client data; breaking |
+| a value added to a strict enum | an old decoder rejects it; breaking |
+| a value added to an already-open enum with all old values retained | old decoders read the new name as `unknown` |
+| a new generated data object type | old update-group decoders do not know it; conservatively breaking |
 | a request/command renamed or removed | `404` |
 | a refusal code renamed | its generic refusal text |
 
@@ -233,3 +237,17 @@ shown neutrally for (a feed entry's kind), never for anything behaviour depends 
 open enums out of commands.
 
 Contract tests (round trip, `validate()`, `onUpdate`, channels): `dartway-testing`.
+
+`projectContractVersion` is an error when the generated project contract is incompatible at the
+same line or cannot be verified. The generator compares its resolved source models in memory with
+the descriptor read from the fixed Git commit; regeneration or editing the working JSON cannot
+erase that baseline. Missing descriptors require exact reproduction of the committed codecs and
+registry using existing resolved dependencies and matching committed locks in disposable scratch.
+External path dependency bytes cannot be trusted for descriptor-free bootstrap; establish a descriptor on the trusted base using its original sources. Malformed, unsupported or unreproducible baselines block the check with remediation. CI supplies
+its trusted base SHA explicitly; ordinary check uses the project's recorded base branch merge-base,
+or an unambiguous remote HEAD/main/master. It never chooses feature HEAD as a fallback.
+
+This proves generated codecs and registry shapes, including nested fields and resolved request/result
+kinds. It does not prove handler/domain semantics or manually composed external module contracts.
+Custom codecs, visible custom enum `name` encoders and custom DTO equality used by default omission are unverified. This tooling metadata changes neither runtime negotiation nor the
+framework `dwProtocolVersion`.
