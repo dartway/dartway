@@ -82,10 +82,11 @@ comes with the same methodology.
 
 ## Keeping it current: `dartway update`
 
-A toolkit is a committed artifact, and a month-old one looks exactly like a fresh one. `dartway update`
-is the command that says a project has fallen behind — reinstalls the toolkit, warns when the CLI
-itself is older than the channel, and lists the framework packages and the migration notes the
-project still owes an edit to. Same page, ["Keeping it current"](../5-tooling/agent-toolkit.md#keeping-it-current).
+A toolkit is a committed artifact, and a month-old one looks exactly like a fresh one.
+`dartway update --plan` reports an exact target, checks plugin resolution and lists dependency gaps
+and unconfirmed migration notes without project edits. `update --target <sha>` installs that target.
+After project verification, record each note as applied or not applicable; locks and toolkit
+installation never complete it. Missing records mean an unknown migration baseline. Same page, ["Keeping it current"](../5-tooling/agent-toolkit.md#keeping-it-current).
 
 **It edits no code of the project, deliberately.** Raising a caret is one line; answering a changed
 API is not, and a command that half-did it would leave a tree nobody can tell from a finished one. The

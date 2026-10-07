@@ -2,6 +2,15 @@
 
 ## 0.24.0
 
+- **Breaking — safe framework updates** (#427, #441): `update --plan` reads an exact committed target
+  without project edits; writes require its full `--target` SHA. The proposed analyzer plugin
+  source must resolve through pub before installation or configuration edits. Existing git/path
+  choices and project rules survive. Migration completion is explicitly verified per note in
+  `.dartway/migrations.json`, with applied/not-applicable dispositions and evidence. Locks and
+  toolkit installs never complete notes; unknown baselines and partial completion remain visible.
+  Preflight preserves native diagnostic settings and resolves only the selected dependency
+  source using native dependency YAML; ambiguous sources, pub-only hosted map forms and sources
+  that fail native YAML resolution are rejected before project edits.
 - `generate`/`check` carry `--contract-base` through one resolved generator invocation;
   `projectContractVersion` is an error for incompatible or unverified generated project contracts.
   Direct execution of the resolved generator prevents implicit pub/lock writes during checks.

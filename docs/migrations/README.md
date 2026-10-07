@@ -6,9 +6,11 @@ Everything else in the monorepo describes the framework as it is now. These note
 thing addressed to a project that is *behind*: they say what the new version expects that the old
 one did not, and what to change to satisfy it.
 
-`dartway update`, run in a project, reads this folder out of the channel it installs from and
-prints the notes that still apply to that project. Nothing else tells a project it owes an edit —
-the compiler speaks only after the packages have already moved, and by then the person doing the
+`dartway update --plan`, run in a project, reads this folder from an exact committed target and
+prints its relevant, unconfirmed notes. Completion comes only from verified per-note dispositions
+in `.dartway/migrations.json`, independently of current locks and toolkit installation. Nothing
+else tells a project it owes an edit — the compiler speaks only after the packages have already
+moved, and by then the person doing the
 update is reading errors instead of instructions.
 
 ## When a note is written
@@ -37,8 +39,14 @@ one who still knows what they broke.
 
 ## The version is what delivers the note
 
-A note is shown to a project **below** the version it names — that is the whole of the filtering.
-So a change that writes a note also **moves the version**, in the same pull request:
+The version in `affects` places a note on its package release line. A target below that version
+does not include the note; at or above it, a project depending on that package sees the note until
+it records a verified disposition. Current dependency locks never confirm it. An absent ledger
+means an unknown baseline, requiring review of historical notes too.
+
+A change requiring a note must be delivered by a new release version in the same pull request.
+Follow the root version policy: if the satellite is already ahead of `stable`, use its pending
+release version rather than adding a bump per pull request:
 
 - **the core family**, in lockstep across the six, including during the rewrite: `0.20.0-dev.1` →
   `0.20.0-dev.2`. Each `dev.N` is a release to the projects that follow the branch, whatever it is
@@ -86,8 +94,9 @@ and Docker drops a build argument the Dockerfile does not declare, without a wor
 
 **`affects` is the whole mechanism, so it is checked rather than trusted.** Each key is a package
 name; each value is the version the change lands in, **quoted** — unquoted `0.8` is a YAML number
-and not a version. A project below that version on any of the listed packages is shown the note;
-a project that does not depend on any of them never sees it. `migration_notes_test.dart` fails if
+and not a version. A project depending on any listed package sees the note when the target reaches
+that version, until explicitly verified as applied or not applicable. A project depending on none
+never sees it. `migration_notes_test.dart` fails if
 a note names a package that does not exist, states a version ahead of what that package is on, or
 cannot be parsed at all.
 

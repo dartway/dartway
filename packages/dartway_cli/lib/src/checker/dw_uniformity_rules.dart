@@ -850,8 +850,8 @@ class DwUniformityInspector {
   /// `dartway_lints` analyzer plugin, or null when it does.
   static String? lintsPluginProblem(Directory flutterPackage) {
     const fix =
-        '`dartway update` adds it, pinned to the channel, as `dartway create` '
-        'does';
+        '`dartway update --plan` checks resolution first; '
+        '`dartway update --target <sha>` adds it';
     final options = File(p.join(flutterPackage.path, 'analysis_options.yaml'));
     if (!options.existsSync()) {
       return 'no analysis_options.yaml, so the dartway_lints analyzer plugin '
@@ -873,6 +873,19 @@ class DwUniformityInspector {
     final path = pin is YamlMap ? pin['path'] : null;
     final version = pin is YamlMap ? pin['version'] : pin;
     if (path is String && path.trim().isNotEmpty) return null;
+    final git = pin is YamlMap ? pin['git'] : null;
+    if (git is String && git.trim().isNotEmpty) return null;
+    if (git is YamlMap &&
+        git['url'] is String &&
+        (git['url'] as String).trim().isNotEmpty &&
+        ['ref', 'path'].every(
+          (key) =>
+              !git.containsKey(key) ||
+              (git[key] is String &&
+                  (key == 'path' || (git[key] as String).trim().isNotEmpty)),
+        )) {
+      return null;
+    }
     if (version is String) {
       try {
         VersionConstraint.parse(version);
@@ -882,7 +895,7 @@ class DwUniformityInspector {
             'analysis server cannot resolve the plugin — $fix';
       }
     }
-    return '`dartway_lints:` names neither a version nor a path, so the '
+    return '`dartway_lints:` names neither a version nor a path nor a git source, so the '
         'analysis server loads nothing — $fix';
   }
 

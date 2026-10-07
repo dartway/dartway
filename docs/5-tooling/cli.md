@@ -199,33 +199,66 @@ Commit `.agents/`, selected `.claude/` files, root instruction blocks and `docs/
 
 ## `dartway update` — carry the project onto a newer framework
 
-`setup-ai` installs the toolkit. `update` does that and then answers the question nothing else in a
-project answers: **what else has moved.** It takes the same options, with one difference: the
-channel defaults to the one the project recorded, because "update" means moving forward on the
-channel the project is on.
+Plan the update before editing the project:
 
-It reports three things and changes only the first:
+```bash
+dartway update --plan --channel master
+dartway update --plan --target <full-commit-sha> --channel master
+dartway update --target <full-commit-sha> --channel master
+```
 
-- **the toolkit**, installed as `setup-ai` installs it;
-- **the framework packages the project is behind on** — the version each `dartway_*` package
-  resolves in the project's `pubspec.lock` files against the version in the channel's
-  `packages/*/pubspec.yaml`. Only packages the project depends on are listed. When a project holds
-  several copies of a package (a Flutter lock and a server lock), the **lowest** is the answer: the
-  oldest half is the one still owing the migrations. A hosted package moves by raising its caret
-  (under a `0.x` major a minor behaves like a major, so `^0.4.0` does not admit `0.8.0`); a git one
-  moves by `dart pub upgrade <names>` in the directories the report names;
-- **the migration notes still to apply** — the files of `docs/migrations/` in the channel whose
-  `affects:` names a package the project is below, oldest first, each with its path. A note that
-  cannot be parsed is reported as a framework defect rather than skipped. See
-  [Migration notes](../migrations/README.md).
+`--plan` is read-only for the project: no toolkit, plugin configuration, lock or migration state
+is written. It selects an exact committed framework tree and reports its SHA, package gaps and
+unconfirmed migration notes with their instructions. Only committed files are used, including
+with `--local-repo`; uncommitted framework edits are excluded. Later runs use the printed full
+40-character SHA through `--target`, which is required for any write. Keep the same source options
+and installer choices. A moving channel cannot change what that target contains.
 
-If the CLI itself is older than the `dartway_cli` in the channel, the run says so first: an old CLI
-installs an old idea of what a project needs, and it cannot replace itself mid-run.
+The channel defaults to the recorded toolkit channel. Installer options match `setup-ai`, including
+`--agent codex|claude|both`, language, base branch and tracker; recorded choices and owner rules are
+preserved. `--local-repo` selects a local source. If the running CLI is older than the target's CLI,
+the report says so.
 
-**It edits nothing but the toolkit, deliberately.** A caret is one line, a changed API is not, and a
-command that half-applied the rest would leave a tree nobody can tell from a finished one. The
-`dartway-update` skill carries the list out: read the notes, make the edits, then move the versions,
-in that order.
+Package gaps compare current locks with target versions; they are **dependency information, not
+migration completion**. A lock already at target still has unconfirmed notes. Without locks, declared
+framework dependencies still select notes. Notes remain keyed to their existing `affects:` package
+versions and are bounded by the target's versions. Unreadable notes stop the update explicitly.
+
+**No verified records means an unknown migration baseline.** Review relevant notes even if the
+project was recently created, dependencies were raised by hand, or its toolkit was just installed.
+The CLI never converts toolkit provenance or lock versions into completed notes. Older notes can
+be verified as already satisfied or not applicable; that requires an explicit disposition.
+
+Before installing or editing `analysis_options.yaml`, the CLI resolves the proposed `dartway_lints`
+dependency through pub in a temporary package, including its transitive analyzer constraints.
+Hosted pins are raised only when resolvable; existing git and path choices are retained and checked.
+Diagnostic settings stay unchanged in the plugin configuration; only its dependency source is
+passed to pub, using the native analyzer's dependency YAML form. Choose exactly one `version`,
+`git` or `path` source. A custom `hosted` URL must be a
+string alongside `version`. Ambiguous or invalid native source forms fail before installation,
+because pub and the native analyzer can otherwise select different sources from the same map.
+An unpublished plugin version, invalid source or resolution failure returns a nonzero exit code
+and leaves project files untouched. Choose a resolvable hosted target or project-owned git/path
+configuration. `--framework-path` supplies a local plugin path when adding a missing plugin; it
+preserves an existing source choice. Pub cache activity occurs outside the project.
+
+After successful preflight, `update --target` installs the selected toolkit integrations and applies
+the planned lint configuration edit. It edits no application code, bumps no dependencies and completes
+no migration notes. The `dartway-update` skill guides the project edits, regeneration and verification.
+
+Record each note only after checking its edits or applicability:
+
+```bash
+dartway update --target <sha> --channel master --complete docs/migrations/<note>.md --verified --verification "Checks run and actual results"
+dartway update --target <sha> --channel master --not-applicable docs/migrations/<note>.md --verified --verification "Inspected usage and why this project is unaffected"
+```
+
+These completion commands write only `.dartway/migrations.json`. They require explicit verification
+and evidence, and preserve all other records. Repeat a flag to record a verified batch; invalid or
+conflicting selections write nothing. The ledger stores note path, package-version metadata,
+`applied` or `not-applicable`, verification evidence, exact target and verification time. Commit it
+with the update. Partial completion and repeated planning retain every outstanding note; there is
+no implicit fully-migrated baseline or bulk version marker. See [Migration notes](../migrations/README.md).
 
 ## `dartway generate` — the generated code
 

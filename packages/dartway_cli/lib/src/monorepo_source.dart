@@ -134,7 +134,7 @@ class MonorepoSource {
   );
 
   /// Returns the monorepo root, cloning or updating the cache if needed.
-  Future<Directory> resolve() async {
+  Future<Directory> resolve({String? target}) async {
     final local = localDir;
     if (local != null && local.isNotEmpty) {
       final localRepoDir = Directory(local);
@@ -181,6 +181,15 @@ class MonorepoSource {
         repoUrl,
         cacheDir.path,
       ]);
+    }
+    if (target != null) {
+      await _runGit([
+        'fetch',
+        '--depth',
+        '1',
+        'origin',
+        target,
+      ], workingDirectory: cacheDir.path);
     }
     return cacheDir;
   }
