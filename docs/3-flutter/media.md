@@ -31,7 +31,7 @@ final session = dw.plugins.media.open(
     DwMediaItem(id: lesson.id, kind: DwMediaKind.video, title: lesson.title,
         source: DwMediaSource.resolve(() => fetchSignedUrl(lesson.id))),
   ],
-  callbacks: DwMediaCallbacks(onCompleted: (item) => markWatched(item.id)),
+  callbacks: DwMediaCallbacks(onCompleted: (item) => onPositionThreshold(item.id)),
   options: const DwMediaOpenOptions(autoplayOnOpen: true),
 );
 ```
@@ -107,10 +107,68 @@ flight, and the position has moved past where playback started or the last seek 
 - Autoplay follows the same rule, every time rather than once: a seek clears a real end, so a
   scrub to the end after a real end, a cancelled countdown, or an end by tolerance never moves the
   queue; playing to the end again does.
-- `onCompleted` is the other question — "watched enough" — and it fires when the position first
+- `onCompleted` is a position threshold, not played coverage, and it fires when the position first
   crosses `completedThreshold`, by playback or by a seek. A project that counts a lesson as done
   when the member drags to the end listens to this one.
 - `onProgress` and the periodic resume save run on real playback only.
+
+## Confirmed played intervals (explicit input)
+
+The existing progress/end guards serve callbacks, not an interval proof. A progress
+position after a seek can be far from the last callback. Default video/audio players
+remain unverified for automatic accounting: **position movement records no coverage**.
+Only a caller capable of independently confirming a span may use this opt-in API.
+It must account for platform discontinuities the framework cannot observe.
+
+```dart
+// Configure a project adapter. Success means it durably accepted this exact batch.
+final config = DwMediaConfig(playbackDelivery: saveConfirmedReport);
+// A capable observer captures this before the span, not after a seek/pause.
+final handle = session.playbackObservation;
+// After independently confirming [start, end), forward the same handle:
+final result = handle.record(DwMediaPlayedInterval(start, end));
+final report = session.flushPlayback(); // null if no confirmed intervals
+```
+
+`DwMediaPlayedInterval` requires nonnegative start and end greater than start.
+`DwMediaIntervalAccumulator` merges overlap and adjacency into sorted half-open
+intervals; `coveredDuration` is unique media coverage, not elapsed/repeated listening
+or wall-clock time. Reports copy this immutable union. Rewatch spans may recur in
+later windows; project consumers union reports rather than summing their durations.
+
+A handle is bound to one session, item and actual source-load generation. Reload,
+queue movement, replacement and disposal reject old handles. Pause, buffering,
+seek, speed and background boundaries also invalidate previously captured handles;
+known loading/error/non-playing states reject recording. Results are `recorded`,
+`disabled`, `stale` or `notPlaying`. State guards cannot prove a span. Acquire a new
+handle only for a newly confirmed span; never interpolate missed samples or fill
+an end tolerance. Fullscreen and mini-player share the session. Item identity must
+mean stable content in the project; reopening that same item preserves its engine,
+while retry reloads the source (an expiring URL is not content identity).
+
+`playbackDelivery` is optional on config and open options; without it, recording is
+disabled. `withoutPlaybackDelivery: true` disables an inherited adapter. A nonempty
+explicit flush seals a report into manager-owned pending state before opening a new
+window and starts one delivery attempt. Source/item replacement, end and disposal
+seal remaining confirmed data once. End adds no unobserved tail. Empty windows do
+not create reports. Sealing captures both attribution and adapter, so reopening a
+page cannot redirect an old report.
+
+The manager exposes immutable `pendingPlaybackReports` snapshots and
+`playbackDeliveryError(report)`. Automatic delivery errors are handled and retained;
+`await manager.retryPlaybackReport(report)` explicitly retries and surfaces failure.
+Concurrent retry joins the same attempt. Only successful acceptance of that exact
+batch removes it; late acknowledgement cannot remove newer windows. There are no
+implicit retries. Engine/session disposal finishes without awaiting an unresolved
+adapter. Pending reports survive engine teardown only in this manager's memory,
+not process/plugin teardown. A project needing durability must take ownership before
+acknowledging; hung adapters and retained failures remain inspectable pending work.
+
+Batch/session/source-generation identities are stable only within a manager; project
+adapters define backend idempotency and durable identity. Lesson thresholds (for
+example 70%), storage, request DTOs and completion decisions belong to projects.
+The example's `workout_playback_coverage.dart` forwards explicit confirmed input and
+acknowledges an in-memory union only. Its default player never supplies such input.
 
 ## Queue, fullscreen, mini-player
 
@@ -218,6 +276,7 @@ The package's tests cover every row, default against changed, in
 | `autoRetryDelay` | 3 s | the wait before each of those retries |
 | `loadTimeout` | 30 s | how long one load (resolving the source and opening it) may take before it is an error with `onError`; `null` — per open `withoutLoadTimeout: true` — waits for ever |
 | `controlsAutoHideDelay` | 3 s | how long `controlsVisible` stays true while playing untouched; zero never hides |
+| `playbackDelivery` | `null` (disabled) | optional confirmed-report acceptance adapter; per-session `withoutPlaybackDelivery` disables it |
 | `resume` | `DwMediaResumePolicy()` | the resume policy; `null` reads and writes no positions |
 | `resume.saveInterval` | 5 s | how often the position is saved during real playback |
 | `resume.minimum` | 5 s | a position under this is never saved |

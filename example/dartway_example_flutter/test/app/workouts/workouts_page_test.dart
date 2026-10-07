@@ -1,3 +1,4 @@
+import 'package:dartway_example_flutter/app/workouts/logic/workout_playback_coverage.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -53,6 +54,58 @@ void main() {
     await tester.pump();
     expect(controls, findsOneWidget);
 
+    await stop(tester, app);
+  });
+
+  testWidgets('explicit workout input accepts coverage; default progress and '
+      'seek do not, and later overlapping reports are unioned', (tester) async {
+    final app = await TestApp.start(tester, FakeApp());
+    final coverage = WorkoutPlaybackCoverage();
+    final session = dw.plugins.media.open(
+      items: [workoutVideo('confirmed')],
+      options: DwMediaOpenOptions(
+        autoplayOnOpen: true,
+        playbackDelivery: coverage.accept,
+      ),
+    );
+    await app.settle(tester);
+    await playTo(tester, const Duration(seconds: 1));
+    expect(session.flushPlayback(), isNull);
+    // Simulate a capable observer with an explicitly confirmed span. The
+    // application's default platform callbacks do not make this assertion.
+    final observer = session.playbackObservation;
+    final interval = DwMediaPlayedInterval(
+      Duration.zero,
+      const Duration(seconds: 1),
+    );
+    expect(
+      coverage.confirm(observer, interval),
+      DwMediaObservationResult.recorded,
+    );
+    final first = session.flushPlayback()!;
+    await app.run(
+      tester,
+      dw.plugins.media.sessionManager.retryPlaybackReport(first),
+    );
+    expect(coverage.coveredDuration('confirmed'), const Duration(seconds: 1));
+    await app.run(tester, session.seek(const Duration(seconds: 50)));
+    await playTo(tester, const Duration(seconds: 51));
+    expect(
+      coverage.confirm(observer, interval),
+      DwMediaObservationResult.stale,
+    );
+    expect(session.flushPlayback(), isNull);
+    expect(
+      coverage.confirm(session.playbackObservation, interval),
+      DwMediaObservationResult.recorded,
+    );
+    final repeated = session.flushPlayback()!;
+    await app.run(
+      tester,
+      dw.plugins.media.sessionManager.retryPlaybackReport(repeated),
+    );
+    expect(coverage.coveredDuration('confirmed'), const Duration(seconds: 1));
+    expect(dw.plugins.media.sessionManager.pendingPlaybackReports, isEmpty);
     await stop(tester, app);
   });
 

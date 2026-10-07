@@ -13,3 +13,12 @@ own `ui_kit/` and restyled — the `dartway-media` toolkit skill walks through i
 `package:dartway_media_flutter/testing.dart` fakes both platforms for a project's widget tests.
 
 Documentation, with the table of every setting: `docs/3-flutter/media.md`.
+
+Optional confirmed-playback accounting exports `DwMediaPlayedInterval`,
+`DwMediaIntervalAccumulator` and immutable `DwMediaPlaybackReport`. Configure
+`playbackDelivery`, capture `session.playbackObservation` before a span, and record
+only an interval your caller can independently confirm. Position/progress callbacks
+never record coverage automatically. `flushPlayback()` seals a window; the manager
+retains failed/in-flight reports for inspection and explicit retry, independently of
+engine disposal. Successful delivery acknowledges only that report. Retention is
+in memory for the manager's lifetime; project adapters own persistence and policy.

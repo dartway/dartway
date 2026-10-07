@@ -33,7 +33,7 @@ final session = dw.plugins.media.open(
       source: DwMediaSource.resolve(() => fetchPlaybackUrl(item.id)),
     ),
   ],
-  callbacks: DwMediaCallbacks(onCompleted: (item) => markWatched(item.id)),
+  callbacks: DwMediaCallbacks(onCompleted: (item) => onPositionThreshold(item.id)),
   options: const DwMediaOpenOptions(autoplayOnOpen: true),
 );
 ```
@@ -43,7 +43,7 @@ final session = dw.plugins.media.open(
   disposes it; opening an item a live session stands on returns that session. Everything goes through
   the session — `play`, `seek`, `setSpeed` (only from `options.speeds`), `retry`, the queue.
 - Per-session settings: `DwMediaOpenOptions` (`withoutResume: true` for a clip feed).
-- `onCompleted` — watched enough (a seek counts); `onReachedEnd` — played to the end by real playback
+- `onCompleted` — position threshold (a seek counts), not played coverage; `onReachedEnd` — played to the end by real playback
   only, never a scrub; `onStarted` — the first real playback.
 
 ## Controls, fullscreen, the mini-player
@@ -77,3 +77,35 @@ unmutes. Tests: `DwFakeVideoPlayerPlatform.install()` and `DwFakeJustAudioPlatfo
 `session.seek(…)`, the end `finish()`, a failure `fail(…)` — "a scrub does not count as the end" is
 proved with those, not with a position alone; after an audio command
 `await dwSettleMedia(tester)`; `await dw.plugins.media.dispose()` before a test with a playing video ends.
+
+## Confirmed intervals and delivery (optional)
+
+Default players do not prove played coverage from `onProgress`/position snapshots.
+Never subtract consecutive positions to record time: a seek can bridge the gap.
+Only an observer with independent confirmation may capture
+`session.playbackObservation` before a span and call
+`handle.record(DwMediaPlayedInterval(start, end))` afterwards. A stale
+handle or known non-playing state rejects the observation; these guards do not
+prove the interval. Pause, buffering, seek, speed, background and source reload
+break continuity. Fullscreen/mini-player reuse the session. Missing samples earn
+nothing; neither end nor a seek fills coverage to the duration.
+
+Opt in with `DwMediaConfig(playbackDelivery: acceptReport)` or the session override;
+without an adapter recording is disabled (`withoutPlaybackDelivery` disables an
+inherited adapter). The adapter must take durable ownership before its Future
+succeeds. `session.flushPlayback()` seals a nonempty window and starts one handled
+attempt; replacement/end/disposal seal remaining confirmed intervals too. Inspect
+`manager.pendingPlaybackReports` and `manager.playbackDeliveryError(report)`;
+`await manager.retryPlaybackReport(report)` retries explicitly and surfaces failure.
+Concurrent retry joins the same attempt. Pending reports capture their adapter and
+source attribution, survive engine disposal, and exist only while the manager does.
+There are no retry timers or process-lifetime persistence guarantees.
+
+Reports have immutable half-open intervals, sorted and merged across overlap and
+adjacency, and only unique covered duration. Later reports may overlap after a
+rewatch: project consumers union them using `DwMediaIntervalAccumulator`, rather
+than summing report durations. Batch/session/generation identities are manager-local,
+not backend idempotency keys. Thresholds such as 70%, content identity, DTOs, durable
+storage and backend deduplication belong to the project. The framework example's
+`workout_playback_coverage.dart` illustrates explicit input and in-memory acceptance;
+it never wires position callbacks as confirmed input.

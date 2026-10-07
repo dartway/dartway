@@ -1,4 +1,5 @@
 import 'package:dartway_example_flutter/app/workouts/logic/workout_catalog.dart';
+import 'package:dartway_example_flutter/app/workouts/logic/workout_playback_coverage.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
@@ -33,6 +34,7 @@ class WorkoutsPage extends HookWidget implements DwFeatureWidget {
   @override
   Widget build(BuildContext context) {
     final media = dw.plugins.media.sessionManager;
+    final coverage = useMemoized(WorkoutPlaybackCoverage.new);
     // Coming back restores the session here; leaving minimizes it into the
     // mini-player.
     useEffect(() {
@@ -48,7 +50,11 @@ class WorkoutsPage extends HookWidget implements DwFeatureWidget {
         dw.plugins.media.open(
           items: workoutCatalog,
           startIndex: index,
-          options: const DwMediaOpenOptions(autoplayOnOpen: true),
+          // Explicit-input demonstration only: position callbacks record nothing.
+          options: DwMediaOpenOptions(
+            autoplayOnOpen: true,
+            playbackDelivery: coverage.accept,
+          ),
         );
       }
     }

@@ -26,6 +26,9 @@ abstract class DwMediaController {
   /// seek. Cleared by the next seek.
   bool get endedByPlayback;
 
+  /// State/command gate only, never proof of continuous playback.
+  bool get canObservePlayback;
+
   Future<void> play();
 
   /// Pauses and, with `DwMediaResumePolicy.saveOnPause`, saves the position.

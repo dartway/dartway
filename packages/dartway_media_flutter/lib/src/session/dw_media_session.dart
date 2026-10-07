@@ -17,9 +17,11 @@ final class DwMediaSession {
     required DwMediaCallbacks callbacks,
     required DwMediaConfig options,
     required DwMediaSessionManager manager,
+    required int sessionId,
   }) : _options = options,
        _callbacks = callbacks,
        _manager = manager,
+       _sessionId = sessionId,
        _speed = options.defaultSpeed,
        _queue = ValueNotifier(
          DwMediaQueueState(items: items, currentIndex: startIndex),
@@ -33,6 +35,74 @@ final class DwMediaSession {
 
   DwMediaCallbacks _callbacks;
   final DwMediaSessionManager _manager;
+  final int _sessionId;
+  int _sourceGeneration = 0;
+  int _observationEpoch = 0;
+  Object? _observationVisit;
+  String? _observationItemId;
+  final DwMediaIntervalAccumulator _confirmed = DwMediaIntervalAccumulator();
+
+  /// A token for this item's current source/continuity generation. Acquire a
+  /// new one after play/pause/buffer/seek/speed/load boundaries. State only
+  /// gates recording: the caller must independently confirm the played span,
+  /// including platform discontinuities the default players cannot identify.
+  DwMediaObservationHandle get playbackObservation {
+    final source = _sourceGeneration;
+    final epoch = _observationEpoch;
+    final itemId = _observationItemId ?? currentItem.id;
+    return DwMediaObservationHandle._(
+      sessionId: _sessionId,
+      itemId: itemId,
+      sourceGeneration: source,
+      record: (interval) {
+        if (_disposed ||
+            source != _sourceGeneration ||
+            epoch != _observationEpoch) {
+          return DwMediaObservationResult.stale;
+        }
+        if (_options.playbackDelivery == null)
+          return DwMediaObservationResult.disabled;
+        if (!_controller.canObservePlayback)
+          return DwMediaObservationResult.notPlaying;
+        _confirmed.add(interval);
+        return DwMediaObservationResult.recorded;
+      },
+    );
+  }
+
+  /// Seals the current confirmed window, starts one handled delivery attempt,
+  /// and returns its pending identity; null for an empty window. New
+  /// observations accumulate separately. See the manager's pending/error and
+  /// retry APIs for acknowledgement/failure. This does not await delivery.
+  DwMediaPlaybackReport? flushPlayback() {
+    if (_confirmed.isEmpty) return null;
+    final delivery = _options.playbackDelivery!;
+    final intervals = _confirmed.intervals;
+    final report = _manager._sealPlayback(
+      sessionId: _sessionId,
+      itemId: _observationItemId!,
+      sourceGeneration: _sourceGeneration,
+      intervals: intervals,
+      delivery: delivery,
+    );
+    _confirmed.clear();
+    return report;
+  }
+
+  void _breakObservation() => _observationEpoch++;
+
+  void _sourceChanged(String itemId) {
+    if (_disposed) return;
+    flushPlayback();
+    _sourceGeneration++;
+    _observationItemId = itemId;
+    _breakObservation();
+  }
+
+  void _observationEnded() {
+    _breakObservation();
+    flushPlayback();
+  }
 
   final ValueNotifier<DwMediaQueueState> _queue;
   final ValueNotifier<bool> _fullscreen = ValueNotifier(false);
@@ -90,6 +160,12 @@ final class DwMediaSession {
 
   void _open({required bool autoplay}) {
     final item = _queue.value.current;
+    final visit = Object();
+    _observationVisit = visit;
+    void currentOnly(void Function() action) {
+      if (!_disposed && identical(_observationVisit, visit)) action();
+    }
+
     _autoplayHandled = false;
     final controller = createDwMediaController(
       item: item,
@@ -107,6 +183,9 @@ final class DwMediaSession {
       initialSpeed: _speed,
       initialMuted: _initialMuted(item),
       onPlaybackEnd: _maybeAutoplay,
+      onObservationBreak: () => currentOnly(_breakObservation),
+      onSourceChange: () => currentOnly(() => _sourceChanged(item.id)),
+      onObservationEnd: () => currentOnly(_observationEnded),
     );
     _controller = controller;
     controller.state.addListener(_onPlayback);
@@ -353,6 +432,8 @@ final class DwMediaSession {
 
   Future<void> _moveTo(int index, {required bool autoplay}) async {
     cancelAutoplay();
+    _breakObservation();
+    flushPlayback();
     final old = _controller;
     _detach(old);
     _queue.value = _queue.value.copyWith(
@@ -479,6 +560,7 @@ final class DwMediaSession {
   /// counting down to the next item.
   void _toBackground() {
     if (_disposed) return;
+    _breakObservation();
     if (options.resume?.saveOnBackground ?? false) {
       unawaited(_controller.savePosition());
     }
@@ -505,6 +587,8 @@ final class DwMediaSession {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
+    _breakObservation();
+    flushPlayback();
     _fullscreenRequested = false;
     _stopCountdown();
     _hideControls?.cancel();
@@ -532,6 +616,10 @@ final class DwMediaSession {
     required DwMediaCallbacks callbacks,
     required DwMediaConfig options,
   }) {
+    if (!identical(_options.playbackDelivery, options.playbackDelivery)) {
+      flushPlayback();
+      _breakObservation();
+    }
     _callbacks = callbacks;
     _options = options;
     // Opened again: a page wants it, not only the mini-player.
@@ -549,4 +637,25 @@ final class DwMediaSession {
       unawaited(play());
     }
   }
+}
+
+/// A recording decision, not a playback or delivery acknowledgement.
+enum DwMediaObservationResult { recorded, disabled, stale, notPlaying }
+
+/// An explicit confirmation capability bound to a session/item/source and
+/// continuity generation. Invalid spans fail in DwMediaPlayedInterval's
+/// constructor even when this handle would reject recording.
+final class DwMediaObservationHandle {
+  DwMediaObservationHandle._({
+    required this.sessionId,
+    required this.itemId,
+    required this.sourceGeneration,
+    required DwMediaObservationResult Function(DwMediaPlayedInterval) record,
+  }) : _record = record;
+  final int sessionId;
+  final String itemId;
+  final int sourceGeneration;
+  final DwMediaObservationResult Function(DwMediaPlayedInterval) _record;
+  DwMediaObservationResult record(DwMediaPlayedInterval confirmed) =>
+      _record(confirmed);
 }

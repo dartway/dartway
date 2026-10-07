@@ -855,6 +855,7 @@ void main() {
 
     test('every field of an override reaches the resolved settings', () {
       final store = DwMediaInMemoryPositionStore();
+      Future<void> delivery(DwMediaPlaybackReport report) async {}
       Widget transition(
         BuildContext context,
         Animation<double> animation,
@@ -910,6 +911,7 @@ void main() {
         loadTimeout: const Duration(seconds: 17),
         controlsAutoHideDelay: const Duration(seconds: 16),
         positionStore: store,
+        playbackDelivery: delivery,
       );
       final r = const DwMediaConfig().merge(options);
       expect(r.autoplayOnOpen, isTrue);
@@ -959,6 +961,13 @@ void main() {
       expect(r.loadTimeout, const Duration(seconds: 17));
       expect(r.controlsAutoHideDelay, const Duration(seconds: 16));
       expect(r.positionStore, same(store));
+      expect(r.playbackDelivery, same(delivery));
+      expect(
+        DwMediaConfig(playbackDelivery: delivery)
+            .merge(const DwMediaOpenOptions(withoutPlaybackDelivery: true))
+            .playbackDelivery,
+        isNull,
+      );
 
       expect(
         const DwMediaConfig()
