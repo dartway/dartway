@@ -434,4 +434,4 @@ The CLI launches the already-resolved generator with its package config directly
 pub resolution or lock edits during checks. Resolve dependencies separately first.
 Generator exit 1 means stale output or a generation error, exit 3 means a contract incompatibility
 or unverified comparison. CLI `check` exposes the latter as error-severity `projectContractVersion`
-and exits 1. See [the codec-based rules and strict bootstrap](../2-core/wire-and-versions.md#the-generated-project-contract-gate).
+and exits 1. See [the codec-based rules and first adoption](../2-core/wire-and-versions.md#the-generated-project-contract-gate).

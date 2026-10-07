@@ -564,7 +564,7 @@ for each.
 
 `projectContractVersion` shares one resolved generator invocation with `generatedCodeStale`,
 assessing current source models in memory. It reads baseline descriptors from Git objects and
-reports the fixed SHA and descriptor/bootstrap proof. Incompatible, unsupported and unverified
+reports the fixed SHA and descriptor/adoption proof. Incompatible, unsupported and unverified
 results block the check, including an unavailable generator. Resolve dependencies separately;
 checks launch the resolved generator directly and never run pub, setup or historical SDK scripts.
 See [project contract compatibility](../2-core/wire-and-versions.md#the-generated-project-contract-gate).

@@ -12,12 +12,20 @@ revision to `generate --check --contract-base <SHA>` and
 `check --contract-base <SHA>`; keep that SHA fixed through regeneration and
 feature commits. Normal check uses the configured project base-branch merge-base.
 
-A baseline without the descriptor is accepted only after its committed source
-and existing dependency resolution reproduce the committed codecs/registry
-exactly in disposable scratch. If it cannot be reproduced, the blocking
-`contract not verified` message explains what is missing. Establish a supported,
-regenerated descriptor on the trusted base first; do not seed it from the feature
-tree, update historical dependencies or run project setup scripts to bypass it.
+A baseline without the descriptor is adopted in the pin-move PR when every
+hand-written shared package file is byte-identical to the trusted base. Regenerate
+and commit the codecs/registry and descriptor in that PR. The generator excludes
+its owned output (`lib/generated/**` and generated parts), the shared `pubspec.yaml`
+and lock from the source comparison, so a framework pin move can establish the
+first descriptor. The result prints `adopted at <base SHA>: shared contract source
+unchanged; descriptor established by this change`.
+
+If any hand-written shared file changes, the gate blocks and names the files.
+Split the change: land the framework pin move with generated output and the
+first descriptor, keeping hand-written shared source unchanged; make the contract
+edit in a following PR, verified against the now-committed descriptor. A descriptor
+already committed at the trusted base always takes precedence. No historical
+dependency fetch or reproduction, setup script or adoption flag is needed.
 
 If `projectContractVersion` reports an incompatible edit, raise the shared
 package breaking line (minor below 1.0, major above zero) and regenerate. A patch

@@ -128,7 +128,7 @@ void main() {
   );
 
   test(
-    'descriptor-free bootstrap cannot trust a mutable external path enum',
+    'descriptor-free adoption permits dependency codec changes with unchanged shared source',
     () async {
       final project = TempProject.create(['app_shared']);
       final external = Directory.systemTemp.createTempSync('dw_external_enum_');
@@ -206,8 +206,8 @@ void main() {
         '--contract-base',
         base,
       ]);
-      expect(result.exitCode, 3, reason: output(result));
-      expect(output(result), contains('unverifiable external path dependency'));
+      expect(result.exitCode, 0, reason: output(result));
+      expect(output(result), contains('shared contract source unchanged'));
       expect(bytes(project), snapshot);
     },
     timeout: const Timeout(Duration(minutes: 3)),
@@ -259,54 +259,91 @@ void main() { print(Settings(id: 1, createdAt: DateTime.fromMicrosecondsSinceEpo
     timeout: const Timeout(Duration(minutes: 3)),
   );
   test(
-    'descriptor-free source is accepted only after exact committed codec reproduction',
+    'pin move adopts unchanged shared source through generation and real CLI check',
     () async {
-      final project = TempProject.create(['app_shared']);
+      final project = TempProject.create([
+        'app_shared',
+        'app_server',
+        'app_flutter',
+      ]);
       project.writeFile('app_shared/lib/src/item.dart', itemSource());
       await project.generateClean();
+      final pubspec = project.readFile('app_shared/pubspec.yaml');
       project.writeFile(
-        'app_shared/pubspec.lock',
-        File(p.join(generatorRoot, 'pubspec.lock')).readAsStringSync(),
+        'app_shared/pubspec.yaml',
+        '$pubspec\ndependency_overrides:\n  dartway_core_shared:\n    git:\n      url: https://example.test/framework.git\n      ref: old-pin\n',
       );
+      project.writeFile('app_shared/pubspec.lock', 'old lock bytes\n');
       File(
         project.path('app_shared/lib/generated/dw_contract.json'),
       ).deleteSync();
-      commitResolvedPathPackages(project);
+      // The old generator's output cannot be reproduced by the new one.
+      for (final path in [
+        'lib/src/item.dw.dart',
+        'lib/generated/dw_protocol.dart',
+      ]) {
+        project.writeFile(
+          'app_shared/$path',
+          '${project.readFile('app_shared/$path')}\n// old codec rules\n',
+        );
+      }
       final base = baseline(project);
-      await project.generateClean();
-      final snapshot = bytes(project);
-      final valid = await generatorCli(project, [
-        '--check',
-        '--contract-base',
-        base,
-      ]);
-      expect(valid.exitCode, 0, reason: output(valid));
-      expect(
-        output(valid),
-        contains('exact committed shared codecs/registry reproduction'),
-      );
-      expect(bytes(project), snapshot);
-      File(
-        project.path('app_shared/lib/generated/dw_contract.json'),
-      ).deleteSync();
       project.writeFile(
-        'app_shared/lib/src/item.dw.dart',
-        '${project.readFile('app_shared/lib/src/item.dw.dart')}\n// committed codec drift\n',
+        'app_shared/pubspec.yaml',
+        project
+            .readFile('app_shared/pubspec.yaml')
+            .replaceFirst('old-pin', 'new-pin'),
       );
-      final drift = commit(project, 'unreproducible baseline');
+      project.writeFile('app_shared/pubspec.lock', 'new lock bytes\n');
       await project.generateClean();
-      final blocked = await generatorCli(project, [
-        '--check',
-        '--contract-base',
-        drift,
-      ]);
-      expect(blocked.exitCode, 3, reason: output(blocked));
-      expect(
-        output(blocked),
-        contains('committed codec/registry not reproduced'),
+      generatorResolution(project);
+      commit(project, 'adopt contract gate with pin move');
+      final snapshot = bytes(project);
+      for (final arguments in <List<String>>[
+        ['generate', '--check'],
+        ['generate', '--check', '--contract-base', base],
+        ['check', '--type', 'projectContractVersion'],
+        ['check', '--type', 'projectContractVersion', '--contract-base', base],
+      ]) {
+        final result = await cli(project, arguments);
+        expect(result.exitCode, 0, reason: output(result));
+        expect(
+          output(result),
+          contains(
+            'adopted at $base: shared contract source unchanged; descriptor established by this change',
+          ),
+        );
+        expect(bytes(project), snapshot);
+      }
+      project.writeFile(
+        'app_shared/lib/src/item.dart',
+        itemSource(requiredTitle: true),
       );
+      await project.generateClean();
+      final changed = bytes(project);
+      for (final arguments in <List<String>>[
+        ['generate', '--check', '--contract-base', base],
+        ['check', '--type', 'projectContractVersion', '--contract-base', base],
+      ]) {
+        final result = await cli(project, arguments);
+        expect(
+          result.exitCode,
+          arguments.first == 'check' ? 1 : 3,
+          reason: output(result),
+        );
+        expect(
+          output(result),
+          allOf(
+            contains('app_shared/lib/src/item.dart'),
+            contains('Split the change'),
+            contains('pin move'),
+            contains('following PR'),
+          ),
+        );
+        expect(bytes(project), changed);
+      }
     },
-    timeout: const Timeout(Duration(minutes: 3)),
+    timeout: const Timeout(Duration(minutes: 4)),
   );
 
   test(
@@ -781,27 +818,70 @@ void main() {
     );
   }
 
-  test(
-    'missing descriptor blocks without committed resolved dependency information',
-    () async {
-      final project = TempProject.create(['app_shared']);
-      project.writeFile('app_shared/lib/src/item.dart', itemSource());
-      await project.generateClean();
-      File(
-        project.path('app_shared/lib/generated/dw_contract.json'),
-      ).deleteSync();
-      final base = baseline(project);
-      await project.generateClean();
-      final result = await generatorCli(project, [
-        '--check',
-        '--contract-base',
-        base,
-      ]);
-      expect(result.exitCode, 3, reason: output(result));
-      expect(output(result), contains('committed lock information'));
-    },
-    timeout: const Timeout(Duration(minutes: 2)),
-  );
+  for (final edit in ['modify', 'delete', 'add', 'binary', 'manual-part']) {
+    test(
+      'descriptor-free adoption blocks $edit of hand-written shared files',
+      () async {
+        final project = TempProject.create(['app_shared']);
+        project.writeFile('app_shared/lib/src/item.dart', itemSource());
+        project.writeFile('app_shared/README.md', 'contract documentation\n');
+        project.writeFile(
+          'app_shared/test/manual.dw.dart',
+          '// hand-written fixture\n',
+        );
+        final binary = File(project.path('app_shared/data.bin'))
+          ..writeAsBytesSync([0, 255, 13, 10]);
+        await project.generateClean();
+        File(
+          project.path('app_shared/lib/generated/dw_contract.json'),
+        ).deleteSync();
+        final base = baseline(project);
+        final String changed;
+        switch (edit) {
+          case 'modify':
+            changed = 'app_shared/README.md';
+            project.writeFile(changed, 'changed contract documentation\n');
+          case 'delete':
+            changed = 'app_shared/README.md';
+            File(project.path(changed)).deleteSync();
+          case 'add':
+            changed = 'app_shared/lib/src/new_item.dart';
+            project.writeFile(
+              changed,
+              itemSource()
+                  .replaceAll('ItemRecord', 'NewItem')
+                  .replaceAll('item.dw.dart', 'new_item.dw.dart'),
+            );
+          case 'binary':
+            changed = 'app_shared/data.bin';
+            binary.writeAsBytesSync([0, 254, 13, 10]);
+          case 'manual-part':
+            changed = 'app_shared/test/manual.dw.dart';
+            // A filename, or a header forged at head, cannot turn source into output.
+            project.writeFile(
+              changed,
+              '// GENERATED BY dartway generate. DO NOT EDIT.\n',
+            );
+          default:
+            throw StateError(edit);
+        }
+        await project.generateClean();
+        final snapshot = bytes(project);
+        final result = await generatorCli(project, [
+          '--check',
+          '--contract-base',
+          base,
+        ]);
+        expect(result.exitCode, 3, reason: output(result));
+        expect(
+          output(result),
+          allOf(contains(changed), contains('Split the change')),
+        );
+        expect(bytes(project), snapshot);
+      },
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
+  }
 }
 
 const extra = r'''
@@ -868,41 +948,3 @@ Future<ProcessResult> cli(
   p.join(frameworkPackages, 'dartway_cli/bin/dartway.dart'),
   ...arguments,
 ], workingDirectory: project.path('app_flutter'));
-
-// Bootstrap trust requires path dependency bytes in the committed tree. Reuse
-// the real resolved framework packages, rather than trusting their mutable
-// locations outside this disposable project Git repository.
-void commitResolvedPathPackages(TempProject project) {
-  final configFile = File(
-    project.path('app_shared/.dart_tool/package_config.json'),
-  );
-  final config =
-      jsonDecode(configFile.readAsStringSync()) as Map<String, dynamic>;
-  for (final entry in config['packages'] as List) {
-    if (!(entry['name'] as String).startsWith('dartway_')) continue;
-    final source = Directory(
-      Uri.parse(entry['rootUri'] as String).toFilePath(),
-    );
-    final destination = project.path('baseline_deps/${entry['name']}');
-    project.writeFile(
-      'baseline_deps/${entry['name']}/pubspec.yaml',
-      File(p.join(source.path, 'pubspec.yaml')).readAsStringSync(),
-    );
-    for (final file in Directory(
-      p.join(source.path, 'lib'),
-    ).listSync(recursive: true)) {
-      if (file is File) {
-        project.writeFile(
-          p.join(
-            'baseline_deps',
-            entry['name'] as String,
-            p.relative(file.path, from: source.path),
-          ),
-          file.readAsStringSync(),
-        );
-      }
-    }
-    entry['rootUri'] = p.toUri(destination).toString();
-  }
-  configFile.writeAsStringSync(jsonEncode(config));
-}

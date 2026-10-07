@@ -104,14 +104,13 @@ final class ContractBaseline {
   final String proof;
 }
 
-/// Reads only Git objects at [sha]. A missing descriptor has one narrow
-/// bootstrap: reproduce the committed codecs/registry using existing resolved
-/// dependencies. No pub get, setup scripts, SDK switching or feature seed.
+/// A committed descriptor always wins. Without one, adopt [current] only when
+/// the shared package hand-written files still match the Git objects at [sha].
 Future<ContractBaseline> readContractBaseline({
   required String root,
   required String sha,
   required DwProjectPackage shared,
-  required Future<List<GeneratedFile>> Function(String root) generate,
+  required Map<String, dynamic> current,
 }) async {
   final gitRoot = _git(root, ['rev-parse', '--show-toplevel']).trim();
   var relative = p.posix.joinAll(
@@ -165,227 +164,95 @@ Future<ContractBaseline> readContractBaseline({
       'committed descriptor (Git object, format 1 / codec 1)',
     );
   }
-  final scratch = Directory.systemTemp.createTempSync('dw_contract_base_');
-  try {
-    // Do not follow a historical symlink out of the disposable tree.
-    final tree = _git(gitRoot, ['ls-tree', '-rz', sha]);
-    final omitted = <String>[];
-    for (final entry in tree.split('\u0000')) {
-      if (!entry.startsWith('120000 ') && !entry.startsWith('160000 ')) {
-        continue;
-      }
-      final path = entry.substring(entry.indexOf('\t') + 1);
-      if (path.endsWith('.dart') ||
-          path.endsWith('pubspec.yaml') ||
-          path.contains('/lib/')) {
-        throw FormatException(
-          'baseline codec source symlink/submodule is unsupported: $path',
-        );
-      }
-      // Agent adapters/assets cannot participate in the analyzed codec tree;
-      // omit them rather than materializing links in disposable scratch.
-      omitted.add(path);
-    }
-    final archive = p.join(scratch.path, 'tree.tar');
-    _git(gitRoot, ['archive', '--format=tar', '--output=$archive', sha]);
-    final checkout = Directory(p.join(scratch.path, 'tree'))..createSync();
-    final extracted = Process.runSync('tar', [
-      '-xf',
-      archive,
-      for (final path in omitted) '--exclude=$path',
-      '-C',
-      checkout.path,
-    ]);
-    if (extracted.exitCode != 0) {
-      throw const FormatException('cannot extract committed source tree');
-    }
-    // The descriptor owns only the shared registry/codecs. App SDK sources,
-    // server schema and handler semantics are outside this proof.
-    final target = p.join(
-      checkout.path,
-      p.relative(shared.root, from: gitRoot),
-    );
-    for (final package in [shared]) {
-      final destination = p.join(
-        checkout.path,
-        p.relative(package.root, from: gitRoot),
-      );
-      final oldPubspec = File(p.join(destination, 'pubspec.yaml'));
-      if (!oldPubspec.existsSync()) {
-        throw FormatException('baseline lacks package ${package.name}');
-      }
-      final old = loadYaml(oldPubspec.readAsStringSync()) as Map;
-      final current =
-          loadYaml(
-                File(p.join(package.root, 'pubspec.yaml')).readAsStringSync(),
-              )
-              as Map;
-      for (final key in [
-        'name',
-        'environment',
-        'dependencies',
-        'dev_dependencies',
-        'dependency_overrides',
-        'resolution',
-      ]) {
-        if (jsonEncode(canonical(_plain(old[key]))) !=
-            jsonEncode(canonical(_plain(current[key])))) {
-          throw FormatException(
-            'baseline ${package.name} $key cannot be reproduced from existing dependency resolution; establish a descriptor on the trusted base first',
-          );
-        }
-      }
-      var ancestor = package.root;
-      File? config;
-      File? lock;
-      while (true) {
-        final candidate = File(
-          p.join(ancestor, '.dart_tool/package_config.json'),
-        );
-        if (candidate.existsSync()) {
-          config = candidate;
-          lock = File(p.join(ancestor, 'pubspec.lock'));
-          break;
-        }
-        final parent = p.dirname(ancestor);
-        if (parent == ancestor) break;
-        ancestor = parent;
-      }
-      if (config == null ||
-          lock == null ||
-          !lock.existsSync() ||
-          !p.isWithin(gitRoot, lock.path)) {
-        throw FormatException(
-          'baseline ${package.name} needs existing resolved package config and committed lock information',
-        );
-      }
-      final oldLock = File(
-        p.join(checkout.path, p.relative(lock.path, from: gitRoot)),
-      );
-      if (!oldLock.existsSync() ||
-          !_sameResolution(
-            loadYaml(oldLock.readAsStringSync()),
-            loadYaml(lock.readAsStringSync()),
-          )) {
-        throw FormatException(
-          'baseline ${package.name} dependency lock differs from the existing resolution; establish a descriptor on the trusted base first',
-        );
-      }
-      final decoded =
-          jsonDecode(config.readAsStringSync()) as Map<String, dynamic>;
-      final locked =
-          (loadYaml(oldLock.readAsStringSync()) as Map)['packages'] as Map;
-      if (decoded['configVersion'] != 2 || decoded['packages'] is! List) {
-        throw const FormatException(
-          'unsupported resolved package configuration',
-        );
-      }
-      for (final entry in decoded['packages'] as List) {
-        final uri = config.uri.resolve(entry['rootUri'] as String);
-        if (uri.scheme != 'file') {
-          throw const FormatException('unsupported resolved dependency URI');
-        }
-        final dependency = p.normalize(uri.toFilePath());
-        final pinned = locked[entry['name']];
-        if (pinned is Map &&
-            pinned['source'] == 'path' &&
-            !p.equals(dependency, gitRoot) &&
-            !p.isWithin(gitRoot, dependency)) {
-          throw FormatException(
-            'unverifiable external path dependency ${entry['name']} in descriptor-free baseline; commit a descriptor on the trusted base with its original dependency source available',
-          );
-        }
-        entry['rootUri'] = p
-            .toUri(
-              p.equals(dependency, gitRoot) || p.isWithin(gitRoot, dependency)
-                  ? p.join(checkout.path, p.relative(dependency, from: gitRoot))
-                  : dependency,
-            )
-            .toString();
-        if (!Directory(
-          Uri.parse(entry['rootUri'] as String).toFilePath(),
-        ).existsSync()) {
-          throw FormatException(
-            'resolved dependency ${entry['name']} is unavailable for the committed baseline',
-          );
-        }
-      }
-      for (final entry in decoded['packages'] as List) {
-        final pinned = locked[entry['name']];
-        if (pinned is! Map) continue;
-        final dependencyPubspec = File(
-          p.join(
-            Uri.parse(entry['rootUri'] as String).toFilePath(),
-            'pubspec.yaml',
-          ),
-        );
-        if (!dependencyPubspec.existsSync()) {
-          throw FormatException(
-            'resolved dependency ${entry['name']} lacks its pubspec',
-          );
-        }
-        final metadata = loadYaml(dependencyPubspec.readAsStringSync());
-        if (metadata is! Map ||
-            metadata['name'] != entry['name'] ||
-            '${metadata['version']}' != '${pinned['version']}') {
-          throw FormatException(
-            'resolved dependency ${entry['name']} does not match the committed dependency lock',
-          );
-        }
-      }
-      final copied = File(
-        p.join(destination, '.dart_tool/package_config.json'),
-      );
-      copied.parent.createSync(recursive: true);
-      copied.writeAsStringSync(jsonEncode(decoded));
-    }
-    final output = await generate(target);
-    final descriptorFile = output
-        .where((f) => p.basename(f.path) == 'dw_contract.json')
-        .single;
-    for (final file in output.where(
-      (f) => p.basename(f.path) != 'dw_contract.json',
-    )) {
-      final committed = File(file.path);
-      if (!committed.existsSync() ||
-          committed.readAsStringSync() != file.content) {
-        throw FormatException(
-          'committed codec/registry not reproduced: ${p.relative(file.path, from: target)}; regenerate and commit with a supported generator on the trusted base first',
-        );
-      }
-    }
-    final descriptor = jsonDecode(descriptorFile.content);
-    validateContract(descriptor);
-    return ContractBaseline(
-      descriptor as Map<String, dynamic>,
-      'validated bootstrap (committed shared source, matching dependency locks, exact committed shared codecs/registry reproduction)',
-    );
-  } finally {
-    scratch.deleteSync(recursive: true);
+  final basePackage = p.posix.dirname(
+    p.posix.dirname(p.posix.dirname(relative)),
+  );
+  final headPackage = p.posix.joinAll(
+    p.split(p.relative(shared.root, from: gitRoot)),
+  );
+  final baseFiles = <String, (String, String)>{};
+  for (final entry in _git(gitRoot, [
+    'ls-tree',
+    '-rz',
+    sha,
+    '--',
+    basePackage,
+  ]).split('\u0000')) {
+    if (entry.isEmpty) continue;
+    final tab = entry.indexOf('\t');
+    final metadata = entry.substring(0, tab).split(' ');
+    final path = p.posix.relative(entry.substring(tab + 1), from: basePackage);
+    baseFiles[path] = (metadata[0], metadata[2]);
   }
+  // Include additions as well as base-tracked files: a new DTO must not become
+  // an unverified contract edit just because it had no blob at the base.
+  final paths = <String>{
+    ...baseFiles.keys,
+    for (final path in _git(gitRoot, [
+      'ls-files',
+      '-z',
+      '--cached',
+      '--others',
+      '--exclude-standard',
+      '--',
+      headPackage,
+    ]).split('\u0000'))
+      if (path.isNotEmpty) p.posix.relative(path, from: headPackage),
+  }.toList()..sort();
+  final changed = <String>[];
+  for (final path in paths) {
+    if (path == 'pubspec.yaml' || path == 'pubspec.lock') continue;
+    final entry = baseFiles[path];
+    final before = entry == null
+        ? null
+        : _gitBytes(gitRoot, ['cat-file', 'blob', entry.$2]);
+    final after = _fileBytes(
+      p.join(shared.root, p.joinAll(p.posix.split(path))),
+    );
+    // Ownership is determined from the base bytes for existing files. A head
+    // cannot hide an edit to a manual part by adding a generated header.
+    if (isGeneratorOwnedFile(path, before ?? after ?? const [])) continue;
+    if (before == null || after == null || !_sameBytes(before, after)) {
+      changed.add(p.posix.join(headPackage, path));
+    }
+  }
+  if (changed.isNotEmpty) {
+    throw FormatException(
+      'shared contract source changed: ${changed.join(', ')}. Split the change: '
+      'land the pin move with generated files and the descriptor first, keeping '
+      'hand-written shared source unchanged; make the contract edit in a following PR',
+    );
+  }
+  return ContractBaseline(
+    current,
+    'adopted at $sha: shared contract source unchanged; descriptor established by this change',
+  );
 }
 
-Object? _plain(Object? value) => switch (value) {
-  Map() => {
-    for (final entry in value.entries) '${entry.key}': _plain(entry.value),
-  },
-  List() => value.map(_plain).toList(),
-  _ => value,
-};
-
-bool _sameResolution(Object? a, Object? b) {
-  Object? resolution(Object? value) {
-    final plain = _plain(value);
-    if (plain is! Map || plain['packages'] is! Map) return null;
-    return {
-      for (final entry in (plain['packages'] as Map).entries)
-        entry.key: {...entry.value as Map}..remove('dependency'),
-    };
+List<int> _gitBytes(String root, List<String> arguments) {
+  final result = Process.runSync(
+    'git',
+    arguments,
+    workingDirectory: root,
+    stdoutEncoding: null,
+  );
+  if (result.exitCode != 0) {
+    throw FormatException('Git baseline unavailable: ${result.stderr}'.trim());
   }
+  return result.stdout as List<int>;
+}
 
-  final before = resolution(a);
-  final after = resolution(b);
-  return before != null &&
-      after != null &&
-      jsonEncode(canonical(before)) == jsonEncode(canonical(after));
+List<int>? _fileBytes(String path) =>
+    switch (FileSystemEntity.typeSync(path, followLinks: false)) {
+      FileSystemEntityType.file => File(path).readAsBytesSync(),
+      FileSystemEntityType.link => utf8.encode(Link(path).targetSync()),
+      _ => null,
+    };
+
+bool _sameBytes(List<int> before, List<int> after) {
+  if (before.length != after.length) return false;
+  for (var i = 0; i < before.length; i++) {
+    if (before[i] != after[i]) return false;
+  }
+  return true;
 }

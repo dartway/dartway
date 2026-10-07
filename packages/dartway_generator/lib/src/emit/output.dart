@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 
 import 'package:analyzer/dart/analysis/formatter_options.dart' as analyzer;
 import 'package:dart_style/dart_style.dart';
@@ -117,6 +118,18 @@ OutputPlan planOutput(
   );
 }
 
+/// The reserved generated directory belongs to the generator. A part belongs
+/// to it only with its ownership header; a manual `.dw.dart` is still source.
+/// [relativePath] uses POSIX separators relative to the package root.
+bool isGeneratorOwnedFile(String relativePath, List<int> bytes) {
+  if (p.posix.isWithin('lib/generated', relativePath)) return true;
+  return relativePath.endsWith('.dw.dart') &&
+      LineSplitter.split(
+            utf8.decode(bytes, allowMalformed: true),
+          ).firstOrNull?.trim() ==
+          generatedHeader;
+}
+
 /// A part is stale when it is ours (starts with the header) and its source no
 /// longer declares it. The source is checked textually rather than trusted to
 /// the analysis: a library that failed to analyze must not lose its part.
@@ -127,7 +140,9 @@ bool _isStalePart(File part) {
   } on FileSystemException {
     return false;
   }
-  if (first.trim() != generatedHeader) return false;
+  if (!isGeneratorOwnedFile(p.basename(part.path), utf8.encode(first))) {
+    return false;
+  }
   final partName = p.basename(part.path);
   final source = File(
     p.join(

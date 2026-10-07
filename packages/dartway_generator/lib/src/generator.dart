@@ -197,7 +197,7 @@ abstract final class DwCodeGenerator {
             root: root,
             sha: baselineSha,
             shared: shared,
-            generate: (target) => _baselineOutput(target, sdkPath),
+            current: current,
           );
           proof = baseline.proof;
           final previousVersion = DwContractVersion.parse(
@@ -228,7 +228,7 @@ abstract final class DwCodeGenerator {
         } catch (error) {
           diagnostics.add(
             DwGenerationDiagnostic(
-              'contract not verified: baseline $baselineSha: $error. Establish a supported, regenerated descriptor/codecs on the trusted base revision first; never seed it from the feature tree.',
+              'contract not verified: baseline $baselineSha: $error. A committed descriptor takes precedence; first adoption requires unchanged hand-written shared source.',
               code: 'projectContractVersion',
             ),
           );
@@ -238,39 +238,6 @@ abstract final class DwCodeGenerator {
       final plan = planOutput(files, packages);
       if (!check) plan.apply();
       return finish(plan: plan);
-    } finally {
-      await collection.dispose();
-    }
-  }
-
-  static Future<List<GeneratedFile>> _baselineOutput(
-    String root,
-    String? sdkPath,
-  ) async {
-    final diagnostics = <DwGenerationDiagnostic>[];
-    final packages = detectPackages(root, diagnostics);
-    if (diagnostics.isNotEmpty) {
-      throw FormatException(diagnostics.map((d) => d.message).join('; '));
-    }
-    final collection = AnalysisContextCollection(
-      includedPaths: [for (final package in packages) package.root],
-      sdkPath: sdkPath ?? findDartSdk(),
-    );
-    try {
-      final run = _Run(diagnostics);
-      for (final package in packages) {
-        await run.scanPackage(package, collection.contextFor(package.root));
-      }
-      final files = run.emit();
-      if (diagnostics.isNotEmpty) {
-        throw FormatException(diagnostics.map((d) => d.message).join('; '));
-      }
-      if (planOutput(files, packages).removed.isNotEmpty) {
-        throw const FormatException(
-          'committed generated output contains stale codecs',
-        );
-      }
-      return files;
     } finally {
       await collection.dispose();
     }

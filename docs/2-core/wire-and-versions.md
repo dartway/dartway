@@ -192,11 +192,17 @@ Regenerating at shared version `0.7.2` or `0.7.3` remains red; change it to `0.8
 The existing runtime then refuses an older client line with 426/`dw.updateRequired`. A nullable
 `String? title` addition accepts the old payload and can stay on `0.7`.
 
-Missing descriptors are bootstrapped only from committed sources in disposable scratch, using
-existing resolved dependency information and matching committed locks, with exact reproduction of
-the committed codecs/registry. External path dependencies cannot establish a descriptor-free baseline: their historical bytes are not committed in the project tree. Unsupported formats, custom codecs, custom enum `name` encoders or default-equality overrides, missing dependencies or failed
-reproduction produce blocking `contract not verified` diagnostics; establish a regenerated baseline
-on the trusted base first. No feature-tree snapshot seed, historical dependency upgrade or setup
-script is used. Coverage is generated project codecs/registry, excluding handler/domain semantics
-and manually composed external modules. The descriptor is tooling metadata; it adds no runtime
-compatibility negotiation and does not change the framework `dwProtocolVersion`.
+When the trusted base has no descriptor, first adoption requires byte-identical
+hand-written shared package files. The generator compares base-tracked source bytes
+with the current shared package and also rejects added source files. Its owned
+output (`lib/generated/**` and parts bearing its generated header), the shared
+`pubspec.yaml` and lock are excluded. A framework pin move may regenerate codecs
+and establish the descriptor; the result names the base SHA and adoption proof.
+If source differs, the gate names the files and asks to split the change: land the
+pin move and descriptor first, then edit the contract in a following PR. A committed
+descriptor always wins. No historical dependency fetch or codec reproduction is
+used. Unsupported formats, custom codecs, custom enum `name` encoders and
+default-equality overrides remain blocking `contract not verified` diagnostics.
+Coverage is generated project codecs/registry, excluding handler/domain semantics
+and manually composed external modules. The descriptor is tooling metadata; it adds
+no runtime compatibility negotiation and does not change `dwProtocolVersion`.
