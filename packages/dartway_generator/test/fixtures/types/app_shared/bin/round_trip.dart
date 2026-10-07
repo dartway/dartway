@@ -79,8 +79,15 @@ void main() {
     maybeColors: const [null, Color.red],
     dimensions: dimensions,
     allDimensions: const [dimensions, null],
+    calendarDays: [DwCalendarDay(2024, 2, 29), DwCalendarDay(2026, 1, 1)],
+    dayMap: {'leap': DwCalendarDay(2024, 2, 29), 'none': null},
+    discontinuedOn: DwCalendarDay(2025, 12, 31),
   );
   final fullBack = roundTrip(full);
+  check(
+    jsonEncode(full.toJson()['calendarDays']) == '["2024-02-29","2026-01-01"]',
+    'calendar-day collection wire values are canonical strings',
+  );
   check(fullBack.updatedAt!.isUtc, 'DateTime decodes as UTC');
   check(
     fullBack.ratings.last.runtimeType == double,
@@ -183,6 +190,13 @@ void main() {
     'a table page is a serialised field and part of the key',
   );
   roundTrip(const ItemHistory(itemId: 4));
+  const calendarHistory = CalendarHistory(itemId: 4);
+  roundTrip(calendarHistory);
+  final calendarCursor = DwWindowCursor.decode(calendarHistory.cursorOf(full));
+  check(
+    calendarCursor.sortValue == DwCalendarDay(2024, 2, 29),
+    'generated window request cursor round-trips a calendar day',
+  );
   roundTrip(const WideRequest(a1: 1, a20: 20));
   check(
     const WideRequest(a1: 1) != const WideRequest(a2: 1),

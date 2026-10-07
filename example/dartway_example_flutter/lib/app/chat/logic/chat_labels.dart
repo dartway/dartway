@@ -20,9 +20,9 @@ extension ChatDayLabel on DateTime {
   String chatDayLabel(AppLocalizations l10n, {DateTime? now}) {
     final local = toLocal();
     final today = (now ?? DateTime.now()).toLocal();
-    final day = DateTime(local.year, local.month, local.day);
-    final todayDay = DateTime(today.year, today.month, today.day);
-    final days = todayDay.difference(day).inDays;
+    final day = DwCalendarDay(local.year, local.month, local.day);
+    final todayDay = DwCalendarDay(today.year, today.month, today.day);
+    final days = todayDay.differenceInDays(day);
     if (days == 0) return l10n.chatToday;
     if (days == 1) return l10n.chatYesterday;
     return local.year == today.year
@@ -33,7 +33,8 @@ extension ChatDayLabel on DateTime {
   bool isSameLocalDay(DateTime other) {
     final a = toLocal();
     final b = other.toLocal();
-    return a.year == b.year && a.month == b.month && a.day == b.day;
+    return DwCalendarDay(a.year, a.month, a.day) ==
+        DwCalendarDay(b.year, b.month, b.day);
   }
 }
 

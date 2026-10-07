@@ -52,6 +52,10 @@ diff `check` compares against.
    | make a column NOT NULL | `m.alterColumnNullability(t, 'c', nullable: false, backfill: '…')` |
    | change a type | `m.alterColumnType(t, 'c', '<type>', using: '"c"::<type>')` |
 
+   When changing a `timestamptz` column to a `DwCalendarDay`/PostgreSQL `date`, name the civil zone
+   in the expression: `using: '("c" AT TIME ZONE \'America/Los_Angeles\')::date'`. The zone decides
+   the date for each stored instant; never cast an instant to date without recording that choice.
+
    **A drop and an add in one table are usually one rename** — accepting both empties the column on every
    row. Decisions appear in `down` too; answer them or `down` is `m.irreversible()` (`m.noop()` when
    nothing to undo). `backfill` is a SQL expression per row, in the migration's transaction. Never

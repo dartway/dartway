@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 
 void main() {
   group('DwWindowCursor', () {
-    test('round-trips int, String and DateTime sort values', () {
+    test('round-trips int, String, DateTime and calendar-day sort values', () {
       final at = DateTime.utc(2026, 9, 14, 10, 30, 0, 123, 456);
       for (final (sortValue, id) in <(Object, Object)>[
         (42, 7),
@@ -14,6 +14,7 @@ void main() {
         ('', ''),
         (at, 7),
         (DateTime.utc(1969, 12, 31, 23, 59, 59), 'x'),
+        (DwCalendarDay(2024, 2, 29), 7),
       ]) {
         final cursor = DwWindowCursor.encode(sortValue, id);
         final back = DwWindowCursor.decode(cursor);
@@ -22,6 +23,27 @@ void main() {
         expect(back, DwWindowCursor(sortValue, id));
       }
     });
+
+    test(
+      'calendar-day cursors sort by civil date and reject invalid values',
+      () {
+        final newer = DwWindowCursor.encode(DwCalendarDay(2024, 3, 1), 1);
+        final older = DwWindowCursor.encode(DwCalendarDay(2024, 2, 29), 99);
+        expect(
+          DwWindowCursor.comparePositions(
+            DwWindowCursor.decode(newer).position,
+            DwWindowCursor.decode(older).position,
+          ),
+          greaterThan(0),
+        );
+        expect(
+          () => DwWindowCursor.decode(
+            base64Url.encode(utf8.encode('["d","2023-02-29",7]')),
+          ),
+          throwsFormatException,
+        );
+      },
+    );
 
     test('is URL-safe: nothing to escape, no padding', () {
       final cursor = DwWindowCursor.encode('???>>>~~~ ', 'ÿÿÿ');

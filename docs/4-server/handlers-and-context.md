@@ -138,7 +138,8 @@ DwCallHandler.window<Q extends DwWindowRequest<T, S, I>, T extends DwDataObject,
 ```
 
 The request class names a row's place in the sequence (`positionOf`): a sort value `S` (`int`,
-`String` or `DateTime`) and an id `I` (`int` or `String`). Other types throw `ArgumentError` when
+`String`, `DateTime` or `DwCalendarDay`) and an id `I` (`int` or `String`). A calendar day sorts by
+its Gregorian year, month and day and is encoded in a cursor as canonical `YYYY-MM-DD`. Other types throw `ArgumentError` when
 the handler is declared, because a cursor of them could not be encoded.
 
 The handler reads **one direction** at a time. `DwWindowInput` carries:

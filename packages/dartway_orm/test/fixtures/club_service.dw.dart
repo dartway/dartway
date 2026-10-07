@@ -13,6 +13,8 @@ mixin _$ClubServiceRow on DwTableRow {
           other.kind == _self.kind &&
           other.price == _self.price &&
           other.duration == _self.duration &&
+          other.availableOn == _self.availableOn &&
+          other.discontinuedOn == _self.discontinuedOn &&
           dwListEquals(other.tags, _self.tags) &&
           dwListEquals(other.offeredAs, _self.offeredAs) &&
           other.createdAt == _self.createdAt &&
@@ -27,6 +29,8 @@ mixin _$ClubServiceRow on DwTableRow {
     _self.kind,
     _self.price,
     _self.duration,
+    _self.availableOn,
+    _self.discontinuedOn,
     Object.hashAll(_self.tags),
     Object.hashAll(_self.offeredAs),
     _self.createdAt,
@@ -37,7 +41,7 @@ mixin _$ClubServiceRow on DwTableRow {
 
   @override
   String toString() =>
-      'ClubServiceRow(id: ${_self.id}, title: ${_self.title}, kind: ${_self.kind}, price: ${_self.price}, duration: ${_self.duration}, tags: ${_self.tags}, offeredAs: ${_self.offeredAs}, createdAt: ${_self.createdAt}, archivedAt: ${_self.archivedAt}, cover: ${_self.cover}, active: ${_self.active})';
+      'ClubServiceRow(id: ${_self.id}, title: ${_self.title}, kind: ${_self.kind}, price: ${_self.price}, duration: ${_self.duration}, availableOn: ${_self.availableOn}, discontinuedOn: ${_self.discontinuedOn}, tags: ${_self.tags}, offeredAs: ${_self.offeredAs}, createdAt: ${_self.createdAt}, archivedAt: ${_self.archivedAt}, cover: ${_self.cover}, active: ${_self.active})';
 }
 
 extension ClubServiceRowCopyWith on ClubServiceRow {
@@ -46,6 +50,8 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
     ClubServiceKind? kind,
     DwFieldPatch<double> price = const DwFieldPatch.keep(),
     Duration? duration,
+    DwCalendarDay? availableOn,
+    DwFieldPatch<DwCalendarDay> discontinuedOn = const DwFieldPatch.keep(),
     List<String>? tags,
     List<ClubServiceKind>? offeredAs,
     DateTime? createdAt,
@@ -58,6 +64,8 @@ extension ClubServiceRowCopyWith on ClubServiceRow {
     kind: kind ?? this.kind,
     price: price.apply(this.price),
     duration: duration ?? this.duration,
+    availableOn: availableOn ?? this.availableOn,
+    discontinuedOn: discontinuedOn.apply(this.discontinuedOn),
     tags: tags ?? this.tags,
     offeredAs: offeredAs ?? this.offeredAs,
     createdAt: createdAt ?? this.createdAt,
@@ -78,6 +86,8 @@ mixin _$NewClubServiceRow on DwRowDraft<ClubServiceRow> {
           other.kind == _self.kind &&
           other.price == _self.price &&
           other.duration == _self.duration &&
+          other.availableOn == _self.availableOn &&
+          other.discontinuedOn == _self.discontinuedOn &&
           dwListEquals(other.tags, _self.tags) &&
           dwListEquals(other.offeredAs, _self.offeredAs) &&
           other.createdAt == _self.createdAt &&
@@ -91,6 +101,8 @@ mixin _$NewClubServiceRow on DwRowDraft<ClubServiceRow> {
     _self.kind,
     _self.price,
     _self.duration,
+    _self.availableOn,
+    _self.discontinuedOn,
     Object.hashAll(_self.tags),
     Object.hashAll(_self.offeredAs),
     _self.createdAt,
@@ -101,7 +113,7 @@ mixin _$NewClubServiceRow on DwRowDraft<ClubServiceRow> {
 
   @override
   String toString() =>
-      'NewClubServiceRow(title: ${_self.title}, kind: ${_self.kind}, price: ${_self.price}, duration: ${_self.duration}, tags: ${_self.tags}, offeredAs: ${_self.offeredAs}, createdAt: ${_self.createdAt}, archivedAt: ${_self.archivedAt}, cover: ${_self.cover}, active: ${_self.active})';
+      'NewClubServiceRow(title: ${_self.title}, kind: ${_self.kind}, price: ${_self.price}, duration: ${_self.duration}, availableOn: ${_self.availableOn}, discontinuedOn: ${_self.discontinuedOn}, tags: ${_self.tags}, offeredAs: ${_self.offeredAs}, createdAt: ${_self.createdAt}, archivedAt: ${_self.archivedAt}, cover: ${_self.cover}, active: ${_self.active})';
 }
 
 /// A [ClubServiceRow] before insert: every column but the id.
@@ -112,6 +124,8 @@ final class NewClubServiceRow extends DwRowDraft<ClubServiceRow>
     required this.kind,
     this.price,
     required this.duration,
+    required this.availableOn,
+    this.discontinuedOn,
     this.tags = const <String>[],
     this.offeredAs = const <ClubServiceKind>[],
     required this.createdAt,
@@ -124,6 +138,8 @@ final class NewClubServiceRow extends DwRowDraft<ClubServiceRow>
   final ClubServiceKind kind;
   final double? price;
   final Duration duration;
+  final DwCalendarDay availableOn;
+  final DwCalendarDay? discontinuedOn;
   final List<String> tags;
   final List<ClubServiceKind> offeredAs;
   final DateTime createdAt;
@@ -138,6 +154,8 @@ extension NewClubServiceRowCopyWith on NewClubServiceRow {
     ClubServiceKind? kind,
     DwFieldPatch<double> price = const DwFieldPatch.keep(),
     Duration? duration,
+    DwCalendarDay? availableOn,
+    DwFieldPatch<DwCalendarDay> discontinuedOn = const DwFieldPatch.keep(),
     List<String>? tags,
     List<ClubServiceKind>? offeredAs,
     DateTime? createdAt,
@@ -149,6 +167,8 @@ extension NewClubServiceRowCopyWith on NewClubServiceRow {
     kind: kind ?? this.kind,
     price: price.apply(this.price),
     duration: duration ?? this.duration,
+    availableOn: availableOn ?? this.availableOn,
+    discontinuedOn: discontinuedOn.apply(this.discontinuedOn),
     tags: tags ?? this.tags,
     offeredAs: offeredAs ?? this.offeredAs,
     createdAt: createdAt ?? this.createdAt,
@@ -166,6 +186,8 @@ extension NewClubServiceRowWithId on NewClubServiceRow {
     kind: kind,
     price: price,
     duration: duration,
+    availableOn: availableOn,
+    discontinuedOn: discontinuedOn,
     tags: tags,
     offeredAs: offeredAs,
     createdAt: createdAt,
@@ -189,6 +211,12 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
 
   DwTableColumn<Duration> get duration =>
       const DwTableColumn('duration', DwColumnType.duration);
+
+  DwTableColumn<DwCalendarDay> get availableOn =>
+      const DwTableColumn('available_on', DwColumnType.calendarDay);
+
+  DwTableColumn<DwCalendarDay?> get discontinuedOn =>
+      const DwTableColumn('discontinued_on', DwColumnType.calendarDay);
 
   DwTableColumn<List<String>> get tags =>
       const DwTableColumn('tags', DwJsonListType<String>());
@@ -221,6 +249,8 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
     kind,
     price,
     duration,
+    availableOn,
+    discontinuedOn,
     tags,
     offeredAs,
     createdAt,
@@ -236,6 +266,8 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
     kind: row.decode(kind),
     price: row.decode(price),
     duration: row.decode(duration),
+    availableOn: row.decode(availableOn),
+    discontinuedOn: row.decode(discontinuedOn),
     tags: row.decode(tags),
     offeredAs: row.decode(offeredAs),
     createdAt: row.decode(createdAt),
@@ -250,6 +282,8 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
     'kind': row.kind,
     'price': row.price,
     'duration': row.duration,
+    'available_on': row.availableOn,
+    'discontinued_on': row.discontinuedOn,
     'tags': row.tags,
     'offered_as': row.offeredAs,
     'created_at': row.createdAt,
@@ -264,6 +298,8 @@ final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
     'kind': draft.kind,
     'price': draft.price,
     'duration': draft.duration,
+    'available_on': draft.availableOn,
+    'discontinued_on': draft.discontinuedOn,
     'tags': draft.tags,
     'offered_as': draft.offeredAs,
     'created_at': draft.createdAt,

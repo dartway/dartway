@@ -82,7 +82,7 @@ final class InvoiceRow extends DwTableRow with _$InvoiceRow {
 - `id` is the stored key, `int`: `row.id` needs no `!` (`redundantBangAllowed` has the analyzer fail
   one). A row not stored yet is its generated draft `New<Entity>Row`; `insert`, `tryInsert`,
   `insertAll`, `upsert` take drafts and answer stored rows.
-- Columns: `int`, `double`, `String`, `bool`, `DateTime`, `Duration`, `Uint8List`, an enum (its name),
+- Columns: `int`, `double`, `String`, `bool`, `DateTime`, `DwCalendarDay`, `Duration`, `Uint8List`, an enum (its name),
   `List`/`Map<String, T>` of scalars or a `List` of an enum (`jsonb`), nullable ones. A DTO is not a
   column.
 - `@DwForeignKey('table', onDelete: …)` (framework tables too: `dw_account`, `dw_stored_file`),

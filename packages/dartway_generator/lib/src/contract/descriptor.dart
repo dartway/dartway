@@ -63,6 +63,8 @@ Map<String, Object?> describeContract(
         shape['kind'] = 'double';
       case DateTimeWire():
         shape['kind'] = 'dateTime';
+      case CalendarDayWire():
+        shape['kind'] = 'calendarDay';
       case DurationWire():
         shape['kind'] = 'duration';
       case BytesWire():
@@ -256,6 +258,7 @@ void validateContract(Object? descriptor) {
           'bool' ||
           'double' ||
           'dateTime' ||
+          'calendarDay' ||
           'duration' ||
           'bytes' ||
           'void' ||

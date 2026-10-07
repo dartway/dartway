@@ -78,6 +78,13 @@ months against the schema of its own day. It describes tables with schema litera
 everything else. A `backfill` is an SQL expression computed for each existing row: the column is
 added nullable, filled and then made `NOT NULL`, in the migration's transaction.
 
+`DwCalendarDay` maps to PostgreSQL `date`. Adopting it for a new field is optional and needs no
+framework migration. If a project chooses to convert an existing `timestamptz` field, the project
+owns that schema change and must name the civil zone in its `USING` expression, for example
+`(starts_at AT TIME ZONE 'America/Los_Angeles')::date`; the selected zone decides which day each
+instant becomes. The framework does not rewrite timestamp columns or require existing projects to
+adopt the date type.
+
 ## The ledger and the rules
 
 Applied migrations are rows of `dw_migrations`: namespace, id, checksum, batch, order of

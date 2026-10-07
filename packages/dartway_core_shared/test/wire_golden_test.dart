@@ -441,6 +441,14 @@ List<_WireShape> _wireShapes() {
           DwWindowCursor.decode(cursor! as String).encoded,
       ],
     ),
+    _WireShape(
+      'result.calendarCursor',
+      () => [DwWindowCursor.encode(DwCalendarDay(2024, 2, 29), 7)],
+      readBack: (json) => [
+        for (final cursor in json! as List<Object?>)
+          DwWindowCursor.decode(cursor! as String).encoded,
+      ],
+    ),
 
     // Refusals.
     _WireShape(

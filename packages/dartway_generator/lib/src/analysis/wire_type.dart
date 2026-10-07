@@ -41,6 +41,10 @@ final class DateTimeWire extends WireType {
   const DateTimeWire({required super.nullable});
 }
 
+final class CalendarDayWire extends WireType {
+  const CalendarDayWire({required super.nullable});
+}
+
 final class DurationWire extends WireType {
   const DurationWire({required super.nullable});
 }
@@ -119,10 +123,10 @@ final class WireTypeReader {
   final bool forEntity;
 
   String get supportedList => forEntity
-      ? 'int, double, String, bool, DateTime, Duration, Uint8List, an enum, '
+      ? 'int, double, String, bool, DateTime, DwCalendarDay, Duration, Uint8List, an enum, '
             'List<T> or Map<String, T> of int, double, String or bool (jsonb), '
             'List<E> of an enum (jsonb of names), or a nullable one of these'
-      : 'int, double, String, bool, DateTime, Duration, Uint8List, an enum, '
+      : 'int, double, String, bool, DateTime, DwCalendarDay, Duration, Uint8List, an enum, '
             'a DTO class, List<T>, Map<String, T>, DwFieldPatch<T>, or a nullable '
             'one of these';
 
@@ -152,8 +156,9 @@ final class WireTypeReader {
           when inner is! ScalarWire && inner is! DoubleWire:
         throw UnsupportedType(
           '`$display` is stored as jsonb, whose elements are read back as '
-          'plain JSON: they must be int, double, String or bool — or, in a '
-          'list, a non-null enum',
+          'plain JSON and cannot reconstruct framework value objects: use '
+          'int, double, String or bool — or, in a list, a non-null enum. '
+          'DwCalendarDay is supported as a direct column, not inside jsonb',
         );
       default:
         return;
@@ -182,6 +187,10 @@ final class WireTypeReader {
     if (type.isDartCoreDouble) return DoubleWire(nullable: nullable);
     if (_isSdk(element, 'dart:core', 'DateTime')) {
       return DateTimeWire(nullable: nullable);
+    }
+    if (DwFrameworkTypes.isCoreClass(element, 'DwCalendarDay')) {
+      _requireVisible(type);
+      return CalendarDayWire(nullable: nullable);
     }
     if (_isSdk(element, 'dart:core', 'Duration')) {
       return DurationWire(nullable: nullable);

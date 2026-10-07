@@ -11,6 +11,7 @@ void main() {
     title: 'Yoga',
     kind: ClubServiceKind.group,
     duration: const Duration(hours: 1),
+    availableOn: DwCalendarDay(2026, 9, 1),
     tags: tags,
     createdAt: DateTime.utc(2026, 9, 1),
   );

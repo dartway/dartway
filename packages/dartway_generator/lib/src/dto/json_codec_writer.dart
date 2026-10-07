@@ -10,6 +10,7 @@ abstract final class JsonCodecWriter {
   static String encodeValue(WireType type, String value) => switch (type) {
     ScalarWire() || DoubleWire() => value,
     DateTimeWire() => 'DwJsonCodec.encodeDateTime($value)',
+    CalendarDayWire() => 'DwJsonCodec.encodeCalendarDay($value)',
     DurationWire() => 'DwJsonCodec.encodeDuration($value)',
     BytesWire() => 'DwJsonCodec.encodeBytes($value)',
     EnumWire() => '$value.name',
@@ -58,6 +59,7 @@ abstract final class JsonCodecWriter {
       ScalarWire(:final dartName) => '$nonNull as $dartName',
       DoubleWire() => 'DwJsonCodec.decodeDouble($json)',
       DateTimeWire() => 'DwJsonCodec.decodeDateTime($json)',
+      CalendarDayWire() => 'DwJsonCodec.decodeCalendarDay($json)',
       DurationWire() => 'DwJsonCodec.decodeDuration($json)',
       BytesWire() => 'DwJsonCodec.decodeBytes($json)',
       EnumWire(:final spelling) =>

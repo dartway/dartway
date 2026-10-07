@@ -44,6 +44,9 @@ abstract final class DwColumnType<T> {
   /// Stored as an instant; always read back in UTC.
   static const DwColumnType<DateTime> timestamptz = _DwDateTimeType();
 
+  /// A Gregorian calendar date stored as PostgreSQL `date`, with no time zone.
+  static const DwColumnType<DwCalendarDay> calendarDay = _DwCalendarDayType();
+
   /// Stored as `bigint` microseconds: exact, sortable, and free of the
   /// month/day ambiguity of `interval`.
   static const DwColumnType<Duration> duration = _DwDurationType();
@@ -136,6 +139,43 @@ final class _DwDateTimeType extends DwColumnType<DateTime> {
   DateTime decode(Object raw) {
     if (raw is DateTime) return raw.toUtc();
     throw DwDecodeException('expected DateTime, got ${raw.runtimeType}');
+  }
+}
+
+/// `postgres` represents PostgreSQL `date` values as UTC [DateTime] objects.
+/// This adapter keeps that driver carrier private and always constructs it at
+/// UTC midnight from the date components, so local time-zone offsets cannot
+/// shift the stored day.
+final class _DwCalendarDayType extends DwColumnType<DwCalendarDay> {
+  const _DwCalendarDayType() : super('date');
+
+  @override
+  pg.Type<Object> get parameterType => pg.Type.date;
+
+  @override
+  pg.Type<Object> get arrayParameterType => pg.Type.dateArray;
+
+  @override
+  Object encode(DwCalendarDay value) =>
+      DateTime.utc(value.year, value.month, value.day);
+
+  @override
+  Object encodeArrayElement(DwCalendarDay value) => encode(value);
+
+  @override
+  DwCalendarDay decode(Object raw) {
+    if (raw is! DateTime) {
+      throw DwDecodeException(
+        'expected DateTime for date, got ${raw.runtimeType}',
+      );
+    }
+    try {
+      return DwCalendarDay(raw.year, raw.month, raw.day);
+    } on ArgumentError {
+      throw DwDecodeException(
+        'PostgreSQL date is outside the DwCalendarDay range: $raw',
+      );
+    }
   }
 }
 

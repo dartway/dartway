@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- Recognize the framework `DwCalendarDay` by package identity in DTO codecs and entity rows; record
+  its additive `calendarDay` descriptor kind. Direct entity columns map to `DwColumnType.calendarDay`;
+  JSONB collections of this value remain unsupported with a diagnostic.
+
 - Emit a deterministic project wire descriptor and verify source-derived contracts against a fixed
   committed Git baseline. Breaking edits require the shared package breaking line to advance;
   unsupported/custom or unreproducible baselines block the check. Descriptor-free commits require

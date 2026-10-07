@@ -172,6 +172,9 @@ const String wireGolden = r'''
       "WyJpIiw0MiwiYi03Il0",
       "WyJzIiwiWm_DqyIsN10"
     ],
+    "result.calendarCursor": [
+      "WyJkIiwiMjAyNC0wMi0yOSIsN10"
+    ],
     "refusal.full": {
       "code": "seatsNotEnough",
       "params": {

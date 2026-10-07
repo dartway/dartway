@@ -158,7 +158,8 @@ or its pages skip and repeat rows; the client drops a row that arrives twice.
 ## Window cursors
 
 `positionOf` is the one definition of a window's order: the sort value `S` (`int`, `String` or
-`DateTime`) and the id `I` (`int` or `String`) of a row.
+`DateTime` or `DwCalendarDay`) and the id `I` (`int` or `String`) of a row. A calendar-day cursor
+uses canonical `YYYY-MM-DD` and compares by civil date, without converting to an instant.
 
 ```dart
 @override

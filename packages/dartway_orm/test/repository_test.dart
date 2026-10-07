@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 
 import 'package:dartway_orm/dartway_orm.dart';
+import 'package:postgres/postgres.dart' as pg;
 import 'package:test/test.dart';
 
 import 'fixtures/app_setting.dart';
@@ -18,6 +19,8 @@ void main() {
     ClubServiceKind kind = ClubServiceKind.group,
     double? price,
     Duration duration = const Duration(hours: 1),
+    DwCalendarDay? availableOn,
+    DwCalendarDay? discontinuedOn,
     List<String> tags = const [],
     List<ClubServiceKind> offeredAs = const [],
     DateTime? createdAt,
@@ -29,6 +32,8 @@ void main() {
     kind: kind,
     price: price,
     duration: duration,
+    availableOn: availableOn ?? DwCalendarDay(2026, 9, 1),
+    discontinuedOn: discontinuedOn,
     tags: tags,
     offeredAs: offeredAs,
     createdAt: createdAt ?? DateTime.utc(2026, 9, 1, 10),
@@ -52,6 +57,8 @@ void main() {
           kind: ClubServiceKind.personal,
           price: 12.5,
           duration: const Duration(days: 400, microseconds: 7),
+          availableOn: DwCalendarDay(2024, 2, 29),
+          discontinuedOn: DwCalendarDay(2025, 1, 2),
           tags: ['a', 'b, c', '"quoted"'],
           createdAt: local,
           archivedAt: DateTime.utc(2027, 1, 1),
@@ -63,6 +70,8 @@ void main() {
       expect(stored.createdAt.isUtc, isTrue);
       expect(stored.createdAt, local.toUtc());
       expect(stored.duration, const Duration(days: 400, microseconds: 7));
+      expect(stored.availableOn, DwCalendarDay(2024, 2, 29));
+      expect(stored.discontinuedOn, DwCalendarDay(2025, 1, 2));
       expect(stored.tags, ['a', 'b, c', '"quoted"']);
       expect(stored.cover, [0, 1, 254, 255]);
       expect(stored.kind, ClubServiceKind.personal);
@@ -72,17 +81,80 @@ void main() {
       expect(read, stored);
     });
 
+    test(
+      'date binding stays a civil day across process and session zones',
+      () async {
+        // Run this suite with TZ=Pacific/Kiritimati. The legacy pg.Type.date
+        // path truncates after converting local midnight to UTC; the typed
+        // calendar-day adapter creates a UTC carrier from the Y/M/D components.
+        final localMidnight = DateTime(2026, 9, 14);
+        final day = DwCalendarDay(
+          localMidnight.year,
+          localMidnight.month,
+          localMidnight.day,
+        );
+        final raw = await db().run(
+          r'SELECT $1::date AS legacy, $2::date AS calendar_day',
+          const [pg.Type.date, pg.Type.date],
+          [localMidnight, DwColumnType.calendarDay.encode(day)],
+        );
+        expect(raw.single[0], DateTime.utc(2026, 9, 13));
+        expect(
+          DwColumnType.calendarDay.decode(raw.single[1]!),
+          DwCalendarDay(2026, 9, 14),
+        );
+
+        final result = await db().transaction((tx) async {
+          await tx.execute("SET LOCAL TIME ZONE 'Pacific/Honolulu'");
+          final repository = tx.repository<ClubServiceRow, ClubServiceTable>(
+            ClubServiceRow.tableDef,
+          );
+          return repository.insertAll([
+            service(
+              title: 'Leap day',
+              availableOn: DwCalendarDay(2024, 2, 29),
+              discontinuedOn: DwCalendarDay(2024, 3, 1),
+            ),
+            service(title: 'March day', availableOn: DwCalendarDay(2024, 3, 1)),
+          ]);
+        });
+        expect(result.map((row) => row.availableOn), [
+          DwCalendarDay(2024, 2, 29),
+          DwCalendarDay(2024, 3, 1),
+        ]);
+        expect(result.last.discontinuedOn, isNull);
+        expect(
+          await db().clubServices.find(
+            where: (t) => t.availableOn.equals(DwCalendarDay(2024, 3, 1)),
+            orderBy: (t) => [t.availableOn.asc()],
+          ),
+          hasLength(1),
+        );
+        expect(
+          await db().clubServices.find(
+            where: (t) =>
+                t.availableOn.gte(DwCalendarDay(2024, 2, 29)) &
+                t.discontinuedOn.inList([DwCalendarDay(2024, 3, 1)]),
+            orderBy: (t) => [t.availableOn.asc()],
+          ),
+          hasLength(1),
+        );
+      },
+    );
+
     test('nulls round-trip as SQL NULL', () async {
       final stored = await db().clubServices.insert(service());
       expect(stored.price, isNull);
       expect(stored.archivedAt, isNull);
+      expect(stored.discontinuedOn, isNull);
       expect(stored.cover, isNull);
       final raw = await db().query(
-        'SELECT price IS NULL AS p, archived_at IS NULL AS a, cover IS NULL AS c '
+        'SELECT price IS NULL AS p, archived_at IS NULL AS a, cover IS NULL AS c, '
+        'discontinued_on IS NULL AS d '
         'FROM club_service WHERE id = @id',
         params: {'id': stored.id},
       );
-      expect(raw.single, {'p': true, 'a': true, 'c': true});
+      expect(raw.single, {'p': true, 'a': true, 'c': true, 'd': true});
     });
 
     test('the enum is stored as its name', () async {
@@ -144,23 +216,22 @@ void main() {
       expect(stored['names'], '["personal", "group"]');
     });
 
-    test(
-      'a list of an enum holding a name no value has fails loudly',
-      () async {
-        await db().execute(
-          "INSERT INTO club_service (title, kind, duration, tags, offered_as, "
-          "created_at) VALUES ('x', 'group', 1, '[]', '[\"retired\"]', now())",
-        );
-        expect(db().clubServices.find(), throwsA(isA<DwDecodeException>()));
-      },
-    );
+    test('a list of an enum holding a name no value has fails loudly', () async {
+      await db().execute(
+        "INSERT INTO club_service (title, kind, duration, tags, offered_as, "
+        "available_on, created_at) "
+        "VALUES ('x', 'group', 1, '[]', '[\"retired\"]', '2026-01-01', now())",
+      );
+      expect(db().clubServices.find(), throwsA(isA<DwDecodeException>()));
+    });
 
     test(
       'a decoded row that does not fit the row class fails loudly',
       () async {
         await db().execute(
           "INSERT INTO club_service (title, kind, duration, tags, offered_as, "
-          "created_at) VALUES ('x', 'unknown', 1, '[]', '[]', now())",
+          "available_on, created_at) "
+          "VALUES ('x', 'unknown', 1, '[]', '[]', '2026-01-01', now())",
         );
         expect(db().clubServices.find(), throwsA(isA<DwDecodeException>()));
       },
@@ -833,8 +904,8 @@ void main() {
 
     test('execute runs a script without parameters and counts rows', () async {
       final count = await db().execute('''
-        INSERT INTO club_service (title, kind, duration, tags, offered_as, created_at) VALUES ('a', 'group', 1, '[]', '[]', now());
-        INSERT INTO club_service (title, kind, duration, tags, offered_as, created_at) VALUES ('b', 'group', 1, '[]', '[]', now());
+        INSERT INTO club_service (title, kind, duration, tags, offered_as, available_on, created_at) VALUES ('a', 'group', 1, '[]', '[]', '2026-01-01', now());
+        INSERT INTO club_service (title, kind, duration, tags, offered_as, available_on, created_at) VALUES ('b', 'group', 1, '[]', '[]', '2026-01-01', now());
       ''');
       expect(count, 2);
       expect(

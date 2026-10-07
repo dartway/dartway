@@ -72,6 +72,11 @@ void main() {
         project.readFile('app_shared/lib/generated/dw_protocol.dart'),
         'types/dw_protocol.dart',
       );
+      final contract = project.readFile(
+        'app_shared/lib/generated/dw_contract.json',
+      );
+      expect(contract, contains('"kind": "calendarDay"'));
+      expect(contract, contains('"kind": "dateTime"'));
     });
 
     test('generated code is clean under strict analysis', () async {

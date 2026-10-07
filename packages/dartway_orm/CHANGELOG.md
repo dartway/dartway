@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- Add `DwColumnType.calendarDay` for nullable or required `DwCalendarDay` columns, PostgreSQL
+  `date` binding/decoding, comparisons and date-array parameters. Existing timestamp columns and
+  repository insert/default behavior are unchanged.
+
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the router
   that follows a provider (dartway/dartway#407).
 
