@@ -1,7 +1,7 @@
 ---
 name: dartway-update
 description: >-
-  Moving the project onto a newer DartWay: update the CLI, run `dartway update` (installs .claude/,
+  Moving the project onto a newer DartWay: update the CLI, run `dartway update` (installs the selected agent integrations,
   reports the packages behind and the migration notes owed), make the edits the notes ask for, then
   move the core family together and each satellite on its own, regenerate, prove it with the gates
   and a run, and report whether the protocol version moved. Also the old shapes a project may still
@@ -17,9 +17,9 @@ caret is the last step, not the task; the update is its own branch and PR, never
 1. **A branch from a clean tree**: `git status`, then `git switch -c chore/dartway-update __BASE_BRANCH__`.
 2. **Update the CLI**: `dart pub global activate dartway_cli` — an old CLI installs an old toolkit.
 3. **`dartway update`** — takes the framework from the recorded channel (`--channel`, `--local-repo`),
-   installs `.claude/`, and reports the `dartway_*` packages behind (resolved version, the channel's,
+   installs the selected agent integrations, and reports the `dartway_*` packages behind (resolved version, the channel's,
    the directories holding it) and the migration notes that still apply, oldest first. It changes
-   nothing but `.claude/` and the `dartway_lints` line of the Flutter package's `analysis_options.yaml`
+   nothing but managed toolkit files and root connection blocks and the `dartway_lints` line of the Flutter package's `analysis_options.yaml`
    (`lintsPluginMissing`). Nothing behind and no notes: commit both and stop. An unreadable note
    is a framework defect — file it, read it by hand.
 4. **Each note, in the order given**: first `grep` whether the project uses what changed — not applying
@@ -42,7 +42,7 @@ caret is the last step, not the task; the update is its own branch and PR, never
    changed default or wiring step shows only there. The framework's own migrations apply at server start.
    **Say whether `dwProtocolVersion` moved** between the resolved `dartway_core_shared` before and after:
    installed apps then get `426`, and the server and the new builds must ship together.
-8. **Commit** `.claude/` and `analysis_options.yaml` with the rest: `chore(deps): move to dartway <version>, applying <n> migrations`,
+8. **Commit** `.agents/`, the selected `.claude/` integration and root instruction blocks and `analysis_options.yaml` with the rest: `chore(deps): move to dartway <version>, applying <n> migrations`,
    the body naming the notes applied and found not to apply.
 9. **Report**: the toolkit's channel and commit; what moved from what to what; notes applied, not
    applicable, and **left undone with why**; the protocol version; the gates, and what was red before.

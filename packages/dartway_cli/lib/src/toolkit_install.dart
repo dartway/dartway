@@ -19,6 +19,12 @@ void addToolkitInstallOptions(
 }) {
   parser
     ..addOption(
+      'agent',
+      allowed: ['codex', 'claude', 'both'],
+      defaultsTo: 'both',
+      help: 'Agent integrations to install (recorded for future updates).',
+    )
+    ..addOption(
       'base-branch',
       defaultsTo: 'master',
       help: 'Base branch of THIS project (used by PR/commit skills).',
@@ -60,6 +66,7 @@ void addToolkitInstallOptions(
 /// recorded have been reconciled.
 class ToolkitInstallChoice {
   ToolkitInstallChoice({
+    this.agent = 'both',
     required this.baseBranch,
     required this.language,
     required this.notesTracker,
@@ -95,6 +102,7 @@ class ToolkitInstallChoice {
         : (installed?.setting(settingKey) ?? args[flag] as String);
 
     return ToolkitInstallChoice(
+      agent: pick('agent', ToolkitProvenance.agentSetting),
       baseBranch: pick('base-branch', ToolkitProvenance.baseBranchSetting),
       language: pick('language', ToolkitProvenance.languageSetting),
       notesTracker: pick(
@@ -113,6 +121,7 @@ class ToolkitInstallChoice {
     );
   }
 
+  final String agent;
   final String baseBranch;
   final String language;
   final String notesTracker;
@@ -126,13 +135,17 @@ class ToolkitInstallChoice {
   /// runs from.
   final bool channelChosen;
 
-  Map<String, String> get settings => ToolkitProvenance.settingsOf(
-    baseBranch: baseBranch,
-    language: language,
-    notesTracker: notesTracker,
-  );
+  Map<String, String> get settings => {
+    ToolkitProvenance.agentSetting: agent,
+    ...ToolkitProvenance.settingsOf(
+      baseBranch: baseBranch,
+      language: language,
+      notesTracker: notesTracker,
+    ),
+  };
 
   void describe(StringSink out) {
+    out.writeln('Agent integrations: $agent');
     out.writeln('Base branch: $baseBranch');
     out.writeln('Project language: $language');
     out.writeln(
@@ -204,6 +217,7 @@ Future<ToolkitInstallResult?> installToolkitInto({
       notesTracker: choice.notesTracker,
     ),
     provenance: provenance,
+    agent: choice.agent,
   );
 
   return ToolkitInstallResult(monorepoDir: monorepoDir, provenance: provenance);

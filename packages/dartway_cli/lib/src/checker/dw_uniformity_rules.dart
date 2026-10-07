@@ -117,7 +117,7 @@ class DwUniformityInspector {
     }
     if (_active.contains(DwCheckType.docCommentLanguage) && language == null) {
       _notes.add(
-        'docCommentLanguage not judged: .claude/dartway-toolkit.json records '
+        'docCommentLanguage not judged: .agents/dartway-toolkit.json records '
         'no language this check can read — `dartway setup-ai --language '
         '<code>` records one',
       );

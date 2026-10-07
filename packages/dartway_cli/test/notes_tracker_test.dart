@@ -95,7 +95,7 @@ void main() {
 
   Future<String> claudeMdFor(String? notesTracker) async => read(
     await installInto(null, notesTracker: notesTracker),
-    p.join('.claude', 'CLAUDE.md'),
+    p.join('.agents', 'DARTWAY.md'),
   );
 
   group('the token', () {

@@ -463,7 +463,7 @@ enum DwCheckType {
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
-  /// The `error` set is published as the law list in `toolkit/CLAUDE.md` — the
+  /// The `error` set is published as the law list in `toolkit/AGENTS.md` — the
   /// rules a project on this framework may not override, as against the
   /// defaults it may. That is deliberately derived rather than sorted by hand:
   /// a check that declines to fail because it has a second legitimate reading

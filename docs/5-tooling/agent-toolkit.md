@@ -1,4 +1,4 @@
-# What is the `.claude/` folder in a DartWay project?
+# The DartWay agent toolkit
 
 The methodology of the framework, written for an agent instead of for a reader. Every project created
 by `dartway create` has it; `dartway setup-ai` installs it into a project you already have, and
@@ -29,34 +29,35 @@ a missing one — the agent writes non-working code with full confidence.
 
 ## What gets installed
 
-```
+```text
+AGENTS.md                    # Codex: owner text + managed connection block
+CLAUDE.md                    # Claude: owner text + managed connection block
+.agents/
+  DARTWAY.md                 # shared managed policy
+  dartway-toolkit.json        # revision and install choices
+  skills/dartway-*/SKILL.md   # Codex skills
 .claude/
-  CLAUDE.md                   # the constitution, always in the agent's context
-  skills/dartway-*/SKILL.md   # loaded by relevance to the task
-  commands/commit.md          # /commit
-  commands/dartway-checkup.md # /dartway-checkup
-  settings.json               # merged, not overwritten
-  dartway-toolkit.json        # where this install came from
-docs/dev_notes/
-  README.md                   # the form of a project finding
-  _coverage.md                # what /dartway-checkup has read
+  CLAUDE.md                  # pointer to shared policy
+  skills/dartway-*/SKILL.md   # generated Claude copies
+  commands/                  # shared skill wrappers
+  settings.json              # Claude permissions, merged
 ```
 
-**`CLAUDE.md` is the constitution**: the laws of the framework, the naming rules, what each package
-of the project is for, and where things go. It is loaded into every session, which is why it stays
-short and points at skills for the how.
+`create`, `setup-ai` and `update` accept `--agent codex|claude|both`.
+The default is `both`; later installs preserve the recorded choice unless
+explicitly overridden. Switching removes only managed DartWay skills and
+connection blocks for the deselected agent. Custom skills and owner instructions
+are preserved. Codex permissions are not inferred from Claude settings.
 
-**The laws are the checker's error set.** A law is a rule a project does not override; everything
-else in the toolkit is a default a project may replace with its own rule. The line is not drawn by
-taste: the published law list is exactly the checks `dart run dartway_cli:dartway check` fails on, and
-`packages/dartway_cli/test/toolkit_law_list_test.dart` holds the two together. A check that is only a
-warning is one with a second legitimate reading, and a project cannot be forbidden to decide that for
-itself.
+`toolkit/AGENTS.md` is the shared policy source, installed with project tokens
+as `.agents/DARTWAY.md`. Marked `dartway-toolkit:start` / `dartway-toolkit:end`
+blocks in root instructions tell both agents to read it. Malformed blocks refuse
+installation before files are changed. Skills have one source in `toolkit/skills/`.
 
-**Every rule is stated once.** A rule the checker holds is one row of that law table, naming the
-check and the skill that owns its topic — the check's own message says what to write instead. A rule
-no check can hold is written in the one skill that owns its topic, and everything else points there.
-The history and the reasons behind the rules are the framework's decision record, not the toolkit's.
+The manifest moves from `.agents/dartway-toolkit.json` to `.agents/dartway-toolkit.json`;
+the first upgrade reads existing settings from the old location. Commit managed
+files and root connection blocks. Project findings remain in `docs/dev_notes/`.
+Framework laws are the checker error set; project conventions override defaults.
 
 ## The skills
 
@@ -89,7 +90,7 @@ skills → `dartway-finish`.
 | `dartway-framework-notes` | Filing a finding back to the framework as an issue: what must not travel, the labels, the marker a workaround leaves in the code |
 
 Two commands come with them. **`/commit`** writes one conventional-commit line in English and decides
-nothing local — whether commits carry a ticket belongs to the project's own `CLAUDE.md`. **`/dartway-checkup`**
+nothing local — whether commits carry a ticket belongs to the project's root instructions. **`/dartway-checkup`**
 reports the state of the whole project and what is worth taking into work next: it runs the
 project's gates first (`dart run dartway_cli:dartway check`, `dart run dartway_cli:dartway generate --check`, the analyzers, the tests), compares
 them with what CI actually runs, measures how far the project trails the framework, and only then
@@ -115,20 +116,20 @@ The packages are detected by directory suffix at the project root on every run; 
 install before a file is touched**: the installer reads the toolkit first, and a token this CLI does
 not know, or one it would fill with nothing, is named with its file — a toolkit from another
 framework revision than the CLI, rather than a skill that tells the agent about `/lib/src/`. The three flag settings are recorded in
-`.claude/dartway-toolkit.json` and replayed by the next install unless a flag names another value —
+`.agents/dartway-toolkit.json` and replayed by the next install unless a flag names another value —
 see [The CLI](cli.md).
 
 ## Managed files, project files, and the one in between
 
 **Managed files are the toolkit's**, and every install removes them and copies them again:
-`.claude/CLAUDE.md`, every skill directory named `dartway-*`, and the `commit.md` and
+`.agents/DARTWAY.md`, `.claude/CLAUDE.md`, every skill directory named `dartway-*`, and the `commit.md` and
 `dartway-checkup.md` commands (a retired command on the installer's list is removed the same way).
-Anything else in `.claude/` — a project's own skills and commands — is never touched.
+Anything else in `.agents/skills/` or `.claude/` — a project's own skills and commands — is never touched.
 
 So do not edit a `dartway-*` skill in place: the next install drops the change. To customize,
 **copy the skill under another name** and edit the copy. The source of truth is `toolkit/` in the
 monorepo, and there is no reverse sync. Rules a project adds of its own belong in its root
-`CLAUDE.md` or its own skills.
+`AGENTS.md`, `CLAUDE.md` or its own skills.
 
 **`.claude/settings.json` is a toolkit default the project extends**, so it is merged rather than
 overwritten or skipped. It pre-approves this stack's build, test and run commands — `dart pub get`,
@@ -140,17 +141,17 @@ entry is printed** — the one cost of merging is an entry a project removed on 
 printing makes that visible in the same run. A file that is not a JSON object is left as it is and
 reported.
 
-**`docs/dev_notes/`** is the one place the installer writes outside `.claude/`: the project's own
+**`docs/dev_notes/`** holds the project's own
 findings, one committed file per finding. It is tracked, not git-ignored — a finding travels out in
 the pull request that carries it and survives a `git worktree remove`. `README.md` there is the
 toolkit's and is refreshed on every install; `_coverage.md` is the project's record of what
 `/dartway-checkup` has read, created once and never touched again.
 
-`.claude/dartway-toolkit.json` records where the install came from — the repository or local path,
+`.agents/dartway-toolkit.json` records where the install came from — the repository or local path,
 the channel, the commit, the CLI version — and the settings. It records **provenance, not content**:
 a list of installed files or their hashes would be a second copy of the files, and copies drift.
 
-Commit `.claude/` and `docs/dev_notes/` after every install: a clone comes with the skills in place,
+Commit `.agents/`, selected `.claude/` files, root instruction blocks and `docs/dev_notes/` after every install: a clone comes with the skills in place,
 and the history records which version of the methodology a piece of code was written under.
 
 ## Findings about the framework go back to the framework

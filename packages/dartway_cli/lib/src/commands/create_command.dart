@@ -23,6 +23,12 @@ class CreateCommand extends Command<int> {
   CreateCommand() {
     argParser
       ..addOption(
+        'agent',
+        allowed: ['codex', 'claude', 'both'],
+        defaultsTo: 'both',
+        help: 'Agent integrations to install.',
+      )
+      ..addOption(
         'channel',
         defaultsTo:
             Platform.environment['DARTWAY_BRANCH'] ??
@@ -177,6 +183,7 @@ class CreateCommand extends Command<int> {
       language: argResults!['language'] as String,
       notesTracker: argResults!['notes-tracker'] as String,
     );
+    settings[ToolkitProvenance.agentSetting] = argResults!['agent'] as String;
     await ToolkitInstaller.install(
       toolkitDir: Directory(p.join(monorepoDir.path, 'toolkit')),
       projectRoot: targetDir,
@@ -186,6 +193,7 @@ class CreateCommand extends Command<int> {
         notesTracker: settings[ToolkitProvenance.notesTrackerSetting]!,
       ),
       provenance: await source.provenance(monorepoDir, settings: settings),
+      agent: settings[ToolkitProvenance.agentSetting]!,
     );
 
     if (argResults!['git'] as bool) {

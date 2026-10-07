@@ -96,7 +96,7 @@ its codes is the admin, so there is no default. A real delivery goes into
 5. **App** — a screen with `ref.watch(dw.request(MyRequest()))`, a button with
    `dw.action((_) => dw.command(MyCommand()))`, the texts in `lib/l10n/`.
 
-The `.claude/` toolkit guides an AI assistant through the same steps.
+The shared toolkit in `.agents/` and selected `.claude/` integration guides an AI assistant through the same steps.
 
 ## Checks and tests
 
