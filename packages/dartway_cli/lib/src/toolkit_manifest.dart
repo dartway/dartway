@@ -61,6 +61,10 @@ class ToolkitProvenance {
   /// Reads the manifest a previous install left, or null when there is none —
   /// which is every project installed before this existed.
   static ToolkitProvenance? read(Directory projectRoot) {
+    // Installer metadata relocation is explicitly approved in AGENTS.md,
+    // Standards (2026-10-07), and D-125. It retains owner-selected install
+    // settings, not an old API or runtime. The next install writes only the
+    // common manifest and removes the old file.
     final common = _fileIn(projectRoot);
     final file = common.existsSync()
         ? common
