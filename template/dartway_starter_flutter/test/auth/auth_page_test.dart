@@ -219,6 +219,14 @@ void main() {
     expect(find.text('Get a code'), findsNothing);
     expect(find.text('Home'), findsNothing);
 
+    final expectedReports = app.unexpectedErrorReports;
+    expect(expectedReports, hasLength(2));
+    for (final report in expectedReports) {
+      expect(report.source, DwErrorSource.client);
+      expect('${report.error}', contains('dw.updateRequired'));
+      app.consumeErrorReport(report);
+    }
+
     await app.stop(tester);
   });
 }

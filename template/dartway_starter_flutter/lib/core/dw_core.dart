@@ -28,6 +28,9 @@ abstract final class AppDwCore {
   /// [clientOptions] instead — and with a token store of its own the core needs
   /// no storage plugin at all. It passes an in-memory [analyticsStore] too:
   /// the events the app records wait there instead of on the device.
+  ///
+  /// [onErrorReport] observes reports after the app's normal error policy has
+  /// run; the widget-test harness uses this existing hook to assert reports.
   static DwFlutterCore create({
     required Uri baseUrl,
     required String appVersion,
@@ -37,13 +40,17 @@ abstract final class AppDwCore {
     DwTokenStore? tokenStore,
     DwClientOptions clientOptions = const DwClientOptions(),
     DwAnalyticsStore? analyticsStore,
+    void Function(DwErrorReport report)? onErrorReport,
   }) => dw = DwFlutterCore(
     config: DwFlutterConfig(
       appVersion: appVersion,
       refusalText: (refusal) => appL10n.refusalText(refusal),
       updateRequiredScreen: (context, refusal) =>
           UpdateRequiredPage(refusal: refusal),
-      onErrorReport: _onErrorReport,
+      onErrorReport: (report) {
+        _onErrorReport(report);
+        onErrorReport?.call(report);
+      },
       readLoadingBuilder: (context) =>
           const Center(child: AppProgressIndicator()),
       readFailedBuilder: (context, error, retry) => LoadFailedMessage(

@@ -171,7 +171,18 @@ testWidgets('the app name comes from the server settings, and a name saved '
 ```
 
 (`template/dartway_starter_flutter/test/app/home/home_page_test.dart`.) `stop` waits out notifications,
-unmounts the app, disposes the core and asserts `server.errors` is empty.
+unmounts the app, disposes the core and asserts both `server.errors` and unaccounted application
+error reports are empty. The app factory routes the existing `DwFlutterConfig.onErrorReport` hook
+to the harness while preserving its normal reporting behavior. The harness also captures Flutter
+errors through `FlutterError.onError` and `PlatformDispatcher.onError` until cleanup finishes, then
+restores both hooks even if teardown assertions fail. `DwRefusalException` and
+`DwNotAuthenticatedException` reports are normal outcomes and are excluded from incident checks.
+
+An error-path test can assert a captured `DwErrorReport` and account for that exact report with
+`app.consumeErrorReport(report)`. The report must have been received by this harness; unrelated
+reports still fail `stop`. Most screens keep the cheap fake timing defaults, including an immediate
+cache release. A cache or navigation lifecycle test passes `clientOptions: const DwClientOptions()`
+to `TestApp.start` to use the production client's one-second release delay.
 
 **Settle by short pumps, not `pumpAndSettle`.** A loading indicator animates for as long as it is on
 screen, so settling by frames waits out the timeout instead of the traffic.

@@ -6,7 +6,6 @@ import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/dartway_example_app.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:dartway_push_flutter/dartway_push_flutter.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -93,7 +92,13 @@ final class FakeApp {
 /// A running app over a [FakeApp]: the app's own core, built for this
 /// test, and the app's own widget.
 final class TestApp {
-  TestApp._(this.fake, this.core, this.logs, this._debugPrint);
+  TestApp._(
+    this.fake,
+    this.core,
+    this.logs,
+    this._restoreGlobalHooks,
+    this._errorReports,
+  );
 
   final FakeApp fake;
   final DwFlutterCore core;
@@ -104,7 +109,27 @@ final class TestApp {
 
   DwFakeServer get server => fake.server;
 
-  final DebugPrintCallback _debugPrint;
+  final void Function() _restoreGlobalHooks;
+  final List<DwErrorReport> _errorReports;
+  bool _stopped = false;
+
+  /// Unexpected reports not yet explicitly accounted for by this test.
+  List<DwErrorReport> get unexpectedErrorReports =>
+      List.unmodifiable(_errorReports);
+
+  /// Accounts for exactly this report instance after the test asserts its
+  /// error, source and other relevant metadata.
+  void consumeErrorReport(DwErrorReport report) {
+    final index = _errorReports.indexWhere(
+      (candidate) => identical(candidate, report),
+    );
+    expect(
+      index,
+      isNonNegative,
+      reason: 'the expected error report was not captured by this test',
+    );
+    if (index >= 0) _errorReports.removeAt(index);
+  }
 
   /// Builds a core against [fake], signed in as [session] (or signed out),
   /// and pumps the app at phone size.
@@ -112,7 +137,9 @@ final class TestApp {
   /// With [bootstrap], the app is mounted as `DwAppRunner` mounts it — under
   /// the framework's `DwAppBootstrapper`, which runs `dw.init` and puts the
   /// screens that cover the whole app in place — instead of pumping the app
-  /// widget over a core started here.
+  /// widget over a core started here. [clientOptions] defaults to the fake
+  /// server's immediate release delay; pass production options for cache or
+  /// navigation lifecycle tests.
   static Future<TestApp> start(
     WidgetTester tester,
     FakeApp fake, {
@@ -120,6 +147,7 @@ final class TestApp {
     Size size = const Size(390, 844),
     bool bootstrap = false,
     List<DwPushTransportClient> pushTransports = const [],
+    DwClientOptions clientOptions = dwFakeClientOptions,
   }) async {
     tester.view
       ..physicalSize = size * 3
@@ -132,19 +160,52 @@ final class TestApp {
     final printed = debugPrint;
     debugPrint = (message, {wrapWidth}) => logs.add(message ?? '');
 
+    final errorReports = <DwErrorReport>[];
+    final previousFlutterError = FlutterError.onError;
+    final binding = WidgetsBinding.instance;
+    final previousPlatformError = binding.platformDispatcher.onError;
+    var globalsRestored = false;
+    void restoreGlobalHooks() {
+      if (globalsRestored) return;
+      globalsRestored = true;
+      FlutterError.onError = previousFlutterError;
+      binding.platformDispatcher.onError = previousPlatformError;
+      debugPrint = printed;
+    }
+
+    addTearDown(restoreGlobalHooks);
     final core = AppDwCore.create(
       baseUrl: fake.server.baseUrl,
       appVersion: appBuildVersion,
       httpTransport: fake.server.httpTransport,
       liveConnector: fake.server.liveConnector,
       tokenStore: DwMemoryTokenStore(session),
-      clientOptions: dwFakeClientOptions,
+      clientOptions: clientOptions,
       pushTransports: pushTransports,
       analyticsStore: DwMemoryAnalyticsStore(),
+      onErrorReport: (report) {
+        if (report.error is DwRefusalException ||
+            report.error is DwNotAuthenticatedException) {
+          return;
+        }
+        errorReports.add(report);
+      },
     );
     // Disposing twice is harmless; this one is for a test that failed before
     // [stop], so the next test can build its own core.
     addTearDown(core.dispose);
+    FlutterError.onError = (details) {
+      core.handleError(
+        details.exception,
+        details.stack ?? StackTrace.empty,
+        source: DwErrorSource.zone,
+      );
+      previousFlutterError?.call(details);
+    };
+    binding.platformDispatcher.onError = (error, stack) {
+      core.handleError(error, stack, source: DwErrorSource.zone);
+      return true;
+    };
 
     if (bootstrap) {
       await tester.pumpWidget(
@@ -163,7 +224,8 @@ final class TestApp {
       await core.init();
       await tester.pumpWidget(const ProviderScope(child: AppRoot()));
     }
-    final app = TestApp._(fake, core, logs, printed);
+    final app = TestApp._(fake, core, logs, restoreGlobalHooks, errorReports);
+    addTearDown(() => app.stop(tester));
     await app.settle(tester);
     return app;
   }
@@ -243,16 +305,52 @@ final class TestApp {
   }
 
   /// Waits out the notifications on screen, unmounts the app and stops the
-  /// core, asserting that the fake server met nothing unexpected.
+  /// core, then checks for both unexpected fake-server calls and reports.
   Future<void> stop(WidgetTester tester) async {
-    await waitOutNotifications(tester);
-    await tester.pumpWidget(const SizedBox());
-    await settle(tester);
+    if (_stopped) return;
+    Object? cleanupError;
+    StackTrace? cleanupStack;
+    Future<void> attempt(Future<void> Function() cleanup) async {
+      try {
+        await cleanup();
+      } catch (error, stackTrace) {
+        cleanupError ??= error;
+        cleanupStack ??= stackTrace;
+      }
+    }
+
+    await attempt(() => waitOutNotifications(tester));
+    await attempt(() => tester.pumpWidget(const SizedBox()));
+    await attempt(() => settle(tester));
     // Its send timer would outlive the test; bounded, so a dispose that
     // stalls fails here instead of hanging the suite.
-    await run(tester, core.plugins.analytics.dispose());
-    await core.dispose();
-    debugPrint = _debugPrint;
+    await attempt(() => run(tester, core.plugins.analytics.dispose()));
+    await attempt(core.dispose);
+    await attempt(() async {
+      final pendingException = tester.takeException();
+      if (pendingException != null &&
+          !_errorReports.any(
+            (report) => identical(report.error, pendingException),
+          )) {
+        core.handleError(
+          pendingException,
+          StackTrace.current,
+          source: DwErrorSource.zone,
+        );
+      }
+    });
+    _restoreGlobalHooks();
+    _stopped = true;
+    if (cleanupError != null) {
+      Error.throwWithStackTrace(cleanupError!, cleanupStack!);
+    }
     expect(server.errors, isEmpty, reason: 'the fake server met a surprise');
+    expect(
+      _errorReports,
+      isEmpty,
+      reason:
+          'unexpected DartWay error reports were not accounted for: '
+          '${_errorReports.map((report) => '${report.source}: ${report.error}').join('; ')}',
+    );
   }
 }

@@ -31,6 +31,9 @@ abstract final class AppDwCore {
   /// [pushTransports] deliver notifications — FCM when Firebase is configured;
   /// a test passes a fake one. With none, push is inert. A test passes an
   /// in-memory [analyticsStore] too, where the recorded events wait.
+  ///
+  /// [onErrorReport] observes reports after the app's normal error policy has
+  /// run; the widget-test harness uses this existing hook to assert reports.
   static DwFlutterCore create({
     required Uri baseUrl,
     required String appVersion,
@@ -40,13 +43,17 @@ abstract final class AppDwCore {
     DwClientOptions clientOptions = const DwClientOptions(),
     List<DwPushTransportClient> pushTransports = const [],
     DwAnalyticsStore? analyticsStore,
+    void Function(DwErrorReport report)? onErrorReport,
   }) => dw = DwFlutterCore(
     config: DwFlutterConfig(
       appVersion: appVersion,
       refusalText: (refusal) => appL10n.refusalText(refusal),
       updateRequiredScreen: (context, refusal) =>
           UpdateRequiredPage(refusal: refusal),
-      onErrorReport: _onErrorReport,
+      onErrorReport: (report) {
+        _onErrorReport(report);
+        onErrorReport?.call(report);
+      },
       readLoadingBuilder: (context) =>
           const Center(child: AppProgressIndicator()),
       readFailedBuilder: (context, error, retry) => LoadFailedMessage(

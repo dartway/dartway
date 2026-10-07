@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -281,6 +282,12 @@ void main() {
           .onPressed,
       isNotNull,
     );
+
+    final report = app.unexpectedErrorReports.single;
+    expect(report.source, DwErrorSource.asyncBuild);
+    expect(report.failedCall, 'ListMyChatReadStates');
+    expect('${report.error}', contains('incident-badges'));
+    app.consumeErrorReport(report);
 
     await app.stop(tester);
   });
