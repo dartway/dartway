@@ -4,8 +4,6 @@ import 'package:path/path.dart' as p;
 import 'package:pub_semver/pub_semver.dart';
 import 'package:yaml/yaml.dart';
 
-import 'version_check.dart';
-
 /// Where the notes live inside the monorepo, as a relative path.
 const migrationNotesDir = 'docs/migrations';
 
@@ -33,25 +31,10 @@ class DwMigrationNote {
   final String title;
 
   /// The packages this note is about, each with the version the change lands
-  /// in. A project below that version on any of them has the work ahead of it.
+  /// in. The target must reach that version; completion is recorded separately.
   final Map<String, String> affects;
 
   final String body;
-
-  /// Whether a project standing at [projectVersions] still has this note to
-  /// apply.
-  ///
-  /// A package the project does not depend on cannot make a note apply: that is
-  /// the "who is affected" filter, and it is mechanical rather than a sentence
-  /// somebody has to read.
-  bool appliesTo(Map<String, String> projectVersions) {
-    for (final entry in affects.entries) {
-      final current = projectVersions[entry.key];
-      if (current == null) continue;
-      if (!isPackageAtLeastVersion(current, entry.value)) return true;
-    }
-    return false;
-  }
 
   /// [affects], parsed as semver where it parses at all — a problem the
   /// frontmatter check above already reports on a version that does not.
@@ -275,7 +258,9 @@ Object parseMigrationNote({required String contents, required String path}) {
     }
     // A YAML scalar like 0.8 parses as a number, and "0.8" is not a version.
     // Quoting it is the fix, and saying so is cheaper than a wrong comparison.
-    if (version is! String || !RegExp(r'^\d+\.\d+\.\d+').hasMatch(version)) {
+    if (version is! String ||
+        !RegExp(r'^\d+\.\d+\.\d+').hasMatch(version) ||
+        _tryParseVersion(version) == null) {
       return DwMigrationNoteProblem(
         path: path,
         problem:
@@ -293,10 +278,3 @@ Object parseMigrationNote({required String contents, required String path}) {
     body: lines.sublist(end + 1).join('\n').trim(),
   );
 }
-
-/// The notes a project standing at [projectVersions] still has to apply, in the
-/// order to apply them.
-List<DwMigrationNote> migrationNotesToApply({
-  required List<DwMigrationNote> notes,
-  required Map<String, String> projectVersions,
-}) => notes.where((note) => note.appliesTo(projectVersions)).toList();

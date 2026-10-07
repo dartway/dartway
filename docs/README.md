@@ -14,7 +14,7 @@ page and the code it describes travel in the same PR — the synchronisation law
 | `4-server/` | The server: the app server, handlers and their context, the database, migrations, accounts and identities, uploads, jobs, routes, alerts, push delivery, analytics |
 | `5-tooling/` | The CLI, testing, deploy, the conventions checker, the agent toolkit |
 | `6-studio/` | DartWay Studio and the bridge an app opens to it |
-| `migrations/` | Notes on what a project has to change when it moves to a newer framework — read by `dartway update` |
+| `migrations/` | Project edits for a framework target — reported by `dartway update --plan` until explicitly verified |
 
 `DESIGN.md` is not documentation. It is the law of how the framework's own public API is designed —
 written for whoever changes the framework, not for whoever uses it, and it is not published.

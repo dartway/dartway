@@ -109,10 +109,12 @@ outward — to an application that is **behind**, and whose author will read wha
 weeks from now with none of today's context.
 
 **No exemption, including for the rewrite** (D-080). A note is written in the same pull request as
-the change — and because a note reaches a project only when it is *below* the version named, the
-same pull request raises the version that delivers it: a prerelease of the family's next version in
-lockstep (`0.21.0-dev.1`, then `dev.2`, … after `0.20.0`; pub.dev receives the plain version when the
-release is cut, D-086), or the satellite's own, with the carets in `template/` and `example/`. The one
+the change, keyed to the package version that delivers it. A target at or above that version shows
+the note until the project records a verified applied/not-applicable disposition; dependency locks
+and toolkit installations never complete it (D-126). Follow the root version policy: use a
+satellite's pending release version if it is already ahead of `stable`; otherwise raise it. The
+family's prereleases move in lockstep (`0.21.0-dev.1`, then `dev.2`, … after `0.20.0`; pub.dev receives
+the plain version when the release is cut, D-086), with the carets in `template/` and `example/`. The one
 journey without a note is a project coming from 0.x, which is recreated on the rewrite rather than
 migrated (D-031).
 

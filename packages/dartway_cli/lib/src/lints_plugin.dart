@@ -147,6 +147,9 @@ DwLintsWiring _raise(
   if (current is YamlMap && current.containsKey('path')) {
     return (change: null, manual: null);
   }
+  if (current is YamlMap && current.containsKey('git')) {
+    return (change: null, manual: null);
+  }
   if (path != null) {
     return (
       change: null,

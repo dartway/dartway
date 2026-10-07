@@ -82,7 +82,7 @@ skills → `dartway-finish`.
 | `dartway-ui-kit` | The kit as source inside the app, and the ban on raw styles outside it |
 | `dartway-on-device` | What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |
 | `dartway-finish` | The definition of done before a commit or PR: audit the diff, apply only what is confirmed |
-| `dartway-update` | Moving onto a newer framework: `dartway update`, the migration notes, then the versions |
+| `dartway-update` | Plan an exact target, resolve the plugin, apply and verify notes, then record dispositions |
 | `dartway-push-delivery` | Server-side push delivery |
 | `dartway-analytics` | Events tracked in the app and on the server, stored in the project's Postgres |
 | `dartway-media` | Video and audio through the media plugin; the controls are the project's own kit widgets |
@@ -172,9 +172,11 @@ in every project that skipped it. `--notes-tracker owner/repo` sends them to ano
 ## Keeping it current
 
 - **`dartway setup-ai`** — the first install, or a re-install on the same channel.
-- **`dartway update`** — the toolkit from the channel the project is on, plus the report of which
-  framework packages the project is behind on and which migration notes it still owes. The
-  `dartway-update` skill carries that report out.
+- **`dartway update --plan`** — a read-only exact-target plan and plugin resolution preflight.
+  `update --target <sha>` installs that committed toolkit and resolvable plugin configuration.
+  Migration notes stay unconfirmed until explicitly verified as applied or not applicable in
+  `.dartway/migrations.json`; toolkit installation and dependency locks do not complete them.
+  The `dartway-update` skill carries the plan through project edits and verification.
 - **`--local-repo <checkout>`** (or `DARTWAY_MONOREPO_DIR`) — install from a local monorepo checkout
   instead of a channel, for working on the framework and a project side by side. It records no
   channel. A CLI activated from a checkout uses that checkout when no channel is chosen.

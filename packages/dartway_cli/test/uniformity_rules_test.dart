@@ -518,6 +518,12 @@ const j = Row(spacing: 0);
       expect(problem(), isNull);
       options('plugins:\n  dartway_lints:\n    path: ../lints\n');
       expect(problem(), isNull);
+      options(
+        'plugins:\n  dartway_lints:\n    git:\n'
+        '      url: https://github.com/dartway/dartway.git\n'
+        '      ref: target-sha\n      path: packages/dartway_lints\n',
+      );
+      expect(problem(), isNull);
     });
 
     test('a pin that resolves to nothing is reported too', () {

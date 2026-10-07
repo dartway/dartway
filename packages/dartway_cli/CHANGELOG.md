@@ -2,6 +2,13 @@
 
 ## 0.24.0
 
+- **Breaking — safe framework updates** (#427, #441): `update --plan` reads an exact committed target
+  without project edits; writes require its full `--target` SHA. The proposed analyzer plugin
+  source must resolve through pub before installation or configuration edits. Existing git/path
+  choices and project rules survive. Migration completion is explicitly verified per note in
+  `.dartway/migrations.json`, with applied/not-applicable dispositions and evidence. Locks and
+  toolkit installs never complete notes; unknown baselines and partial completion remain visible.
+
 - One toolkit supports Codex and Claude. `create`, `setup-ai` and `update`
   accept `--agent codex|claude|both` (default `both`, recorded for updates).
   Root owner instructions are preserved; managed blocks connect both agents

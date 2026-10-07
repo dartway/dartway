@@ -95,69 +95,6 @@ void main() {
     });
   });
 
-  group('selection', () {
-    final note = DwMigrationNote(
-      path: 'docs/migrations/2026-09-05-plugins.md',
-      title: 'plugins as a list',
-      affects: const {'dartway_core_flutter': '0.8.0'},
-      body: '',
-    );
-
-    test('applies to a project below the version it lands in', () {
-      expect(note.appliesTo({'dartway_core_flutter': '0.4.0'}), isTrue);
-    });
-
-    test('does not apply once the project has that version', () {
-      expect(note.appliesTo({'dartway_core_flutter': '0.8.0'}), isFalse);
-      expect(note.appliesTo({'dartway_core_flutter': '0.9.1'}), isFalse);
-    });
-
-    test('does not apply to a project without the package at all', () {
-      // The "who is affected" filter, done mechanically: a project that never
-      // depended on the package has nothing to change.
-      expect(note.appliesTo({'dartway_router': '1.0.0'}), isFalse);
-    });
-
-    test('a project on an earlier pre-release of the very version a note '
-        'lands in still has the note ahead of it — the case isAtLeastVersion '
-        'could not tell from "same release" (review of #308)', () {
-      final devNote = DwMigrationNote(
-        path: 'n.md',
-        title: 't',
-        affects: const {'dartway_core_server': '0.20.0-dev.4'},
-        body: '',
-      );
-      expect(
-        devNote.appliesTo({'dartway_core_server': '0.20.0-dev.2'}),
-        isTrue,
-      );
-      expect(
-        devNote.appliesTo({'dartway_core_server': '0.20.0-dev.4'}),
-        isFalse,
-      );
-      expect(devNote.appliesTo({'dartway_core_server': '0.20.0'}), isFalse);
-    });
-
-    test('one package behind is enough when a note names several', () {
-      final wide = DwMigrationNote(
-        path: 'n.md',
-        title: 't',
-        affects: const {
-          'dartway_core_flutter': '0.8.0',
-          'dartway_core_server': '0.12.0',
-        },
-        body: '',
-      );
-      expect(
-        wide.appliesTo({
-          'dartway_core_flutter': '0.8.0',
-          'dartway_core_server': '0.11.4',
-        }),
-        isTrue,
-      );
-    });
-  });
-
   group('readMigrationNotes orders by date, then version, then name', () {
     late Directory sandbox;
 
@@ -320,7 +257,7 @@ void main() {
           // request bumps to — but never one further out: a version nothing is
           // moving towards is a migration that never becomes due.
           expect(
-            isAtLeastVersion(current!, entry.value),
+            isPackageAtLeastVersion(current!, entry.value),
             isTrue,
             reason:
                 '${note.path} says ${entry.key} ${entry.value}, but the '
