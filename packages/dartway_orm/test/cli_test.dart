@@ -49,13 +49,14 @@ void main() {
   String migrationsDir() => p.join(sandbox.path, 'migrations');
 
   DwMigrationCli cli({
+    String? directory,
     DwDatabaseSchema? schema,
     List<DwDatabaseMigration> migrations = const [],
     Map<String, List<DwDatabaseMigration>> modules = const {},
   }) => DwMigrationCli(
     schema: schema ?? DwDatabaseSchema.fromTables(const []),
     migrations: migrations,
-    directory: migrationsDir(),
+    directory: directory ?? migrationsDir(),
     modules: modules,
     database: testServerConfig(name: database.name),
     scratchDatabasePrefix: 'orm_test_scratch_',
@@ -261,6 +262,39 @@ final class M$id extends DwDatabaseMigration {
       expect(out.toString(), contains('create table club_session'));
     });
 
+    test(
+      'registration imports every migration through its owning package',
+      () async {
+        File(p.join(sandbox.path, 'pubspec.yaml')).writeAsStringSync('''
+name: shop_server
+environment:
+  sdk: ^3.11.0
+dependencies:
+  dartway_core_server: ^0.20.0-dev.1
+''');
+        final directory = p.join(sandbox.path, 'lib', 'src', 'migrations');
+        for (final name in ['initial', 'data_work']) {
+          expect(
+            await cli(directory: directory).run(['create', name]),
+            DwMigrationCli.exitOk,
+            reason: out.toString(),
+          );
+        }
+        final registration = File(
+          p.join(directory, 'migrations.dart'),
+        ).readAsStringSync();
+        for (final name in ['initial', 'data_work']) {
+          expect(
+            registration,
+            contains(
+              "import 'package:shop_server/src/migrations/m20260914_083005_$name.dart';",
+            ),
+          );
+        }
+        expect(registration, isNot(matches(RegExp(r"import 'm[^']+\.dart';"))));
+      },
+    );
+
     test('in a server project imports dartway_core_server and is written as '
         "that project's dart format leaves it, then sealed", () async {
       File(p.join(sandbox.path, 'pubspec.yaml')).writeAsStringSync('''
@@ -282,6 +316,7 @@ dev_dependencies:
       final registration = File(
         p.join(migrationsDir(), 'migrations.dart'),
       ).readAsStringSync();
+      expect(registration, contains("import 'm20260914_083005_initial.dart';"));
       const serverImport =
           "import 'package:dartway_core_server/dartway_core_server.dart';";
       for (final file in [source, registration]) {
@@ -612,4 +647,39 @@ dev_dependencies:
       contains('final List<DwDatabaseMigration> pushMigrations = [];'),
     );
   });
+
+  test(
+    'registration at lib root uses a package URI; outside lib stays relative',
+    () {
+      File(
+        p.join(sandbox.path, 'pubspec.yaml'),
+      ).writeAsStringSync('name: shop_server\n');
+      for (final (directory, uri) in [
+        ('lib', 'package:shop_server/m20260101_000000_initial.dart'),
+        ('library', 'm20260101_000000_initial.dart'),
+        ('test', 'm20260101_000000_initial.dart'),
+      ]) {
+        expect(
+          DwDraftWriter.registration(
+            variable: 'appMigrations',
+            classesById: const {
+              '20260101_000000_initial': 'M20260101000000Initial',
+            },
+            project: DwMigrationProject.of(p.join(sandbox.path, directory)),
+          ),
+          contains("import '$uri';"),
+        );
+      }
+      expect(
+        DwDraftWriter.registration(
+          variable: 'appMigrations',
+          classesById: const {
+            '20260101_000000_initial': 'M20260101000000Initial',
+          },
+          project: DwMigrationProject.standalone,
+        ),
+        contains("import 'm20260101_000000_initial.dart';"),
+      );
+    },
+  );
 }
