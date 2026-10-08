@@ -42,7 +42,7 @@ RUN flutter pub get --enforce-lockfile
 # here or in the app. Building this image by hand means passing it by hand.
 ARG DW_BACKEND_URL
 RUN test -n "$DW_BACKEND_URL"
-RUN flutter build web --release \
+RUN flutter build web --release --no-web-resources-cdn \
     --dart-define="DW_BACKEND_URL=${DW_BACKEND_URL}"
 
 # `COPY` keeps each file's mode, and the checkout's modes come from the umask

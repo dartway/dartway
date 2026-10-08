@@ -409,7 +409,7 @@ reads the events; the prose may change wording at any time, the events may not.
 | `step_finished` | `index`, `count`, `id`, `exit_code`; `stdout`, `stderr` for a step whose output is its result |
 | `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message`; `resumed: true` when the step failed in the deployment being resumed and was not run again |
 | `services` | `services` (`name`, `status`) |
-| `probe` | `title`, `passed`, `detail` |
+| `probe` | `title`, `passed`, `warning`, `detail` |
 | `run_finished` | `ok`, `exit_code`; `failed_step`, or `reason` (`checks`, `nothing-to-resume`, `unreachable`, `verification`) |
 
 **Then it verifies from outside**, as a browser and an app would, retrying failed probes up to twelve
@@ -418,6 +418,9 @@ times five seconds apart:
 - `GET /health` answers `200` `ok` through the api host and through the app host;
 - `GET /` on the app host is the Flutter `index.html`, served with a revalidating cache policy, and
   the build's entry points are not served for reuse without revalidation;
+- `main.dart.js` (or a Wasm build's `main.dart.wasm`) answers a request accepting gzip with
+  `Content-Encoding: gzip`; `index.html` and `flutter_bootstrap.js` do not load CanvasKit from
+  `www.gstatic.com` (an old project Dockerfile is warned about without failing the deploy);
 - `/dw/live` upgrades through both hosts (from the app origin on the app host) and the server speaks
   on the socket;
 - where declared: the site answers `200 text/html`; the storage preflight admits a `PUT` from the app
@@ -461,6 +464,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `database-reachable` | error | With `database: external`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS`/`_CA_FILE` are validated exactly as the server parses them, then a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with the same `sslmode` the server will use (`require`, `verify-full` with a CA file, or `disable`) and runs a query — a real authenticated connection, not a bare TCP probe. A failure names why: a malformed stored value, DNS, refused, a timeout, authentication, the server not offering TLS, or its certificate not verifying against the configured CA. Skipped with `database: bundled` |
 | `secrets-match-local` | warning | The server store and `deploy/secrets.yaml` hold the same key names |
 | `outside` | error | The same outside probes `run` ends with, against whatever is deployed now; runs even when SSH fails |
+| `web-resources-local` | warning | The deployed startup files do not load CanvasKit from `www.gstatic.com`; an old web Dockerfile is named with the migration that adds `--no-web-resources-cdn` |
 
 ## Images
 
@@ -473,7 +477,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
   the server fails — and `ENTRYPOINT ["/app/server"]` in exec form.
 - **The web image** builds with Flutter from the project root, takes `ARG DW_BACKEND_URL` (and refuses
   to build without it) and `ARG STUDIO_APP_ORIGIN` (the same address, for the Studio binding's access
-  check; an app without the binding declares no such ARG and Docker drops it), runs `flutter build web --release --dart-define=DW_BACKEND_URL=…`, and serves
+  check; an app without the binding declares no such ARG and Docker drops it), runs `flutter build web --release --no-web-resources-cdn --dart-define=DW_BACKEND_URL=…` so CanvasKit is served from the app's own origin, and serves
   the build with `nginx:1.30.5-alpine` and `<project>_flutter/nginx.conf`. It serves files only.
 - **`.dockerignore` denies everything** and admits the packages by role suffix (`*_server/`,
   `*_flutter/`, `*_shared/`), minus build output and `.env` — so the working copy's history, build
@@ -488,6 +492,13 @@ and an `ETag` (a `304`, not a download) and keeps the long-lived, immutable rule
 a content hash. `web-cache-policy` reads that configuration; the outside probe asks the deployed site.
 **Fixing it does not reach a browser that already holds a copy** — tell whoever you can reach to
 hard-reload.
+
+The rendered front proxy compresses responses from the app and optional static-site hosts with
+gzip (level 5, for JavaScript, Wasm, CSS, JSON, SVG, text and web manifests) once they reach 1 KiB.
+It leaves the API host and the app host's `/dw/` call locations untouched: compression here owns
+large static delivery, while the call protocol remains exactly what the server emits. Nginx adds
+`Vary: Accept-Encoding`; its compressed weak ETag continues to make `If-None-Match` revalidation a
+`304`. The cache-control split above is unchanged.
 
 ## Secrets
 

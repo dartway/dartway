@@ -368,6 +368,7 @@ int reportOutsideVerification(
     report.event('probe', {
       'title': result.title,
       'passed': result.passed,
+      'warning': result.warning,
       'detail': result.detail,
     });
   }

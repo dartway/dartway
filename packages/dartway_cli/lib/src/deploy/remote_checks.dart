@@ -96,6 +96,13 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
     // HTTPS, not SSH — and it must still run when the SSH checks have failed.
     evaluate: _checkOutside,
   ),
+  DwDeployCheck(
+    id: 'web-resources-local',
+    title: 'The deployed app loads CanvasKit from its own origin',
+    stage: DwDeployCheckStage.remote,
+    severity: DwCheckSeverity.warning,
+    evaluate: _checkCanvasKitOrigin,
+  ),
 ];
 
 /// Addresses [hostOrAddress] resolves to; empty when it does not resolve.
@@ -774,4 +781,13 @@ Future<DwDeployVerdict> _checkOutside(DwDeployContext context) async {
         'should. "dartway deploy run" asks the same questions at its end and '
         'reports each one.',
   );
+}
+
+Future<DwDeployVerdict> _checkCanvasKitOrigin(DwDeployContext context) async {
+  final result = await DwOutsideProbe().canvasKitOrigin(context.stack.appOrigin);
+  return result.warning
+      ? DwDeployVerdict.fail(result.detail)
+      : result.passed
+      ? DwDeployVerdict.pass(result.detail)
+      : DwDeployVerdict.fail(result.detail);
 }

@@ -270,7 +270,54 @@ void main() {
   test('every outside probe answers as a browser and an app need', () async {
     final results = await runner.verifyFromOutside(attempts: 3);
     expect(reportOutsideVerification(results), 0, reason: results.join('\n'));
-    expect(results.map((r) => r.title), hasLength(9));
+    expect(results.map((r) => r.title), hasLength(11));
+  });
+
+  test('the front proxy compresses and revalidates the web bundle', () async {
+    final client = HttpClient()
+      ..autoUncompress = false
+      ..connectionFactory = (uri, proxyHost, proxyPort) =>
+          Socket.startConnect(InternetAddress.loopbackIPv4, port);
+    try {
+      final request = await client.getUrl(
+        Uri.parse('${stack.appOrigin}/main.dart.js'),
+      );
+      request.headers.set(HttpHeaders.acceptEncodingHeader, 'gzip');
+      final response = await request.close();
+      expect(response.statusCode, 200);
+      expect(response.headers.value('content-encoding'), 'gzip');
+      expect(response.headers.value('vary'), contains('Accept-Encoding'));
+      final etag = response.headers.value('etag');
+      expect(etag, isNotNull);
+      await response.drain<void>();
+
+      final revalidation = await client.getUrl(
+        Uri.parse('${stack.appOrigin}/main.dart.js'),
+      );
+      revalidation.headers
+        ..set(HttpHeaders.acceptEncodingHeader, 'gzip')
+        ..set(HttpHeaders.ifNoneMatchHeader, etag!);
+      final notModified = await revalidation.close();
+      expect(notModified.statusCode, 304);
+      await notModified.drain<void>();
+    } finally {
+      client.close(force: true);
+    }
+  });
+
+  test('the web image contains CanvasKit and serves Wasm correctly', () async {
+    final bundled = await compose(
+      'exec -T web test -f '
+      '/usr/share/nginx/html/canvaskit/canvaskit.wasm',
+    );
+    expect(bundled.exitCode, 0, reason: bundled.stderr);
+
+    final wasm = await send(
+      'HEAD',
+      '${stack.appOrigin}/canvaskit/canvaskit.wasm',
+    );
+    expect(wasm.status, 200);
+    expect(wasm.headers.contentType?.mimeType, 'application/wasm');
   });
 
   test(

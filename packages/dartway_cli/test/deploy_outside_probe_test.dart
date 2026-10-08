@@ -103,6 +103,74 @@ void main() {
     });
   });
 
+  group('web compression', () {
+    test('passes when the JavaScript bundle is gzip encoded', () async {
+      site.handler = (request) async {
+        if (request.uri.path != '/main.dart.js') {
+          return text(request, 404, '');
+        }
+        expect(request.headers.value('accept-encoding'), contains('gzip'));
+        final bytes = gzip.encode(List<int>.filled(2048, 65));
+        request.response
+          ..statusCode = 200
+          ..headers.contentType = ContentType(
+            'application',
+            'javascript',
+          )
+          ..headers.set('content-encoding', 'gzip')
+          ..add(bytes);
+        await request.response.close();
+      };
+      final result = await site.probe.webCompression(
+        'http://app.example.com',
+      );
+      expect(result.passed, isTrue, reason: result.detail);
+      expect(result.detail, contains('main.dart.js'));
+    });
+
+    test(
+      'fails with the file and size when the bundle is uncompressed',
+      () async {
+        site.handler = (request) => request.uri.path == '/main.dart.js'
+            ? text(request, 200, 'x' * 4096)
+            : text(request, 404, '');
+        final result = await site.probe.webCompression(
+          'http://app.example.com',
+        );
+        expect(result.passed, isFalse);
+        expect(result.detail, contains('/main.dart.js (4096 bytes)'));
+        expect(result.detail, contains('expected gzip'));
+      },
+    );
+  });
+
+  group('CanvasKit origin', () {
+    test('warns when a startup file names the Flutter CDN', () async {
+      site.handler = (request) => text(
+        request,
+        200,
+        request.uri.path == '/flutter_bootstrap.js'
+            ? 'https://www.gstatic.com/flutter-canvaskit/v1/canvaskit.js'
+            : '<html>local bootstrap</html>',
+      );
+      final result = await site.probe.canvasKitOrigin(
+        'http://app.example.com',
+      );
+      expect(result.warning, isTrue);
+      expect(result.detail, contains('--no-web-resources-cdn'));
+      expect(result.detail, contains('2026-10-08-local-canvaskit.md'));
+    });
+
+    test('passes when startup files use local resources', () async {
+      site.handler = (request) => text(request, 200, 'canvaskit/canvaskit.js');
+      final result = await site.probe.canvasKitOrigin(
+        'http://app.example.com',
+      );
+      expect(result.passed, isTrue, reason: result.detail);
+      expect(result.warning, isFalse);
+    });
+  });
+
   group('live upgrade', () {
     test('passes on 101 followed by the documented dw. close', () async {
       String? origin;

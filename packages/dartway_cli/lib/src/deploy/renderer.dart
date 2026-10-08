@@ -531,6 +531,7 @@ class DwStackRenderer {
     // --- app
     _openServer(buffer, _target.appDomain);
     buffer
+      ..write(_gzipConfiguration)
       ..writeln('    client_max_body_size $bodyLimit;')
       ..writeln()
       ..writeln(
@@ -561,11 +562,13 @@ class DwStackRenderer {
       ..writeln()
       ..writeln('    # Calls, on the app\'s own origin: no CORS, no preflight.')
       ..writeln('    location /dw/ {');
+    buffer.writeln('        gzip off;');
     _proxy(buffer);
     buffer
       ..writeln('    }')
       ..writeln()
       ..writeln('    location = /health {');
+    buffer.writeln('        gzip off;');
     _proxy(buffer);
     buffer
       ..writeln('    }')
@@ -609,6 +612,7 @@ class DwStackRenderer {
     if (site != null && site.deployed) {
       _openServer(buffer, site.domain);
       buffer
+        ..write(_gzipConfiguration)
         ..writeln('    root /srv/site;')
         ..writeln('    index index.html;')
         ..writeln('    etag on;')
@@ -666,6 +670,18 @@ class DwStackRenderer {
 
     return buffer.toString();
   }
+
+  /// Compresses only the static app and site hosts. The API and `/dw/`
+  /// locations stay untouched: response compression is a delivery concern for
+  /// the large web build, not a change to the call protocol.
+  static const String _gzipConfiguration = '''    gzip on;
+    gzip_proxied any;
+    gzip_vary on;
+    gzip_comp_level 5;
+    gzip_min_length 1024;
+    gzip_types application/javascript text/javascript application/wasm text/css application/json image/svg+xml text/plain application/manifest+json;
+
+''';
 
   void _openServer(StringBuffer buffer, String domain) {
     buffer.writeln('server {');
