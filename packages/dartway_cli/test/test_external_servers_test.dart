@@ -549,12 +549,10 @@ void main() {
           final output = process.stdout.transform(utf8.decoder).join();
           final errors = process.stderr.transform(utf8.decoder).join();
           final groupFile = File(p.join(root.path, 'process-group'));
+          int readGroupId() => int.parse(groupFile.readAsStringSync().trim());
           addTearDown(() async {
             if (processGroup && groupFile.existsSync()) {
-              await signalGroup(
-                int.parse(groupFile.readAsStringSync().trim()),
-                'INT',
-              );
+              await signalGroup(readGroupId(), 'INT');
             } else {
               process.kill(ProcessSignal.sigint);
             }
@@ -562,10 +560,7 @@ void main() {
               await process.exitCode.timeout(const Duration(seconds: 30));
             } on TimeoutException {
               if (processGroup && groupFile.existsSync()) {
-                await signalGroup(
-                  int.parse(groupFile.readAsStringSync().trim()),
-                  'KILL',
-                );
+                await signalGroup(readGroupId(), 'KILL');
               }
               process.kill(ProcessSignal.sigkill);
               await process.exitCode;
@@ -574,9 +569,7 @@ void main() {
             await errors;
           });
           final owned = await created('interrupted');
-          final groupId = processGroup
-              ? int.parse(groupFile.readAsStringSync().trim())
-              : null;
+          final groupId = processGroup ? readGroupId() : null;
           if (groupId != null) {
             final suiteGroup = await Process.run('ps', [
               '-o',
