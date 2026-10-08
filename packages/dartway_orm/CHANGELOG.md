@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- Write package imports in the migration index when its directory is under the owning package's
+  `lib/`, so `migrate create` no longer reintroduces `relativeImport` errors (#445). Standalone
+  directories and directories outside `lib/` keep relative imports.
+
 - Add `DwColumnType.calendarDay` for nullable or required `DwCalendarDay` columns, PostgreSQL
   `date` binding/decoding, comparisons and date-array parameters. Existing timestamp columns and
   repository insert/default behavior are unchanged.

@@ -114,7 +114,13 @@ abstract final class DwDraftWriter {
       ..writeln("import '${project.ormLibrary}';")
       ..writeln();
     for (final id in ids) {
-      buffer.writeln("import '${fileName(id)}';");
+      final file = fileName(id);
+      final name = project.packageName;
+      final path = project.migrationsPath;
+      final uri = name != null && path != null
+          ? 'package:$name/${[if (path.isNotEmpty) path, file].join('/')}'
+          : file;
+      buffer.writeln("import '$uri';");
     }
     buffer
       ..writeln()

@@ -125,6 +125,14 @@ say nothing.** Different: one line, and a decision — still needed (refresh `ch
 
 ## Phase C — apply
 
-Only what was confirmed, in batches the author names. Format only the files of the diff
-(`git diff --name-only origin/__BASE_BRANCH__...HEAD -- '*.dart' | xargs dart format`), re-run the
-gates the edits reach, and end with what was applied, what is left to the author, which gates are green.
+Only what was confirmed, in batches the author names. Format only the files of the diff, excluding
+sealed migrations: formatting can change their checksum and cause `DwMigrationRefused`. Keep their
+`// dart format off` marker. The migrations index can be formatted normally:
+
+```bash
+git diff --name-only -z origin/__BASE_BRANCH__...HEAD -- '*.dart' \
+  ':(exclude)**/lib/src/migrations/m[0-9]*.dart' | xargs -0 dart format
+```
+
+Re-run the gates the edits reach, and end with what was applied, what is left to the author, which
+gates are green.

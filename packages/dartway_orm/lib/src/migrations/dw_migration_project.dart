@@ -7,12 +7,14 @@ import 'package:pub_semver/pub_semver.dart';
 import 'package:yaml/yaml.dart';
 
 /// What a draft needs to know about the project it is written into: which
-/// library to import ORM types from, and which language version to format for.
+/// libraries to import, and which language version to format for.
 @internal
 final class DwMigrationProject {
   const DwMigrationProject({
     required this.ormLibrary,
     required this.languageVersion,
+    this.packageName,
+    this.migrationsPath,
   });
 
   /// A project that declares nothing: the ORM itself, formatted at the newest
@@ -36,14 +38,30 @@ final class DwMigrationProject {
   /// draft is formatted the way `dart format` formats the project.
   final Version languageVersion;
 
+  /// The name declared in the owning pubspec.
+  final String? packageName;
+
+  /// The migrations directory's URI path under `lib`, or null outside `lib`.
+  /// Empty when the directory is `lib` itself.
+  final String? migrationsPath;
+
   /// The project owning [directory]: the nearest `pubspec.yaml` at or above
   /// it. [standalone] when there is none.
   static DwMigrationProject of(String directory) {
-    var folder = p.absolute(p.normalize(directory));
+    final migrationsDirectory = p.normalize(p.absolute(directory));
+    var folder = migrationsDirectory;
     while (true) {
       final pubspec = File(p.join(folder, 'pubspec.yaml'));
       if (pubspec.existsSync()) {
-        return fromPubspec(pubspec.readAsStringSync());
+        final lib = p.join(folder, 'lib');
+        return fromPubspec(
+          pubspec.readAsStringSync(),
+          migrationsPath: p.equals(lib, migrationsDirectory)
+              ? ''
+              : p.isWithin(lib, migrationsDirectory)
+              ? p.split(p.relative(migrationsDirectory, from: lib)).join('/')
+              : null,
+        );
       }
       final parent = p.dirname(folder);
       if (parent == folder) return standalone;
@@ -53,8 +71,9 @@ final class DwMigrationProject {
 
   /// Reads a `pubspec.yaml`. Only `dependencies` count: a draft is compiled
   /// into the project's own code, which cannot import a dev dependency.
-  static DwMigrationProject fromPubspec(String text) {
+  static DwMigrationProject fromPubspec(String text, {String? migrationsPath}) {
     final yaml = loadYaml(text);
+    final name = yaml is YamlMap ? yaml['name'] : null;
     final dependencies = yaml is YamlMap ? yaml['dependencies'] : null;
     final environment = yaml is YamlMap ? yaml['environment'] : null;
     final sdk = environment is YamlMap ? environment['sdk'] : null;
@@ -65,6 +84,8 @@ final class DwMigrationProject {
           ? serverPackageLibrary
           : ormPackageLibrary,
       languageVersion: _languageVersionOf(sdk),
+      packageName: name is String ? name : null,
+      migrationsPath: migrationsPath,
     );
   }
 

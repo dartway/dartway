@@ -2,7 +2,9 @@
 
 A migration is Dart code in the server package that moves the schema one step — carrying the rows
 already there across it, when it must. The project's migrations live in `lib/src/migrations/`, one file each, registered in
-`lib/src/migrations/migrations.dart`. The server applies them when it starts; `bin/migrate.dart`
+`lib/src/migrations/migrations.dart`. `create` writes package imports in that index, using the name
+from the nearest `pubspec.yaml` and the directory's path under `lib/`; directories outside `lib/`
+use relative imports. The server applies them when it starts; `bin/migrate.dart`
 applies, rolls back, inspects and drafts them.
 
 Migrations are code rather than a diff computed at deploy time because only a person knows whether
