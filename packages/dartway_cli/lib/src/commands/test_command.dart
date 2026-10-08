@@ -175,6 +175,8 @@ class TestCommand extends Command<int> {
         withStorage && storageUrl == null && databaseUrl == null;
     EphemeralDatabase? ephemeral;
     EphemeralStorage? ephemeralStorage;
+    Future<EphemeralDatabase?>? startingDatabase;
+    Future<EphemeralStorage?>? startingStorage;
     Process? test;
     var interrupted = false;
     var result = 1;
@@ -197,10 +199,8 @@ class TestCommand extends Command<int> {
       if (test != null) unawaited(stopTest());
     });
 
-    Future<T?> untilInterrupted<T>(Future<T> operation) => Future.any([
-      operation.then<T?>((value) => value),
-      interrupt.future.then<T?>((_) => null),
-    ]);
+    Future<T?> untilInterrupted<T extends Object>(Future<T?> operation) =>
+        Future.any([operation, interrupt.future.then<T?>((_) => null)]);
 
     Future<int> worker(String operation) async {
       final process = await Process.start(
@@ -226,10 +226,11 @@ class TestCommand extends Command<int> {
       );
       if (external.isNotEmpty && await worker('check') != 0) return 1;
       if (interrupted) return 130;
-      // Sequential ownership: every acquired container is visible to finally,
-      // including when the second start fails or the run is interrupted.
+      // Keep starts until finally has recovered ownership, even if SIGINT wins
+      // the race before Docker returns the container coordinates.
       if (databaseUrl == null) {
-        ephemeral = await untilInterrupted(database.start());
+        final start = startingDatabase = database.start();
+        ephemeral = await untilInterrupted<EphemeralDatabase>(start);
         if (interrupted) return 130;
         if (ephemeral == null) {
           stderr.writeln(
@@ -246,7 +247,8 @@ class TestCommand extends Command<int> {
       }
       if (interrupted) return 130;
       if (startStorage) {
-        ephemeralStorage = await untilInterrupted(storage.start());
+        final start = startingStorage = storage.start();
+        ephemeralStorage = await untilInterrupted<EphemeralStorage>(start);
         if (interrupted) return 130;
         if (ephemeralStorage == null) {
           stderr.writeln(
@@ -258,20 +260,19 @@ class TestCommand extends Command<int> {
       }
       final databaseReady =
           ephemeral == null ||
-          await untilInterrupted(
-                database.waitUntilReady(ephemeral!, _readinessTimeout),
-              ) ==
-              true;
+          await database.waitUntilReady(
+            ephemeral!,
+            _readinessTimeout,
+            cancelled: () => interrupted,
+          );
       if (interrupted) return 130;
       final storageReady =
           ephemeralStorage == null ||
-          await untilInterrupted(
-                storage.waitUntilReady(
-                  ephemeralStorage!,
-                  _readinessTimeout,
-                ),
-              ) ==
-              true;
+          await storage.waitUntilReady(
+            ephemeralStorage!,
+            _readinessTimeout,
+            cancelled: () => interrupted,
+          );
       if (interrupted) return 130;
       if (!databaseReady || !storageReady) {
         stderr.writeln(
@@ -314,6 +315,8 @@ class TestCommand extends Command<int> {
         stderr.writeln('External test server cleanup failed; run id: $runId.');
         result = 1;
       } finally {
+        if (startingDatabase != null) ephemeral ??= await startingDatabase;
+        if (startingStorage != null) ephemeralStorage ??= await startingStorage;
         if (keep) {
           stdout.writeln(_keptMessage(ephemeral, ephemeralStorage));
         } else {

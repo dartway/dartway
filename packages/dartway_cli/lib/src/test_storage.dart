@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:math';
 
@@ -66,19 +67,24 @@ class TestStorage {
   /// before the server inside it answers.
   Future<bool> waitUntilReady(
     EphemeralStorage storage,
-    Duration timeout,
-  ) async {
+    Duration timeout, {
+    bool Function()? cancelled,
+  }) async {
     final deadline = DateTime.now().add(timeout);
     final client = HttpClient()..connectionTimeout = const Duration(seconds: 1);
     try {
-      while (DateTime.now().isBefore(deadline)) {
+      while (cancelled?.call() != true && DateTime.now().isBefore(deadline)) {
         try {
           final request = await client.getUrl(
             storage.endpoint.replace(path: '/health'),
           );
-          final response = await request.close();
-          await response.drain<void>();
+          final response = await request.close().timeout(
+            const Duration(seconds: 1),
+          );
+          await response.drain<void>().timeout(const Duration(seconds: 1));
           if (response.statusCode == 200) return true;
+        } on TimeoutException {
+          // A listening server may still be unable to answer health checks.
         } on IOException {
           // Not listening yet.
         }

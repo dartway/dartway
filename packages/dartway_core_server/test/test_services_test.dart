@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -15,6 +16,8 @@ void main() {
         addTearDown(() => server.close(force: true));
         var deleted = false, bucketDeleted = false;
         var pages = 0;
+        final sweeping = Completer<void>();
+        final resume = Completer<void>();
         final deletedKeys = <String>[];
         server.listen((request) async {
           final path = request.uri.pathSegments;
@@ -24,6 +27,10 @@ void main() {
               '<Name>$bucket</Name></Bucket></Buckets></ListAllMyBucketsResult>',
             );
           } else if (request.method == 'GET') {
+            if (!sweeping.isCompleted) {
+              sweeping.complete();
+              await resume.future;
+            }
             pages++;
             expect(request.uri.queryParameters['encoding-type'], 'url');
             request.response.write(
@@ -59,6 +66,11 @@ void main() {
         addTearDown(() => process.kill(ProcessSignal.sigkill));
         final output = process.stdout.transform(utf8.decoder).join();
         final errors = process.stderr.transform(utf8.decoder).join();
+        await sweeping.future.timeout(const Duration(seconds: 20));
+        // Main is already sweeping; another interrupt must not abort it.
+        expect(process.kill(ProcessSignal.sigint), isTrue);
+        await Future<void>.delayed(const Duration(milliseconds: 150));
+        resume.complete();
         final result = await process.exitCode.timeout(
           const Duration(seconds: 30),
         );

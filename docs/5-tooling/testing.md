@@ -113,6 +113,8 @@ SIGINT, the CLI stops the suite and sweeps only resources named for that run on 
 servers, including bucket objects. Concurrent runs remain untouched. Plain `dart test` without
 `DW_TEST_RUN_ID` keeps the existing names and per-file teardown. SIGKILL or loss of the executor
 cannot run cleanup; the environment must discard its servers or remove that exact run's resources.
+A second Ctrl-C while the cleanup worker's VM is starting or compiling can also prevent cleanup.
+Once its `main` begins, the worker ignores SIGINT until the sweep finishes.
 
 A minimal cloud image starts Postgres, creates a dedicated role and provides a maintenance database:
 
