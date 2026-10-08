@@ -8,7 +8,7 @@
   Interrupted starts are awaited and removed, and readiness polling stops on interruption.
 - The rendered front proxy gzip-compresses app and site static responses while preserving ETag
   revalidation. Web builds bundle CanvasKit instead of loading it from Google's CDN, and deploy
-  probes fail on an uncompressed main bundle and warn when startup still names the CDN (#423).
+  probes fail on an uncompressed main bundle and warn when startup still selects the CDN (#423).
 
 - Deploy output is masked on the target by literal stored secret value (at least 6 characters),
   including URL percent-encoded forms, before stdout/stderr reach human logs or JSON progress.

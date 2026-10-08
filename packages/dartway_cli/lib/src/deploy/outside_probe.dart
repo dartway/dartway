@@ -27,7 +27,11 @@ class DwProbeResult {
 
   @override
   String toString() =>
-      '${warning ? 'warn' : passed ? 'ok  ' : 'FAIL'} $title — $detail';
+      '${warning
+          ? 'warn'
+          : passed
+          ? 'ok  '
+          : 'FAIL'} $title — $detail';
 }
 
 /// Asks a deployed stack the questions a browser and a mobile app would, over
@@ -208,6 +212,12 @@ class DwOutsideProbe {
           headers: {HttpHeaders.acceptEncodingHeader: 'gzip'},
         );
         if (answer.status != 200) continue;
+        final mimeType = answer.headers.contentType?.mimeType;
+        if (mimeType != 'application/javascript' &&
+            mimeType != 'text/javascript' &&
+            mimeType != 'application/wasm') {
+          continue;
+        }
         final encoding = answer.headers.value(
           HttpHeaders.contentEncodingHeader,
         );
@@ -225,7 +235,8 @@ class DwOutsideProbe {
     }
     return DwProbeResult.fail(
       title,
-      'neither main.dart.js nor main.dart.wasm answered 200',
+      'neither main.dart.js nor main.dart.wasm answered 200 with a '
+      'JavaScript or application/wasm Content-Type',
     );
   }
 
@@ -237,7 +248,8 @@ class DwOutsideProbe {
       try {
         final answer = await _send('GET', Uri.parse('$origin$path'));
         if (answer.status != 200) continue;
-        if (answer.body.contains('www.gstatic.com/flutter-canvaskit')) {
+        if (answer.body.contains('www.gstatic.com/flutter-canvaskit') &&
+            !_usesLocalCanvasKit(answer.body)) {
           return DwProbeResult.warning(
             title,
             '$path loads www.gstatic.com/flutter-canvaskit; add '
@@ -250,6 +262,24 @@ class DwOutsideProbe {
       }
     }
     return DwProbeResult.pass(title, 'startup files do not load gstatic.com');
+  }
+
+  static bool _usesLocalCanvasKit(String startup) {
+    // Flutter retains its CDN fallback in the loader even for a local build.
+    // The generated JSON selects which branch the loader actually uses.
+    final config = RegExp(
+      r'_flutter\.buildConfig\s*=\s*(\{.*?\})\s*;',
+      dotAll: true,
+    ).firstMatch(startup);
+    if (config == null) return false;
+    final buildConfig = jsonDecode(config.group(1)!);
+    if (buildConfig is! Map || buildConfig['useLocalCanvasKit'] != true) {
+      return false;
+    }
+    // A loader configuration takes precedence over the generated build flag.
+    return !RegExp(
+      r'''["']?canvasKitBaseUrl["']?\s*:\s*["'](?:https?:)?//www\.gstatic\.com/flutter-canvaskit''',
+    ).hasMatch(startup);
   }
 
   /// `GET <origin>/dw/live` upgrades to a WebSocket and the DartWay server
@@ -460,20 +490,22 @@ class DwOutsideProbe {
 }
 
 /// The questions a deployment of [stack] must answer from outside, in order:
-/// health through both hosts, the app page and its cache policy, the live
-/// socket through both hosts, and — where they exist — the site, the storage
+/// health through both hosts, the app page, cache policy, compression and
+/// CanvasKit origin, the live socket through both hosts, and — where they
+/// exist — the site, the storage
 /// CORS rule a browser upload depends on, and what each bucket gives to
 /// anyone without keys.
 List<Future<DwProbeResult> Function()> dwOutsideProbes(
   DwStack stack,
-  DwOutsideProbe probe,
-) => [
+  DwOutsideProbe probe, {
+  bool includeCanvasKitOrigin = true,
+}) => [
   () => probe.health(stack.apiOrigin),
   () => probe.health(stack.appOrigin),
   () => probe.appIndex(stack.appOrigin),
   () => probe.webCache(stack.appOrigin),
   () => probe.webCompression(stack.appOrigin),
-  () => probe.canvasKitOrigin(stack.appOrigin),
+  if (includeCanvasKitOrigin) () => probe.canvasKitOrigin(stack.appOrigin),
   () => probe.liveUpgrade(stack.apiOrigin),
   () => probe.liveUpgrade(stack.appOrigin, browserOrigin: stack.appOrigin),
   if (stack.siteOrigin case final site?) () => probe.site(site),

@@ -270,6 +270,11 @@ void main() {
   test('every outside probe answers as a browser and an app need', () async {
     final results = await runner.verifyFromOutside(attempts: 3);
     expect(reportOutsideVerification(results), 0, reason: results.join('\n'));
+    expect(
+      results.where((r) => r.warning),
+      isEmpty,
+      reason: results.join('\n'),
+    );
     expect(results.map((r) => r.title), hasLength(11));
   });
 
@@ -288,7 +293,7 @@ void main() {
       expect(response.headers.value('content-encoding'), 'gzip');
       expect(response.headers.value('vary'), contains('Accept-Encoding'));
       final etag = response.headers.value('etag');
-      expect(etag, isNotNull);
+      expect(etag, startsWith('W/'));
       await response.drain<void>();
 
       final revalidation = await client.getUrl(

@@ -113,17 +113,12 @@ void main() {
         final bytes = gzip.encode(List<int>.filled(2048, 65));
         request.response
           ..statusCode = 200
-          ..headers.contentType = ContentType(
-            'application',
-            'javascript',
-          )
+          ..headers.contentType = ContentType('application', 'javascript')
           ..headers.set('content-encoding', 'gzip')
           ..add(bytes);
         await request.response.close();
       };
-      final result = await site.probe.webCompression(
-        'http://app.example.com',
-      );
+      final result = await site.probe.webCompression('http://app.example.com');
       expect(result.passed, isTrue, reason: result.detail);
       expect(result.detail, contains('main.dart.js'));
     });
@@ -132,7 +127,12 @@ void main() {
       'fails with the file and size when the bundle is uncompressed',
       () async {
         site.handler = (request) => request.uri.path == '/main.dart.js'
-            ? text(request, 200, 'x' * 4096)
+            ? text(
+                request,
+                200,
+                'x' * 4096,
+                headers: {'content-type': 'application/javascript'},
+              )
             : text(request, 404, '');
         final result = await site.probe.webCompression(
           'http://app.example.com',
@@ -142,9 +142,97 @@ void main() {
         expect(result.detail, contains('expected gzip'));
       },
     );
+    for (final jsStatus in [200, 404]) {
+      test(
+        'uses Wasm after a $jsStatus non-bundle JavaScript response',
+        () async {
+          final paths = <String>[];
+          site.handler = (request) async {
+            paths.add(request.uri.path);
+            final wasm = request.uri.path == '/main.dart.wasm';
+            request.response
+              ..statusCode = wasm ? 200 : jsStatus
+              ..headers.set(
+                'content-type',
+                wasm ? 'application/wasm' : 'text/html',
+              )
+              ..headers.set('content-encoding', 'gzip')
+              ..add(gzip.encode(List<int>.filled(2048, 65)));
+            await request.response.close();
+          };
+          final result = await site.probe.webCompression(
+            'http://app.example.com',
+          );
+          expect(result.passed, isTrue, reason: result.detail);
+          expect(result.detail, contains('/main.dart.wasm'));
+          expect(paths, ['/main.dart.js', '/main.dart.wasm']);
+        },
+      );
+    }
+
+    test(
+      'fails when both bundle paths serve a gzipped HTML fallback',
+      () async {
+        site.handler = (request) async {
+          request.response
+            ..statusCode = 200
+            ..headers.contentType = ContentType.html
+            ..headers.set('content-encoding', 'gzip')
+            ..add(gzip.encode('<html>fallback</html>'.codeUnits));
+          await request.response.close();
+        };
+        final result = await site.probe.webCompression(
+          'http://app.example.com',
+        );
+        expect(result.passed, isFalse, reason: result.detail);
+      },
+    );
   });
 
   group('CanvasKit origin', () {
+    const loader =
+        'function base(config, buildConfig) {'
+        'if (config.canvasKitBaseUrl) return config.canvasKitBaseUrl;'
+        'if (buildConfig.engineRevision && !buildConfig.useLocalCanvasKit) '
+        'return "https://www.gstatic.com/flutter-canvaskit";'
+        'return "canvaskit";}';
+
+    for (final local in [true, false]) {
+      test('reads the generated local CanvasKit setting ($local)', () async {
+        site.handler = (request) => text(
+          request,
+          200,
+          request.uri.path == '/flutter_bootstrap.js'
+              ? '$loader\n_flutter.buildConfig = '
+                    '{"engineRevision":"revision","builds":[{"renderer":"canvaskit"}]'
+                    '${local ? ',"useLocalCanvasKit":true' : ''}};'
+              : '<html>local bootstrap</html>',
+        );
+        final result = await site.probe.canvasKitOrigin(
+          'http://app.example.com',
+        );
+        expect(result.passed, isTrue, reason: result.detail);
+        expect(result.warning, !local, reason: result.detail);
+      });
+    }
+
+    test(
+      'warns on an explicit CDN override despite the local build flag',
+      () async {
+        site.handler = (request) => text(
+          request,
+          200,
+          '$loader\n_flutter.buildConfig = {"useLocalCanvasKit":true};'
+          '_flutter.loader.load({config: {'
+          'canvasKitBaseUrl: "https://www.gstatic.com/flutter-canvaskit/revision"}});',
+        );
+        final result = await site.probe.canvasKitOrigin(
+          'http://app.example.com',
+        );
+        expect(result.warning, isTrue, reason: result.detail);
+      },
+    );
+
     test('warns when a startup file names the Flutter CDN', () async {
       site.handler = (request) => text(
         request,
@@ -153,9 +241,7 @@ void main() {
             ? 'https://www.gstatic.com/flutter-canvaskit/v1/canvaskit.js'
             : '<html>local bootstrap</html>',
       );
-      final result = await site.probe.canvasKitOrigin(
-        'http://app.example.com',
-      );
+      final result = await site.probe.canvasKitOrigin('http://app.example.com');
       expect(result.warning, isTrue);
       expect(result.detail, contains('--no-web-resources-cdn'));
       expect(result.detail, contains('2026-10-08-local-canvaskit.md'));
@@ -163,9 +249,7 @@ void main() {
 
     test('passes when startup files use local resources', () async {
       site.handler = (request) => text(request, 200, 'canvaskit/canvaskit.js');
-      final result = await site.probe.canvasKitOrigin(
-        'http://app.example.com',
-      );
+      final result = await site.probe.canvasKitOrigin('http://app.example.com');
       expect(result.passed, isTrue, reason: result.detail);
       expect(result.warning, isFalse);
     });

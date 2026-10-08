@@ -388,6 +388,8 @@ List<String> _describeProbes(DwStack stack) => [
   'GET ${stack.apiOrigin}/health and ${stack.appOrigin}/health — 200 "ok"',
   'GET ${stack.appOrigin}/ — the Flutter index.html, revalidated',
   'cache policy of the web build entry points',
+  'gzip compression of ${stack.appOrigin}/main.dart.js or main.dart.wasm',
+  'CanvasKit origin in the app startup files — warn on gstatic.com',
   'upgrade ${stack.apiOrigin}/dw/live and ${stack.appOrigin}/dw/live — 101',
   if (stack.siteOrigin case final site?) 'GET $site/ — the site',
   if (stack.storageOrigin case final storage?) ...[

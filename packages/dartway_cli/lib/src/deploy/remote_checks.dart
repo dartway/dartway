@@ -767,7 +767,12 @@ Future<DwDeployVerdict> _checkSecretsMatchLocal(DwDeployContext context) async {
 /// storage CORS rule.
 Future<DwDeployVerdict> _checkOutside(DwDeployContext context) async {
   final results = [
-    for (final probe in dwOutsideProbes(context.stack, DwOutsideProbe()))
+    // CanvasKit is reported separately by the warning-severity check.
+    for (final probe in dwOutsideProbes(
+      context.stack,
+      DwOutsideProbe(),
+      includeCanvasKitOrigin: false,
+    ))
       await probe(),
   ];
   final failed = results.where((result) => !result.passed).toList();
@@ -784,10 +789,10 @@ Future<DwDeployVerdict> _checkOutside(DwDeployContext context) async {
 }
 
 Future<DwDeployVerdict> _checkCanvasKitOrigin(DwDeployContext context) async {
-  final result = await DwOutsideProbe().canvasKitOrigin(context.stack.appOrigin);
-  return result.warning
-      ? DwDeployVerdict.fail(result.detail)
-      : result.passed
+  final result = await DwOutsideProbe().canvasKitOrigin(
+    context.stack.appOrigin,
+  );
+  return result.passed && !result.warning
       ? DwDeployVerdict.pass(result.detail)
       : DwDeployVerdict.fail(result.detail);
 }

@@ -419,8 +419,10 @@ times five seconds apart:
 - `GET /` on the app host is the Flutter `index.html`, served with a revalidating cache policy, and
   the build's entry points are not served for reuse without revalidation;
 - `main.dart.js` (or a Wasm build's `main.dart.wasm`) answers a request accepting gzip with
-  `Content-Encoding: gzip`; `index.html` and `flutter_bootstrap.js` do not load CanvasKit from
-  `www.gstatic.com` (an old project Dockerfile is warned about without failing the deploy);
+  `Content-Encoding: gzip` and a JavaScript or Wasm content type; an HTML fallback is not a bundle.
+  `index.html` and `flutter_bootstrap.js` do not load CanvasKit from `www.gstatic.com` (an old
+  project Dockerfile is warned about without failing the deploy). The generated `useLocalCanvasKit`
+  setting selects local files even though Flutter retains the CDN fallback in its loader;
 - `/dw/live` upgrades through both hosts (from the app origin on the app host) and the server speaks
   on the socket;
 - where declared: the site answers `200 text/html`; the storage preflight admits a `PUT` from the app
