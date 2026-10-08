@@ -198,6 +198,10 @@ abstract final class DwCodeGenerator {
             sha: baselineSha,
             shared: shared,
             current: current,
+            generatedPaths: {
+              for (final file in files)
+                if (p.isWithin(shared.root, file.path)) file.path,
+            },
           );
           proof = baseline.proof;
           final previousVersion = DwContractVersion.parse(
@@ -228,7 +232,7 @@ abstract final class DwCodeGenerator {
         } catch (error) {
           diagnostics.add(
             DwGenerationDiagnostic(
-              'contract not verified: baseline $baselineSha: $error. A committed descriptor takes precedence; first adoption requires unchanged hand-written shared source.',
+              'contract not verified: baseline $baselineSha: $error. A committed descriptor takes precedence; first adoption requires unchanged hand-written shared source and in-repo path dependencies.',
               code: 'projectContractVersion',
             ),
           );

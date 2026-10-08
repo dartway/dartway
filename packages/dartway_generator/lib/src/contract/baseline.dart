@@ -105,12 +105,13 @@ final class ContractBaseline {
 }
 
 /// A committed descriptor always wins. Without one, adopt [current] only when
-/// the shared package hand-written files still match the Git objects at [sha].
+/// the shared package and its in-repo path dependencies match Git blobs at [sha].
 Future<ContractBaseline> readContractBaseline({
   required String root,
   required String sha,
   required DwProjectPackage shared,
   required Map<String, dynamic> current,
+  required Set<String> generatedPaths,
 }) async {
   final gitRoot = _git(root, ['rev-parse', '--show-toplevel']).trim();
   var relative = p.posix.joinAll(
@@ -170,64 +171,75 @@ Future<ContractBaseline> readContractBaseline({
   final headPackage = p.posix.joinAll(
     p.split(p.relative(shared.root, from: gitRoot)),
   );
-  final baseFiles = <String, (String, String)>{};
-  for (final entry in _git(gitRoot, [
-    'ls-tree',
-    '-rz',
-    sha,
-    '--',
-    basePackage,
-  ]).split('\u0000')) {
-    if (entry.isEmpty) continue;
-    final tab = entry.indexOf('\t');
-    final metadata = entry.substring(0, tab).split(' ');
-    final path = p.posix.relative(entry.substring(tab + 1), from: basePackage);
-    baseFiles[path] = (metadata[0], metadata[2]);
-  }
-  // Include additions as well as base-tracked files: a new DTO must not become
-  // an unverified contract edit just because it had no blob at the base.
-  final paths = <String>{
-    ...baseFiles.keys,
-    for (final path in _git(gitRoot, [
-      'ls-files',
-      '-z',
-      '--cached',
-      '--others',
-      '--exclude-standard',
-      '--',
-      headPackage,
-    ]).split('\u0000'))
-      if (path.isNotEmpty) p.posix.relative(path, from: headPackage),
-  }.toList()..sort();
   final changed = <String>[];
-  for (final path in paths) {
-    if (path == 'pubspec.yaml' || path == 'pubspec.lock') continue;
-    final entry = baseFiles[path];
-    if (entry?.$1 == '160000') {
-      throw FormatException(
-        'baseline shared contract source submodule is unsupported: '
-        '${p.posix.join(headPackage, path)}; keep the shared contract source '
-        'in tracked files so its bytes can be compared',
-      );
+  for (final (base, head) in [
+    (basePackage, headPackage),
+    for (final dependency in _inRepoPathDependencies(shared.root, gitRoot))
+      (dependency, dependency),
+  ]) {
+    final baseFiles = <String, (String, String)>{};
+    for (final entry in _git(gitRoot, [
+      'ls-tree',
+      '-rz',
+      sha,
+      '--',
+      base,
+    ]).split('\u0000')) {
+      if (entry.isEmpty) continue;
+      final tab = entry.indexOf('\t');
+      final metadata = entry.substring(0, tab).split(' ');
+      final path = p.posix.relative(entry.substring(tab + 1), from: base);
+      baseFiles[path] = (metadata[0], metadata[2]);
     }
-    final before = entry == null
-        ? null
-        : _gitBytes(gitRoot, ['cat-file', 'blob', entry.$2]);
-    final after = _fileBytes(
-      p.join(shared.root, p.joinAll(p.posix.split(path))),
-    );
-    // Ownership is determined from the base bytes for existing files. A head
-    // cannot hide an edit to a manual part by adding a generated header.
-    if (isGeneratorOwnedFile(path, before ?? after ?? const [])) continue;
-    if (before == null || after == null || !_sameBytes(before, after)) {
-      changed.add(p.posix.join(headPackage, path));
+    // Include additions as well as base-tracked files, including deletions.
+    final paths = <String>{
+      ...baseFiles.keys,
+      for (final path in _git(gitRoot, [
+        'ls-files',
+        '-z',
+        '--cached',
+        '--others',
+        '--exclude-standard',
+        '--',
+        head,
+      ]).split('\u0000'))
+        if (path.isNotEmpty) p.posix.relative(path, from: head),
+    }.toList()..sort();
+    for (final path in paths) {
+      if (path == 'pubspec.yaml' || path == 'pubspec.lock') continue;
+      final entry = baseFiles[path];
+      final gitPath = p.posix.join(head, path);
+      final filePath = p.join(gitRoot, p.joinAll(p.posix.split(gitPath)));
+      if (entry?.$1 == '160000') {
+        throw FormatException(
+          'baseline shared contract source submodule is unsupported: '
+          '$gitPath; keep the shared contract source '
+          'in tracked files so its blobs can be compared',
+        );
+      }
+      if (head == headPackage) {
+        if (generatedPaths.contains(filePath)) continue;
+        // Only parts need base bytes for ownership. An existing manual part
+        // cannot hide an edit by adding a generated header at head.
+        if (path.endsWith('.dw.dart')) {
+          final bytes = entry == null
+              ? _fileBytes(filePath)
+              : _gitBytes(gitRoot, ['cat-file', 'blob', entry.$2]);
+          if (isGeneratorOwnedFile(path, bytes ?? const [])) continue;
+        }
+      }
+      final after = await _workingBlobId(gitRoot, gitPath, filePath);
+      if (entry == null || after == null || entry.$2 != after) {
+        changed.add(gitPath);
+      }
     }
   }
+  changed.sort();
   if (changed.isNotEmpty) {
     throw FormatException(
       'shared contract source changed: ${changed.join(', ')}. Split the change: '
       'land the pin move with generated files and the descriptor first, keeping '
-      'hand-written shared source unchanged; make the contract edit in a following PR',
+      'hand-written shared source and in-repo path dependencies unchanged; make the contract edit in a following PR',
     );
   }
   return ContractBaseline(
@@ -256,10 +268,81 @@ List<int>? _fileBytes(String path) =>
       _ => null,
     };
 
-bool _sameBytes(List<int> before, List<int> after) {
-  if (before.length != after.length) return false;
-  for (var i = 0; i < before.length; i++) {
-    if (before[i] != after[i]) return false;
+// Pub stores relative lock paths against the resolution root, which can be
+// above the shared package in a workspace. Include transitive path entries too.
+Iterable<String> _inRepoPathDependencies(
+  String sharedRoot,
+  String gitRoot,
+) sync* {
+  var resolutionRoot = sharedRoot;
+  while (true) {
+    final lock = File(p.join(resolutionRoot, 'pubspec.lock'));
+    if (lock.existsSync()) {
+      final metadata = loadYaml(lock.readAsStringSync());
+      if (metadata is! Map || metadata['packages'] is! Map) {
+        throw const FormatException('resolved lock does not identify packages');
+      }
+      final paths = <String>{};
+      for (final entry in (metadata['packages'] as Map).values) {
+        if (entry is! Map || entry['source'] != 'path') continue;
+        final description = entry['description'];
+        if (description is! Map || description['path'] is! String) {
+          throw const FormatException('resolved path dependency has no path');
+        }
+        var path = p.normalize(
+          p.absolute(p.join(resolutionRoot, description['path'] as String)),
+        );
+        if (Directory(path).existsSync()) {
+          path = Directory(path).resolveSymbolicLinksSync();
+        }
+        if (path == sharedRoot ||
+            (path != gitRoot && !p.isWithin(gitRoot, path))) {
+          continue;
+        }
+        paths.add(p.posix.joinAll(p.split(p.relative(path, from: gitRoot))));
+      }
+      yield* paths.toList()..sort();
+      return;
+    }
+    final parent = p.dirname(resolutionRoot);
+    if (parent == resolutionRoot) return;
+    resolutionRoot = parent;
   }
-  return true;
+}
+
+Future<String?> _workingBlobId(
+  String root,
+  String gitPath,
+  String filePath,
+) async {
+  switch (FileSystemEntity.typeSync(filePath, followLinks: false)) {
+    case FileSystemEntityType.file:
+      // --path applies Git's clean/eol filters, matching the committed blob.
+      return _git(root, [
+        'hash-object',
+        '--path=$gitPath',
+        '--',
+        filePath,
+      ]).trim();
+    case FileSystemEntityType.link:
+      // Git stores a symlink's target verbatim, without clean/eol filters.
+      final process = await Process.start('git', [
+        'hash-object',
+        '--stdin',
+      ], workingDirectory: root);
+      final output = process.stdout.transform(utf8.decoder).join();
+      final error = process.stderr.transform(utf8.decoder).join();
+      process.stdin.add(utf8.encode(Link(filePath).targetSync()));
+      await process.stdin.close();
+      final code = await process.exitCode;
+      if (code != 0) {
+        throw FormatException(
+          'Git baseline unavailable: ${await error}'.trim(),
+        );
+      }
+      await error;
+      return (await output).trim();
+    default:
+      return null;
+  }
 }

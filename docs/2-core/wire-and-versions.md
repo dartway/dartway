@@ -192,12 +192,19 @@ Regenerating at shared version `0.7.2` or `0.7.3` remains red; change it to `0.8
 The existing runtime then refuses an older client line with 426/`dw.updateRequired`. A nullable
 `String? title` addition accepts the old payload and can stay on `0.7`.
 
-When the trusted base has no descriptor, first adoption requires byte-identical
-hand-written shared package files. The generator compares base-tracked source bytes
-with the current shared package and also rejects added source files. Its owned
-output (`lib/generated/**` and parts bearing its generated header), the shared
-`pubspec.yaml` and lock are excluded. A framework pin move may regenerate codecs
-and establish the descriptor; the result names the base SHA and adoption proof.
+When the trusted base has no descriptor, first adoption requires unchanged
+hand-written shared package files **and every resolved `source: path` dependency
+inside the Git root**, including transitive path dependencies. For each package,
+the generator compares the union of base-tracked and current files, excluding
+that package's `pubspec.yaml` and `pubspec.lock`. Framework git-subpath dependencies
+and external dependencies stay outside the comparison. In the shared package,
+only the exact paths emitted by the current generator and `.dw.dart` parts bearing
+its generated header are excluded; existing parts are judged from base bytes, so
+adding a header cannot hide a source edit. Hand-written files under `lib/generated/`
+are still compared. Current files are hashed with `git hash-object --path` against
+base blob IDs, applying Git clean/eol filters so a CRLF checkout of LF source passes.
+A framework pin move may regenerate codecs and establish the descriptor; the result
+names the base SHA and adoption proof.
 If source differs, the gate names the files and asks to split the change: land the
 pin move and descriptor first, then edit the contract in a following PR. A committed
 descriptor always wins. No historical dependency fetch or codec reproduction is

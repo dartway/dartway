@@ -242,11 +242,15 @@ Contract tests (round trip, `validate()`, `onUpdate`, channels): `dartway-testin
 `projectContractVersion` is an error when the generated project contract is incompatible at the
 same line or cannot be verified. The generator compares its resolved source models in memory with
 the descriptor read from the fixed Git commit; regeneration or editing the working JSON cannot
-erase that baseline. Without a committed descriptor, adoption requires byte-identical
-hand-written shared source, excluding generator-owned output, the shared pubspec and
-lock. The pin-move PR regenerates output and establishes the first descriptor;
-changed shared source blocks and names the files. Split it: land the pin move with
-unchanged shared source first, then the contract edit in a following PR. A committed
+erase that baseline. Without a committed descriptor, adoption requires unchanged
+hand-written shared source and every resolved `source: path` dependency inside the Git root,
+including transitive dependencies. Compare the union of base-tracked and current files per package,
+excluding its pubspec and lock. Shared output ownership is the current emitted paths plus
+header-bearing `.dw.dart` parts judged from base bytes; hand-written files under `lib/generated/`
+are compared. Git blob IDs apply clean/eol filters. Framework git-subpath and external dependencies
+stay outside the comparison. The pin-move PR regenerates output and establishes the first descriptor;
+changed compared source blocks and names the files. Split it: land the pin move with
+unchanged shared source and in-repo path dependencies first, then the contract edit in a following PR. A committed
 base descriptor always wins. No historical dependency fetch or codec reproduction
 is used. Malformed or unsupported contracts remain blocking. CI supplies its trusted
 base SHA explicitly; ordinary check uses the project's recorded base branch merge-base,

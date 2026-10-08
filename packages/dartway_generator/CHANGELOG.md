@@ -2,6 +2,12 @@
 
 ## 0.21.0-dev.17
 
+- First contract adoption also compares resolved in-repo path dependencies, including transitive
+  entries. Shared generator ownership is the exact emitted set plus header-bearing parts judged
+  from base bytes; hand-written files under `lib/generated/` are compared. Compare Git blob IDs
+  with clean/eol filters so CRLF working copies pass. Framework git-subpath and external
+  dependencies remain excluded (dartway/dartway#458).
+
 - Recognize the framework `DwCalendarDay` by package identity in DTO codecs and entity rows; record
   its additive `calendarDay` descriptor kind. Direct entity columns map to `DwColumnType.calendarDay`;
   JSONB collections of this value remain unsupported with a diagnostic.
