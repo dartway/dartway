@@ -290,9 +290,14 @@ bucket anyone can read, or a public one nobody can.
    the same guard (below) right before it starts anything, because a server is not always `setup`
    again after a config change.
 9. **`docker-compose.yml`, `nginx.conf`**, the `nginx.d` directories, the override bridge and the
-   project's Nginx snippets, then `docker compose config --quiet` over the result.
-10. **The firewall**: `ufw` (installed when absent), OpenSSH, 80, 443 and `firewall_ports`.
-11. **A one-day self-signed certificate**, so Nginx can start at all — the real one cannot be issued
+    project's Nginx snippets, then `docker compose config --quiet` over the result.
+10. **BBR congestion control**: loads `tcp_bbr` now and on boot, and writes the host's `fq` queue
+    discipline and BBR selection under `/etc/sysctl.d`. The rendered front proxy also selects BBR
+    in its own network namespace, where the browser-facing TLS sockets actually live; a host-only
+    setting is not sufficient because congestion control is namespaced. The proxy is the only
+    service that accepts long-RTT public TCP, including traffic for storage on its own domain.
+11. **The firewall**: `ufw` (installed when absent), OpenSSH, 80, 443 and `firewall_ports`.
+12. **A one-day self-signed certificate**, so Nginx can start at all — the real one cannot be issued
     until Nginx answers the challenge, and the first `run` issues it.
 
 It ends by naming the required secrets still to deliver. **Idempotent throughout**: every step finds
@@ -303,7 +308,10 @@ up a change to the rendered files. `--dry-run` prints the rendered `docker-compo
 ## `run` — deploy
 
 First `run` evaluates the working-copy checks of `deploy check` and refuses on any error, pointing at
-`dart run dartway_cli:dartway deploy check --local` for the detail. Then:
+`dart run dartway_cli:dartway deploy check --local` for the detail. Before its first remote step it
+also verifies that the host advertises BBR; if not, it stops before replacing anything and asks for
+`dartway deploy setup`. An existing server converges with one `deploy setup`, followed by
+`deploy run`. Then:
 
 1. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
    repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`);
@@ -461,6 +469,8 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `ssh-reachable` | error | Key-based SSH works; when it fails the other server checks are skipped |
 | `deploy-user` | error | The deployment user exists |
 | `docker-available` | error | Docker Compose is usable by the deployment user |
+| `proxy-congestion-control` | error | The running front proxy reports `bbr` from its own network namespace; the host's value cannot stand in for this reading |
+| `host-congestion-control` | warning | The host reports `bbr`; re-run `deploy setup` when it does not, so SSH and registry pulls use the framework setting too |
 | `runtime-secrets` | error | Every required secret is in the server store with a value, and nothing reserved is |
 | `secret-files` | error | Every `requires.files` entry is delivered **and** mounted into the server container, read from the configuration Compose will actually run |
 | `database-reachable` | error | With `database: external`: `DW_DATABASE_PORT`/`_SSL`/`_MAX_CONNECTIONS`/`_CA_FILE` are validated exactly as the server parses them, then a throwaway, pinned Postgres client on the deployment host connects to the stored coordinates with the same `sslmode` the server will use (`require`, `verify-full` with a CA file, or `disable`) and runs a query — a real authenticated connection, not a bare TCP probe. A failure names why: a malformed stored value, DNS, refused, a timeout, authentication, the server not offering TLS, or its certificate not verifying against the configured CA. Skipped with `database: bundled` |

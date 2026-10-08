@@ -15,6 +15,23 @@ import 'support/deploy_fixtures.dart';
 /// whatever else it prints (#433 reported an exit 0 that the CLI, read
 /// closely, could not have given; this keeps it that way).
 void main() {
+  test('missing host BBR stops before the first deployment step', () async {
+    final ssh = RecordingSsh([
+      (
+        'tcp_available_congestion_control',
+        const DwSshResult(exitCode: 1, stdout: 'reno cubic\n', stderr: ''),
+      ),
+    ]);
+    final code = await runDeploy(
+      stackFrom(),
+      DeployRunCommand().argParser.parse(['--env', 'staging']),
+      connection: ssh,
+      localChecks: const [],
+    );
+    expect(code, 1);
+    expect(ssh.issued, hasLength(1));
+  });
+
   test(
     'a failed step makes deploy run exit non-zero, naming the step',
     () async {

@@ -118,6 +118,19 @@ Future<int> runDeploy(
     return finish(0);
   }
 
+  // The proxy asks its own network namespace for BBR. Prove the host can
+  // supply it before the first remote step can replace a running service.
+  final bbr = await ssh.run(
+    "grep -qw bbr /proc/sys/net/ipv4/tcp_available_congestion_control",
+  );
+  if (!bbr.ok) {
+    report.problems.writeln(
+      'BBR congestion control is not available on the server. '
+      'Run `dartway deploy setup` once on this server, then deploy again.',
+    );
+    return finish(1, reason: 'bbr-unavailable');
+  }
+
   Map<String, DwRemoteStepRecord>? record;
   if (resume) {
     try {

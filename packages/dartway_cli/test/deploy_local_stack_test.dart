@@ -132,6 +132,16 @@ void main() {
   }
 
   setUpAll(() async {
+    final available = File(
+      '/proc/sys/net/ipv4/tcp_available_congestion_control',
+    );
+    if (!available.existsSync() ||
+        !available.readAsStringSync().split(RegExp(r'\s+')).contains('bbr')) {
+      markTestSkipped(
+        'the Docker host does not provide tcp_bbr, so a BBR proxy cannot start',
+      );
+      return;
+    }
     root = Directory.systemTemp.createTempSync('dw_stack_proof_');
     project = Directory(p.join(root.path, 'project'));
     copyProject(Directory(p.join(monorepo.path, 'example')), project);
@@ -276,6 +286,14 @@ void main() {
       reason: results.join('\n'),
     );
     expect(results.map((r) => r.title), hasLength(11));
+  });
+
+  test('the running front proxy uses BBR', () async {
+    final result = await compose(
+      'exec -T nginx cat /proc/sys/net/ipv4/tcp_congestion_control',
+    );
+    expect(result.ok, isTrue, reason: result.stderr);
+    expect(result.stdout.trim(), 'bbr');
   });
 
   test('the front proxy compresses and revalidates the web bundle', () async {

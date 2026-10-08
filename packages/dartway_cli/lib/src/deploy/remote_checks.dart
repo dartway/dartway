@@ -56,6 +56,22 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
     evaluate: _checkDockerAvailable,
   ),
   DwDeployCheck(
+    id: 'proxy-congestion-control',
+    title: 'The front proxy uses BBR congestion control',
+    stage: DwDeployCheckStage.remote,
+    severity: DwCheckSeverity.error,
+    requiresSsh: true,
+    evaluate: _checkProxyCongestionControl,
+  ),
+  DwDeployCheck(
+    id: 'host-congestion-control',
+    title: 'The deployment host uses BBR congestion control',
+    stage: DwDeployCheckStage.remote,
+    severity: DwCheckSeverity.warning,
+    requiresSsh: true,
+    evaluate: _checkHostCongestionControl,
+  ),
+  DwDeployCheck(
     id: 'runtime-secrets',
     title: 'Every required secret is in the server store, with a value',
     stage: DwDeployCheckStage.remote,
@@ -104,6 +120,42 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
     evaluate: _checkCanvasKitOrigin,
   ),
 ];
+
+Future<DwDeployVerdict> _checkProxyCongestionControl(
+  DwDeployContext context,
+) async {
+  final result = await context.ssh!.runAs(
+    context.target.deployUser,
+    '${DwComposeFiles.commandIn(context.target.appDir, 'exec -T nginx')} '
+    'cat /proc/sys/net/ipv4/tcp_congestion_control',
+  );
+  final value = result.stdout.trim();
+  return result.ok && value == 'bbr'
+      ? const DwDeployVerdict.pass('bbr in the proxy network namespace')
+      : DwDeployVerdict.fail(
+          result.ok
+              ? 'proxy reports ${value.isEmpty ? 'no value' : value}'
+              : result.firstLine,
+          fix: 'Run "dartway deploy setup" once, then "dartway deploy run".',
+        );
+}
+
+Future<DwDeployVerdict> _checkHostCongestionControl(
+  DwDeployContext context,
+) async {
+  final result = await context.ssh!.run(
+    'cat /proc/sys/net/ipv4/tcp_congestion_control',
+  );
+  final value = result.stdout.trim();
+  return result.ok && value == 'bbr'
+      ? const DwDeployVerdict.pass('bbr on the host')
+      : DwDeployVerdict.fail(
+          result.ok
+              ? 'host reports ${value.isEmpty ? 'no value' : value}'
+              : result.firstLine,
+          fix: 'Run "dartway deploy setup" once on this server.',
+        );
+}
 
 /// Addresses [hostOrAddress] resolves to; empty when it does not resolve.
 Future<Set<String>> _resolve(String hostOrAddress) async {
