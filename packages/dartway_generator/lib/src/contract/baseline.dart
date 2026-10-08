@@ -171,10 +171,21 @@ Future<ContractBaseline> readContractBaseline({
   final headPackage = p.posix.joinAll(
     p.split(p.relative(shared.root, from: gitRoot)),
   );
-  final changed = <String>[];
+  final baseDependencies = _inRepoPathDependencies(
+    basePackage,
+    gitRoot,
+    sha: sha,
+  );
+  final headDependencies = _inRepoPathDependencies(headPackage, gitRoot);
+  final changed = <String>[
+    // A departed dependency is a removed contract input even if its old files
+    // remain on disk. Otherwise repointing it could hide an external edit.
+    ...baseDependencies.difference(headDependencies),
+  ];
+  final compared = <String, String?>{};
   for (final (base, head) in [
     (basePackage, headPackage),
-    for (final dependency in _inRepoPathDependencies(shared.root, gitRoot))
+    for (final dependency in {...baseDependencies, ...headDependencies})
       (dependency, dependency),
   ]) {
     final baseFiles = <String, (String, String)>{};
@@ -208,7 +219,7 @@ Future<ContractBaseline> readContractBaseline({
     for (final path in paths) {
       if (path == 'pubspec.yaml' || path == 'pubspec.lock') continue;
       final entry = baseFiles[path];
-      final gitPath = p.posix.join(head, path);
+      final gitPath = p.posix.normalize(p.posix.join(head, path));
       final filePath = p.join(gitRoot, p.joinAll(p.posix.split(gitPath)));
       if (entry?.$1 == '160000') {
         throw FormatException(
@@ -228,10 +239,14 @@ Future<ContractBaseline> readContractBaseline({
           if (isGeneratorOwnedFile(path, bytes ?? const [])) continue;
         }
       }
-      final after = await _workingBlobId(gitRoot, gitPath, filePath);
-      if (entry == null || after == null || entry.$2 != after) {
-        changed.add(gitPath);
-      }
+      compared[gitPath] = entry?.$2;
+    }
+  }
+  final workingBlobs = await _workingBlobIds(gitRoot, compared.keys);
+  for (final entry in compared.entries) {
+    final after = workingBlobs[entry.key];
+    if (entry.value == null || after == null || entry.value != after) {
+      changed.add(entry.key);
     }
   }
   changed.sort();
@@ -268,79 +283,218 @@ List<int>? _fileBytes(String path) =>
       _ => null,
     };
 
-// Pub stores relative lock paths against the resolution root, which can be
-// above the shared package in a workspace. Include transitive path entries too.
-Iterable<String> _inRepoPathDependencies(
-  String sharedRoot,
-  String gitRoot,
-) sync* {
-  var resolutionRoot = sharedRoot;
+// Resolve dependency names from pubspec edges, but take their actual sources
+// from the lock so overrides do not create a second dependency graph. Both
+// snapshots stay within the Git root; base metadata never comes from head.
+Set<String> _inRepoPathDependencies(
+  String sharedPackage,
+  String gitRoot, {
+  String? sha,
+}) {
+  String? read(String path) => sha == null
+      ? (File(p.join(gitRoot, path)).existsSync()
+            ? File(p.join(gitRoot, path)).readAsStringSync()
+            : null)
+      : _tryGit(gitRoot, ['show', '$sha:$path']);
+
+  var resolutionRoot = sharedPackage;
+  Map? packages;
   while (true) {
-    final lock = File(p.join(resolutionRoot, 'pubspec.lock'));
-    if (lock.existsSync()) {
-      final metadata = loadYaml(lock.readAsStringSync());
+    final text = read(p.posix.join(resolutionRoot, 'pubspec.lock'));
+    if (text != null) {
+      final metadata = loadYaml(text);
       if (metadata is! Map || metadata['packages'] is! Map) {
         throw const FormatException('resolved lock does not identify packages');
       }
-      final paths = <String>{};
-      for (final entry in (metadata['packages'] as Map).values) {
-        if (entry is! Map || entry['source'] != 'path') continue;
-        final description = entry['description'];
-        if (description is! Map || description['path'] is! String) {
-          throw const FormatException('resolved path dependency has no path');
-        }
-        var path = p.normalize(
-          p.absolute(p.join(resolutionRoot, description['path'] as String)),
-        );
-        if (Directory(path).existsSync()) {
-          path = Directory(path).resolveSymbolicLinksSync();
-        }
-        if (path == sharedRoot ||
-            (path != gitRoot && !p.isWithin(gitRoot, path))) {
-          continue;
-        }
-        paths.add(p.posix.joinAll(p.split(p.relative(path, from: gitRoot))));
-      }
-      yield* paths.toList()..sort();
-      return;
+      packages = metadata['packages'] as Map;
+      break;
     }
-    final parent = p.dirname(resolutionRoot);
-    if (parent == resolutionRoot) return;
-    resolutionRoot = parent;
+    if (resolutionRoot == '.') break;
+    resolutionRoot = p.posix.dirname(resolutionRoot);
   }
+  if (packages == null) return {};
+
+  String? inRepo(String path) {
+    var absolute = p.normalize(p.join(gitRoot, resolutionRoot, path));
+    if (sha == null && Directory(absolute).existsSync()) {
+      absolute = Directory(absolute).resolveSymbolicLinksSync();
+    }
+    if (absolute != gitRoot && !p.isWithin(gitRoot, absolute)) return null;
+    return p.posix.joinAll(p.split(p.relative(absolute, from: gitRoot)));
+  }
+
+  final resolved = <String, String>{};
+  for (final entry in packages.entries) {
+    if (entry.value is! Map || (entry.value as Map)['source'] != 'path') {
+      continue;
+    }
+    final description = (entry.value as Map)['description'];
+    if (description is! Map || description['path'] is! String) {
+      throw const FormatException('resolved path dependency has no path');
+    }
+    final path = inRepo(description['path'] as String);
+    if (path != null) resolved[entry.key as String] = path;
+  }
+
+  // Workspace members do not have lock entries. Their pubspecs still provide
+  // the same dependency edges, including edges to overridden path packages.
+  final workspaceText = read(p.posix.join(resolutionRoot, 'pubspec.yaml'));
+  final workspace = workspaceText == null ? null : loadYaml(workspaceText);
+  if (workspace is Map && workspace['workspace'] is List) {
+    final workspacePackages = <String, Map>{resolutionRoot: workspace};
+    final pubspecs = sha == null
+        ? _git(gitRoot, [
+            'ls-files',
+            '-z',
+            '--cached',
+            '--others',
+            '--exclude-standard',
+            '--',
+            resolutionRoot,
+          ])
+        : _git(gitRoot, [
+            'ls-tree',
+            '-rz',
+            '--name-only',
+            sha,
+            '--',
+            resolutionRoot,
+          ]);
+    for (final path in pubspecs.split('\u0000').toSet()) {
+      if (p.posix.basename(path) != 'pubspec.yaml') continue;
+      final text = read(path);
+      if (text == null) continue;
+      final metadata = loadYaml(text);
+      if (metadata is Map &&
+          metadata['resolution'] == 'workspace' &&
+          metadata['name'] is String) {
+        workspacePackages[p.posix.dirname(path)] = metadata;
+      }
+    }
+    final pendingWorkspace = [resolutionRoot];
+    final visitedWorkspace = <String>{};
+    while (pendingWorkspace.isNotEmpty) {
+      final package = pendingWorkspace.removeLast();
+      if (!visitedWorkspace.add(package)) continue;
+      final metadata = workspacePackages[package]!;
+      if (metadata['name'] is String) {
+        resolved[metadata['name'] as String] = package;
+      }
+      if (metadata['workspace'] is! List) continue;
+      final members = <RegExp>[
+        for (final pattern in (metadata['workspace'] as List).cast<String>())
+          RegExp(
+            '^${RegExp.escape(p.posix.normalize(pattern)).replaceAll(r'\*\*', '.*').replaceAll(r'\*', '[^/]*')}\$',
+          ),
+      ];
+      for (final member in workspacePackages.keys) {
+        final relative = p.posix.relative(member, from: package);
+        if (members.any((pattern) => pattern.hasMatch(relative))) {
+          pendingWorkspace.add(member);
+        }
+      }
+    }
+  }
+
+  final closure = <String>{};
+  final pending = [sharedPackage];
+  final visited = <String>{};
+  while (pending.isNotEmpty) {
+    final package = pending.removeLast();
+    if (!visited.add(package)) continue;
+    final text = read(p.posix.join(package, 'pubspec.yaml'));
+    if (text == null) {
+      throw FormatException(
+        'path dependency pubspec unavailable: $package/pubspec.yaml',
+      );
+    }
+    final metadata = loadYaml(text);
+    if (metadata is! Map ||
+        (metadata['dependencies'] != null &&
+            metadata['dependencies'] is! Map)) {
+      throw FormatException(
+        'path dependency pubspec does not identify dependencies: $package/pubspec.yaml',
+      );
+    }
+    final dependencies = metadata['dependencies'] as Map?;
+    for (final name in dependencies?.keys ?? const []) {
+      final dependency = resolved[name];
+      if (dependency == null || dependency == sharedPackage) continue;
+      if (closure.add(dependency)) pending.add(dependency);
+    }
+  }
+  return closure;
 }
 
-Future<String?> _workingBlobId(
+// --stdin-paths applies each file's attributes just as --path does, while one
+// process hashes all regular files. Git expects C-quoted paths for special bytes.
+Future<Map<String, String>> _workingBlobIds(
   String root,
-  String gitPath,
-  String filePath,
+  Iterable<String> paths,
 ) async {
-  switch (FileSystemEntity.typeSync(filePath, followLinks: false)) {
-    case FileSystemEntityType.file:
-      // --path applies Git's clean/eol filters, matching the committed blob.
-      return _git(root, [
-        'hash-object',
-        '--path=$gitPath',
-        '--',
-        filePath,
-      ]).trim();
-    case FileSystemEntityType.link:
-      // Git stores a symlink's target verbatim, without clean/eol filters.
-      final process = await Process.start('git', [
-        'hash-object',
-        '--stdin',
-      ], workingDirectory: root);
-      final output = process.stdout.transform(utf8.decoder).join();
-      final error = process.stderr.transform(utf8.decoder).join();
-      process.stdin.add(utf8.encode(Link(filePath).targetSync()));
-      await process.stdin.close();
-      final code = await process.exitCode;
-      final stderr = await error;
-      if (code != 0) {
-        throw FormatException('Git baseline unavailable: $stderr'.trim());
-      }
-      return (await output).trim();
-    default:
-      return null;
+  final regular = <String>[];
+  final blobs = <String, String>{};
+  for (final path in paths) {
+    final filePath = p.join(root, p.joinAll(p.posix.split(path)));
+    switch (FileSystemEntity.typeSync(filePath, followLinks: false)) {
+      case FileSystemEntityType.file:
+        regular.add(path);
+      case FileSystemEntityType.link:
+        blobs[path] = await _workingLinkBlobId(root, filePath);
+      default:
+        break;
+    }
   }
+  if (regular.isEmpty) return blobs;
+  final process = await Process.start('git', [
+    'hash-object',
+    '--stdin-paths',
+  ], workingDirectory: root);
+  final output = process.stdout.transform(utf8.decoder).join();
+  final error = process.stderr.transform(utf8.decoder).join();
+  for (final path in regular) {
+    final quoted = utf8
+        .encode(path)
+        .map(
+          (byte) => byte >= 32 && byte < 127 && byte != 34 && byte != 92
+              ? String.fromCharCode(byte)
+              : '\\${byte.toRadixString(8).padLeft(3, '0')}',
+        )
+        .join();
+    process.stdin.writeln('"$quoted"');
+  }
+  await process.stdin.close();
+  final code = await process.exitCode;
+  final stderr = await error;
+  if (code != 0) {
+    throw FormatException('Git baseline unavailable: $stderr'.trim());
+  }
+  final ids = LineSplitter.split(await output).toList();
+  if (ids.length != regular.length) {
+    throw const FormatException(
+      'Git baseline unavailable: incomplete file hashes',
+    );
+  }
+  for (var i = 0; i < regular.length; i++) {
+    blobs[regular[i]] = ids[i];
+  }
+  return blobs;
+}
+
+Future<String> _workingLinkBlobId(String root, String filePath) async {
+  // Git stores a symlink's target verbatim, without clean/eol filters.
+  final process = await Process.start('git', [
+    'hash-object',
+    '--stdin',
+  ], workingDirectory: root);
+  final output = process.stdout.transform(utf8.decoder).join();
+  final error = process.stderr.transform(utf8.decoder).join();
+  process.stdin.add(utf8.encode(Link(filePath).targetSync()));
+  await process.stdin.close();
+  final code = await process.exitCode;
+  final stderr = await error;
+  if (code != 0) {
+    throw FormatException('Git baseline unavailable: $stderr'.trim());
+  }
+  return (await output).trim();
 }

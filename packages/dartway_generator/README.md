@@ -11,11 +11,8 @@ Run as `dartway generate` (add `--check --contract-base <trusted-SHA>` to verify
 The compatibility gate compares source-derived codec models with Git objects at a fixed committed
 baseline, reusing the shared package breaking line. Incompatible or unverified results fail;
 regeneration cannot silently approve a breaking contract. Without a committed descriptor,
-unchanged hand-written shared source and resolved in-repo path dependencies permit adoption
-in the pin-move PR. Each package excludes its pubspec and lock; shared output ownership is exactly
-the current emitted paths plus header-bearing `.dw.dart` parts judged from base bytes. Hand-written
-files under `lib/generated/` are compared. Git blob IDs apply clean/eol filters; framework
-git-subpath and external dependencies remain outside the comparison. Changed source blocks: land the pin move
+[first descriptor adoption](../../docs/2-core/wire-and-versions.md#first-descriptor-adoption)
+can establish the baseline in the pin-move PR. Changed source blocks: land the pin move
 and descriptor first, then edit the contract in a following PR. No project setup scripts,
 historical dependency upgrades or runtime negotiation are added. Coverage excludes
 handler/domain semantics and manually composed external modules. Checks default to the configured

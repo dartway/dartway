@@ -12,17 +12,9 @@ revision to `generate --check --contract-base <SHA>` and
 `check --contract-base <SHA>`; keep that SHA fixed through regeneration and
 feature commits. Normal check uses the configured project base-branch merge-base.
 
-A baseline without the descriptor is adopted in the pin-move PR when every
-hand-written shared package file and every resolved `source: path` dependency
-inside the Git root is unchanged from the trusted base. This includes transitive
-path dependencies; framework git-subpath dependencies and external dependencies
-stay outside the comparison. Regenerate and commit the codecs/registry and
-descriptor in that PR. For each compared package, the union of base-tracked and
-current files is checked, excluding its `pubspec.yaml` and `pubspec.lock`. In the
-shared package, generator ownership is exactly its current emitted paths plus
-header-bearing `.dw.dart` parts (existing parts judged from base bytes).
-Hand-written files under `lib/generated/` are compared too. Git blob IDs are
-compared after clean/eol filters, so CRLF working copies of LF blobs pass.
+A baseline without the descriptor can be adopted in the pin-move PR under the
+[first descriptor adoption rules](../2-core/wire-and-versions.md#first-descriptor-adoption).
+Regenerate and commit the codecs/registry and descriptor in that PR.
 The result prints `adopted at <base SHA>: shared contract source
 unchanged; descriptor established by this change`.
 

@@ -128,9 +128,16 @@ void main() {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  for (final location in ['external', 'in-repo', 'workspace-transitive']) {
+  for (final location in [
+    'external',
+    'in-repo',
+    'workspace-transitive',
+    'repointed-path',
+    'repointed-git',
+  ]) {
     final inRepo = location != 'external';
     final workspace = location == 'workspace-transitive';
+    final repointed = location.startsWith('repointed-');
     test(
       'descriptor-free adoption ${inRepo ? 'blocks $location' : 'permits external'} path dependency codec changes',
       () async {
@@ -159,16 +166,22 @@ void main() {
         configFile.writeAsStringSync(jsonEncode(config));
         project.writeFile(
           'app_shared/pubspec.yaml',
-          '${project.readFile('app_shared/pubspec.yaml')}  external_enum:\n    path: ${external.path}\n',
+          project
+              .readFile('app_shared/pubspec.yaml')
+              .replaceFirst(
+                'dependencies:\n',
+                'dependencies:\n  ${workspace ? 'enum_bridge' : 'external_enum'}:\n    path: ${workspace ? '../enum_bridge' : external.path}\n',
+              ),
         );
+        if (workspace) {
+          project.writeFile(
+            'enum_bridge/pubspec.yaml',
+            'name: enum_bridge\nversion: 1.0.0\ndependencies:\n  external_enum:\n    path: ../external_enum\n',
+          );
+        }
         project.writeFile(
           workspace ? 'pubspec.lock' : 'app_shared/pubspec.lock',
-          File(
-            p.join(generatorRoot, 'pubspec.lock'),
-          ).readAsStringSync().replaceFirst(
-            'packages:\n',
-            'packages:\n  external_enum:\n    dependency: ${workspace ? 'transitive' : 'direct main'}\n    description:\n      path: ${inRepo ? (workspace ? 'external_enum' : '../external_enum') : external.path}\n      relative: $inRepo\n    source: path\n    version: "1.0.0"\n',
-          ),
+          'packages:\n${workspace ? '  enum_bridge:\n    description:\n      path: enum_bridge\n      relative: true\n    source: path\n' : ''}  external_enum:\n    dependency: ${workspace ? 'transitive' : 'direct main'}\n    description:\n      path: ${inRepo ? (workspace ? 'external_enum' : '../external_enum') : external.path}\n      relative: $inRepo\n    source: path\n    version: "1.0.0"\n',
         );
         project.writeFile('app_shared/lib/src/item.dart', r'''
 import 'package:dartway_core_shared/dartway_core_shared.dart';
@@ -198,7 +211,49 @@ void main() {
           project.path('app_shared/lib/generated/dw_contract.json'),
         ).deleteSync();
         final base = baseline(project);
-        enumFile.writeAsStringSync('enum ItemState { ready, archived }\n');
+        if (repointed) {
+          final replacement = Directory.systemTemp.createTempSync(
+            'dw_repointed_enum_',
+          );
+          addTearDown(() => replacement.deleteSync(recursive: true));
+          File(p.join(replacement.path, 'pubspec.yaml')).writeAsStringSync(
+            File(p.join(external.path, 'pubspec.yaml')).readAsStringSync(),
+          );
+          final replacementEnum = File(
+            p.join(replacement.path, 'lib/state.dart'),
+          );
+          replacementEnum.parent.createSync();
+          replacementEnum.writeAsStringSync(
+            'enum ItemState { ready, archived }\n',
+          );
+          for (final entry in config['packages'] as List) {
+            if ((entry as Map)['name'] == 'external_enum') {
+              entry['rootUri'] = replacement.uri.toString();
+            }
+          }
+          configFile.writeAsStringSync(jsonEncode(config));
+          final source = location == 'repointed-git'
+              ? 'git:\n      url: https://example.test/enums.git\n      ref: new-pin'
+              : 'path: ${replacement.path}';
+          project.writeFile(
+            'app_shared/pubspec.yaml',
+            project
+                .readFile('app_shared/pubspec.yaml')
+                .replaceFirst('path: ${external.path}', source),
+          );
+          project.writeFile('app_shared/pubspec.lock', '''
+packages:
+  external_enum:
+    source: ${location == 'repointed-git' ? 'git' : 'path'}
+    description:
+      path: ${replacement.path}
+      relative: false
+''');
+          // The old in-repo files stay present and unchanged: only the resolved
+          // dependency moved, so comparing the head lock alone would miss it.
+        } else {
+          enumFile.writeAsStringSync('enum ItemState { ready, archived }\n');
+        }
         await project.generateClean();
         final after = await project.runScript(
           'app_shared',
@@ -217,7 +272,7 @@ void main() {
           output(result),
           contains(
             inRepo
-                ? 'shared contract source changed: external_enum/lib/state.dart'
+                ? 'shared contract source changed: external_enum'
                 : 'shared contract source unchanged',
           ),
         );
@@ -226,6 +281,166 @@ void main() {
       timeout: const Timeout(Duration(minutes: 3)),
     );
   }
+
+  test('workspace adoption ignores app-only and dev-only path packages', () async {
+    final project = TempProject.create(['app_shared', 'app_flutter']);
+    project.writeFile('app_shared/lib/src/item.dart', itemSource());
+    project.writeFile(
+      'app_shared/pubspec.yaml',
+      '${project.readFile('app_shared/pubspec.yaml')}  dev_only:\n    path: ../dev_only\n',
+    );
+    project.writeFile(
+      'app_flutter/pubspec.yaml',
+      'name: app_flutter\ndependencies:\n  app_only:\n    path: ../app_only\n',
+    );
+    for (final name in ['app_only', 'dev_only']) {
+      project.writeFile('$name/pubspec.yaml', 'name: $name\n');
+      project.writeFile('$name/lib/state.dart', 'enum ItemState { ready }\n');
+    }
+    project.writeFile('pubspec.lock', '''packages:
+  app_only:
+    source: path
+    description:
+      path: app_only
+      relative: true
+  dev_only:
+    source: path
+    description:
+      path: dev_only
+      relative: true
+''');
+    await project.generateClean();
+    File(
+      project.path('app_shared/lib/generated/dw_contract.json'),
+    ).deleteSync();
+    project.writeFile(
+      'pubspec.yaml',
+      'name: app_workspace\nworkspace:\n  - app_shared\n  - app_flutter\n',
+    );
+    for (final name in ['app_shared', 'app_flutter']) {
+      project.writeFile(
+        '$name/pubspec.yaml',
+        '${project.readFile('$name/pubspec.yaml')}\nresolution: workspace\n',
+      );
+    }
+    final base = baseline(project);
+    for (final name in ['app_only', 'dev_only']) {
+      project.writeFile(
+        '$name/lib/state.dart',
+        'enum ItemState { ready, archived }\n',
+      );
+    }
+    final result = await DwCodeGenerator.run(
+      project.path('app_shared'),
+      contractBase: base,
+    );
+    expect(result.diagnostics, isEmpty);
+    expect(result.contractProof, contains('shared contract source unchanged'));
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
+  test(
+    'adoption traverses nested workspace members missing from the lock and resolved overrides',
+    () async {
+      final project = TempProject.create(['app_shared']);
+      project.writeFile('app_shared/lib/src/item.dart', itemSource());
+      await project.generateClean();
+      File(
+        project.path('app_shared/lib/generated/dw_contract.json'),
+      ).deleteSync();
+      project.writeFile(
+        'pubspec.yaml',
+        'name: app_workspace\nworkspace:\n  - app_shared\n  - members/*\n',
+      );
+      project.writeFile(
+        'app_shared/pubspec.yaml',
+        project
+            .readFile('app_shared/pubspec.yaml')
+            .replaceFirst(
+              'dependencies:\n',
+              'resolution: workspace\ndependencies:\n  enum_bridge: any\n',
+            ),
+      );
+      project.writeFile(
+        'members/enum_bridge/pubspec.yaml',
+        'name: enum_bridge\nresolution: workspace\nworkspace:\n  - support\ndependencies:\n  enum_shapes: any\n',
+      );
+      project.writeFile(
+        'members/enum_bridge/support/pubspec.yaml',
+        'name: enum_shapes\nresolution: workspace\ndependencies:\n  external_enum: any\n',
+      );
+      project.writeFile('external_enum/pubspec.yaml', 'name: external_enum\n');
+      project.writeFile(
+        'external_enum/lib/state.dart',
+        'enum ItemState { ready }\n',
+      );
+      project.writeFile(
+        'pubspec_overrides.yaml',
+        'dependency_overrides:\n  external_enum:\n    path: external_enum\n',
+      );
+      project.writeFile('pubspec.lock', '''packages:
+  external_enum:
+    source: path
+    description:
+      path: external_enum
+      relative: true
+''');
+      final base = baseline(project);
+      project.writeFile(
+        'external_enum/lib/state.dart',
+        'enum ItemState { ready, archived }\n',
+      );
+      final result = await DwCodeGenerator.run(
+        project.path('app_shared'),
+        contractBase: base,
+      );
+      expect(
+        result.diagnostics.map((d) => d.message).join(),
+        contains(
+          'shared contract source changed: external_enum/lib/state.dart',
+        ),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  test('adoption does not read a lock above the Git root', () async {
+    final project = TempProject.create(['app_shared']);
+    project.writeFile('app_shared/lib/src/item.dart', itemSource());
+    await project.generateClean();
+    File(
+      project.path('app_shared/lib/generated/dw_contract.json'),
+    ).deleteSync();
+    project.writeFile('app_shared/.gitignore', '.dart_tool/\n');
+    git(project, ['-C', 'app_shared', 'init', '-b', 'main']);
+    git(project, [
+      '-C',
+      'app_shared',
+      'add',
+      'pubspec.yaml',
+      'analysis_options.yaml',
+      '.gitignore',
+      'lib',
+    ]);
+    git(project, [
+      '-C',
+      'app_shared',
+      '-c',
+      'user.name=Fixture',
+      '-c',
+      'user.email=fixture@example.test',
+      'commit',
+      '-m',
+      'trusted baseline',
+    ]);
+    final base = git(project, ['-C', 'app_shared', 'rev-parse', 'HEAD']);
+    project.writeFile('pubspec.lock', 'not a resolved lock');
+    final result = await DwCodeGenerator.run(
+      project.path('app_shared'),
+      contractBase: base,
+    );
+    expect(result.diagnostics, isEmpty);
+    expect(result.contractProof, contains('shared contract source unchanged'));
+  }, timeout: const Timeout(Duration(minutes: 2)));
 
   test(
     'custom DTO equality used by default omission is unverified, not silently compatible',
@@ -962,6 +1177,15 @@ packages:
     () async {
       final project = TempProject.create(['app_shared']);
       project.writeFile('app_shared/lib/src/item.dart', itemSource());
+      for (final name in [
+        'space name',
+        'line\nbreak',
+        'quote"name',
+        r'back\slash',
+        'café',
+      ]) {
+        project.writeFile('app_shared/$name', 'contract source\n');
+      }
       await project.generateClean();
       File(
         project.path('app_shared/lib/generated/dw_contract.json'),
