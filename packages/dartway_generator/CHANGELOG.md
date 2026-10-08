@@ -2,11 +2,11 @@
 
 ## 0.21.0-dev.17
 
-- First contract adoption also compares resolved in-repo path dependencies, including transitive
-  entries. Shared generator ownership is the exact emitted set plus header-bearing parts judged
-  from base bytes; hand-written files under `lib/generated/` are compared. Compare Git blob IDs
-  with clean/eol filters so CRLF working copies pass. Framework git-subpath and external
-  dependencies remain excluded (dartway/dartway#458).
+- First contract adoption compares shared's own path-dependency closure at both base and head,
+  excluding app-only and dev-only packages. Repointed dependencies remain blocking, the lock walk
+  stops at the Git root, and regular files are hashed in one Git call (dartway/dartway#460).
+  See the [first descriptor adoption rules](../../docs/2-core/wire-and-versions.md#first-descriptor-adoption)
+  for the compared set and output ownership (dartway/dartway#458).
 
 - Recognize the framework `DwCalendarDay` by package identity in DTO codecs and entity rows; record
   its additive `calendarDay` descriptor kind. Direct entity columns map to `DwColumnType.calendarDay`;
@@ -14,10 +14,9 @@
 
 - Emit a deterministic project wire descriptor and verify source-derived contracts against a fixed
   committed Git baseline. Breaking edits require the shared package breaking line to advance;
-  unsupported/custom or unreproducible baselines block the check. Descriptor-free commits require
-  unchanged hand-written shared source for first adoption, excluding generator-owned output, the
-  shared pubspec and lock. A pin-move PR can establish the descriptor; changed source blocks with
-  named paths and instructions to split the change. Remove the now-unreachable reproduction bootstrap.
+  unsupported/custom or unreproducible baselines block the check. Descriptor-free commits follow the
+  [first descriptor adoption rules](../../docs/2-core/wire-and-versions.md#first-descriptor-adoption).
+  A pin-move PR can establish the descriptor; changed source blocks with named paths and instructions to split the change. Remove the now-unreachable reproduction bootstrap.
 
 - The family also moves in lockstep to deliver the migration note for the router
   that follows a provider (dartway/dartway#407).

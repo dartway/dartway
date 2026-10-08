@@ -192,17 +192,27 @@ Regenerating at shared version `0.7.2` or `0.7.3` remains red; change it to `0.8
 The existing runtime then refuses an older client line with 426/`dw.updateRequired`. A nullable
 `String? title` addition accepts the old payload and can stay on `0.7`.
 
+### First descriptor adoption
+
 When the trusted base has no descriptor, first adoption requires unchanged
-hand-written shared package files **and every resolved `source: path` dependency
-inside the Git root**, including transitive path dependencies. For each package,
-the generator compares the union of base-tracked and current files, excluding
-that package's `pubspec.yaml` and `pubspec.lock`. Framework git-subpath dependencies
-and external dependencies stay outside the comparison. In the shared package,
-only the exact paths emitted by the current generator and `.dw.dart` parts bearing
-its generated header are excluded; existing parts are judged from base bytes, so
-adding a header cannot hide a source edit. Hand-written files under `lib/generated/`
-are still compared. Current files are hashed with `git hash-object --path` against
-base blob IDs, applying Git clean/eol filters so a CRLF checkout of LF source passes.
+hand-written shared package files and the union of **shared's own in-repo path-dependency
+closure at the trusted base and at head**. Starting from shared's `dependencies`, the generator
+follows each in-repo path dependency's pubspec transitively; dev dependencies and packages used
+only by the server or app are excluded. The resolved lock identifies dependency sources, including
+overrides; workspace members supply their own pubspec edges. Base pubspecs and locks are read from
+Git objects at the trusted SHA. The nearest-lock walk stops at the Git root. A dependency that
+leaves this closure blocks adoption and is named even if its old files remain unchanged in the
+repository, so repointing it to Git or an external path cannot hide a contract change.
+Framework git-subpath dependencies and dependencies outside the Git root at both revisions stay
+outside the comparison.
+
+For each compared package, the generator compares the union of base-tracked and current files,
+excluding that package's `pubspec.yaml` and `pubspec.lock`. In shared, only the exact paths emitted
+by the current generator and `.dw.dart` parts bearing its generated header are excluded; existing
+parts are judged from base bytes, so adding a header cannot hide a source edit. Hand-written files
+under `lib/generated/` are still compared. Regular files are hashed in one
+`git hash-object --stdin-paths` call with worktree-relative paths, applying Git clean/eol filters
+so a CRLF checkout of LF source passes; symlinks are hashed individually by their verbatim targets.
 A framework pin move may regenerate codecs and establish the descriptor; the result
 names the base SHA and adoption proof.
 If source differs, the gate names the files and asks to split the change: land the
