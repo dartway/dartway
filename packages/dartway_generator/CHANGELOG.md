@@ -9,7 +9,9 @@
 - Emit a deterministic project wire descriptor and verify source-derived contracts against a fixed
   committed Git baseline. Breaking edits require the shared package breaking line to advance;
   unsupported/custom or unreproducible baselines block the check. Descriptor-free commits require
-  exact codec/registry reproduction with existing resolved dependencies, without project writes.
+  unchanged hand-written shared source for first adoption, excluding generator-owned output, the
+  shared pubspec and lock. A pin-move PR can establish the descriptor; changed source blocks with
+  named paths and instructions to split the change. Remove the now-unreachable reproduction bootstrap.
 
 - The family also moves in lockstep to deliver the migration note for the router
   that follows a provider (dartway/dartway#407).

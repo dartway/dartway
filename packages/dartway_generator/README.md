@@ -10,9 +10,11 @@ Run as `dartway generate` (add `--check --contract-base <trusted-SHA>` to verify
 
 The compatibility gate compares source-derived codec models with Git objects at a fixed committed
 baseline, reusing the shared package breaking line. Incompatible or unverified results fail;
-regeneration cannot silently approve a breaking contract. Missing descriptors require exact
-committed shared codec/registry reproduction with existing resolved dependency locks. No project
-setup scripts, historical dependency upgrades or runtime negotiation are added. Coverage excludes
+regeneration cannot silently approve a breaking contract. Without a committed descriptor,
+byte-identical hand-written shared source permits adoption in the pin-move PR, excluding
+generator-owned output, the shared pubspec and lock. Changed source blocks: land the pin move
+and descriptor first, then edit the contract in a following PR. No project setup scripts,
+historical dependency upgrades or runtime negotiation are added. Coverage excludes
 handler/domain semantics and manually composed external modules. Checks default to the configured
 project base-branch merge-base; CI supplies its trusted base SHA explicitly.
 

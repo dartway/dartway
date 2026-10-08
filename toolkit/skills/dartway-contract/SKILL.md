@@ -242,10 +242,14 @@ Contract tests (round trip, `validate()`, `onUpdate`, channels): `dartway-testin
 `projectContractVersion` is an error when the generated project contract is incompatible at the
 same line or cannot be verified. The generator compares its resolved source models in memory with
 the descriptor read from the fixed Git commit; regeneration or editing the working JSON cannot
-erase that baseline. Missing descriptors require exact reproduction of the committed codecs and
-registry using existing resolved dependencies and matching committed locks in disposable scratch.
-External path dependency bytes cannot be trusted for descriptor-free bootstrap; establish a descriptor on the trusted base using its original sources. Malformed, unsupported or unreproducible baselines block the check with remediation. CI supplies
-its trusted base SHA explicitly; ordinary check uses the project's recorded base branch merge-base,
+erase that baseline. Without a committed descriptor, adoption requires byte-identical
+hand-written shared source, excluding generator-owned output, the shared pubspec and
+lock. The pin-move PR regenerates output and establishes the first descriptor;
+changed shared source blocks and names the files. Split it: land the pin move with
+unchanged shared source first, then the contract edit in a following PR. A committed
+base descriptor always wins. No historical dependency fetch or codec reproduction
+is used. Malformed or unsupported contracts remain blocking. CI supplies its trusted
+base SHA explicitly; ordinary check uses the project's recorded base branch merge-base,
 or an unambiguous remote HEAD/main/master. It never chooses feature HEAD as a fallback.
 
 This proves generated codecs and registry shapes, including nested fields and resolved request/result

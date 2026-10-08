@@ -270,5 +270,5 @@ bump, refresh the recordings with `DW_UPDATE_GOLDENS=1 dart test test/wire_golde
 The generated project contract gate is separate from the core wire golden. CI passes its trusted
 base SHA to `generate --check`/`check --contract-base`; regeneration cannot silently approve a breaking
 DTO edit. Fixture tests exercise old/new generated codecs and real CLI/Git baselines, including
-read-only project byte identity and blocking unsupported/bootstrap failures. Tooling metadata alone
+read-only project byte identity and pin-move adoption, changed-source rejection and blocking unsupported contracts. Tooling metadata alone
 does not trigger a core wire bump or runtime interoperability tier.
