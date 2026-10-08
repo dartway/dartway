@@ -23,13 +23,13 @@ write_file() {
 }
 write_file /etc/modules-load.d/dartway-bbr.conf 'tcp_bbr'
 modprobe tcp_bbr 2>/dev/null || true
-if ! grep -qw bbr /proc/sys/net/ipv4/tcp_available_congestion_control; then
-  echo 'fatal: this kernel does not provide tcp_bbr' >&2
-  exit 1
-fi
 write_file /etc/sysctl.d/90-dartway-net.conf 'net.core.default_qdisc=fq
 net.ipv4.tcp_congestion_control=bbr'
 sysctl -p /etc/sysctl.d/90-dartway-net.conf >/dev/null
+if ! grep -qw bbr /proc/sys/net/ipv4/tcp_allowed_congestion_control; then
+  echo 'fatal: this network namespace does not allow tcp_bbr' >&2
+  exit 1
+fi
 ''';
 
 /// Provisions a server and renders the infrastructure it runs on.

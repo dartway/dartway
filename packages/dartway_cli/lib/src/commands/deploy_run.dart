@@ -121,18 +121,18 @@ Future<int> runDeploy(
   // The proxy asks its own network namespace for BBR. Prove the host can
   // supply it before the first remote step can replace a running service.
   final bbr = await ssh.run(
-    'cat /proc/sys/net/ipv4/tcp_available_congestion_control',
+    'cat /proc/sys/net/ipv4/tcp_allowed_congestion_control',
   );
   if (!bbr.ok) {
     report.problems.writeln(
-      'Could not read the congestion controls available on the server: '
+      'Could not read the congestion controls allowed on the server: '
       '${bbr.firstLine}',
     );
     return finish(1, reason: 'unreachable');
   }
   if (!bbr.stdout.split(RegExp(r'\s+')).contains('bbr')) {
     report.problems.writeln(
-      'BBR congestion control is not available on the server. '
+      'BBR congestion control is not allowed on the server. '
       'Run `dart run dartway_cli:dartway deploy setup` once on this server, '
       'then deploy again.',
     );

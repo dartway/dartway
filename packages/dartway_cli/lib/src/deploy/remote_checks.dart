@@ -155,7 +155,7 @@ Future<DwDeployVerdict> _checkHostCongestionControl(
           result.ok
               ? 'host reports ${value.isEmpty ? 'no value' : value}'
               : result.firstLine,
-          fix: 'Run "dartway deploy setup" once on this server.',
+          fix: 'Run "dart run dartway_cli:dartway deploy setup" once on this server.',
         );
 }
 

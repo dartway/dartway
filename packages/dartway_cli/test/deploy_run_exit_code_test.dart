@@ -49,13 +49,13 @@ void main() {
   test('missing host BBR stops before the first deployment step', () async {
     final ssh = RecordingSsh([
       (
-        'tcp_available_congestion_control',
+        'tcp_allowed_congestion_control',
         const DwSshResult(exitCode: 0, stdout: 'reno cubic\n', stderr: ''),
       ),
     ]);
     final result = await runWith(ssh);
     expect(result.code, 1);
-    expect(result.human, contains('BBR congestion control is not available'));
+    expect(result.human, contains('BBR congestion control is not allowed'));
     expect(
       result.events.singleWhere((event) => event['event'] == 'run_finished'),
       containsPair('reason', 'bbr-unavailable'),
@@ -66,7 +66,7 @@ void main() {
   test('an SSH failure is reported as unreachable, not missing BBR', () async {
     final ssh = RecordingSsh([
       (
-        'tcp_available_congestion_control',
+        'tcp_allowed_congestion_control',
         const DwSshResult(
           exitCode: 255,
           stdout: '',
@@ -79,7 +79,7 @@ void main() {
     expect(result.human, contains('Connection refused'));
     expect(
       result.human,
-      isNot(contains('BBR congestion control is not available')),
+      isNot(contains('BBR congestion control is not allowed')),
     );
     expect(
       result.events.singleWhere((event) => event['event'] == 'run_finished'),
@@ -132,7 +132,7 @@ class _ServerWhereEveryStepExits extends RecordingSsh {
   @override
   Future<DwSshResult> run(String command) async {
     issued.add(command);
-    if (command.contains('tcp_available_congestion_control')) {
+    if (command.contains('tcp_allowed_congestion_control')) {
       return const DwSshResult(
         exitCode: 0,
         stdout: 'reno cubic bbr\n',

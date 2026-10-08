@@ -26,7 +26,8 @@ void main() {
     final writes = dwBbrSetupScript
         .replaceAll('/etc/modules-load.d/dartway-bbr.conf', modules.path)
         .replaceAll('/etc/sysctl.d/90-dartway-net.conf', sysctl.path)
-        .replaceFirst(RegExp(r'modprobe tcp_bbr[\s\S]*?fi\n'), '')
+        .replaceFirst(RegExp(r'modprobe tcp_bbr[^\n]*\n'), '')
+        .replaceFirst(RegExp(r'if ! grep[\s\S]*?fi\n'), '')
         .replaceFirst(RegExp(r'sysctl -p[^\n]+\n'), '');
 
     // Modification times through Dart: GNU `stat --format` is not on macOS.
@@ -96,7 +97,7 @@ void main() {
       );
       expect(bbr, contains('modprobe tcp_bbr'));
       expect(bbr, contains('modprobe tcp_bbr 2>/dev/null || true'));
-      expect(bbr, contains('tcp_available_congestion_control'));
+      expect(bbr, contains('tcp_allowed_congestion_control'));
       expect(bbr, contains('net.core.default_qdisc=fq'));
       expect(bbr, contains('net.ipv4.tcp_congestion_control=bbr'));
       expect(bbr, contains('sysctl -p /etc/sysctl.d/90-dartway-net.conf'));

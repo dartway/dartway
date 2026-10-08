@@ -25,7 +25,9 @@ class _PerRepoRegistry {
     server.listen((request) async {
       // /v2/<repository>/manifests/<tag>
       final segments = request.uri.pathSegments;
-      final repository = segments.sublist(1, segments.length - 2).join('/');
+      final repository = segments
+          .sublist(1, segments.length - 2)
+          .join('/');
       final status = statusByRepository[repository] ?? 200;
       if (status == 200) {
         // A real registry names its own digest; resolve() requires it.
@@ -152,25 +154,30 @@ void main() {
       },
     );
 
-    test('a real failure on one image outweighs a transient one on another — '
-        'the deploy is refused, not merely skipped, when anything is '
-        'definitely wrong, and both are named (L1: a transient result beside '
-        'a definite one must not go unmentioned)', () async {
-      fake.statusByRepository = {'library/postgres': 404, 'library/nginx': 503};
-      final verdict = await evaluateImagesResolve(images, fake.registry);
-      expect(verdict.passed, isFalse);
-      expect(verdict.skipped, isFalse);
-      expect(verdict.detail, contains('404'));
-      expect(verdict.detail, contains('Postgres'));
-      expect(
-        verdict.detail,
-        contains('nginx'),
-        reason:
-            'the transient nginx result must still be visible, not '
-            'silently dropped because a definite failure took priority',
-      );
-      expect(verdict.detail, contains('503'));
-    });
+    test(
+      'a real failure on one image outweighs a transient one on another — '
+      'the deploy is refused, not merely skipped, when anything is '
+      'definitely wrong, and both are named (L1: a transient result beside '
+      'a definite one must not go unmentioned)',
+      () async {
+        fake.statusByRepository = {
+          'library/postgres': 404,
+          'library/nginx': 503,
+        };
+        final verdict = await evaluateImagesResolve(images, fake.registry);
+        expect(verdict.passed, isFalse);
+        expect(verdict.skipped, isFalse);
+        expect(verdict.detail, contains('404'));
+        expect(verdict.detail, contains('Postgres'));
+        expect(
+          verdict.detail,
+          contains('nginx'),
+          reason: 'the transient nginx result must still be visible, not '
+              'silently dropped because a definite failure took priority',
+        );
+        expect(verdict.detail, contains('503'));
+      },
+    );
   });
 
   group('the images-resolve check declaration', () {

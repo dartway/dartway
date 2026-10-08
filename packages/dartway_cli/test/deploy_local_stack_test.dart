@@ -32,11 +32,11 @@ import 'support/deploy_fixtures.dart';
 /// the firewall and SSH itself. Everything between "the checkout is on the
 /// machine" and "a browser gets the right answers" it runs for real.
 void main() {
-  final available = File('/proc/sys/net/ipv4/tcp_available_congestion_control');
+  final allowed = File('/proc/sys/net/ipv4/tcp_allowed_congestion_control');
   final bbrSkipReason =
-      !available.existsSync() ||
-          !available.readAsStringSync().split(RegExp(r'\s+')).contains('bbr')
-      ? 'the Docker host does not provide tcp_bbr, so a BBR proxy cannot start'
+      !allowed.existsSync() ||
+          !allowed.readAsStringSync().split(RegExp(r'\s+')).contains('bbr')
+      ? 'the Docker host does not allow tcp_bbr, so a BBR proxy cannot start'
       : null;
   final monorepo = () {
     var dir = Directory.current.absolute;

@@ -310,7 +310,7 @@ up a change to the rendered files. `--dry-run` prints the rendered `docker-compo
 
 First `run` evaluates the working-copy checks of `deploy check` and refuses on any error, pointing at
 `dart run dartway_cli:dartway deploy check --local` for the detail. Before its first remote step it
-also verifies that the host advertises BBR; if not, it stops before replacing anything and asks for
+also verifies that the host allows BBR; if not, it stops before replacing anything and asks for
 `dart run dartway_cli:dartway deploy setup`. An existing server converges with one
 `dart run dartway_cli:dartway deploy setup`, followed by
 `dart run dartway_cli:dartway deploy run`. Then:
