@@ -8,6 +8,7 @@ import '../checker/dw_check_type.dart';
 import 'deploy_target.dart';
 import 'local_secrets_file.dart';
 import 'nginx_upstreams.dart';
+import 'output_mask.dart';
 import 'renderer.dart';
 import 'secret_store.dart';
 import 'ssh_runner.dart';
@@ -23,7 +24,18 @@ enum DwDeployCheckStage { local, remote }
 
 /// Everything a check is allowed to look at.
 class DwDeployContext {
-  DwDeployContext({required this.projectRoot, required this.stack, this.ssh});
+  DwDeployContext({
+    required this.projectRoot,
+    required this.stack,
+    DwSshRunner? ssh,
+  }) : ssh = ssh == null
+           ? null
+           : DwMaskedSshRunner(
+               ssh,
+               deployUser: stack.target.deployUser,
+               storeFile:
+                   '${stack.target.runtimeConfigDir}/${DwSecretStore.fileName}',
+             );
 
   final Directory projectRoot;
   final DwStack stack;

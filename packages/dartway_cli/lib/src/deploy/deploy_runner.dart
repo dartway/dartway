@@ -5,6 +5,7 @@ import 'data_volumes.dart';
 import 'deploy_target.dart';
 import 'nginx_upstreams.dart';
 import 'outside_probe.dart';
+import 'output_mask.dart';
 import 'remote_steps.dart';
 import 'renderer.dart';
 import 'secret_store.dart';
@@ -53,14 +54,20 @@ class DwDeployStep {
 /// nothing — not that it is skipped.
 class DwDeployRunner {
   DwDeployRunner({
-    required this.ssh,
+    required DwSshRunner ssh,
     required this.stack,
     String? appDir,
     String? storeDir,
     DwOutsideProbe? probe,
     this.remote,
     this.buildContext = '.',
-  }) : appDir = appDir ?? stack.target.appDir,
+  }) : ssh = DwMaskedSshRunner(
+         ssh,
+         deployUser: stack.target.deployUser,
+         storeFile:
+             '${storeDir ?? stack.target.runtimeConfigDir}/${DwSecretStore.fileName}',
+       ),
+       appDir = appDir ?? stack.target.appDir,
        store = DwSecretStore(
          ssh: ssh,
          target: stack.target,

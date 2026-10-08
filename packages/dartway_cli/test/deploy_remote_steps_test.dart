@@ -29,6 +29,32 @@ void main() {
   );
 
   group('a step run detached', () {
+    test(
+      'a complete masked answer survives a connection lost after it',
+      () async {
+        File(
+          p.join(temp.path, 'secrets.env'),
+        ).writeAsStringSync("TOKEN='stored-secret'\n");
+        final remote = steps(_BrokenAfterFinish())..beginFresh(['one']);
+        final result = await remote.run('one', "echo 'done stored-secret'");
+        expect(result.exitCode, 0);
+        expect(result.stdout, 'done ***\n');
+        expect(result.stderr, isEmpty);
+      },
+    );
+
+    test(
+      'a masking failure returns a failure without releasing step output',
+      () async {
+        Directory(p.join(temp.path, 'secrets.env')).createSync();
+        final remote = steps(LocalShell())..beginFresh(['one']);
+        final result = await remote.run('one', "echo 'must stay on target'");
+        expect(result.ok, isFalse);
+        expect(result.stdout, isEmpty);
+        expect(result.stderr, contains('Cannot read the secret store'));
+      },
+    );
+
     test('answers its exit code and both streams, byte for byte', () async {
       final remote = steps(LocalShell())..beginFresh(['one']);
       final result = await remote.run(
@@ -152,6 +178,28 @@ void main() {
       expect((await running).ok, isTrue);
     });
   });
+}
+
+class _BrokenAfterFinish extends DwSshRunner {
+  _BrokenAfterFinish() : super(host: 'localhost', user: 'local');
+
+  @override
+  Future<DwSshResult> runAsWithInput(
+    String deployUser,
+    String command,
+    String input,
+  ) async {
+    final finished = await LocalShell().runAsWithInput(
+      deployUser,
+      command,
+      input,
+    );
+    return DwSshResult(
+      exitCode: 255,
+      stdout: finished.stdout,
+      stderr: 'Connection closed after the complete answer.',
+    );
+  }
 }
 
 /// The first call reaches the server and its answer is lost, as when the
