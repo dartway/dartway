@@ -611,7 +611,7 @@ void main() {
         timeout: const Timeout(Duration(minutes: 2)),
         skip: processGroup && !Platform.isLinux && !Platform.isMacOS
             ? 'requires POSIX process groups and Bash job control'
-            : false,
+            : null,
       );
     }
   }, tags: ['services']);
