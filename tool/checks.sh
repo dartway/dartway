@@ -349,7 +349,7 @@ service_suites() {
       bash -c "cd '$package' && $(runner_of "$package") test"
   done
   run "packages/dartway_cli (external test servers)" \
-    bash -c "cd packages/dartway_cli && dart test test/test_external_servers_test.dart"
+    bash -c "cd packages/dartway_cli && dart test -t services --run-skipped test/test_external_servers_test.dart"
 }
 
 [ "$MODE" = services ] && require_services

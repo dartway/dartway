@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'package:args/command_runner.dart';
+import 'package:path/path.dart' as p;
 
 import '../deploy/stack.dart';
 import '../project_layout.dart';
@@ -18,7 +19,7 @@ class TestCommand extends Command<int> {
       ..addOption(
         'database-url',
         help:
-            'Explicit Postgres test server: postgres://user[:password]@host[:port]/maintenance-db (role needs CREATEDB).',
+            'Explicit Postgres test server: postgres://user:password@host[:port]/maintenance-db (role needs CREATEDB).',
       )
       ..addOption(
         'storage-url',
@@ -177,6 +178,7 @@ class TestCommand extends Command<int> {
     Process? test;
     var interrupted = false;
     var result = 1;
+    final interrupt = Completer<void>();
     Future<void>? stopping;
     Future<void> stopTest() => stopping ??= () async {
       final process = test;
@@ -191,12 +193,18 @@ class TestCommand extends Command<int> {
     }();
     final signal = ProcessSignal.sigint.watch().listen((_) {
       interrupted = true;
+      if (!interrupt.isCompleted) interrupt.complete();
       if (test != null) unawaited(stopTest());
     });
 
+    Future<T?> untilInterrupted<T>(Future<T> operation) => Future.any([
+      operation.then<T?>((value) => value),
+      interrupt.future.then<T?>((_) => null),
+    ]);
+
     Future<int> worker(String operation) async {
       final process = await Process.start(
-        Platform.resolvedExecutable,
+        _dartExecutable,
         [...workerArguments!, operation, ...external],
         workingDirectory: serverDir.path,
         environment: environment,
@@ -221,7 +229,8 @@ class TestCommand extends Command<int> {
       // Sequential ownership: every acquired container is visible to finally,
       // including when the second start fails or the run is interrupted.
       if (databaseUrl == null) {
-        ephemeral = await database.start();
+        ephemeral = await untilInterrupted(database.start());
+        if (interrupted) return 130;
         if (ephemeral == null) {
           stderr.writeln(
             'Could not start the test database. Is the Docker daemon running? Run dartway doctor.',
@@ -237,7 +246,8 @@ class TestCommand extends Command<int> {
       }
       if (interrupted) return 130;
       if (startStorage) {
-        ephemeralStorage = await storage.start();
+        ephemeralStorage = await untilInterrupted(storage.start());
+        if (interrupted) return 130;
         if (ephemeralStorage == null) {
           stderr.writeln(
             'Could not start the test storage. Is the Docker daemon running? Run dartway doctor.',
@@ -248,10 +258,21 @@ class TestCommand extends Command<int> {
       }
       final databaseReady =
           ephemeral == null ||
-          await database.waitUntilReady(ephemeral!, _readinessTimeout);
+          await untilInterrupted(
+                database.waitUntilReady(ephemeral!, _readinessTimeout),
+              ) ==
+              true;
+      if (interrupted) return 130;
       final storageReady =
           ephemeralStorage == null ||
-          await storage.waitUntilReady(ephemeralStorage!, _readinessTimeout);
+          await untilInterrupted(
+                storage.waitUntilReady(
+                  ephemeralStorage!,
+                  _readinessTimeout,
+                ),
+              ) ==
+              true;
+      if (interrupted) return 130;
       if (!databaseReady || !storageReady) {
         stderr.writeln(
           'The test container did not become ready within ${_readinessTimeout.inSeconds}s.',
@@ -264,7 +285,7 @@ class TestCommand extends Command<int> {
         '${storageUrl != null || ephemeralStorage != null ? ' and buckets' : ''}.',
       );
       test = await Process.start(
-        Platform.resolvedExecutable,
+        _dartExecutable,
         ['test', ...argResults!.rest],
         workingDirectory: serverDir.path,
         environment: environment,
@@ -318,4 +339,9 @@ class TestCommand extends Command<int> {
     'Remove them with `docker rm -f '
         '${[?database?.id, ?storage?.id].join(' ')}`.',
   ].join('\n');
+
+  static String get _dartExecutable {
+    final running = p.basenameWithoutExtension(Platform.resolvedExecutable);
+    return running == 'dart' ? Platform.resolvedExecutable : 'dart';
+  }
 }

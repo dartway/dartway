@@ -32,10 +32,10 @@ void main() {
   );
 
   test(
-    'password omission, IPv6 loopback and dedicated remote opt-in',
+    'IPv6 loopback and dedicated remote opt-in',
     () async {
       final local = TestServerUrl.parse(
-        'postgres://test@[::1]/postgres',
+        'postgres://test:secret@[::1]/postgres',
         database: true,
       );
       final environment = await local.environment(
@@ -43,7 +43,7 @@ void main() {
         allowRemote: false,
       );
       expect(environment['DW_DATABASE_PORT'], '5432');
-      expect(environment['DW_DATABASE_PASSWORD'], '');
+      expect(environment['DW_DATABASE_PASSWORD'], 'secret');
       final remote = TestServerUrl.parse(
         'postgres://test:secret@192.0.2.1/postgres',
         database: true,
@@ -72,6 +72,7 @@ void main() {
           true,
         ),
         ('http://test:private-value@localhost/postgres', true),
+        ('postgres://test@localhost/postgres', true),
         ('http://test:private-value@localhost/bucket', false),
         ('http://test@localhost:9000', false),
         ('https://test:private-value@localhost:0', false),

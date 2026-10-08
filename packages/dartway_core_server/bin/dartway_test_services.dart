@@ -9,6 +9,11 @@ import 'package:dartway_core_server/src/files/dw_object_store.dart';
 import 'package:dartway_core_server/src/testing/dw_test_run.dart';
 
 Future<void> main(List<String> args) async {
+  // The parent owns interruption and waits for this sweep. A second Ctrl-C
+  // from the terminal must not abandon run-owned resources halfway through.
+  final interrupt = args.firstOrNull == 'cleanup'
+      ? ProcessSignal.sigint.watch().listen((_) {})
+      : null;
   final run = testRunId()!;
   var failed = false;
   for (final service in args.skip(1)) {
@@ -104,6 +109,7 @@ Future<void> main(List<String> args) async {
       failed = true;
     }
   }
+  await interrupt?.cancel();
   exitCode = failed ? 1 : 0;
 }
 

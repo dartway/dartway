@@ -30,7 +30,8 @@ final class DwTestDatabase {
     DwDatabaseConfig? admin,
     String prefix = 'dw_test',
   }) async {
-    final adminConfig = admin ?? testDatabaseConfig(Platform.environment);
+    final adminConfig =
+        admin ?? DwDatabaseConfig.fromEnvironment(Platform.environment);
     final random = Random.secure();
     final suffix = List.generate(
       10,

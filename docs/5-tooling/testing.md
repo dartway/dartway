@@ -87,8 +87,7 @@ dart run dartway_cli:dartway test \
 ```
 
 `--database-url` names the maintenance database on the test server; the role needs `CREATEDB`.
-The password and port are optional (port defaults to 5432); an omitted password requires a server
-that accepts the role without one. `--storage-url` accepts HTTP or HTTPS with access and secret keys,
+The password is required and the port is optional (it defaults to 5432). `--storage-url` accepts HTTP or HTTPS with access and secret keys,
 and uses path-style S3 in `us-east-1`. URL-encode reserved characters in credentials.
 Both flags select servers independently: a supplied URL prevents that service's container from
 starting. With `--database-url` alone, storage is disabled and the startup line says so;

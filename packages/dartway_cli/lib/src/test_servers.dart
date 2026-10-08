@@ -31,7 +31,9 @@ class TestServerUrl {
           uri.hasFragment ||
           (uri.hasPort && (uri.port < 1 || uri.port > 65535)) ||
           (database
-              ? uri.pathSegments.length != 1 || uri.pathSegments.single.isEmpty
+              ? uri.pathSegments.length != 1 ||
+                    uri.pathSegments.single.isEmpty ||
+                    password.isEmpty
               : (uri.path != '' && uri.path != '/') || password.isEmpty)) {
         throw const FormatException();
       }
@@ -39,7 +41,7 @@ class TestServerUrl {
     } on FormatException {
       throw FormatException(
         database
-            ? '--database-url must be postgres://user[:password]@host[:port]/maintenance-db'
+            ? '--database-url must be postgres://user:password@host[:port]/maintenance-db'
             : '--storage-url must be http[s]://access-key:secret-key@host[:port]',
       );
     }

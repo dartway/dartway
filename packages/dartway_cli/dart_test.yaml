@@ -1,4 +1,6 @@
 tags:
+  services:
+    skip: "needs Postgres and storage; run by tool/checks.sh services"
   # Builds the example's images and runs the rendered stack in local Docker:
   # minutes, and a Docker daemon. Not part of `tool/checks.sh`, which needs no
   # services; run it by name:

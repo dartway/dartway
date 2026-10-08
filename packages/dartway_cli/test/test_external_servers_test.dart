@@ -343,8 +343,6 @@ void main() {
         timeout: const Timeout(Duration(minutes: 2)),
       );
     },
-    skip: env['DW_DATABASE_HOST'] != null && env['DW_STORAGE_ENDPOINT'] != null
-        ? false
-        : 'needs explicit DW_DATABASE_* and DW_STORAGE_* services',
+    tags: ['services'],
   );
 }
