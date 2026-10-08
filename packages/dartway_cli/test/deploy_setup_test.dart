@@ -29,15 +29,10 @@ void main() {
         .replaceFirst(RegExp(r'modprobe tcp_bbr[\s\S]*?fi\n'), '')
         .replaceFirst(RegExp(r'sysctl -p[^\n]+\n'), '');
 
-    Future<String> stat() async {
-      final result = await Process.run('stat', [
-        '--format=%i:%y',
-        modules.path,
-        sysctl.path,
-      ]);
-      expect(result.exitCode, 0, reason: '${result.stderr}');
-      return '${result.stdout}';
-    }
+    // Modification times through Dart: GNU `stat --format` is not on macOS.
+    Future<String> stat() async =>
+        '${(await modules.stat()).modified.microsecondsSinceEpoch}:'
+        '${(await sysctl.stat()).modified.microsecondsSinceEpoch}';
 
     final first = await Process.run('dash', ['-c', writes]);
     expect(first.exitCode, 0, reason: '${first.stderr}');

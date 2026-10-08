@@ -132,6 +132,13 @@ class _ServerWhereEveryStepExits extends RecordingSsh {
   @override
   Future<DwSshResult> run(String command) async {
     issued.add(command);
+    if (command.contains('tcp_available_congestion_control')) {
+      return const DwSshResult(
+        exitCode: 0,
+        stdout: 'reno cubic bbr\n',
+        stderr: '',
+      );
+    }
     final nonce = _nonce.firstMatch(command)?.group(0);
     if (nonce == null) {
       return const DwSshResult(exitCode: 0, stdout: '', stderr: '');
