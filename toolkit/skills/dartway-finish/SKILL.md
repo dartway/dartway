@@ -131,7 +131,8 @@ sealed migrations: formatting can change their checksum and cause `DwMigrationRe
 
 ```bash
 git diff --name-only -z origin/__BASE_BRANCH__...HEAD -- '*.dart' \
-  ':(exclude)**/lib/src/migrations/m[0-9]*.dart' | xargs -0 dart format
+  ':(exclude,glob)**/lib/src/migrations/m[0-9]*.dart' | \
+  xargs -0 sh -c 'if [ "$#" -gt 0 ]; then dart format "$@"; fi' sh
 ```
 
 Re-run the gates the edits reach, and end with what was applied, what is left to the author, which
