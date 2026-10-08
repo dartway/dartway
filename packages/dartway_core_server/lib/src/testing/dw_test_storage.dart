@@ -36,6 +36,8 @@ final class DwTestStorage {
   /// `DW_STORAGE_PATH_STYLE` in [environment] (the process environment by
   /// default); bucket names there are ignored. `DW_TEST_RUN_ID` replaces
   /// [prefix] with `dw-test-<run>` so interrupted runs can be cleaned up.
+  /// The run id is read from [environment] when supplied, otherwise from the
+  /// process environment; a supplied map without it does not inherit one.
   /// A missing variable throws a [StateError] naming them.
   static Future<DwTestStorage> create({
     Map<String, String>? environment,

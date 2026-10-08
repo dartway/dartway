@@ -63,6 +63,7 @@ Future<void> main(List<String> args) async {
           for (final bucket in tags(body, 'Name').where(pattern.hasMatch)) {
             // Delete each page before listing again: no continuation token can
             // become stale as objects disappear, and no 1000-object limit leaks.
+            Set<String>? previousPage;
             while (true) {
               final listing = await read(
                 store,
@@ -73,8 +74,15 @@ Future<void> main(List<String> args) async {
               final keys = tags(
                 listing,
                 'Key',
-              ).map(Uri.decodeComponent).toList();
+              ).map(Uri.decodeQueryComponent).toList();
               if (keys.isEmpty) break;
+              final page = keys.toSet();
+              if (previousPage != null &&
+                  page.length == previousPage.length &&
+                  page.containsAll(previousPage)) {
+                throw const _CleanupStalled();
+              }
+              previousPage = page;
               for (final key in keys) {
                 await store.delete(bucket, key);
               }
@@ -88,7 +96,8 @@ Future<void> main(List<String> args) async {
     } catch (error) {
       // Driver/HTTP errors can contain supplied credentials; do not echo them.
       stderr.writeln(
-        'Test $service ${args.first} failed (${error.runtimeType}). '
+        'Test $service ${args.first} failed '
+        '(${error is _CleanupStalled ? 'S3 cleanup made no progress' : error.runtimeType}). '
         'Check connectivity and permissions (CREATEDB for Postgres, bucket '
         'listing and deletion for S3); run id: $run.',
       );
@@ -124,4 +133,8 @@ Iterable<String> tags(String xml, String tag) sync* {
         .replaceAll('&apos;', "'")
         .replaceAll('&amp;', '&');
   }
+}
+
+final class _CleanupStalled implements Exception {
+  const _CleanupStalled();
 }

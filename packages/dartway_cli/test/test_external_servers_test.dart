@@ -215,11 +215,13 @@ void main() {
   test('creates isolated resources', () async {
     final database = await DwTestDatabase.create(prefix: 'custom_test');
     ${storage ? 'final storage = await DwTestStorage.create(prefix: "custom-test");' : ''}
-    File('${root.path}/$name.json').writeAsStringSync(jsonEncode({
+    final ready = File('${root.path}/$name.json.tmp');
+    ready.writeAsStringSync(jsonEncode({
       'run': Platform.environment['DW_TEST_RUN_ID'], 'database': database.config.name,
       ${storage ? "'public': storage.publicBucket, 'private': storage.privateBucket," : ''}
       'inheritedStorage': Platform.environment['DW_STORAGE_PUBLIC_BUCKET'],
     }));
+    ready.renameSync('${root.path}/$name.json');
     ${hold
               ? 'await Completer<void>().future;'
               : fail
@@ -319,7 +321,7 @@ void main() {
           final owned = await created('interrupted');
           await store.put(
             owned['private'] as String,
-            'a<&/雪.txt',
+            'a + <&/雪.txt',
             bytes: utf8.encode('test'),
             contentType: 'text/plain',
           );

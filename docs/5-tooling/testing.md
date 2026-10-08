@@ -100,6 +100,12 @@ Both hosts must resolve only to loopback addresses. A dedicated remote test serv
 and `DW_STORAGE_*` variables do not select servers or affect the suite: without flags, containers
 remain the default. This prevents a shell or stage `.env` from silently redirecting tests.
 
+The loopback guard checks the current DNS answers; it does not pin later suite connections to those
+answers. Prefer literal loopback addresses to avoid a hostname changing between validation and use.
+Postgres URL mode disables TLS, including with `--allow-remote-test-server`; remote credentials
+travel unencrypted. Use a local tunnel or an isolated, trusted test network. `https` storage URLs
+use normal TLS certificate verification.
+
 Every CLI run, including a container run, supplies a fresh `DW_TEST_RUN_ID` (16 lower-case letters
 or digits). The test helpers use
 `dw_test_<run>_<random>` databases and `dw-test-<run>-<role>-<random>` buckets, overriding their
