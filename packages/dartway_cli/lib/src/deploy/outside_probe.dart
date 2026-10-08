@@ -248,14 +248,25 @@ class DwOutsideProbe {
       try {
         final answer = await _send('GET', Uri.parse('$origin$path'));
         if (answer.status != 200) continue;
-        if (answer.body.contains('www.gstatic.com/flutter-canvaskit') &&
-            !_usesLocalCanvasKit(answer.body)) {
-          return DwProbeResult.warning(
-            title,
-            '$path loads www.gstatic.com/flutter-canvaskit; add '
-            '--no-web-resources-cdn to flutter build web '
-            '(docs/migrations/2026-10-08-local-canvaskit.md)',
-          );
+        if (answer.body.contains('www.gstatic.com/flutter-canvaskit')) {
+          late final bool usesLocalCanvasKit;
+          try {
+            usesLocalCanvasKit = _usesLocalCanvasKit(answer.body);
+          } on FormatException {
+            return DwProbeResult.warning(
+              title,
+              'cannot tell where CanvasKit is loaded from: '
+              'buildConfig is not JSON',
+            );
+          }
+          if (!usesLocalCanvasKit) {
+            return DwProbeResult.warning(
+              title,
+              '$path loads www.gstatic.com/flutter-canvaskit; add '
+              '--no-web-resources-cdn to flutter build web '
+              '(docs/migrations/2026-10-08-local-canvaskit.md)',
+            );
+          }
         }
       } on Object catch (error) {
         return DwProbeResult.fail(title, _describe(error));
