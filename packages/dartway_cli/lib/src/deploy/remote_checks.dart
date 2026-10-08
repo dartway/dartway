@@ -126,7 +126,7 @@ Future<DwDeployVerdict> _checkProxyCongestionControl(
 ) async {
   final result = await context.ssh!.runAs(
     context.target.deployUser,
-    '${DwComposeFiles.commandIn(context.target.appDir, 'exec -T nginx')} '
+    '${DwComposeFiles.commandIn(context.target.appDir, 'exec -T ${DwStack.nginxService}')} '
     'cat /proc/sys/net/ipv4/tcp_congestion_control',
   );
   final value = result.stdout.trim();
@@ -136,7 +136,9 @@ Future<DwDeployVerdict> _checkProxyCongestionControl(
           result.ok
               ? 'proxy reports ${value.isEmpty ? 'no value' : value}'
               : result.firstLine,
-          fix: 'Run "dartway deploy setup" once, then "dartway deploy run".',
+          fix:
+              'Run "dart run dartway_cli:dartway deploy setup" once, then '
+              '"dart run dartway_cli:dartway deploy run".',
         );
 }
 

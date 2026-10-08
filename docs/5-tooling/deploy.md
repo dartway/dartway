@@ -272,30 +272,31 @@ bucket anyone can read, or a public one nobody can.
 1. **Root privileges** — root, or passwordless sudo; an unreachable host is not reported as a
    privilege problem.
 2. **Base packages and Docker**, installed only where Docker is missing.
-3. **The deployment user**, created if absent and added to the `docker` group.
-4. **The secret store**, with the secrets that are only random strings generated in place: with
+3. **BBR congestion control**: loads `tcp_bbr` now and on boot, verifies that the kernel provides
+   it, and writes the host's `fq` queue discipline and BBR selection under `/etc/sysctl.d`. The
+   rendered front proxy also selects BBR in its own network namespace, where the browser-facing TLS
+   sockets actually live; a host-only setting is not sufficient because congestion control is
+   namespaced. The proxy is the only service that accepts long-RTT public TCP, including traffic for
+   storage on its own domain.
+4. **The deployment user**, created if absent and added to the `docker` group.
+5. **The secret store**, with the secrets that are only random strings generated in place: with
    `database: bundled`, `DW_DATABASE_PASSWORD`; and with the bundled storage, the storage keys. An
    external database's `DW_DATABASE_*` are never generated — they are the provider's own credentials,
    delivered with `secret set`. Existing values are never replaced — regenerating the database
    password would lock the server out of a database initialised with the old one.
-5. **A repository key**, for a `git@` repository: generated **on** the server, so the private half
+6. **A repository key**, for a `git@` repository: generated **on** the server, so the private half
    exists nowhere else. When the server cannot yet reach the repository, setup stops and prints the
    public key, asking for it to be registered as a **read-only** deploy key — the server only ever
    fetches, and a writable key turns access to the box into access to the repository.
-6. **The checkout** of `branch`.
-7. **`.env`** with the generated secrets — what the compose file itself interpolates.
-8. **A data volume guard**: if the server already has a data volume of this project and an expected
+7. **The checkout** of `branch`.
+8. **`.env`** with the generated secrets — what the compose file itself interpolates.
+9. **A data volume guard**: if the server already has a data volume of this project and an expected
    one is missing — a config change renamed or replaced what a volume held — setup refuses. Compose
    would otherwise create that volume empty and serve it beside the real data, silently. `run` runs
    the same guard (below) right before it starts anything, because a server is not always `setup`
    again after a config change.
-9. **`docker-compose.yml`, `nginx.conf`**, the `nginx.d` directories, the override bridge and the
+10. **`docker-compose.yml`, `nginx.conf`**, the `nginx.d` directories, the override bridge and the
     project's Nginx snippets, then `docker compose config --quiet` over the result.
-10. **BBR congestion control**: loads `tcp_bbr` now and on boot, and writes the host's `fq` queue
-    discipline and BBR selection under `/etc/sysctl.d`. The rendered front proxy also selects BBR
-    in its own network namespace, where the browser-facing TLS sockets actually live; a host-only
-    setting is not sufficient because congestion control is namespaced. The proxy is the only
-    service that accepts long-RTT public TCP, including traffic for storage on its own domain.
 11. **The firewall**: `ufw` (installed when absent), OpenSSH, 80, 443 and `firewall_ports`.
 12. **A one-day self-signed certificate**, so Nginx can start at all — the real one cannot be issued
     until Nginx answers the challenge, and the first `run` issues it.
@@ -310,8 +311,9 @@ up a change to the rendered files. `--dry-run` prints the rendered `docker-compo
 First `run` evaluates the working-copy checks of `deploy check` and refuses on any error, pointing at
 `dart run dartway_cli:dartway deploy check --local` for the detail. Before its first remote step it
 also verifies that the host advertises BBR; if not, it stops before replacing anything and asks for
-`dartway deploy setup`. An existing server converges with one `deploy setup`, followed by
-`deploy run`. Then:
+`dart run dartway_cli:dartway deploy setup`. An existing server converges with one
+`dart run dartway_cli:dartway deploy setup`, followed by
+`dart run dartway_cli:dartway deploy run`. Then:
 
 1. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
    repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`);

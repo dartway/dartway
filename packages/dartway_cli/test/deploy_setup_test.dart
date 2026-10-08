@@ -18,6 +18,43 @@ void main() {
     expect(syntax.exitCode, 0, reason: '${syntax.stderr}');
   });
 
+  test('the BBR configuration writes are idempotent', () async {
+    final root = Directory.systemTemp.createTempSync('dw_bbr_setup_');
+    addTearDown(() => root.deleteSync(recursive: true));
+    final modules = File('${root.path}/dartway-bbr.conf');
+    final sysctl = File('${root.path}/90-dartway-net.conf');
+    final writes = dwBbrSetupScript
+        .replaceAll('/etc/modules-load.d/dartway-bbr.conf', modules.path)
+        .replaceAll('/etc/sysctl.d/90-dartway-net.conf', sysctl.path)
+        .replaceFirst(RegExp(r'modprobe tcp_bbr[\s\S]*?fi\n'), '')
+        .replaceFirst(RegExp(r'sysctl -p[^\n]+\n'), '');
+
+    Future<String> stat() async {
+      final result = await Process.run('stat', [
+        '--format=%i:%y',
+        modules.path,
+        sysctl.path,
+      ]);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+      return '${result.stdout}';
+    }
+
+    final first = await Process.run('dash', ['-c', writes]);
+    expect(first.exitCode, 0, reason: '${first.stderr}');
+    final before = await stat();
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    final second = await Process.run('dash', ['-c', writes]);
+    expect(second.exitCode, 0, reason: '${second.stderr}');
+
+    expect(modules.readAsStringSync(), 'tcp_bbr\n');
+    expect(
+      sysctl.readAsStringSync(),
+      'net.core.default_qdisc=fq\n'
+      'net.ipv4.tcp_congestion_control=bbr\n',
+    );
+    expect(await stat(), before, reason: 'the second run must not rewrite');
+  });
+
   test('refuses before writing anything when the guard fails', () async {
     final ssh = RecordingSsh([
       (
@@ -63,9 +100,11 @@ void main() {
         (command) => command.contains('/etc/modules-load.d/dartway-bbr.conf'),
       );
       expect(bbr, contains('modprobe tcp_bbr'));
+      expect(bbr, contains('modprobe tcp_bbr 2>/dev/null || true'));
+      expect(bbr, contains('tcp_available_congestion_control'));
       expect(bbr, contains('net.core.default_qdisc=fq'));
       expect(bbr, contains('net.ipv4.tcp_congestion_control=bbr'));
-      expect(bbr, contains('sysctl --system'));
+      expect(bbr, contains('sysctl -p /etc/sysctl.d/90-dartway-net.conf'));
     },
   );
 }

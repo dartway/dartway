@@ -32,6 +32,12 @@ import 'support/deploy_fixtures.dart';
 /// the firewall and SSH itself. Everything between "the checkout is on the
 /// machine" and "a browser gets the right answers" it runs for real.
 void main() {
+  final available = File('/proc/sys/net/ipv4/tcp_available_congestion_control');
+  final bbrSkipReason =
+      !available.existsSync() ||
+          !available.readAsStringSync().split(RegExp(r'\s+')).contains('bbr')
+      ? 'the Docker host does not provide tcp_bbr, so a BBR proxy cannot start'
+      : null;
   final monorepo = () {
     var dir = Directory.current.absolute;
     while (!File(p.join(dir.path, 'example', '.dockerignore')).existsSync()) {
@@ -131,17 +137,11 @@ void main() {
     );
   }
 
+  // The group is intentionally kept at the existing indentation so this safety
+  // wrapper does not reformat the entire Docker proof.
+  // dart format off
+  group('local stack', () {
   setUpAll(() async {
-    final available = File(
-      '/proc/sys/net/ipv4/tcp_available_congestion_control',
-    );
-    if (!available.existsSync() ||
-        !available.readAsStringSync().split(RegExp(r'\s+')).contains('bbr')) {
-      markTestSkipped(
-        'the Docker host does not provide tcp_bbr, so a BBR proxy cannot start',
-      );
-      return;
-    }
     root = Directory.systemTemp.createTempSync('dw_stack_proof_');
     project = Directory(p.join(root.path, 'project'));
     copyProject(Directory(p.join(monorepo.path, 'example')), project);
@@ -290,7 +290,8 @@ void main() {
 
   test('the running front proxy uses BBR', () async {
     final result = await compose(
-      'exec -T nginx cat /proc/sys/net/ipv4/tcp_congestion_control',
+      'exec -T ${DwStack.nginxService} '
+      'cat /proc/sys/net/ipv4/tcp_congestion_control',
     );
     expect(result.ok, isTrue, reason: result.stderr);
     expect(result.stdout.trim(), 'bbr');
@@ -624,6 +625,8 @@ void main() {
     // than being killed when it ran out.
     expect(state.stdout.trim(), '0');
   });
+  }, skip: bbrSkipReason);
+  // dart format on
 }
 
 /// A presigned S3 PUT bound to its length, content type and `if-none-match`,

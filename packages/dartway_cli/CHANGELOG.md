@@ -5,7 +5,8 @@
 - Deploy provisions BBR with `fq` on the host and selects BBR inside the front proxy's network
   namespace. `deploy run` refuses before replacement when the host cannot provide BBR, while
   `deploy check` fails a non-BBR proxy and warns about a non-BBR host (#469). Existing servers
-  converge by running `dartway deploy setup` once and then `dartway deploy run`.
+  converge by running `dart run dartway_cli:dartway deploy setup` once and then
+  `dart run dartway_cli:dartway deploy run`.
 - `test` accepts explicit `--database-url` / `--storage-url` for Docker-free executors, guards
   non-loopback servers with `--allow-remote-test-server`, and cleans only run-owned resources
   after success, failure or SIGINT. Container defaults remain; doctor explains this mode (#463).
