@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartway_generator/dartway_generator.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -127,44 +128,49 @@ void main() {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  test(
-    'descriptor-free adoption permits dependency codec changes with unchanged shared source',
-    () async {
-      final project = TempProject.create(['app_shared']);
-      final external = Directory.systemTemp.createTempSync('dw_external_enum_');
-      addTearDown(() => external.deleteSync(recursive: true));
-      File(p.join(external.path, 'pubspec.yaml')).writeAsStringSync(
-        'name: external_enum\nversion: 1.0.0\nenvironment:\n  sdk: ^3.11.0\n',
-      );
-      final enumFile = File(p.join(external.path, 'lib/state.dart'));
-      enumFile.parent.createSync();
-      enumFile.writeAsStringSync('enum ItemState { ready }\n');
-      final configFile = File(
-        project.path('app_shared/.dart_tool/package_config.json'),
-      );
-      final config =
-          jsonDecode(configFile.readAsStringSync()) as Map<String, dynamic>;
-      (config['packages'] as List).add({
-        'name': 'external_enum',
-        'rootUri': external.uri.toString(),
-        'packageUri': 'lib/',
-        'languageVersion': '3.11',
-      });
-      configFile.writeAsStringSync(jsonEncode(config));
-      project.writeFile(
-        'app_shared/pubspec.yaml',
-        '${project.readFile('app_shared/pubspec.yaml')}  external_enum:\n    path: ${external.path}\n',
-      );
-      project.writeFile(
-        'app_shared/pubspec.lock',
-        File(
-          p.join(generatorRoot, 'pubspec.lock'),
-        ).readAsStringSync().replaceFirst(
-          'packages:\n',
-          'packages:\n  external_enum:\n    dependency: direct main\n    description:\n      path: ${external.path}\n      relative: false\n    source: path\n    version: "1.0.0"\n',
-        ),
-      );
-      project.writeFile('app_shared/lib/src/item.dart', r'''
+  for (final location in ['external', 'in-repo', 'workspace-transitive']) {
+    final inRepo = location != 'external';
+    final workspace = location == 'workspace-transitive';
+    test(
+      'descriptor-free adoption ${inRepo ? 'blocks $location' : 'permits external'} path dependency codec changes',
+      () async {
+        final project = TempProject.create(['app_shared']);
+        final external = inRepo
+            ? (Directory(project.path('external_enum'))..createSync())
+            : Directory.systemTemp.createTempSync('dw_external_enum_');
+        if (!inRepo) addTearDown(() => external.deleteSync(recursive: true));
+        File(p.join(external.path, 'pubspec.yaml')).writeAsStringSync(
+          'name: external_enum\nversion: 1.0.0\nenvironment:\n  sdk: ^3.11.0\n',
+        );
+        final enumFile = File(p.join(external.path, 'lib/state.dart'));
+        enumFile.parent.createSync();
+        enumFile.writeAsStringSync('enum ItemState { ready }\n');
+        final configFile = File(
+          project.path('app_shared/.dart_tool/package_config.json'),
+        );
+        final config =
+            jsonDecode(configFile.readAsStringSync()) as Map<String, dynamic>;
+        (config['packages'] as List).add({
+          'name': 'external_enum',
+          'rootUri': external.uri.toString(),
+          'packageUri': 'lib/',
+          'languageVersion': '3.11',
+        });
+        configFile.writeAsStringSync(jsonEncode(config));
+        project.writeFile(
+          'app_shared/pubspec.yaml',
+          '${project.readFile('app_shared/pubspec.yaml')}  external_enum:\n    path: ${external.path}\n',
+        );
+        project.writeFile(
+          workspace ? 'pubspec.lock' : 'app_shared/pubspec.lock',
+          File(
+            p.join(generatorRoot, 'pubspec.lock'),
+          ).readAsStringSync().replaceFirst(
+            'packages:\n',
+            'packages:\n  external_enum:\n    dependency: ${workspace ? 'transitive' : 'direct main'}\n    description:\n      path: ${inRepo ? (workspace ? 'external_enum' : '../external_enum') : external.path}\n      relative: $inRepo\n    source: path\n    version: "1.0.0"\n',
+          ),
+        );
+        project.writeFile('app_shared/lib/src/item.dart', r'''
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:external_enum/state.dart';
 part 'item.dw.dart';
@@ -174,44 +180,52 @@ final class ItemRecord extends DwDataObject with _$ItemRecord {
   final ItemState state;
 }
 ''');
-      project.writeFile('app_shared/bin/enum_probe.dart', r'''
+        project.writeFile('app_shared/bin/enum_probe.dart', r'''
 import '../lib/src/item.dart';
 void main() {
   try { $ItemRecordFromJson({'id': 1, 'state': 'archived'}); print('decoded'); }
   catch (e) { print(e.runtimeType); }
 }
 ''');
-      await project.generateClean();
-      final before = await project.runScript(
-        'app_shared',
-        'bin/enum_probe.dart',
-      );
-      expect(before.exitCode, 0, reason: output(before));
-      expect(before.stdout, 'DwUnknownEnumValue\n');
-      File(
-        project.path('app_shared/lib/generated/dw_contract.json'),
-      ).deleteSync();
-      final base = baseline(project);
-      enumFile.writeAsStringSync('enum ItemState { ready, archived }\n');
-      await project.generateClean();
-      final after = await project.runScript(
-        'app_shared',
-        'bin/enum_probe.dart',
-      );
-      expect(after.exitCode, 0, reason: output(after));
-      expect(after.stdout, 'decoded\n');
-      final snapshot = bytes(project);
-      final result = await generatorCli(project, [
-        '--check',
-        '--contract-base',
-        base,
-      ]);
-      expect(result.exitCode, 0, reason: output(result));
-      expect(output(result), contains('shared contract source unchanged'));
-      expect(bytes(project), snapshot);
-    },
-    timeout: const Timeout(Duration(minutes: 3)),
-  );
+        await project.generateClean();
+        final before = await project.runScript(
+          'app_shared',
+          'bin/enum_probe.dart',
+        );
+        expect(before.exitCode, 0, reason: output(before));
+        expect(before.stdout, 'DwUnknownEnumValue\n');
+        File(
+          project.path('app_shared/lib/generated/dw_contract.json'),
+        ).deleteSync();
+        final base = baseline(project);
+        enumFile.writeAsStringSync('enum ItemState { ready, archived }\n');
+        await project.generateClean();
+        final after = await project.runScript(
+          'app_shared',
+          'bin/enum_probe.dart',
+        );
+        expect(after.exitCode, 0, reason: output(after));
+        expect(after.stdout, 'decoded\n');
+        final snapshot = bytes(project);
+        final result = await generatorCli(project, [
+          '--check',
+          '--contract-base',
+          base,
+        ]);
+        expect(result.exitCode, inRepo ? 3 : 0, reason: output(result));
+        expect(
+          output(result),
+          contains(
+            inRepo
+                ? 'shared contract source changed: external_enum/lib/state.dart'
+                : 'shared contract source unchanged',
+          ),
+        );
+        expect(bytes(project), snapshot);
+      },
+      timeout: const Timeout(Duration(minutes: 3)),
+    );
+  }
 
   test(
     'custom DTO equality used by default omission is unverified, not silently compatible',
@@ -273,7 +287,15 @@ void main() { print(Settings(id: 1, createdAt: DateTime.fromMicrosecondsSinceEpo
         'app_shared/pubspec.yaml',
         '$pubspec\ndependency_overrides:\n  dartway_core_shared:\n    git:\n      url: https://example.test/framework.git\n      ref: old-pin\n',
       );
-      project.writeFile('app_shared/pubspec.lock', 'old lock bytes\n');
+      project.writeFile('app_shared/pubspec.lock', '''
+packages:
+  dartway_core_shared:
+    description:
+      path: packages/dartway_core_shared
+      ref: old-pin
+      url: https://example.test/framework.git
+    source: git
+''');
       File(
         project.path('app_shared/lib/generated/dw_contract.json'),
       ).deleteSync();
@@ -294,7 +316,12 @@ void main() { print(Settings(id: 1, createdAt: DateTime.fromMicrosecondsSinceEpo
             .readFile('app_shared/pubspec.yaml')
             .replaceFirst('old-pin', 'new-pin'),
       );
-      project.writeFile('app_shared/pubspec.lock', 'new lock bytes\n');
+      project.writeFile(
+        'app_shared/pubspec.lock',
+        project
+            .readFile('app_shared/pubspec.lock')
+            .replaceFirst('old-pin', 'new-pin'),
+      );
       await project.generateClean();
       generatorResolution(project);
       commit(project, 'adopt contract gate with pin move');
@@ -866,7 +893,108 @@ void main() {
     timeout: const Timeout(Duration(minutes: 2)),
   );
 
-  for (final edit in ['modify', 'delete', 'add', 'binary', 'manual-part']) {
+  test(
+    'adoption through a symlinked project root preserves output ownership and hashes links',
+    () async {
+      final project = TempProject.create(['app_shared']);
+      final alias = Link('${project.root}_alias')..createSync(project.root);
+      addTearDown(alias.deleteSync);
+      project.writeFile('app_shared/lib/src/item.dart', itemSource());
+      project.writeFile('app_shared/README.md', 'contract guide\n');
+      final link = Link(project.path('app_shared/guide-link'))
+        ..createSync('README.md');
+      project.writeFile('app_shared/pubspec.lock', '''
+packages:
+  app_shared:
+    description:
+      path: .
+      relative: true
+    source: path
+''');
+      await project.generateClean();
+      File(
+        project.path('app_shared/lib/generated/dw_contract.json'),
+      ).deleteSync();
+      project.writeFile(
+        'app_shared/lib/generated/dw_protocol.dart',
+        '${project.readFile('app_shared/lib/generated/dw_protocol.dart')}\n// old generator\n',
+      );
+      final base = baseline(project);
+      final adoption = await DwCodeGenerator.run(
+        alias.path,
+        contractBase: base,
+      );
+      expect(adoption.diagnostics, isEmpty);
+      expect(adoption.root, project.root);
+      expect(
+        adoption.contractProof,
+        contains('shared contract source unchanged'),
+      );
+      expect(
+        adoption.written,
+        contains(project.path('app_shared/lib/generated/dw_protocol.dart')),
+      );
+      final snapshot = bytes(project);
+      final check = await DwCodeGenerator.run(
+        alias.path,
+        check: true,
+        contractBase: base,
+      );
+      expect(check.isUpToDate, isTrue, reason: check.diagnostics.toString());
+      expect(bytes(project), snapshot);
+      link.deleteSync();
+      link.createSync('different.md');
+      final changed = await DwCodeGenerator.run(
+        alias.path,
+        check: true,
+        contractBase: base,
+      );
+      expect(
+        changed.diagnostics.map((d) => d.message).join(),
+        contains('shared contract source changed: app_shared/guide-link'),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  test(
+    'descriptor-free adoption accepts CRLF working source over LF blobs',
+    () async {
+      final project = TempProject.create(['app_shared']);
+      project.writeFile('app_shared/lib/src/item.dart', itemSource());
+      await project.generateClean();
+      File(
+        project.path('app_shared/lib/generated/dw_contract.json'),
+      ).deleteSync();
+      final base = baseline(project);
+      git(project, ['config', 'core.autocrlf', 'true']);
+      final source = 'app_shared/lib/src/item.dart';
+      project.writeFile(
+        source,
+        project.readFile(source).replaceAll('\n', '\r\n'),
+      );
+      await project.generateClean();
+      final snapshot = bytes(project);
+      final result = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        base,
+      ]);
+      expect(result.exitCode, 0, reason: output(result));
+      expect(output(result), contains('shared contract source unchanged'));
+      expect(bytes(project), snapshot);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  for (final edit in [
+    'modify',
+    'delete',
+    'add',
+    'binary',
+    'manual-part',
+    'generated-library',
+  ]) {
     test(
       'descriptor-free adoption blocks $edit of hand-written shared files',
       () async {
@@ -874,9 +1002,25 @@ void main() {
         project.writeFile('app_shared/lib/src/item.dart', itemSource());
         project.writeFile('app_shared/README.md', 'contract documentation\n');
         project.writeFile(
+          'app_shared/lib/generated/manual.dart',
+          'enum ManualState { ready }\n',
+        );
+        project.writeFile(
           'app_shared/test/manual.dw.dart',
           '// hand-written fixture\n',
         );
+        if (edit == 'generated-library') {
+          project.writeFile('app_shared/lib/src/item.dart', r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+import '../generated/manual.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, this.state = ManualState.ready});
+  @override final int id;
+  final ManualState state;
+}
+''');
+        }
         final binary = File(project.path('app_shared/data.bin'))
           ..writeAsBytesSync([0, 255, 13, 10]);
         await project.generateClean();
@@ -903,6 +1047,12 @@ void main() {
           case 'binary':
             changed = 'app_shared/data.bin';
             binary.writeAsBytesSync([0, 254, 13, 10]);
+          case 'generated-library':
+            changed = 'app_shared/lib/generated/manual.dart';
+            project.writeFile(
+              changed,
+              'enum ManualState { ready, archived }\n',
+            );
           case 'manual-part':
             changed = 'app_shared/test/manual.dw.dart';
             // A filename, or a header forged at head, cannot turn source into output.

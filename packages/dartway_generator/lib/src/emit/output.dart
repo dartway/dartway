@@ -118,11 +118,10 @@ OutputPlan planOutput(
   );
 }
 
-/// The reserved generated directory belongs to the generator. A part belongs
-/// to it only with its ownership header; a manual `.dw.dart` is still source.
+/// A part belongs to the generator only with its ownership header; a manual
+/// `.dw.dart` is still source. Other output is identified by the emitted paths.
 /// [relativePath] uses POSIX separators relative to the package root.
 bool isGeneratorOwnedFile(String relativePath, List<int> bytes) {
-  if (p.posix.isWithin('lib/generated', relativePath)) return true;
   return relativePath.endsWith('.dw.dart') &&
       LineSplitter.split(
             utf8.decode(bytes, allowMalformed: true),
