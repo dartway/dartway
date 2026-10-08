@@ -229,8 +229,9 @@ class DoctorCommand extends Command<int> {
         'not found on PATH',
         fix:
             'Install Docker Desktop — https://docs.docker.com/get-docker/ '
-            '(Postgres and the storage run in it, for development and for '
-            '`dartway test`; there is no second path)',
+            'for local development. Without Docker, run tests with '
+            '`dartway test --database-url postgres://user:password@localhost/postgres` '
+            '(and --storage-url for uploads).',
       );
     }
     if (result.exitCode != 0) {
@@ -239,7 +240,8 @@ class DoctorCommand extends Command<int> {
         'installed, but the daemon is not responding',
         fix:
             'Start Docker Desktop and wait until it reports "running" '
-            '(`docker compose up -d` and `dartway test` need the daemon)',
+            'for container runs, or use `dartway test --database-url` '
+            'with an explicit test server (--storage-url for uploads).',
       );
     }
     return _Check.ok('Docker', 'daemon responding');

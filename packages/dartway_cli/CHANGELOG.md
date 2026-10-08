@@ -2,6 +2,10 @@
 
 ## 0.24.0
 
+- `test` accepts explicit `--database-url` / `--storage-url` for Docker-free executors, guards
+  non-loopback servers with `--allow-remote-test-server`, and cleans only run-owned resources
+  after success, failure or SIGINT. Container defaults remain; doctor explains this mode (#463).
+
 - Deploy output is masked on the target by literal stored secret value (at least 6 characters),
   including URL percent-encoded forms, before stdout/stderr reach human logs or JSON progress.
   Covers fresh and resumed steps, direct runs, setup and checks (#437).

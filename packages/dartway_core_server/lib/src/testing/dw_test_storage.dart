@@ -5,6 +5,7 @@ import 'dart:math';
 import '../files/dw_file_storage.dart';
 import '../files/dw_object_store.dart';
 import '../files/dw_storage_buckets.dart';
+import 'dw_test_run.dart';
 
 /// A public and a private bucket for one test file, provisioned as a project
 /// storage is ([DwFileStorageSetup.provision]) and removed, objects and all,
@@ -33,8 +34,9 @@ final class DwTestStorage {
   /// storage named by `DW_STORAGE_ENDPOINT`, `DW_STORAGE_ACCESS_KEY`,
   /// `DW_STORAGE_SECRET_KEY` and optionally `DW_STORAGE_REGION` and
   /// `DW_STORAGE_PATH_STYLE` in [environment] (the process environment by
-  /// default); bucket names there are ignored. A missing variable throws a
-  /// [StateError] naming them.
+  /// default); bucket names there are ignored. `DW_TEST_RUN_ID` replaces
+  /// [prefix] with `dw-test-<run>` so interrupted runs can be cleaned up.
+  /// A missing variable throws a [StateError] naming them.
   static Future<DwTestStorage> create({
     Map<String, String>? environment,
     String prefix = 'dw-test',
@@ -61,6 +63,8 @@ final class DwTestStorage {
         '(${error.message})',
       );
     }
+    final run = testRunId(environment);
+    if (run != null) prefix = 'dw-test-$run';
     final random = Random.secure();
     String name(String role) =>
         '$prefix-$role-${List.generate(10, (_) => 'abcdefghijklmnopqrstuvwxyz0123456789'[random.nextInt(36)]).join()}';

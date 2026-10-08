@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:args/command_runner.dart';
 
@@ -7,41 +8,29 @@ import '../deploy/stack.dart';
 import '../project_layout.dart';
 import '../test_database.dart';
 import '../test_storage.dart';
+import '../test_servers.dart';
 
-/// Runs the server package's tests against a database — and an S3-compatible
-/// storage — that belong to the run.
-///
-/// The arrangement it replaces was the other way round: the database belonged
-/// to the *project*, as a `postgres_test` service on a hardcoded host port, and
-/// both halves of that went wrong quietly.
-///
-/// **The port.** Every project created from the template asked for the same
-/// one. The second container up does not get it — and does not fail either:
-/// Docker starts it with the port simply unpublished, and the suite then
-/// connects to the neighbour's database. Where the neighbour's schema is close
-/// enough for migrations to apply, the run is green having verified nothing.
-///
-/// **The lifetime.** The service declared no volume, on the stated reasoning
-/// that a test database surviving a restart is a liability — but the `postgres`
-/// image declares an anonymous one, and Compose keeps it. Rows outlived the run
-/// that wrote them, and turned up as arithmetic (`Expected: <2>, Actual: <3>`)
-/// several hypotheses away from their cause.
-///
-/// Both disappear once nothing is fixed and nothing is shared: the container is
-/// started here, published on whatever port Docker has free, and removed when
-/// the run ends. The coordinates arrive as `DW_DATABASE_*` — what
-/// `DwDatabaseConfig.fromEnvironment` reads, and what `DwTestDatabase` creates
-/// each test file's own database from. The storage arrives the same way, as
-/// `DW_STORAGE_ENDPOINT`/`_ACCESS_KEY`/`_SECRET_KEY`, where `DwTestStorage`
-/// creates each test file's buckets.
-///
-/// **Why the environment.** It is a property of the process; a test file
-/// cannot opt out of it, where a per-file configuration is one a file can
-/// forget — in one real project such an override was honoured by 25 of 29
-/// files, which is worse than none.
+/// Runs server tests on run-owned containers or explicitly supplied servers.
+/// The environment passed to the suite is owned by this run, never inherited.
 class TestCommand extends Command<int> {
   TestCommand() {
     argParser
+      ..addOption(
+        'database-url',
+        help:
+            'Explicit Postgres test server: postgres://user[:password]@host[:port]/maintenance-db (role needs CREATEDB).',
+      )
+      ..addOption(
+        'storage-url',
+        help:
+            'Explicit path-style S3 test server: http[s]://access-key:secret-key@host[:port].',
+      )
+      ..addFlag(
+        'allow-remote-test-server',
+        negatable: false,
+        help:
+            'Allow explicit servers outside loopback. Use a dedicated test server only.',
+      )
       ..addFlag(
         'keep',
         negatable: false,
@@ -110,104 +99,210 @@ class TestCommand extends Command<int> {
       return 1;
     }
 
-    final image = argResults?['image'] as String? ?? _defaultImage;
+    final databaseUrl = argResults?['database-url'] as String?;
+    final storageUrl = argResults?['storage-url'] as String?;
     final withStorage = argResults?['storage'] as bool? ?? true;
+    final keep = argResults?['keep'] as bool? ?? false;
+    final allowRemote =
+        argResults?['allow-remote-test-server'] as bool? ?? false;
+    if ((databaseUrl != null || storageUrl != null) && keep) {
+      stderr.writeln(
+        '--keep is only available for container runs; external run resources are always removed.',
+      );
+      return 1;
+    }
+    if (storageUrl != null && !withStorage) {
+      stderr.writeln('--storage-url cannot be combined with --no-storage.');
+      return 1;
+    }
+
+    final random = Random.secure();
+    final runId = List.generate(
+      16,
+      (_) => random.nextInt(36).toRadixString(36),
+    ).join();
+    // Drop every inherited service option, including CA, buckets and region.
+    // Without a storage flag, even an inherited stage storage is unreachable.
+    final environment = {
+      for (final entry in Platform.environment.entries)
+        if (!entry.key.startsWith('DW_DATABASE_') &&
+            !entry.key.startsWith('DW_STORAGE_'))
+          entry.key: entry.value,
+      'DW_TEST_RUN_ID': runId,
+    };
+    final external = [
+      if (databaseUrl != null) 'database',
+      if (storageUrl != null) 'storage',
+    ];
+    List<String>? workerArguments;
+    try {
+      final db = databaseUrl == null
+          ? null
+          : TestServerUrl.parse(databaseUrl, database: true);
+      final s3 = storageUrl == null
+          ? null
+          : TestServerUrl.parse(storageUrl, database: false);
+      if (db != null)
+        environment.addAll(
+          await db.environment(database: true, allowRemote: allowRemote),
+        );
+      if (s3 != null)
+        environment.addAll(
+          await s3.environment(database: false, allowRemote: allowRemote),
+        );
+      if (external.isNotEmpty) {
+        workerArguments = testServicesArguments(serverDir, []);
+      }
+    } on FormatException catch (error) {
+      stderr.writeln(error.message);
+      return 1;
+    } on SocketException {
+      stderr.writeln('Could not resolve the explicit test server host.');
+      return 1;
+    }
+
+    final image = argResults?['image'] as String? ?? _defaultImage;
     final storageImage =
         argResults?['storage-image'] as String? ?? DwStack.storageImage;
-    final keep = argResults?['keep'] as bool? ?? false;
-
     final database = TestDatabase(
       image: image,
       name: _maintenanceDatabase,
       user: _user,
     );
     final storage = TestStorage(image: storageImage);
-
-    stdout.writeln(
-      'Starting $image${withStorage ? ' and $storageImage' : ''} for this '
-      'run…',
-    );
-    final (ephemeral, ephemeralStorage) = await (
-      database.start(),
-      withStorage ? storage.start() : Future<EphemeralStorage?>.value(),
-    ).wait;
-
-    Future<void> cleanUp() async {
-      if (keep) {
-        stdout.writeln(_keptMessage(ephemeral, ephemeralStorage));
-        return;
+    final startStorage =
+        withStorage && storageUrl == null && databaseUrl == null;
+    EphemeralDatabase? ephemeral;
+    EphemeralStorage? ephemeralStorage;
+    Process? test;
+    var interrupted = false;
+    var result = 1;
+    Future<void>? stopping;
+    Future<void> stopTest() => stopping ??= () async {
+      final process = test;
+      if (process == null) return;
+      process.kill(ProcessSignal.sigint);
+      try {
+        await process.exitCode.timeout(const Duration(seconds: 10));
+      } on TimeoutException {
+        process.kill(ProcessSignal.sigkill);
+        await process.exitCode;
       }
-      if (ephemeral != null) await database.remove(ephemeral);
-      if (ephemeralStorage != null) await storage.remove(ephemeralStorage);
-    }
+    }();
+    final signal = ProcessSignal.sigint.watch().listen((_) {
+      interrupted = true;
+      if (test != null) unawaited(stopTest());
+    });
 
-    if (ephemeral == null || (withStorage && ephemeralStorage == null)) {
-      stderr.writeln(
-        'Could not start the test ${ephemeral == null ? 'database' : 'storage'}. '
-        'Is the Docker daemon running? `dartway doctor` says which '
-        'prerequisite is missing.',
-      );
-      if (ephemeral != null) await database.remove(ephemeral);
-      if (ephemeralStorage != null) await storage.remove(ephemeralStorage);
-      return 1;
-    }
-
-    // The containers have to go even when the run does not end normally: an
-    // abandoned one holds a port and, worse, holds rows that the next run
-    // would find. Ctrl-C is the common case and is not an exception a
-    // `finally` sees.
-    //
-    // `--keep` survives the interrupt, because an interrupted run is exactly
-    // the one somebody wants to look inside.
-    final signals = <StreamSubscription<ProcessSignal>>[
-      ProcessSignal.sigint.watch().listen((_) async {
-        await cleanUp();
-        exit(130);
-      }),
-    ];
-
-    try {
-      final (databaseReady, storageReady) = await (
-        database.waitUntilReady(ephemeral, _readinessTimeout),
-        ephemeralStorage == null
-            ? Future.value(true)
-            : storage.waitUntilReady(ephemeralStorage, _readinessTimeout),
-      ).wait;
-      if (!databaseReady || !storageReady) {
-        stderr.writeln(
-          'The ${databaseReady ? 'storage' : 'database'} container started '
-          'but never began accepting connections within '
-          '${_readinessTimeout.inSeconds}s.',
-        );
-        return 1;
-      }
-      stdout.writeln(
-        'Database ready on localhost:${ephemeral.port}'
-        '${ephemeralStorage == null ? '' : ', storage on ${ephemeralStorage.endpoint}'}; '
-        'each test file creates a database${ephemeralStorage == null ? '' : ' and buckets'} '
-        'of its own.',
-      );
-
-      final test = await Process.start(
-        'dart',
-        ['test', ...argResults!.rest],
+    Future<int> worker(String operation) async {
+      final process = await Process.start(
+        Platform.resolvedExecutable,
+        [...workerArguments!, operation, ...external],
         workingDirectory: serverDir.path,
-        environment: {
-          ...ephemeral.databaseEnvironment(
+        environment: environment,
+        includeParentEnvironment: false,
+        mode: ProcessStartMode.inheritStdio,
+      );
+      return process.exitCode;
+    }
+
+    Future<int> runSuite() async {
+      stdout.writeln(
+        'Test run $runId: '
+        '${databaseUrl == null ? 'starting $image' : 'explicit Postgres'}; '
+        '${storageUrl != null
+            ? 'explicit S3'
+            : startStorage
+            ? 'starting $storageImage'
+            : 'storage disabled (no storage server supplied)'}.',
+      );
+      if (external.isNotEmpty && await worker('check') != 0) return 1;
+      if (interrupted) return 130;
+      // Sequential ownership: every acquired container is visible to finally,
+      // including when the second start fails or the run is interrupted.
+      if (databaseUrl == null) {
+        ephemeral = await database.start();
+        if (ephemeral == null) {
+          stderr.writeln(
+            'Could not start the test database. Is the Docker daemon running? Run dartway doctor.',
+          );
+          return 1;
+        }
+        environment.addAll(
+          ephemeral!.databaseEnvironment(
             name: _maintenanceDatabase,
             user: _user,
           ),
-          ...?ephemeralStorage?.storageEnvironment(),
-        },
+        );
+      }
+      if (interrupted) return 130;
+      if (startStorage) {
+        ephemeralStorage = await storage.start();
+        if (ephemeralStorage == null) {
+          stderr.writeln(
+            'Could not start the test storage. Is the Docker daemon running? Run dartway doctor.',
+          );
+          return 1;
+        }
+        environment.addAll(ephemeralStorage!.storageEnvironment());
+      }
+      final databaseReady =
+          ephemeral == null ||
+          await database.waitUntilReady(ephemeral!, _readinessTimeout);
+      final storageReady =
+          ephemeralStorage == null ||
+          await storage.waitUntilReady(ephemeralStorage!, _readinessTimeout);
+      if (!databaseReady || !storageReady) {
+        stderr.writeln(
+          'The test container did not become ready within ${_readinessTimeout.inSeconds}s.',
+        );
+        return 1;
+      }
+      if (interrupted) return 130;
+      stdout.writeln(
+        'Servers ready; each test file creates its own database'
+        '${storageUrl != null || ephemeralStorage != null ? ' and buckets' : ''}.',
+      );
+      test = await Process.start(
+        Platform.resolvedExecutable,
+        ['test', ...argResults!.rest],
+        workingDirectory: serverDir.path,
+        environment: environment,
+        includeParentEnvironment: false,
         mode: ProcessStartMode.inheritStdio,
       );
-      return await test.exitCode;
+      if (interrupted) await stopTest();
+      final code = await test!.exitCode;
+      if (stopping != null) await stopping;
+      return interrupted ? 130 : code;
+    }
+
+    try {
+      result = await runSuite();
+    } on Exception {
+      stderr.writeln(
+        'Could not run the server tests; check the resolved server package and service availability.',
+      );
     } finally {
-      for (final signal in signals) {
+      // The writer must stop before the sweep, so it cannot create resources
+      // behind cleanup. Keep the signal listener alive through the sweep.
+      if (test != null) await test!.exitCode;
+      try {
+        if (external.isNotEmpty && await worker('cleanup') != 0) result = 1;
+      } on Exception {
+        stderr.writeln('External test server cleanup failed; run id: $runId.');
+        result = 1;
+      } finally {
+        if (keep) {
+          stdout.writeln(_keptMessage(ephemeral, ephemeralStorage));
+        } else {
+          if (ephemeral != null) await database.remove(ephemeral!);
+          if (ephemeralStorage != null) await storage.remove(ephemeralStorage!);
+        }
         await signal.cancel();
       }
-      await cleanUp();
     }
+    return interrupted && result != 1 ? 130 : result;
   }
 
   static String _keptMessage(

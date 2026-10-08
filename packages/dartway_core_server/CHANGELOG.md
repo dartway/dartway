@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- Test databases and storage buckets read optional `DW_TEST_RUN_ID` for run-scoped names,
+  allowing CLI cleanup after interrupted suites; plain `dart test` naming is unchanged (#463).
+  S3 requests support literal IPv6 loopback endpoints for explicit test servers.
+
 - Sign-in code requests accept an optional project-defined `deliveryHint`. The server validates it
   against `DwAuthConfig.allowedDeliveryHints` and auth hooks read `ctx.deliveryHint`, with unchanged
   callback signatures and identifier cooldown, request-window and idempotency rules. Null retains
