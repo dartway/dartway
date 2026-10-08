@@ -11,6 +11,7 @@ import 'package:dartway_orm/dartway_orm.dart';
 import '../context/dw_call_context.dart';
 import '../server/dw_app_server.dart';
 import 'dw_fake_outbound_http.dart';
+import 'dw_test_run.dart';
 
 /// A throwaway database for one test file: created empty, dropped after.
 final class DwTestDatabase {
@@ -23,7 +24,8 @@ final class DwTestDatabase {
 
   /// Creates a database named `<prefix>_<random>` on the server described by
   /// [admin] (by default `DW_DATABASE_*` from the environment, whose `NAME`
-  /// is the maintenance database the statement runs in).
+  /// is the maintenance database the statement runs in). With `DW_TEST_RUN_ID`,
+  /// uses `dw_test_<run>_<random>` regardless of [prefix], for run cleanup.
   static Future<DwTestDatabase> create({
     DwDatabaseConfig? admin,
     String prefix = 'dw_test',
@@ -35,7 +37,8 @@ final class DwTestDatabase {
       10,
       (_) => 'abcdefghijklmnopqrstuvwxyz0123456789'[random.nextInt(36)],
     ).join();
-    final name = '${prefix}_$suffix';
+    final run = testRunId();
+    final name = run == null ? '${prefix}_$suffix' : 'dw_test_${run}_$suffix';
     final database = await DwPostgresDatabase.open(
       adminConfig.copyWith(maxConnections: 1),
     );
@@ -74,6 +77,7 @@ final class DwTestServer {
   /// answers from the rules the test gives it, and refuses the rest — a test
   /// server never reaches the network through `ctx.http`.
   final DwFakeOutboundHttp http;
+
   /// The UTC offset every caller of this test server reports
   /// (`Dw-Utc-Offset`, the handler's `ctx.callerUtcOffset`): [caller]s and
   /// [connectClient]s made after it is set use it. Zero by default, so what a

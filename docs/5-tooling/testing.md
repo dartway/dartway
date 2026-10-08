@@ -6,7 +6,7 @@ another:
 | Tier | Runs with | Proves | Needs |
 |---|---|---|---|
 | Contract | `dart test` in `<project>_shared` | every data object, request and command survives the wire and comes back equal | nothing |
-| Server acceptance | `dart run dartway_cli:dartway test` in the Flutter package | handlers, access rules, publishing, migrations — on a real Postgres and a real S3 storage, through real clients | Docker |
+| Server acceptance | `dart run dartway_cli:dartway test` in the Flutter package | handlers, access rules, publishing, migrations — on a real Postgres and a real S3 storage, through real clients | Docker or explicit test servers |
 | Widgets | `flutter test` in `<project>_flutter` | a screen reads, commands, refuses and follows live updates as the user sees it | nothing: an in-memory server |
 
 The skeleton ships a worked example of each, and the reference application in `example/` another:
@@ -53,7 +53,7 @@ dart run dartway_cli:dartway test --keep                 # leave the containers 
 dart run dartway_cli:dartway test --no-storage           # a server without uploads
 ```
 
-The command starts `postgres:17-alpine` and `rustfs/rustfs:1.0.0` —
+By default the command starts `postgres:17-alpine` and `rustfs/rustfs:1.0.0` —
 the images a deployment runs — each published on `127.0.0.1` at a port Docker picks and with its data in `tmpfs`,
 waits until Postgres answers `pg_isready` and the storage its health endpoint (60 seconds at most), runs
 `dart test` in the server package, and removes both containers afterwards, on Ctrl+C too. `--image`
@@ -74,6 +74,58 @@ their cause. A container that exists for one run has no port to lose and nothing
 **Why the environment, and not a configuration per file.** The environment is a property of the
 process: a test file cannot forget it. A per-file override can be forgotten, and in a real project
 one was honoured by 25 files out of 29.
+
+### Servers supplied by a cloud environment
+
+No Docker is needed when the environment already runs a Postgres and, for uploads, an
+S3-compatible server. Supply them explicitly:
+
+```bash
+dart run dartway_cli:dartway test \
+  --database-url postgres://test_user:test_password@127.0.0.1:5432/postgres \
+  --storage-url http://test_key:test_secret@127.0.0.1:9000
+```
+
+`--database-url` names the maintenance database on the test server; the role needs `CREATEDB`.
+The password is required and the port is optional (it defaults to 5432). `--storage-url` accepts HTTP or HTTPS with access and secret keys,
+and uses path-style S3 in `us-east-1`. URL-encode reserved characters in credentials.
+Both flags select servers independently: a supplied URL prevents that service's container from
+starting. With `--database-url` alone, storage is disabled and the startup line says so;
+add `--storage-url` for projects whose tests upload files. `--no-storage` still disables storage.
+`--keep` is limited to container runs.
+
+Both hosts must resolve only to loopback addresses. A dedicated remote test server requires
+`--allow-remote-test-server`; never supply a stage or production server. Inherited `DW_DATABASE_*`
+and `DW_STORAGE_*` variables do not select servers or affect the suite: without flags, containers
+remain the default. This prevents a shell or stage `.env` from silently redirecting tests.
+
+The loopback guard checks the current DNS answers; it does not pin later suite connections to those
+answers. Prefer literal loopback addresses to avoid a hostname changing between validation and use.
+Postgres URL mode disables TLS, including with `--allow-remote-test-server`; remote credentials
+travel unencrypted. Use a local tunnel or an isolated, trusted test network. `https` storage URLs
+use normal TLS certificate verification.
+
+Every CLI run, including a container run, supplies a fresh `DW_TEST_RUN_ID` (16 lower-case letters
+or digits). The test helpers use
+`dw_test_<run>_<random>` databases and `dw-test-<run>-<role>-<random>` buckets, overriding their
+per-file prefixes while the run id is set. Each file remains isolated. On success, failure and
+SIGINT, the CLI stops the suite and sweeps only resources named for that run on the explicit
+servers, including bucket objects. Concurrent runs remain untouched. Plain `dart test` without
+`DW_TEST_RUN_ID` keeps the existing names and per-file teardown. SIGKILL or loss of the executor
+cannot run cleanup; the environment must discard its servers or remove that exact run's resources.
+A second Ctrl-C while the cleanup worker's VM is starting or compiling can also prevent cleanup.
+Once its `main` begins, the worker ignores SIGINT until the sweep finishes.
+
+A minimal cloud image starts Postgres, creates a dedicated role and provides a maintenance database:
+
+```sql
+CREATE ROLE test_user LOGIN PASSWORD 'test_password' CREATEDB;
+```
+
+Listen on loopback and permit that role to connect to the maintenance database and its new databases.
+For projects with uploads, also start an S3-compatible server on loopback, with dedicated keys
+allowed to list, create, configure and delete buckets and their objects. Pass its URL with
+`--storage-url`. Provisioning and starting these servers belongs to the environment.
 
 ### What a suite has to start a server
 
@@ -221,9 +273,10 @@ outside it, then:
   `example/dartway_example_server` and `template/dartway_starter_server` (project servers, run by
   `dart run dartway_cli:dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
   directory runs — the direction that fails loudly;
-- **services**: the suites of `packages/dartway_orm`, `packages/dartway_core_server` and
-  `packages/dartway_push_server`, against the Postgres of `DW_DATABASE_*` and the S3-compatible
-  storage of `DW_STORAGE_*`. It is not in the default because it needs two containers, and it is
+- **services**: the suites of `packages/dartway_analytics_server`,
+  `packages/dartway_auth_providers_server`, `packages/dartway_orm`, `packages/dartway_core_server`
+  and `packages/dartway_push_server`, plus the CLI external-server acceptance tests, against the
+  Postgres of `DW_DATABASE_*` and the S3-compatible storage of `DW_STORAGE_*`. It is not in the default because it needs two containers, and it is
   not optional: CI runs it on every pull request with a Postgres service and a storage, on the ports
   the script's header gives with its `docker run` and `export` lines. Asked for without every
   variable set, or with nothing answering on the database's or the storage's port, it stops before

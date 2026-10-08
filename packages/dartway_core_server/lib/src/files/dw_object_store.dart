@@ -59,7 +59,8 @@ final class DwObjectStore {
   String _host(String bucket) {
     final endpoint = config.endpoint;
     final host = config.pathStyle ? endpoint.host : '$bucket.${endpoint.host}';
-    return endpoint.hasPort ? '$host:${endpoint.port}' : host;
+    final authority = host.contains(':') ? '[$host]' : host;
+    return endpoint.hasPort ? '$authority:${endpoint.port}' : authority;
   }
 
   /// The decoded path of [key]'s object in [bucket] (of the bucket itself for

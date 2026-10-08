@@ -20,7 +20,9 @@ Future<void> main(List<String> args) async {
   if (args.isNotEmpty && DwPinnedCli.projectCommands.contains(args.first)) {
     final pinned = DwPinnedCli.of(findProjectRoot());
     if (!pinned.isPinnedOne) {
-      stderr.writeln(pinned.complaintFor(args.join(' ')));
+      stderr.writeln(
+        pinned.complaintFor(args.first == 'test' ? 'test' : args.join(' ')),
+      );
       exitCode = 1;
       return;
     }

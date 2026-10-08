@@ -65,10 +65,11 @@ class TestDatabase {
   /// connection attempt inside that window fails as `connection refused`.
   Future<bool> waitUntilReady(
     EphemeralDatabase database,
-    Duration timeout,
-  ) async {
+    Duration timeout, {
+    bool Function()? cancelled,
+  }) async {
     final deadline = DateTime.now().add(timeout);
-    while (DateTime.now().isBefore(deadline)) {
+    while (cancelled?.call() != true && DateTime.now().isBefore(deadline)) {
       final probe = await _docker([
         'exec',
         database.id,

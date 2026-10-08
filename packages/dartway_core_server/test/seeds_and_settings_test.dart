@@ -66,7 +66,7 @@ void main() {
       DwTestServer server,
     ) async => {
       for (final row in await server.db.catalogItems.find())
-        row.slug: (row.id!, row.title, row.published),
+        row.slug: (row.id, row.title, row.published),
     };
 
     Future<Map<String, String>> versions(DwTestServer server) async => {
