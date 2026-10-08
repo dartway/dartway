@@ -233,6 +233,21 @@ void main() {
       },
     );
 
+    test('warns when buildConfig is not JSON', () async {
+      site.handler = (request) => text(
+        request,
+        200,
+        '$loader\n_flutter.buildConfig = {"useLocalCanvasKit":true,};',
+      );
+      final result = await site.probe.canvasKitOrigin('http://app.example.com');
+      expect(result.passed, isTrue, reason: result.detail);
+      expect(result.warning, isTrue, reason: result.detail);
+      expect(
+        result.detail,
+        'cannot tell where CanvasKit is loaded from: buildConfig is not JSON',
+      );
+    });
+
     test('warns when a startup file names the Flutter CDN', () async {
       site.handler = (request) => text(
         request,
