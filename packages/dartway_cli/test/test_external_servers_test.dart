@@ -15,22 +15,7 @@ void main() {
   late Directory root;
   late Directory server;
   late File dockerCalled;
-  late Directory compiledRoot;
   late String compiledCli;
-  setUpAll(() async {
-    compiledRoot = await Directory.systemTemp.createTemp('dw463_compiled_');
-    compiledCli = p.join(compiledRoot.path, 'dartway');
-    final result = await Process.run(Platform.resolvedExecutable, [
-      'compile',
-      'exe',
-      '--packages=${config.path}',
-      p.join(repo.path, 'packages/dartway_cli/bin/dartway.dart'),
-      '-o',
-      compiledCli,
-    ]);
-    expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
-  });
-  tearDownAll(() => compiledRoot.delete(recursive: true));
   setUp(() async {
     root = await Directory.systemTemp.createTemp('dw463_');
     server = Directory(p.join(root.path, 'proof_server'))..createSync();
@@ -80,9 +65,31 @@ void main() {
     List<String> arguments, {
     Map<String, String> environment = const {},
     bool compiled = false,
+    bool processGroup = false,
   }) => Process.start(
-    compiled ? compiledCli : Platform.resolvedExecutable,
+    processGroup
+        ? '/bin/bash'
+        : compiled
+        ? compiledCli
+        : Platform.resolvedExecutable,
     [
+      if (processGroup) ...[
+        '-c',
+        // Job control gives the CLI and its descendants a separate group, while
+        // the wrapper stays outside it to report the CLI's exit status.
+        r'''
+set -m
+group_file=$1
+shift
+"$@" &
+child=$!
+printf '%s\n' "$child" > "$group_file"
+wait "$child"
+''',
+        'dartway-test-group',
+        p.join(root.path, 'process-group'),
+        compiled ? compiledCli : Platform.resolvedExecutable,
+      ],
       if (!compiled) ...[
         '--packages=${config.path}',
         p.join(repo.path, 'packages/dartway_cli/bin/dartway.dart'),
@@ -107,6 +114,11 @@ void main() {
     final code = await process.exitCode;
     return (code, '${await output}${await errors}');
   }
+
+  Future<ProcessResult> signalGroup(int groupId, String signal) => Process.run(
+    '/bin/bash',
+    ['-c', r'kill -s "$1" -- "-$2"', 'dartway-test-group', signal, '$groupId'],
+  );
 
   test(
     'remote database is refused before services start, without leaking credentials',
@@ -266,6 +278,20 @@ esac
   test(
     'compiled CLI uses Dart for both the suite and service workers',
     () async {
+      compiledCli = p.join(root.path, 'dartway');
+      final compiled = await Process.run(Platform.resolvedExecutable, [
+        'compile',
+        'exe',
+        '--packages=${config.path}',
+        p.join(repo.path, 'packages/dartway_cli/bin/dartway.dart'),
+        '-o',
+        compiledCli,
+      ]);
+      expect(
+        compiled.exitCode,
+        0,
+        reason: '${compiled.stdout}${compiled.stderr}',
+      );
       final storage = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => storage.close(force: true));
       storage.listen((request) async {
@@ -303,7 +329,7 @@ exec '${Platform.resolvedExecutable}' "\$@"
       expect(calls[2], startsWith('--packages='));
       expect(dockerCalled.readAsStringSync(), contains('rm database-id'));
     },
-    timeout: const Timeout(Duration(minutes: 1)),
+    timeout: const Timeout(Duration(minutes: 2)),
   );
 
   test(
@@ -421,6 +447,7 @@ void main() {
     final ready = File('${root.path}/$name.json.tmp');
     ready.writeAsStringSync(jsonEncode({
       'run': Platform.environment['DW_TEST_RUN_ID'], 'database': database.config.name,
+      'pid': pid,
       ${storage ? "'public': storage.publicBucket, 'private': storage.privateBucket," : ''}
       'inheritedStorage': Platform.environment['DW_STORAGE_PUBLIC_BUCKET'],
     }));
@@ -483,65 +510,109 @@ void main() {
       },
       timeout: const Timeout(Duration(minutes: 2)),
     );
-    test(
-      'SIGINT sweeps databases and nonempty buckets, leaving a concurrent run intact',
-      () async {
-        fixture('other', hold: true, storage: true);
-        fixture('interrupted', hold: true, storage: true);
-        final other = await launch([
-          '--database-url',
-          databaseUrl,
-          '--storage-url',
-          storageUrl,
-          '--',
-          'test/other_test.dart',
-        ]);
-        final otherOutput = other.stdout.transform(utf8.decoder).join();
-        final otherErrors = other.stderr.transform(utf8.decoder).join();
-        addTearDown(() async {
-          other.kill(ProcessSignal.sigint);
-          await other.exitCode;
-          await otherOutput;
-          await otherErrors;
-        });
-        final concurrent = await created('other');
-        final process = await launch([
-          '--database-url',
-          databaseUrl,
-          '--storage-url',
-          storageUrl,
-          '--',
-          'test/interrupted_test.dart',
-        ]);
-        final output = process.stdout.transform(utf8.decoder).join();
-        final errors = process.stderr.transform(utf8.decoder).join();
-        addTearDown(() async {
-          process.kill(ProcessSignal.sigint);
-          await process.exitCode;
-        });
-        final owned = await created('interrupted');
-        await store.put(
-          owned['private'] as String,
-          'a + <&/雪.txt',
-          bytes: utf8.encode('test'),
-          contentType: 'text/plain',
-        );
-        process.kill(ProcessSignal.sigint);
-        final code = await process.exitCode.timeout(
-          const Duration(seconds: 30),
-        );
-        expect(code, 130, reason: '${await output}${await errors}');
-        final names = await databases();
-        expect(names, isNot(contains(owned['database'])));
-        expect(names, contains(concurrent['database']));
-        final listing = await buckets();
-        expect(listing, isNot(contains(owned['public'])));
-        expect(listing, isNot(contains(owned['private'])));
-        expect(listing, contains(concurrent['public']));
-        expect(listing, contains(concurrent['private']));
-        expect(dockerCalled.existsSync(), isFalse);
-      },
-      timeout: const Timeout(Duration(minutes: 2)),
-    );
+    for (final processGroup in [false, true]) {
+      test(
+        '${processGroup ? 'group' : 'pid-only'} SIGINT sweeps databases and nonempty buckets, leaving a concurrent run intact',
+        () async {
+          fixture('other', hold: true, storage: true);
+          fixture('interrupted', hold: true, storage: true);
+          final other = await launch([
+            '--database-url',
+            databaseUrl,
+            '--storage-url',
+            storageUrl,
+            '--',
+            'test/other_test.dart',
+          ]);
+          final otherOutput = other.stdout.transform(utf8.decoder).join();
+          final otherErrors = other.stderr.transform(utf8.decoder).join();
+          addTearDown(() async {
+            other.kill(ProcessSignal.sigint);
+            try {
+              await other.exitCode.timeout(const Duration(seconds: 30));
+            } on TimeoutException {
+              other.kill(ProcessSignal.sigkill);
+              await other.exitCode;
+            }
+            await otherOutput;
+            await otherErrors;
+          });
+          final concurrent = await created('other');
+          final process = await launch([
+            '--database-url',
+            databaseUrl,
+            '--storage-url',
+            storageUrl,
+            '--',
+            'test/interrupted_test.dart',
+          ], processGroup: processGroup);
+          final output = process.stdout.transform(utf8.decoder).join();
+          final errors = process.stderr.transform(utf8.decoder).join();
+          final groupFile = File(p.join(root.path, 'process-group'));
+          int readGroupId() => int.parse(groupFile.readAsStringSync().trim());
+          addTearDown(() async {
+            if (processGroup && groupFile.existsSync()) {
+              await signalGroup(readGroupId(), 'INT');
+            } else {
+              process.kill(ProcessSignal.sigint);
+            }
+            try {
+              await process.exitCode.timeout(const Duration(seconds: 30));
+            } on TimeoutException {
+              if (processGroup && groupFile.existsSync()) {
+                await signalGroup(readGroupId(), 'KILL');
+              }
+              process.kill(ProcessSignal.sigkill);
+              await process.exitCode;
+            }
+            await output;
+            await errors;
+          });
+          final owned = await created('interrupted');
+          final groupId = processGroup ? readGroupId() : null;
+          if (groupId != null) {
+            final suiteGroup = await Process.run('ps', [
+              '-o',
+              'pgid=',
+              '-p',
+              '${owned['pid']}',
+            ]);
+            expect(suiteGroup.exitCode, 0, reason: '${suiteGroup.stderr}');
+            expect(int.parse((suiteGroup.stdout as String).trim()), groupId);
+          }
+          await store.put(
+            owned['private'] as String,
+            'a + <&/雪.txt',
+            bytes: utf8.encode('test'),
+            contentType: 'text/plain',
+          );
+          if (groupId == null) {
+            expect(process.kill(ProcessSignal.sigint), isTrue);
+          } else {
+            final signalled = await signalGroup(groupId, 'INT');
+            expect(signalled.exitCode, 0, reason: '${signalled.stderr}');
+          }
+          final code = await process.exitCode.timeout(
+            const Duration(seconds: 30),
+          );
+          expect(code, 130, reason: '${await output}${await errors}');
+          final names = await databases();
+          expect(names, isNot(anyElement(contains(owned['run'] as String))));
+          expect(names, isNot(contains(owned['database'])));
+          expect(names, contains(concurrent['database']));
+          final listing = await buckets();
+          expect(listing, isNot(contains(owned['run'] as String)));
+          expect(listing, isNot(contains(owned['public'])));
+          expect(listing, isNot(contains(owned['private'])));
+          expect(listing, contains(concurrent['public']));
+          expect(listing, contains(concurrent['private']));
+          expect(dockerCalled.existsSync(), isFalse);
+        },
+        timeout: const Timeout(Duration(minutes: 2)),
+        skip: processGroup && !Platform.isLinux && !Platform.isMacOS
+            ? 'requires POSIX process groups and Bash job control'
+            : null,
+      );
+    }
   }, tags: ['services']);
 }
