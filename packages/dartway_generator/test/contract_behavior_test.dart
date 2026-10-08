@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartway_generator/dartway_generator.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -888,6 +889,70 @@ void main() {
         ),
       );
       expect(bytes(project), snapshot);
+    },
+    timeout: const Timeout(Duration(minutes: 2)),
+  );
+
+  test(
+    'adoption through a symlinked project root preserves output ownership and hashes links',
+    () async {
+      final project = TempProject.create(['app_shared']);
+      final alias = Link('${project.root}_alias')..createSync(project.root);
+      addTearDown(alias.deleteSync);
+      project.writeFile('app_shared/lib/src/item.dart', itemSource());
+      project.writeFile('app_shared/README.md', 'contract guide\n');
+      final link = Link(project.path('app_shared/guide-link'))
+        ..createSync('README.md');
+      project.writeFile('app_shared/pubspec.lock', '''
+packages:
+  app_shared:
+    description:
+      path: .
+      relative: true
+    source: path
+''');
+      await project.generateClean();
+      File(
+        project.path('app_shared/lib/generated/dw_contract.json'),
+      ).deleteSync();
+      project.writeFile(
+        'app_shared/lib/generated/dw_protocol.dart',
+        '${project.readFile('app_shared/lib/generated/dw_protocol.dart')}\n// old generator\n',
+      );
+      final base = baseline(project);
+      final adoption = await DwCodeGenerator.run(
+        alias.path,
+        contractBase: base,
+      );
+      expect(adoption.diagnostics, isEmpty);
+      expect(adoption.root, project.root);
+      expect(
+        adoption.contractProof,
+        contains('shared contract source unchanged'),
+      );
+      expect(
+        adoption.written,
+        contains(project.path('app_shared/lib/generated/dw_protocol.dart')),
+      );
+      final snapshot = bytes(project);
+      final check = await DwCodeGenerator.run(
+        alias.path,
+        check: true,
+        contractBase: base,
+      );
+      expect(check.isUpToDate, isTrue, reason: check.diagnostics.toString());
+      expect(bytes(project), snapshot);
+      link.deleteSync();
+      link.createSync('different.md');
+      final changed = await DwCodeGenerator.run(
+        alias.path,
+        check: true,
+        contractBase: base,
+      );
+      expect(
+        changed.diagnostics.map((d) => d.message).join(),
+        contains('shared contract source changed: app_shared/guide-link'),
+      );
     },
     timeout: const Timeout(Duration(minutes: 2)),
   );

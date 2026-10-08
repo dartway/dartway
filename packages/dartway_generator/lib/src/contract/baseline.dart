@@ -335,12 +335,10 @@ Future<String?> _workingBlobId(
       process.stdin.add(utf8.encode(Link(filePath).targetSync()));
       await process.stdin.close();
       final code = await process.exitCode;
+      final stderr = await error;
       if (code != 0) {
-        throw FormatException(
-          'Git baseline unavailable: ${await error}'.trim(),
-        );
+        throw FormatException('Git baseline unavailable: $stderr'.trim());
       }
-      await error;
       return (await output).trim();
     default:
       return null;
