@@ -559,6 +559,37 @@ void main() {
     final stack = stackVariants()['bundled storage and a site']!;
     final nginx = DwStackRenderer(stack: stack).nginxFile;
 
+    test('compresses app and site static responses, but not call traffic', () {
+      const types = [
+        'application/javascript',
+        'text/javascript',
+        'application/wasm',
+        'text/css',
+        'application/json',
+        'image/svg+xml',
+        'text/plain',
+        'application/manifest+json',
+      ];
+      for (final host in ['app.example.com', 'example.com']) {
+        final block = _serverBlock(nginx, host);
+        expect(block, contains('gzip on;'));
+        expect(block, contains('gzip_proxied any;'));
+        expect(block, contains('gzip_vary on;'));
+        expect(block, contains('gzip_comp_level 5;'));
+        expect(block, contains('gzip_min_length 1024;'));
+        for (final type in types) {
+          expect(block, contains(type));
+        }
+      }
+      expect(
+        _serverBlock(nginx, 'api.example.com'),
+        isNot(contains('gzip on')),
+      );
+      final app = _serverBlock(nginx, 'app.example.com');
+      expect(_location(app, '/dw/'), contains('gzip off;'));
+      expect(_location(app, '= /health'), contains('gzip off;'));
+    });
+
     test('app: files from the web image, calls and health to the server', () {
       final app = _serverBlock(nginx, 'app.example.com');
       expect(_location(app, '/'), contains('proxy_pass http://web:80;'));

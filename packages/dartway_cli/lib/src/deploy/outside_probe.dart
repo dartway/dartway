@@ -7,18 +7,31 @@ import 'web_cache.dart';
 
 /// One observation of a deployed stack from outside it.
 class DwProbeResult {
-  const DwProbeResult.pass(this.title, this.detail) : passed = true;
-  const DwProbeResult.fail(this.title, this.detail) : passed = false;
+  const DwProbeResult.pass(this.title, this.detail)
+    : passed = true,
+      warning = false;
+  const DwProbeResult.warning(this.title, this.detail)
+    : passed = true,
+      warning = true;
+  const DwProbeResult.fail(this.title, this.detail)
+    : passed = false,
+      warning = false;
 
   final String title;
   final bool passed;
+  final bool warning;
 
   /// What was observed. Stated on success too, so the report describes the
   /// deployment rather than merely approving of it.
   final String detail;
 
   @override
-  String toString() => '${passed ? 'ok  ' : 'FAIL'} $title — $detail';
+  String toString() =>
+      '${warning
+          ? 'warn'
+          : passed
+          ? 'ok  '
+          : 'FAIL'} $title — $detail';
 }
 
 /// Asks a deployed stack the questions a browser and a mobile app would, over
@@ -38,7 +51,9 @@ class DwOutsideProbe {
   final Duration timeout;
 
   HttpClient _client() {
-    final client = HttpClient()..connectionTimeout = timeout;
+    final client = HttpClient()
+      ..connectionTimeout = timeout
+      ..autoUncompress = false;
     final redirect = connectTo;
     if (redirect != null) {
       client.connectionFactory = (uri, proxyHost, proxyPort) =>
@@ -47,7 +62,7 @@ class DwOutsideProbe {
     return client;
   }
 
-  Future<({int status, HttpHeaders headers, String body})> _send(
+  Future<({int status, HttpHeaders headers, String body, int size})> _send(
     String method,
     Uri url, {
     Map<String, String> headers = const {},
@@ -63,14 +78,21 @@ class DwOutsideProbe {
         request.add(body);
       }
       final response = await request.close().timeout(timeout);
-      final text = await utf8.decoder
-          .bind(response)
-          .join()
-          .timeout(timeout, onTimeout: () => '');
+      var bytes = await response
+          .fold<List<int>>(<int>[], (all, part) => all..addAll(part))
+          .timeout(timeout, onTimeout: () => <int>[]);
+      final size = response.contentLength >= 0
+          ? response.contentLength
+          : bytes.length;
+      if (response.headers.value(HttpHeaders.contentEncodingHeader) == 'gzip') {
+        bytes = gzip.decode(bytes);
+      }
+      final text = utf8.decode(bytes, allowMalformed: true);
       return (
         status: response.statusCode,
         headers: response.headers,
         body: text,
+        size: size,
       );
     } finally {
       client.close(force: true);
@@ -175,6 +197,89 @@ class DwOutsideProbe {
       title,
       '$answered entry point(s) revalidate before reuse',
     );
+  }
+
+  /// The JavaScript or Wasm application bundle is compressed by the front
+  /// proxy. A missing build kind is ignored because Flutter emits one or the
+  /// other depending on its renderer.
+  Future<DwProbeResult> webCompression(String origin) async {
+    final title = 'compression of $origin';
+    for (final path in ['/main.dart.js', '/main.dart.wasm']) {
+      try {
+        final answer = await _send(
+          'GET',
+          Uri.parse('$origin$path'),
+          headers: {HttpHeaders.acceptEncodingHeader: 'gzip'},
+        );
+        if (answer.status != 200) continue;
+        final mimeType = answer.headers.contentType?.mimeType;
+        if (mimeType != 'application/javascript' &&
+            mimeType != 'text/javascript' &&
+            mimeType != 'application/wasm') {
+          continue;
+        }
+        final encoding = answer.headers.value(
+          HttpHeaders.contentEncodingHeader,
+        );
+        if (encoding != 'gzip') {
+          return DwProbeResult.fail(
+            title,
+            '$path (${answer.size} bytes) has Content-Encoding '
+            '"${encoding ?? '<none>'}"; expected gzip',
+          );
+        }
+        return DwProbeResult.pass(title, '$path (${answer.size} bytes), gzip');
+      } on Object catch (error) {
+        return DwProbeResult.fail(title, _describe(error));
+      }
+    }
+    return DwProbeResult.fail(
+      title,
+      'neither main.dart.js nor main.dart.wasm answered 200 with a '
+      'JavaScript or application/wasm Content-Type',
+    );
+  }
+
+  /// Flutter's startup files must refer to the CanvasKit files bundled into
+  /// the web image rather than the default Google CDN.
+  Future<DwProbeResult> canvasKitOrigin(String origin) async {
+    final title = 'CanvasKit origin of $origin';
+    for (final path in ['/', '/flutter_bootstrap.js']) {
+      try {
+        final answer = await _send('GET', Uri.parse('$origin$path'));
+        if (answer.status != 200) continue;
+        if (answer.body.contains('www.gstatic.com/flutter-canvaskit') &&
+            !_usesLocalCanvasKit(answer.body)) {
+          return DwProbeResult.warning(
+            title,
+            '$path loads www.gstatic.com/flutter-canvaskit; add '
+            '--no-web-resources-cdn to flutter build web '
+            '(docs/migrations/2026-10-08-local-canvaskit.md)',
+          );
+        }
+      } on Object catch (error) {
+        return DwProbeResult.fail(title, _describe(error));
+      }
+    }
+    return DwProbeResult.pass(title, 'startup files do not load gstatic.com');
+  }
+
+  static bool _usesLocalCanvasKit(String startup) {
+    // Flutter retains its CDN fallback in the loader even for a local build.
+    // The generated JSON selects which branch the loader actually uses.
+    final config = RegExp(
+      r'_flutter\.buildConfig\s*=\s*(\{.*?\})\s*;',
+      dotAll: true,
+    ).firstMatch(startup);
+    if (config == null) return false;
+    final buildConfig = jsonDecode(config.group(1)!);
+    if (buildConfig is! Map || buildConfig['useLocalCanvasKit'] != true) {
+      return false;
+    }
+    // A loader configuration takes precedence over the generated build flag.
+    return !RegExp(
+      r'''["']?canvasKitBaseUrl["']?\s*:\s*["'](?:https?:)?//www\.gstatic\.com/flutter-canvaskit''',
+    ).hasMatch(startup);
   }
 
   /// `GET <origin>/dw/live` upgrades to a WebSocket and the DartWay server
@@ -385,18 +490,22 @@ class DwOutsideProbe {
 }
 
 /// The questions a deployment of [stack] must answer from outside, in order:
-/// health through both hosts, the app page and its cache policy, the live
-/// socket through both hosts, and — where they exist — the site, the storage
+/// health through both hosts, the app page, cache policy, compression and
+/// CanvasKit origin, the live socket through both hosts, and — where they
+/// exist — the site, the storage
 /// CORS rule a browser upload depends on, and what each bucket gives to
 /// anyone without keys.
 List<Future<DwProbeResult> Function()> dwOutsideProbes(
   DwStack stack,
-  DwOutsideProbe probe,
-) => [
+  DwOutsideProbe probe, {
+  bool includeCanvasKitOrigin = true,
+}) => [
   () => probe.health(stack.apiOrigin),
   () => probe.health(stack.appOrigin),
   () => probe.appIndex(stack.appOrigin),
   () => probe.webCache(stack.appOrigin),
+  () => probe.webCompression(stack.appOrigin),
+  if (includeCanvasKitOrigin) () => probe.canvasKitOrigin(stack.appOrigin),
   () => probe.liveUpgrade(stack.apiOrigin),
   () => probe.liveUpgrade(stack.appOrigin, browserOrigin: stack.appOrigin),
   if (stack.siteOrigin case final site?) () => probe.site(site),
