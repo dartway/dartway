@@ -392,6 +392,182 @@ void main() {
     });
   });
 
+  group('linking an e-mail code to a provider identity by its verified e-mail '
+      '(#373)', () {
+    Future<Harness> linkingHarness() => Harness.start(
+      app: TestApp(),
+      build: (app, config) =>
+          app.server(config, auth: app.auth(linkByVerifiedEmail: true)),
+    );
+
+    test('linkByVerifiedEmail on, a provider identity proved the address: an '
+        'e-mail code for it lands on that account — not a new one, no '
+        'onAccountCreated, the e-mail identity attached verified, one change '
+        '(email, linked)', () async {
+      final linked = await linkingHarness();
+      try {
+        final google = await linked.server.server.accounts
+            .signInWithExternalIdentity(
+              provider: 'google',
+              subject: 'g-1',
+              // Stored normalized: the code below names it in lower case.
+              verifiedEmail: 'Ada@Example.com',
+            );
+        final changes = linked.app.identifierChanges.length;
+        final createdBefore = linked.app.createdAccounts.length;
+
+        final (_, session) = await linked.signedIn('ada@example.com');
+
+        expect(session.id, google.id);
+        expect(session.isNewAccount, isFalse);
+        expect(
+          linked.app.createdAccounts.length,
+          createdBefore,
+          reason: 'onAccountCreated must not run for a linked identity',
+        );
+        final all = await linked.server.server.accounts.listIdentities(
+          google.id,
+        );
+        expect(all.map((i) => i.provider ?? i.kind!.name), ['google', 'email']);
+        expect(all.last.value, 'ada@example.com');
+        expect(all.last.verifiedAt, isNotNull);
+
+        final change = linked.app.identifierChanges.skip(changes).single;
+        expect(change.accountId, google.id);
+        expect(change.kind, DwIdentifierKind.email);
+        expect(change.provider, isNull);
+        expect(change.cause, DwIdentifierChangeCause.linked);
+        expect(change.previous, isNull);
+        expect(change.current, 'ada@example.com');
+      } finally {
+        await linked.stop();
+      }
+    });
+
+    test('the address follows the token: after a sign-in proving another '
+        'address, a code to the old one makes a new account and a code to the '
+        'new one links', () async {
+      final linked = await linkingHarness();
+      try {
+        final google = await linked.server.server.accounts
+            .signInWithExternalIdentity(
+              provider: 'google',
+              subject: 'g-2',
+              verifiedEmail: 'old@example.com',
+            );
+        await linked.server.server.accounts.signInWithExternalIdentity(
+          provider: 'google',
+          subject: 'g-2',
+          verifiedEmail: 'new@example.com',
+        );
+
+        final (_, old) = await linked.signedIn('old@example.com');
+        expect(old.id, isNot(google.id));
+        expect(old.isNewAccount, isTrue);
+
+        final (_, fresh) = await linked.signedIn('new@example.com');
+        expect(fresh.id, google.id);
+        expect(fresh.isNewAccount, isFalse);
+      } finally {
+        await linked.stop();
+      }
+    });
+
+    test(
+      'provider identities of two accounts proved the same address: '
+      'ambiguous — the code makes a new account, and a warning says why',
+      () async {
+        final linked = await linkingHarness();
+        try {
+          // No `email` identity to link to, so each makes its own account.
+          final google = await linked.server.server.accounts
+              .signInWithExternalIdentity(
+                provider: 'google',
+                subject: 'g-3',
+                verifiedEmail: 'shared@example.com',
+              );
+          final apple = await linked.server.server.accounts
+              .signInWithExternalIdentity(
+                provider: 'apple',
+                subject: 'a-3',
+                verifiedEmail: 'shared@example.com',
+              );
+          expect(apple.id, isNot(google.id));
+          final logged = RecordingLogger.lines.length;
+
+          final (_, session) = await linked.signedIn('shared@example.com');
+
+          expect(session.isNewAccount, isTrue);
+          expect(session.id, isNot(anyOf(google.id, apple.id)));
+          expect(
+            RecordingLogger.lines.skip(logged),
+            contains(
+              allOf(startsWith('warning'), contains('more than one account')),
+            ),
+          );
+        } finally {
+          await linked.stop();
+        }
+      },
+    );
+
+    test('linkByVerifiedEmail off (the default): a new account', () async {
+      final google = await accounts().signInWithExternalIdentity(
+        provider: 'google',
+        subject: 'g-4',
+        verifiedEmail: 'nolinking-373@example.com',
+      );
+      final (_, session) = await harness().signedIn(
+        'nolinking-373@example.com',
+      );
+      expect(session.isNewAccount, isTrue);
+      expect(session.id, isNot(google.id));
+    });
+
+    test(
+      'the token proved no address (verifiedEmail null): a new account',
+      () async {
+        final linked = await linkingHarness();
+        try {
+          final google = await linked.server.server.accounts
+              .signInWithExternalIdentity(provider: 'google', subject: 'g-5');
+          final (_, session) = await linked.signedIn('unproved@example.com');
+          expect(session.isNewAccount, isTrue);
+          expect(session.id, isNot(google.id));
+        } finally {
+          await linked.stop();
+        }
+      },
+    );
+
+    test('a code sign-in and a provider\'s first sign-in for one address, at '
+        'once, leave exactly one account — whichever takes the e-mail lock '
+        'first, the other links to it', () async {
+      final linked = await linkingHarness();
+      try {
+        final results = await Future.wait([
+          linked.signedIn('together@example.com').then((r) => r.$2.id),
+          linked.server.server.accounts
+              .signInWithExternalIdentity(
+                provider: 'google',
+                subject: 'g-6',
+                verifiedEmail: 'together@example.com',
+              )
+              .then((r) => r.id),
+        ]);
+        expect(results.toSet(), hasLength(1));
+        final owners = await linked.db.query(
+          'SELECT DISTINCT account_id FROM dw_identity '
+          'WHERE value IN (@email, @subject)',
+          params: {'email': 'together@example.com', 'subject': 'g-6'},
+        );
+        expect(owners, hasLength(1));
+      } finally {
+        await linked.stop();
+      }
+    });
+  });
+
   group('deleting an account', () {
     Future<int> countOf(String table, int accountId) async =>
         (await harness().db.query(

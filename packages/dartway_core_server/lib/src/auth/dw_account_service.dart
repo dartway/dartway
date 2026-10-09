@@ -410,9 +410,12 @@ final class DwAccountService {
   ///
   /// [verifiedEmail] is the e-mail the provider's token proved, if any —
   /// **only** when the token itself says so (`email_verified`); pass `null`
-  /// otherwise. It is read only on the identity's first sign-in, and only
-  /// when `DwAuthConfig.linkByVerifiedEmail` is on, to attach to the account
-  /// of a matching `email` identity instead of creating a new one.
+  /// otherwise. It is read only when `DwAuthConfig.linkByVerifiedEmail` is
+  /// on, and links both ways: on the identity's first sign-in, to attach to
+  /// the account of a matching `email` identity instead of creating a new
+  /// one; and on every sign-in, it is kept with the identity, so that a later
+  /// e-mail code sign-in to the same address reaches this account instead of
+  /// creating another.
   Future<DwAuthSession> signInWithExternalIdentity({
     required String provider,
     required String subject,
@@ -603,6 +606,16 @@ Future<bool> _hasProviderIdentity(
 /// A sign-in ([DwSignInOrigin]) has just proved the identifier, so its
 /// identity is marked verified now, new or not; a tool's is not.
 ///
+/// With `DwAuthConfig.linkByVerifiedEmail` on, a sign-in to an e-mail address
+/// no `email` identity holds yet first looks for the provider identities whose
+/// token last proved that address (`dw_identity.provider_email`, written by
+/// [dwEnsureExternalAccount]): when they all belong to one account, the
+/// `email` identity is attached there instead of creating an account,
+/// `onIdentifierChanged` runs ([DwIdentifierChangeCause.linked]) and
+/// `onAccountCreated` does not. Belonging to two or more accounts, the
+/// address is ambiguous: an account is created as before, and a warning is
+/// logged — picking one of them would be a guess about whose address it is.
+///
 /// Must run inside a transaction on `ctx.db`: the lock is transaction-scoped
 /// and the account, its identity and `onAccountCreated` commit together.
 @internal
@@ -635,6 +648,26 @@ Future<DwEnsuredAccount> dwEnsureAccount(
         created: false,
       );
     }
+    if (kind == DwIdentifierKind.email && auth.linkByVerifiedEmail) {
+      final linkTo = await _accountOfProviderEmail(ctx, identifier);
+      if (linkTo != null) {
+        await db.execute(
+          'INSERT INTO dw_identity (account_id, kind, value, verified_at) '
+          'VALUES (@account, @kind, @value, now())',
+          params: {'account': linkTo, 'kind': kind.name, 'value': identifier},
+        );
+        await auth.onIdentifierChanged?.call(
+          ctx,
+          DwIdentifierChange(
+            accountId: linkTo,
+            kind: kind,
+            cause: DwIdentifierChangeCause.linked,
+            current: identifier,
+          ),
+        );
+        return (accountId: linkTo, created: false);
+      }
+    }
   } else {
     final existing = await dwAccountOf(db, kind, identifier);
     if (existing != null) return (accountId: existing, created: false);
@@ -652,6 +685,27 @@ Future<DwEnsuredAccount> dwEnsureAccount(
   return (accountId: accountId, created: true);
 }
 
+/// The one account whose provider identities' tokens last proved the
+/// normalized [email] verified, or `null` — none, or more than one, which is
+/// logged: the address is ambiguous, and a code sign-in to it links nowhere.
+///
+/// Runs under the `email:` lock of the address, which every write of a
+/// non-null `provider_email` holds too.
+Future<int?> _accountOfProviderEmail(DwCallContext ctx, String email) async {
+  final rows = await ctx.db.query(
+    'SELECT DISTINCT account_id FROM dw_identity '
+    'WHERE provider_email = @value LIMIT 2',
+    params: {'value': email},
+  );
+  if (rows.length > 1) {
+    ctx.log.warning(
+      'linkByVerifiedEmail: provider identities of more than one account '
+      'proved the same e-mail; a code sign-in to it makes a new account',
+    );
+  }
+  return rows.length == 1 ? rows.single.get<int>('account_id') : null;
+}
+
 /// The account of an external provider's [subject], created when the identity
 /// is new: the external twin of [dwEnsureAccount].
 ///
@@ -666,6 +720,13 @@ Future<DwEnsuredAccount> dwEnsureAccount(
 /// the same proof. The one case this refuses to link: the account already
 /// holds a *different* identity of the same provider — see
 /// [_hasProviderIdentity]. The e-mail identity itself is untouched.
+///
+/// Every sign-in, first or not, also writes the identity's `provider_email`:
+/// the normalized [verifiedEmail] with the option on, `NULL` otherwise — what
+/// [dwEnsureAccount] reads to link the other way, from an e-mail code to this
+/// account. Rewritten each time, it follows the token's address, fills in
+/// for identities made before the option was turned on, and clears when the
+/// option is turned off.
 ///
 /// Must run inside a transaction on `ctx.db`.
 @internal
@@ -703,9 +764,9 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
     await db.advisoryLock(DwLockSpace.identifier, key);
   }
   final existing = await db.query(
-    'UPDATE dw_identity SET verified_at = now() '
+    'UPDATE dw_identity SET verified_at = now(), provider_email = @email '
     'WHERE kind = @kind AND value = @value RETURNING account_id',
-    params: {'kind': provider, 'value': subject},
+    params: {'kind': provider, 'value': subject, 'email': normalizedEmail},
   );
   if (existing.isNotEmpty) {
     return (accountId: existing.single.get<int>('account_id'), created: false);
@@ -725,9 +786,15 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
       : matched;
   if (linkTo != null) {
     await db.execute(
-      'INSERT INTO dw_identity (account_id, kind, value, verified_at) '
-      'VALUES (@account, @kind, @value, now())',
-      params: {'account': linkTo, 'kind': provider, 'value': subject},
+      'INSERT INTO dw_identity '
+      '(account_id, kind, value, verified_at, provider_email) '
+      'VALUES (@account, @kind, @value, now(), @email)',
+      params: {
+        'account': linkTo,
+        'kind': provider,
+        'value': subject,
+        'email': normalizedEmail,
+      },
     );
     await auth.onIdentifierChanged?.call(
       ctx,
@@ -744,9 +811,15 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
     'INSERT INTO dw_account DEFAULT VALUES RETURNING id',
   )).single.get<int>('id');
   await db.execute(
-    'INSERT INTO dw_identity (account_id, kind, value, verified_at) '
-    'VALUES (@account, @kind, @value, now())',
-    params: {'account': accountId, 'kind': provider, 'value': subject},
+    'INSERT INTO dw_identity '
+    '(account_id, kind, value, verified_at, provider_email) '
+    'VALUES (@account, @kind, @value, now(), @email)',
+    params: {
+      'account': accountId,
+      'kind': provider,
+      'value': subject,
+      'email': normalizedEmail,
+    },
   );
   await created(ctx, accountId, provider, subject, registration);
   return (accountId: accountId, created: true);

@@ -183,15 +183,15 @@ final class DwAuthConfig {
   final Future<void> Function(DwCallContext ctx, int accountId)?
   onAccountDeleting;
 
-  /// Whether the **first** sign-in of a provider identity (`google`,
-  /// `apple` — `DwAccountService.signInWithExternalIdentity`) may attach to
-  /// an existing account instead of creating a new one, when the token says
-  /// its e-mail is verified and an `email` identity of that normalized
-  /// address already belongs to an account. Off by default.
+  /// Whether one verified e-mail address links a provider identity
+  /// (`google`, `apple` — `DwAccountService.signInWithExternalIdentity`) and
+  /// an e-mail identity into one account, in either order. Off by default.
   ///
-  /// On: the provider identity is attached to that account under the same
-  /// advisory lock as the e-mail identity (so a race with an e-mail sign-in
-  /// cannot split them), `onIdentifierChanged` runs
+  /// **Provider after e-mail.** The **first** sign-in of a provider identity
+  /// may attach to an existing account instead of creating a new one, when
+  /// the token says its e-mail is verified and an `email` identity of that
+  /// normalized address already belongs to an account. The provider identity
+  /// is attached to that account, `onIdentifierChanged` runs
   /// ([DwIdentifierChangeCause.linked]) instead of [onExternalAccountCreated],
   /// and the answered session is not a new account. The e-mail's own
   /// verification is untouched, and matching does not require it: an e-mail
@@ -202,6 +202,24 @@ final class DwAuthConfig {
   /// none, never links — this is not a fallback to try, it is a
   /// precondition. Nor does it link when the matched account already holds a
   /// *different* identity of this same provider — see the risk below.
+  ///
+  /// **E-mail after provider.** Every provider sign-in keeps, with the
+  /// provider identity, the normalized address its token proved verified
+  /// (cleared when the token proves none, or this option is off). An e-mail
+  /// code sign-in to an address no `email` identity holds attaches the new
+  /// `email` identity, verified, to the account whose provider identities
+  /// proved that address — `onIdentifierChanged` runs
+  /// ([DwIdentifierChangeCause.linked]) instead of [onAccountCreated], and
+  /// the answered session is not a new account. When provider identities of
+  /// two or more accounts proved the same address, it is ambiguous: the code
+  /// creates a new account, as with the option off, and a warning is logged.
+  /// Kept with the provider identity rather than as an `email` identity of
+  /// its own, it never brings back an address its owner removed, and adds no
+  /// identity nobody confirmed by code.
+  ///
+  /// Both directions run under the advisory lock of the e-mail identifier, so
+  /// an e-mail sign-in and a provider's first sign-in for the same address,
+  /// at once, make one account.
   ///
   /// **Why opt-in.** A provider's "verified" means "verified at the moment
   /// that provider's account was created", not "verified now" — a Google
@@ -215,7 +233,9 @@ final class DwAuthConfig {
   /// account signing in for the first time under this provider and landing on
   /// somebody else's e-mail. It is not a defence against a provider identity
   /// created before this option was turned on, or against a first sign-in
-  /// with a provider the account has never used. Turning this on is a
+  /// with a provider the account has never used. The other direction carries
+  /// the same trade turned around: whoever receives the address's mail now
+  /// signs in by code to the account a provider proved the address for. Turning this on is a
   /// project deciding the remaining trade is worth the account its members
   /// would otherwise get twice.
   final bool linkByVerifiedEmail;
@@ -290,10 +310,15 @@ enum DwIdentifierChangeCause {
   /// `DwAccountService.removeIdentities` removed it.
   removed,
 
-  /// A provider identity's first sign-in matched an existing account's
-  /// verified e-mail (`DwAuthConfig.linkByVerifiedEmail`) and was attached to
-  /// it instead of creating a new one. Distinct from [confirmed]: nobody
-  /// confirmed a code here, a provider's token stood in for one.
+  /// One verified e-mail address joined two identities into one account
+  /// (`DwAuthConfig.linkByVerifiedEmail`), in either direction: a provider
+  /// identity's first sign-in matched an existing account's `email`
+  /// identity and was attached to it ([DwIdentifierChange.provider] set), or
+  /// an e-mail code sign-in matched the address a provider identity's token
+  /// proved and its `email` identity was attached to that account
+  /// ([DwIdentifierChange.kind] set) — either instead of creating a new
+  /// account. Distinct from [confirmed]: no code was confirmed for this
+  /// account's own request; a sign-in's proof of the address stood in.
   linked,
 }
 
