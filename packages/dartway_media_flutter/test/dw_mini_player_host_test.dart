@@ -4,6 +4,7 @@
 import 'dart:async';
 
 import 'package:dartway_media_flutter/dartway_media_flutter.dart';
+import 'package:dartway_media_flutter/testing.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -495,4 +496,177 @@ void main() {
     expect(builds - before, lessThanOrEqualTo(1));
     await endSession(tester, session);
   });
+
+  group('a page that opens its session in initState, under a host mounted '
+      'a frame earlier', () {
+    /// The host in `MaterialApp.builder`, its chrome listening to the
+    /// shown session's playback and queue — pumped before any page opens.
+    Future<void> pumpApp(WidgetTester tester, DwMediaConfig config) async {
+      manager = DwMediaSessionManager(config: config);
+      await tester.pumpWidget(
+        MaterialApp(
+          navigatorKey: navigator,
+          builder: (context, child) => Stack(
+            children: [
+              ?child,
+              DwMiniPlayerHost(
+                sessionManager: manager,
+                onExpand: (_) {},
+                builder: (context, session, expand, close) => ListenableBuilder(
+                  listenable: Listenable.merge([
+                    session.playback,
+                    session.queue,
+                  ]),
+                  builder: (context, _) => ColoredBox(
+                    key: chrome,
+                    color: session.playback.value.isPlaying
+                        ? Colors.white
+                        : Colors.black,
+                    child: Text(
+                      '${session.queue.value.items.length}',
+                      textDirection: TextDirection.ltr,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          home: const SizedBox.expand(),
+        ),
+      );
+    }
+
+    /// Pushes a page whose `initState` calls [open], and builds it.
+    Future<void> pushOpening(WidgetTester tester, VoidCallback open) async {
+      unawaited(
+        navigator.currentState!.push(
+          MaterialPageRoute<void>(builder: (_) => _OpensOnEntry(open)),
+        ),
+      );
+      await tester.pump();
+    }
+
+    testWidgets('a new session, no autoplay: it becomes active after the '
+        'frame', (tester) async {
+      await pumpApp(tester, const DwMediaConfig());
+      late DwMediaSession session;
+      await pushOpening(
+        tester,
+        () => session = manager.open(items: [videoItem('p')]),
+      );
+      expect(tester.takeException(), isNull);
+      await tester.pump();
+      expect(manager.active.value, same(session));
+      await tester.pump(const Duration(seconds: 1));
+      await endSession(tester, session);
+    });
+
+    testWidgets('a new session with autoplay under singleActiveItem: the '
+        'minimized one playing pauses, the new one is active', (tester) async {
+      await pumpApp(tester, const DwMediaConfig());
+      final first = manager.open(items: [videoItem('a')]);
+      await rig.loadVideo(tester);
+      await first.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 1));
+      first.minimize();
+      await tester.pump();
+      expect(find.byKey(chrome), findsOneWidget);
+      expect(first.playback.value.isPlaying, isTrue);
+
+      late DwMediaSession second;
+      await pushOpening(
+        tester,
+        () => second = manager.open(
+          items: [videoItem('b')],
+          options: const DwMediaOpenOptions(autoplayOnOpen: true),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      await rig.loadVideo(tester);
+      await dwSettleMedia(tester);
+      expect(tester.takeException(), isNull);
+      expect(first.playback.value.isPlaying, isFalse);
+      expect(second.playback.value.isPlaying, isTrue);
+      expect(manager.active.value, same(second));
+      await endSession(tester, second);
+      await endSession(tester, first);
+    });
+
+    testWidgets('the minimized session\'s item again, with another queue and '
+        'autoplay: it plays the new queue with the new callbacks', (
+      tester,
+    ) async {
+      await pumpApp(tester, const DwMediaConfig());
+      final oldStarts = <String>[];
+      final newStarts = <String>[];
+      final item = videoItem('a');
+      final session = manager.open(
+        items: [item],
+        callbacks: DwMediaCallbacks(
+          onStarted: (item) => oldStarts.add(item.id),
+        ),
+      );
+      await rig.loadVideo(tester);
+      session.minimize();
+      await tester.pump();
+      expect(find.byKey(chrome), findsOneWidget);
+      expect(session.playback.value.isPlaying, isFalse);
+
+      final items = [videoItem('before'), item, videoItem('after')];
+      late DwMediaSession reopened;
+      await pushOpening(
+        tester,
+        () => reopened = manager.open(
+          items: items,
+          startIndex: 1,
+          callbacks: DwMediaCallbacks(
+            onStarted: (item) => newStarts.add(item.id),
+          ),
+          options: const DwMediaOpenOptions(autoplayOnOpen: true),
+        ),
+      );
+      expect(tester.takeException(), isNull);
+      await dwSettleMedia(tester);
+      expect(tester.takeException(), isNull);
+      expect(reopened, same(session));
+      expect(session.queue.value.items, items);
+      expect(session.queue.value.currentIndex, 1);
+      expect(session.playback.value.isPlaying, isTrue);
+      expect(manager.active.value, same(session));
+      await rig.playVideoTo(tester, const Duration(seconds: 1));
+      expect(newStarts, ['a']);
+      expect(oldStarts, isEmpty);
+      await endSession(tester, session);
+    });
+
+    testWidgets('open() outside a build still sets active at once', (
+      tester,
+    ) async {
+      await pumpApp(tester, const DwMediaConfig());
+      final session = manager.open(items: [videoItem('now')]);
+      expect(manager.active.value, same(session));
+      await rig.loadVideo(tester);
+      await endSession(tester, session);
+    });
+  });
+}
+
+final class _OpensOnEntry extends StatefulWidget {
+  const _OpensOnEntry(this.open);
+
+  final VoidCallback open;
+
+  @override
+  State<_OpensOnEntry> createState() => _OpensOnEntryState();
+}
+
+final class _OpensOnEntryState extends State<_OpensOnEntry> {
+  @override
+  void initState() {
+    super.initState();
+    widget.open();
+  }
+
+  @override
+  Widget build(BuildContext context) => const SizedBox.expand();
 }

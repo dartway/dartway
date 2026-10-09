@@ -24,6 +24,11 @@
 - The resize handle carries semantics (increase/decrease step the width; its label is
   `DwMiniPlayerHost.resizeHandleLabel`; a step that would change nothing is not offered), and the
   resize cursor shows over the whole player, chrome buttons included, while a resize runs.
+- `DwMediaSessionManager.open()` is safe from `initState` and a build (#377): it returns the
+  session at once, and writes what existing listeners hear — `active`, the claim of `autoplayOnOpen`
+  that pauses other sessions under `singleActiveItem`, a reused session's queue, engine settings
+  and play — once the tree is unlocked, so a `DwMiniPlayerHost` mounted earlier no longer throws
+  "setState() called during build". Outside a build all of it still happens at once.
 
 ## 0.1.0
 

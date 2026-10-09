@@ -610,6 +610,10 @@ final class DwMediaSession {
   /// settings that can still apply ([DwMediaController.adoptOptions]); a
   /// different queue replaces this one around the same item, keeping its
   /// engine; and `autoplayOnOpen` plays the item if it is paused or hidden.
+  ///
+  /// What nobody listens to changes at once, so [options] read in the same
+  /// build is already the new one; the engine, the queue and the play that
+  /// listeners hear wait until the tree is unlocked.
   void _reopen({
     required List<DwMediaItem> items,
     required int startIndex,
@@ -624,18 +628,25 @@ final class DwMediaSession {
     _options = options;
     // Opened again: a page wants it, not only the mini-player.
     _leftForMiniPlayer = false;
-    _controller.adoptOptions(options);
-    final queue = _queue.value;
-    final sameQueue =
-        queue.currentIndex == startIndex && listEquals(queue.items, items);
-    if (!sameQueue) {
-      cancelAutoplay();
-      _queue.value = DwMediaQueueState(items: items, currentIndex: startIndex);
-      _updatePreview(_playback.value);
-    }
-    if (options.autoplayOnOpen && !_playback.value.isPlaying) {
-      unawaited(play());
-    }
+    _hidden = false;
+    _whenUnlocked(() {
+      if (_disposed) return;
+      _controller.adoptOptions(options);
+      final queue = _queue.value;
+      final sameQueue =
+          queue.currentIndex == startIndex && listEquals(queue.items, items);
+      if (!sameQueue) {
+        cancelAutoplay();
+        _queue.value = DwMediaQueueState(
+          items: items,
+          currentIndex: startIndex,
+        );
+        _updatePreview(_playback.value);
+      }
+      if (options.autoplayOnOpen && !_playback.value.isPlaying) {
+        unawaited(play());
+      }
+    });
   }
 }
 

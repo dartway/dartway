@@ -131,6 +131,10 @@ final class DwMediaSessionManager {
   /// display-sleep option — stay as the item was loaded), a different
   /// queue replaces the old one around the same item, and `autoplayOnOpen`
   /// plays it if it is paused or hidden.
+  ///
+  /// Safe from `initState` and a build: the session is returned at once,
+  /// and what existing listeners hear — [active], a reused session's queue
+  /// and playback — is written once the tree is unlocked.
   DwMediaSession open({
     required List<DwMediaItem> items,
     int startIndex = 0,
@@ -145,17 +149,13 @@ final class DwMediaSessionManager {
     final resolved = config.merge(options);
     for (final session in _sessions) {
       if (!session.isDisposed && session.currentItem == wanted) {
-        session._hidden = false;
         session._reopen(
           items: items,
           startIndex: startIndex,
           callbacks: callbacks,
           options: resolved,
         );
-        final current = _active.value;
-        if (current == null || !current.playback.value.isPlaying) {
-          _active.value = session;
-        }
+        _takeActiveUnlessPlaying(session);
         return session;
       }
     }
@@ -171,14 +171,23 @@ final class DwMediaSessionManager {
     _sessions.add(session);
     // Autoplay claims the session through `play()`. Without it the new
     // session takes the mini-player's place only while nothing plays.
-    if (!session.options.autoplayOnOpen) {
+    if (!session.options.autoplayOnOpen) _takeActiveUnlessPlaying(session);
+    // Synchronous: its notifiers have no listeners yet, and the caller
+    // needs its engine.
+    session._open(autoplay: session.options.autoplayOnOpen);
+    return session;
+  }
+
+  /// [session] takes the mini-player's place while nothing else plays —
+  /// decided when the write runs, once the tree is unlocked.
+  void _takeActiveUnlessPlaying(DwMediaSession session) {
+    _whenUnlocked(() {
+      if (session.isDisposed) return;
       final current = _active.value;
       if (current == null || !current.playback.value.isPlaying) {
         _active.value = session;
       }
-    }
-    session._open(autoplay: session.options.autoplayOnOpen);
-    return session;
+    });
   }
 
   /// A session the mini-player's close only hid is reachable by opening its
@@ -190,14 +199,19 @@ final class DwMediaSessionManager {
     }
   }
 
+  /// A tap claims at once; autoplay from an open in `initState` claims
+  /// once the tree is unlocked.
   void _claim(DwMediaSession session) {
-    _active.value = session;
-    if (!session.options.singleActiveItem) return;
-    for (final other in _sessions) {
-      if (!identical(other, session) && !other.isDisposed) {
-        unawaited(other.pause());
+    _whenUnlocked(() {
+      if (session.isDisposed) return;
+      _active.value = session;
+      if (!session.options.singleActiveItem) return;
+      for (final other in _sessions) {
+        if (!identical(other, session) && !other.isDisposed) {
+          unawaited(other.pause());
+        }
       }
-    }
+    });
   }
 
   void _release(DwMediaSession session) {
