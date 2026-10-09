@@ -147,6 +147,29 @@ production:
     expectValuesHidden(result, [oldA, newA]);
   });
 
+  test('leaves server-empty keys out of the ready command', () async {
+    const localA = 'local-empty-sentinel';
+    const localB = 'local-differing-sentinel';
+    const serverB = 'server-differing-sentinel';
+    writeLocal("staging:\n  A: '$localA'\n  B: '$localB'\n");
+    File(store.file).writeAsStringSync("A=''\nB='$serverB'\n");
+
+    final reported = await pull();
+
+    expect(reported.code, 0);
+    expect(reported.out, contains('values differ: B'));
+    expect(reported.out, contains('server empty: A'));
+    expect(reported.out, contains('--env staging --overwrite B"'));
+    expect(reported.out, isNot(contains('--overwrite A,B')));
+
+    final applied = await pull(overwrite: {'B'});
+
+    expect(applied.code, 0);
+    expect(local.read()!['staging'], {'A': localA, 'B': serverB});
+    expectValuesHidden(reported, [localA, localB, serverB]);
+    expectValuesHidden(applied, [localA, localB, serverB]);
+  });
+
   test('dry run prints the overwrite plan and changes no bytes', () async {
     const oldA = 'local-dry-sentinel';
     const newA = 'server-dry-sentinel';
@@ -211,6 +234,8 @@ production:
     final result = await pull(overwrite: {'A'});
 
     expect(result.code, 1);
+    expect(result.out, isNot(contains('overwrite: A')));
+    expect(result.out, contains('server empty: A'));
     expect(result.err, contains('A'));
     expect(local.file.readAsBytesSync(), before);
     expectValuesHidden(result, [localA]);

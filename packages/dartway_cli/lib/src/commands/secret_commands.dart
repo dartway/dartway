@@ -862,6 +862,7 @@ Future<int> runSecretPull({
   final additions = <String, String>{};
   final replacements = <String, String>{};
   final differing = <String>[];
+  final serverEmpty = <String>[];
   final refused = <String>[];
   for (final entry in remote.entries) {
     final localValue = localSection[entry.key];
@@ -870,12 +871,11 @@ Future<int> runSecretPull({
     if (localValue == null || (localValue.isEmpty && entry.value.isNotEmpty)) {
       additions[entry.key] = entry.value;
     } else if (localValue != entry.value) {
-      if (overwrite.contains(entry.key)) {
-        if (entry.value.isEmpty) {
-          refused.add(entry.key);
-        } else {
-          replacements[entry.key] = entry.value;
-        }
+      if (entry.value.isEmpty) {
+        serverEmpty.add(entry.key);
+        if (overwrite.contains(entry.key)) refused.add(entry.key);
+      } else if (overwrite.contains(entry.key)) {
+        replacements[entry.key] = entry.value;
       } else {
         differing.add(entry.key);
       }
@@ -885,8 +885,9 @@ Future<int> runSecretPull({
       localSection.keys.where((key) => !remote.containsKey(key)).toList()
         ..sort();
   final addedNames = additions.keys.toList()..sort();
-  final overwrittenNames = {...replacements.keys, ...refused}.toList()..sort();
+  final overwrittenNames = replacements.keys.toList()..sort();
   differing.sort();
+  serverEmpty.sort();
   refused.sort();
 
   stdout.writeln('Compare ${store.file} with ${local.file.path}');
@@ -901,6 +902,11 @@ Future<int> runSecretPull({
         '  Take the server values with "dartway secret pull --env '
         '$environment --overwrite ${differing.join(',')}".',
       );
+  }
+  if (serverEmpty.isNotEmpty) {
+    stdout.writeln(
+      '  server empty: ${serverEmpty.join(', ')} — push the local value instead',
+    );
   }
   if (localOnly.isNotEmpty) {
     stdout.writeln('  local only: ${localOnly.join(', ')}');
