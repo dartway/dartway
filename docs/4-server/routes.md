@@ -45,8 +45,11 @@ a path that does not start with `/`, or on the same method and path declared twi
 A route's `ctx` is a `DwCallContext` ([handlers](handlers-and-context.md#dwcallcontext)):
 `ctx.db`, `ctx.transaction`, `ctx.publish`, `ctx.jobs`, `ctx.accounts`, `ctx.files`, `ctx.log`. A
 route may publish and enqueue jobs. It does **not** run in a transaction: `ctx.db` is the pool, so a
-route that writes more than one row opens `ctx.transaction`. Publications are delivered when the
-route answers.
+route that writes more than one row opens `ctx.transaction`. That transaction is retried on a
+deadlock or a serialization failure, up to three attempts, like a command's
+([database](database.md#transactions)): its body may run more than once, so a call to another
+service belongs before or after it, not inside. Publications are delivered when the route answers;
+one made before the transaction is delivered once, whatever the retries.
 
 ## `DwHttpRequest` and `DwHttpResponse`
 

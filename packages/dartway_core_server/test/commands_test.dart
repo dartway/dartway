@@ -203,6 +203,30 @@ void main() {
       },
     );
 
+    test('a non-transactional command whose transaction loses a conflict '
+        'answers its value, silently', () async {
+      final incidents = harness().app.alerts.incidents.length;
+      final answer = await harness().caller().call(
+        const CountOutside('conflict-outside'),
+      );
+      expect(answer.value(const CountOutside('')), 1);
+      expect(await executions('conflict-outside'), 1);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(harness().app.alerts.incidents.length, incidents);
+    });
+
+    test('a transaction nested in a command runs once per attempt of the '
+        'command\'s own', () async {
+      final answer = await harness().caller().call(
+        const Count('nested', mode: 'nestedConflictOnce'),
+      );
+      expect(answer.value(const Count('')), 1);
+      // The savepoint let the conflict rise: the command's transaction ran
+      // again, not the savepoint alone.
+      expect(harness().app.transactionRuns, containsPair('nested/outer', 2));
+      expect(harness().app.transactionRuns, containsPair('nested/nested', 2));
+    });
+
     test('the same key with another command type is a conflict', () async {
       final caller = harness().caller();
       await caller.call(const Count('typed'), key: 'r4');

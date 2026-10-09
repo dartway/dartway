@@ -277,7 +277,12 @@ final class DwJobRunner {
         job: DwJobAttempt(name: job.name, attempt: 1, maxAttempts: 1),
       );
       try {
-        await ctx.transaction((_) => job.handle(ctx));
+        // A savepoint, which does not retry by itself: a conflict re-runs
+        // the handler here rather than waiting for the next slot.
+        await dwRetryingTransaction(
+          ctx,
+          () => ctx.transaction((_) => job.handle(ctx)),
+        );
         await tx.execute(
           'UPDATE dw_recurring_job SET next_run_at = @next, '
           'last_run_at = @now::timestamptz, last_error = NULL '
@@ -355,8 +360,12 @@ final class DwJobRunner {
       );
       try {
         // A savepoint: a failing handler leaves the claim transaction usable
-        // for recording the failure under the same row lock.
-        await ctx.transaction((_) => job.run(ctx, payload));
+        // for recording the failure under the same row lock. A conflict
+        // re-runs the handler here before an attempt is spent.
+        await dwRetryingTransaction(
+          ctx,
+          () => ctx.transaction((_) => job.run(ctx, payload)),
+        );
         await tx.execute(
           'DELETE FROM dw_job WHERE id = @id',
           params: {'id': id},

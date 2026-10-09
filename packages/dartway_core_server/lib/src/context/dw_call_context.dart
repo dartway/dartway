@@ -12,6 +12,7 @@ import '../channels/dw_channel_rules.dart';
 import '../files/dw_file_service.dart';
 import '../jobs/dw_job_queue.dart';
 import '../outbound/dw_outbound_http.dart';
+import '../server/dw_runtime.dart';
 import '../server/dw_server_clock.dart';
 import '../server/dw_server_module.dart';
 import '../settings/dw_settings_store.dart';
@@ -100,6 +101,13 @@ abstract class DwCallContext {
   /// Runs [body] in a transaction (a savepoint when already inside one).
   /// Publications, revocations and jobs made inside it take effect only when
   /// it commits.
+  ///
+  /// A top-level transaction that loses a deadlock or a serialization
+  /// failure is rolled back and run again, up to three times in all, with
+  /// [memo] forgotten between attempts; a savepoint lets the conflict rise to
+  /// the top-level one. So [body] may run more than once and must do nothing
+  /// that a retry would repeat outside the database — an outbound call
+  /// belongs after the transaction, not inside it.
   Future<T> transaction<T>(Future<T> Function(DwDatabaseHandle tx) body);
 
   /// Sends [item] (a data object or a `DwDeletedObject`) to [channel] once
@@ -434,7 +442,15 @@ final class DwRuntimeContext extends DwCallContext {
   DwDatabaseHandle get db => _current.db;
 
   @override
-  Future<T> transaction<T>(Future<T> Function(DwDatabaseHandle tx) body) async {
+  Future<T> transaction<T>(Future<T> Function(DwDatabaseHandle tx) body) {
+    // Only a transaction this context really opens is retried: a savepoint
+    // lets the conflict rise to the outermost level, so retries never
+    // multiply.
+    if (_current.db.inTransaction) return _open(body);
+    return dwRetryingTransaction(this, () => _open(body));
+  }
+
+  Future<T> _open<T>(Future<T> Function(DwDatabaseHandle tx) body) async {
     final parent = _current;
     late _Scope scope;
     final result = await parent.db.transaction((tx) {
@@ -448,11 +464,11 @@ final class DwRuntimeContext extends DwCallContext {
     return result;
   }
 
-  /// Forgets per-call state before a transaction is retried.
-  void resetForRetry() {
-    _memo.clear();
-    _root.effects.clear();
-  }
+  /// Forgets what [memo] holds before a transaction is retried: a value
+  /// computed inside the failed attempt may no longer be true. Effects are
+  /// not touched — the failed transaction's were never absorbed, and the
+  /// root's were made before it and must survive the retry.
+  void forgetMemo() => _memo.clear();
 
   @override
   void publish(

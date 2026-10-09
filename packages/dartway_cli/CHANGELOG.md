@@ -2,6 +2,11 @@
 
 ## 0.24.0
 
+- Deploy: the output mask also replaces a stored value in the RFC 3986 userinfo form that
+  `Uri(userInfo:)` produces (sub-delims and `:` kept, the rest percent-encoded), so a password
+  logged inside a connection URL such as `postgres://app:p%40ss$word@db` is masked. The deploy
+  guide names the forms the mask covers; other partial encodings are not recognised (#455).
+
 - Deploy: the first certificate issuance moves the self-signed certificate of `deploy setup` aside
   instead of deleting it, and puts it back when certbot fails (Let's Encrypt down, a rate limit,
   DNS not pointed yet). The step still fails, but nginx keeps a certificate to start with at its
