@@ -78,8 +78,13 @@ final class DwFileClient {
 
   /// A link to read file [fileId]: a short-lived one for a private file, its
   /// URL for a public one. Fetch it when the file is about to be shown.
-  Future<DwCallResult<DwFileLink>> getLink(int fileId) =>
-      _client.fetch(DwGetFileLink(fileId: fileId));
+  ///
+  /// With [download] the link has a browser save the file rather than show
+  /// it; it is then always short-lived, a public file's too.
+  Future<DwCallResult<DwFileLink>> getLink(
+    int fileId, {
+    bool download = false,
+  }) => _client.fetch(DwGetFileLink(fileId: fileId, download: download));
 
   Future<void> _put(
     DwUploadTicket ticket,

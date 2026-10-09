@@ -723,6 +723,10 @@ List<_WireShape> _wireShapes() {
     ),
     dto('dto.getFileLink', const DwGetFileLink(fileId: 11)),
     dto(
+      'dto.getFileLink.download',
+      const DwGetFileLink(fileId: 11, download: true),
+    ),
+    dto(
       'dto.fileLink',
       DwFileLink(
         id: 11,

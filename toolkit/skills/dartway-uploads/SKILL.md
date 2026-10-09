@@ -58,6 +58,7 @@ Public files are never asked.
 - **Public URLs in batch**, in the `_objects` mapper: `ctx.files.publicUrls(fileIds)` once per list
   (guard the empty set); the data object carries the URL. **Private files**: the data object carries the
   id; the app asks `dw.files.getLink(id)` when opening, inside `dw.action` — never stored, never watched.
+  A Save button asks `dw.files.getLink(id, download: true)` and opens the URL — never a Blob fetch.
   Names and sizes for a list: `ctx.files.describe(fileIds)` — never SQL on `dw_stored_file`.
 - **A replaced or cleared file is deleted**: `ctx.files.delete(previous)` — the row in the command's
   transaction, the object by a job after commit. `delete` and `store` run in a command, a job or a hook;

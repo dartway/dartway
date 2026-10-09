@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- A file link asked with `DwGetFileLink(download: true)` answers `Content-Disposition: attachment`
+  with the file's name, and is always presigned and expiring — a public file's too, since its
+  permanent URL cannot carry the disposition. Without the flag nothing changes (dartway/dartway#481).
+
 - Test databases and storage buckets read optional `DW_TEST_RUN_ID` for run-scoped names,
   allowing CLI cleanup after interrupted suites; plain `dart test` naming is unchanged (#463).
   S3 requests support literal IPv6 loopback endpoints for explicit test servers; cleanup

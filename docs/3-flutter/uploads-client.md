@@ -69,7 +69,7 @@ final result = await dw.files.upload(
 ```dart
 // example/dartway_example_flutter/lib/app/chat/logic/chat_files.dart
 static Future<String> linkOf(ChatAttachment attachment) async =>
-    (await dw.files.getLink(attachment.id)).valueOrThrow.url;
+    (await dw.files.getLink(attachment.id, download: true)).valueOrThrow.url;
 
 // …and the tile that opens it, in the feature's widgets/
 onTap: () => dw.action(
@@ -84,6 +84,11 @@ A refused link is shown by `dw.action` like any refusal; the widget reads no res
 short-lived presigned one for a private file. **Fetch it when the file is about to be shown**, do not
 store or watch it — a private link expires, and it is a credential. A public `DwStoredFile` also carries
 its `url` directly; a private one has `url == null`.
+
+**A Save button** calls `getLink(fileId, download: true)` and opens the URL: the link answers with
+`Content-Disposition: attachment`, so the browser saves the file under its name instead of showing
+it — no fetch into a Blob, no CORS on the bucket. A download link is always short-lived and presigned,
+a public file's too.
 
 ## `dw.uploader()`: an upload slot for a screen
 

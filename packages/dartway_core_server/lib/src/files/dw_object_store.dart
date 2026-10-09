@@ -120,21 +120,26 @@ final class DwObjectStore {
   }
 
   /// A URL anyone holding it can read [key] in [bucket] with until [expires]
-  /// passes. [fileName] becomes the name a browser saves the file under.
+  /// passes. [fileName] becomes the name a browser saves the file under;
+  /// [attachment] has the browser save the file rather than show it.
   Uri presignGet({
     required String bucket,
     required String key,
     required Duration expires,
     required DateTime time,
     String? fileName,
+    bool attachment = false,
   }) {
     final path = _path(bucket, key);
     final query = _signer.presignedQuery(
       method: 'GET',
       path: path,
       query: [
-        if (fileName != null)
-          ('response-content-disposition', _inlineDisposition(fileName)),
+        if (fileName != null || attachment)
+          (
+            'response-content-disposition',
+            _disposition(fileName, attachment: attachment),
+          ),
       ],
       headers: [('host', _host(bucket))],
       expires: expires,
@@ -143,11 +148,13 @@ final class DwObjectStore {
     return _url(bucket, path, query);
   }
 
-  /// `inline` with the name in both forms of RFC 6266: an ASCII fallback for
-  /// old clients, and the exact UTF-8 name.
-  static String _inlineDisposition(String fileName) {
+  /// `attachment` or `inline`, with the name in both forms of RFC 6266: an
+  /// ASCII fallback for old clients, and the exact UTF-8 name.
+  static String _disposition(String? fileName, {required bool attachment}) {
+    final type = attachment ? 'attachment' : 'inline';
+    if (fileName == null) return type;
     final ascii = fileName.replaceAll(RegExp(r'[^\x20-\x7e]|["\\]'), '_');
-    return 'inline; filename="$ascii"; '
+    return '$type; filename="$ascii"; '
         "filename*=UTF-8''${DwSigV4Signer.encode(fileName)}";
   }
 

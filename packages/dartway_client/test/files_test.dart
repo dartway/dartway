@@ -627,4 +627,19 @@ void main() {
     expect(link.expiresAt, isNotNull);
     expect((await client.files.getLink(999)), isA<DwCallRefused<DwFileLink>>());
   });
+
+  test('getLink asks for a download when told to', () async {
+    final file = (await upload(DwUploadSource.bytes(bytes(5)))).valueOrNull!;
+    final shown = (await client.files.getLink(file.id)).valueOrNull!;
+    expect(shown.url, isNot(contains('disposition=attachment')));
+    final saved = (await client.files.getLink(
+      file.id,
+      download: true,
+    )).valueOrNull!;
+    expect(saved.url, endsWith('&disposition=attachment'));
+    expect(
+      server.requestsOf<DwGetFileLink>().last,
+      DwGetFileLink(fileId: file.id, download: true),
+    );
+  });
 }
