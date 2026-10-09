@@ -16,6 +16,21 @@ List<String> _ids(DwDeployRunner runner) =>
     runner.steps(skipGitUpdate: false).map((step) => step.id).toList();
 
 void main() {
+  test(
+    'a pinned checkout stops when its deployment directory is unavailable',
+    () async {
+      final ssh = RecordingSsh();
+      final runner = DwDeployRunner(ssh: ssh, stack: stackFrom());
+
+      await runner.updateCheckout('abcdef1');
+
+      expect(
+        ssh.issued.single,
+        contains("cd '\\''/home/deployer/shop'\\'' || exit \$?\n"),
+      );
+    },
+  );
+
   group('the order of a deployment', () {
     final runner = DwDeployRunner(
       ssh: RecordingSsh(),
@@ -842,6 +857,105 @@ esac
       final result = await bridge();
       expect(result.ok, isTrue);
       expect(checkout.listSync(), isEmpty);
+    });
+  });
+
+  group('revision-pinned checkout', () {
+    late Directory temp;
+    late Directory remote;
+    late Directory source;
+    late Directory checkout;
+    late DwDeployRunner runner;
+    late String sha1;
+    late String sha2;
+
+    String git(Directory directory, List<String> arguments) {
+      final result = Process.runSync(
+        'git',
+        arguments,
+        workingDirectory: directory.path,
+      );
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+      return (result.stdout as String).trim();
+    }
+
+    setUp(() {
+      temp = Directory.systemTemp.createTempSync('dw_revision_');
+      remote = Directory(p.join(temp.path, 'remote.git'))..createSync();
+      git(remote, ['init', '--bare']);
+      source = Directory(p.join(temp.path, 'source'))..createSync();
+      git(source, ['init', '-b', 'master']);
+      git(source, ['config', 'user.name', 'DartWay test']);
+      git(source, ['config', 'user.email', 'test@example.com']);
+      File(p.join(source.path, 'value')).writeAsStringSync('one');
+      git(source, ['add', 'value']);
+      git(source, ['commit', '-m', 'one']);
+      sha1 = git(source, ['rev-parse', 'HEAD']);
+      git(source, ['remote', 'add', 'origin', remote.path]);
+      git(source, ['push', '-u', 'origin', 'master']);
+      checkout = Directory(p.join(temp.path, 'checkout'));
+      final clone = Process.runSync('git', [
+        'clone',
+        remote.path,
+        checkout.path,
+      ]);
+      expect(clone.exitCode, 0, reason: clone.stderr);
+      File(p.join(source.path, 'value')).writeAsStringSync('two');
+      git(source, ['commit', '-am', 'two']);
+      sha2 = git(source, ['rev-parse', 'HEAD']);
+      git(source, ['push']);
+      runner = DwDeployRunner(
+        ssh: LocalShell(),
+        stack: stackFrom(),
+        appDir: checkout.path,
+      );
+    });
+
+    tearDown(() => temp.deleteSync(recursive: true));
+
+    test('deploys the requested ancestor after the remote tip moves', () async {
+      final result = await runner.updateCheckout(sha1);
+      expect(result.ok, isTrue, reason: result.stderr);
+      expect(git(checkout, ['rev-parse', 'HEAD']), sha1);
+    });
+
+    test('refuses a commit that is not on the remote branch', () async {
+      git(source, ['checkout', '--orphan', 'other']);
+      git(source, ['rm', '-rf', '.']);
+      File(p.join(source.path, 'other')).writeAsStringSync('other');
+      git(source, ['add', 'other']);
+      git(source, ['commit', '-m', 'other']);
+      final other = git(source, ['rev-parse', 'HEAD']);
+      git(source, ['push', 'origin', 'other']);
+      git(checkout, ['fetch', 'origin', 'other']);
+      final before = git(checkout, ['rev-parse', 'HEAD']);
+      final result = await runner.updateCheckout(other);
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('revision-not-on-branch'));
+      expect(git(checkout, ['rev-parse', 'HEAD']), before);
+    });
+
+    test('refuses an unknown revision', () async {
+      final before = git(checkout, ['rev-parse', 'HEAD']);
+      final result = await runner.updateCheckout(List.filled(40, 'f').join());
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('revision-not-found'));
+      expect(git(checkout, ['rev-parse', 'HEAD']), before);
+    });
+
+    test('refuses to move backwards from a deployed descendant', () async {
+      expect((await runner.updateCheckout(sha2)).ok, isTrue);
+      final result = await runner.updateCheckout(sha1);
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('superseded'));
+      expect(git(checkout, ['rev-parse', 'HEAD']), sha2);
+    });
+
+    test('allows redeploying the current revision', () async {
+      expect((await runner.updateCheckout(sha2)).ok, isTrue);
+      final result = await runner.updateCheckout(sha2);
+      expect(result.ok, isTrue, reason: result.stderr);
+      expect(git(checkout, ['rev-parse', 'HEAD']), sha2);
     });
   });
 }

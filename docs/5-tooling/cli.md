@@ -400,11 +400,14 @@ cd <project>_flutter
 dart run dartway_cli:dartway deploy setup --env staging
 dart run dartway_cli:dartway deploy check --env staging
 dart run dartway_cli:dartway deploy run   --env staging
+dart run dartway_cli:dartway deploy run   --env staging --revision "$GITHUB_SHA"
 dartway secret set SMS_API_TOKEN --env staging
 ```
 
 `setup` provisions a server and renders its Compose and Nginx configuration, `run` deploys, and
-`check` asserts that a deployment would work without changing anything. Everything is
+`check` asserts that a deployment would work without changing anything. `run --revision <sha>`
+pins a CI deployment to its verified commit and refuses if the server has already moved past it.
+Everything is
 described by `deploy/config.yaml`. The whole story is [Deploying the server](deploy.md).
 
 ## `dartway secret` — the values that are not in Git

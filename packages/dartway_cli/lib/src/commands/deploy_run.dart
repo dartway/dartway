@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:args/command_runner.dart';
 
 import '../checker/dw_check_type.dart';
 import '../deploy/deploy_check.dart';
@@ -36,6 +37,8 @@ Future<int> runDeploy(
           : DwDeployProgress.text());
   final out = report.human;
   final resume = results.flag('resume');
+  final revision = results.option('revision');
+  validateDeployRevision(results);
 
   int finish(int code, {String? failedStep, String? reason}) {
     report.event('run_finished', {
@@ -65,15 +68,19 @@ Future<int> runDeploy(
     },
   );
   final runner = DwDeployRunner(ssh: ssh, stack: stack, remote: remote);
-  var steps = runner.steps(skipGitUpdate: results.flag('skip-git-update'));
+  var steps = runner.steps(
+    skipGitUpdate: results.flag('skip-git-update'),
+    revision: revision,
+  );
 
   out
     ..writeln('Deploy [$environment]${resume ? ' — resuming' : ''}')
     ..writeln(
       '  server:  $sshUser@${target.host}, runs as ${target.deployUser}',
     )
-    ..writeln('  branch:  ${target.branch}')
-    ..writeln('  dir:     ${target.appDir}');
+    ..writeln('  branch:  ${target.branch}');
+  if (revision != null) out.writeln('  revision: $revision');
+  out.writeln('  dir:     ${target.appDir}');
 
   // The working-copy checks are cheap and catch the mismatches that otherwise
   // surface as a half-deployed server.
@@ -140,6 +147,7 @@ Future<int> runDeploy(
   }
 
   Map<String, DwRemoteStepRecord>? record;
+  var resumeVerifiedCheckout = false;
   if (resume) {
     try {
       record = await remote.read();
@@ -159,11 +167,41 @@ Future<int> runDeploy(
     // never saw.
     final planned = record.keys.toList();
     steps = [for (final id in planned) ...steps.where((step) => step.id == id)];
+    final checkout = record['update-checkout'];
+    if (revision != null && checkout == null) {
+      report.problems.writeln(
+        'Cannot resume with --revision: the recorded deployment did not '
+        'update the checkout.',
+      );
+      return finish(
+        1,
+        failedStep: 'update-checkout',
+        reason: 'revision-mismatch',
+      );
+    }
+    if (revision != null && checkout!.succeeded) {
+      final deployed = await runner.deployedRevision();
+      final head = deployed.stdout.trim().split('\n').first;
+      if (!deployed.ok ||
+          !head.toLowerCase().startsWith(revision.toLowerCase())) {
+        report.problems.writeln(
+          'Cannot resume: server HEAD ${head.isEmpty ? '<unknown>' : head} '
+          'does not match revision $revision.',
+        );
+        return finish(
+          1,
+          failedStep: 'update-checkout',
+          reason: 'revision-mismatch',
+        );
+      }
+      resumeVerifiedCheckout = true;
+    }
   }
 
   report.event('run_started', {
     'environment': environment,
     'resume': resume,
+    'revision': ?revision,
     'steps': _stepList(steps),
   });
 
@@ -189,11 +227,25 @@ Future<int> runDeploy(
     remote: remote,
     resumeFrom: record,
     retryFailed: results.flag('retry-failed'),
+    retryFailedStepIds: revision == null ? const {} : const {'update-checkout'},
+    trustedSucceededStepIds: resumeVerifiedCheckout
+        ? const {'update-checkout'}
+        : const {},
     progress: report,
     onUpdated: reportRevision,
   );
   if (failedStep != null) {
-    return finish(1, failedStep: failedStep);
+    String? reason;
+    if (failedStep == 'update-checkout' && revision != null) {
+      final failed = await remote.collect(failedStep);
+      final output = '${failed.stdout}\n${failed.stderr}';
+      reason = const [
+        'revision-not-found',
+        'revision-not-on-branch',
+        'superseded',
+      ].where(output.contains).firstOrNull;
+    }
+    return finish(1, failedStep: failedStep, reason: reason);
   }
 
   out.writeln('\nServices');
@@ -233,6 +285,8 @@ Future<String?> executeDeploySteps(
   DwRemoteSteps? remote,
   Map<String, DwRemoteStepRecord>? resumeFrom,
   bool retryFailed = false,
+  Set<String> retryFailedStepIds = const {},
+  Set<String> trustedSucceededStepIds = const {},
   DwDeployProgress? progress,
 }) async {
   final report = progress ?? DwDeployProgress.text();
@@ -245,7 +299,9 @@ Future<String?> executeDeploySteps(
     final step = steps[index];
     final position = {'index': index + 1, 'count': steps.length, 'id': step.id};
     final previous = passingOver ? resumeFrom![step.id] : null;
-    if (previous != null && previous.succeeded && step.verdict == null) {
+    if (previous != null &&
+        previous.succeeded &&
+        (step.verdict == null || trustedSucceededStepIds.contains(step.id))) {
       out.writeln(
         '\n[${index + 1}/${steps.length}] ${step.title} — done by the run '
         'being resumed',
@@ -263,6 +319,7 @@ Future<String?> executeDeploySteps(
         remote != null &&
         previous != null &&
         !retryFailed &&
+        !retryFailedStepIds.contains(step.id) &&
         (previous.state == DwRemoteStepState.rejected ||
             (previous.state == DwRemoteStepState.exited &&
                 !previous.succeeded));
@@ -375,6 +432,21 @@ Future<String?> executeDeploySteps(
     }
   }
   return null;
+}
+
+/// Validates the revision options before deployment can open an SSH
+/// connection.
+void validateDeployRevision(ArgResults results) {
+  final revision = results.option('revision');
+  if (revision != null && !RegExp(r'^[0-9a-fA-F]{7,64}$').hasMatch(revision)) {
+    throw UsageException('--revision must be 7–64 hexadecimal characters.', '');
+  }
+  if (revision != null && results.flag('skip-git-update')) {
+    throw UsageException(
+      '--revision cannot be used with --skip-git-update.',
+      '',
+    );
+  }
 }
 
 /// Prints the outside verification and answers the exit code.
