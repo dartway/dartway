@@ -494,7 +494,10 @@ dw_certificate_coverage() {
   /// this replaces the bootstrap certificate with a real one, and extends a
   /// lineage certbot manages to a host added to the configuration since — a
   /// storage domain, a site. A lineage that already names every host is left
-  /// alone, which keeps a routine deploy off the rate limit.
+  /// alone, which keeps a routine deploy off the rate limit. A failed first
+  /// issuance puts the bootstrap certificate back: nginx reads its
+  /// certificate at every start, and one with none to read does not start
+  /// (#436).
   ///
   /// Runs twice in a deployment ([steps]). First before anything is built or
   /// replaced, through the proxy the previous deploy left running
@@ -514,6 +517,12 @@ dw_certificate_coverage() {
     final domains = target.servedDomains
         .map((domain) => "-d '$domain'")
         .join(' ');
+    final live = '/etc/letsencrypt/live/$certName';
+    final archive = '/etc/letsencrypt/archive/$certName';
+    final renewal = '/etc/letsencrypt/renewal/$certName.conf';
+    // Beside the lineage, on the same volume, where certbot looks for nothing.
+    const stashes = '/etc/letsencrypt/dw-bootstrap';
+    final stash = '$stashes/$certName';
     final request =
         "certbot certonly --webroot -w /var/www/certbot \\\n"
         "    --cert-name '$certName' $domains \\\n"
@@ -556,11 +565,33 @@ esac
 $_certbot "
   set -e
   # certonly refuses to write into an existing live directory, and that
-  # directory is exactly what the bootstrap step created.
-  rm -rf /etc/letsencrypt/live/$certName \\
-         /etc/letsencrypt/archive/$certName \\
-         /etc/letsencrypt/renewal/$certName.conf
-  $request
+  # directory is exactly what the bootstrap step created. It is moved aside
+  # (a rename: the same volume) and put back when no certificate replaces it,
+  # so that a failed issuance still leaves nginx a certificate to start with.
+  # A stash beside a live directory holding no certificate is an earlier run
+  # stopped before it put the bootstrap back.
+  if [ -d $stash ] && [ ! -e $live/fullchain.pem ]; then rm -rf $live; mv $stash $live; fi
+  rm -rf $stash $archive $renewal
+  if [ -d $live ]; then
+    mkdir -p $stashes
+    mv $live $stash
+  fi
+  if ! $request; then
+    if [ -s $renewal ] && [ -r $live/fullchain.pem ]; then
+      rm -rf $stash
+      echo 'ERROR: certbot failed after issuing $certName; the issued certificate is kept' >&2
+      exit 1
+    fi
+    rm -rf $live $archive $renewal
+    if [ -d $stash ]; then
+      mv $stash $live
+      echo 'ERROR: issuance failed; the self-signed certificate is back in place' >&2
+    else
+      echo 'ERROR: issuance failed' >&2
+    fi
+    exit 1
+  fi
+  rm -rf $stash
 " </dev/null
 ''');
   }

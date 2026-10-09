@@ -376,8 +376,9 @@ converges with one `dart run dartway_cli:dartway deploy setup`, followed by
    deploy after the one that renders it. The hosts are read from the certificate Nginx serves, and one that
    already names them all is left alone, so a routine deploy asks Let's Encrypt nothing; a host added
    since (a storage domain, a site) extends the lineage with `--expand`, under the same name; the
-   self-signed certificate of `setup` is replaced by an issued one. Let's Encrypt fails for reasons of
-   its own, and a failure here stops the deploy with the previous version still serving. With no
+   self-signed certificate of `setup` is replaced by an issued one, and a failed first issuance puts
+   the self-signed certificate back. Let's Encrypt fails for reasons of its own, and a failure here
+   stops the deploy with the previous version still serving. With no
    proxy running — a first deploy, a stand that is down — nothing is serving that a failure could
    take down, and the certificate is left to step 13;
 8. builds the images;
@@ -401,8 +402,9 @@ converges with one `dart run dartway_cli:dartway deploy setup`, followed by
    starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this
    stops the deploy before that restart;
 13. makes the certificate cover every served host once more, through the proxy now running: what a
-   first deploy could not ask for at step 7 is issued here. On a routine deploy step 7 has already
-   covered every host, and this asks nothing;
+   first deploy could not ask for at step 7 is issued here, and a failed first issuance puts the
+   self-signed certificate back. On a routine deploy step 7 has already covered every host, and
+   this asks nothing;
 14. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
     a second later on its configuration.
 

@@ -36,6 +36,7 @@ void main() {
   late DwStack stack;
   late DwDeployRunner runner;
   late File asked;
+  late File failing;
   late File projectOverride;
   late String fakeOverride;
 
@@ -58,8 +59,9 @@ void main() {
   ], workingDirectory: dir.path);
 
   /// Runs [script] in a one-off certbot container of the stack, as the step
-  /// does, with [arguments] as its positional parameters.
-  void inCertbot(String script, [List<String> arguments = const []]) {
+  /// does, with [arguments] as its positional parameters; returns what it
+  /// printed.
+  String inCertbot(String script, [List<String> arguments = const []]) {
     final result = compose([
       'run',
       '--rm',
@@ -73,6 +75,7 @@ void main() {
       ...arguments,
     ]);
     if (result.exitCode != 0) fail('certbot container: ${result.stderr}');
+    return result.stdout as String;
   }
 
   /// A lineage the way certbot lays one out — renewal config, archive, live
@@ -113,6 +116,46 @@ CONF
     [stack.target.apiDomain, ...hosts],
   );
 
+  /// The one-day self-signed certificate `deploy setup` writes straight into
+  /// the live directory, with nothing else of a lineage beside it.
+  void bootstrap() => inCertbot(
+    r'''
+set -e
+name=$1
+le=/etc/letsencrypt
+rm -rf "$le/live/$name" "$le/archive/$name" "$le/renewal/$name.conf" "$le/dw-bootstrap/$name"
+mkdir -p "$le/live/$name"
+openssl req -x509 -nodes -newkey rsa:2048 -days 1 \
+  -keyout "$le/live/$name/privkey.pem" \
+  -out "$le/live/$name/fullchain.pem" \
+  -subj "/CN=$name" 2>/dev/null
+''',
+    [stack.target.apiDomain],
+  );
+
+  /// The sha256 of the live certificate and key, `missing` for one absent.
+  String liveBytes() => inCertbot(
+    r'''
+for file in fullchain privkey; do
+  path=/etc/letsencrypt/live/$1/$file.pem
+  if [ -e "$path" ]; then sha256sum <"$path"; else echo missing; fi
+done
+''',
+    [stack.target.apiDomain],
+  );
+
+  /// Which of a lineage's paths exist under the certificate's name, the
+  /// bootstrap's stash among them.
+  List<String> present() => inCertbot(
+    r'''
+le=/etc/letsencrypt
+for path in "live/$1" "archive/$1" "renewal/$1.conf" "dw-bootstrap/$1"; do
+  if [ -e "$le/$path" ]; then echo "$path"; fi
+done
+''',
+    [stack.target.apiDomain],
+  ).split('\n').where((line) => line.isNotEmpty).toList();
+
   setUpAll(() {
     dir = Directory.systemTemp.createTempSync('dw_certificate_');
     project = p.basename(dir.path).toLowerCase();
@@ -125,8 +168,15 @@ CONF
     );
     final fake = Directory(p.join(dir.path, 'fake'))..createSync();
     asked = File(p.join(fake.path, 'asked'));
+    failing = File(p.join(fake.path, 'fail'));
     final certbot = File(p.join(fake.path, 'certbot'))
-      ..writeAsStringSync('#!/bin/sh\necho "\$*" >>/dw-fake/asked\n');
+      ..writeAsStringSync(
+        '#!/bin/sh\n'
+        'echo "\$*" >>/dw-fake/asked\n'
+        // A failing certbot, running first whatever residue the test wants
+        // it to leave behind.
+        'if [ -e /dw-fake/fail ]; then sh /dw-fake/fail; exit 1; fi\n',
+      );
     Process.runSync('chmod', ['+x', certbot.path]);
     projectOverride = File(p.join(dir.path, DwComposeFiles.projectOverride))
       ..createSync(recursive: true);
@@ -209,11 +259,62 @@ services:
         expect(request, contains('-d $host'));
       }
     });
+  });
 
-    test('the bootstrap certificate is replaced by an issued one', () async {
-      inCertbot(
-        'rm -f /etc/letsencrypt/renewal/${stack.target.apiDomain}.conf',
+  // dartway/dartway#436: certonly will not write into the live directory the
+  // bootstrap occupies, and a failed issuance used to leave none at all —
+  // nginx then refused to start at its next restart.
+  group('a first issuance over the bootstrap certificate', () {
+    late final name = stack.target.apiDomain;
+    tearDown(() {
+      if (failing.existsSync()) failing.deleteSync();
+    });
+
+    test('that fails leaves the bootstrap certificate byte for byte', () async {
+      bootstrap();
+      final before = liveBytes();
+      failing.writeAsStringSync('');
+
+      final step = await runner.issueCertificate();
+      expect(step.ok, isFalse);
+      expect(
+        step.stderr,
+        contains('the self-signed certificate is back in place'),
       );
+      expect(askedOfCertbot().single, startsWith('certonly'));
+      expect(liveBytes(), before);
+      expect(liveBytes(), isNot(contains('missing')));
+      expect(present(), ['live/$name']);
+    });
+
+    test('that fails leaving residue puts the bootstrap back without '
+        'it', () async {
+      bootstrap();
+      final before = liveBytes();
+      failing.writeAsStringSync(
+        ': >/etc/letsencrypt/renewal/$name.conf\n'
+        'mkdir -p /etc/letsencrypt/archive/$name\n',
+      );
+
+      final step = await runner.issueCertificate();
+      expect(step.ok, isFalse);
+      askedOfCertbot();
+      expect(liveBytes(), before);
+      expect(present(), ['live/$name']);
+
+      // The next deploy still reads the lineage as unmanaged, and asks for a
+      // new certificate rather than an extension.
+      failing.deleteSync();
+      final next = await runner.issueCertificate();
+      expect(next.ok, isTrue, reason: next.stderr);
+      expect(next.stdout, isNot(contains('extending')));
+      expect(next.stdout, isNot(contains('already manages')));
+      expect(askedOfCertbot().single, isNot(contains('--expand')));
+    });
+
+    test('that succeeds replaces it, and keeps no stash', () async {
+      bootstrap();
+      final before = liveBytes();
 
       final step = await runner.issueCertificate();
       expect(step.ok, isTrue, reason: step.stderr);
@@ -221,6 +322,27 @@ services:
       final request = askedOfCertbot().single;
       expect(request, startsWith('certonly'));
       expect(request, isNot(contains('--expand')));
+      expect(liveBytes(), isNot(before));
+      expect(present(), isNot(contains('dw-bootstrap/$name')));
+    });
+
+    test('after a run stopped with the bootstrap set aside, and failing, '
+        'restores it from the stash', () async {
+      bootstrap();
+      final before = liveBytes();
+      inCertbot(
+        'mkdir -p /etc/letsencrypt/dw-bootstrap && '
+        'mv /etc/letsencrypt/live/\$1 /etc/letsencrypt/dw-bootstrap/\$1',
+        [name],
+      );
+      expect(present(), ['dw-bootstrap/$name']);
+      failing.writeAsStringSync('');
+
+      final step = await runner.issueCertificate();
+      expect(step.ok, isFalse);
+      askedOfCertbot();
+      expect(liveBytes(), before);
+      expect(present(), ['live/$name']);
     });
   });
 
