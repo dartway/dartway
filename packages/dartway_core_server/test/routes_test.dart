@@ -9,6 +9,17 @@ import 'support/test_app.dart';
 /// Project routes: external doors on the same port, over the framework's own
 /// HTTP types.
 void main() {
+  Future<int> bump(DwDatabaseHandle db, String label) async => (await db.query(
+    'INSERT INTO counter (label, n) VALUES (@label, 1) '
+    'ON CONFLICT (label) DO UPDATE SET n = counter.n + 1 RETURNING n',
+    params: {'label': label},
+  )).single.get<int>('n');
+
+  /// Label → how many times the transaction of `/conflicted` ran for it, and
+  /// how many times its memoised value was computed.
+  final attempts = <String, int>{};
+  final computed = <String, int>{};
+
   final harness = useHarness(
     build: (app, config) => app.server(
       config,
@@ -43,6 +54,35 @@ void main() {
           final note = await TestApp.insertNote(ctx.db, 'from a route');
           ctx.publish(const DwLiveChannel(TestChannel.public), note);
           return DwHttpResponse.empty(status: 202);
+        }),
+        // Loses its first `conflicts` transactions: to a serialization
+        // failure, or to a deadlock the database itself raises.
+        DwHttpRoute.post('/conflicted', (ctx, request) async {
+          final label = request.query['label']!;
+          final conflicts = int.parse(request.query['conflicts'] ?? '1');
+          // Before the transaction, so outside what a retry repeats.
+          final before = await bump(ctx.db, '$label/before');
+          final note = await TestApp.insertNote(ctx.db, 'before $label');
+          ctx.publish(const DwLiveChannel(TestChannel.public), note);
+          final (n, memo) = await ctx.transaction((tx) async {
+            final n = await bump(tx, label);
+            final memo = ctx.memo(
+              #conflicted,
+              () => computed[label] = (computed[label] ?? 0) + 1,
+            );
+            final attempt = attempts[label] = (attempts[label] ?? 0) + 1;
+            if (attempt <= conflicts) {
+              if (request.query['deadlock'] == 'true') {
+                await tx.execute(
+                  r"DO $$ BEGIN RAISE EXCEPTION 'deadlock' "
+                  r"USING ERRCODE = '40P01'; END $$",
+                );
+              }
+              throw DwSerializationFailure('could not serialize access');
+            }
+            return (n, memo);
+          });
+          return DwHttpResponse.json({'before': before, 'n': n, 'memo': memo});
         }),
         DwHttpRoute.get(
           '/refuse',
@@ -151,6 +191,83 @@ void main() {
     expect((await caller.raw('POST', '/publish')).status, 202);
     final update = await live.expect<DwUpdateMessage>();
     expect((update.updates.objects.single as NoteView).text, 'from a route');
+  });
+
+  group('a transaction that loses a conflict runs again', () {
+    Future<DwTestAnswer> conflicted(
+      String label, {
+      int conflicts = 1,
+      bool deadlock = false,
+    }) => caller.raw(
+      'POST',
+      '/conflicted',
+      query: {
+        'label': label,
+        'conflicts': '$conflicts',
+        if (deadlock) 'deadlock': 'true',
+      },
+    );
+
+    Future<int> written(String label) async {
+      final rows = await harness().db.query(
+        'SELECT n FROM counter WHERE label = @label',
+        params: {'label': label},
+      );
+      return rows.isEmpty ? 0 : rows.single.get<int>('n');
+    }
+
+    test('after a serialization failure: answered once, written once, '
+        'silently', () async {
+      final incidents = harness().app.alerts.incidents.length;
+      final answer = await conflicted('serialization');
+      expect(answer.status, 200);
+      expect(answer.json, {'before': 1, 'n': 1, 'memo': 2});
+      expect(attempts['serialization'], 2);
+      expect(await written('serialization'), 1);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(harness().app.alerts.incidents.length, incidents);
+    });
+
+    test('after a deadlock the database raises', () async {
+      final incidents = harness().app.alerts.incidents.length;
+      final answer = await conflicted('deadlock', deadlock: true);
+      expect(answer.status, 200);
+      expect(answer.json, {'before': 1, 'n': 1, 'memo': 2});
+      expect(await written('deadlock'), 1);
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+      expect(harness().app.alerts.incidents.length, incidents);
+    });
+
+    test(
+      'while what the route did before it is done and delivered once',
+      () async {
+        final (_, session) = await harness().signedIn('route-c@example.com');
+        final live = await harness().live(token: session.token);
+        expect(await live.subscribe('public'), isA<DwSubscribedMessage>());
+        final answer = await conflicted('before');
+        expect(answer.status, 200);
+        expect(await written('before/before'), 1);
+        final update = await live.expect<DwUpdateMessage>();
+        expect(
+          (update.updates.objects.single as NoteView).text,
+          'before before',
+        );
+        await live.expectSilence();
+      },
+    );
+
+    test('until it has lost three times: then 500 with an incident', () async {
+      final answer = await conflicted('always', conflicts: 3);
+      expect(answer.status, 500);
+      expect(attempts['always'], 3);
+      expect(await written('always'), 0);
+      final incident = (answer.json! as Map)['incident'];
+      await eventually(
+        () => harness().app.alerts.incidents.any(
+          (i) => i.id == incident && i.where == 'route POST /conflicted',
+        ),
+      );
+    });
   });
 
   test('a refusal answers its call status with the refusal, a failure 500 '

@@ -194,6 +194,16 @@ final class TestApp {
   /// `ctx.job` as each run of `flaky` saw it: `attempt/max:isLast`.
   final List<String> jobAttempts = [];
 
+  /// `tag:attempt` as each run of `conflicted` saw it.
+  final List<String> conflictedRuns = [];
+
+  /// How many runs of the recurring `tick` should still lose a conflict.
+  int tickConflicts = 0;
+
+  /// `label/outer` and `label/nested` → how many times the transaction of
+  /// `Count(mode: nestedConflictOnce)` and the one nested in it ran.
+  final Map<String, int> transactionRuns = {};
+
   /// Held open by the `announced` job after its transaction commits, until a
   /// test completes it.
   Completer<void> jobGate = Completer();
@@ -357,6 +367,9 @@ final class TestApp {
   ]) async => [
     for (final row in await db.query(sql, params: params)) _note(row),
   ];
+
+  void _ran(String key) =>
+      transactionRuns[key] = (transactionRuns[key] ?? 0) + 1;
 
   Future<int> _count(DwDatabaseHandle db, String label) async =>
       (await db.query(
@@ -662,6 +675,16 @@ final class TestApp {
             throw StateError('first execution fails');
           case 'conflictOnce' when failedOnce.add(command.label):
             throw DwSerializationFailure('could not serialize access');
+          case 'nestedConflictOnce':
+            _ran('${command.label}/outer');
+            // A savepoint: the conflict rises to the command's transaction,
+            // which is the one that runs again.
+            await ctx.transaction((tx) async {
+              _ran('${command.label}/nested');
+              if (failedOnce.add(command.label)) {
+                throw DwSerializationFailure('could not serialize access');
+              }
+            });
         }
         return n;
       },
@@ -671,7 +694,14 @@ final class TestApp {
       transactional: false,
       handle: (ctx, command) async {
         if (ctx.db.inTransaction) throw StateError('expected no transaction');
-        final n = await ctx.transaction((tx) => _count(tx, command.label));
+        final n = await ctx.transaction((tx) async {
+          final n = await _count(tx, command.label);
+          if (command.label.startsWith('conflict') &&
+              failedOnce.add(command.label)) {
+            throw DwSerializationFailure('could not serialize access');
+          }
+          return n;
+        });
         final note = await ctx.transaction(
           (tx) => insertNote(tx, 'outside ${command.label}'),
         );
@@ -897,6 +927,21 @@ final class TestApp {
       },
     ),
     DwQueuedJob(
+      tagged('conflicted'),
+      maxAttempts: 3,
+      backoff: (attempt) => const Duration(milliseconds: 50),
+      handle: (ctx, tag) async {
+        conflictedRuns.add('$tag:${ctx.job!.attempt}');
+        await _logJob(ctx, 'conflicted', tag);
+        final left = jobFailures['conflicted:$tag'] ?? 0;
+        if (left > 0) {
+          jobFailures['conflicted:$tag'] = left - 1;
+          throw DwSerializationFailure('could not serialize access');
+        }
+        jobEvents.add('conflicted:$tag');
+      },
+    ),
+    DwQueuedJob(
       tagged('outside'),
       transactional: false,
       maxAttempts: 2,
@@ -933,6 +978,10 @@ final class TestApp {
         every: const Duration(milliseconds: 300),
         handle: (ctx) async {
           await _logJob(ctx, 'tick', null);
+          if (tickConflicts > 0) {
+            tickConflicts--;
+            throw DwSerializationFailure('could not serialize access');
+          }
           jobEvents.add('tick');
         },
       ),

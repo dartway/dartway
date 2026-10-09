@@ -161,6 +161,9 @@ mapping through `_objects`, publishing through `_publications`.
 - **The transaction may be retried** from the start; nothing inside may reach outside the database.
   A handler that calls a service is `transactional: false` — its comment says why — with
   `ctx.transaction((tx) async {…})` around its writes, or enqueues a job, which joins the transaction.
+- **Every top-level `ctx.transaction` body may run up to three times** — in a command, a route, a
+  job or a startup step, the framework retries it on a deadlock or a serialization failure. Outbound
+  calls stay outside it; no hand-rolled retry loop around it.
 - A request handler is a read and writes nothing (`dartway-realtime` for what throws there).
 
 ## 5. Rows → data objects, in batch

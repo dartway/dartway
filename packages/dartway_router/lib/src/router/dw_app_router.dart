@@ -307,10 +307,23 @@ class DwAppRouter<RouterState> {
     DwNavigationRoute<RouterState> route,
     List<List<DwNavigationRoute<RouterState>>> zones,
   ) {
+    final exit = route.descriptor.onExit;
     return GoRoute(
       name: route.name,
       path: route.routePath,
       caseSensitive: options.caseSensitive,
+      // The leaving route's own name, not `state.topRoute`: when a nested
+      // route leaves together with its parent, the top route names the child.
+      onExit: exit == null
+          ? null
+          : (context, state) => exit(
+                context,
+                DwNavigationTarget(
+                  uri: state.uri,
+                  routeName: route.name,
+                  pathParameters: state.pathParameters,
+                ),
+              ),
       pageBuilder: (context, state) {
         // Use go_router's own per-page key, which is unique for every entry on
         // the stack (a random key for imperative pushes, preserved across

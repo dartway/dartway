@@ -1,11 +1,17 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-/// Where a navigation was going when a guard is asked about it.
+/// A location a navigation hook is asked about: where a navigation was going
+/// when a guard decides on it, or the location being left when a route's
+/// exit hook decides whether to let it go.
 ///
 /// A guard that turns someone away can name the place it turned them away
-/// from — the one thing "back to it after signing in" needs (#288). The
-/// router's own value rather than go_router's `GoRouterState`: a guard needs
+/// from — the one thing "back to it after signing in" needs (#288). An exit
+/// hook ([DwNavigationExitGuard]) learns which route is being left and with
+/// which parameters, so it can tell whether its question applies. The
+/// router's own value rather than go_router's `GoRouterState`: a hook needs
 /// the address, not the transport's whole state.
 final class DwNavigationTarget {
   const DwNavigationTarget({
@@ -14,11 +20,14 @@ final class DwNavigationTarget {
     this.pathParameters = const {},
   });
 
-  /// The location asked for, query included: `/orders/42?tab=items`.
+  /// The location, query included: `/orders/42?tab=items`. For a guard,
+  /// the location asked for; for an exit hook, the location being left.
   final Uri uri;
 
   /// The name of the route it resolves to; `null` for a location no route
-  /// of this router names.
+  /// of this router names. For an exit hook, the route being left — which
+  /// may be a parent of the route [uri] shows, when it leaves together with
+  /// a nested child.
   final String? routeName;
 
   /// The route's path parameters: `{'id': '42'}` for `/orders/:id`.
@@ -77,6 +86,43 @@ final class DwNavigationTarget {
 typedef DwNavigationGuard<RouterState> = String? Function(
   RouterState state,
   DwNavigationTarget target,
+);
+
+/// Type definition for route exit hooks.
+///
+/// Set as [DwNavigationRouteDescriptor.onExit], it is asked before the person
+/// leaves the route — on a pop, a system back, and on any change of address:
+/// browser back and forward, a typed URL, a link, `go`. Return `true` to let
+/// the navigation go on, `false` to keep the person on the route.
+///
+/// [context] is the navigator's context, so a sheet or a dialog opens from
+/// it. [leaving] is the location being left, with the name and path
+/// parameters of the route the hook belongs to. Where the person is going is
+/// not known at this point.
+///
+/// Descriptors are `const`, so the hook is a static method or a top-level
+/// function, not a closure. Whether to ask is a fact of app state — read it
+/// through the context (a Riverpod `ProviderScope.containerOf(context)`)
+/// rather than from the page.
+///
+/// Example:
+/// ```dart
+/// Future<bool> askBeforeLeavingCourse(
+///   BuildContext context,
+///   DwNavigationTarget leaving,
+/// ) async {
+///   final container = ProviderScope.containerOf(context);
+///   if (!container.read(pendingRatingProvider)) return true;
+///   final answer = await showModalBottomSheet<bool>(
+///     context: context,
+///     builder: (_) => const RateLessonSheet(),
+///   );
+///   return answer ?? false;
+/// }
+/// ```
+typedef DwNavigationExitGuard = FutureOr<bool> Function(
+  BuildContext context,
+  DwNavigationTarget leaving,
 );
 
 /// Type definition for shell route page builders.

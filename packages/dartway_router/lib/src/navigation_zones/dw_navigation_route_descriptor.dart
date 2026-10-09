@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import 'dw_navigation_params_mixin.dart';
 import 'dw_navigation_route.dart';
+import 'dw_navigation_types.dart';
 
 /// Declarative descriptor of a navigation route.
 ///
@@ -44,6 +45,7 @@ abstract class DwNavigationRouteDescriptor<RouterState> {
     required this.pageWidget,
     this.parent,
     this.extraPathSegment,
+    this.onExit,
   }) : assert(
           extraPathSegment == null || extraPathSegment != '',
           'extraPathSegment must not be the empty string — omit it (leave it '
@@ -102,6 +104,42 @@ abstract class DwNavigationRouteDescriptor<RouterState> {
   /// ```
   final String? extraPathSegment;
 
+  /// Asked before the person leaves this route; `false` keeps them on it.
+  ///
+  /// One hook for every way out: a pop, the system back, and any change of
+  /// address — browser back and forward, a typed URL, a link in a header,
+  /// `go`. `PopScope` sees only the first two. The hook receives the
+  /// navigator's context, so it can open a sheet or a dialog and answer
+  /// with the person's choice, and the location being left with this
+  /// route's name and path parameters ([DwNavigationTarget]).
+  ///
+  /// Descriptors are `const`, so the hook is a static method or a top-level
+  /// function — a tear-off, not a closure. Whether to ask is decided from
+  /// app state the hook reads through the context.
+  ///
+  /// Mind when it fires:
+  /// - it fires on every exit, including the ones the person did not
+  ///   choose: a zone guard redirecting away (signing out) and switching
+  ///   a branch of a `StatefulShellRoute`. The hook checks its own
+  ///   precondition and answers `true` when its question does not apply;
+  /// - it does not fire when navigation goes deeper, into a child route of
+  ///   this one: the route stays on the stack. It fires when the child
+  ///   leaves together with it, with [DwNavigationTarget.routeName] still
+  ///   naming this route.
+  ///
+  /// Example:
+  /// ```dart
+  /// course(
+  ///   DwNavigationRouteDescriptor.parameterized(
+  ///     pageWidget: CoursePage(),
+  ///     parameter: AppParams.courseId,
+  ///     parent: home,
+  ///     onExit: askToRateLesson, // a top-level function
+  ///   ),
+  /// )
+  /// ```
+  final DwNavigationExitGuard? onExit;
+
   /// Builds the path segment contributed by this route.
   ///
   /// This method is called with the route's enum name and should return
@@ -152,6 +190,7 @@ abstract class DwNavigationRouteDescriptor<RouterState> {
   /// This creates a route accessible at `/` (assuming zoneRoot is empty).
   const factory DwNavigationRouteDescriptor.zoneRoot({
     required Widget pageWidget,
+    DwNavigationExitGuard? onExit,
   }) = _ZoneRootRouteDescriptor<RouterState>;
 
   /// Creates a simple route descriptor without parameters.
@@ -199,6 +238,7 @@ abstract class DwNavigationRouteDescriptor<RouterState> {
     required Widget pageWidget,
     DwNavigationRoute<RouterState>? parent,
     String? extraPathSegment,
+    DwNavigationExitGuard? onExit,
   }) = _SimpleRouteDescriptor<RouterState>;
 
   /// Creates a parameterized route descriptor with a path parameter.
@@ -239,6 +279,7 @@ abstract class DwNavigationRouteDescriptor<RouterState> {
     required DwNavigationParamsMixin parameter,
     required DwNavigationRoute<RouterState>? parent,
     String? extraPathSegment,
+    DwNavigationExitGuard? onExit,
   }) = _ParameterizedRouteDescriptor<RouterState>;
 }
 
@@ -254,6 +295,7 @@ class _ZoneRootRouteDescriptor<RouterState>
     extends DwNavigationRouteDescriptor<RouterState> {
   const _ZoneRootRouteDescriptor({
     required super.pageWidget,
+    super.onExit,
   }) : super._(
           extraPathSegment: null,
         );
@@ -284,6 +326,7 @@ class _SimpleRouteDescriptor<RouterState>
     required super.pageWidget,
     super.parent,
     super.extraPathSegment,
+    super.onExit,
   }) : super._();
 
   @override
@@ -305,6 +348,7 @@ class _ParameterizedRouteDescriptor<RouterState>
     required super.parent,
     required this.parameter,
     super.extraPathSegment,
+    super.onExit,
   }) : super._();
 
   /// The parameter mixin that defines the parameter name and type.
