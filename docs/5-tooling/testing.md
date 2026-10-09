@@ -54,7 +54,8 @@ dart run dartway_cli:dartway test --no-storage           # a server without uplo
 ```
 
 By default the command starts `postgres:17-alpine` and `rustfs/rustfs:1.0.0` —
-the images a deployment runs — each published on `127.0.0.1` at a port Docker picks and with its data in `tmpfs`,
+the images a deployment runs — pulled first when absent, with up to three attempts, so a project's CI
+needs no pre-pull step — each published on `127.0.0.1` at a port Docker picks and with its data in `tmpfs`,
 waits until Postgres answers `pg_isready` and the storage its health endpoint (60 seconds at most), runs
 `dart test` in the server package, and removes both containers afterwards, on Ctrl+C too. `--image`
 and `--storage-image` name other images. The suite receives the coordinates in its environment:
