@@ -2,6 +2,9 @@
 
 ## 0.24.0
 
+- `deploy run --revision <sha>` deploys the verified commit only when it belongs to the configured
+  remote branch, and refuses an older revision when the server already contains it. The revision is
+  included in text and JSON progress, and invalid revisions fail before SSH (#473).
 - `secret pull --overwrite KEY[,KEY…]` can take the server value for selected differing keys. Pull
   prints a names-only plan, supports the same plan under `--dry-run`, refuses empty server values,
   and restores the original local file when read-back verification fails (#434).

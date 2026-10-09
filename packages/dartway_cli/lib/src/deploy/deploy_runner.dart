@@ -121,17 +121,41 @@ class DwDeployRunner {
     return ssh.runAs(target.deployUser, script);
   }
 
-  /// Brings the checkout to the tip of the deployment branch.
+  /// Brings the checkout to [revision], or the tip of the deployment branch.
   ///
   /// `reset --hard` rather than `pull`: the server mirrors the repository, and
   /// a stray edit on the box must not be able to block a deploy. Ignored and
   /// untracked files — the rendered files among them — survive this.
-  Future<DwSshResult> updateCheckout() => _as(
-    "cd '$appDir' && "
-    "git fetch origin '${target.branch}' --prune && "
-    "git checkout -B '${target.branch}' 'origin/${target.branch}' && "
-    "git reset --hard 'origin/${target.branch}'",
-  );
+  Future<DwSshResult> updateCheckout([String? revision]) {
+    if (revision == null) {
+      return _as(
+        "cd '$appDir' && "
+        "git fetch origin '${target.branch}' --prune && "
+        "git checkout -B '${target.branch}' 'origin/${target.branch}' && "
+        "git reset --hard 'origin/${target.branch}'",
+      );
+    }
+    return _as('''
+cd '$appDir' || exit \$?
+git fetch origin '${target.branch}' --prune || exit \$?
+resolved=\$(git rev-parse --verify '$revision^{commit}' 2>/dev/null) || {
+  echo "revision-not-found: $revision not found on origin/${target.branch}" >&2
+  exit 1
+}
+git merge-base --is-ancestor "\$resolved" 'origin/${target.branch}' || {
+  echo "revision-not-on-branch: $revision not on origin/${target.branch}" >&2
+  exit 1
+}
+head=\$(git rev-parse HEAD) || exit \$?
+if [ "\$head" != "\$resolved" ] && git merge-base --is-ancestor "\$resolved" "\$head"; then
+  echo "superseded: the server is at \$head, which already contains \$resolved" >&2
+  exit 1
+fi
+git checkout -B '${target.branch}' "\$resolved" &&
+git reset --hard "\$resolved" &&
+git rev-parse HEAD
+''');
+  }
 
   /// The commit the checkout is at: the full hash on the first line, the
   /// short one and the subject on the second.
@@ -544,8 +568,11 @@ echo "nginx restarted and running"
   Future<DwSshResult> status() =>
       _compose("ps --format '{{.Name}}\t{{.Status}}'");
 
-  List<DwDeployStep> steps({required bool skipGitUpdate}) => [
-    for (final step in _plannedSteps(skipGitUpdate: skipGitUpdate))
+  List<DwDeployStep> steps({required bool skipGitUpdate, String? revision}) => [
+    for (final step in _plannedSteps(
+      skipGitUpdate: skipGitUpdate,
+      revision: revision,
+    ))
       DwDeployStep(
         id: step.id,
         title: step.title,
@@ -562,12 +589,26 @@ echo "nginx restarted and running"
       ),
   ];
 
-  List<DwDeployStep> _plannedSteps({required bool skipGitUpdate}) => [
+  List<DwDeployStep> _plannedSteps({
+    required bool skipGitUpdate,
+    String? revision,
+  }) => [
     if (!skipGitUpdate)
       DwDeployStep(
         id: 'update-checkout',
-        title: 'Update the checkout to origin/${target.branch}',
-        run: updateCheckout,
+        title: revision == null
+            ? 'Update the checkout to origin/${target.branch}'
+            : 'Update the checkout to revision $revision',
+        run: () => updateCheckout(revision),
+        verdict: revision == null
+            ? null
+            : (result) {
+                final head = result.stdout.trim().split('\n').last;
+                return RegExp(r'^[0-9a-f]{40,64}$').hasMatch(head) &&
+                        head.toLowerCase().startsWith(revision.toLowerCase())
+                    ? null
+                    : 'Expected checkout HEAD to be revision $revision, got ${head.isEmpty ? 'no revision' : head}.';
+              },
       ),
     // After the checkout and before anything reads the stack: the bridge names
     // a file in the working copy, so it has to judge the revision this deploy
