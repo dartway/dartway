@@ -30,8 +30,11 @@ arrived crashing the confirmation (D-034).
 
 **`DwGetFileLink(fileId)`** is a single request that answers a **`DwFileLink`**: `id`, `url`, and
 `expiresAt` for a private file. It is a request, not a command, so no signed URL is ever stored for
-idempotency; fetch it when the file is about to be shown. `fileName` is only a display name — the
-key is built from nothing the client sends.
+idempotency; fetch it when the file is about to be shown. The link shows the file (`inline`) by
+default; `DwGetFileLink(fileId, download: true)` asks for one that saves it (`attachment`, under the
+file's name), and that link is always presigned and expires, a public file's too — the permanent
+public URL cannot carry the disposition. `fileName` is only a display name — the key is built from
+nothing the client sends.
 
 The client side — the uploader, progress, retries — is [uploads on the client](../3-flutter/uploads-client.md).
 

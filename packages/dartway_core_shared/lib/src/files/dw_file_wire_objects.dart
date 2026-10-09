@@ -346,32 +346,45 @@ final class DwStoredFile extends DwDataObject {
 /// Refused `dw.notFound` for a file that does not exist or is not confirmed,
 /// and `dw.forbidden` when the project's read rule says no.
 final class DwGetFileLink extends DwSingleRequest<DwFileLink> {
-  const DwGetFileLink({required this.fileId});
+  const DwGetFileLink({required this.fileId, this.download = false});
 
   final int fileId;
+
+  /// Whether the link should have a browser save the file rather than show
+  /// it. A download link is always presigned and expires, a public file's
+  /// too: the permanent public URL cannot ask for a download.
+  final bool download;
 
   @override
   String get dwTypeName => 'DwGetFileLink';
 
   @override
-  Map<String, Object?> toJson() => {'fileId': fileId};
+  Map<String, Object?> toJson() => {
+    'fileId': fileId,
+    if (download) 'download': true,
+  };
 
-  static DwGetFileLink fromJson(Map<String, Object?> json) =>
-      DwGetFileLink(fileId: json['fileId']! as int);
+  static DwGetFileLink fromJson(Map<String, Object?> json) => DwGetFileLink(
+    fileId: json['fileId']! as int,
+    download: json['download'] as bool? ?? false,
+  );
 
   @override
   bool operator ==(Object other) =>
-      other is DwGetFileLink && other.fileId == fileId;
+      other is DwGetFileLink &&
+      other.fileId == fileId &&
+      other.download == download;
 
   @override
-  int get hashCode => fileId.hashCode;
+  int get hashCode => Object.hash(fileId, download);
 
   @override
-  String toString() => 'DwGetFileLink($fileId)';
+  String toString() => 'DwGetFileLink($fileId${download ? ', download' : ''})';
 }
 
-/// A link to read a file: short-lived and presigned for a private file,
-/// the permanent public URL (without [expiresAt]) for a public one.
+/// A link to read a file: a presigned one, which expires at [expiresAt], or
+/// a public file's own URL, which carries no [expiresAt]. A private file's
+/// link and every download link are presigned, a public file's too.
 final class DwFileLink extends DwDataObject {
   const DwFileLink({required this.id, required this.url, this.expiresAt});
 
@@ -381,7 +394,7 @@ final class DwFileLink extends DwDataObject {
 
   final String url;
 
-  /// When a private link stops working; `null` for a public file.
+  /// When a presigned link stops working; `null` for a permanent public URL.
   final DateTime? expiresAt;
 
   @override

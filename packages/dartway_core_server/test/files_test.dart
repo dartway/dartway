@@ -209,6 +209,18 @@ void main() {
       addTearDown(() => readers.remove(bobSession.id));
       final allowed = (await bob.call(request)).value(request);
       expect((await getUrl(allowed.url)).bytes, bytes);
+
+      final download = DwGetFileLink(fileId: file.id, download: true);
+      final saved = await getUrl(
+        (await alice.call(download)).value(download).url,
+      );
+      expect(saved.status, 200);
+      expect(saved.bytes, bytes);
+      expect(
+        saved.headers.value('content-disposition'),
+        "attachment; filename=\"_______ ______.txt\"; filename*=UTF-8''"
+        '%D0%B4%D0%BE%D0%B3%D0%BE%D0%B2%D0%BE%D1%80%20%22%D0%B8%D1%82%D0%BE%D0%B3%22.txt',
+      );
     });
 
     test('a public file\'s link is its public URL, for anyone', () async {
@@ -217,6 +229,35 @@ void main() {
       final link = (await anonymous.call(request)).value(request);
       expect(link.url, file.url);
       expect(link.expiresAt, isNull);
+    });
+
+    test('a public file\'s download link is presigned and saves the file, '
+        'for anyone', () async {
+      final bytes = 'a public picture'.codeUnits;
+      final file = await upload(
+        alice,
+        TestUpload.avatar,
+        bytes: bytes,
+        name: 'me.png',
+      );
+      final key = (await rowOf(file.id)).get<String>('object_key');
+      final request = DwGetFileLink(fileId: file.id, download: true);
+      final link = (await anonymous.call(request)).value(request);
+      expect(link.url, isNot(file.url));
+      expect(
+        link.expiresAt!.difference(DateTime.now()).inSeconds,
+        inInclusiveRange(590, 600),
+      );
+      final url = Uri.parse(link.url);
+      expect(url.path, '/${storage.publicBucket}/$key');
+      expect(url.queryParameters, contains('X-Amz-Signature'));
+      final read = await getUrl(link.url);
+      expect(read.status, 200);
+      expect(read.bytes, bytes);
+      expect(
+        read.headers.value('content-disposition'),
+        'attachment; filename="me.png"; filename*=UTF-8\'\'me.png',
+      );
     });
 
     test('an unfinished or absent file has no link', () async {

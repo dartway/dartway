@@ -186,7 +186,9 @@ final class DwFakeStorage {
     return DwCallOk(
       DwFileLink(
         id: id,
-        url: '$_storage/objects/$id?read=fake',
+        url:
+            '$_storage/objects/$id?read=fake'
+            '${request.download ? '&disposition=attachment' : ''}',
         expiresAt: DateTime.now().toUtc().add(const Duration(minutes: 10)),
       ),
     );

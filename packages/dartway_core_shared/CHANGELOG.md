@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- `DwGetFileLink` takes `download` (default `false`): `true` asks for a link that has a browser save
+  the file (`attachment`) rather than show it. Written to JSON only when true, so every existing
+  encoding is byte-identical and the protocol version stays (dartway/dartway#481).
+
 - Add opt-in `DwCalendarDay`, a validated Gregorian Y/M/D value (`0001`–`9999`) with canonical
   `YYYY-MM-DD` JSON, civil arithmetic and ordering. Window cursors accept it with a distinct `d`
   discriminator; existing timestamp, cursor and runtime protocol encodings are unchanged.

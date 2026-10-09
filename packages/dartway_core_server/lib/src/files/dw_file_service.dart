@@ -424,7 +424,9 @@ final class DwFileStore {
     final bucket = row.get<String>('bucket');
     final key = row.get<String>('object_key');
     final public = record.visibility == DwFileVisibility.public;
-    if (public) {
+    // A download is always presigned, a public file's too: the public URL
+    // cannot carry the disposition that makes a browser save the file.
+    if (public && !request.download) {
       if (publicUrlOf(bucket, key) case final url?) {
         return DwFileLink(id: record.id, url: url);
       }
@@ -448,7 +450,7 @@ final class DwFileStore {
     return DwFileLink(
       id: record.id,
       url:
-          '${objects.presignGet(bucket: bucket, key: key, expires: storage.linkLifetime, time: now, fileName: record.fileName)}',
+          '${objects.presignGet(bucket: bucket, key: key, expires: storage.linkLifetime, time: now, fileName: record.fileName, attachment: request.download)}',
       expiresAt: DateTime.fromMillisecondsSinceEpoch(
         now.millisecondsSinceEpoch ~/ 1000 * 1000,
         isUtc: true,
