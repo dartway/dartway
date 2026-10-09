@@ -34,11 +34,19 @@ function characters(value,    i,n,b) {
   }
   return n
 }
-function encoded(value, component,    out,i,c) {
+# Mode 0 is strict, 1 keeps the URI component set, 2 the RFC 3986 userinfo
+# set (sub-delims and ":"), as Uri(userInfo:) in Dart leaves them literal.
+function literal(c, mode) {
+  if (c ~ /^[A-Za-z0-9_.~-]$/) return 1
+  if (mode == 1) return c ~ /^[!*()]$/
+  if (mode == 2) return c ~ /^[!$&\047()*+,;=:]$/
+  return 0
+}
+function encoded(value, mode,    out,i,c) {
   out = ""
   for (i = 1; i <= length(value); i++) {
     c = substr(value, i, 1)
-    if (c ~ /^[A-Za-z0-9_.~-]$/ || (component && c ~ /^[!*()]$/)) out = out c
+    if (literal(c, mode)) out = out c
     else out = out sprintf("%%%02X", bytes[c])
   }
   return out
@@ -76,7 +84,7 @@ BEGIN {
     value = substr(entry, start, length(entry) - start)
     if (characters(value) < 6) continue
     add(value)
-    for (kind = 0; kind <= 1; kind++) {
+    for (kind = 0; kind <= 2; kind++) {
       url = encoded(value, kind); add(url); add(lowerHex(url))
     }
   }
