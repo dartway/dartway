@@ -182,7 +182,11 @@ Future<int> runDeploy(
     (step) =>
         step.id == 'update-checkout' && !(record?[step.id]?.succeeded ?? false),
   );
-  if (!updates) await reportRevision();
+  // The revision is read from the checkout, which is named after the
+  // project: on a server running another project's stack it is not this
+  // project's to read, so nothing is sent there before the identity passed.
+  final identifies = steps.any((step) => step.id == 'stack-identity');
+  if (!updates && !identifies) await reportRevision();
 
   final failedStep = await executeDeploySteps(
     steps,
@@ -191,6 +195,7 @@ Future<int> runDeploy(
     retryFailed: results.flag('retry-failed'),
     progress: report,
     onUpdated: reportRevision,
+    onIdentified: updates ? null : reportRevision,
   );
   if (failedStep != null) {
     return finish(1, failedStep: failedStep);
@@ -230,6 +235,7 @@ List<Map<String, String>> _stepList(List<DwDeployStep> steps) => [
 Future<String?> executeDeploySteps(
   List<DwDeployStep> steps, {
   Future<void> Function()? onUpdated,
+  Future<void> Function()? onIdentified,
   DwRemoteSteps? remote,
   Map<String, DwRemoteStepRecord>? resumeFrom,
   bool retryFailed = false,
@@ -368,6 +374,9 @@ Future<String?> executeDeploySteps(
     });
     if (step.id == 'update-checkout') {
       await onUpdated?.call();
+    }
+    if (step.id == 'stack-identity') {
+      await onIdentified?.call();
     }
     // Says nothing on a server whose bridge is already in place.
     if (step.id == 'bridge-override' && result.stdout.trim().isNotEmpty) {

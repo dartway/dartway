@@ -1,4 +1,3 @@
-// ignore_for_file: unused_import
 import 'package:path/path.dart' as p;
 
 import 'deploy_target.dart';
