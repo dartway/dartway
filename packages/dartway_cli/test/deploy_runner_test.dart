@@ -457,12 +457,34 @@ esac
         expect(result.stdout, isNot(contains('extending')));
         expect(result.stdout, isNot(contains('already manages')));
         final request = issued().last;
-        expect(
-          request,
-          contains('rm -rf /etc/letsencrypt/live/api.example.com'),
-        );
-        expect(request, contains('certbot certonly'));
+        final certonly = request.indexOf('certbot certonly');
+        expect(certonly, isNot(-1));
         expect(request, isNot(contains('--expand')));
+        // Moved aside, to be put back if issuance fails — never removed: the
+        // only removal of the live directory before certonly is of one that
+        // holds no certificate (#436).
+        final moveAside = request.indexOf(
+          'mv /etc/letsencrypt/live/api.example.com '
+          '/etc/letsencrypt/dw-bootstrap/api.example.com',
+        );
+        expect(moveAside, isNot(-1));
+        expect(moveAside, lessThan(certonly));
+        final removals = request
+            .substring(0, certonly)
+            .split('\n')
+            .where(
+              (line) =>
+                  line.contains('rm ') &&
+                  line.contains('/live/api.example.com'),
+            );
+        for (final line in removals) {
+          expect(
+            line,
+            contains(
+              '[ ! -e /etc/letsencrypt/live/api.example.com/fullchain.pem ]',
+            ),
+          );
+        }
       });
 
       test('a coverage it cannot read fails rather than asks', () async {

@@ -2,6 +2,11 @@
 
 ## 0.24.0
 
+- Deploy: the first certificate issuance moves the self-signed certificate of `deploy setup` aside
+  instead of deleting it, and puts it back when certbot fails (Let's Encrypt down, a rate limit,
+  DNS not pointed yet). The step still fails, but nginx keeps a certificate to start with at its
+  next restart, where before it refused to start and only `deploy setup` could bring it back (#436).
+
 - Deploy: `project:` in an environment of `deploy/config.yaml` names the deployment on the server
   (checkout, secret store, Compose project, data volumes); absent, it is the repository's name as
   before. A new `stack-identity` guard refuses when the server runs other stacks and not this one,
