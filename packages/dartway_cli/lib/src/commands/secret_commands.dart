@@ -777,11 +777,18 @@ Future<int> runSecretPush({
 /// generated in place gets a maintainer's copy.
 class SecretPullCommand extends _SecretCommandBase {
   SecretPullCommand() {
-    argParser.addFlag(
-      'dry-run',
-      negatable: false,
-      help: 'Report what would change, write nothing.',
-    );
+    argParser
+      ..addMultiOption(
+        'overwrite',
+        help:
+            'Replace these keys when the server holds a different value. '
+            'Comma-separated or repeatable.',
+      )
+      ..addFlag(
+        'dry-run',
+        negatable: false,
+        help: 'Print the plan, write nothing.',
+      );
   }
 
   @override
@@ -790,11 +797,12 @@ class SecretPullCommand extends _SecretCommandBase {
   @override
   String get description =>
       'Copy keys the server has and ${DwLocalSecretsFile.relativePath} lacks '
-      'into it.';
+      'into it. Differing keys are replaced only when named in --overwrite.';
 
   @override
   String get invocation =>
-      'dartway secret pull --env <environment> [--dry-run]';
+      'dartway secret pull --env <environment> [--dry-run] '
+      '[--overwrite KEY,…]';
 
   @override
   Future<int> run() async {
@@ -806,87 +814,163 @@ class SecretPullCommand extends _SecretCommandBase {
       );
     }
     final stack = resolveStack(results);
-    final environment = stack.target.environment;
     final store = openStore(stack, results);
     final local = DwLocalSecretsFile.of(projectRoot);
 
-    final remoteRead = await store.readFile();
-    if (!remoteRead.ok) {
-      stderr.writeln('Cannot read ${store.file}: ${remoteRead.firstLine}');
-      return 1;
-    }
-    final Map<String, String> remote;
-    try {
-      remote = DwSecretStore.parse(remoteRead.stdout);
-    } on DwSecretFormatException catch (error) {
-      stderr.writeln('The server store is malformed: ${error.message}');
-      return 1;
-    }
+    return runSecretPull(
+      stack: stack,
+      store: store,
+      local: local,
+      overwrite: results.multiOption('overwrite').toSet(),
+      dryRun: results.flag('dry-run'),
+    );
+  }
+}
 
-    final localSection =
-        (local.read() ?? const <String, Map<String, String>>{})[environment] ??
-        const <String, String>{};
+/// The body of `secret pull`, apart from resolving the deployment target.
+///
+/// The plan is printed before any write. Missing keys and empty local
+/// placeholders are added; differing keys are replaced only when named in
+/// [overwrite]. A requested empty server value refuses the entire pull. After
+/// writing, the file is parsed again and every changed key is checked; a
+/// failed check restores the exact bytes that were present before the write.
+Future<int> runSecretPull({
+  required DwStack stack,
+  required DwSecretStore store,
+  required DwLocalSecretsFile local,
+  required Set<String> overwrite,
+  required bool dryRun,
+}) async {
+  final remoteRead = await store.readFile();
+  if (!remoteRead.ok) {
+    stderr.writeln('Cannot read ${store.file}: ${remoteRead.firstLine}');
+    return 1;
+  }
+  final Map<String, String> remote;
+  try {
+    remote = DwSecretStore.parse(remoteRead.stdout);
+  } on DwSecretFormatException catch (error) {
+    stderr.writeln('The server store is malformed: ${error.message}');
+    return 1;
+  }
 
-    final additions = <String, String>{};
-    final differing = <String>[];
-    for (final entry in remote.entries) {
-      final localValue = localSection[entry.key];
-      // A local placeholder carries no information, so it is filled rather
-      // than reported as a conflict.
-      if (localValue == null ||
-          (localValue.isEmpty && entry.value.isNotEmpty)) {
-        additions[entry.key] = entry.value;
-      } else if (localValue != entry.value) {
+  final environment = stack.target.environment;
+  final localSection =
+      (local.read() ?? const <String, Map<String, String>>{})[environment] ??
+      const <String, String>{};
+
+  final additions = <String, String>{};
+  final replacements = <String, String>{};
+  final differing = <String>[];
+  final serverEmpty = <String>[];
+  final refused = <String>[];
+  for (final entry in remote.entries) {
+    final localValue = localSection[entry.key];
+    // A local placeholder carries no information, so it is filled rather
+    // than reported as a conflict.
+    if (localValue == null || (localValue.isEmpty && entry.value.isNotEmpty)) {
+      additions[entry.key] = entry.value;
+    } else if (localValue != entry.value) {
+      if (entry.value.isEmpty) {
+        serverEmpty.add(entry.key);
+        if (overwrite.contains(entry.key)) refused.add(entry.key);
+      } else if (overwrite.contains(entry.key)) {
+        replacements[entry.key] = entry.value;
+      } else {
         differing.add(entry.key);
       }
     }
-    final localOnly =
-        localSection.keys.where((key) => !remote.containsKey(key)).toList()
-          ..sort();
+  }
+  final localOnly =
+      localSection.keys.where((key) => !remote.containsKey(key)).toList()
+        ..sort();
+  final addedNames = additions.keys.toList()..sort();
+  final overwrittenNames = replacements.keys.toList()..sort();
+  differing.sort();
+  serverEmpty.sort();
+  refused.sort();
 
-    stdout.writeln('Compare ${store.file} with ${local.file.path}');
-    if (additions.isEmpty) {
-      stdout.writeln('  nothing to add');
-    } else {
-      stdout.writeln(
-        '  add to $environment: ${(additions.keys.toList()..sort()).join(', ')}',
-      );
-    }
-    if (differing.isNotEmpty) {
-      stdout
-        ..writeln('  values differ: ${(differing..sort()).join(', ')}')
-        ..writeln(
-          '  Differing values are reported, never rewritten — the local file '
-          'is the one you maintain. Resolve them by hand, or overwrite the '
-          'server with "dartway secret push".',
-        );
-    }
-    if (localOnly.isNotEmpty) {
-      stdout.writeln('  local only: ${localOnly.join(', ')}');
-    }
-
-    if (additions.isEmpty) {
-      return 0;
-    }
-    if (results.flag('dry-run')) {
-      stdout.writeln('Dry run — nothing written.');
-      return 0;
-    }
-    if (!local.exists) {
-      local.file
-        ..parent.createSync(recursive: true)
-        ..writeAsStringSync(
-          '# Secrets of every environment. Git-ignored; keep it backed up '
-          'somewhere you control.\n',
-        );
-    }
-    local.write(environment, additions);
+  stdout.writeln('Compare ${store.file} with ${local.file.path}');
+  if (addedNames.isNotEmpty) stdout.writeln('  add: ${addedNames.join(', ')}');
+  if (overwrittenNames.isNotEmpty) {
+    stdout.writeln('  overwrite: ${overwrittenNames.join(', ')}');
+  }
+  if (differing.isNotEmpty) {
     stdout
-      ..writeln('Added ${additions.length} key(s) to ${local.file.path}.')
+      ..writeln('  values differ: ${differing.join(', ')}')
       ..writeln(
-        'This file now holds secrets for $environment; it must stay out of '
-        'Git (deploy/.gitignore) and be backed up somewhere you control.',
+        '  Take the server values with "dartway secret pull --env '
+        '$environment --overwrite ${differing.join(',')}".',
       );
+  }
+  if (serverEmpty.isNotEmpty) {
+    stdout.writeln(
+      '  server empty: ${serverEmpty.join(', ')} — push the local value instead',
+    );
+  }
+  if (localOnly.isNotEmpty) {
+    stdout.writeln('  local only: ${localOnly.join(', ')}');
+  }
+
+  if (refused.isNotEmpty) {
+    stderr
+      ..writeln('Refusing to pull: nothing was written.')
+      ..writeln(
+        '  ${refused.join(', ')} would replace a local value with an empty '
+        'server value; push the local value instead.',
+      );
+    return 1;
+  }
+
+  final changes = <String, String>{...additions, ...replacements};
+  if (dryRun) {
+    stdout.writeln('Dry run — nothing written.');
     return 0;
   }
+  if (changes.isEmpty) return 0;
+
+  final originalBytes = local.exists ? local.file.readAsBytesSync() : null;
+  if (!local.exists) {
+    local.file
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(
+        '# Secrets of every environment. Git-ignored; keep it backed up '
+        'somewhere you control.\n',
+      );
+  }
+  local.write(environment, changes);
+
+  final mismatched = <String>[];
+  try {
+    final after = local.read()?[environment] ?? const <String, String>{};
+    for (final entry in changes.entries) {
+      if (after[entry.key] != entry.value) mismatched.add(entry.key);
+    }
+  } on Object {
+    mismatched.addAll(changes.keys.where((key) => !mismatched.contains(key)));
+  }
+  if (mismatched.isNotEmpty) {
+    if (originalBytes == null) {
+      local.file.deleteSync();
+    } else {
+      local.file.writeAsBytesSync(originalBytes);
+    }
+    mismatched.sort();
+    stderr.writeln(
+      'Pull verification failed for ${mismatched.join(', ')}; restored the '
+      'original file.',
+    );
+    return 1;
+  }
+
+  stdout
+    ..writeln(
+      'Updated ${changes.length} key(s) in ${local.file.path} '
+      '(${additions.length} added, ${replacements.length} overwritten).',
+    )
+    ..writeln(
+      'This file now holds secrets for $environment; it must stay out of '
+      'Git (deploy/.gitignore) and be backed up somewhere you control.',
+    );
+  return 0;
 }
