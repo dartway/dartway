@@ -40,6 +40,7 @@ reads it.
 | `deploy_user` | no | The unprivileged user that owns the checkout and runs the stack; defaults to `dw_admin` |
 | `os` | yes | The server's operating system (`ubuntu`) |
 | `repo`, `branch` | yes | The repository the server checks out, and the branch it deploys |
+| `project` | no | The deployment's name on the server — checkout, secret store, Compose project, data volumes; absent means the last segment of `repo`. Lower case letters, digits, `_` and `-`, as Compose accepts |
 | `ssl_email` | yes | Where Let's Encrypt writes about expiring certificates |
 | `api_domain` | yes | The server, for mobile apps and webhooks |
 | `app_domain` | yes | The Flutter web app |
@@ -62,8 +63,8 @@ key the deploy does not read is a setting somebody believes is in force. Every d
 name, and each role needs a host of its own — Nginx routes by `server_name`, so two roles on one host
 means one of them is never reached.
 
-Names are derived, not configured. The project name is the last segment of `repo` without `.git`;
-the checkout is `/home/<deploy_user>/<project>`. With `database: bundled`, the database and its role
+Names are derived, not configured. The project name is `project` when it is set, and otherwise the
+last segment of `repo` without `.git`; the checkout is `/home/<deploy_user>/<project>`. With `database: bundled`, the database and its role
 are named after the server package without `_server`; with `database: external` they are a managed
 provider's own, delivered as `DW_DATABASE_NAME`/`DW_DATABASE_USER` — there is nothing to derive them
 from. The storage buckets are named after the same prefix with dashes.
@@ -78,6 +79,28 @@ this refusal on a host whose stock `admin` group exists — that guard is not wh
 does is the default: `dw_admin` is fixed rather than derived from the project, because no stock
 image or package ships a group under the `dw_` prefix, so an operator who does not set
 `deploy_user` never meets this collision at all.
+
+### Moving the repository
+
+The project name is the deployment's whole identity on the server: the checkout
+`/home/<deploy_user>/<project>`, the secret store `~/.config/<project>`, the Compose project and with
+it every data volume (`<project>_postgres_data`). Derived from `repo`, it changes when the repository
+moves to another owner or is renamed — and the same server then holds a stack under the old name
+that the new one does not see. Pin the old name in each environment of `deploy/config.yaml` when
+the repository moves:
+
+```yaml
+stage:
+  repo: git@github.com:new-owner/new-name.git
+  project: old-name   # the name the stack on the server already has
+```
+
+`run`, `setup` and `check` hold this with the **stack-identity** check: they list the stacks on the
+server — data volumes (`<name>_postgres_data`, `<name>_storage_data`) and secret stores
+(`~/.config/<name>/secrets.env`), by name only — and refuse when there are stacks and none is this
+project's, naming the ones found and the `project:` line that would match. A server with no stack
+at all passes. A second project on the same host is set up once with `deploy setup --new-stack`;
+after that its own secret store names it.
 
 ## Three hosts, one server process
 
@@ -279,26 +302,30 @@ bucket anyone can read, or a public one nobody can.
    namespaced. The proxy is the only service that accepts long-RTT public TCP, including traffic for
    storage on its own domain.
 4. **The deployment user**, created if absent and added to the `docker` group.
-5. **The secret store**, with the secrets that are only random strings generated in place: with
+5. **The stack-identity guard**: setup refuses when the server runs other stacks and not this
+   project's — the shape of a [repository that moved](#moving-the-repository) without `project:`
+   — before the secret store is created under the new name. `--new-stack` skips this one check, for
+   a genuinely second project on the same host, and nothing else.
+6. **The secret store**, with the secrets that are only random strings generated in place: with
    `database: bundled`, `DW_DATABASE_PASSWORD`; and with the bundled storage, the storage keys. An
    external database's `DW_DATABASE_*` are never generated — they are the provider's own credentials,
    delivered with `secret set`. Existing values are never replaced — regenerating the database
    password would lock the server out of a database initialised with the old one.
-6. **A repository key**, for a `git@` repository: generated **on** the server, so the private half
+7. **A repository key**, for a `git@` repository: generated **on** the server, so the private half
    exists nowhere else. When the server cannot yet reach the repository, setup stops and prints the
    public key, asking for it to be registered as a **read-only** deploy key — the server only ever
    fetches, and a writable key turns access to the box into access to the repository.
-7. **The checkout** of `branch`.
-8. **`.env`** with the generated secrets — what the compose file itself interpolates.
-9. **A data volume guard**: if the server already has a data volume of this project and an expected
+8. **The checkout** of `branch`.
+9. **`.env`** with the generated secrets — what the compose file itself interpolates.
+10. **A data volume guard**: if the server already has a data volume of this project and an expected
    one is missing — a config change renamed or replaced what a volume held — setup refuses. Compose
    would otherwise create that volume empty and serve it beside the real data, silently. `run` runs
    the same guard (below) right before it starts anything, because a server is not always `setup`
    again after a config change.
-10. **`docker-compose.yml`, `nginx.conf`**, the `nginx.d` directories, the override bridge and the
+11. **`docker-compose.yml`, `nginx.conf`**, the `nginx.d` directories, the override bridge and the
     project's Nginx snippets, then `docker compose config --quiet` over the result.
-11. **The firewall**: `ufw` (installed when absent), OpenSSH, 80, 443 and `firewall_ports`.
-12. **A one-day self-signed certificate**, so Nginx can start at all — the real one cannot be issued
+12. **The firewall**: `ufw` (installed when absent), OpenSSH, 80, 443 and `firewall_ports`.
+13. **A one-day self-signed certificate**, so Nginx can start at all — the real one cannot be issued
     until Nginx answers the challenge, and the first `run` issues it.
 
 It ends by naming the required secrets still to deliver. **Idempotent throughout**: every step finds
@@ -315,24 +342,28 @@ also verifies that the host allows BBR; if not, it stops before replacing anythi
 `dart run dartway_cli:dartway deploy setup`, followed by
 `dart run dartway_cli:dartway deploy run`. Then:
 
-1. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
+1. **checks this server runs this project's stack** (`stack-identity`), first, even with
+   `--skip-git-update`: the same guard `setup` runs, so a [moved repository](#moving-the-repository)
+   stops here, with the server untouched, instead of failing to `cd` into a checkout that does not
+   exist — or, after a `setup`, starting a second, empty stack;
+2. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
    repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`);
-2. writes the override bridge;
-3. **renders `docker-compose.yml` and `nginx.conf`** from `deploy/config.yaml` and this version of
+3. writes the override bridge;
+4. **renders `docker-compose.yml` and `nginx.conf`** from `deploy/config.yaml` and this version of
    the CLI, and says of each whether it changed. Both are derived files, and a derived file written
    once goes stale in silence: a CLI that had learnt to pass a new build argument met a compose file
    rendered before that argument existed, and the deploy died inside `docker build` blaming the
    project's Dockerfile — while the file to fix was on the server and in no repository. The write
    goes through `cat >`, never a rename, because the proxy has its configuration bind-mounted;
-4. renders `.env` from the secret store, refusing — by key name and line number, never by value —
+5. renders `.env` from the secret store, refusing — by key name and line number, never by value —
    when the store is absent, a line is malformed, a key is declared twice, a key is one the compose
    file sets, or a required secret is missing or empty;
-5. checks the merged Compose configuration;
-6. **the same data volume guard `setup` runs** (above): refuses when an expected data volume of the
+6. checks the merged Compose configuration;
+7. **the same data volume guard `setup` runs** (above): refuses when an expected data volume of the
    rendered stack does not exist while another data volume of this project does — the shape of a
    config change (a rename, a different storage backend) about to serve fresh data next to the real
    one. One implementation, run from both commands;
-7. **makes the TLS certificate cover every served host, before anything is built or replaced**,
+8. **makes the TLS certificate cover every served host, before anything is built or replaced**,
    through the proxy the previous deploy left running. That proxy answers the ACME challenge for a
    host added to the configuration since: its port-80 server comes before the `nginx.d/http`
    snippets, so Nginx makes it the default for any name no project port-80 server claims. A snippet
@@ -344,12 +375,12 @@ also verifies that the host allows BBR; if not, it stops before replacing anythi
    self-signed certificate of `setup` is replaced by an issued one. Let's Encrypt fails for reasons of
    its own, and a failure here stops the deploy with the previous version still serving. With no
    proxy running — a first deploy, a stand that is down — nothing is serving that a failure could
-   take down, and the certificate is left to step 13;
-8. builds the images;
-9. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
+   take down, and the certificate is left to step 14;
+9. builds the images;
+10. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
    bundled`, starts Postgres — with `database: external` there is nothing of the database's to start,
    the server reaches it directly;
-10. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
+11. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
    flight are answered, live sockets close with "server stopping" — and from then on the proxy
    answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
    idempotency key, so a retry never runs it twice). The new image applies the migrations in a
@@ -360,15 +391,15 @@ also verifies that the host allows BBR; if not, it stops before replacing anythi
    declares. When the migrations fail (they roll back) or the new server does not become healthy,
    the image that was serving is started again and the step fails with the server's own log; after
    a failure past the migrations the previous code runs on the new schema, and the message says so;
-11. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
-12. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
+12. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
+13. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
    the server — and runs `nginx -t` inside the running proxy. Nginx resolves an upstream once, when it
    starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this
    stops the deploy before that restart;
-13. makes the certificate cover every served host once more, through the proxy now running: what a
-   first deploy could not ask for at step 7 is issued here. On a routine deploy step 7 has already
+14. makes the certificate cover every served host once more, through the proxy now running: what a
+   first deploy could not ask for at step 8 is issued here. On a routine deploy step 8 has already
    covered every host, and this asks nothing;
-14. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
+15. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
     a second later on its configuration.
 
 What keeps a push routine is not that the rendering is skipped but that it is idempotent and
@@ -385,7 +416,7 @@ Every step runs on the server **detached from the `ssh` session**: its script is
 routine deploy still makes one connection per step; when that connection breaks, fresh ones wait for
 the same step for up to fifteen minutes, and past that `run` stops waiting and says the step is still
 running. Nothing the invoking machine does — losing its network, or dying because it is a container
-of the stack whose server step 10 replaces — stops a step midway.
+of the stack whose server step 11 replaces — stops a step midway.
 
 That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
 steps after the interruption still need someone to run them: **`dart run dartway_cli:dartway deploy run --env <env>
@@ -471,6 +502,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `ssh-reachable` | error | Key-based SSH works; when it fails the other server checks are skipped |
 | `deploy-user` | error | The deployment user exists |
 | `docker-available` | error | Docker Compose is usable by the deployment user |
+| `stack-identity` | error | The server runs this project's stack, or none at all — not only other ones; see [Moving the repository](#moving-the-repository) |
 | `proxy-congestion-control` | error | The running front proxy reports `bbr` from its own network namespace; the host's value cannot stand in for this reading |
 | `host-congestion-control` | warning | The host reports `bbr`; re-run `deploy setup` when it does not, so SSH and registry pulls use the framework setting too |
 | `runtime-secrets` | error | Every required secret is in the server store with a value, and nothing reserved is |

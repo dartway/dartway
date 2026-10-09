@@ -115,7 +115,7 @@ void main() {
           .singleWhere((event) => event['event'] == 'run_finished');
       expect(finished, containsPair('ok', false));
       expect(finished, containsPair('exit_code', 1));
-      expect(finished, containsPair('failed_step', 'update-checkout'));
+      expect(finished, containsPair('failed_step', 'stack-identity'));
     },
   );
 }

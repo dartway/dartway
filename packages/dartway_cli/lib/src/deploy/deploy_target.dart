@@ -60,6 +60,7 @@ class DwDeployTarget {
     required this.sslEmail,
     required this.apiDomain,
     required this.appDomain,
+    this.project,
     this.site,
     this.database = DwDatabaseMode.bundled,
     this.storage = DwStorageMode.none,
@@ -84,6 +85,10 @@ class DwDeployTarget {
   final String repo;
   final String branch;
   final String sslEmail;
+
+  /// `project:` from `deploy/config.yaml`, or null when the key is absent and
+  /// [projectName] falls back to the repository's name.
+  final String? project;
 
   /// The server for mobile apps and webhooks: everything is proxied to it.
   final String apiDomain;
@@ -126,14 +131,25 @@ class DwDeployTarget {
   /// or package uses for a group name.
   static const defaultDeployUser = 'dw_admin';
 
-  /// Project name derived from the repository URL. Names the checkout and the
-  /// runtime configuration directory on the server.
+  /// The deployment's identity on the server: it names the checkout, the
+  /// secret store (`~/.config/<name>`), the Compose project and with it every
+  /// data volume (`<name>_postgres_data`).
+  ///
+  /// `project:` when the environment sets it, the last segment of [repo]
+  /// otherwise. A repository that moves or is renamed keeps its deployment
+  /// only by pinning the old name with `project:` — without it the same
+  /// server would get a second, empty stack beside the live one, which the
+  /// `stack-identity` guard refuses (`judgeStackIdentity`).
   String get projectName {
+    if (project case final name?) return name;
     final lastSegment = repo.split('/').last;
     return lastSegment.endsWith('.git')
         ? lastSegment.substring(0, lastSegment.length - 4)
         : lastSegment;
   }
+
+  /// What Compose accepts as a project name, and so what `project:` may be.
+  static final RegExp projectNamePattern = RegExp(r'^[a-z0-9][a-z0-9_-]*$');
 
   /// Where the deployment keeps the repository checkout.
   String get appDir => '/home/$deployUser/$projectName';
@@ -222,6 +238,14 @@ class DwDeployTarget {
         defaultDeployUser;
     final os = guarded(() => reader.requiredString('os'));
     final repo = guarded(() => reader.requiredString('repo'));
+    final project = guarded(() => reader.optionalString('project'));
+    if (project != null && !projectNamePattern.hasMatch(project)) {
+      problems.add(
+        '$source: "project" must be a Compose project name — lower case '
+        'letters, digits, "_" and "-", starting with a letter or a digit — '
+        'got "$project"',
+      );
+    }
     final branch = guarded(() => reader.requiredString('branch'));
     final sslEmail = guarded(() => reader.requiredString('ssl_email'));
     final apiDomain = guarded(() => reader.requiredString('api_domain'));
@@ -348,6 +372,7 @@ class DwDeployTarget {
         sslEmail: sslEmail!,
         apiDomain: apiDomain!,
         appDomain: appDomain!,
+        project: project,
         site: site,
         database: database,
         storage: storage,
@@ -452,6 +477,7 @@ class DwDeployTarget {
     'deploy_user',
     'os',
     'repo',
+    'project',
     'branch',
     'ssl_email',
     'api_domain',

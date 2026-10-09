@@ -2,6 +2,14 @@
 
 ## 0.24.0
 
+- Deploy: `project:` in an environment of `deploy/config.yaml` names the deployment on the server
+  (checkout, secret store, Compose project, data volumes); absent, it is the repository's name as
+  before. A new `stack-identity` guard — the first step of `deploy run`, before the secret store in
+  `deploy setup`, and a `deploy check` server check — refuses when the server runs other stacks and
+  not this one, naming them and the `project:` line to set: a repository that moved no longer
+  starts a second, empty stack beside the live one. `deploy setup --new-stack` sets up a genuine
+  second project on such a host (#482).
+
 - `secret pull --overwrite KEY[,KEY…]` can take the server value for selected differing keys. Pull
   prints a names-only plan, supports the same plan under `--dry-run`, refuses empty server values,
   and restores the original local file when read-back verification fails (#434).

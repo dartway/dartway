@@ -121,6 +121,26 @@ class DwDeployRunner {
     return ssh.runAs(target.deployUser, script);
   }
 
+  /// Asks the server which stacks it runs and refuses when it runs others but
+  /// not this one ([judgeStackIdentity]) — a repository that moved without
+  /// `project:` pinning the old name. First of all, so a refusal leaves the
+  /// server exactly as it was.
+  Future<DwSshResult> checkStackIdentity() async {
+    final listed = await _as(dwStackIdentityScript(target));
+    if (!listed.ok) return listed;
+    final verdict = judgeStackIdentity(
+      projectName: target.projectName,
+      environment: target.environment,
+      volumeListing: listed.stdout,
+      configDirListing: listed.stdout,
+    );
+    return DwSshResult(
+      exitCode: verdict.ok ? 0 : 1,
+      stdout: verdict.ok ? verdict.detail : '',
+      stderr: verdict.ok ? '' : verdict.detail,
+    );
+  }
+
   /// Brings the checkout to the tip of the deployment branch.
   ///
   /// `reset --hard` rather than `pull`: the server mirrors the repository, and
@@ -563,6 +583,14 @@ echo "nginx restarted and running"
   ];
 
   List<DwDeployStep> _plannedSteps({required bool skipGitUpdate}) => [
+    // Before anything touches the server: every path below is named after the
+    // project, and a project whose name changed with its repository would
+    // otherwise find no checkout, or start a second, empty stack.
+    DwDeployStep(
+      id: 'stack-identity',
+      title: "Check this server runs this project's stack",
+      run: checkStackIdentity,
+    ),
     if (!skipGitUpdate)
       DwDeployStep(
         id: 'update-checkout',

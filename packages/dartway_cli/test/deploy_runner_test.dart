@@ -3,8 +3,10 @@ import 'dart:io';
 
 import 'package:dartway_cli/src/commands/deploy_run.dart';
 import 'package:dartway_cli/src/deploy/compose_files.dart';
+import 'package:dartway_cli/src/deploy/data_volumes.dart';
 import 'package:dartway_cli/src/deploy/deploy_progress.dart';
 import 'package:dartway_cli/src/deploy/deploy_runner.dart';
+import 'package:dartway_cli/src/deploy/deploy_target.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:path/path.dart' as p;
@@ -31,6 +33,7 @@ void main() {
 
     test('is the whole sequence, in order', () {
       expect(ids, [
+        'stack-identity',
         'update-checkout',
         'bridge-override',
         'render-stack',
@@ -511,6 +514,118 @@ esac
       ]) {
         expect(ssh.issued.single, contains(key));
       }
+    });
+  });
+
+  group('the stack-identity step', () {
+    final quiet = IOSink(StreamController<List<int>>()..stream.drain<void>());
+    DwDeployProgress progress() =>
+        DwDeployProgress.into(human: quiet, events: quiet);
+
+    // The repository moved from acme/molodey to dealwithitdwi/moloday; the
+    // server still runs the stack named after the old one.
+    DwStack moved({String extra = ''}) => DwStack(
+      target: DwDeployTarget.parse(
+        configYaml(
+          extra: extra,
+        ).replaceFirst('acme/shop.git', 'dealwithitdwi/moloday.git'),
+        environment: 'staging',
+      ),
+      projectRoot: Directory.systemTemp,
+      serverPackage: 'shop_server',
+      flutterPackage: 'shop_flutter',
+      front: const DwTlsFront(),
+    );
+
+    RecordingSsh serverRunningMolodey() => RecordingSsh([
+      (
+        'docker volume ls',
+        const DwSshResult(
+          exitCode: 0,
+          stdout:
+              'molodey_postgres_data\n'
+              '/home/deployer/.config/molodey/secrets.env\n',
+          stderr: '',
+        ),
+      ),
+    ]);
+
+    test('is the first step, with or without the checkout update', () {
+      final runner = DwDeployRunner(ssh: RecordingSsh(), stack: moved());
+      expect(runner.steps(skipGitUpdate: false).first.id, 'stack-identity');
+      expect(runner.steps(skipGitUpdate: true).first.id, 'stack-identity');
+    });
+
+    test('on a server running only another stack, the deploy stops there and '
+        'sends nothing else', () async {
+      final ssh = serverRunningMolodey();
+      final failed = await executeDeploySteps(
+        DwDeployRunner(ssh: ssh, stack: moved()).steps(skipGitUpdate: false),
+        progress: progress(),
+      );
+
+      expect(failed, 'stack-identity');
+      expect(ssh.issued, hasLength(1));
+      expect(ssh.issued.single, isNot(contains('git ')));
+      expect(ssh.issued.single, isNot(contains("cd '")));
+      expect(ssh.issued.single, isNot(contains('docker compose')));
+    });
+
+    test('says what to set when it refuses', () async {
+      final result = await DwDeployRunner(
+        ssh: serverRunningMolodey(),
+        stack: moved(),
+      ).checkStackIdentity();
+
+      expect(result.ok, isFalse);
+      expect(result.stderr, contains('set "project: molodey" under staging'));
+    });
+
+    test('with project: pinning the old name, it passes and the checkout '
+        'is updated where the stack lives', () async {
+      final ssh = serverRunningMolodey();
+      final failed = await executeDeploySteps(
+        DwDeployRunner(
+          ssh: ssh,
+          stack: moved(extra: '  project: molodey\n'),
+        ).steps(skipGitUpdate: false).take(2).toList(),
+        progress: progress(),
+      );
+
+      expect(failed, isNull);
+      expect(ssh.issued.first, contains('docker volume ls'));
+      // The checkout update, in the directory the live stack runs from.
+      expect(ssh.issued[1], contains('/home/deployer/molodey'));
+      expect(ssh.issued[1], contains('git fetch origin'));
+    });
+
+    // The script itself, in a shell: the store listing is a glob that matches
+    // nothing on a fresh server, and that must not fail the step.
+    test('lists the secret stores, and nothing is not an error', () async {
+      final home = Directory.systemTemp.createTempSync('dw_identity_');
+      addTearDown(() => home.deleteSync(recursive: true));
+      final script = dwStackIdentityScript(moved().target)
+          .replaceAll('/home/deployer', home.path)
+          .replaceFirst(
+            "docker volume ls --format '{{.Name}}'",
+            'echo molodey_postgres_data',
+          );
+
+      final empty = await LocalShell().run(script);
+      expect(empty.ok, isTrue, reason: empty.stderr);
+      expect(empty.stdout.trim(), 'molodey_postgres_data');
+
+      File(p.join(home.path, '.config', 'molodey', 'secrets.env'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('KEY=value\n');
+      Directory(p.join(home.path, '.config', 'unrelated')).createSync();
+      final listed = await LocalShell().run(script);
+      expect(listed.ok, isTrue, reason: listed.stderr);
+      expect(listed.stdout.trim().split('\n'), [
+        'molodey_postgres_data',
+        p.join(home.path, '.config', 'molodey', 'secrets.env'),
+      ]);
+      expect(listed.stdout, isNot(contains('KEY=value')));
     });
   });
 

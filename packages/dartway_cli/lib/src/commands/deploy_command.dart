@@ -84,6 +84,14 @@ class DeploySetupCommand extends Command<int> {
       )
       ..addOption('identity', help: 'SSH private key file.')
       ..addFlag(
+        'new-stack',
+        negatable: false,
+        help:
+            'Set up a second project on a host that already runs other '
+            "stacks: skips only the check that this server runs this "
+            "project's stack.",
+      )
+      ..addFlag(
         'dry-run',
         negatable: false,
         help: 'Print the rendered files and change nothing.',
@@ -99,7 +107,7 @@ class DeploySetupCommand extends Command<int> {
 
   @override
   String get invocation =>
-      'dartway deploy setup --env <environment> [--dry-run]';
+      'dartway deploy setup --env <environment> [--dry-run] [--new-stack]';
 
   @override
   Future<int> run() => runSetup(
