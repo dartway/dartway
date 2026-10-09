@@ -148,6 +148,22 @@ void main() {
       roundTrip(const DwGetFileLink(fileId: 8)),
       const DwGetFileLink(fileId: 8),
     );
+    expect(
+      roundTrip(const DwGetFileLink(fileId: 8, download: true)),
+      const DwGetFileLink(fileId: 8, download: true),
+    );
+  });
+
+  test('a link asked to show the file says nothing of a download', () {
+    expect(const DwGetFileLink(fileId: 8).toJson(), {'fileId': 8});
+    expect(const DwGetFileLink(fileId: 8, download: true).toJson(), {
+      'fileId': 8,
+      'download': true,
+    });
+    expect(
+      const DwGetFileLink(fileId: 8),
+      isNot(const DwGetFileLink(fileId: 8, download: true)),
+    );
   });
 
   test('a command answers its file through the protocol', () {

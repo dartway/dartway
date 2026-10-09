@@ -2,8 +2,11 @@
 
 ## 0.21.0-dev.17
 
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the router
-  that follows a provider (dartway/dartway#407).
+- `dw.files.getLink(fileId, download: true)` asks for a link that saves the file rather than shows
+  it; `DwFakeStorage` marks such a link with `&disposition=attachment` (dartway/dartway#481).
+
+- The family moves in lockstep to deliver the migration note for the router that follows a provider
+  (dartway/dartway#407).
 
 ## 0.21.0-dev.16
 

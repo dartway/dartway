@@ -30,7 +30,8 @@ abstract final class ChatFiles {
     };
   }
 
-  /// The link to [attachment]. Run inside `dw.action`, which shows a refusal.
+  /// The link that saves [attachment] rather than showing it. Run inside
+  /// `dw.action`, which shows a refusal.
   static Future<String> linkOf(ChatAttachment attachment) async =>
-      (await dw.files.getLink(attachment.id)).valueOrThrow.url;
+      (await dw.files.getLink(attachment.id, download: true)).valueOrThrow.url;
 }

@@ -609,6 +609,10 @@ const String wireGolden = r'''
     "dto.getFileLink": {
       "fileId": 11
     },
+    "dto.getFileLink.download": {
+      "fileId": 11,
+      "download": true
+    },
     "dto.fileLink": {
       "id": 11,
       "url": "https://storage.invalid/private/avatar/7/x.png?sig",
