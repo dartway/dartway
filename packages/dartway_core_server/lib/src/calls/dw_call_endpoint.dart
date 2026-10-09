@@ -56,7 +56,6 @@ final class DwCallEndpoint {
   /// By call class; one per request and command class of the protocol.
   final Map<Type, DwCallHandler> handlers;
 
-  static const int _maxTransactionAttempts = 3;
   static const int maxIdempotencyKeyLength = 128;
 
   DwWireProtocol get _protocol => runtime.protocol;
@@ -405,34 +404,24 @@ final class DwCallEndpoint {
       return _runNonTransactional(handler, command, key, accountId, ctx, typeName);
     }
     try {
-      for (var attempt = 1; ; attempt++) {
-        try {
-          return await ctx.transaction((tx) async {
-            // Two sends of one key racing each other: the second waits here
-            // and then finds the first one's outcome.
-            await tx.advisoryLock(
-              DwLockSpace.idempotencyKey,
-              dwLockKey('$accountId/$key'),
-            );
-            final stored = await dwStoredOutcome(tx, key, accountId);
-            if (stored != null) return _replay(stored, typeName);
-            await _check(handler.access, ctx, command);
-            final value = await handler.run(ctx, command);
-            if (handler.recordsSuccess && !ctx.madeSecret) {
-              await dwRecordOutcome(tx, key, accountId, typeName, 'ok', value);
-            }
-            return DwApiResponse.ok(value);
-          });
-        } catch (error) {
-          if (attempt < _maxTransactionAttempts &&
-              dwIsRetryableTransactionError(error)) {
-            ctx.log.info('transaction conflict, attempt $attempt; retrying');
-            ctx.resetForRetry();
-            continue;
-          }
-          rethrow;
+      // A conflict re-runs the whole transaction: `ctx.transaction` retries
+      // the outermost one it opens.
+      return await ctx.transaction((tx) async {
+        // Two sends of one key racing each other: the second waits here and
+        // then finds the first one's outcome.
+        await tx.advisoryLock(
+          DwLockSpace.idempotencyKey,
+          dwLockKey('$accountId/$key'),
+        );
+        final stored = await dwStoredOutcome(tx, key, accountId);
+        if (stored != null) return _replay(stored, typeName);
+        await _check(handler.access, ctx, command);
+        final value = await handler.run(ctx, command);
+        if (handler.recordsSuccess && !ctx.madeSecret) {
+          await dwRecordOutcome(tx, key, accountId, typeName, 'ok', value);
         }
-      }
+        return DwApiResponse.ok(value);
+      });
     } on DwRefusalException catch (refusal) {
       // The transaction has rolled back; the refusal is the outcome, and a
       // retry of the same intent is answered the same.
