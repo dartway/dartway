@@ -396,12 +396,34 @@ have nothing to work with; an exchange Apple refuses does not refuse the sign-in
 token already proved.
 
 **The app's half is two packages, one per provider**, so a project takes what it offers:
-`dartway_auth_google` (`dw.signInWithGoogle()`) and `dartway_auth_apple` (`dw.signInWithApple()`).
-Each makes the nonce, gets the token from the provider's SDK, sends the command and signs the
-answered session in; what the provider told about the person is handed to an `introduce` callback
-whose answer joins `registration`, so the project names its own fields and neither package knows
-them. Apple's package also carries the `authorizationCode`; Google's nonce is fixed by
-`DwGoogleAuth.initialize`, because the Google SDK takes it there rather than per sign-in.
+`dartway_auth_google` (`DwGoogleAuth.signInCommand()`) and `dartway_auth_apple`
+(`DwAppleSignIn.signInCommand()`). Each makes the nonce, gets the token from the provider's SDK and
+answers the `DwSignInWithProvider` it makes — and sends nothing. The app sends it with `dw.command`
+and keeps the answered session with `dw.signIn`, exactly as it does `DwVerifyCode`: one way to send
+any sign-in, whatever the credential. What the provider told about the person is handed to an
+`introduce` callback whose answer joins `registration`, so the project names its own fields and
+neither package knows them. Apple's command also carries the `authorizationCode`; Google's nonce is
+fixed by `DwGoogleAuth.initialize`, because the Google SDK takes it there rather than per sign-in.
+
+```dart
+final signIn = await DwGoogleAuth.signInCommand(
+  introduce: (account) => {
+    if (account.displayName case final name?) RegistrationKeys.firstName: name,
+  },
+);
+final result = await dw.command(signIn);
+if (result case DwCallOk(value: final session)) await dw.signIn(session);
+```
+
+**A provider sign-up the project refuses is finished with the same command.** A project whose
+`onExternalAccountCreated` refuses until the terms are accepted (`consentsRequired`) answers the
+first sign-in of a new person with that refusal; nothing is created, and Apple's code is not
+exchanged — the refusal rolls back before it. The app keeps the command in its state, shows its
+consent step, and sends `signIn.withRegistration({...consents})`: the same token, nonce and code with
+the consent keys added, later keys winning. The provider is not asked again — for Apple that matters,
+since a second authorization would not tell the name. A held command lives as long as its token:
+about an hour for Google, about ten minutes for Apple. `dw.providerCredentialRejected` on a re-send
+means the token has expired: ask the provider again.
 
 **What a project still owes the stores.** Offering Google or Apple sign-in brings App Store
 guideline 4.8 into play — an app whose main account uses a third-party sign-in must also offer one

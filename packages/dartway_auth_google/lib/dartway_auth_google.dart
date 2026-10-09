@@ -1,4 +1,5 @@
-/// Sign in with Google for a DartWay app: `dw.signInWithGoogle()`.
+/// Sign in with Google for a DartWay app: `DwGoogleAuth.signInCommand()`
+/// makes the sign-in command, which the app sends with `dw.command`.
 ///
 /// The server half is `dartway_auth_providers_server`, which verifies the
 /// token; see `docs/4-server/auth-identity.md`.

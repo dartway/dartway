@@ -3,13 +3,12 @@ import 'dart:math';
 
 import 'package:crypto/crypto.dart';
 import 'package:dartway_auth_providers_shared/dartway_auth_providers_shared.dart';
-import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:sign_in_with_apple/sign_in_with_apple.dart';
 
 /// What Apple told about the person, which it does **only at the very first
 /// authorization** and never again: not in the identity token, not on the
 /// next sign-in, not after a reinstall. The project decides what to do with
-/// it — see [DwAppleSignInCall.signInWithApple].
+/// it — see [DwAppleSignIn.signInCommand].
 final class DwAppleIntroduction {
   const DwAppleIntroduction({this.givenName, this.familyName, this.email});
 
@@ -23,8 +22,7 @@ final class DwAppleIntroduction {
 
   /// Whether Apple said anything at all — false on every sign-in but the
   /// first.
-  bool get isEmpty =>
-      givenName == null && familyName == null && email == null;
+  bool get isEmpty => givenName == null && familyName == null && email == null;
 }
 
 /// Asks Apple for a credential. Replaced in tests; there is no other reason
@@ -52,6 +50,82 @@ abstract final class DwAppleSignIn {
     webAuthenticationOptions: webAuthenticationOptions,
   );
 
+  /// Runs the Apple flow and answers the sign-in command it makes, sending
+  /// nothing.
+  ///
+  /// The nonce is made here and checked by the server; Apple's one-time
+  /// `authorizationCode` travels with the command, because it is the only
+  /// thing that can later revoke this person's tokens when they delete their
+  /// account — an app that drops it cannot meet Apple's own rule.
+  ///
+  /// The app sends the command with `dw.command` and keeps the session it
+  /// answers with `dw.signIn`, exactly as it does with a code. When the
+  /// project refuses the sign-up — `consentsRequired` from its
+  /// `onExternalAccountCreated` — the app keeps the command, shows its consent
+  /// step, and sends [DwSignInWithProvider.withRegistration] with the consent
+  /// keys. Asking Apple again is not an option here: Apple tells the name
+  /// only at the first authorization, so a second run would lose it for
+  /// good. The token lives about ten minutes; `dw.providerCredentialRejected`
+  /// on a re-send means "ask Apple again".
+  ///
+  /// [registration] is what the project collects at sign-up. Apple's
+  /// introduction — the name, once in a lifetime — is handed to
+  /// [introduce], whose answer is merged into it, so the project names its
+  /// own fields and the framework knows none of them:
+  ///
+  /// ```dart
+  /// final signIn = await DwAppleSignIn.signInCommand(
+  ///   introduce: (person) => {
+  ///     if (person.givenName case final name?) RegistrationKeys.firstName: name,
+  ///   },
+  /// );
+  /// final result = await dw.command(signIn);
+  /// if (result case DwCallOk(value: final session)) await dw.signIn(session);
+  /// ```
+  ///
+  /// Throws [SignInWithAppleAuthorizationException] when the person cancels —
+  /// the app decides whether that is worth a word on the screen.
+  static Future<DwSignInWithProvider> signInCommand({
+    Map<String, String> registration = const {},
+    Map<String, String> Function(DwAppleIntroduction person)? introduce,
+    List<AppleIDAuthorizationScopes> scopes = const [
+      AppleIDAuthorizationScopes.fullName,
+      AppleIDAuthorizationScopes.email,
+    ],
+    WebAuthenticationOptions? webAuthenticationOptions,
+  }) async {
+    final nonce = newNonce();
+    final credential = await credentials(
+      scopes: scopes,
+      nonce: hashedNonce(nonce),
+      webAuthenticationOptions: webAuthenticationOptions,
+    );
+    final identityToken = credential.identityToken;
+    if (identityToken == null) {
+      // Apple answered without the one thing the server can check. Nothing to
+      // send, and nothing to pretend about.
+      throw const SignInWithAppleAuthorizationException(
+        code: AuthorizationErrorCode.failed,
+        message: 'Apple returned no identity token',
+      );
+    }
+    final person = DwAppleIntroduction(
+      givenName: credential.givenName,
+      familyName: credential.familyName,
+      email: credential.email,
+    );
+    return DwSignInWithProvider(
+      provider: DwAuthProvider.apple,
+      idToken: identityToken,
+      nonce: nonce,
+      authorizationCode: credential.authorizationCode,
+      registration: {
+        ...registration,
+        if (introduce != null && !person.isEmpty) ...introduce(person),
+      },
+    );
+  }
+
   /// Whether this device can sign in with Apple at all — false on an Android
   /// build without `webAuthenticationOptions`, and on desktop.
   static Future<bool> isAvailable() => SignInWithApple.isAvailable();
@@ -72,77 +146,4 @@ abstract final class DwAppleSignIn {
   /// The nonce as Apple receives it.
   static String hashedNonce(String raw) =>
       sha256.convert(utf8.encode(raw)).toString();
-}
-
-/// Signing in with Apple from the app's `dw`.
-extension DwAppleSignInCall on DwFlutterCore {
-  /// Runs the Apple flow and signs the session in, answering what the server
-  /// said.
-  ///
-  /// The nonce is made here and checked by the server; Apple's one-time
-  /// `authorizationCode` travels with the sign-in, because it is the only
-  /// thing that can later revoke this person's tokens when they delete their
-  /// account — an app that drops it cannot meet Apple's own rule.
-  ///
-  /// [registration] is what the project collects at sign-up. Apple's
-  /// introduction — the name, once in a lifetime — is handed to
-  /// [introduce], whose answer is merged into it, so the project names its
-  /// own fields and the framework knows none of them:
-  ///
-  /// ```dart
-  /// await dw.signInWithApple(
-  ///   introduce: (person) => {
-  ///     if (person.givenName case final name?) RegistrationKeys.firstName: name,
-  ///   },
-  /// );
-  /// ```
-  ///
-  /// Throws [SignInWithAppleAuthorizationException] when the person cancels —
-  /// the app decides whether that is worth a word on the screen.
-  Future<DwCallResult<DwAuthSession>> signInWithApple({
-    Map<String, String> registration = const {},
-    Map<String, String> Function(DwAppleIntroduction person)? introduce,
-    List<AppleIDAuthorizationScopes> scopes = const [
-      AppleIDAuthorizationScopes.fullName,
-      AppleIDAuthorizationScopes.email,
-    ],
-    WebAuthenticationOptions? webAuthenticationOptions,
-  }) async {
-    final nonce = DwAppleSignIn.newNonce();
-    final credential = await DwAppleSignIn.credentials(
-      scopes: scopes,
-      nonce: DwAppleSignIn.hashedNonce(nonce),
-      webAuthenticationOptions: webAuthenticationOptions,
-    );
-    final identityToken = credential.identityToken;
-    if (identityToken == null) {
-      // Apple answered without the one thing the server can check. Nothing to
-      // send, and nothing to pretend about.
-      throw const SignInWithAppleAuthorizationException(
-        code: AuthorizationErrorCode.failed,
-        message: 'Apple returned no identity token',
-      );
-    }
-    final person = DwAppleIntroduction(
-      givenName: credential.givenName,
-      familyName: credential.familyName,
-      email: credential.email,
-    );
-    final result = await command(
-      DwSignInWithProvider(
-        provider: DwAuthProvider.apple,
-        idToken: identityToken,
-        nonce: nonce,
-        authorizationCode: credential.authorizationCode,
-        registration: {
-          ...registration,
-          if (introduce != null && !person.isEmpty) ...introduce(person),
-        },
-      ),
-    );
-    if (result case DwCallOk<DwAuthSession>(:final value)) {
-      await signIn(value);
-    }
-    return result;
-  }
 }

@@ -47,6 +47,26 @@ final class DwSignInWithProvider extends DwActionCommand<DwAuthSession> {
   final String? authorizationCode;
   final Map<String, String> registration;
 
+  /// The same sign-in with [more] added to [registration], a key in [more]
+  /// winning over the same key already there.
+  ///
+  /// This is how a refused sign-up is finished: a project whose
+  /// `onExternalAccountCreated` refuses until the terms are accepted keeps the
+  /// command it sent, shows its consent step, and sends this copy — the same
+  /// token, nonce and authorization code, so the provider is not asked again.
+  /// The token lives as long as the provider made it (Google's about an hour,
+  /// Apple's about ten minutes); a copy sent later is refused with
+  /// [DwProviderRefusal.credentialRejected], and the app asks the provider for
+  /// a fresh one.
+  DwSignInWithProvider withRegistration(Map<String, String> more) =>
+      DwSignInWithProvider(
+        provider: provider,
+        idToken: idToken,
+        nonce: nonce,
+        authorizationCode: authorizationCode,
+        registration: {...registration, ...more},
+      );
+
   @override
   String get dwTypeName => 'DwSignInWithProvider';
 
@@ -61,7 +81,10 @@ final class DwSignInWithProvider extends DwActionCommand<DwAuthSession> {
 
   static DwSignInWithProvider fromJson(Map<String, Object?> json) =>
       DwSignInWithProvider(
-        provider: DwJsonCodec.decodeEnum(json['provider'], DwAuthProvider.values),
+        provider: DwJsonCodec.decodeEnum(
+          json['provider'],
+          DwAuthProvider.values,
+        ),
         idToken: json['idToken']! as String,
         nonce: json['nonce'] as String?,
         authorizationCode: json['authorizationCode'] as String?,

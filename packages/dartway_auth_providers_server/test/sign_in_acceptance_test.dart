@@ -422,6 +422,46 @@ void main() {
     );
   });
 
+  test('a sign-up the project refuses creates nothing and exchanges no code; '
+      'the same token, nonce and code sent again with the consent keys '
+      'creates the account and exchanges the code once (#374)', () async {
+    await club.stop();
+    club = await _ProviderHarness.start(
+      appleKeys,
+      apple,
+      consentRequired: true,
+    );
+    const signIn = DwSignInWithProvider(
+      provider: DwAuthProvider.apple,
+      idToken: appleToken,
+      nonce: 'deadbeef',
+      authorizationCode: 'apple-code-5',
+      registration: {'firstName': 'Ada'},
+    );
+
+    final refused = await club.send(signIn);
+    expect(refused.refusal.code, _ClubRefusal.consentsRequired.code);
+    expect(refused.refusal.field, 'consents');
+    expect(club.created, isEmpty);
+    expect(await club.db.query('SELECT 1 FROM dw_identity'), isEmpty);
+    expect(await club.db.query('SELECT 1 FROM dw_account'), isEmpty);
+    expect(
+      apple.calls,
+      isEmpty,
+      reason: 'a refused sign-up must leave the one-time code unspent',
+    );
+
+    final again = signIn.withRegistration({'terms': 'true'});
+    final session = (await club.send(again)).value(again);
+    expect(session.isNewAccount, isTrue);
+    expect(club.created.single.accountId, session.id);
+    expect(club.created.single.registration, containsPair('firstName', 'Ada'));
+    expect(club.created.single.registration, containsPair('terms', 'true'));
+    final exchanges = apple.to('/auth/token');
+    expect(exchanges, hasLength(1));
+    expect(exchanges.single['code'], 'apple-code-5');
+  });
+
   test('a repeat of the very same call mints a new session rather than '
       'replaying the stored one', () async {
     final key = 'idem-${DateTime.now().microsecondsSinceEpoch}';
@@ -445,6 +485,8 @@ DwSignInWithProvider _signIn() => const DwSignInWithProvider(
   nonce: 'deadbeef',
 );
 
+enum _ClubRefusal with DwRefusalCodes { consentsRequired }
+
 typedef _Creation = ({
   int accountId,
   String provider,
@@ -466,6 +508,7 @@ final class _ProviderHarness {
     FakeApple apple, {
     bool withSigningKey = true,
     bool linkByVerifiedEmail = false,
+    bool consentRequired = false,
     FakeKeySet? googleKeys,
   }) async {
     final DwDatabaseConfig admin;
@@ -502,6 +545,14 @@ final class _ProviderHarness {
             generateCode: (ctx, kind, identifier, accountId) async => '654321',
             onExternalAccountCreated:
                 (ctx, accountId, provider, subject, registration) async {
+                  // As a project whose sign-up needs the terms accepted: the
+                  // refusal rolls the account back with the transaction.
+                  if (consentRequired && registration['terms'] != 'true') {
+                    ctx.refuse(
+                      _ClubRefusal.consentsRequired,
+                      field: 'consents',
+                    );
+                  }
                   harness.created.add((
                     accountId: accountId,
                     provider: provider,

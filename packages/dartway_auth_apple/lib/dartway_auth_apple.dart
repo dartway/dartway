@@ -1,4 +1,5 @@
-/// Sign in with Apple for a DartWay app: `dw.signInWithApple()`.
+/// Sign in with Apple for a DartWay app: `DwAppleSignIn.signInCommand()`
+/// makes the sign-in command, which the app sends with `dw.command`.
 ///
 /// The server half is `dartway_auth_providers_server`, which verifies the
 /// token and keeps what a deletion needs; see
