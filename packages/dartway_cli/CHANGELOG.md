@@ -2,6 +2,7 @@
 
 ## 0.24.0
 
+- `dartway create` no longer writes a LICENSE; a project's licence is its owner's decision (#422).
 - `deploy run --revision <sha>` deploys the verified commit only when it belongs to the configured
   remote branch, and refuses an older revision when the server already contains it. The revision is
   included in text and JSON progress, and invalid revisions fail before SSH (#473).
