@@ -254,8 +254,10 @@ The framework owns accounts, identifiers and keys; `DwAuthConfig` (the skeleton'
   [`account/logic/auth.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/lib/src/account/logic/auth.dart);
 - `onExternalAccountCreated` — the profile for a Google/Apple sign-in, required to allow one; the
   verified claims are in `registration` under `DwProviderClaim` keys, which the app cannot write;
-- `linkByVerifiedEmail` — off by default, and off is the safer default; `onIdentifierChanged` — mirror
-  or republish an identifier, in the changing transaction.
+- `linkByVerifiedEmail` — off by default, and off is the safer default; on, it links both ways: a
+  provider's first sign-in to an existing e-mail account, and an e-mail code to the account a provider
+  proved the address for; `onIdentifierChanged` — mirror or republish an identifier, in the changing
+  transaction.
 
 Google and Apple sign-in is `DwSignInProvidersModule([DwGoogleSignIn(clientIds: [android, ios, web]),
 DwAppleSignIn(clientIds: [bundleId], signingKey: …)])` in `modules:` — one client id per platform — with

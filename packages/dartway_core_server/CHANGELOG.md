@@ -16,6 +16,16 @@
 - The family moves in lockstep to deliver the migration note for the router
   that follows a provider (dartway/dartway#407).
 
+- `DwAuthConfig.linkByVerifiedEmail` links both ways: an e-mail code sign-in to an address no `email`
+  identity holds lands on the account whose provider identity's token proved that address verified,
+  instead of making a second account — the `email` identity is attached verified,
+  `onIdentifierChanged` runs (`DwIdentifierChangeCause.linked`, `kind` set) and `onAccountCreated`
+  does not. Provider identities of two or more accounts proving one address make it ambiguous: a new
+  account as before, and a logged warning. **New framework migration
+  `20261009_000001_dw_identity_provider_email`**: `dw_identity.provider_email`, rewritten on every
+  provider sign-in (the normalized verified address under the option, `NULL` otherwise), so it fills
+  in for identities made before the option was on (dartway/dartway#373).
+
 ## 0.21.0-dev.16
 
 - Nothing changed here; the family moves in lockstep to deliver the migration note for the import,

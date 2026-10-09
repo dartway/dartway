@@ -35,6 +35,11 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _keysAndIdentitiesDown,
   ),
   const _DwSqlMigration('20260930_000000_dw_setting', _settingUp, _settingDown),
+  const _DwSqlMigration(
+    '20261009_000001_dw_identity_provider_email',
+    _identityProviderEmailUp,
+    _identityProviderEmailDown,
+  ),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
@@ -278,6 +283,23 @@ CREATE TABLE dw_setting (
 ];
 
 const List<String> _settingDown = ['DROP TABLE dw_setting'];
+
+// The e-mail a provider identity's token proved verified, normalized: what an
+// e-mail code sign-in for the same address links to under
+// `DwAuthConfig.linkByVerifiedEmail`. Rewritten on every sign-in of the
+// identity — `NULL` when the option is off or the token proved none — so it
+// fills in for identities made before the option was turned on. `NULL` on
+// every code identity.
+const List<String> _identityProviderEmailUp = [
+  'ALTER TABLE dw_identity ADD COLUMN provider_email text',
+  'CREATE INDEX dw_identity_provider_email ON dw_identity (provider_email) '
+      'WHERE provider_email IS NOT NULL',
+];
+
+const List<String> _identityProviderEmailDown = [
+  'DROP INDEX dw_identity_provider_email',
+  'ALTER TABLE dw_identity DROP COLUMN provider_email',
+];
 
 const List<String> _initialDown = [
   'DROP TABLE dw_recurring_job',

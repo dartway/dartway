@@ -164,6 +164,63 @@ void main() {
       expect(session.isNewAccount, isTrue);
       expect(club.created, hasLength(1));
     });
+
+    Future<DwAuthSession> emailCode(String identifier) async {
+      final request = DwRequestCode(
+        kind: DwIdentifierKind.email,
+        identifier: identifier,
+      );
+      final ticket = (await club.send(request)).value(request);
+      final verify = DwVerifyCode(ticketId: ticket.id, code: '654321');
+      return (await club.send(verify)).value(verify);
+    }
+
+    test('the other way round (#373): an Apple token first, then an e-mail '
+        'code for the address it proved — the code lands on the same '
+        'account', () async {
+      await club.stop();
+      club = await _ProviderHarness.start(
+        appleKeys,
+        apple,
+        linkByVerifiedEmail: true,
+      );
+      final providerSession = (await signIn()).value(_signIn());
+      expect(providerSession.isNewAccount, isTrue);
+
+      final emailSession = await emailCode('ada@example.com');
+      expect(emailSession.id, providerSession.id);
+      expect(emailSession.isNewAccount, isFalse);
+      expect(
+        await club.db.query(
+          'SELECT kind FROM dw_identity WHERE account_id = @id ORDER BY id',
+          params: {'id': providerSession.id},
+        ),
+        [
+          isA<DwResultRow>().having((r) => r.get<String>('kind'), '', 'apple'),
+          isA<DwResultRow>().having((r) => r.get<String>('kind'), '', 'email'),
+        ],
+      );
+    });
+
+    test('a Google token with email_verified: false first, then an e-mail '
+        'code for the same address: a new account (#373)', () async {
+      await club.stop();
+      club = await _ProviderHarness.start(
+        appleKeys,
+        apple,
+        linkByVerifiedEmail: true,
+        googleKeys: FakeKeySet(googleJwks),
+      );
+      final providerSession = (await signIn(
+        provider: DwAuthProvider.google,
+        token: googleTokenEmailUnverified,
+        nonce: null,
+      )).value(_signIn());
+
+      final emailSession = await emailCode('ada@example.com');
+      expect(emailSession.id, isNot(providerSession.id));
+      expect(emailSession.isNewAccount, isTrue);
+    });
   });
 
   group('linkByVerifiedEmail: the email_verified gate is real (#356)', () {
