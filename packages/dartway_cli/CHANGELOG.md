@@ -2,6 +2,12 @@
 
 ## 0.24.0
 
+- The template's `.github/workflows/claude-review.yml` can no longer push code to a pull request.
+  It passes the workflow's own `github_token` (held to `contents: read`) instead of letting the
+  action exchange OIDC for the Claude App's writable installation token, drops `track_progress`,
+  which forced tag mode with its edit and commit tools, and names those tools in
+  `--disallowedTools`. A project created earlier applies the same three changes (#494).
+
 - Deploy: the output mask also replaces a stored value in the RFC 3986 userinfo form that
   `Uri(userInfo:)` produces (sub-delims and `:` kept, the rest percent-encoded), so a password
   logged inside a connection URL such as `postgres://app:p%40ss$word@db` is masked. The deploy
