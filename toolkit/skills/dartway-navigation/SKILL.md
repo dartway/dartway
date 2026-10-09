@@ -69,6 +69,14 @@ GoRouter.of(context).goNamed(
   `dw.action(…, confirmation: DwUiConfirmation(…))`. **Back from a page** is `goNamed(<parent>.name)` or
   the `AppBar`'s leading button; `Navigator.of(context).pop(value)` closes only a dialog or a sheet, with
   the builder's own context — on a page the check does not catch it and it is still wrong.
+- **Asking before leaving a page** is the route descriptor's `onExit`, not `PopScope`: `PopScope` misses
+  browser back and forward, a typed URL and a header link on the web; `onExit` is asked on every way out.
+  Descriptors are `const`, so it is a top-level function or a static method —
+  `onExit: askBeforeLeaving` with `Future<bool> askBeforeLeaving(BuildContext context,
+  DwNavigationTarget leaving)` — that reads whether to ask from app state
+  (`ProviderScope.containerOf(context)`), opens the sheet from `context`, and answers `true` to leave,
+  `false` to stay. It also fires on a sign-out redirect and a tab switch, so it checks its own
+  precondition first and answers `true` when there is nothing to ask.
 - **A screen's subject is its address**: "open the chat at this message" is a path or query parameter,
   never a provider set before `goNamed` and cleared by the page (lost on reload, link and back).
 - **"New" is its own route** (`.simple` for create beside `.parameterized` for edit), never an id `0` or

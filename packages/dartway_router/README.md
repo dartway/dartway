@@ -363,6 +363,47 @@ DwAppRouter<AppSession>(
 );
 ```
 
+### Asking Before Leaving a Route
+
+A route's `onExit` is asked before the person leaves it — on a pop, the system back, and any change
+of address: browser back and forward, a typed URL, a link, `go`. `PopScope` sees only the first two.
+Return `true` to let the navigation go on, `false` to keep the person on the route. The hook gets the
+navigator's context, so it can open a sheet and answer with the person's choice, and the location
+being left as a `DwNavigationTarget` naming this route and its path parameters.
+
+Descriptors are `const`, so the hook is a top-level function or a static method, not a closure.
+Whether to ask comes from app state, read through the context:
+
+```dart
+Future<bool> askToRateLesson(BuildContext context, DwNavigationTarget leaving) async {
+  final container = ProviderScope.containerOf(context);
+  if (!container.read(lessonToRateProvider)) return true; // nothing to ask
+  final leave = await showModalBottomSheet<bool>(
+    context: context,
+    builder: (_) => const RateLessonSheet(), // pops true to leave, false to stay
+  );
+  return leave ?? false;
+}
+
+enum AppRoutes implements DwNavigationRoute<AppSession> {
+  course(
+    DwNavigationRouteDescriptor.parameterized(
+      pageWidget: CoursePage(),
+      parameter: AppParams.courseId,
+      parent: home,
+      onExit: askToRateLesson,
+    ),
+  ),
+  // ...
+}
+```
+
+It fires on every exit, including the ones the person did not choose — a zone guard redirecting away
+(signing out), a switch of a `StatefulShellRoute` branch — so the hook checks its own precondition.
+It does not fire when navigation goes deeper into a child route; when a child leaves together with
+it, it fires once, with `leaving.routeName` naming this route. Where the person is going is not
+known to it, and closing or reloading the browser tab is not covered.
+
 ### Shell Routes
 
 There are two kinds of shell routes. Choose based on whether you need tab state preserved.
@@ -673,9 +714,11 @@ Abstract interface for navigation routes. Routes are defined as enums implementi
 Describes how a route contributes to the URL path.
 
 **Factory Constructors:**
-- `zoneRoot({required pageWidget})` - Zone root route
-- `simple({required pageWidget, parent, extraPathSegment})` - Simple route
-- `parameterized({required pageWidget, required parameter, required parent, extraPathSegment})` - Parameterized route
+- `zoneRoot({required pageWidget, onExit})` - Zone root route
+- `simple({required pageWidget, parent, extraPathSegment, onExit})` - Simple route
+- `parameterized({required pageWidget, required parameter, required parent, extraPathSegment, onExit})` - Parameterized route
+
+`onExit` is an optional `DwNavigationExitGuard`, `(BuildContext context, DwNavigationTarget leaving) => FutureOr<bool>`, asked before the person leaves the route (see "Asking Before Leaving a Route").
 
 #### `DwNavigationParamsMixin<T>`
 
