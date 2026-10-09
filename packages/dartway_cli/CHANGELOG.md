@@ -12,6 +12,11 @@
   `deploy check` it is a server check. `deploy setup --new-stack` sets up a genuine
   second project on such a host (#482).
 
+- `deploy check`'s `secret-files` reads the server's Compose configuration as JSON
+  (`docker compose config --no-interpolate --format json`) instead of Compose's YAML, where a raw
+  environment value such as a generated `*abc` password read as an undefined alias and failed the
+  check on a healthy configuration. Output that does not parse is reported as unreadable without
+  quoting any of it (#479).
 - `dartway create` no longer writes a LICENSE; a project's licence is its owner's decision (#422).
 - `deploy run --revision <sha>` deploys the verified commit only when it belongs to the configured
   remote branch, and refuses an older revision when the server already contains it. The revision is

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_cli/src/checker/dw_check_type.dart';
@@ -5,6 +6,7 @@ import 'package:dartway_cli/src/deploy/deploy_check.dart';
 import 'package:dartway_cli/src/deploy/image_registry.dart';
 import 'package:dartway_cli/src/deploy/remote_checks.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
+import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:test/test.dart';
 
 import 'support/deploy_fixtures.dart';
@@ -87,6 +89,97 @@ void main() {
       );
       expect(foreign.passed, isFalse);
       expect(foreign.detail, contains('set "project: molodey"'));
+    });
+  });
+
+  group('the secret-files check', () {
+    final check = dwRemoteDeployChecks.firstWhere(
+      (check) => check.id == 'secret-files',
+    );
+    final stack = stackFrom(extra: '  requires:\n    files: [fcm.json]\n');
+    final store = stack.target.runtimeConfigDir;
+    // A generated password: in Compose's `--no-interpolate` YAML this came
+    // out unquoted, and `*x` read as an alias with no anchor (#479).
+    const password = '*x&y!z';
+
+    String configuration({String? environmentValue}) => jsonEncode({
+      'services': {
+        DwStack.serverService: {
+          'environment': {'PASSWORD': environmentValue ?? password},
+          'volumes': [
+            {
+              'type': 'bind',
+              'source': '$store/fcm.json',
+              'target': '${DwStack.secretFilesDir}/fcm.json',
+              'read_only': true,
+            },
+          ],
+        },
+      },
+    });
+
+    Future<(DwDeployVerdict, RecordingSsh)> evaluate(String stdout) async {
+      final ssh = RecordingSsh([
+        (
+          'ls -1A',
+          const DwSshResult(exitCode: 0, stdout: 'fcm.json\n', stderr: ''),
+        ),
+        (
+          'config --no-interpolate',
+          DwSshResult(exitCode: 0, stdout: stdout, stderr: ''),
+        ),
+      ]);
+      final verdict = await check.evaluate(
+        DwDeployContext(
+          projectRoot: Directory.systemTemp,
+          stack: stack,
+          ssh: ssh,
+        ),
+      );
+      return (verdict, ssh);
+    }
+
+    test('reads the mounts from JSON, whatever the environment holds', () {
+      expect(dwServiceMounts(configuration(), DwStack.serverService), {
+        '$store/fcm.json': '${DwStack.secretFilesDir}/fcm.json',
+      });
+    });
+
+    test('maps the short source:target:ro string form too', () {
+      final short = jsonEncode({
+        'services': {
+          DwStack.serverService: {
+            'volumes': [
+              '$store/fcm.json:${DwStack.secretFilesDir}/fcm.json:ro',
+            ],
+          },
+        },
+      });
+      expect(dwServiceMounts(short, DwStack.serverService), {
+        '$store/fcm.json': '${DwStack.secretFilesDir}/fcm.json',
+      });
+    });
+
+    test('asks Compose for JSON and passes on a mounted file', () async {
+      final (verdict, ssh) = await evaluate(configuration());
+      expect(verdict.passed, isTrue, reason: verdict.detail);
+      expect(ssh.issued.where((command) => command.contains('config ')), [
+        contains('config --no-interpolate --format json'),
+      ]);
+    });
+
+    test('unreadable output fails without quoting it', () async {
+      const sentinel = 'SENTINEL-4f1c9e';
+      final (verdict, _) = await evaluate(
+        'services:\n  server:\n    environment:\n      PASSWORD: *$sentinel\n',
+      );
+      expect(verdict.passed, isFalse);
+      expect(
+        verdict.detail,
+        'the compose configuration is unreadable (not JSON)',
+      );
+      expect(verdict.detail, isNot(contains(sentinel)));
+      expect(verdict.fix ?? '', isNot(contains(sentinel)));
     });
   });
 

@@ -1,7 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
-import 'package:yaml/yaml.dart';
 
 import '../checker/dw_check_type.dart';
 import 'compose_files.dart';
@@ -164,8 +164,7 @@ Future<DwDeployVerdict> _checkHostCongestionControl(
           result.ok
               ? 'host reports ${value.isEmpty ? 'no value' : value}'
               : result.firstLine,
-          fix:
-              'Run "dart run dartway_cli:dartway deploy setup" once on this server.',
+          fix: 'Run "dart run dartway_cli:dartway deploy setup" once on this server.',
         );
 }
 
@@ -428,7 +427,10 @@ Future<DwDeployVerdict> _checkSecretFiles(DwDeployContext context) async {
 
   final configuration = await context.ssh!.runAs(
     context.target.deployUser,
-    DwComposeFiles.commandIn(context.target.appDir, 'config --no-interpolate'),
+    DwComposeFiles.commandIn(
+      context.target.appDir,
+      'config --no-interpolate --format json',
+    ),
   );
   if (!configuration.ok) {
     return DwDeployVerdict.fail(
@@ -446,9 +448,11 @@ Future<DwDeployVerdict> _checkSecretFiles(DwDeployContext context) async {
   final Map<String, String> mounts;
   try {
     mounts = dwServiceMounts(configuration.stdout, DwStack.serverService);
-  } on YamlException catch (error) {
-    return DwDeployVerdict.fail(
-      'the compose configuration is unreadable: ${error.message}',
+  } on FormatException {
+    // The exception's message may quote the offending text, and that text
+    // comes from a configuration holding secret values: it is never printed.
+    return const DwDeployVerdict.fail(
+      'the compose configuration is unreadable (not JSON)',
     );
   }
 
@@ -474,20 +478,26 @@ Future<DwDeployVerdict> _checkSecretFiles(DwDeployContext context) async {
 }
 
 /// Bind-mount sources of [service], mapped to where they land inside the
-/// container, as Compose itself resolves them. Both spellings are accepted:
-/// `docker compose config` normalises volumes to the long form, and a short
-/// `source:target:ro` string must not read as "nothing is mounted".
+/// container, as Compose itself resolves them, read from the JSON of
+/// `docker compose config --format json`. JSON, not Compose's YAML: in
+/// `--no-interpolate` mode Compose prints environment values raw, and a
+/// generated password such as `*abc` comes out as an unquoted YAML alias that
+/// a stricter parser rejects. Both volume spellings are accepted: Compose
+/// normalises volumes to the long form, and a short `source:target:ro` string
+/// must not read as "nothing is mounted".
+///
+/// Throws a [FormatException] when [configuration] is not JSON.
 Map<String, String> dwServiceMounts(String configuration, String service) {
-  final document = loadYaml(configuration);
-  final services = document is YamlMap ? document['services'] : null;
-  final definition = services is YamlMap ? services[service] : null;
-  final volumes = definition is YamlMap ? definition['volumes'] : null;
+  final document = jsonDecode(configuration);
+  final services = document is Map ? document['services'] : null;
+  final definition = services is Map ? services[service] : null;
+  final volumes = definition is Map ? definition['volumes'] : null;
   final mounts = <String, String>{};
-  if (volumes is! YamlList) {
+  if (volumes is! List) {
     return mounts;
   }
   for (final entry in volumes) {
-    if (entry is YamlMap) {
+    if (entry is Map) {
       final source = entry['source'];
       final target = entry['target'];
       if (source != null && target != null) {
