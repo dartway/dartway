@@ -2,6 +2,12 @@
 
 ## 0.24.0
 
+- `dartway test` pulls an image it does not have locally before starting a container from it,
+  with up to three attempts (2 s, then 5 s apart) and one `pulling <image> (attempt n/3)` line per
+  attempt on stderr. A transient registry error (a timeout, a 5xx, a rate limit) no longer fails
+  the run, and a pull that fails three times is reported as `could not pull <image> after 3
+  attempts: <last error line>` before "could not start". An image already present costs no network
+  (#497).
 - The template's `.github/workflows/claude-review.yml` can no longer push code to a pull request.
   It passes the workflow's own `github_token` (held to `contents: read`) instead of letting the
   action exchange OIDC for the Claude App's writable installation token, drops `track_progress`,

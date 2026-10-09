@@ -3,6 +3,7 @@ import 'dart:io';
 import 'dart:math';
 
 import 'test_database.dart';
+import 'test_images.dart';
 
 /// An S3-compatible storage container that exists for the length of one test
 /// run — the storage twin of [TestDatabase], and for the same reasons: nothing
@@ -32,6 +33,11 @@ class TestStorage {
   /// and the data lives in memory, so a container leaked by a killed run holds
   /// nothing the next one could find.
   Future<EphemeralStorage?> start() async {
+    final missing = await dwEnsureImage(image, docker: _docker);
+    if (missing != null) {
+      stderr.writeln(missing);
+      return null;
+    }
     final run = await _docker([
       'run',
       '--detach',
