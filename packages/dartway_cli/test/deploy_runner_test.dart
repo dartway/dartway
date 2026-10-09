@@ -673,6 +673,42 @@ esac
       });
     });
 
+    // Judging the recorded identity again must not make the steps the resumed
+    // run already finished start over.
+    test('a passed identity on --resume still passes over the finished steps',
+        () async {
+      final ran = <String>[];
+      DwDeployStep step(String id, {String? Function(DwSshResult)? verdict}) =>
+          DwDeployStep(
+            id: id,
+            title: id,
+            verdict: verdict,
+            run: () async {
+              ran.add(id);
+              return const DwSshResult(exitCode: 0, stdout: '', stderr: '');
+            },
+          );
+      const done = DwRemoteStepRecord(DwRemoteStepState.exited, 0);
+      final failed = await executeDeploySteps(
+        [
+          step('stack-identity', verdict: (_) => null),
+          step('update-checkout'),
+          step('build'),
+          step('start'),
+        ],
+        resumeFrom: {
+          'stack-identity': done,
+          'update-checkout': done,
+          'build': const DwRemoteStepRecord(DwRemoteStepState.pending),
+          'start': const DwRemoteStepRecord(DwRemoteStepState.pending),
+        },
+        progress: progress(),
+      );
+
+      expect(failed, isNull);
+      expect(ran, ['stack-identity', 'build', 'start']);
+    });
+
     // The whole command, with the checkout update skipped: the revision is
     // read from the checkout, and on a foreign server that is not read
     // either until the identity has passed.

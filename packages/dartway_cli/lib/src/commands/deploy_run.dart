@@ -315,7 +315,15 @@ Future<String?> executeDeploySteps(
       report.event('step_skipped', position);
       continue;
     }
-    passingOver = false;
+    // The identity check is judged again on every resume, but it changes
+    // nothing on the server: when it passed before, the steps after it are
+    // still passed over rather than started again. A failed or unfinished
+    // earlier record ends up in the branches below, which stop or return.
+    if (!(step.id == 'stack-identity' &&
+        previous != null &&
+        previous.succeeded)) {
+      passingOver = false;
+    }
     // A step the run being resumed ended badly is not tried again by itself:
     // a self-deploy resumes after every interruption, and a failing step
     // would be repeated until the attempts ran out, each time stopping the
