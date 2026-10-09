@@ -338,35 +338,36 @@ up a change to the rendered files. `--dry-run` prints the rendered `docker-compo
 First `run` evaluates the working-copy checks of `deploy check` and refuses on any error, pointing at
 `dart run dartway_cli:dartway deploy check --local` for the detail. Before its first remote step it
 also verifies that the host allows BBR; if not, it stops before replacing anything and asks for
-`dart run dartway_cli:dartway deploy setup`. An existing server converges with one
-`dart run dartway_cli:dartway deploy setup`, followed by
+`dart run dartway_cli:dartway deploy setup`. Next it **checks this server runs this project's
+stack** (`stack-identity`), the same guard `setup` runs. The check runs on every invocation, with
+`--resume`, `--retry-failed` and `--skip-git-update` too, and comes before the step record, the
+checkout or any step is touched. A [moved repository](#moving-the-repository) stops here with exit 1
+and the reason `stack-identity`. The server is left untouched and nothing is recorded. The check is
+not a step, so a resume still passes over the steps the resumed run finished. An existing server
+converges with one `dart run dartway_cli:dartway deploy setup`, followed by
 `dart run dartway_cli:dartway deploy run`. Then:
 
-1. **checks this server runs this project's stack** (`stack-identity`), first, even with
-   `--skip-git-update`: the same guard `setup` runs, so a [moved repository](#moving-the-repository)
-   stops here, with the server untouched, instead of failing to `cd` into a checkout that does not
-   exist — or, after a `setup`, starting a second, empty stack;
-2. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
+1. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
    repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`).
    CI can pass `--revision <sha>` (7–64 hexadecimal characters) to deploy exactly the verified
    commit. It must belong to `origin/<branch>`, and the run refuses rather than moving backwards
    when the server is already at a descendant of that commit;
-3. writes the override bridge;
-4. **renders `docker-compose.yml` and `nginx.conf`** from `deploy/config.yaml` and this version of
+2. writes the override bridge;
+3. **renders `docker-compose.yml` and `nginx.conf`** from `deploy/config.yaml` and this version of
    the CLI, and says of each whether it changed. Both are derived files, and a derived file written
    once goes stale in silence: a CLI that had learnt to pass a new build argument met a compose file
    rendered before that argument existed, and the deploy died inside `docker build` blaming the
    project's Dockerfile — while the file to fix was on the server and in no repository. The write
    goes through `cat >`, never a rename, because the proxy has its configuration bind-mounted;
-5. renders `.env` from the secret store, refusing — by key name and line number, never by value —
+4. renders `.env` from the secret store, refusing — by key name and line number, never by value —
    when the store is absent, a line is malformed, a key is declared twice, a key is one the compose
    file sets, or a required secret is missing or empty;
-6. checks the merged Compose configuration;
-7. **the same data volume guard `setup` runs** (above): refuses when an expected data volume of the
+5. checks the merged Compose configuration;
+6. **the same data volume guard `setup` runs** (above): refuses when an expected data volume of the
    rendered stack does not exist while another data volume of this project does — the shape of a
    config change (a rename, a different storage backend) about to serve fresh data next to the real
    one. One implementation, run from both commands;
-8. **makes the TLS certificate cover every served host, before anything is built or replaced**,
+7. **makes the TLS certificate cover every served host, before anything is built or replaced**,
    through the proxy the previous deploy left running. That proxy answers the ACME challenge for a
    host added to the configuration since: its port-80 server comes before the `nginx.d/http`
    snippets, so Nginx makes it the default for any name no project port-80 server claims. A snippet
@@ -378,12 +379,12 @@ also verifies that the host allows BBR; if not, it stops before replacing anythi
    self-signed certificate of `setup` is replaced by an issued one. Let's Encrypt fails for reasons of
    its own, and a failure here stops the deploy with the previous version still serving. With no
    proxy running — a first deploy, a stand that is down — nothing is serving that a failure could
-   take down, and the certificate is left to step 14;
-9. builds the images;
-10. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
+   take down, and the certificate is left to step 13;
+8. builds the images;
+9. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
    bundled`, starts Postgres — with `database: external` there is nothing of the database's to start,
    the server reaches it directly;
-11. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
+10. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
    flight are answered, live sockets close with "server stopping" — and from then on the proxy
    answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
    idempotency key, so a retry never runs it twice). The new image applies the migrations in a
@@ -394,15 +395,15 @@ also verifies that the host allows BBR; if not, it stops before replacing anythi
    declares. When the migrations fail (they roll back) or the new server does not become healthy,
    the image that was serving is started again and the step fails with the server's own log; after
    a failure past the migrations the previous code runs on the new schema, and the message says so;
-12. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
-13. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
+11. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
+12. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
    the server — and runs `nginx -t` inside the running proxy. Nginx resolves an upstream once, when it
    starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this
    stops the deploy before that restart;
-14. makes the certificate cover every served host once more, through the proxy now running: what a
-   first deploy could not ask for at step 8 is issued here. On a routine deploy step 8 has already
+13. makes the certificate cover every served host once more, through the proxy now running: what a
+   first deploy could not ask for at step 7 is issued here. On a routine deploy step 7 has already
    covered every host, and this asks nothing;
-15. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
+14. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
     a second later on its configuration.
 
 What keeps a push routine is not that the rendering is skipped but that it is idempotent and
@@ -419,7 +420,7 @@ Every step runs on the server **detached from the `ssh` session**: its script is
 routine deploy still makes one connection per step; when that connection breaks, fresh ones wait for
 the same step for up to fifteen minutes, and past that `run` stops waiting and says the step is still
 running. Nothing the invoking machine does — losing its network, or dying because it is a container
-of the stack whose server step 11 replaces — stops a step midway.
+of the stack whose server step 10 replaces — stops a step midway.
 
 That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
 steps after the interruption still need someone to run them: **`dart run dartway_cli:dartway deploy run --env <env>
@@ -456,7 +457,7 @@ reads the events; the prose may change wording at any time, the events may not.
 | `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message`; `resumed: true` when the step failed in the deployment being resumed and was not run again |
 | `services` | `services` (`name`, `status`) |
 | `probe` | `title`, `passed`, `warning`, `detail` |
-| `run_finished` | `ok`, `exit_code`; optional `failed_step` and `reason` (`bbr-unavailable`, `checks`, `nothing-to-resume`, `revision-mismatch`, `revision-not-found`, `revision-not-on-branch`, `superseded`, `unreachable`, `verification`) |
+| `run_finished` | `ok`, `exit_code`; optional `failed_step` and `reason` (`bbr-unavailable`, `checks`, `nothing-to-resume`, `revision-mismatch`, `revision-not-found`, `revision-not-on-branch`, `stack-identity`, `superseded`, `unreachable`, `verification`) |
 
 **Then it verifies from outside**, as a browser and an app would, retrying failed probes up to twelve
 times five seconds apart:

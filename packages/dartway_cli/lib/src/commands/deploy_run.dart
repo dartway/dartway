@@ -146,6 +146,18 @@ Future<int> runDeploy(
     return finish(1, reason: 'bbr-unavailable');
   }
 
+  // Every path a step touches is named after the project: a project whose
+  // name changed with its repository would find no checkout, or start a
+  // second, empty stack. Asked on every run, a resume included, before the
+  // step record, the deployed revision or any step: a refusal is not a step
+  // and leaves nothing on the server.
+  final identity = await runner.checkStackIdentity();
+  if (!identity.ok) {
+    report.problems.writeln('Refusing to deploy: ${identity.detail}');
+    return finish(1, reason: 'stack-identity');
+  }
+  out.writeln('  stack:   ${identity.detail}');
+
   Map<String, DwRemoteStepRecord>? record;
   var resumeVerifiedCheckout = false;
   if (resume) {
@@ -220,11 +232,7 @@ Future<int> runDeploy(
     (step) =>
         step.id == 'update-checkout' && !(record?[step.id]?.succeeded ?? false),
   );
-  // The revision is read from the checkout, which is named after the
-  // project: on a server running another project's stack it is not this
-  // project's to read, so nothing is sent there before the identity passed.
-  final identifies = steps.any((step) => step.id == 'stack-identity');
-  if (!updates && !identifies) await reportRevision();
+  if (!updates) await reportRevision();
 
   final failedStep = await executeDeploySteps(
     steps,
@@ -237,7 +245,6 @@ Future<int> runDeploy(
         : const {},
     progress: report,
     onUpdated: reportRevision,
-    onIdentified: updates ? null : reportRevision,
   );
   if (failedStep != null) {
     String? reason;
@@ -287,7 +294,6 @@ List<Map<String, String>> _stepList(List<DwDeployStep> steps) => [
 Future<String?> executeDeploySteps(
   List<DwDeployStep> steps, {
   Future<void> Function()? onUpdated,
-  Future<void> Function()? onIdentified,
   DwRemoteSteps? remote,
   Map<String, DwRemoteStepRecord>? resumeFrom,
   bool retryFailed = false,
@@ -315,15 +321,7 @@ Future<String?> executeDeploySteps(
       report.event('step_skipped', position);
       continue;
     }
-    // The identity check is judged again on every resume, but it changes
-    // nothing on the server: when it passed before, the steps after it are
-    // still passed over rather than started again. A failed or unfinished
-    // earlier record ends up in the branches below, which stop or return.
-    if (!(step.id == 'stack-identity' &&
-        previous != null &&
-        previous.succeeded)) {
-      passingOver = false;
-    }
+    passingOver = false;
     // A step the run being resumed ended badly is not tried again by itself:
     // a self-deploy resumes after every interruption, and a failing step
     // would be repeated until the attempts ran out, each time stopping the
@@ -439,9 +437,6 @@ Future<String?> executeDeploySteps(
     });
     if (step.id == 'update-checkout') {
       await onUpdated?.call();
-    }
-    if (step.id == 'stack-identity') {
-      await onIdentified?.call();
     }
     // Says nothing on a server whose bridge is already in place.
     if (step.id == 'bridge-override' && result.stdout.trim().isNotEmpty) {

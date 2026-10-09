@@ -121,25 +121,28 @@ class DwDeployRunner {
     return ssh.runAs(target.deployUser, script);
   }
 
-  /// Asks the server which stacks it runs: its data volumes and its secret
-  /// stores, names only ([dwStackIdentityScript]). The answer is judged by
-  /// [stackIdentityVerdict], the step's verdict — not here — so that a
-  /// refusal is recorded on the server and a resumed deployment stops on it
-  /// instead of taking the listing's exit 0 for a pass.
-  Future<DwSshResult> listStacks() => _as(dwStackIdentityScript(target));
-
-  /// Why the server [listStacks] answered for must not be deployed to, or
-  /// null when it runs this project's stack or none at all
-  /// ([judgeStackIdentity]) — a repository that moved without `project:`
-  /// pinning the old name is refused here, before anything else is sent.
-  String? stackIdentityVerdict(DwSshResult listed) {
-    final verdict = judgeStackIdentity(
+  /// Whether this server runs this project's stack, or none at all
+  /// ([judgeStackIdentity]): a repository that moved without `project:`
+  /// pinning the old name fails here. It lists data volumes and secret
+  /// stores, names only ([dwStackIdentityScript]), over the plain connection
+  /// — a precondition of `deploy run`, not one of its [steps], so it is
+  /// judged afresh on every run and resume and never recorded on the server.
+  Future<DwDataVolumeVerdict> checkStackIdentity() async {
+    final listed = await ssh.runAs(
+      target.deployUser,
+      dwStackIdentityScript(target),
+    );
+    if (!listed.ok) {
+      return DwDataVolumeVerdict.fail(
+        'cannot list the stacks on the server: ${listed.firstLine}',
+      );
+    }
+    return judgeStackIdentity(
       projectName: target.projectName,
       environment: target.environment,
       volumeListing: listed.stdout,
       configDirListing: listed.stdout,
     );
-    return verdict.ok ? null : verdict.detail;
   }
 
   /// Brings the checkout to [revision], or the tip of the deployment branch.
@@ -614,15 +617,6 @@ echo "nginx restarted and running"
     required bool skipGitUpdate,
     String? revision,
   }) => [
-    // Before anything touches the server: every path below is named after the
-    // project, and a project whose name changed with its repository would
-    // otherwise find no checkout, or start a second, empty stack.
-    DwDeployStep(
-      id: 'stack-identity',
-      title: "Check this server runs this project's stack",
-      run: listStacks,
-      verdict: stackIdentityVerdict,
-    ),
     if (!skipGitUpdate)
       DwDeployStep(
         id: 'update-checkout',

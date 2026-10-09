@@ -348,8 +348,7 @@ class _RevisionRefusalServer extends _ServerWhereEveryStepExits {
 }
 
 /// Answers every detached step the way the server's step runner reports one
-/// that exited with [code] — but the stack-identity listing, which answers as
-/// a fresh server, so the steps after it are the ones that fail.
+/// that exited with [code].
 class _ServerWhereEveryStepExits extends RecordingSsh {
   _ServerWhereEveryStepExits(this.code);
 
@@ -370,13 +369,6 @@ class _ServerWhereEveryStepExits extends RecordingSsh {
     final nonce = _nonce.firstMatch(command)?.group(0);
     if (nonce == null) {
       return const DwSshResult(exitCode: 0, stdout: '', stderr: '');
-    }
-    if (command.contains('stack-identity')) {
-      return DwSshResult(
-        exitCode: 0,
-        stdout: '$nonce exited 0\n\n$nonce stderr\n\n$nonce end 0\n',
-        stderr: '',
-      );
     }
     return DwSshResult(
       exitCode: 0,

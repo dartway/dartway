@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_cli/src/commands/deploy_command.dart';
@@ -8,7 +9,6 @@ import 'package:dartway_cli/src/deploy/data_volumes.dart';
 import 'package:dartway_cli/src/deploy/deploy_progress.dart';
 import 'package:dartway_cli/src/deploy/deploy_runner.dart';
 import 'package:dartway_cli/src/deploy/deploy_target.dart';
-import 'package:dartway_cli/src/deploy/remote_steps.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:path/path.dart' as p;
@@ -50,7 +50,6 @@ void main() {
 
     test('is the whole sequence, in order', () {
       expect(ids, [
-        'stack-identity',
         'update-checkout',
         'bridge-override',
         'render-stack',
@@ -534,11 +533,7 @@ esac
     });
   });
 
-  group('the stack-identity step', () {
-    final quiet = IOSink(StreamController<List<int>>()..stream.drain<void>());
-    DwDeployProgress progress() =>
-        DwDeployProgress.into(human: quiet, events: quiet);
-
+  group('the stack-identity precondition', () {
     // The repository moved from acme/molodey to dealwithitdwi/moloday; the
     // server still runs the stack named after the old one.
     DwStack moved({String extra = ''}) => DwStack(
@@ -554,212 +549,151 @@ esac
       front: const DwTlsFront(),
     );
 
-    RecordingSsh serverRunningMolodey() => RecordingSsh([
-      (
-        'docker volume ls',
-        const DwSshResult(
-          exitCode: 0,
-          stdout:
-              'molodey_postgres_data\n'
-              '/home/deployer/.config/molodey/secrets.env\n',
-          stderr: '',
-        ),
-      ),
-    ]);
+    const molodey =
+        'molodey_postgres_data\n/home/deployer/.config/molodey/secrets.env\n';
 
-    test('is the first step, with or without the checkout update', () {
-      final runner = DwDeployRunner(ssh: RecordingSsh(), stack: moved());
-      expect(runner.steps(skipGitUpdate: false).first.id, 'stack-identity');
-      expect(runner.steps(skipGitUpdate: true).first.id, 'stack-identity');
-    });
-
-    test('on a server running only another stack, the deploy stops there and '
-        'sends nothing else', () async {
-      final ssh = serverRunningMolodey();
-      final failed = await executeDeploySteps(
-        DwDeployRunner(ssh: ssh, stack: moved()).steps(skipGitUpdate: false),
-        progress: progress(),
-      );
-
-      expect(failed, 'stack-identity');
-      expect(ssh.issued, hasLength(1));
-      expect(ssh.issued.single, isNot(contains('git ')));
-      expect(ssh.issued.single, isNot(contains("cd '")));
-      expect(ssh.issued.single, isNot(contains('docker compose')));
-    });
-
-    test('says what to set when it refuses', () async {
-      final runner = DwDeployRunner(
-        ssh: serverRunningMolodey(),
-        stack: moved(),
-      );
-      final listed = await runner.listStacks();
-
-      expect(listed.ok, isTrue);
-      expect(
-        runner.stackIdentityVerdict(listed),
-        contains('set "project: molodey" under staging'),
-      );
-    });
-
-    // The refusal is the step's verdict, so it is recorded on the server: the
-    // listing itself exits 0, and a resume that took that exit code's word
-    // would pass over the guard and update a checkout on a foreign server.
-    group('through the detached step runner', () {
-      late Directory temp;
-      late LocalShell shell;
-      late DwRemoteSteps remote;
-
-      setUp(() {
-        temp = Directory.systemTemp.createTempSync('dw_identity_resume_');
-        // A `docker` that answers the listing of a server running molodey.
-        final bin = Directory(p.join(temp.path, 'bin'))..createSync();
-        File(
-          p.join(bin.path, 'docker'),
-        ).writeAsStringSync('#!/bin/sh\necho molodey_postgres_data\n');
-        Process.runSync('chmod', ['+x', p.join(bin.path, 'docker')]);
-        shell = LocalShell(
-          environment: {'PATH': '${bin.path}:${Platform.environment['PATH']}'},
-        );
-        remote = DwRemoteSteps(
-          ssh: shell,
-          deployUser: 'deployer',
-          directory: p.join(temp.path, 'deploy-run'),
-          pollInterval: const Duration(milliseconds: 50),
-        );
-      });
-      tearDown(() => temp.deleteSync(recursive: true));
-
-      List<DwDeployStep> steps() => DwDeployRunner(
-        ssh: shell,
-        stack: moved(),
-        remote: remote,
-      ).steps(skipGitUpdate: false);
-
-      test('a refusal stays a refusal on --resume, and with --retry-failed '
-          'is judged again', () async {
-        expect(
-          await executeDeploySteps(
-            steps(),
-            remote: remote,
-            progress: progress(),
-          ),
-          'stack-identity',
-        );
-        final record = (await remote.read())!;
-        expect(record['stack-identity']!.state, DwRemoteStepState.rejected);
-        expect(record['update-checkout']!.state, DwRemoteStepState.pending);
-
-        for (final retryFailed in [false, true]) {
-          final resumed = (await remote.read())!;
-          final planned = [
-            for (final id in resumed.keys)
-              ...steps().where((step) => step.id == id),
-          ];
-          expect(
-            await executeDeploySteps(
-              planned,
-              remote: remote,
-              resumeFrom: resumed,
-              retryFailed: retryFailed,
-              progress: progress(),
-            ),
-            'stack-identity',
-            reason: 'retryFailed: $retryFailed',
-          );
-          final after = (await remote.read())!;
-          expect(after['update-checkout']!.state, DwRemoteStepState.pending);
-        }
-      });
-    });
-
-    // Judging the recorded identity again must not make the steps the resumed
-    // run already finished start over.
-    test('a passed identity on --resume still passes over the finished steps',
-        () async {
-      final ran = <String>[];
-      DwDeployStep step(String id, {String? Function(DwSshResult)? verdict}) =>
-          DwDeployStep(
-            id: id,
-            title: id,
-            verdict: verdict,
-            run: () async {
-              ran.add(id);
-              return const DwSshResult(exitCode: 0, stdout: '', stderr: '');
-            },
-          );
-      const done = DwRemoteStepRecord(DwRemoteStepState.exited, 0);
-      final failed = await executeDeploySteps(
-        [
-          step('stack-identity', verdict: (_) => null),
-          step('update-checkout'),
-          step('build'),
-          step('start'),
-        ],
-        resumeFrom: {
-          'stack-identity': done,
-          'update-checkout': done,
-          'build': const DwRemoteStepRecord(DwRemoteStepState.pending),
-          'start': const DwRemoteStepRecord(DwRemoteStepState.pending),
-        },
-        progress: progress(),
-      );
-
-      expect(failed, isNull);
-      expect(ran, ['stack-identity', 'build', 'start']);
-    });
-
-    // The whole command, with the checkout update skipped: the revision is
-    // read from the checkout, and on a foreign server that is not read
-    // either until the identity has passed.
-    test('deploy run --skip-git-update sends no cd and no git to a foreign '
-        'server', () async {
-      final ssh = _ServerAnsweringEveryStep(
-        'molodey_postgres_data\n/home/deployer/.config/molodey/secrets.env\n',
-      );
+    Future<({int code, List<Map<String, Object?>> events})> deploy(
+      _IdentityServer server,
+      DwStack stack,
+      List<String> flags,
+    ) async {
+      final quiet = IOSink(StreamController<List<int>>()..stream.drain<void>());
+      final events = StreamController<List<int>>();
+      final lines = events.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .toList();
+      final sink = IOSink(events.sink);
       final code = await runDeploy(
-        moved(),
-        DeployRunCommand().argParser.parse([
-          '--env',
-          'staging',
-          '--skip-git-update',
-        ]),
-        connection: ssh,
-        progress: progress(),
+        stack,
+        DeployRunCommand().argParser.parse(['--env', 'staging', ...flags]),
+        connection: server,
+        progress: DwDeployProgress.into(human: quiet, events: sink),
         localChecks: const [],
       );
-
-      expect(code, 1);
-      expect(ssh.issued.where((command) => command.contains('git ')), isEmpty);
-      expect(
-        ssh.issued.where(
-          (command) => command.contains('/home/deployer/moloday'),
-        ),
-        isEmpty,
+      await sink.close();
+      return (
+        code: code,
+        events: [
+          for (final line in await lines)
+            jsonDecode(line) as Map<String, Object?>,
+        ],
       );
-      expect(ssh.issued.last, contains('stack-identity.rejected'));
+    }
+
+    test('is no step of the deployment', () {
+      final runner = DwDeployRunner(ssh: RecordingSsh(), stack: moved());
+      for (final skip in [false, true]) {
+        expect(
+          runner.steps(skipGitUpdate: skip).map((step) => step.id),
+          isNot(contains('stack-identity')),
+        );
+      }
     });
+
+    // Fresh, resumed, retried and without the checkout update alike: the
+    // listing is the one command after the BBR probe, and the refusal is the
+    // run's reason, not a failed step — nothing is read from or written to
+    // the step record, the checkout or Compose.
+    for (final flags in const [
+      <String>[],
+      ['--resume'],
+      ['--resume', '--retry-failed'],
+      ['--skip-git-update'],
+    ]) {
+      test('on a server running only another stack, ${flags.join(' ')} '
+          'refuses before anything else is sent', () async {
+        final server = _IdentityServer(
+          listing: molodey,
+          record: 'update-checkout exited 0\nbridge-override pending\n',
+        );
+        final result = await deploy(server, moved(), flags);
+
+        expect(result.code, 1);
+        final finished = result.events.last;
+        expect(finished['event'], 'run_finished');
+        expect(finished['reason'], 'stack-identity');
+        expect(finished.containsKey('failed_step'), isFalse);
+        expect(server.issued, hasLength(2));
+        expect(server.issued.first, contains('tcp_allowed_congestion_control'));
+        expect(server.issued.last, contains('docker volume ls'));
+        expect(server.started, isEmpty);
+        for (final command in server.issued) {
+          expect(command, isNot(contains('git ')));
+          expect(command, isNot(contains('deploy-run')));
+          expect(command, isNot(contains('/home/deployer/moloday')));
+        }
+      });
+    }
 
     test('with project: pinning the old name, it passes and the checkout '
         'is updated where the stack lives', () async {
-      final ssh = serverRunningMolodey();
-      final failed = await executeDeploySteps(
-        DwDeployRunner(
-          ssh: ssh,
-          stack: moved(extra: '  project: molodey\n'),
-        ).steps(skipGitUpdate: false).take(2).toList(),
-        progress: progress(),
+      final server = _IdentityServer(listing: molodey, exitCode: 1);
+      final result = await deploy(
+        server,
+        moved(extra: '  project: molodey\n'),
+        const [],
       );
 
-      expect(failed, isNull);
-      expect(ssh.issued.first, contains('docker volume ls'));
-      // The checkout update, in the directory the live stack runs from.
-      expect(ssh.issued[1], contains('/home/deployer/molodey'));
-      expect(ssh.issued[1], contains('git fetch origin'));
+      expect(result.code, 1);
+      expect(result.events.last['failed_step'], 'update-checkout');
+      final (:command, :script) = server.started.single;
+      expect(command, contains('update-checkout'));
+      expect(script, contains('/home/deployer/molodey'));
+      expect(script, contains('git fetch origin'));
+    });
+
+    // The resume passes over what the run being resumed finished, exactly as
+    // without the check: a checkout, a build or a server replacement done
+    // before is not done again, and a step that failed or still runs is
+    // collected, not started.
+    group('on --resume, once it passed', () {
+      final ids = [
+        for (final step in DwDeployRunner(
+          ssh: RecordingSsh(),
+          stack: moved(),
+        ).steps(skipGitUpdate: false))
+          step.id,
+      ];
+      final after = ids.indexOf('build') + 1;
+      String record(String next) => [
+        for (final id in ids.take(after)) '$id exited 0',
+        '${ids[after]} $next',
+        for (final id in ids.skip(after + 1)) '$id pending',
+      ].join('\n');
+
+      for (final next in const ['exited 1', 'running']) {
+        test('the completed steps are passed over and a step that is '
+            '${next.split(' ').first} is not started again', () async {
+          final server = _IdentityServer(
+            listing: 'shop_postgres_data\n',
+            record: record(next),
+            exitCode: 1,
+          );
+          final result = await deploy(
+            server,
+            moved(extra: '  project: shop\n'),
+            const ['--resume'],
+          );
+
+          expect(result.code, 1);
+          expect(result.events.last['failed_step'], ids[after]);
+          expect(server.started, isEmpty);
+          final skipped = [
+            for (final event in result.events)
+              if (event['event'] == 'step_skipped') event['id'],
+          ];
+          expect(skipped, ids.take(after));
+          for (final command in server.issued) {
+            expect(command, isNot(contains('git fetch')));
+            expect(command, isNot(contains(' build')));
+          }
+        });
+      }
     });
 
     // The script itself, in a shell: the store listing is a glob that matches
-    // nothing on a fresh server, and that must not fail the step.
+    // nothing on a fresh server, and that must not fail the check.
     test('lists the secret stores, and nothing is not an error', () async {
       final home = Directory.systemTemp.createTempSync('dw_identity_');
       addTearDown(() => home.deleteSync(recursive: true));
@@ -1221,10 +1155,17 @@ esac
 
 /// Answers the BBR question, and every detached step the way the server's
 /// step runner reports one that exited 0 having printed [stdout].
-class _ServerAnsweringEveryStep extends RecordingSsh {
-  _ServerAnsweringEveryStep(this.stdout);
+/// A server for the whole `deploy run`: BBR allowed, [listing] as the answer
+/// to the stack-identity check, [record] as the step record a resume reads,
+/// and every detached step — started or collected — reported as exited with
+/// [exitCode]. What it was asked to start is kept in [started].
+class _IdentityServer extends RecordingSsh {
+  _IdentityServer({required this.listing, this.record, this.exitCode = 0});
 
-  final String stdout;
+  final String listing;
+  final String? record;
+  final int exitCode;
+  final List<({String command, String script})> started = [];
 
   static final _nonce = RegExp(r'--dw-step-[0-9a-f]{8}--');
 
@@ -1234,14 +1175,30 @@ class _ServerAnsweringEveryStep extends RecordingSsh {
     if (command.contains('tcp_allowed_congestion_control')) {
       return const DwSshResult(exitCode: 0, stdout: 'cubic bbr\n', stderr: '');
     }
+    if (command.contains('docker volume ls') && command.contains('secrets')) {
+      return DwSshResult(exitCode: 0, stdout: listing, stderr: '');
+    }
+    if (command.contains(r'[ -f "$d/plan" ]')) {
+      return DwSshResult(exitCode: 0, stdout: record ?? 'none\n', stderr: '');
+    }
     final nonce = _nonce.firstMatch(command)?.group(0);
     if (nonce == null) {
       return const DwSshResult(exitCode: 0, stdout: '', stderr: '');
     }
     return DwSshResult(
       exitCode: 0,
-      stdout: '$nonce exited 0\n$stdout\n$nonce stderr\n\n$nonce end 0\n',
+      stdout: '$nonce exited $exitCode\n\n$nonce stderr\n\n$nonce end 0\n',
       stderr: '',
     );
+  }
+
+  @override
+  Future<DwSshResult> runAsWithInput(
+    String deployUser,
+    String command,
+    String input,
+  ) {
+    started.add((command: command, script: input));
+    return run(command);
   }
 }
