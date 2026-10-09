@@ -2,6 +2,13 @@
 
 ## 0.24.0
 
+- `dartway test` pulls an image it does not have locally before starting a container from it,
+  with up to three attempts (2 s, then 5 s apart) and one `pulling <image> (attempt n/3)` line per
+  attempt on stderr. A transient registry error (a timeout, a 5xx, a rate limit) no longer fails
+  the run, and a pull that fails three times is reported as `could not pull <image> after 3
+  attempts: <last error line>` before "could not start". An image already present costs no network
+  (#497).
+
 - Deploy: the output mask also replaces a stored value in the RFC 3986 userinfo form that
   `Uri(userInfo:)` produces (sub-delims and `:` kept, the rest percent-encoded), so a password
   logged inside a connection URL such as `postgres://app:p%40ss$word@db` is masked. The deploy

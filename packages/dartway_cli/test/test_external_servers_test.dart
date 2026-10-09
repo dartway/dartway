@@ -200,6 +200,7 @@ wait "$child"
     File(p.join(root.path, 'bin/docker')).writeAsStringSync('''
 #!/bin/sh
 case "\$1" in
+  image) echo sha256:present ;;
   run)
     id=database-id
     for arg in "\$@"; do

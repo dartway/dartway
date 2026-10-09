@@ -1,5 +1,7 @@
 import 'dart:io';
 
+import 'test_images.dart';
+
 /// A database container that exists for the length of one test run.
 ///
 /// It is deliberately not a service in the project's `docker-compose.yaml`.
@@ -28,6 +30,11 @@ class TestDatabase {
   /// but the container also carries a password that is trivially readable from
   /// the process list.
   Future<EphemeralDatabase?> start() async {
+    final missing = await dwEnsureImage(image, docker: _docker);
+    if (missing != null) {
+      stderr.writeln(missing);
+      return null;
+    }
     final run = await _docker([
       'run',
       '--detach',
