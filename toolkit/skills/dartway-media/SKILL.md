@@ -67,7 +67,10 @@ into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle 
   `useEffect(() { media.active.value?.restore(); return () => media.active.value?.minimize(); }, const [])`,
   as the framework repository's example (on GitHub, not in this project) does in
   [`workouts_page.dart`](https://github.com/dartway/dartway/blob/master/example/dartway_example_flutter/lib/app/workouts/workouts_page.dart).
-  With `miniPlayer: false`, `minimize()` follows `onLeaveWithoutMiniPlayer`.
+  With `miniPlayer: false`, `minimize()` follows `onLeaveWithoutMiniPlayer`. `open()`, `minimize()`
+  and `restore()` are safe from `initState`/`dispose` — a page that plays its own material on
+  entry opens it there, with no post-frame helper of its own; `play()`, `pause()`, `seek()` and
+  `jumpTo()` are commands for after the frame (a tap, a callback), never called from a build.
 
 ## Platforms and tests
 

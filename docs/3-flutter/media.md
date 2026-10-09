@@ -196,7 +196,10 @@ acknowledges an in-memory union only. Its default player never supplies such inp
   `session.minimized` is true; the
   `builder` draws it, and `onExpand(item)` navigates to the app's own player page — the package
   has no opinion on routes. The player page calls `session.minimize()` when it goes and
-  `session.restore()` when it comes back, both safe from `initState`/`dispose`. It sits above the
+  `session.restore()` when it comes back, both safe from `initState`/`dispose`; so is `open()`,
+  which returns the session at once and changes `active` — and, opening an item it already holds,
+  that session's queue and playback — after the frame. `play()`, `pause()`, `seek()` and `jumpTo()`
+  are commands for after the frame (a tap, a callback), not for a build. It sits above the
   navigator, where there is no overlay: its buttons cannot carry tooltips.
 - **The mini-player stays where it is let go.** A drag moves it inside the visible area — the
   viewport less the system padding — and it stays there; `miniPlayerSnapToEdges` settles it on an
