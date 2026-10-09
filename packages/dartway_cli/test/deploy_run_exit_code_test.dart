@@ -190,7 +190,7 @@ void main() {
     'resume skips a successful checkout after matching server HEAD',
     () async {
       final ssh = _ResumeRevisionServer(
-        record: 'update-checkout exited 0\n',
+        record: 'update-checkout exited 0\nbuild exited 1\n',
         head: 'abcdef1234567890\nabcdef1 verified\n',
       );
       final result = await runWith(
@@ -315,11 +315,12 @@ class _ResumeRevisionServer extends _ServerWhereEveryStepExits {
       issued.add(command);
       return DwSshResult(exitCode: 0, stdout: record, stderr: '');
     }
-    if (command.contains("git log -1 --format='%H%n%h %s'")) {
+    if (command.contains('git log -1 --format=') &&
+        !command.contains('--dw-step-')) {
       issued.add(command);
       return DwSshResult(exitCode: 0, stdout: head, stderr: '');
     }
-    if (command.contains('--dw-step-') && command.contains('update-checkout')) {
+    if (command.contains('cat >"\$d/update-checkout.sh"')) {
       detachedCheckoutRuns++;
     }
     return super.run(command);

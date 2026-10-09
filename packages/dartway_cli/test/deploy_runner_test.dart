@@ -26,7 +26,7 @@ void main() {
 
       expect(
         ssh.issued.single,
-        contains("cd '/home/deployer/shop' || exit \$?\n"),
+        contains("cd '\\''/home/deployer/shop'\\'' || exit \$?\n"),
       );
     },
   );
