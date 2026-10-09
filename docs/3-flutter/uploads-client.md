@@ -71,7 +71,7 @@ final result = await dw.files.upload(
 static Future<String> linkOf(ChatAttachment attachment) async =>
     (await dw.files.getLink(attachment.id, download: true)).valueOrThrow.url;
 
-// …and the tile that opens it, in the feature's widgets/
+// …and the tile that asks for it, in the feature's widgets/
 onTap: () => dw.action(
   (_) => ChatFiles.linkOf(file),
   followUpIfMountedAction: (context, url) => Clipboard.setData(ClipboardData(text: url)),

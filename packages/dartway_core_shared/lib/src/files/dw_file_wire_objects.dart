@@ -382,8 +382,9 @@ final class DwGetFileLink extends DwSingleRequest<DwFileLink> {
   String toString() => 'DwGetFileLink($fileId${download ? ', download' : ''})';
 }
 
-/// A link to read a file: short-lived and presigned for a private file,
-/// the permanent public URL (without [expiresAt]) for a public one.
+/// A link to read a file: a presigned one, which expires at [expiresAt], or
+/// a public file's own URL, which carries no [expiresAt]. A private file's
+/// link and every download link are presigned, a public file's too.
 final class DwFileLink extends DwDataObject {
   const DwFileLink({required this.id, required this.url, this.expiresAt});
 
@@ -393,7 +394,7 @@ final class DwFileLink extends DwDataObject {
 
   final String url;
 
-  /// When a private link stops working; `null` for a public file.
+  /// When a presigned link stops working; `null` for a permanent public URL.
   final DateTime? expiresAt;
 
   @override
