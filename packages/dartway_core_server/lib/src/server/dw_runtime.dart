@@ -268,3 +268,36 @@ abstract final class DwLockSpace {
 bool dwIsRetryableTransactionError(Object error) =>
     error is DwSerializationFailure ||
     (error is DwDatabaseException && error.code == '40P01');
+
+/// How many times [dwRetryingTransaction] runs a transaction that keeps
+/// losing a conflict before its error is let through.
+@internal
+const int dwMaxTransactionAttempts = 3;
+
+/// Runs [open] — the opening of one outermost transaction on [ctx] — again
+/// when it fails on a deadlock or a serialization failure, up to
+/// [dwMaxTransactionAttempts] times in all.
+///
+/// A retry repeats a command's guarantees: the failed transaction's effects
+/// were never absorbed, since effects are absorbed only on commit, so only
+/// the memo is forgotten. What the context did before the transaction — a
+/// publication made outside it — stays and is delivered once.
+@internal
+Future<T> dwRetryingTransaction<T>(
+  DwRuntimeContext ctx,
+  Future<T> Function() open,
+) async {
+  for (var attempt = 1; ; attempt++) {
+    try {
+      return await open();
+    } catch (error) {
+      if (attempt < dwMaxTransactionAttempts &&
+          dwIsRetryableTransactionError(error)) {
+        ctx.log.info('transaction conflict, attempt $attempt; retrying');
+        ctx.forgetMemo();
+        continue;
+      }
+      rethrow;
+    }
+  }
+}

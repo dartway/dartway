@@ -2,6 +2,14 @@
 
 ## 0.21.0-dev.17
 
+- Every top-level `ctx.transaction` retries a deadlock (`40P01`) or a serialization failure, up to
+  three attempts with the memo cleared between them — in routes, non-transactional commands, leased
+  jobs, `runInContext` and startup steps, not only in transactional commands. A transactional
+  queued job or a recurring job re-runs its handler in place before an attempt is spent or an alert
+  raised. A savepoint never retries by itself; what a context published before the transaction
+  survives a retry and is delivered once. A `ctx.transaction` body may therefore run up to three
+  times (#378).
+
 - Test databases and storage buckets read optional `DW_TEST_RUN_ID` for run-scoped names,
   allowing CLI cleanup after interrupted suites; plain `dart test` naming is unchanged (#463).
   S3 requests support literal IPv6 loopback endpoints for explicit test servers; cleanup

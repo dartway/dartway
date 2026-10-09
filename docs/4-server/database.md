@@ -316,9 +316,14 @@ Future<R> transaction<R>(
   the whole transaction.
 
 In a handler, use `ctx.transaction`: it also ties the call's publications and jobs to the commit
-([handlers](handlers-and-context.md#dwcallcontext)). A transactional command already runs in one,
-and the framework retries it on a serialization failure or a deadlock; a transaction opened
-anywhere else is not retried for you.
+([handlers](handlers-and-context.md#dwcallcontext)). A top-level `ctx.transaction` — the one that
+really opens a transaction, wherever it is opened: a transactional command, a route, a
+non-transactional command, a job, a startup step — is retried on a serialization failure or a
+deadlock, up to three attempts, with the per-call memo cleared between them. A nested one (a
+savepoint) is not retried by itself: the conflict rises to the top-level transaction, which runs
+again. So a `ctx.transaction` body may run up to three times and must do nothing outside the
+database that a retry would repeat. `transaction` called on a handle rather than on `ctx` is not
+retried for you.
 
 ## Row locks
 

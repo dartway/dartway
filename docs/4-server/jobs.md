@@ -141,7 +141,10 @@ The handler runs in a savepoint of the transaction that claimed the row, and the
 that same transaction. So the job disappears exactly when its work commits: a crash mid-job rolls
 everything back and leaves the job pending, as if it never started.
 
-On a throw, the savepoint rolls back, and the attempt, the error's text (`last_error`) and the next
+A deadlock or a serialization failure in the handler re-runs it in place, up to three times in all,
+before an attempt is spent — the conflict rolls the savepoint back, so the retry starts clean. On
+any other throw, or a conflict lost three times, the savepoint rolls back, and the attempt, the
+error's text (`last_error`) and the next
 run time — `backoff(attempt)` from now — are written under the same row lock. Intermediate failures
 are logged as warnings. The last attempt sets `failed_at` and **alerts** ([alerts](alerts.md)). A
 failed row stays in `dw_job` for the operator — nothing retries it — until `dw.cleanup` removes it
@@ -158,6 +161,8 @@ So a non-transactional job may run twice, and **a handler running longer than it
 twice at once** — another worker claims the row when the lease expires. Make such handlers
 idempotent, and give them a lease longer than they take.
 
+Its `ctx.transaction` is retried on a deadlock or a serialization failure, like every top-level
+transaction ([database](database.md#transactions)): keep the external call outside it.
 What such a handler publishes inside a `ctx.transaction` goes out **when that transaction commits**,
 not when the job ends — a status ("analysing") reaches subscribers before the slow call it announces.
 Publications outside any transaction go when the handler returns.
@@ -176,8 +181,10 @@ a run. At start the server syncs the table with the declared jobs: a shortened i
 next run in, a lengthened one keeps the run already due, and a job no longer declared is removed.
 
 A run executes in the transaction that claimed it. After a long outage the job runs once, not once
-per missed slot, and its next run is the first slot of its schedule after now. A failure alerts, stores its text in `last_error`,
-and waits for the next slot: a recurring job has no retries — its next run is the retry.
+per missed slot, and its next run is the first slot of its schedule after now. A deadlock or a
+serialization failure re-runs the handler in place, as for a queued job. Any other failure alerts,
+stores its text in `last_error`, and waits for the next slot: a recurring job has no retries — its
+next run is the retry.
 
 ### Two versions at once
 

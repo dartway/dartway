@@ -171,10 +171,10 @@ DwCallHandler.command<C extends DwActionCommand<R>, R>({
 ```
 
 **`transactional: true`** (the default) runs the idempotency lookup, the access check, the handler
-and the outcome record in one database transaction. `ctx.db` is that transaction. A serialization
-failure or a deadlock retries the whole transaction, up to three attempts, with the per-call memo
-and the pending publications cleared. So a transactional handler must do nothing a retry would
-repeat outside the database.
+and the outcome record in one database transaction. `ctx.db` is that transaction. Like every
+top-level transaction, it is retried whole on a serialization failure or a deadlock, up to three
+attempts, with the per-call memo cleared; what the failed attempt published was discarded with it.
+So a transactional handler must do nothing a retry would repeat outside the database.
 
 **`transactional: false`** is for handlers that call external services — a payment provider, a
 storage request — which must not run inside a transaction that may be retried or held open for
@@ -352,8 +352,8 @@ abstract final class ProfileAccess {
 }
 ```
 
-The access check and the handler then share one profile read. The memo is cleared when a
-transactional command is retried, so a retry never sees a value read in the rolled-back attempt.
+The access check and the handler then share one profile read. The memo is cleared when a top-level
+transaction is retried, so a retry never sees a value read in the rolled-back attempt.
 
 ## Rows become data objects, in batch
 

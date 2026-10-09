@@ -168,6 +168,39 @@ void main() {
     },
   );
 
+  test('a transactional job that loses a conflict runs again at once, on '
+      'the same attempt', () async {
+    final app = harness().app;
+    app.jobFailures['conflicted:once'] = 1;
+    await caller.call(const EnqueueJob('conflicted', 'once'));
+    await eventually(() async => await jobRow('once') == null);
+    expect(app.conflictedRuns.where((r) => r.startsWith('once:')), [
+      'once:1',
+      'once:1',
+    ]);
+    // The losing run's log row went with its savepoint.
+    expect(await logged('conflicted'), ['once']);
+  });
+
+  test('a recurring job that loses a conflict runs again at once, without '
+      'an alert', () async {
+    final app = harness().app;
+    final incidents = app.alerts.incidents.length;
+    // The first run to finish after the conflict was consumed.
+    final ran = app.jobEvents.stream.firstWhere(
+      (e) => e == 'tick' && app.tickConflicts == 0,
+    );
+    app.tickConflicts = 1;
+    await ran;
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(
+      app.alerts.incidents
+          .skip(incidents)
+          .where((i) => i.where.contains('tick')),
+      isEmpty,
+    );
+  });
+
   test(
     'jobs a newer version declared wait for it, and stop nothing here',
     () async {
