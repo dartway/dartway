@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:args/command_runner.dart';
 import 'package:dartway_cli/src/commands/deploy_command.dart';
 import 'package:dartway_cli/src/commands/deploy_run.dart';
 import 'package:dartway_cli/src/deploy/deploy_progress.dart';
@@ -131,6 +132,11 @@ void main() {
         arguments: const ['--env', 'staging', '--revision', 'abcdef1'],
       );
       expect(result.code, 1);
+      expect(result.human, contains('revision: abcdef1'));
+      expect(
+        result.events.singleWhere((event) => event['event'] == 'run_started'),
+        containsPair('revision', 'abcdef1'),
+      );
       expect(
         result.events.singleWhere((event) => event['event'] == 'run_finished'),
         allOf(
@@ -141,24 +147,27 @@ void main() {
     });
   }
 
-  test('invalid revision and skip-update conflict fail before SSH', () async {
-    for (final arguments in const [
-      ['--env', 'staging', '--revision', 'not-hex'],
-      ['--env', 'staging', '--revision', 'abcdef1', '--skip-git-update'],
-    ]) {
-      final ssh = RecordingSsh();
-      await expectLater(
-        runDeploy(
-          stackFrom(),
-          DeployRunCommand().argParser.parse(arguments),
-          connection: ssh,
-          localChecks: const [],
-        ),
-        throwsArgumentError,
-      );
-      expect(ssh.issued, isEmpty);
-    }
-  });
+  test(
+    'invalid revision options exit 64 through the command runner before SSH',
+    () async {
+      for (final arguments in const [
+        ['--env', 'staging', '--revision', 'not-hex'],
+        ['--env', 'staging', '--revision', 'abcdef1', '--skip-git-update'],
+      ]) {
+        final ssh = RecordingSsh();
+        final runner = CommandRunner<int>('dartway', 'test')
+          ..addCommand(DeployRunCommand(stack: stackFrom(), connection: ssh));
+        var code = 0;
+        try {
+          code = await runner.run(['run', ...arguments]) ?? 0;
+        } on UsageException {
+          code = 64;
+        }
+        expect(code, 64);
+        expect(ssh.issued, isEmpty);
+      }
+    },
+  );
 
   test('dry-run plan names the pinned revision', () async {
     final ssh = RecordingSsh();
@@ -176,6 +185,145 @@ void main() {
     expect(result.human, contains('Update the checkout to revision abcdef1'));
     expect(ssh.issued, isEmpty);
   });
+
+  test(
+    'resume skips a successful checkout after matching server HEAD',
+    () async {
+      final ssh = _ResumeRevisionServer(
+        record: 'update-checkout exited 0\n',
+        head: 'abcdef1234567890\nabcdef1 verified\n',
+      );
+      final result = await runWith(
+        ssh,
+        arguments: const [
+          '--env',
+          'staging',
+          '--resume',
+          '--revision',
+          'abcdef1',
+        ],
+      );
+      expect(
+        result.events,
+        contains(
+          allOf(
+            containsPair('event', 'step_skipped'),
+            containsPair('id', 'update-checkout'),
+          ),
+        ),
+      );
+      expect(ssh.detachedCheckoutRuns, 0);
+    },
+  );
+
+  test('resume refuses a successful checkout at a different HEAD', () async {
+    final result = await runWith(
+      _ResumeRevisionServer(
+        record: 'update-checkout exited 0\n',
+        head: '1234567890abcdef\n1234567 other\n',
+      ),
+      arguments: const [
+        '--env',
+        'staging',
+        '--resume',
+        '--revision',
+        'abcdef1',
+      ],
+    );
+    expect(result.code, 1);
+    expect(
+      result.events.singleWhere((event) => event['event'] == 'run_finished'),
+      allOf(
+        containsPair('failed_step', 'update-checkout'),
+        containsPair('reason', 'revision-mismatch'),
+      ),
+    );
+  });
+
+  test(
+    'resume retries a recorded checkout failure with the revision',
+    () async {
+      final ssh = _ResumeRevisionServer(record: 'update-checkout exited 1\n');
+      await runWith(
+        ssh,
+        arguments: const [
+          '--env',
+          'staging',
+          '--resume',
+          '--revision',
+          'abcdef1',
+        ],
+      );
+      expect(ssh.detachedCheckoutRuns, 1);
+      expect(
+        ssh.checkoutScript,
+        contains("rev-parse --verify 'abcdef1^{commit}'"),
+      );
+    },
+  );
+
+  test('resume with a revision refuses a plan without checkout', () async {
+    final ssh = _ResumeRevisionServer(record: 'build-server exited 0\n');
+    final result = await runWith(
+      ssh,
+      arguments: const [
+        '--env',
+        'staging',
+        '--resume',
+        '--revision',
+        'abcdef1',
+      ],
+    );
+    expect(result.code, 1);
+    expect(
+      result.events.singleWhere((event) => event['event'] == 'run_finished'),
+      containsPair('reason', 'revision-mismatch'),
+    );
+    expect(ssh.detachedCheckoutRuns, 0);
+  });
+}
+
+class _ResumeRevisionServer extends _ServerWhereEveryStepExits {
+  _ResumeRevisionServer({required this.record, this.head = ''}) : super(0);
+
+  final String record;
+  final String head;
+  int detachedCheckoutRuns = 0;
+  String checkoutScript = '';
+
+  @override
+  Future<DwSshResult> runAsWithInput(
+    String deployUser,
+    String command,
+    String input,
+  ) {
+    if (command.contains('update-checkout')) checkoutScript = input;
+    return run(command);
+  }
+
+  @override
+  Future<DwSshResult> run(String command) async {
+    if (command.contains('tcp_allowed_congestion_control')) {
+      issued.add(command);
+      return const DwSshResult(
+        exitCode: 0,
+        stdout: 'reno cubic bbr\n',
+        stderr: '',
+      );
+    }
+    if (command.contains('while read -r id')) {
+      issued.add(command);
+      return DwSshResult(exitCode: 0, stdout: record, stderr: '');
+    }
+    if (command.contains("git log -1 --format='%H%n%h %s'")) {
+      issued.add(command);
+      return DwSshResult(exitCode: 0, stdout: head, stderr: '');
+    }
+    if (command.contains('--dw-step-') && command.contains('update-checkout')) {
+      detachedCheckoutRuns++;
+    }
+    return super.run(command);
+  }
 }
 
 class _RevisionRefusalServer extends _ServerWhereEveryStepExits {

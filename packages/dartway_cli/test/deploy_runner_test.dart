@@ -16,6 +16,21 @@ List<String> _ids(DwDeployRunner runner) =>
     runner.steps(skipGitUpdate: false).map((step) => step.id).toList();
 
 void main() {
+  test(
+    'a pinned checkout stops when its deployment directory is unavailable',
+    () async {
+      final ssh = RecordingSsh();
+      final runner = DwDeployRunner(ssh: ssh, stack: stackFrom());
+
+      await runner.updateCheckout('abcdef1');
+
+      expect(
+        ssh.issued.single,
+        contains("cd '/home/deployer/shop' || exit \$?\n"),
+      );
+    },
+  );
+
   group('the order of a deployment', () {
     final runner = DwDeployRunner(
       ssh: RecordingSsh(),
@@ -860,11 +875,7 @@ esac
         arguments,
         workingDirectory: directory.path,
       );
-      expect(
-        result.exitCode,
-        0,
-        reason: '${result.stdout}\n${result.stderr}',
-      );
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
       return (result.stdout as String).trim();
     }
 

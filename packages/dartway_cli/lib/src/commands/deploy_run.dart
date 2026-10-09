@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:args/args.dart';
+import 'package:args/command_runner.dart';
 
 import '../checker/dw_check_type.dart';
 import '../deploy/deploy_check.dart';
@@ -37,17 +38,7 @@ Future<int> runDeploy(
   final out = report.human;
   final resume = results.flag('resume');
   final revision = results.option('revision');
-  if (revision != null &&
-      !RegExp(r'^[0-9a-fA-F]{7,64}$').hasMatch(revision)) {
-    throw ArgumentError.value(
-      revision,
-      'revision',
-      'must be 7–64 hexadecimal characters',
-    );
-  }
-  if (revision != null && results.flag('skip-git-update')) {
-    throw ArgumentError('--revision cannot be used with --skip-git-update');
-  }
+  validateDeployRevision(results);
 
   int finish(int code, {String? failedStep, String? reason}) {
     report.event('run_finished', {
@@ -156,6 +147,7 @@ Future<int> runDeploy(
   }
 
   Map<String, DwRemoteStepRecord>? record;
+  var resumeVerifiedCheckout = false;
   if (resume) {
     try {
       record = await remote.read();
@@ -175,8 +167,19 @@ Future<int> runDeploy(
     // never saw.
     final planned = record.keys.toList();
     steps = [for (final id in planned) ...steps.where((step) => step.id == id)];
-    if (revision != null &&
-        (record['update-checkout']?.succeeded ?? false)) {
+    final checkout = record['update-checkout'];
+    if (revision != null && checkout == null) {
+      report.problems.writeln(
+        'Cannot resume with --revision: the recorded deployment did not '
+        'update the checkout.',
+      );
+      return finish(
+        1,
+        failedStep: 'update-checkout',
+        reason: 'revision-mismatch',
+      );
+    }
+    if (revision != null && checkout!.succeeded) {
       final deployed = await runner.deployedRevision();
       final head = deployed.stdout.trim().split('\n').first;
       if (!deployed.ok ||
@@ -191,6 +194,7 @@ Future<int> runDeploy(
           reason: 'revision-mismatch',
         );
       }
+      resumeVerifiedCheckout = true;
     }
   }
 
@@ -223,6 +227,10 @@ Future<int> runDeploy(
     remote: remote,
     resumeFrom: record,
     retryFailed: results.flag('retry-failed'),
+    retryFailedStepIds: revision == null ? const {} : const {'update-checkout'},
+    trustedSucceededStepIds: resumeVerifiedCheckout
+        ? const {'update-checkout'}
+        : const {},
     progress: report,
     onUpdated: reportRevision,
   );
@@ -277,6 +285,8 @@ Future<String?> executeDeploySteps(
   DwRemoteSteps? remote,
   Map<String, DwRemoteStepRecord>? resumeFrom,
   bool retryFailed = false,
+  Set<String> retryFailedStepIds = const {},
+  Set<String> trustedSucceededStepIds = const {},
   DwDeployProgress? progress,
 }) async {
   final report = progress ?? DwDeployProgress.text();
@@ -289,7 +299,9 @@ Future<String?> executeDeploySteps(
     final step = steps[index];
     final position = {'index': index + 1, 'count': steps.length, 'id': step.id};
     final previous = passingOver ? resumeFrom![step.id] : null;
-    if (previous != null && previous.succeeded && step.verdict == null) {
+    if (previous != null &&
+        previous.succeeded &&
+        (step.verdict == null || trustedSucceededStepIds.contains(step.id))) {
       out.writeln(
         '\n[${index + 1}/${steps.length}] ${step.title} — done by the run '
         'being resumed',
@@ -307,6 +319,7 @@ Future<String?> executeDeploySteps(
         remote != null &&
         previous != null &&
         !retryFailed &&
+        !retryFailedStepIds.contains(step.id) &&
         (previous.state == DwRemoteStepState.rejected ||
             (previous.state == DwRemoteStepState.exited &&
                 !previous.succeeded));
@@ -419,6 +432,21 @@ Future<String?> executeDeploySteps(
     }
   }
   return null;
+}
+
+/// Validates the revision options before deployment can open an SSH
+/// connection.
+void validateDeployRevision(ArgResults results) {
+  final revision = results.option('revision');
+  if (revision != null && !RegExp(r'^[0-9a-fA-F]{7,64}$').hasMatch(revision)) {
+    throw UsageException('--revision must be 7–64 hexadecimal characters.', '');
+  }
+  if (revision != null && results.flag('skip-git-update')) {
+    throw UsageException(
+      '--revision cannot be used with --skip-git-update.',
+      '',
+    );
+  }
 }
 
 /// Prints the outside verification and answers the exit code.

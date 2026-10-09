@@ -110,7 +110,9 @@ class DeploySetupCommand extends Command<int> {
 
 /// Deploys to an already-provisioned server.
 class DeployRunCommand extends Command<int> {
-  DeployRunCommand() {
+  DeployRunCommand({DwStack? stack, DwSshRunner? connection})
+    : _stack = stack,
+      _connection = connection {
     argParser
       ..addOption('env', help: 'Environment declared in deploy/config.yaml.')
       ..addOption(
@@ -156,6 +158,9 @@ class DeployRunCommand extends Command<int> {
       );
   }
 
+  final DwStack? _stack;
+  final DwSshRunner? _connection;
+
   @override
   String get name => 'run';
 
@@ -172,17 +177,11 @@ class DeployRunCommand extends Command<int> {
   @override
   Future<int> run() {
     final results = argResults!;
-    final revision = results.option('revision');
-    if (revision != null &&
-        !RegExp(r'^[0-9a-fA-F]{7,64}$').hasMatch(revision)) {
-      usageException('--revision must be 7–64 hexadecimal characters.');
-    }
-    if (revision != null && results.flag('skip-git-update')) {
-      usageException('--revision cannot be used with --skip-git-update.');
-    }
+    validateDeployRevision(results);
     return runDeploy(
-      resolveDeployStack(this, results, deployProjectRoot()),
+      _stack ?? resolveDeployStack(this, results, deployProjectRoot()),
       results,
+      connection: _connection,
     );
   }
 }

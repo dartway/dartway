@@ -136,7 +136,7 @@ class DwDeployRunner {
       );
     }
     return _as('''
-cd '$appDir'
+cd '$appDir' || exit \$?
 git fetch origin '${target.branch}' --prune || exit \$?
 resolved=\$(git rev-parse --verify '$revision^{commit}' 2>/dev/null) || {
   echo "revision-not-found: $revision not found on origin/${target.branch}" >&2
