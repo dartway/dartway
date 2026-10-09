@@ -257,6 +257,29 @@ void main() {
     expect('${onChannel.stderr}', contains('nowhere.git'));
   });
 
+  test('the review workflow cannot push: the workflow token, agent mode, and '
+      'the commit tools taken away (#494)', () async {
+    final project = await create(['shop', '--local-repo', repository.path]);
+    final workflow = read(project, '.github/workflows/claude-review.yml');
+
+    // The Claude App's token can write contents whatever `permissions:` says;
+    // only the workflow's own token is held to `contents: read`.
+    expect(workflow, contains(r'github_token: ${{ secrets.GITHUB_TOKEN }}'));
+    // Tracking forces tag mode on pull requests, whose tools edit and commit.
+    // The key, not the word: the comment above the step names it to explain
+    // why it is absent.
+    expect(
+      RegExp(r'^\s*track_progress\s*:', multiLine: true).hasMatch(workflow),
+      isFalse,
+      reason: workflow,
+    );
+    expect(
+      RegExp(r'--disallowedTools "[^"]*Bash\(git push:\*\)').hasMatch(workflow),
+      isTrue,
+      reason: workflow,
+    );
+  });
+
   test('the language and the tracker chosen at creation are recorded, because '
       'update runs with no arguments and reads them back', () async {
     final project = await create([
