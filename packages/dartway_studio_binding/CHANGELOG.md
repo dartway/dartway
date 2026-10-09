@@ -2,6 +2,8 @@
 
 ## 0.2.1
 
+- **Requires `dartway_studio_bridge` 0.11.0** (#376), where `StudioFrameController` gains
+  `setInteractive` on the Studio side. Nothing this package uses changed.
 - **Requires `dartway_router` 3.0.0** (#314), where a simple route's `extraPathSegment`
   replaces its name in the URL instead of doubling it, and every descendant of such a route
   moves with it. The shape this package reads is unchanged (`route.fullPath` and

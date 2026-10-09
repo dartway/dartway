@@ -13,8 +13,10 @@
 #   tool/checks.sh             analyze + test: needs no Docker
 #   tool/checks.sh analyze     dart analyze over every resolution root, and
 #                              dartway check over template/ and example/
-#   tool/checks.sh test        every suite that needs no services, plus every
-#                              `js/*` npm package (typecheck, node --test, build)
+#   tool/checks.sh test        every suite that needs no services, the suites
+#                              of the packages named in BROWSER again in Chrome,
+#                              and every `js/*` npm package (typecheck,
+#                              node --test, build)
 #   tool/checks.sh services    the suites of the packages named in SERVICES,
 #                              against DW_DATABASE_* and DW_STORAGE_*
 #
@@ -111,6 +113,15 @@ packages/dartway_auth_providers_server|Postgres
 packages/dartway_orm|Postgres
 packages/dartway_core_server|Postgres and storage
 packages/dartway_push_server|Postgres"
+
+# Packages whose suites also run in a browser, by `test` after the VM run. A
+# test that needs the web engine — a platform view, `dart:ui_web`, a real DOM
+# element — is `@TestOn('browser')`, and the VM run skips it without a word: a
+# package is named here so that skip is not the only run it gets. The whole
+# suite runs in Chrome rather than the browser files alone: the code it shares
+# with the VM ships to the web, and is proved on the web compiler too (D-136).
+BROWSER="\
+packages/dartway_studio_bridge|the preview frame's iframe behind a platform view"
 
 # The reason this package is skipped, or nothing if it is not.
 skip_reason() {
@@ -311,6 +322,36 @@ js_checks() {
   done
 }
 
+# `flutter test --platform chrome` finds the browser the way flutter_tools
+# does: `CHROME_EXECUTABLE` when set, otherwise `google-chrome` on Linux and
+# the application bundle on macOS. Checked first and refused by name, as
+# `require_node_floor` refuses a missing Node: a browser lane that cannot start
+# must not read as a lane with nothing to say.
+require_chrome() {
+  local package="$1" chrome
+  if [ -n "${CHROME_EXECUTABLE:-}" ]; then
+    chrome="$CHROME_EXECUTABLE"
+  elif [ "$(uname)" = Darwin ]; then
+    chrome="/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+  else
+    chrome="google-chrome"
+  fi
+  if ! command -v "$chrome" >/dev/null 2>&1; then
+    echo "browser: Chrome not found ($chrome); $package runs its suite in it" >&2
+    echo "  install Chrome, or point CHROME_EXECUTABLE at a Chrome or Chromium binary" >&2
+    exit 1
+  fi
+}
+
+browser_suites() {
+  echo "══ browser"
+  for package in $(printf '%s\n' "$BROWSER" | cut -d'|' -f1); do
+    require_chrome "$package"
+    run "$package (chrome)" \
+      bash -c "cd '$package' && flutter test --platform chrome"
+  done
+}
+
 # Stops the run, before anything is resolved or run, unless every variable the
 # suites read is set and both services answer on their ports. Forty suites each
 # failing in `setUpAll` say the same thing less clearly.
@@ -357,6 +398,7 @@ resolve
 [ "$MODE" = all ] || [ "$MODE" = analyze ] && analyze
 [ "$MODE" = all ] || [ "$MODE" = analyze ] && project_checks
 [ "$MODE" = all ] || [ "$MODE" = test ] && test_suites
+[ "$MODE" = all ] || [ "$MODE" = test ] && browser_suites
 [ "$MODE" = all ] || [ "$MODE" = test ] && js_checks
 [ "$MODE" = services ] && service_suites
 
