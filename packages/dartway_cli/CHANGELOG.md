@@ -5,6 +5,10 @@
 - `deploy run --revision <sha>` deploys the verified commit only when it belongs to the configured
   remote branch, and refuses an older revision when the server already contains it. The revision is
   included in text and JSON progress, and invalid revisions fail before SSH (#473).
+- `secret pull --overwrite KEY[,KEY…]` can take the server value for selected differing keys. Pull
+  prints a names-only plan, supports the same plan under `--dry-run`, refuses empty server values,
+  and restores the original local file when read-back verification fails (#434).
+
 - Deploy provisions BBR with `fq` on the host and selects BBR inside the front proxy's network
   namespace. `deploy run` refuses before replacement when the host cannot provide BBR, while
   `deploy check` fails a non-BBR proxy and warns about a non-BBR host (#469). Existing servers

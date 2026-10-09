@@ -425,7 +425,7 @@ reads the events; the prose may change wording at any time, the events may not.
 | `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message`; `resumed: true` when the step failed in the deployment being resumed and was not run again |
 | `services` | `services` (`name`, `status`) |
 | `probe` | `title`, `passed`, `warning`, `detail` |
-| `run_finished` | `ok`, `exit_code`; optional `failed_step` and `reason` (`checks`, `nothing-to-resume`, `unreachable`, `bbr-unavailable`, `verification`, `revision-not-found`, `revision-not-on-branch`, `superseded`, `revision-mismatch`) |
+| `run_finished` | `ok`, `exit_code`; optional `failed_step` and `reason` (`bbr-unavailable`, `checks`, `nothing-to-resume`, `revision-mismatch`, `revision-not-found`, `revision-not-on-branch`, `superseded`, `unreachable`, `verification`) |
 
 **Then it verifies from outside**, as a browser and an app would, retrying failed probes up to twelve
 times five seconds apart:
@@ -570,7 +570,7 @@ running server keeps the environment it started with**: a changed secret takes e
 | `secret list` | Names only — which are required, generated, empty or refused — plus the stored files. Values are never read |
 | `secret put-file <path>` | Uploads a document (a service-account JSON) into the store with mode 600; `--name` stores it under another name. It reaches the server only when declared under `requires.files`, mounted read-only at `/run/secrets/<name>` — re-run `setup` after declaring one |
 | `secret push` | Adds to the server store what it lacks from the environment's section of `deploy/secrets.yaml`; a key whose server value differs is refused by name, never replaced silently |
-| `secret pull` | Copies keys the server has and the local file lacks into it; differing values are reported, never rewritten |
+| `secret pull` | Copies keys the server has and the local file lacks; `--overwrite KEY[,KEY…]` takes the server value for exactly the named differing keys |
 
 **`deploy/secrets.yaml`** is optional: the maintainer's copy of every environment's secrets, one
 section per environment and no shared section, git-ignored by the skeleton's `deploy/.gitignore`.
@@ -602,4 +602,13 @@ key names and a checksum of the store travel back, never a value, the same rule 
 everywhere else. That checksum is checked again right before `push` writes, so a second push, or a
 hand edit, landing in between the two is refused rather than silently undone; and a store that exists
 but cannot be read fails the comparison outright, rather than being read as an absent one that every
-key would then look new against. `pull` takes `--dry-run` too.
+key would then look new against.
+
+`pull` prints its plan as key names only: additions, requested overwrites, remaining differing keys,
+server-empty keys and local-only keys. Without `--overwrite`, a difference includes a ready-to-run
+command naming every differing key whose server value is non-empty. `--overwrite KEY[,KEY…]` replaces only those named values; there is no blanket
+overwrite because the local file may hold the only copy of a rotation that has not been pushed yet.
+An empty server value never replaces a non-empty local value: pull refuses and directs the maintainer
+to push instead. `--dry-run` prints the same plan without writing. A completed write is read back and
+verified; if the file cannot be parsed or a changed key does not match, its original bytes are
+restored.
