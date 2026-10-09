@@ -23,6 +23,10 @@ The duplicate route name error's own explanation is corrected: it used to say "f
 
 Any project relying on the old, doubled URL of a simple route with `extraPathSegment` set breaks — and so does every route nested under one, since `fullPath` is built from the parent chain: a plain child of `planPreferences` moved from `/…/plan/planPreferences/<child>` to `/…/plan/<child>`, a parameterized child's `:id` segment moves the same way. See `docs/migrations/2026-09-26-simple-extra-path-segment-replaces-name.md` for what to check and how to bridge old links.
 
+### Added
+
+**A route can ask before the person leaves it: `onExit` on the descriptor** (#424). `DwNavigationRouteDescriptor.zoneRoot`, `.simple` and `.parameterized` take an optional `onExit`, a `DwNavigationExitGuard` — `FutureOr<bool> Function(BuildContext context, DwNavigationTarget leaving)` — passed to go_router's `GoRoute.onExit`. It is asked on a pop, the system back and any change of address (browser back and forward, a typed URL, a link, `go`), which `PopScope` misses on the web; `true` lets the navigation go on, `false` keeps the person on the route. `context` is the navigator's, so a sheet opens from it; `leaving` is the location being left with the leaving route's own name and path parameters, the router's type rather than go_router's `GoRouterState` (as for guards, #288). Descriptors are `const`, so the hook is a top-level function or a static method. It also fires when a zone guard redirects away and when a `StatefulShellRoute` branch is switched, and not when navigation goes deeper into a child route.
+
 ## 2.0.0 - 2026-09-23
 
 ### Breaking
