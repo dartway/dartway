@@ -60,6 +60,17 @@ void main() {
   String read(Directory project, String path) =>
       File(p.join(project.path, path)).readAsStringSync();
 
+  test('does not give the project a licence or notice', () async {
+    final project = await create([
+      'shop',
+      '--local-repo',
+      repository.path,
+    ]);
+
+    expect(File(p.join(project.path, 'LICENSE')).existsSync(), isFalse);
+    expect(File(p.join(project.path, 'NOTICE')).existsSync(), isFalse);
+  });
+
   test('everything is named after the project, and nothing after the '
       'template', () async {
     final project = await create([
