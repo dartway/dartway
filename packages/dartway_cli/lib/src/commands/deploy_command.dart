@@ -123,6 +123,10 @@ class DeployRunCommand extends Command<int> {
         negatable: false,
         help: 'Deploy what is already checked out on the server.',
       )
+      ..addOption(
+        'revision',
+        help: 'Deploy this verified commit from the configured branch.',
+      )
       ..addFlag(
         'resume',
         negatable: false,
@@ -163,13 +167,24 @@ class DeployRunCommand extends Command<int> {
   @override
   String get invocation =>
       'dartway deploy run --env <environment> [--dry-run] [--skip-git-update] '
-      '[--resume] [--progress json]';
+      '[--revision <sha>] [--resume] [--progress json]';
 
   @override
-  Future<int> run() => runDeploy(
-    resolveDeployStack(this, argResults!, deployProjectRoot()),
-    argResults!,
-  );
+  Future<int> run() {
+    final results = argResults!;
+    final revision = results.option('revision');
+    if (revision != null &&
+        !RegExp(r'^[0-9a-fA-F]{7,64}$').hasMatch(revision)) {
+      usageException('--revision must be 7–64 hexadecimal characters.');
+    }
+    if (revision != null && results.flag('skip-git-update')) {
+      usageException('--revision cannot be used with --skip-git-update.');
+    }
+    return runDeploy(
+      resolveDeployStack(this, results, deployProjectRoot()),
+      results,
+    );
+  }
 }
 
 /// Validates that the project is deployable to the given environment.

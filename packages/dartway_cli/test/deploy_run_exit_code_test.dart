@@ -16,8 +16,9 @@ import 'support/deploy_fixtures.dart';
 /// closely, could not have given; this keeps it that way).
 void main() {
   Future<({int code, String human, List<Map<String, Object?>> events})> runWith(
-    RecordingSsh ssh,
-  ) async {
+    RecordingSsh ssh, {
+    List<String> arguments = const ['--env', 'staging'],
+  }) async {
     final human = StreamController<List<int>>();
     final events = StreamController<List<int>>();
     final humanLines = human.stream.transform(utf8.decoder).join();
@@ -29,7 +30,7 @@ void main() {
     final eventSink = IOSink(events.sink);
     final code = await runDeploy(
       stackFrom(),
-      DeployRunCommand().argParser.parse(['--env', 'staging']),
+      DeployRunCommand().argParser.parse(arguments),
       connection: ssh,
       progress: DwDeployProgress.into(human: humanSink, events: eventSink),
       localChecks: const [],
@@ -118,6 +119,83 @@ void main() {
       expect(finished, containsPair('failed_step', 'update-checkout'));
     },
   );
+
+  for (final reason in const [
+    'revision-not-found',
+    'revision-not-on-branch',
+    'superseded',
+  ]) {
+    test('$reason refusal identifies the checkout step and reason', () async {
+      final result = await runWith(
+        _RevisionRefusalServer(reason),
+        arguments: const ['--env', 'staging', '--revision', 'abcdef1'],
+      );
+      expect(result.code, 1);
+      expect(
+        result.events.singleWhere((event) => event['event'] == 'run_finished'),
+        allOf(
+          containsPair('failed_step', 'update-checkout'),
+          containsPair('reason', reason),
+        ),
+      );
+    });
+  }
+
+  test('invalid revision and skip-update conflict fail before SSH', () async {
+    for (final arguments in const [
+      ['--env', 'staging', '--revision', 'not-hex'],
+      ['--env', 'staging', '--revision', 'abcdef1', '--skip-git-update'],
+    ]) {
+      final ssh = RecordingSsh();
+      await expectLater(
+        runDeploy(
+          stackFrom(),
+          DeployRunCommand().argParser.parse(arguments),
+          connection: ssh,
+          localChecks: const [],
+        ),
+        throwsArgumentError,
+      );
+      expect(ssh.issued, isEmpty);
+    }
+  });
+
+  test('dry-run plan names the pinned revision', () async {
+    final ssh = RecordingSsh();
+    final result = await runWith(
+      ssh,
+      arguments: const [
+        '--env',
+        'staging',
+        '--revision',
+        'abcdef1',
+        '--dry-run',
+      ],
+    );
+    expect(result.code, 0);
+    expect(result.human, contains('Update the checkout to revision abcdef1'));
+    expect(ssh.issued, isEmpty);
+  });
+}
+
+class _RevisionRefusalServer extends _ServerWhereEveryStepExits {
+  _RevisionRefusalServer(this.reason) : super(1);
+
+  final String reason;
+
+  @override
+  Future<DwSshResult> run(String command) async {
+    final result = await super.run(command);
+    if (!command.contains('--dw-step-') || result.stdout.isEmpty) return result;
+    return DwSshResult(
+      exitCode: result.exitCode,
+      stdout: result.stdout.replaceFirst(
+        'fatal: the step failed',
+        '$reason: checkout refused',
+      ),
+      stderr: result.stderr,
+    );
+  }
 }
 
 /// Answers every detached step the way the server's step runner reports one

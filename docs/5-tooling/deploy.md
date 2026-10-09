@@ -316,7 +316,10 @@ also verifies that the host allows BBR; if not, it stops before replacing anythi
 `dart run dartway_cli:dartway deploy run`. Then:
 
 1. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
-   repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`);
+   repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`).
+   CI can pass `--revision <sha>` (7–64 hexadecimal characters) to deploy exactly the verified
+   commit. It must belong to `origin/<branch>`, and the run refuses rather than moving backwards
+   when the server is already at a descendant of that commit;
 2. writes the override bridge;
 3. **renders `docker-compose.yml` and `nginx.conf`** from `deploy/config.yaml` and this version of
    the CLI, and says of each whether it changed. Both are derived files, and a derived file written

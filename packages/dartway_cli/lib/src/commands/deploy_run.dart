@@ -36,6 +36,18 @@ Future<int> runDeploy(
           : DwDeployProgress.text());
   final out = report.human;
   final resume = results.flag('resume');
+  final revision = results.option('revision');
+  if (revision != null &&
+      !RegExp(r'^[0-9a-fA-F]{7,64}$').hasMatch(revision)) {
+    throw ArgumentError.value(
+      revision,
+      'revision',
+      'must be 7–64 hexadecimal characters',
+    );
+  }
+  if (revision != null && results.flag('skip-git-update')) {
+    throw ArgumentError('--revision cannot be used with --skip-git-update');
+  }
 
   int finish(int code, {String? failedStep, String? reason}) {
     report.event('run_finished', {
@@ -65,15 +77,19 @@ Future<int> runDeploy(
     },
   );
   final runner = DwDeployRunner(ssh: ssh, stack: stack, remote: remote);
-  var steps = runner.steps(skipGitUpdate: results.flag('skip-git-update'));
+  var steps = runner.steps(
+    skipGitUpdate: results.flag('skip-git-update'),
+    revision: revision,
+  );
 
   out
     ..writeln('Deploy [$environment]${resume ? ' — resuming' : ''}')
     ..writeln(
       '  server:  $sshUser@${target.host}, runs as ${target.deployUser}',
     )
-    ..writeln('  branch:  ${target.branch}')
-    ..writeln('  dir:     ${target.appDir}');
+    ..writeln('  branch:  ${target.branch}');
+  if (revision != null) out.writeln('  revision: $revision');
+  out.writeln('  dir:     ${target.appDir}');
 
   // The working-copy checks are cheap and catch the mismatches that otherwise
   // surface as a half-deployed server.
@@ -159,11 +175,29 @@ Future<int> runDeploy(
     // never saw.
     final planned = record.keys.toList();
     steps = [for (final id in planned) ...steps.where((step) => step.id == id)];
+    if (revision != null &&
+        (record['update-checkout']?.succeeded ?? false)) {
+      final deployed = await runner.deployedRevision();
+      final head = deployed.stdout.trim().split('\n').first;
+      if (!deployed.ok ||
+          !head.toLowerCase().startsWith(revision.toLowerCase())) {
+        report.problems.writeln(
+          'Cannot resume: server HEAD ${head.isEmpty ? '<unknown>' : head} '
+          'does not match revision $revision.',
+        );
+        return finish(
+          1,
+          failedStep: 'update-checkout',
+          reason: 'revision-mismatch',
+        );
+      }
+    }
   }
 
   report.event('run_started', {
     'environment': environment,
     'resume': resume,
+    'revision': ?revision,
     'steps': _stepList(steps),
   });
 
@@ -193,7 +227,17 @@ Future<int> runDeploy(
     onUpdated: reportRevision,
   );
   if (failedStep != null) {
-    return finish(1, failedStep: failedStep);
+    String? reason;
+    if (failedStep == 'update-checkout' && revision != null) {
+      final failed = await remote.collect(failedStep);
+      final output = '${failed.stdout}\n${failed.stderr}';
+      reason = const [
+        'revision-not-found',
+        'revision-not-on-branch',
+        'superseded',
+      ].where(output.contains).firstOrNull;
+    }
+    return finish(1, failedStep: failedStep, reason: reason);
   }
 
   out.writeln('\nServices');
