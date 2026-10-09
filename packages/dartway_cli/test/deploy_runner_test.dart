@@ -690,6 +690,49 @@ esac
           }
         });
       }
+
+      // The whole resume, to its end: the checkout and the build recorded
+      // done are passed over, the steps after them run, and the deployment
+      // is verified from outside — by a local site standing in for the
+      // stack's origins.
+      test('the completed steps are passed over, the rest run, and the run '
+          'succeeds', () async {
+        final site = await _VerifiedSite.start();
+        addTearDown(site.close);
+        final server = _IdentityServer(
+          listing: 'shop_postgres_data\n',
+          record: [
+            for (final id in ids.take(after)) '$id exited 0',
+            for (final id in ids.skip(after)) '$id pending',
+          ].join('\n'),
+        );
+        final result = await HttpOverrides.runWithHttpOverrides(
+          () => deploy(server, moved(extra: '  project: shop\n'), const [
+            '--resume',
+          ]),
+          site.overrides,
+        );
+
+        expect(result.code, 0);
+        final finished = result.events.last;
+        expect(finished['event'], 'run_finished');
+        expect(finished['ok'], isTrue);
+        expect(finished.containsKey('failed_step'), isFalse);
+        expect([
+          for (final event in result.events)
+            if (event['event'] == 'step_skipped') event['id'],
+        ], ids.take(after));
+        final started = [
+          for (final (:command, script: _) in server.started)
+            ids.lastWhere((id) => command.contains("'$id'")),
+        ];
+        expect(started, ids.skip(after));
+        expect(started, isNot(contains('update-checkout')));
+        expect(started, isNot(contains('build')));
+        for (final (:command, :script) in server.started) {
+          expect(script, isNot(contains('git fetch')), reason: command);
+        }
+      });
     });
 
     // The script itself, in a shell: the store listing is a glob that matches
@@ -1185,9 +1228,13 @@ class _IdentityServer extends RecordingSsh {
     if (nonce == null) {
       return const DwSshResult(exitCode: 0, stdout: '', stderr: '');
     }
+    // The upstream check asks two questions; an empty answer to both is a
+    // stack and a proxy configuration that agree.
+    final stdout = command.contains('check-upstreams') ? '--dw-nginx-d--' : '';
     return DwSshResult(
       exitCode: 0,
-      stdout: '$nonce exited $exitCode\n\n$nonce stderr\n\n$nonce end 0\n',
+      stdout:
+          '$nonce exited $exitCode\n$stdout\n$nonce stderr\n\n$nonce end 0\n',
       stderr: '',
     );
   }
@@ -1201,4 +1248,66 @@ class _IdentityServer extends RecordingSsh {
     started.add((command: command, script: input));
     return run(command);
   }
+}
+
+/// Answers every outside probe of a minimal stack the way a healthy
+/// deployment does. [overrides] sends every connection the probes open to
+/// it, whatever origin they ask for, in plain HTTP.
+class _VerifiedSite {
+  _VerifiedSite(this._server);
+
+  final HttpServer _server;
+
+  static Future<_VerifiedSite> start() async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen(_answer);
+    return _VerifiedSite(server);
+  }
+
+  HttpOverrides get overrides => _ToLoopback(_server.port);
+
+  Future<void> close() => _server.close(force: true);
+
+  static Future<void> _answer(HttpRequest request) async {
+    final response = request.response;
+    switch (request.uri.path) {
+      case '/dw/live':
+        final socket = await WebSocketTransformer.upgrade(request);
+        await socket.close(4000, 'dw.protocolUnsupported');
+        return;
+      case '/health':
+        response.write('ok');
+      case '/':
+        response
+          ..headers.contentType = ContentType.html
+          ..headers.set(HttpHeaders.cacheControlHeader, 'no-cache')
+          ..write('<html><script src="flutter_bootstrap.js"></script></html>');
+      case '/flutter_bootstrap.js':
+        response
+          ..headers.set(HttpHeaders.cacheControlHeader, 'no-cache')
+          ..write('// the bundled loader');
+      case '/main.dart.js':
+        response
+          ..headers.contentType = ContentType('application', 'javascript')
+          ..headers.set(HttpHeaders.cacheControlHeader, 'no-cache')
+          ..headers.set(HttpHeaders.contentEncodingHeader, 'gzip')
+          ..add(gzip.encode(utf8.encode('main();')));
+      default:
+        response.statusCode = HttpStatus.notFound;
+    }
+    await response.close();
+  }
+}
+
+class _ToLoopback extends HttpOverrides {
+  _ToLoopback(this.port);
+
+  final int port;
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) =>
+      super.createHttpClient(context)
+        ..findProxy = ((_) => 'DIRECT')
+        ..connectionFactory = (uri, proxyHost, proxyPort) =>
+            Socket.startConnect(InternetAddress.loopbackIPv4, port);
 }
