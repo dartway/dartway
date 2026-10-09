@@ -69,8 +69,9 @@ void main() {
       () async {
         const secret = r'pass.*[]\/&$word';
         final encoded = Uri.encodeComponent(secret);
-        File(p.join(temp.path, 'secrets.env'))
-            .writeAsStringSync("TOKEN='$secret'\n");
+        File(
+          p.join(temp.path, 'secrets.env'),
+        ).writeAsStringSync("TOKEN='$secret'\n");
         final plan = [
           step(
             'leaks',
@@ -104,8 +105,9 @@ void main() {
   }
 
   test('successful step output is masked in prose and step_finished', () async {
-    File(p.join(temp.path, 'secrets.env'))
-        .writeAsStringSync("TOKEN='stored-secret'\n");
+    File(
+      p.join(temp.path, 'secrets.env'),
+    ).writeAsStringSync("TOKEN='stored-secret'\n");
     final plan = [
       DwDeployStep(
         id: 'prints',
@@ -195,6 +197,45 @@ void main() {
       isNull,
     );
     expect(ran(), ['a', 'b', 'c', 'b', 'c']);
+  });
+
+  test(
+    'a matching recorded checkout is skipped after its HEAD was verified',
+    () async {
+      final checkout = step('update-checkout', verdict: (_) => 'old output');
+      remote.beginFresh(['update-checkout', 'after']);
+      await checkout.run();
+
+      expect(
+        await executeDeploySteps(
+          [checkout, step('after')],
+          remote: remote,
+          resumeFrom: await remote.read(),
+          trustedSucceededStepIds: const {'update-checkout'},
+          progress: progress,
+        ),
+        isNull,
+      );
+      expect(ran(), ['update-checkout', 'after']);
+    },
+  );
+
+  test('a recorded failed checkout runs again with the pinned plan', () async {
+    final failed = step('update-checkout', script: 'exit 1');
+    remote.beginFresh(['update-checkout', 'after']);
+    await failed.run();
+
+    expect(
+      await executeDeploySteps(
+        [step('update-checkout'), step('after')],
+        remote: remote,
+        resumeFrom: await remote.read(),
+        retryFailedStepIds: const {'update-checkout'},
+        progress: progress,
+      ),
+      isNull,
+    );
+    expect(ran(), ['update-checkout', 'update-checkout', 'after']);
   });
 
   test('the events name every step, its position and its end', () async {

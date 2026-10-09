@@ -347,7 +347,10 @@ also verifies that the host allows BBR; if not, it stops before replacing anythi
    stops here, with the server untouched, instead of failing to `cd` into a checkout that does not
    exist — or, after a `setup`, starting a second, empty stack;
 2. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
-   repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`);
+   repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`).
+   CI can pass `--revision <sha>` (7–64 hexadecimal characters) to deploy exactly the verified
+   commit. It must belong to `origin/<branch>`, and the run refuses rather than moving backwards
+   when the server is already at a descendant of that commit;
 3. writes the override bridge;
 4. **renders `docker-compose.yml` and `nginx.conf`** from `deploy/config.yaml` and this version of
    the CLI, and says of each whether it changed. Both are derived files, and a derived file written
@@ -429,7 +432,9 @@ that step's reason and the output the server kept, because a self-deploy resumes
 interruption and a failing step would otherwise be repeated until the attempts ran out — each time
 stopping the server it had just started again. `--retry-failed` with `--resume` runs it once more
 (against the checkout that deployment updated to); after fixing code, deploy anew rather than
-resume.
+resume. With `--revision`, resuming first verifies that a successfully completed checkout is still
+at that revision. A mismatch, or a recorded plan that had no checkout step, is refused with
+`revision-mismatch`; a checkout that previously failed is retried with the requested revision.
 
 A new `run` starts a new record, says where the previous deployment stopped if it did not finish,
 and refuses while a step of it is still running — two deployments never interleave on one server.
@@ -443,7 +448,7 @@ reads the events; the prose may change wording at any time, the events may not.
 |---|---|
 | `notice` | `message` — what the server said about the previous deployment |
 | `plan` | `steps` (`id`, `title`) — `--dry-run` only |
-| `run_started` | `environment`, `resume`, `steps` (`id`, `title`) |
+| `run_started` | `environment`, `resume`, optional `revision`, `steps` (`id`, `title`) |
 | `revision` | `commit` (full hash), `subject` — after the checkout update, or before the steps when there is none |
 | `step_skipped` | `index`, `count`, `id` — done by the deployment being resumed |
 | `step_started` | `index`, `count`, `id`, `title`, `picked_up` — waiting for a step already on the server |
@@ -451,7 +456,7 @@ reads the events; the prose may change wording at any time, the events may not.
 | `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message`; `resumed: true` when the step failed in the deployment being resumed and was not run again |
 | `services` | `services` (`name`, `status`) |
 | `probe` | `title`, `passed`, `warning`, `detail` |
-| `run_finished` | `ok`, `exit_code`; `failed_step`, or `reason` (`bbr-unavailable`, `checks`, `nothing-to-resume`, `unreachable`, `verification`) |
+| `run_finished` | `ok`, `exit_code`; optional `failed_step` and `reason` (`bbr-unavailable`, `checks`, `nothing-to-resume`, `revision-mismatch`, `revision-not-found`, `revision-not-on-branch`, `superseded`, `unreachable`, `verification`) |
 
 **Then it verifies from outside**, as a browser and an app would, retrying failed probes up to twelve
 times five seconds apart:

@@ -118,7 +118,9 @@ class DeploySetupCommand extends Command<int> {
 
 /// Deploys to an already-provisioned server.
 class DeployRunCommand extends Command<int> {
-  DeployRunCommand() {
+  DeployRunCommand({DwStack? stack, DwSshRunner? connection})
+    : _stack = stack,
+      _connection = connection {
     argParser
       ..addOption('env', help: 'Environment declared in deploy/config.yaml.')
       ..addOption(
@@ -130,6 +132,10 @@ class DeployRunCommand extends Command<int> {
         'skip-git-update',
         negatable: false,
         help: 'Deploy what is already checked out on the server.',
+      )
+      ..addOption(
+        'revision',
+        help: 'Deploy this verified commit from the configured branch.',
       )
       ..addFlag(
         'resume',
@@ -160,6 +166,9 @@ class DeployRunCommand extends Command<int> {
       );
   }
 
+  final DwStack? _stack;
+  final DwSshRunner? _connection;
+
   @override
   String get name => 'run';
 
@@ -171,13 +180,18 @@ class DeployRunCommand extends Command<int> {
   @override
   String get invocation =>
       'dartway deploy run --env <environment> [--dry-run] [--skip-git-update] '
-      '[--resume] [--progress json]';
+      '[--revision <sha>] [--resume] [--progress json]';
 
   @override
-  Future<int> run() => runDeploy(
-    resolveDeployStack(this, argResults!, deployProjectRoot()),
-    argResults!,
-  );
+  Future<int> run() {
+    final results = argResults!;
+    validateDeployRevision(results);
+    return runDeploy(
+      _stack ?? resolveDeployStack(this, results, deployProjectRoot()),
+      results,
+      connection: _connection,
+    );
+  }
 }
 
 /// Validates that the project is deployable to the given environment.
