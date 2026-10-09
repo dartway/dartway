@@ -12,7 +12,7 @@ absent from `tcp_allowed_congestion_control`.
 
 ## What to change
 
-Run setup once for each server, before its first deploy on this version:
+Run setup once on each server, before its next `deploy run`:
 
 ```bash
 dart run dartway_cli:dartway deploy setup --env <environment>
@@ -25,15 +25,16 @@ prints:
 BBR congestion control is not allowed on the server. Run `dart run dartway_cli:dartway deploy setup` once on this server, then deploy again.
 ```
 
-With `--progress json`, the finished event instead carries `bbr-unavailable` as its reason.
+With `--progress json`, the message goes to stderr and the `run_finished` event carries
+`reason: "bbr-unavailable"`.
 
 ## How to check
 
 After the next `deploy run`, run
 `dart run dartway_cli:dartway deploy check --env <environment>`. Confirm that
-`[proxy-congestion-control] The front proxy uses BBR congestion control` passes and that the
-`host-congestion-control` warning now passes too. In the app directory on the server, you can also
-read the value checked in the running proxy directly:
+`proxy-congestion-control` (The front proxy uses BBR congestion control) passes, and so does
+`host-congestion-control`. In the app directory on the server, you can also read the value checked
+in the running proxy directly:
 
 ```bash
 docker compose exec -T nginx cat /proc/sys/net/ipv4/tcp_congestion_control
