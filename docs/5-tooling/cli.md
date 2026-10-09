@@ -410,6 +410,12 @@ pins a CI deployment to its verified commit and refuses if the server has alread
 Everything is
 described by `deploy/config.yaml`. The whole story is [Deploying the server](deploy.md).
 
+All three first check that the server runs this project's stack, or none at all, and refuse when it
+runs only other ones — a repository that moved without `project:` pinning the name its stack has on
+the server ([Moving the repository](deploy.md#moving-the-repository)). `deploy setup --new-stack`
+sets up a genuinely second project on a host that already runs others: it skips that one check and
+nothing else.
+
 ## `dartway secret` — the values that are not in Git
 
 ```bash

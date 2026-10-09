@@ -25,9 +25,7 @@ class _PerRepoRegistry {
     server.listen((request) async {
       // /v2/<repository>/manifests/<tag>
       final segments = request.uri.pathSegments;
-      final repository = segments
-          .sublist(1, segments.length - 2)
-          .join('/');
+      final repository = segments.sublist(1, segments.length - 2).join('/');
       final status = statusByRepository[repository] ?? 200;
       if (status == 200) {
         // A real registry names its own digest; resolve() requires it.
@@ -51,6 +49,47 @@ class _PerRepoRegistry {
 }
 
 void main() {
+  group('the stack-identity check', () {
+    final check = dwRemoteDeployChecks.firstWhere(
+      (check) => check.id == 'stack-identity',
+    );
+
+    Future<DwDeployVerdict> evaluate(String listing) => check.evaluate(
+      DwDeployContext(
+        projectRoot: Directory.systemTemp,
+        stack: stackFrom(),
+        ssh: RecordingSsh([
+          (
+            'docker volume ls',
+            DwSshResult(exitCode: 0, stdout: listing, stderr: ''),
+          ),
+        ]),
+      ),
+    );
+
+    // `deploy check` reports every remote check in this order, so being
+    // declared here is what puts it in the report.
+    test('is a server check of the report, an error, after the user one', () {
+      final ids = dwRemoteDeployChecks.map((check) => check.id).toList();
+      expect(
+        ids.indexOf('stack-identity'),
+        greaterThan(ids.indexOf('deploy-user')),
+      );
+      expect(check.requiresSsh, isTrue);
+      expect(check.severity, DwCheckSeverity.error);
+    });
+
+    test('passes on a server running this stack, fails on one running only '
+        'another', () async {
+      expect((await evaluate('shop_postgres_data\n')).passed, isTrue);
+      final foreign = await evaluate(
+        '/home/deployer/.config/molodey/secrets.env\n',
+      );
+      expect(foreign.passed, isFalse);
+      expect(foreign.detail, contains('set "project: molodey"'));
+    });
+  });
+
   group('congestion-control checks', () {
     Future<DwDeployVerdict> evaluate(String id, RecordingSsh ssh) {
       final check = dwRemoteDeployChecks.firstWhere((check) => check.id == id);
@@ -154,30 +193,25 @@ void main() {
       },
     );
 
-    test(
-      'a real failure on one image outweighs a transient one on another — '
-      'the deploy is refused, not merely skipped, when anything is '
-      'definitely wrong, and both are named (L1: a transient result beside '
-      'a definite one must not go unmentioned)',
-      () async {
-        fake.statusByRepository = {
-          'library/postgres': 404,
-          'library/nginx': 503,
-        };
-        final verdict = await evaluateImagesResolve(images, fake.registry);
-        expect(verdict.passed, isFalse);
-        expect(verdict.skipped, isFalse);
-        expect(verdict.detail, contains('404'));
-        expect(verdict.detail, contains('Postgres'));
-        expect(
-          verdict.detail,
-          contains('nginx'),
-          reason: 'the transient nginx result must still be visible, not '
-              'silently dropped because a definite failure took priority',
-        );
-        expect(verdict.detail, contains('503'));
-      },
-    );
+    test('a real failure on one image outweighs a transient one on another — '
+        'the deploy is refused, not merely skipped, when anything is '
+        'definitely wrong, and both are named (L1: a transient result beside '
+        'a definite one must not go unmentioned)', () async {
+      fake.statusByRepository = {'library/postgres': 404, 'library/nginx': 503};
+      final verdict = await evaluateImagesResolve(images, fake.registry);
+      expect(verdict.passed, isFalse);
+      expect(verdict.skipped, isFalse);
+      expect(verdict.detail, contains('404'));
+      expect(verdict.detail, contains('Postgres'));
+      expect(
+        verdict.detail,
+        contains('nginx'),
+        reason:
+            'the transient nginx result must still be visible, not '
+            'silently dropped because a definite failure took priority',
+      );
+      expect(verdict.detail, contains('503'));
+    });
   });
 
   group('the images-resolve check declaration', () {

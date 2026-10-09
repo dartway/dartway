@@ -231,11 +231,9 @@ staging:
     // #328: DigitalOcean's Ubuntu 24.04 image ships an empty `admin` group,
     // and a project-derived name is not the fix — `dw_admin` is fixed
     // because no stock image or package uses the `dw_` prefix for a group.
-    test(
-      'deploy_user defaults to dw_admin when deploy/config.yaml does not '
-      'name one',
-      () {
-        const text = '''
+    test('deploy_user defaults to dw_admin when deploy/config.yaml does not '
+        'name one', () {
+      const text = '''
 staging:
   host: 203.0.113.10
   ssh_user: root
@@ -247,18 +245,54 @@ staging:
   app_domain: app.example.com
 ''';
 
-        final target = DwDeployTarget.parse(text, environment: 'staging');
+      final target = DwDeployTarget.parse(text, environment: 'staging');
 
-        expect(target.deployUser, DwDeployTarget.defaultDeployUser);
-        expect(target.deployUser, 'dw_admin');
-      },
-    );
+      expect(target.deployUser, DwDeployTarget.defaultDeployUser);
+      expect(target.deployUser, 'dw_admin');
+    });
 
     test('an explicit deploy_user wins over the default', () {
       final target = targetFrom();
 
       expect(target.deployUser, 'deployer');
       expect(target.deployUser, isNot(DwDeployTarget.defaultDeployUser));
+    });
+
+    group('the project name', () {
+      // The case this exists for: the repository moved to another owner and
+      // name, and the deployment on the server kept the old one.
+      String moved({String extra = ''}) => configYaml(
+        extra: extra,
+      ).replaceFirst('acme/shop.git', 'dealwithitdwi/moloday.git');
+
+      test('project: pins it, whatever the repository is called', () {
+        final target = DwDeployTarget.parse(
+          moved(extra: '  project: molodey\n'),
+          environment: 'staging',
+        );
+
+        expect(target.projectName, 'molodey');
+        expect(target.appDir, '/home/deployer/molodey');
+        expect(target.runtimeConfigDir, '/home/deployer/.config/molodey');
+      });
+
+      test('without project: it is the last segment of the repository', () {
+        expect(
+          DwDeployTarget.parse(moved(), environment: 'staging').projectName,
+          'moloday',
+        );
+        expect(targetFrom().projectName, 'shop');
+      });
+
+      test('a name Compose would not accept is a problem of the file', () {
+        expect(
+          () => DwDeployTarget.parse(
+            moved(extra: '  project: Mol Odey\n  bogus: 1\n'),
+            environment: 'staging',
+          ),
+          _refusal(['"project" must be a Compose project name', 'bogus']),
+        );
+      });
     });
   });
 

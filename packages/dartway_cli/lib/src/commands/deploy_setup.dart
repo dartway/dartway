@@ -218,6 +218,36 @@ usermod -aG docker '${target.deployUser}'
     return 1;
   }
 
+  // Before the secret store, the first thing setup names after the project:
+  // a server that runs other stacks and not this one is, far more often than
+  // a second project, the same project after its repository moved — and
+  // creating a store under the new name is how a second, empty stack starts.
+  if (results.flag('new-stack')) {
+    stdout.writeln(
+      "\nThis server runs this project's stack\n"
+      '  skipped — --new-stack',
+    );
+  } else if (!await step("This server runs this project's stack", () async {
+    final listed = await ssh.runAs(
+      target.deployUser,
+      dwStackIdentityScript(target),
+    );
+    if (!listed.ok) return listed;
+    final verdict = judgeStackIdentity(
+      projectName: target.projectName,
+      environment: environment,
+      volumeListing: listed.stdout,
+      configDirListing: listed.stdout,
+    );
+    return DwSshResult(
+      exitCode: verdict.ok ? 0 : 1,
+      stdout: verdict.ok ? verdict.detail : '',
+      stderr: verdict.ok ? '' : verdict.detail,
+    );
+  }, report: true)) {
+    return 1;
+  }
+
   if (!await step('Secret store', () async {
     final created = await store.ensureDirectory();
     if (!created.ok) {

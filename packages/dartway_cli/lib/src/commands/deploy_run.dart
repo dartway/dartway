@@ -146,6 +146,18 @@ Future<int> runDeploy(
     return finish(1, reason: 'bbr-unavailable');
   }
 
+  // Every path a step touches is named after the project: a project whose
+  // name changed with its repository would find no checkout, or start a
+  // second, empty stack. Asked on every run, a resume included, before the
+  // step record, the deployed revision or any step: a refusal is not a step
+  // and leaves nothing on the server.
+  final identity = await runner.checkStackIdentity();
+  if (!identity.ok) {
+    report.problems.writeln('Refusing to deploy: ${identity.detail}');
+    return finish(1, reason: 'stack-identity');
+  }
+  out.writeln('  stack:   ${identity.detail}');
+
   Map<String, DwRemoteStepRecord>? record;
   var resumeVerifiedCheckout = false;
   if (resume) {

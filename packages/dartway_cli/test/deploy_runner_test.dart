@@ -1,10 +1,14 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartway_cli/src/commands/deploy_command.dart';
 import 'package:dartway_cli/src/commands/deploy_run.dart';
 import 'package:dartway_cli/src/deploy/compose_files.dart';
+import 'package:dartway_cli/src/deploy/data_volumes.dart';
 import 'package:dartway_cli/src/deploy/deploy_progress.dart';
 import 'package:dartway_cli/src/deploy/deploy_runner.dart';
+import 'package:dartway_cli/src/deploy/deploy_target.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:path/path.dart' as p;
@@ -529,6 +533,238 @@ esac
     });
   });
 
+  group('the stack-identity precondition', () {
+    // The repository moved from acme/molodey to dealwithitdwi/moloday; the
+    // server still runs the stack named after the old one.
+    DwStack moved({String extra = ''}) => DwStack(
+      target: DwDeployTarget.parse(
+        configYaml(
+          extra: extra,
+        ).replaceFirst('acme/shop.git', 'dealwithitdwi/moloday.git'),
+        environment: 'staging',
+      ),
+      projectRoot: Directory.systemTemp,
+      serverPackage: 'shop_server',
+      flutterPackage: 'shop_flutter',
+      front: const DwTlsFront(),
+    );
+
+    const molodey =
+        'molodey_postgres_data\n/home/deployer/.config/molodey/secrets.env\n';
+
+    Future<({int code, List<Map<String, Object?>> events})> deploy(
+      _IdentityServer server,
+      DwStack stack,
+      List<String> flags,
+    ) async {
+      final quiet = IOSink(StreamController<List<int>>()..stream.drain<void>());
+      final events = StreamController<List<int>>();
+      final lines = events.stream
+          .transform(utf8.decoder)
+          .transform(const LineSplitter())
+          .toList();
+      final sink = IOSink(events.sink);
+      final code = await runDeploy(
+        stack,
+        DeployRunCommand().argParser.parse(['--env', 'staging', ...flags]),
+        connection: server,
+        progress: DwDeployProgress.into(human: quiet, events: sink),
+        localChecks: const [],
+      );
+      await sink.close();
+      return (
+        code: code,
+        events: [
+          for (final line in await lines)
+            jsonDecode(line) as Map<String, Object?>,
+        ],
+      );
+    }
+
+    test('is no step of the deployment', () {
+      final runner = DwDeployRunner(ssh: RecordingSsh(), stack: moved());
+      for (final skip in [false, true]) {
+        expect(
+          runner.steps(skipGitUpdate: skip).map((step) => step.id),
+          isNot(contains('stack-identity')),
+        );
+      }
+    });
+
+    // Fresh, resumed, retried and without the checkout update alike: the
+    // listing is the one command after the BBR probe, and the refusal is the
+    // run's reason, not a failed step — nothing is read from or written to
+    // the step record, the checkout or Compose.
+    for (final flags in const [
+      <String>[],
+      ['--resume'],
+      ['--resume', '--retry-failed'],
+      ['--skip-git-update'],
+    ]) {
+      test('on a server running only another stack, ${flags.join(' ')} '
+          'refuses before anything else is sent', () async {
+        final server = _IdentityServer(
+          listing: molodey,
+          record: 'update-checkout exited 0\nbridge-override pending\n',
+        );
+        final result = await deploy(server, moved(), flags);
+
+        expect(result.code, 1);
+        final finished = result.events.last;
+        expect(finished['event'], 'run_finished');
+        expect(finished['reason'], 'stack-identity');
+        expect(finished.containsKey('failed_step'), isFalse);
+        expect(server.issued, hasLength(2));
+        expect(server.issued.first, contains('tcp_allowed_congestion_control'));
+        expect(server.issued.last, contains('docker volume ls'));
+        expect(server.started, isEmpty);
+        for (final command in server.issued) {
+          expect(command, isNot(contains('git ')));
+          expect(command, isNot(contains('deploy-run')));
+          expect(command, isNot(contains('/home/deployer/moloday')));
+        }
+      });
+    }
+
+    test('with project: pinning the old name, it passes and the checkout '
+        'is updated where the stack lives', () async {
+      final server = _IdentityServer(listing: molodey, exitCode: 1);
+      final result = await deploy(
+        server,
+        moved(extra: '  project: molodey\n'),
+        const [],
+      );
+
+      expect(result.code, 1);
+      expect(result.events.last['failed_step'], 'update-checkout');
+      final (:command, :script) = server.started.single;
+      expect(command, contains('update-checkout'));
+      expect(script, contains('/home/deployer/molodey'));
+      expect(script, contains('git fetch origin'));
+    });
+
+    // The resume passes over what the run being resumed finished, exactly as
+    // without the check: a checkout, a build or a server replacement done
+    // before is not done again, and a step that failed or still runs is
+    // collected, not started.
+    group('on --resume, once it passed', () {
+      final ids = [
+        for (final step in DwDeployRunner(
+          ssh: RecordingSsh(),
+          stack: moved(),
+        ).steps(skipGitUpdate: false))
+          step.id,
+      ];
+      final after = ids.indexOf('build') + 1;
+      String record(String next) => [
+        for (final id in ids.take(after)) '$id exited 0',
+        '${ids[after]} $next',
+        for (final id in ids.skip(after + 1)) '$id pending',
+      ].join('\n');
+
+      for (final next in const ['exited 1', 'running']) {
+        test('the completed steps are passed over and a step that is '
+            '${next.split(' ').first} is not started again', () async {
+          final server = _IdentityServer(
+            listing: 'shop_postgres_data\n',
+            record: record(next),
+            exitCode: 1,
+          );
+          final result = await deploy(
+            server,
+            moved(extra: '  project: shop\n'),
+            const ['--resume'],
+          );
+
+          expect(result.code, 1);
+          expect(result.events.last['failed_step'], ids[after]);
+          expect(server.started, isEmpty);
+          final skipped = [
+            for (final event in result.events)
+              if (event['event'] == 'step_skipped') event['id'],
+          ];
+          expect(skipped, ids.take(after));
+          for (final command in server.issued) {
+            expect(command, isNot(contains('git fetch')));
+            expect(command, isNot(contains(' build')));
+          }
+        });
+      }
+
+      // The whole resume, to its end: the checkout and the build recorded
+      // done are passed over, the steps after them run, and the deployment
+      // is verified from outside — by a local site standing in for the
+      // stack's origins.
+      test('the completed steps are passed over, the rest run, and the run '
+          'succeeds', () async {
+        final site = await _VerifiedSite.start();
+        addTearDown(site.close);
+        final server = _IdentityServer(
+          listing: 'shop_postgres_data\n',
+          record: [
+            for (final id in ids.take(after)) '$id exited 0',
+            for (final id in ids.skip(after)) '$id pending',
+          ].join('\n'),
+        );
+        final result = await HttpOverrides.runWithHttpOverrides(
+          () => deploy(server, moved(extra: '  project: shop\n'), const [
+            '--resume',
+          ]),
+          site.overrides,
+        );
+
+        expect(result.code, 0);
+        final finished = result.events.last;
+        expect(finished['event'], 'run_finished');
+        expect(finished['ok'], isTrue);
+        expect(finished.containsKey('failed_step'), isFalse);
+        expect([
+          for (final event in result.events)
+            if (event['event'] == 'step_skipped') event['id'],
+        ], ids.take(after));
+        final started = [
+          for (final (:command, script: _) in server.started)
+            ids.lastWhere((id) => command.contains("'$id'")),
+        ];
+        expect(started, ids.skip(after));
+        expect(started, isNot(contains('update-checkout')));
+        expect(started, isNot(contains('build')));
+        for (final (:command, :script) in server.started) {
+          expect(script, isNot(contains('git fetch')), reason: command);
+        }
+      });
+    });
+
+    // The script itself, in a shell: the store listing is a glob that matches
+    // nothing on a fresh server, and that must not fail the check.
+    test('lists the secret stores, and nothing is not an error', () async {
+      final home = Directory.systemTemp.createTempSync('dw_identity_');
+      addTearDown(() => home.deleteSync(recursive: true));
+      final script = dwStackIdentityScript(moved().target)
+          .replaceAll('/home/deployer', home.path)
+          .replaceFirst(
+            "docker volume ls --format '{{.Name}}'",
+            'echo molodey_postgres_data',
+          );
+
+      final empty = await LocalShell().run(script);
+      expect(empty.ok, isTrue, reason: empty.stderr);
+      expect(empty.stdout.trim(), 'molodey_postgres_data');
+
+      File(p.join(home.path, '.config', 'molodey', 'secrets.env'))
+        ..createSync(recursive: true)
+        ..writeAsStringSync('KEY=value\n');
+      Directory(p.join(home.path, '.config', 'unrelated')).createSync();
+      final listed = await LocalShell().run(script);
+      expect(listed.ok, isTrue, reason: listed.stderr);
+      expect(listed.stdout.trim().split('\n'), [
+        'molodey_postgres_data',
+        p.join(home.path, '.config', 'molodey', 'secrets.env'),
+      ]);
+      expect(listed.stdout, isNot(contains('KEY=value')));
+    });
+  });
+
   group('checkDataVolumes', () {
     DwDeployRunner runnerWith(RecordingSsh ssh) => DwDeployRunner(
       ssh: ssh,
@@ -958,4 +1194,120 @@ esac
       expect(git(checkout, ['rev-parse', 'HEAD']), sha2);
     });
   });
+}
+
+/// Answers the BBR question, and every detached step the way the server's
+/// step runner reports one that exited 0 having printed [stdout].
+/// A server for the whole `deploy run`: BBR allowed, [listing] as the answer
+/// to the stack-identity check, [record] as the step record a resume reads,
+/// and every detached step — started or collected — reported as exited with
+/// [exitCode]. What it was asked to start is kept in [started].
+class _IdentityServer extends RecordingSsh {
+  _IdentityServer({required this.listing, this.record, this.exitCode = 0});
+
+  final String listing;
+  final String? record;
+  final int exitCode;
+  final List<({String command, String script})> started = [];
+
+  static final _nonce = RegExp(r'--dw-step-[0-9a-f]{8}--');
+
+  @override
+  Future<DwSshResult> run(String command) async {
+    issued.add(command);
+    if (command.contains('tcp_allowed_congestion_control')) {
+      return const DwSshResult(exitCode: 0, stdout: 'cubic bbr\n', stderr: '');
+    }
+    if (command.contains('docker volume ls') && command.contains('secrets')) {
+      return DwSshResult(exitCode: 0, stdout: listing, stderr: '');
+    }
+    if (command.contains(r'[ -f "$d/plan" ]')) {
+      return DwSshResult(exitCode: 0, stdout: record ?? 'none\n', stderr: '');
+    }
+    final nonce = _nonce.firstMatch(command)?.group(0);
+    if (nonce == null) {
+      return const DwSshResult(exitCode: 0, stdout: '', stderr: '');
+    }
+    // The upstream check asks two questions; an empty answer to both is a
+    // stack and a proxy configuration that agree.
+    final stdout = command.contains('check-upstreams') ? '--dw-nginx-d--' : '';
+    return DwSshResult(
+      exitCode: 0,
+      stdout:
+          '$nonce exited $exitCode\n$stdout\n$nonce stderr\n\n$nonce end 0\n',
+      stderr: '',
+    );
+  }
+
+  @override
+  Future<DwSshResult> runAsWithInput(
+    String deployUser,
+    String command,
+    String input,
+  ) {
+    started.add((command: command, script: input));
+    return run(command);
+  }
+}
+
+/// Answers every outside probe of a minimal stack the way a healthy
+/// deployment does. [overrides] sends every connection the probes open to
+/// it, whatever origin they ask for, in plain HTTP.
+class _VerifiedSite {
+  _VerifiedSite(this._server);
+
+  final HttpServer _server;
+
+  static Future<_VerifiedSite> start() async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen(_answer);
+    return _VerifiedSite(server);
+  }
+
+  HttpOverrides get overrides => _ToLoopback(_server.port);
+
+  Future<void> close() => _server.close(force: true);
+
+  static Future<void> _answer(HttpRequest request) async {
+    final response = request.response;
+    switch (request.uri.path) {
+      case '/dw/live':
+        final socket = await WebSocketTransformer.upgrade(request);
+        await socket.close(4000, 'dw.protocolUnsupported');
+        return;
+      case '/health':
+        response.write('ok');
+      case '/':
+        response
+          ..headers.contentType = ContentType.html
+          ..headers.set(HttpHeaders.cacheControlHeader, 'no-cache')
+          ..write('<html><script src="flutter_bootstrap.js"></script></html>');
+      case '/flutter_bootstrap.js':
+        response
+          ..headers.set(HttpHeaders.cacheControlHeader, 'no-cache')
+          ..write('// the bundled loader');
+      case '/main.dart.js':
+        response
+          ..headers.contentType = ContentType('application', 'javascript')
+          ..headers.set(HttpHeaders.cacheControlHeader, 'no-cache')
+          ..headers.set(HttpHeaders.contentEncodingHeader, 'gzip')
+          ..add(gzip.encode(utf8.encode('main();')));
+      default:
+        response.statusCode = HttpStatus.notFound;
+    }
+    await response.close();
+  }
+}
+
+class _ToLoopback extends HttpOverrides {
+  _ToLoopback(this.port);
+
+  final int port;
+
+  @override
+  HttpClient createHttpClient(SecurityContext? context) =>
+      super.createHttpClient(context)
+        ..findProxy = ((_) => 'DIRECT')
+        ..connectionFactory = (uri, proxyHost, proxyPort) =>
+            Socket.startConnect(InternetAddress.loopbackIPv4, port);
 }

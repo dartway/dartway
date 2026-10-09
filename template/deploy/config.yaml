@@ -75,6 +75,9 @@ local:
 #   # tip of the branch, so a stray edit on the machine cannot block one.
 #   repo: git@github.com:your-org/your-project.git
 #   branch: master
+#   # The stack's name on the server; defaults to the repository's name. Set
+#   # it to the old name when the repository moves, or the deploy refuses.
+#   # project: your-project
 #
 #   # Where Let's Encrypt writes about expiring certificates.
 #   ssl_email: ops@example.com

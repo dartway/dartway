@@ -121,6 +121,30 @@ class DwDeployRunner {
     return ssh.runAs(target.deployUser, script);
   }
 
+  /// Whether this server runs this project's stack, or none at all
+  /// ([judgeStackIdentity]): a repository that moved without `project:`
+  /// pinning the old name fails here. It lists data volumes and secret
+  /// stores, names only ([dwStackIdentityScript]), over the plain connection
+  /// — a precondition of `deploy run`, not one of its [steps], so it is
+  /// judged afresh on every run and resume and never recorded on the server.
+  Future<DwDataVolumeVerdict> checkStackIdentity() async {
+    final listed = await ssh.runAs(
+      target.deployUser,
+      dwStackIdentityScript(target),
+    );
+    if (!listed.ok) {
+      return DwDataVolumeVerdict.fail(
+        'cannot list the stacks on the server: ${listed.firstLine}',
+      );
+    }
+    return judgeStackIdentity(
+      projectName: target.projectName,
+      environment: target.environment,
+      volumeListing: listed.stdout,
+      configDirListing: listed.stdout,
+    );
+  }
+
   /// Brings the checkout to [revision], or the tip of the deployment branch.
   ///
   /// `reset --hard` rather than `pull`: the server mirrors the repository, and

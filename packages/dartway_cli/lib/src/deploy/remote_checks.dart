@@ -5,6 +5,7 @@ import 'package:yaml/yaml.dart';
 
 import '../checker/dw_check_type.dart';
 import 'compose_files.dart';
+import 'data_volumes.dart';
 import 'deploy_check.dart';
 import 'deploy_target.dart';
 import 'image_registry.dart';
@@ -54,6 +55,14 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
     severity: DwCheckSeverity.error,
     requiresSsh: true,
     evaluate: _checkDockerAvailable,
+  ),
+  DwDeployCheck(
+    id: 'stack-identity',
+    title: "This server runs this project's stack, not only others",
+    stage: DwDeployCheckStage.remote,
+    severity: DwCheckSeverity.error,
+    requiresSsh: true,
+    evaluate: _checkStackIdentity,
   ),
   DwDeployCheck(
     id: 'proxy-congestion-control',
@@ -155,7 +164,8 @@ Future<DwDeployVerdict> _checkHostCongestionControl(
           result.ok
               ? 'host reports ${value.isEmpty ? 'no value' : value}'
               : result.firstLine,
-          fix: 'Run "dart run dartway_cli:dartway deploy setup" once on this server.',
+          fix:
+              'Run "dart run dartway_cli:dartway deploy setup" once on this server.',
         );
 }
 
@@ -313,6 +323,31 @@ Future<DwDeployVerdict> _checkDockerAvailable(DwDeployContext context) async {
         'Docker must be installed and the deployment user must belong to the '
         'docker group.',
   );
+}
+
+Future<DwDeployVerdict> _checkStackIdentity(DwDeployContext context) async {
+  final target = context.target;
+  final listed = await context.ssh!.runAs(
+    target.deployUser,
+    dwStackIdentityScript(target),
+  );
+  if (!listed.ok) {
+    return DwDeployVerdict.fail(
+      'cannot list the stacks on the server: ${listed.firstLine}',
+      fix:
+          'Docker must be installed and the deployment user must belong to the '
+          'docker group.',
+    );
+  }
+  final verdict = judgeStackIdentity(
+    projectName: target.projectName,
+    environment: target.environment,
+    volumeListing: listed.stdout,
+    configDirListing: listed.stdout,
+  );
+  return verdict.ok
+      ? DwDeployVerdict.pass(verdict.detail)
+      : DwDeployVerdict.fail(verdict.detail);
 }
 
 Future<DwDeployVerdict> _checkRuntimeSecrets(DwDeployContext context) async {

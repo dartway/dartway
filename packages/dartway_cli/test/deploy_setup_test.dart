@@ -103,4 +103,49 @@ void main() {
       expect(bbr, contains('sysctl -p /etc/sysctl.d/90-dartway-net.conf'));
     },
   );
+
+  group('the stack-identity guard', () {
+    // Only another project's stack on the server: the shape of a repository
+    // that moved without pinning its old name.
+    RecordingSsh foreignOnly() => RecordingSsh([
+      (
+        'docker volume ls',
+        const DwSshResult(
+          exitCode: 0,
+          stdout:
+              'molodey_postgres_data\n'
+              '/home/deployer/.config/molodey/secrets.env\n',
+          stderr: '',
+        ),
+      ),
+    ]);
+
+    test('refuses before the secret store is created', () async {
+      final ssh = foreignOnly();
+      final exitCode = await runSetup(stackFrom(), args, connection: ssh);
+
+      expect(exitCode, 1);
+      // The guard is the last thing sent: the secret store, the step right
+      // after it, is never created under the new name.
+      expect(ssh.issued.last, contains('docker volume ls'));
+      expect(ssh.issued.last, contains('/home/deployer/.config'));
+      expect(ssh.issued.any((c) => c.contains('git clone')), isFalse);
+    });
+
+    test('--new-stack sets up a second project beside it', () async {
+      final ssh = foreignOnly();
+      final exitCode = await runSetup(
+        stackFrom(),
+        DeploySetupCommand().argParser.parse([
+          '--env',
+          'staging',
+          '--new-stack',
+        ]),
+        connection: ssh,
+      );
+
+      expect(exitCode, 0);
+      expect(ssh.issued.any((c) => c.contains('git clone')), isTrue);
+    });
+  });
 }

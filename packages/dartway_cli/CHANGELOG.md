@@ -2,6 +2,16 @@
 
 ## 0.24.0
 
+- Deploy: `project:` in an environment of `deploy/config.yaml` names the deployment on the server
+  (checkout, secret store, Compose project, data volumes); absent, it is the repository's name as
+  before. A new `stack-identity` guard refuses when the server runs other stacks and not this one,
+  naming them and the `project:` line to set: a repository that moved no longer starts a second,
+  empty stack beside the live one. It runs in three places. In `deploy run` it is a precondition,
+  not a step: it is checked before any step on every run and resume, and a refusal ends the run
+  with the reason `stack-identity`. In `deploy setup` it runs before the secret store, and in
+  `deploy check` it is a server check. `deploy setup --new-stack` sets up a genuine
+  second project on such a host (#482).
+
 - `dartway create` no longer writes a LICENSE; a project's licence is its owner's decision (#422).
 - `deploy run --revision <sha>` deploys the verified commit only when it belongs to the configured
   remote branch, and refuses an older revision when the server already contains it. The revision is
