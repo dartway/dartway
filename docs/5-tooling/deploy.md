@@ -580,9 +580,12 @@ something surprising.
 
 Output of `deploy run` (including resumed steps), `deploy setup` and `deploy check` is masked
 on the target before it leaves over SSH. The filter reads `secrets.env` as the deployment user
-and replaces literal occurrences of stored values with `***`, including their URL percent-encoded
-forms. Values shorter than **6 characters** remain visible, so common values such as `true` and
-`5432` do not obscure unrelated output. Both stdout and stderr are filtered, including the output
+and replaces occurrences of stored values with `***`: the value as stored, and three percent-encoded
+forms of it — fully encoded (only `A-Za-z0-9_.~-` kept), the URI component form (also keeping
+`!*()`), and the RFC 3986 userinfo form `Uri(userInfo:)` produces (also keeping `!$&'()*+,;=:`) —
+each with its hex digits in either case. Other partial encodings are not recognised. Values
+shorter than **6 characters** remain visible, so common values such as `true` and `5432` do not
+obscure unrelated output. Both stdout and stderr are filtered, including the output
 in JSON progress events. Before the store exists, output passes through unchanged.
 
 Command output is collected until the command finishes. An SSH login other than `deploy_user`

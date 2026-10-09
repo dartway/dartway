@@ -51,6 +51,21 @@ void main() {
   );
 
   test(
+    'userinfo encoding keeps sub-delims and colons literal in either hex case',
+    () async {
+      const secret = r'it is a $pass:(x)=1';
+      store.writeAsStringSync(
+        "TOKEN='$secret'\nAT='p@ss\$word'\nSLASH='p@ss\$w/rd'\n",
+      );
+      final url = Uri(scheme: 'postgres', userInfo: 'app:$secret', host: 'db');
+      final emitted = File(p.join(temp.path, 'emitted.txt'))
+        ..writeAsStringSync('$url p%40ss\$word p%40ss\$w%2Frd p%40ss\$w%2frd');
+      final result = await ssh.runAs('deployer', 'cat ${emitted.path}');
+      expect(result.stdout, 'postgres://app:***@db *** *** ***');
+    },
+  );
+
+  test(
     'the threshold counts characters while URL encoding uses UTF-8 bytes',
     () async {
       store.writeAsStringSync("LONG='éééééé'\nSHORT='ééééé'\nEDGE='123456'\n");
