@@ -37,6 +37,7 @@ void main() {
   late DwDeployRunner runner;
   late File asked;
   late File failing;
+  late File issuing;
   late File projectOverride;
   late String fakeOverride;
 
@@ -169,13 +170,16 @@ done
     final fake = Directory(p.join(dir.path, 'fake'))..createSync();
     asked = File(p.join(fake.path, 'asked'));
     failing = File(p.join(fake.path, 'fail'));
+    issuing = File(p.join(fake.path, 'issue'));
     final certbot = File(p.join(fake.path, 'certbot'))
       ..writeAsStringSync(
         '#!/bin/sh\n'
         'echo "\$*" >>/dw-fake/asked\n'
         // A failing certbot, running first whatever residue the test wants
         // it to leave behind.
-        'if [ -e /dw-fake/fail ]; then sh /dw-fake/fail; exit 1; fi\n',
+        'if [ -e /dw-fake/fail ]; then sh /dw-fake/fail; exit 1; fi\n'
+        // A succeeding one, writing whatever the test wants it to issue.
+        'if [ -e /dw-fake/issue ]; then sh /dw-fake/issue; fi\n',
       );
     Process.runSync('chmod', ['+x', certbot.path]);
     projectOverride = File(p.join(dir.path, DwComposeFiles.projectOverride))
@@ -268,6 +272,7 @@ services:
     late final name = stack.target.apiDomain;
     tearDown(() {
       if (failing.existsSync()) failing.deleteSync();
+      if (issuing.existsSync()) issuing.deleteSync();
     });
 
     test('that fails leaves the bootstrap certificate byte for byte', () async {
@@ -315,6 +320,17 @@ services:
     test('that succeeds replaces it, and keeps no stash', () async {
       bootstrap();
       final before = liveBytes();
+      // A new lineage in the place certbot writes one: a new key and
+      // certificate under live/, and the renewal config that marks it managed.
+      issuing.writeAsStringSync(
+        'set -e\n'
+        'le=/etc/letsencrypt\n'
+        'mkdir -p \$le/live/$name \$le/renewal\n'
+        'openssl req -x509 -nodes -newkey rsa:2048 -days 90 '
+        '-keyout \$le/live/$name/privkey.pem '
+        '-out \$le/live/$name/fullchain.pem -subj /CN=$name 2>/dev/null\n'
+        'echo "cert = \$le/live/$name/fullchain.pem" >\$le/renewal/$name.conf\n',
+      );
 
       final step = await runner.issueCertificate();
       expect(step.ok, isTrue, reason: step.stderr);
@@ -322,8 +338,13 @@ services:
       final request = askedOfCertbot().single;
       expect(request, startsWith('certonly'));
       expect(request, isNot(contains('--expand')));
-      expect(liveBytes(), isNot(before));
-      expect(present(), isNot(contains('dw-bootstrap/$name')));
+      final after = liveBytes();
+      expect(after, isNot(contains('missing')));
+      final [fullchain, privkey] = after.trim().split('\n');
+      final [oldFullchain, oldPrivkey] = before.trim().split('\n');
+      expect(fullchain, isNot(oldFullchain));
+      expect(privkey, isNot(oldPrivkey));
+      expect(present(), ['live/$name', 'renewal/$name.conf']);
     });
 
     test('after a run stopped with the bootstrap set aside, and failing, '
