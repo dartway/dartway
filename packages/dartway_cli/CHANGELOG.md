@@ -2,6 +2,14 @@
 
 ## 0.24.0
 
+- The template ships `.github/workflows/ci.yml`: every mechanical gate of a project — `generate
+  --check`, `migrate.dart check` on a Postgres service, `dart analyze` (`--fatal-infos` in the
+  Flutter package, where the convention rules run as an analyzer plugin), `dart test`,
+  `dartway test`, `flutter test` and `dartway check` — as the steps of one job, `ci`, on every pull
+  request. Each gate runs even after an earlier one failed, Flutter comes from the Flutter
+  package's `.fvmrc`, and packages resolve with `--enforce-lockfile`. The README says how to make
+  `ci` a required check. A project created earlier may copy the file whenever it wants (#495).
+
 - The template's `.github/workflows/claude-review.yml` can no longer push code to a pull request.
   It passes the workflow's own `github_token` (held to `contents: read`) instead of letting the
   action exchange OIDC for the Claude App's writable installation token, drops `track_progress`,

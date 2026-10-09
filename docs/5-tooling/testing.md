@@ -254,6 +254,9 @@ The order the setup brief (`dartway quickstart`) gives an agent, from the projec
 `dart run dartway_cli:dartway check` also reports `migrationsDrift` when `DW_DATABASE_*` names a Postgres it may create
 throwaway databases on; see [The conventions checker](conventions-checker.md).
 
+CI runs these as `ci`: each is a step of the project's `.github/workflows/ci.yml`, on every pull
+request, and every one runs even after an earlier one failed.
+
 ## The framework's own tiers
 
 The monorepo tests itself in four tiers, split by what a run needs.
@@ -283,8 +286,11 @@ outside it, then:
   running anything and names what is missing — it never skips.
 
 **The database suites of `example/` and `template/`** run through `dart run dartway_cli:dartway test`, exactly as a
-project runs them: `.github/workflows/database.yml` installs the CLI from the commit, resolves the
-project and runs `dart run dartway_cli:dartway test` from its root, one job per project. It runs on a daily schedule, by
+project runs them: `.github/workflows/database.yml` installs the CLI from the commit, resolves
+`example/` and runs `dart run dartway_cli:dartway test` from its root. The template is proved as
+`dartway create` hands it out: a project created from the commit, its packages vendored in and
+committed, runs its own `.github/workflows/ci.yml` through `tool/run_project_ci.dart`, which runs
+the steps in order and refuses a construct it does not know rather than skip a gate. It runs on a daily schedule, by
 hand, and on a change to the workflow file itself — not on every pull request yet, because these are
 the suites that test races, and a race is what goes intermittently red on a busier runner.
 

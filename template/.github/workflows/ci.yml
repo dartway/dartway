@@ -1,0 +1,133 @@
+# Every mechanical gate of the project, on every pull request, as one check
+# named `ci` — the one to make required (README.md, "Continuous integration").
+#
+# One job, one step per gate, so a red step names what broke. Every gate runs
+# even after an earlier one failed: the guard is `!cancelled()`, not
+# `always()`, so a cancelled run stops instead of running on. A gate runs only
+# once the packages resolved — without them every gate fails for the same
+# reason, and the one red step that says so is enough.
+#
+# Run any gate locally with its `run:` line from its `working-directory`.
+# The toolchain is the one `dartway_starter_flutter/.fvmrc` pins.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    name: ci
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    # The Postgres the migration check replays on, in throwaway databases it
+    # creates itself. Only the container port is named: Docker picks the host
+    # port, read back below. `dartway test` starts a Postgres and a storage of
+    # its own and does not use this one.
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: dartway
+          POSTGRES_PASSWORD: dartway
+          POSTGRES_DB: dartway_starter
+        options: --health-cmd=pg_isready --health-interval=5s --health-timeout=5s --health-retries=20
+        ports:
+          - '5432'
+    env:
+      DW_DATABASE_HOST: localhost
+      DW_DATABASE_NAME: dartway_starter
+      DW_DATABASE_USER: dartway
+      DW_DATABASE_PASSWORD: dartway
+      DW_DATABASE_SSL: 'false'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # The contract checks compare against a committed base.
+          fetch-depth: 0
+
+      - name: Flutter from .fvmrc
+        id: fvm
+        run: echo "version=$(jq -r .flutter dartway_starter_flutter/.fvmrc)" >> "$GITHUB_OUTPUT"
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ steps.fvm.outputs.version }}
+          channel: stable
+          cache: true
+
+      - name: Contract base
+        env:
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          DB_PORT: ${{ job.services.postgres.ports['5432'] }}
+        run: |
+          base="$PR_BASE"
+          if [ -z "$base" ]; then
+            base="$(git merge-base HEAD "origin/$DEFAULT_BRANCH")"
+          fi
+          echo "CONTRACT_BASE=$base" >> "$GITHUB_ENV"
+          echo "DW_DATABASE_PORT=$DB_PORT" >> "$GITHUB_ENV"
+
+      # The locks are committed and held, as the deploy images hold them: CI
+      # proves the versions the project runs, not whatever resolves today.
+      - name: pub get
+        id: deps
+        run: |
+          (cd dartway_starter_shared && dart pub get --enforce-lockfile)
+          (cd dartway_starter_server && dart pub get --enforce-lockfile)
+          (cd dartway_starter_flutter && flutter pub get --enforce-lockfile)
+
+      - name: generate --check
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_flutter
+        run: dart run dartway_cli:dartway generate --check --contract-base "$CONTRACT_BASE"
+
+      - name: server / migrations
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_server
+        run: dart run bin/migrate.dart check
+
+      - name: shared / analyze
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_shared
+        run: dart analyze
+
+      - name: server / analyze
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_server
+        run: dart analyze
+
+      # `dart analyze`, not `flutter analyze`: the convention rules are an
+      # analyzer plugin, and `flutter analyze` skips plugins.
+      - name: flutter / analyze
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_flutter
+        run: dart analyze --fatal-infos
+
+      - name: shared / test
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_shared
+        run: dart test
+
+      - name: server / acceptance
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_flutter
+        run: dart run dartway_cli:dartway test
+
+      - name: flutter / test
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_flutter
+        run: flutter test
+
+      - name: dartway check
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_flutter
+        run: dart run dartway_cli:dartway check --contract-base "$CONTRACT_BASE"

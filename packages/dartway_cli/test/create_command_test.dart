@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+import 'package:yaml/yaml.dart';
 
 /// `dartway create` over this repository's own template: what a stranger's
 /// project is named after, and what it resolves against.
@@ -278,6 +279,100 @@ void main() {
       isTrue,
       reason: workflow,
     );
+  });
+
+  test('CI is one job named ci, every gate a guarded step of its own, on the '
+      'pinned toolchain and the committed locks (#495)', () async {
+    final project = await create(['shop', '--local-repo', repository.path]);
+    final workflow =
+        loadYaml(read(project, '.github/workflows/ci.yml')) as YamlMap;
+
+    // One check with a stable name is what can be made required, and a
+    // filtered trigger leaves a required check pending forever.
+    final jobs = workflow['jobs'] as YamlMap;
+    expect(jobs.keys, ['ci']);
+    final job = jobs['ci'] as YamlMap;
+    expect(job['name'], 'ci');
+    final on = workflow['on'] as YamlMap;
+    expect(on.containsKey('pull_request'), isTrue);
+    expect(on['pull_request'], isNull, reason: 'no paths or branches filter');
+
+    final steps = (job['steps'] as YamlList).cast<YamlMap>();
+    final gates = steps.where((step) => step['if'] != null).toList();
+    const base = r'--contract-base "$CONTRACT_BASE"';
+    expect(
+      [
+        for (final gate in gates)
+          (gate['name'], gate['working-directory'], gate['run']),
+      ],
+      [
+        (
+          'generate --check',
+          'shop_flutter',
+          'dart run dartway_cli:dartway generate --check $base',
+        ),
+        (
+          'server / migrations',
+          'shop_server',
+          'dart run bin/migrate.dart check',
+        ),
+        ('shared / analyze', 'shop_shared', 'dart analyze'),
+        ('server / analyze', 'shop_server', 'dart analyze'),
+        ('flutter / analyze', 'shop_flutter', 'dart analyze --fatal-infos'),
+        ('shared / test', 'shop_shared', 'dart test'),
+        (
+          'server / acceptance',
+          'shop_flutter',
+          'dart run dartway_cli:dartway test',
+        ),
+        ('flutter / test', 'shop_flutter', 'flutter test'),
+        (
+          'dartway check',
+          'shop_flutter',
+          'dart run dartway_cli:dartway check $base',
+        ),
+      ],
+    );
+    for (final gate in gates) {
+      // Every gate runs after an earlier one failed, and none after a cancel.
+      expect(
+        gate['if'],
+        r"${{ !cancelled() && steps.deps.outcome == 'success' }}",
+        reason: '${gate['name']}',
+      );
+      expect(
+        Directory(
+          p.join(project.path, gate['working-directory'] as String),
+        ).existsSync(),
+        isTrue,
+        reason: '${gate['name']}',
+      );
+    }
+
+    // The toolchain is the one `.fvmrc` pins, not a second copy of it.
+    final fvm = steps.singleWhere((step) => step['id'] == 'fvm');
+    expect(fvm['run'], contains('jq -r .flutter shop_flutter/.fvmrc'));
+    final flutter = steps.singleWhere(
+      (step) => '${step['uses']}'.startsWith('subosito/flutter-action@'),
+    );
+    expect(
+      (flutter['with'] as YamlMap)['flutter-version'],
+      r'${{ steps.fvm.outputs.version }}',
+    );
+    expect(
+      read(project, '.github/workflows/ci.yml'),
+      isNot(contains(RegExp(r'\b3\.\d+\.\d+\b'))),
+    );
+
+    // CI proves the versions the locks name, as the deploy images do.
+    final deps = steps.singleWhere((step) => step['id'] == 'deps');
+    for (final package in ['shop_shared', 'shop_server', 'shop_flutter']) {
+      expect(
+        deps['run'],
+        contains(RegExp('cd $package && \\S+ pub get --enforce-lockfile')),
+        reason: package,
+      );
+    }
   });
 
   test('the language and the tracker chosen at creation are recorded, because '
