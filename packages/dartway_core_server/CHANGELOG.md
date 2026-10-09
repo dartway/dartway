@@ -2,6 +2,15 @@
 
 ## 0.21.0-dev.17
 
+- **BREAKING (schema):** `dw_stored_file` no longer records a bucket. A file's bucket is the one
+  the configuration names for its visibility, resolved at every link, read, deletion and cleanup, so
+  a storage moved to other buckets or another storage serves every existing file once its objects
+  are copied under the same keys. A public file's URL is always `publicBaseUrl` plus its key; a row
+  whose visibility has no configured bucket fails as an incident naming the variable. Framework
+  migration `20261009_000002_dw_stored_file_bucket_from_config` drops the column and stops while
+  one visibility's rows name more than one bucket, with the statement to run once they are in one
+  (dartway/dartway#369).
+
 - Every top-level `ctx.transaction` retries a deadlock (`40P01`) or a serialization failure, up to
   three attempts with the memo cleared between them — in routes, non-transactional commands, leased
   jobs, `runInContext` and startup steps, not only in transactional commands. A transactional

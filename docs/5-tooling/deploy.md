@@ -288,6 +288,14 @@ need (`DW_STORAGE_PUBLIC_BUCKET` with `DW_STORAGE_PUBLIC_BASE_URL`, `DW_STORAGE_
 `secret set`. The bucket check stays on: the server refuses to start on a missing bucket, a private
 bucket anyone can read, or a public one nobody can.
 
+**Moving files to another storage or other buckets** — bundled to external, or a bucket renamed —
+is a copy, not a migration: copy every object of the public bucket into the new public bucket and
+every object of the private one into the new private bucket, **under the same keys**, then point
+the `DW_STORAGE_*` secrets at the new place and deploy. The database names no bucket: a file's
+bucket is the one the configuration names for its visibility (D-136), so every existing file is
+served from the new buckets at once. Neither the bucket check nor the outside probe reads objects,
+so a key that was not copied surfaces only when someone opens that file.
+
 ## `setup` — provision a server and render its stack
 
 `setup` is the only subcommand that writes infrastructure. In order:

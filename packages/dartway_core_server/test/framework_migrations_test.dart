@@ -16,6 +16,10 @@ import 'support/test_app.dart';
 /// migrate a table with rows — once the bucket those rows really are in is
 /// recorded, since no migration can know it — and leave every database that
 /// applied the first text exactly as it is.
+///
+/// Later the column went again: a file's bucket is the one the configuration
+/// names for its visibility (D-136), and a table whose rows of one visibility
+/// are split across buckets stops that migration until they are in one.
 void main() {
   late DwTestDatabase database;
   late DwPostgresDatabase opened;
@@ -36,6 +40,7 @@ void main() {
   DwDatabaseMigration named(String id) =>
       framework.singleWhere((migration) => migration.id == id);
   final bucket = named('20260914_180000_dw_stored_file_bucket');
+  final fromConfig = named('20261009_000002_dw_stored_file_bucket_from_config');
   List<DwDatabaseMigration> upTo(String id) => [
     for (final migration in framework)
       if (migration.id.compareTo(id) <= 0) migration,
@@ -100,7 +105,9 @@ void main() {
       'ALTER TABLE dw_stored_file ADD COLUMN bucket text; '
       "UPDATE dw_stored_file SET bucket = 'club';",
     );
-    final run = await runner(framework).apply();
+    final run = await runner(
+      upTo('20261009_000001_dw_identity_provider_email'),
+    ).apply();
     expect(run.migrations.map((ref) => ref.id), [
       bucket.id,
       '20260914_220000_dw_keys_and_identities',
@@ -157,12 +164,103 @@ void main() {
       '20260914_220000_dw_keys_and_identities',
       '20260930_000000_dw_setting',
       '20261009_000001_dw_identity_provider_email',
+      fromConfig.id,
     ]);
     expect(
       (await runner(framework).status()).map((status) => status.state),
       everyElement(DwMigrationState.applied),
     );
     expect(await storedFileShape(), corrected);
+  });
+
+  /// A file recorded with the bucket it was uploaded to, as the column held
+  /// it before `fromConfig`.
+  Future<void> insertInBucket(
+    int id,
+    String visibility,
+    String bucket,
+  ) => opened.db.execute(
+    'INSERT INTO dw_stored_file (id, account_id, purpose, bucket, object_key, '
+    'visibility, file_name, content_type, byte_size, confirmed_at) VALUES '
+    "(@id, 1, 'avatar', @bucket, @key, @visibility, 'a.png', 'image/png', 10, "
+    'now())',
+    params: {
+      'id': id,
+      'bucket': bucket,
+      'key': 'avatar/1/$id.png',
+      'visibility': visibility,
+    },
+  );
+
+  Future<List<Map<String, Object?>>> storedFiles() async => [
+    for (final row in await opened.db.query(
+      'SELECT id, visibility, object_key FROM dw_stored_file ORDER BY id',
+    ))
+      {
+        'id': row['id'],
+        'visibility': row['visibility'],
+        'object_key': row['object_key'],
+      },
+  ];
+
+  test('one bucket per visibility drops the column and keeps the rows, '
+      'each key unique on its own', () async {
+    await runner(upTo('20261009_000001_dw_identity_provider_email')).apply();
+    await opened.db.execute('INSERT INTO dw_account (id) VALUES (1)');
+    await insertInBucket(1, 'public', 'club-public');
+    await insertInBucket(2, 'public', 'club-public');
+    await insertInBucket(3, 'private', 'club-private');
+    final before = await storedFiles();
+
+    final run = await runner(framework).apply();
+    expect(run.migrations.map((ref) => ref.id), [fromConfig.id]);
+
+    final shape = await storedFileShape();
+    expect(shape, isNot(contains(startsWith('bucket '))));
+    expect(shape, contains('dw_stored_file_object_key UNIQUE (object_key)'));
+    expect(shape, isNot(contains(startsWith('dw_stored_file_object '))));
+    expect(await storedFiles(), before);
+  });
+
+  test('files of one visibility in two buckets stop the migration with the '
+      'buckets and the statement, and migrate once they are in one', () async {
+    await runner(upTo('20261009_000001_dw_identity_provider_email')).apply();
+    await opened.db.execute('INSERT INTO dw_account (id) VALUES (1)');
+    await insertInBucket(1, 'public', 'club');
+    await insertInBucket(2, 'public', 'club-public');
+    await insertInBucket(3, 'private', 'club-private');
+
+    await expectLater(
+      runner(framework).apply(),
+      throwsA(
+        isA<DwMigrationFailed>().having(
+          (failure) => '$failure',
+          'text',
+          allOf(
+            contains(fromConfig.id),
+            contains('public files are in club, club-public'),
+            contains(
+              "UPDATE dw_stored_file SET bucket = '<bucket>' "
+              "WHERE visibility = 'public';",
+            ),
+            isNot(contains('private files are in')),
+          ),
+        ),
+      ),
+    );
+    expect({
+      for (final status in await runner(framework).status())
+        status.ref.id: status.state,
+    }, containsPair(fromConfig.id, DwMigrationState.pending));
+
+    // The objects copied into `club-public`, under the same keys.
+    await opened.db.execute(
+      "UPDATE dw_stored_file SET bucket = 'club-public' "
+      "WHERE visibility = 'public'",
+    );
+    final run = await runner(framework).apply();
+    expect(run.migrations.map((ref) => ref.id), [fromConfig.id]);
+    expect((await storedFiles()).map((row) => row['id']), [1, 2, 3]);
   });
 }
 
