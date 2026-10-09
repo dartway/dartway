@@ -10,6 +10,28 @@ import '../deploy/secret_store.dart';
 import '../deploy/ssh_runner.dart';
 import '../deploy/stack.dart';
 
+/// Idempotently provisions the kernel support and host defaults needed by
+/// the front proxy's namespaced BBR selection.
+const String dwBbrSetupScript = r'''
+set -e
+write_file() {
+  path="$1"
+  content="$2"
+  if [ ! -f "$path" ] || [ "$(cat "$path")" != "$content" ]; then
+    printf '%s\n' "$content" > "$path"
+  fi
+}
+write_file /etc/modules-load.d/dartway-bbr.conf 'tcp_bbr'
+modprobe tcp_bbr 2>/dev/null || true
+write_file /etc/sysctl.d/90-dartway-net.conf 'net.core.default_qdisc=fq
+net.ipv4.tcp_congestion_control=bbr'
+sysctl -p /etc/sysctl.d/90-dartway-net.conf >/dev/null
+if ! grep -qw bbr /proc/sys/net/ipv4/tcp_allowed_congestion_control; then
+  echo 'fatal: this network namespace does not allow tcp_bbr' >&2
+  exit 1
+fi
+''';
+
 /// Provisions a server and renders the infrastructure it runs on.
 ///
 /// Idempotent throughout: every step either finds what it needs or creates it,
@@ -153,6 +175,13 @@ fi
 systemctl enable --now docker >/dev/null 2>&1 || true
 docker compose version >/dev/null
 '''),
+  )) {
+    return 1;
+  }
+
+  if (!await step(
+    'BBR congestion control',
+    () => ssh.runPrivileged(dwBbrSetupScript),
   )) {
     return 1;
   }

@@ -4,7 +4,10 @@ import 'package:dartway_cli/src/checker/dw_check_type.dart';
 import 'package:dartway_cli/src/deploy/deploy_check.dart';
 import 'package:dartway_cli/src/deploy/image_registry.dart';
 import 'package:dartway_cli/src/deploy/remote_checks.dart';
+import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:test/test.dart';
+
+import 'support/deploy_fixtures.dart';
 
 /// A registry that answers a manifest HEAD by which repository was asked
 /// about — enough to prove `evaluateImagesResolve` actually reads what
@@ -48,6 +51,62 @@ class _PerRepoRegistry {
 }
 
 void main() {
+  group('congestion-control checks', () {
+    Future<DwDeployVerdict> evaluate(String id, RecordingSsh ssh) {
+      final check = dwRemoteDeployChecks.firstWhere((check) => check.id == id);
+      return check.evaluate(
+        DwDeployContext(
+          projectRoot: Directory.systemTemp,
+          stack: stackFrom(),
+          ssh: ssh,
+        ),
+      );
+    }
+
+    test('the proxy passes on bbr and fails on cubic', () async {
+      final bbr = RecordingSsh([
+        (
+          'exec -T nginx',
+          const DwSshResult(exitCode: 0, stdout: 'bbr\n', stderr: ''),
+        ),
+      ]);
+      final cubic = RecordingSsh([
+        (
+          'exec -T nginx',
+          const DwSshResult(exitCode: 0, stdout: 'cubic\n', stderr: ''),
+        ),
+      ]);
+      expect((await evaluate('proxy-congestion-control', bbr)).passed, isTrue);
+      expect(
+        (await evaluate('proxy-congestion-control', cubic)).passed,
+        isFalse,
+      );
+    });
+
+    test('a host not using bbr is a warning finding', () async {
+      final ssh = RecordingSsh([
+        (
+          'cat /proc/sys/net/ipv4/tcp_congestion_control',
+          const DwSshResult(exitCode: 0, stdout: 'cubic\n', stderr: ''),
+        ),
+      ]);
+      final check = dwRemoteDeployChecks.firstWhere(
+        (check) => check.id == 'host-congestion-control',
+      );
+      expect(check.severity, DwCheckSeverity.warning);
+      expect(
+        (await check.evaluate(
+          DwDeployContext(
+            projectRoot: Directory.systemTemp,
+            stack: stackFrom(),
+            ssh: ssh,
+          ),
+        )).passed,
+        isFalse,
+      );
+    });
+  });
+
   group('evaluateImagesResolve', () {
     late _PerRepoRegistry fake;
 

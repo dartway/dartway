@@ -332,6 +332,14 @@ class DwStackRenderer {
         buffer.writeln('      - ${_q('127.0.0.1:$port:$port')}');
     }
     buffer
+      ..writeln(
+        '    # TCP to every public host terminates here. Congestion control is',
+      )
+      ..writeln(
+        '    # namespaced, so setting BBR on the host alone is not sufficient.',
+      )
+      ..writeln('    sysctls:')
+      ..writeln('      net.ipv4.tcp_congestion_control: bbr')
       ..writeln('    volumes:')
       ..writeln('      - "./nginx.conf:/etc/nginx/conf.d/default.conf:ro"')
       ..writeln('      - "./nginx.d:/etc/nginx/dartway:ro"');

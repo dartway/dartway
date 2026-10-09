@@ -32,6 +32,12 @@ import 'support/deploy_fixtures.dart';
 /// the firewall and SSH itself. Everything between "the checkout is on the
 /// machine" and "a browser gets the right answers" it runs for real.
 void main() {
+  final allowed = File('/proc/sys/net/ipv4/tcp_allowed_congestion_control');
+  final bbrSkipReason =
+      !allowed.existsSync() ||
+          !allowed.readAsStringSync().split(RegExp(r'\s+')).contains('bbr')
+      ? 'the Docker host does not allow tcp_bbr, so a BBR proxy cannot start'
+      : null;
   final monorepo = () {
     var dir = Directory.current.absolute;
     while (!File(p.join(dir.path, 'example', '.dockerignore')).existsSync()) {
@@ -131,6 +137,10 @@ void main() {
     );
   }
 
+  // The group is intentionally kept at the existing indentation so this safety
+  // wrapper does not reformat the entire Docker proof.
+  // dart format off
+  group('local stack', () {
   setUpAll(() async {
     root = Directory.systemTemp.createTempSync('dw_stack_proof_');
     project = Directory(p.join(root.path, 'project'));
@@ -276,6 +286,15 @@ void main() {
       reason: results.join('\n'),
     );
     expect(results.map((r) => r.title), hasLength(11));
+  });
+
+  test('the running front proxy uses BBR', () async {
+    final result = await compose(
+      'exec -T ${DwStack.nginxService} '
+      'cat /proc/sys/net/ipv4/tcp_congestion_control',
+    );
+    expect(result.ok, isTrue, reason: result.stderr);
+    expect(result.stdout.trim(), 'bbr');
   });
 
   test('the front proxy compresses and revalidates the web bundle', () async {
@@ -606,6 +625,8 @@ void main() {
     // than being killed when it ran out.
     expect(state.stdout.trim(), '0');
   });
+  }, skip: bbrSkipReason);
+  // dart format on
 }
 
 /// A presigned S3 PUT bound to its length, content type and `if-none-match`,

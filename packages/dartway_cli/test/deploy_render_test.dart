@@ -37,6 +37,12 @@ String _location(String block, String spec) {
 }
 
 void main() {
+  test('the front proxy selects BBR in its own network namespace', () {
+    final sysctls =
+        _service(stackFrom(), DwStack.nginxService)['sysctls'] as YamlMap;
+    expect(sysctls['net.ipv4.tcp_congestion_control'], 'bbr');
+  });
+
   group('dataVolumeNames (what the data-volume guard looks for)', () {
     test('always postgres, prefixed with the project', () {
       expect(stackFrom().dataVolumeNames, {'shop_postgres_data'});

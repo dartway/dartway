@@ -15,6 +15,78 @@ import 'support/deploy_fixtures.dart';
 /// whatever else it prints (#433 reported an exit 0 that the CLI, read
 /// closely, could not have given; this keeps it that way).
 void main() {
+  Future<({int code, String human, List<Map<String, Object?>> events})> runWith(
+    RecordingSsh ssh,
+  ) async {
+    final human = StreamController<List<int>>();
+    final events = StreamController<List<int>>();
+    final humanLines = human.stream.transform(utf8.decoder).join();
+    final eventLines = events.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .toList();
+    final humanSink = IOSink(human.sink);
+    final eventSink = IOSink(events.sink);
+    final code = await runDeploy(
+      stackFrom(),
+      DeployRunCommand().argParser.parse(['--env', 'staging']),
+      connection: ssh,
+      progress: DwDeployProgress.into(human: humanSink, events: eventSink),
+      localChecks: const [],
+    );
+    await humanSink.close();
+    await eventSink.close();
+    return (
+      code: code,
+      human: await humanLines,
+      events: [
+        for (final line in await eventLines)
+          jsonDecode(line) as Map<String, Object?>,
+      ],
+    );
+  }
+
+  test('missing host BBR stops before the first deployment step', () async {
+    final ssh = RecordingSsh([
+      (
+        'tcp_allowed_congestion_control',
+        const DwSshResult(exitCode: 0, stdout: 'reno cubic\n', stderr: ''),
+      ),
+    ]);
+    final result = await runWith(ssh);
+    expect(result.code, 1);
+    expect(result.human, contains('BBR congestion control is not allowed'));
+    expect(
+      result.events.singleWhere((event) => event['event'] == 'run_finished'),
+      containsPair('reason', 'bbr-unavailable'),
+    );
+    expect(ssh.issued, hasLength(1));
+  });
+
+  test('an SSH failure is reported as unreachable, not missing BBR', () async {
+    final ssh = RecordingSsh([
+      (
+        'tcp_allowed_congestion_control',
+        const DwSshResult(
+          exitCode: 255,
+          stdout: '',
+          stderr: 'ssh: connect to host example.com: Connection refused\n',
+        ),
+      ),
+    ]);
+    final result = await runWith(ssh);
+    expect(result.code, 1);
+    expect(result.human, contains('Connection refused'));
+    expect(
+      result.human,
+      isNot(contains('BBR congestion control is not allowed')),
+    );
+    expect(
+      result.events.singleWhere((event) => event['event'] == 'run_finished'),
+      containsPair('reason', 'unreachable'),
+    );
+  });
+
   test(
     'a failed step makes deploy run exit non-zero, naming the step',
     () async {
@@ -60,6 +132,13 @@ class _ServerWhereEveryStepExits extends RecordingSsh {
   @override
   Future<DwSshResult> run(String command) async {
     issued.add(command);
+    if (command.contains('tcp_allowed_congestion_control')) {
+      return const DwSshResult(
+        exitCode: 0,
+        stdout: 'reno cubic bbr\n',
+        stderr: '',
+      );
+    }
     final nonce = _nonce.firstMatch(command)?.group(0);
     if (nonce == null) {
       return const DwSshResult(exitCode: 0, stdout: '', stderr: '');
