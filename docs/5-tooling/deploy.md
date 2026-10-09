@@ -599,9 +599,9 @@ hand edit, landing in between the two is refused rather than silently undone; an
 but cannot be read fails the comparison outright, rather than being read as an absent one that every
 key would then look new against.
 
-`pull` prints its plan as key names only: additions, requested overwrites, remaining differing keys
-and local-only keys. Without `--overwrite`, a difference includes a ready-to-run command naming
-every differing key. `--overwrite KEY[,KEY…]` replaces only those named values; there is no blanket
+`pull` prints its plan as key names only: additions, requested overwrites, remaining differing keys,
+server-empty keys and local-only keys. Without `--overwrite`, a difference includes a ready-to-run
+command naming every differing key whose server value is non-empty. `--overwrite KEY[,KEY…]` replaces only those named values; there is no blanket
 overwrite because the local file may hold the only copy of a rotation that has not been pushed yet.
 An empty server value never replaces a non-empty local value: pull refuses and directs the maintainer
 to push instead. `--dry-run` prints the same plan without writing. A completed write is read back and
