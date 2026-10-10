@@ -38,7 +38,7 @@ set in an environment at deploy time. See [wire and versions](../2-core/wire-and
 
 `Dw-App-Version` (`DwFlutterConfig.appVersion`) still travels: it labels the session key the app
 signs in with. It decides nothing. The template reads it from `PackageInfo.fromPlatform()` in
-`main`, as `<semver>+<build>`.
+`main`, as `<semver>+<build>` or `<semver>` if the platform supplies no build number.
 On web, the platform plugin reads the `version.json` written by `flutter build web`.
 
 `pubspec.yaml` keeps the marketing version, with a fallback build number for local builds.

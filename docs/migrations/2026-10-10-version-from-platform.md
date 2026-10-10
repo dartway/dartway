@@ -2,12 +2,15 @@
 title: Read the app version from the platform build
 affects:
   dartway_cli: "0.24.0"
+  dartway_core_shared: "0.21.0-dev.17"
 ---
 
 ## Who is affected
 
 Projects whose Flutter entrypoint passes a committed `appBuildVersion` constant.
-Apply this change on the next template sync.
+Apply this change on the next template sync. Code that reads `DwAppVersion.build`
+must also allow `null`, meaning the platform supplied no build number; do not
+invent a build number for the session label.
 
 ## What to change
 
