@@ -9,7 +9,10 @@ import 'package:dartway_core_server/src/files/dw_object_store.dart';
 import 'package:dartway_core_server/src/files/dw_storage_buckets.dart';
 import 'package:test/test.dart';
 
-Future<void> _provisionOnly(DwFileStorageConfig source) async {
+Future<void> _provisionOnly(
+  DwFileStorageConfig source, {
+  List<String> allowedOrigins = const [],
+}) async {
   final prefix = 'dw-kamal-${DateTime.now().microsecondsSinceEpoch}';
   final public = '$prefix-public';
   final private = '$prefix-private';
@@ -40,17 +43,16 @@ Future<void> _provisionOnly(DwFileStorageConfig source) async {
   });
   // The Kamal API entry point calls only provision: no storage-init and no
   // server startup bucket verification may create the objects for this test.
-  await DwFileStorageSetup.provision(
-    config,
-    allowedOrigins: ['https://app.example.com'],
-  );
+  await DwFileStorageSetup.provision(config, allowedOrigins: allowedOrigins);
   for (final bucket in [public, private]) {
-    final cors = await DwOutsideProbe().storageCors(
-      storageOrigin: source.endpoint.toString(),
-      bucket: bucket,
-      appOrigin: 'https://app.example.com',
-    );
-    expect(cors.passed, true, reason: cors.detail);
+    for (final origin in allowedOrigins) {
+      final cors = await DwOutsideProbe().storageCors(
+        storageOrigin: source.endpoint.toString(),
+        bucket: bucket,
+        appOrigin: origin,
+      );
+      expect(cors.passed, true, reason: cors.detail);
+    }
   }
   final result = await DwOutsideProbe().storageVisibility(
     storageOrigin: source.endpoint.toString(),
@@ -75,7 +77,7 @@ Future<void> _provisionOnly(DwFileStorageConfig source) async {
 
 void main() {
   test(
-    'Kamal provision alone creates visibility and CORS preconditions',
+    'Kamal provision alone creates visibility preconditions',
     () => _provisionOnly(
       DwFileStorageConfig.fromEnvironment(Platform.environment),
     ),
@@ -158,6 +160,7 @@ void main() {
           accessKey: 'dw530access',
           secretKey: 'dw530secretvalue',
         ),
+        allowedOrigins: ['https://app.example.com'],
       );
     },
     tags: ['docker'],
