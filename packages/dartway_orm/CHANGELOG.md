@@ -2,6 +2,11 @@
 
 ## 0.21.0-dev.17
 
+- Treat unknown applied migrations after every registered id in their namespace as
+  `DwMigrationState.ahead`, reported by `DwMigrationRun.ahead`; `apply` and CLI `status` accept
+  them, while rollback refuses until the newer release's code rolls them back. Gaps, checksum
+  edits and dirty migrations still refuse (#527).
+
 - Write package imports in the migration index when its directory is under the owning package's
   `lib/`, so `migrate create` no longer reintroduces `relativeImport` errors (#445). Standalone
   directories and directories outside `lib/` keep relative imports.
