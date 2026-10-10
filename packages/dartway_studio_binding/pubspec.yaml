@@ -26,7 +26,7 @@ dependencies:
   dartway_router: ^3.0.0
   # The wire. Both this package and Studio depend on it; its version means the
   # protocol, which is why host-side changes do not belong there.
-  dartway_studio_bridge: ^0.10.0
+  dartway_studio_bridge: ^0.11.0
   flutter_riverpod: ^3.0.0
 
 dev_dependencies:

@@ -18,7 +18,7 @@ import 'support/test_app.dart';
 /// applied the first text exactly as it is.
 ///
 /// Later the column went again: a file's bucket is the one the configuration
-/// names for its visibility (D-136), and a table whose rows of one visibility
+/// names for its visibility (D-137), and a table whose rows of one visibility
 /// are split across buckets stops that migration until they are in one.
 void main() {
   late DwTestDatabase database;

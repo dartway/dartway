@@ -206,7 +206,7 @@ const List<String> _storedFileDown = ['DROP TABLE dw_stored_file'];
 // Public and private files live in two buckets, so a row names its bucket: a
 // file stays where it was uploaded when the configuration names other buckets
 // later, and its object is found — and deleted — there. Reversed by
-// `20261009_000002_dw_stored_file_bucket_from_config` (D-136).
+// `20261009_000002_dw_stored_file_bucket_from_config` (D-137).
 //
 // No default and no guess for rows that predate the column: they were uploaded
 // to the single bucket `DW_STORAGE_BUCKET` named then, which is neither of the
@@ -308,7 +308,7 @@ const List<String> _identityProviderEmailDown = [
 ];
 
 // A file's bucket is the one the configuration names for its visibility, at
-// every use (D-136): the row says what the file is, the configuration where
+// every use (D-137): the row says what the file is, the configuration where
 // files are kept. A recorded bucket was a copy of the configuration and half an
 // address — the endpoint was never in it — so a storage moved elsewhere sent
 // every link to a bucket that was not there.

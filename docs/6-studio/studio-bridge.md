@@ -118,7 +118,8 @@ back. It returns null when the app is not running on web inside an iframe, so th
 functional and the bridge dormant. This is the low-level surface a binding is built on.
 
 **Studio side.** `createStudioFrameController` hosts the app in an iframe and `StudioBridgeClient`
-drives it. `probeStudioBridge(appUrl:, accessToken:)` asks one question — does this URL answer — with a
+drives it; the controller's `setInteractive(false)` stops the frame taking pointer input while an
+overlay of Studio's covers it, since an iframe catches those events before the Flutter layer above. `probeStudioBridge(appUrl:, accessToken:)` asks one question — does this URL answer — with a
 single handshake in a frame it creates and removes itself, and returns a `StudioHandshakeResult`:
 `accepted`, `rejected` (the app refused the token), or `silent`. Silent covers several causes at
 once — no bridge in the build, a page that never loaded, a deployment that forbids framing — which

@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.11.0
+
+**Breaking: `StudioFrameController` gains `setInteractive(bool interactive)`.**
+An implementation of the interface outside this package — a test fake — adds
+the method (see `docs/migrations/2026-10-09-studio-frame-set-interactive.md`).
+
+**The embedder can switch the preview frame's pointer input off and on.** An
+iframe takes every pointer event over its area before the Flutter layer above
+it sees one, so a dialog, a route or a drag handle laid over the preview lost
+its clicks to the app inside — and the frame was private to the controller, so
+the only lever left was a page-wide rule locking every iframe at once.
+`setInteractive(false)` sets the frame's `pointer-events` to `none`,
+`setInteractive(true)` to `auto`; a new frame is interactive. It works from
+construction, before the view is laid out, and does nothing after `dispose()`.
+Which overlay locks the frame stays the embedder's call; the element itself is
+still not exposed, since the channel's origin and source checks rest on its
+`src` and its window.
+
 ## 0.10.0
 
 **The app's side of the bridge knows which window is its peer.** It used to

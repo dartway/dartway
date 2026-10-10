@@ -107,7 +107,7 @@ resource away from making every file public, and a storage console shows a bucke
 prefix's.
 
 **A `dw_stored_file` row says what the file is — its visibility and key — and the configuration
-says where files are kept** (D-136). Every link, read and deletion resolves the bucket from the
+says where files are kept** (D-137). Every link, read and deletion resolves the bucket from the
 row's visibility at the moment it runs, so a storage moved to other buckets, or to another storage
 altogether, serves every existing file from the new place once each object is copied there under
 the same key; the rows need nothing. A row whose visibility has no configured bucket fails as an

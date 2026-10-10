@@ -20,5 +20,13 @@ abstract interface class StudioFrameController {
   /// Channel to the app inside the frame (origin-locked to the app URL).
   StudioMessageChannel get channel;
 
+  /// Whether the frame receives pointer input — for an embedder whose overlay
+  /// (a dialog, a route, a drag handle) covers the frame: an iframe takes the
+  /// pointer events over its area before the Flutter layer above it sees them.
+  ///
+  /// A new frame is interactive. Takes effect from construction, before the
+  /// view is laid out; after [dispose] it does nothing.
+  void setInteractive(bool interactive);
+
   void dispose();
 }
