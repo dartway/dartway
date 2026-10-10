@@ -1,4 +1,6 @@
-## 0.5.1
+## 0.6.0
+
+- Targets DartWay 0.21 (`dartway_core_*` `^0.21.0`, `dartway_push_shared` `^0.6.0`).
 
 - **A delivery is due by the server's clock, the one its job runs by** (dartway/dartway#385).
   `ctx.push.send` schedules on `ctx.now` (a missing `scheduledAt` is `ctx.now`, not the database's

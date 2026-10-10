@@ -16,13 +16,13 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_auth_providers_shared: ^0.1.1
+  dartway_auth_providers_shared: ^0.2.0
   google_sign_in: ^7.2.0
 
 dev_dependencies:
   # `DwFakeServer`: the command is sent through a real client against it.
-  dartway_client: ^0.21.0-dev.17
-  dartway_core_flutter: ^0.21.0-dev.17
+  dartway_client: ^0.21.0
+  dartway_core_flutter: ^0.21.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

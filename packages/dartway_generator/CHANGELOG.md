@@ -1,6 +1,23 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.21.0
+
+### Breaking changes
+
+- Emit a deterministic project wire descriptor and verify source-derived contracts against a fixed
+  committed Git baseline. Breaking edits require the shared package breaking line to advance;
+  unsupported/custom or unreproducible baselines block the check. Descriptor-free commits follow the
+  [first descriptor adoption rules](../../docs/2-core/wire-and-versions.md#first-descriptor-adoption).
+  A pin-move PR can establish the descriptor; changed source blocks with named paths and instructions to split the change. Remove the now-unreachable reproduction bootstrap.
+
+- **BREAKING: a row class declares `required this.id` and `final int id;`**, and the generator
+  writes its draft beside it: `New<Entity>Row` — the same constructor without `id`, defaults
+  included — a value with `==`, `hashCode` and `toString` by its columns, a `copyWith` and
+  `withId(id)`, and the table's `toDraftRow`. The row's own `copyWith` keeps the id. Reported: a
+  row class named like another's draft (`NewPlanRow` beside `PlanRow`), an id with a default
+  (`this.id = 0`), and a constructor default the draft cannot repeat (dartway/dartway#384).
+
+### Changes
 
 - Emit contract descriptor format 2 and introduction `since` metadata for new data objects,
   preserving trusted baseline metadata. New data objects need any shared version raise above the
@@ -15,87 +32,6 @@
 - Recognize the framework `DwCalendarDay` by package identity in DTO codecs and entity rows; record
   its additive `calendarDay` descriptor kind. Direct entity columns map to `DwColumnType.calendarDay`;
   JSONB collections of this value remain unsupported with a diagnostic.
-
-- Emit a deterministic project wire descriptor and verify source-derived contracts against a fixed
-  committed Git baseline. Breaking edits require the shared package breaking line to advance;
-  unsupported/custom or unreproducible baselines block the check. Descriptor-free commits follow the
-  [first descriptor adoption rules](../../docs/2-core/wire-and-versions.md#first-descriptor-adoption).
-  A pin-move PR can establish the descriptor; changed source blocks with named paths and instructions to split the change. Remove the now-unreachable reproduction bootstrap.
-
-- The family also moves in lockstep to deliver the migration note for the router
-  that follows a provider (dartway/dartway#407).
-
-## 0.21.0-dev.16
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
-  test layout and spacing checks of `dartway check` (dartway/dartway#391).
-
-## 0.21.0-dev.15
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
-  (dartway/dartway#390).
-
-## 0.21.0-dev.14
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
-  state and command checks of `dartway check` (dartway/dartway#389).
-
-## 0.21.0-dev.13
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#388).
-
-## 0.21.0-dev.12
-
-- **BREAKING: a row class declares `required this.id` and `final int id;`**, and the generator
-  writes its draft beside it: `New<Entity>Row` — the same constructor without `id`, defaults
-  included — a value with `==`, `hashCode` and `toString` by its columns, a `copyWith` and
-  `withId(id)`, and the table's `toDraftRow`. The row's own `copyWith` keeps the id. Reported: a
-  row class named like another's draft (`NewPlanRow` beside `PlanRow`), an id with a default
-  (`this.id = 0`), and a constructor default the draft cannot repeat (dartway/dartway#384).
-
-## 0.21.0-dev.11
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
-
-## 0.21.0-dev.10
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
-
-## 0.21.0-dev.9
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#385).
-
-## 0.21.0-dev.8
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#355, #356).
-
-## 0.21.0-dev.7
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).
-
-## 0.21.0-dev.6
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.5
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.4
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.3
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.2
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (#310, D-087).
-
-## 0.21.0-dev.1
-
-- Nothing changed here; the family moves in lockstep with `dartway_client`, fixed for #309.
 
 ## 0.20.0
 

@@ -1,7 +1,9 @@
-## 0.5.1
+## 0.6.0
 
-- Raised the caret on `dartway_push_flutter` to `^0.6.0`, which added `DwPushPermission.unanswered`
-  (dartway/dartway#338) — nothing in this package's own API changed.
+- Targets `dartway_push_flutter` `^0.6.0` (DartWay 0.21), which added `DwPushPermission.unanswered`
+  (dartway/dartway#338). The transport this package exports extends that package's
+  `DwPushTransportClient`, so the caret moves this package a minor; nothing else in its own API
+  changed.
 
 ## 0.5.0
 

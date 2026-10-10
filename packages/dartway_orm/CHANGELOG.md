@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.21.0
+
+### Breaking changes
+
+- **BREAKING: a row's `id` is `int`, and a row not stored yet is its draft.** `DwTableRow.id` is
+  non-null — every row comes out of the database, which assigned it — so a stored row's id is read
+  without `!`. `insert`, `tryInsert`, `insertAll` and `upsert` take a `DwRowDraft<R>` (generated as
+  `New<Entity>Row`) and answer the stored row; `DwTableDef` gains `toDraftRow`, and `toRow` no
+  longer carries the id. An insert with an id of one's own is gone, with `insertAll`'s "every row
+  has an id or none has" (it also left the `bigserial` sequence behind the rows). `update(row)`
+  needs no id check: the type holds it (dartway/dartway#384).
+
+### Changes
 
 - Treat unknown applied migrations after every registered id in their namespace as
   `DwMigrationState.ahead`, reported by `DwMigrationRun.ahead`; `apply` and CLI `status` accept
@@ -15,64 +27,16 @@
   `date` binding/decoding, comparisons and date-array parameters. Existing timestamp columns and
   repository insert/default behavior are unchanged.
 
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the router
-  that follows a provider (dartway/dartway#407).
-
-## 0.21.0-dev.16
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
-  test layout and spacing checks of `dartway check` (dartway/dartway#391).
-
-## 0.21.0-dev.15
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
-  (dartway/dartway#390).
-
-## 0.21.0-dev.14
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
-  state and command checks of `dartway check` (dartway/dartway#389).
-
-## 0.21.0-dev.13
-
 - **`DwTableRepository.upsertAll(drafts, conflictOn:)`** (dartway/dartway#388): every draft
   inserted, or written over the row with the same unique key unless that row already holds exactly
   these values, in one statement; answers how many rows were inserted or changed, so a second run with
   the same drafts writes nothing. Refuses two drafts with one key (compared by value) and a nullable
   conflict column. What `DwSeedRows` runs.
+
 - **`DwMigrationContext.backfill(sql)`**: runs like `sql`, and is the one place `dartway check`
   accepts an `INSERT`, `UPDATE` or `DELETE` in a project migration (`migrationChangesData`) — for
   rows a schema change strands. Content is a seed step. Re-exports `DwTextFieldPatch`.
 
-## 0.21.0-dev.12
-
-- **BREAKING: a row's `id` is `int`, and a row not stored yet is its draft.** `DwTableRow.id` is
-  non-null — every row comes out of the database, which assigned it — so a stored row's id is read
-  without `!`. `insert`, `tryInsert`, `insertAll` and `upsert` take a `DwRowDraft<R>` (generated as
-  `New<Entity>Row`) and answer the stored row; `DwTableDef` gains `toDraftRow`, and `toRow` no
-  longer carries the id. An insert with an id of one's own is gone, with `insertAll`'s "every row
-  has an id or none has" (it also left the `bigserial` sequence behind the rows). `update(row)`
-  needs no id check: the type holds it (dartway/dartway#384).
-
-## 0.21.0-dev.11
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
-
-## 0.21.0-dev.10
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
-
-## 0.21.0-dev.9
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#385).
-
-## 0.21.0-dev.8
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#355, #356).
-
-## 0.21.0-dev.7
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).
 - `DwDatabaseConfig` gains an optional `caFile` (`DW_DATABASE_CA_FILE` in
   `fromEnvironment`): when set, every connection — pooled and `listen()`'s own
   — verifies the server's certificate against that CA (`SslMode.verifyFull`)
@@ -84,30 +48,7 @@
   fallback to `CN`, unlike `libpq`) and `extendedKeyUsage: serverAuth`; every
   managed provider's own CA issues one.
 
-## 0.21.0-dev.6
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.5
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.4
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.3
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.2
-
 - **Aggregates, per-group firsts, upsert and list conditions on the repository**, from the raw SQL three projects wrote around their absence: `count(distinct:)`, `countBy`, `sum`/`sumBy`, `max`/`maxBy`, `min`/`minBy` (typed by the columns, grouped by any column, enum keys decoded), `findFirstPer(group, orderBy:)` (`DISTINCT ON`), `updateWhereReturning`, `upsert(row, conflictOn:)` (`ON CONFLICT … DO UPDATE`), and on a `jsonb` list column `isEmptyList`, `isNotEmptyList`, `contains`, `containsAny`. Raw SQL for these spelled enum values as literals that broke silently on a rename.
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (#310, D-087).
-
-## 0.21.0-dev.1
-
-- Nothing changed here; the family moves in lockstep with `dartway_client`, fixed for #309.
 
 ## 0.20.0
 
