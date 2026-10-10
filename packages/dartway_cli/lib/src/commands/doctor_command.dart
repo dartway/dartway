@@ -5,6 +5,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../pub_host.dart';
+import '../test_servers.dart';
 import '../version_check.dart';
 
 /// Checks that this machine can actually create and run a DartWay project.
@@ -52,7 +53,7 @@ class DoctorCommand extends Command<int> {
       _checkFlutter(),
       _checkGit(),
       await _checkPubHost(),
-      _checkDocker(),
+      await _checkTestServers(),
       _checkPubGlobalBinOnPath(),
     ];
 
@@ -220,6 +221,47 @@ class DoctorCommand extends Command<int> {
       'Restore network access to $host, or point PUB_HOSTED_URL at a mirror '
       'you trust — `dart pub get` has no deadline of its own and will hang '
       'on this without printing anything';
+
+  Future<_Check> _checkTestServers() async {
+    final hosts = <String>[];
+    for (final (variable, database) in [
+      ('DW_TEST_DATABASE_URL', true),
+      ('DW_TEST_STORAGE_URL', false),
+    ]) {
+      final value = Platform.environment[variable];
+      if (value == null) continue;
+      try {
+        final server = TestServerUrl.parse(value, database: database);
+        await server.environment(database: database, allowRemote: false);
+        final uri = server.uri;
+        final port = uri.hasPort
+            ? uri.port
+            : database
+            ? 5432
+            : uri.port;
+        hosts.add('${database ? 'Postgres' : 'S3'} ${uri.host}:$port');
+      } on FormatException catch (error) {
+        return _Check.fail(
+          'tests',
+          '$variable: ${error.message}',
+          fix:
+              'Set $variable to a valid loopback test server URL, or unset it for container runs.',
+        );
+      } on SocketException {
+        return _Check.fail(
+          'tests',
+          '$variable: could not resolve the test server host',
+          fix: 'Use a literal loopback address in $variable.',
+        );
+      }
+    }
+    return hosts.isEmpty
+        ? _checkDocker()
+        : _Check.ok(
+            'tests',
+            'explicit servers from environment; ${hosts.join('; ')}',
+          );
+  }
 
   _Check _checkDocker() {
     final result = _run('docker', ['ps']);

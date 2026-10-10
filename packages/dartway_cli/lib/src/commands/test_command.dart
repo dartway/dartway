@@ -19,12 +19,12 @@ class TestCommand extends Command<int> {
       ..addOption(
         'database-url',
         help:
-            'Explicit Postgres test server: postgres://user:password@host[:port]/maintenance-db (role needs CREATEDB).',
+            'Explicit Postgres test server: postgres://user:password@host[:port]/maintenance-db (role needs CREATEDB). Defaults to DW_TEST_DATABASE_URL.',
       )
       ..addOption(
         'storage-url',
         help:
-            'Explicit path-style S3 test server: http[s]://access-key:secret-key@host[:port].',
+            'Explicit path-style S3 test server: http[s]://access-key:secret-key@host[:port]. Defaults to DW_TEST_STORAGE_URL.',
       )
       ..addFlag(
         'allow-remote-test-server',
@@ -100,8 +100,12 @@ class TestCommand extends Command<int> {
       return 1;
     }
 
-    final databaseUrl = argResults?['database-url'] as String?;
-    final storageUrl = argResults?['storage-url'] as String?;
+    final databaseFlag = argResults?['database-url'] as String?;
+    final databaseUrl =
+        databaseFlag ?? Platform.environment['DW_TEST_DATABASE_URL'];
+    final storageFlag = argResults?['storage-url'] as String?;
+    final storageUrl =
+        storageFlag ?? Platform.environment['DW_TEST_STORAGE_URL'];
     final withStorage = argResults?['storage'] as bool? ?? true;
     final keep = argResults?['keep'] as bool? ?? false;
     final allowRemote =
@@ -123,7 +127,7 @@ class TestCommand extends Command<int> {
       (_) => random.nextInt(36).toRadixString(36),
     ).join();
     // Drop every inherited service option, including CA, buckets and region.
-    // Without a storage flag, even an inherited stage storage is unreachable.
+    // Without an explicit storage URL, inherited stage storage is unreachable.
     final environment = {
       for (final entry in Platform.environment.entries)
         if (!entry.key.startsWith('DW_DATABASE_') &&
@@ -217,9 +221,9 @@ class TestCommand extends Command<int> {
     Future<int> runSuite() async {
       stdout.writeln(
         'Test run $runId: '
-        '${databaseUrl == null ? 'starting $image' : 'explicit Postgres'}; '
+        '${databaseUrl == null ? 'starting $image' : 'explicit Postgres (${databaseFlag != null ? '--database-url' : 'DW_TEST_DATABASE_URL'})'}; '
         '${storageUrl != null
-            ? 'explicit S3'
+            ? 'explicit S3 (${storageFlag != null ? '--storage-url' : 'DW_TEST_STORAGE_URL'})'
             : startStorage
             ? 'starting $storageImage'
             : 'storage disabled (no storage server supplied)'}.',

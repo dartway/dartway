@@ -87,18 +87,33 @@ dart run dartway_cli:dartway test \
   --storage-url http://test_key:test_secret@127.0.0.1:9000
 ```
 
+Cloud setup scripts can supply the same URLs as test-only environment defaults:
+
+```bash
+export DW_TEST_DATABASE_URL=postgres://test_user:test_password@127.0.0.1:5432/postgres
+export DW_TEST_STORAGE_URL=http://test_key:test_secret@127.0.0.1:9000
+dart run dartway_cli:dartway test
+```
+
+Each flag overrides its environment variable. A supplied URL prevents Docker from being called
+for that service; with neither flag nor test-only variable, the container defaults apply.
+The run banner names the source (`--database-url` or `DW_TEST_DATABASE_URL`, and the storage
+equivalent). When either variable is set, `dartway doctor` reports
+`tests: explicit servers from environment` with the hosts and no credentials, and does not
+require Docker for tests.
+
 `--database-url` names the maintenance database on the test server; the role needs `CREATEDB`.
 The password is required and the port is optional (it defaults to 5432). `--storage-url` accepts HTTP or HTTPS with access and secret keys,
 and uses path-style S3 in `us-east-1`. URL-encode reserved characters in credentials.
 Both flags select servers independently: a supplied URL prevents that service's container from
-starting. With `--database-url` alone, storage is disabled and the startup line says so;
+starting. With only a database URL, storage is disabled and the startup line says so;
 add `--storage-url` for projects whose tests upload files. `--no-storage` still disables storage.
 `--keep` is limited to container runs.
 
 Both hosts must resolve only to loopback addresses. A dedicated remote test server requires
-`--allow-remote-test-server`; never supply a stage or production server. Inherited `DW_DATABASE_*`
-and `DW_STORAGE_*` variables do not select servers or affect the suite: without flags, containers
-remain the default. This prevents a shell or stage `.env` from silently redirecting tests.
+`--allow-remote-test-server` (there is no environment equivalent); never supply a stage or
+production server. Inherited `DW_DATABASE_*` and `DW_STORAGE_*` variables do not select servers or
+affect the suite: without flags or test-only URL variables, containers remain the default. This prevents a shell or stage `.env` from silently redirecting tests.
 
 The loopback guard checks the current DNS answers; it does not pin later suite connections to those
 answers. Prefer literal loopback addresses to avoid a hostname changing between validation and use.

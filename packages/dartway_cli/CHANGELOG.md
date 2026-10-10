@@ -2,6 +2,11 @@
 
 ## 0.24.0
 
+- `dartway test` defaults `--database-url` and `--storage-url` from `DW_TEST_DATABASE_URL` and
+  `DW_TEST_STORAGE_URL`; flags take precedence. The run banner names the source, and the existing
+  loopback guard, isolation, cleanup and `--keep` refusal apply. `dartway doctor` reports the
+  environment-selected hosts without credentials and does not require Docker for tests (#522).
+
 - Toolkit: `dartway-testing` requires red-before-fix proof only for bugfix tests; breaking code for
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
   then passes on the same commit without changes is quarantined with a linked record rather than
