@@ -137,9 +137,14 @@ pass" → add `ci`. The classic route, Settings → Branches → a branch protec
 rule, works too.
 
 On a private repository a required check needs a paid GitHub plan, and the
-runs spend the plan's minutes. Moving to a machine of your own is one line:
-`runs-on:` naming a self-hosted Linux runner with Docker, where the acceptance
-gate starts its containers.
+runs spend the plan's minutes.
+
+`ci` runs on `ubuntu-latest` unless the repository or organisation variable
+`DW_CI_RUNS_ON` names other runner labels, as JSON: `["self-hosted","ci-nl"]`
+moves the job onto a self-hosted runner carrying those labels (Settings →
+Secrets and variables → Actions → Variables). Set on the organisation, it moves
+every project at once. The runner needs Linux with Docker: the Postgres service
+and the acceptance gate's containers run there.
 
 `.github/workflows/claude-review.yml` is separate and optional: it runs a Claude
 review on every pull request and posts findings as inline comments. It needs one

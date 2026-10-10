@@ -25,7 +25,10 @@ permissions:
 jobs:
   ci:
     name: ci
-    runs-on: ubuntu-latest
+    # `ubuntu-latest` unless the repository or organisation variable
+    # DW_CI_RUNS_ON names other labels as JSON, e.g. ["self-hosted","linux"]
+    # (README.md, "Continuous integration"). The steps need Linux with Docker.
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 40
     # The Postgres the migration check replays on, in throwaway databases it
     # creates itself. Only the container port is named: Docker picks the host

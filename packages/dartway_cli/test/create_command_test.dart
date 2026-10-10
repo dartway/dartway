@@ -293,6 +293,12 @@ void main() {
     expect(jobs.keys, ['ci']);
     final job = jobs['ci'] as YamlMap;
     expect(job['name'], 'ci');
+    // Hosted runners when nothing says otherwise; a repository or
+    // organisation variable moves every project onto its own runners.
+    expect(
+      job['runs-on'],
+      r'''${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}''',
+    );
     final on = workflow['on'] as YamlMap;
     expect(on.containsKey('pull_request'), isTrue);
     expect(on['pull_request'], isNull, reason: 'no paths or branches filter');

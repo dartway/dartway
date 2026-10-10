@@ -90,6 +90,13 @@ class ProjectCiWorkflow {
     'subosito/flutter-action@',
   ];
 
+  /// The one expression `runs-on:` may hold: the runner labels come from the
+  /// `DW_CI_RUNS_ON` variable, `ubuntu-latest` without it. Where the steps run
+  /// is GitHub's question; here they run on this machine, so it is accepted
+  /// and ignored.
+  static const runsOnExpression =
+      r'''${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}''';
+
   static const _topKeys = {'name', 'on', 'concurrency', 'permissions', 'jobs'};
   static const _jobKeys = {
     'name',
@@ -144,6 +151,15 @@ class ProjectCiWorkflow {
       throw ProjectCiRefusal([...problems, 'job $jobId is not a mapping']);
     }
     _unknownKeys(job, _jobKeys, 'job $jobId', problems);
+    final runsOn = job['runs-on'];
+    if (runsOn is String &&
+        runsOn.contains(r'${{') &&
+        runsOn.trim() != runsOnExpression) {
+      problems.add(
+        'job $jobId: runs-on: $runsOn — the one expression known is '
+        '`$runsOnExpression`',
+      );
+    }
 
     final services = <String, ProjectCiService>{};
     final rawServices = job['services'];

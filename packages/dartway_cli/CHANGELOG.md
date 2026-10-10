@@ -7,8 +7,10 @@
   Flutter package, where the convention rules run as an analyzer plugin), `dart test`,
   `dartway test`, `flutter test` and `dartway check` — as the steps of one job, `ci`, on every pull
   request. Each gate runs even after an earlier one failed, Flutter comes from the Flutter
-  package's `.fvmrc`, and packages resolve with `--enforce-lockfile`. The README says how to make
-  `ci` a required check. A project created earlier may copy the file whenever it wants (#495).
+  package's `.fvmrc`, and packages resolve with `--enforce-lockfile`. The job runs on
+  `ubuntu-latest` unless the `DW_CI_RUNS_ON` repository or organisation variable names other
+  runner labels as JSON (`["self-hosted","ci-nl"]`). The README says how to make `ci` a required
+  check. A project created earlier may copy the file whenever it wants (#495).
 
 - `dartway test` pulls an image it does not have locally before starting a container from it,
   with up to three attempts (2 s, then 5 s apart) and one `pulling <image> (attempt n/3)` line per

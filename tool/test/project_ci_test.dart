@@ -88,6 +88,29 @@ $steps
     ]);
   });
 
+  test('runs-on takes the DW_CI_RUNS_ON expression or a plain label, and no '
+      'other expression', () {
+    String runsOn(String value) =>
+        '''
+on: pull_request
+jobs:
+  ci:
+    runs-on: $value
+    steps: [{run: dart test}]
+''';
+
+    expect(
+      ProjectCiWorkflow.parse(
+        runsOn("${ProjectCiWorkflow.runsOnExpression}"),
+      ).jobId,
+      'ci',
+    );
+    expect(ProjectCiWorkflow.parse(runsOn('ubuntu-latest')).jobId, 'ci');
+    expect(problems(runsOn(r'${{ vars.RUNNER }}')), [
+      contains('runs-on: \${{ vars.RUNNER }}'),
+    ]);
+  });
+
   test('a second job, a fixed host port and an unclosed expression are '
       'refused', () {
     expect(
