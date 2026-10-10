@@ -430,7 +430,8 @@ Future<String?> executeDeploySteps(
           'Warning: deployment succeeded, but cleanup failed '
           '(exit ${result.exitCode}). Run --resume to retry cleanup.',
         );
-        _indent(report.problems, '${result.stdout}\n${result.stderr}');
+        if (summary == null) _indent(report.problems, result.stdout);
+        _indent(report.problems, result.stderr);
         return null;
       }
     }

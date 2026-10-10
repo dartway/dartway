@@ -756,6 +756,7 @@ esac
             site.overrides,
           );
           expect(first.code, 0);
+          expect(first.human, isNot(contains('"images_removed"')));
           expect(
             first.human,
             contains('Warning: deployment succeeded, but cleanup failed'),
