@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dartway_cli/src/deploy/nginx_upstreams.dart';
 import 'package:dartway_cli/src/deploy/renderer.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
@@ -249,11 +251,21 @@ void main() {
       },
     );
 
-    test('the web image is given the app origin Studio signs for', () {
-      final web = _service(stackFrom(), 'web');
+    test('the web image receives the backend and Studio app origins', () {
+      final root = Directory.systemTemp.createTempSync('dw-old-web-');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final dockerfile = File(p.join(root.path, 'shop_flutter/Dockerfile'));
+      dockerfile.parent.createSync(recursive: true);
+      dockerfile.writeAsStringSync(
+        'FROM flutter\nARG DW_BACKEND_URL\n'
+        r'RUN test -n "$DW_BACKEND_URL"'
+        '\n',
+      );
+      final web = _service(stackFrom(projectRoot: root), 'web');
       final args = (web['build'] as YamlMap)['args'] as YamlMap;
       // Without it every app keeps its own address as a default in its
       // Dockerfile, where a stand rename makes it quietly wrong.
+      expect(args['DW_BACKEND_URL'], 'https://app.example.com');
       expect(args['STUDIO_APP_ORIGIN'], 'https://app.example.com');
     });
 

@@ -182,6 +182,13 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     evaluate: _checkServerSignals,
   ),
   DwDeployCheck(
+    id: 'web-backend-url',
+    title: 'The web image receives its declared backend build argument',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkWebBackendUrl,
+  ),
+  DwDeployCheck(
     id: 'locked-dependencies',
     title: 'Every image builds the dependencies the lock file names',
     stage: DwDeployCheckStage.local,
@@ -468,6 +475,28 @@ Future<DwDeployVerdict> _checkServerSignals(DwDeployContext context) async {
         'PID 1 and receives the SIGTERM a deploy sends. Under /bin/sh -c the '
         'signal stops at the shell and the server is killed when the grace '
         'period runs out.',
+  );
+}
+
+// Compose still supplies the argument while live projects move to Kamal.
+Future<DwDeployVerdict> _checkWebBackendUrl(DwDeployContext context) async {
+  final file = context.dockerfileOf(context.flutterPackage);
+  if (!file.existsSync()) {
+    return const DwDeployVerdict.skip('no web Dockerfile');
+  }
+  final declares = file.readAsLinesSync().any(
+    (line) => RegExp(
+      r'^\s*ARG\s+DW_BACKEND_URL(\s|=|$)',
+      caseSensitive: false,
+    ).hasMatch(line),
+  );
+  if (!declares) {
+    return const DwDeployVerdict.skip(
+      'the web Dockerfile uses no DW_BACKEND_URL argument',
+    );
+  }
+  return DwDeployVerdict.pass(
+    'ARG DW_BACKEND_URL, given ${context.stack.appOrigin}',
   );
 }
 

@@ -1,7 +1,13 @@
 import 'dart:convert';
+import 'dart:io';
+
+// Deployment policy is internal to the framework, shared with its CLI.
+// ignore: implementation_imports
+import 'package:dartway_core_shared/src/files/dw_storage_cors.dart';
 
 import 'package:meta/meta.dart';
 
+import '../environment/dw_environment_reader.dart';
 import 'dw_file_storage.dart';
 import 'dw_object_store.dart';
 
@@ -22,7 +28,9 @@ abstract final class DwFileStorageSetup {
   /// on its objects, nothing else — not its listing); deletes the private
   /// bucket's policy, so nothing but a signed request reads it. Writes the
   /// visibility probe into each bucket after setting its policy, for outside
-  /// checks even when startup bucket verification is disabled.
+  /// checks even when startup bucket verification is disabled. Configures
+  /// both buckets' browser CORS for GET and PUT from [allowedOrigins], or
+  /// `DW_ALLOWED_ORIGINS` when omitted. With no origins, no CORS rule is set.
   ///
   /// Deleting the policy is right for a storage the project owns wholly and
   /// wrong for a bucket somebody administers with policies of their own:
@@ -35,10 +43,19 @@ abstract final class DwFileStorageSetup {
   static Future<void> provision(
     DwFileStorageConfig config, {
     Duration requestTimeout = const Duration(seconds: 30),
+    Iterable<String>? allowedOrigins,
   }) async {
     if (config.problems case final problems when problems.isNotEmpty) {
       throw ArgumentError('file storage configuration: ${problems.join('; ')}');
     }
+    final origins =
+        (allowedOrigins ??
+                DwEnvironmentReader.read<List<String>>(
+                  Platform.environment,
+                  (read) => read.list('DW_ALLOWED_ORIGINS'),
+                ))
+            .toSet();
+    final cors = origins.isEmpty ? null : DwStorageCorsRule(origins).xml;
     final store = DwObjectStore(config, requestTimeout: requestTimeout);
     try {
       if (config.publicBucket case final bucket?) {
@@ -58,6 +75,7 @@ abstract final class DwFileStorageSetup {
             code,
           );
         }
+        if (cors != null) await _setCors(store, bucket, cors);
         await _writeVisibilityProbe(store, bucket);
       }
       if (config.privateBucket case final bucket?) {
@@ -75,6 +93,7 @@ abstract final class DwFileStorageSetup {
             code,
           );
         }
+        if (cors != null) await _setCors(store, bucket, cors);
         await _writeVisibilityProbe(store, bucket);
       }
     } finally {
@@ -99,6 +118,28 @@ abstract final class DwFileStorageSetup {
       },
     ],
   });
+
+  static Future<void> _setCors(
+    DwObjectStore store,
+    String bucket,
+    String cors,
+  ) async {
+    final response = await store.send(
+      'PUT',
+      bucket: bucket,
+      query: [('cors', '')],
+      body: utf8.encode(cors),
+      headers: {'content-type': 'application/xml'},
+    );
+    final code = await DwObjectStore.errorCodeOf(response);
+    if (response.statusCode >= 300) {
+      throw DwStorageException(
+        'PUT CORS of $bucket',
+        response.statusCode,
+        code,
+      );
+    }
+  }
 
   static Future<void> _create(DwObjectStore store, String bucket) async {
     final region = store.config.region;

@@ -54,6 +54,13 @@ Future<void> main(List<String> arguments) async {
           publicBucket: stack.publicBucketName,
           privateBucket: stack.privateBucketName,
         ),
+      if (stack.storageOrigin case final origin?)
+        for (final bucket in [stack.publicBucketName, stack.privateBucketName])
+          () => probe.storageCors(
+            storageOrigin: origin,
+            bucket: bucket,
+            appOrigin: stack.appOrigin,
+          ),
     ];
     for (final check in checks) {
       final result = await check();

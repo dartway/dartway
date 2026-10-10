@@ -72,6 +72,26 @@ void main() {
         _local(id).evaluate(contextFor(stack ?? stackFrom()));
 
     test(
+      'web-backend-url: old ARG builds receive their backend origin',
+      () async {
+        write(
+          'shop_flutter/Dockerfile',
+          'FROM flutter\nARG DW_BACKEND_URL\n'
+              r'RUN test -n "$DW_BACKEND_URL"'
+              '\n',
+        );
+        final verdict = await evaluate('web-backend-url');
+        expect(verdict.passed, true);
+        expect(verdict.detail, contains('https://app.example.com'));
+      },
+    );
+
+    test('web-backend-url: origin-based builds need no argument', () async {
+      write('shop_flutter/Dockerfile', 'FROM flutter\nRUN flutter build web\n');
+      expect((await evaluate('web-backend-url')).skipped, true);
+    });
+
+    test(
       'secret-names: a required secret the compose file sets is refused',
       () async {
         final verdict = await evaluate(

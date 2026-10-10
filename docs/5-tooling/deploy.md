@@ -79,10 +79,11 @@ SSH credentials and `KAMAL_REGISTRY_PASSWORD`. `ssh_user` comes from the target.
 The Studio check image reads a checkout mounted read-only at `/project`, with
 `--project /project --env stage` (or `prod`). It verifies TLS by making HTTPS
 requests, health on both hosts, the live socket hello, web caching and bundled
-storage visibility, and exits nonzero on a failure. With bundled storage, the API's
+storage visibility and CORS preflights on both buckets, and exits nonzero on a failure.
+With bundled storage, the API's
 `DW_STORAGE_PROVISION=true` makes `DwFileStorageSetup.provision` create both buckets,
-set their policies and write the visibility probe into each before serving. This
-works with `DW_STORAGE_VERIFY_BUCKETS=false`; Kamal has no `storage-init` service.
+set their policies, configure GET/PUT CORS for `DW_ALLOWED_ORIGINS`, and write the
+visibility probe into each before serving. This works with `DW_STORAGE_VERIFY_BUCKETS=false`; Kamal has no `storage-init` service.
 
 The check image tag follows the resolved `dartway_cli`: Git uses the lock's resolved ref SHA, path uses the checkout's
 HEAD, and pub.dev uses the lock's exact version. A path dependency on a vendored

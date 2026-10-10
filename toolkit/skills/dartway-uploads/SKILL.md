@@ -104,7 +104,9 @@ configures both buckets — only on a storage the project owns. The server probe
 refuses on any mismatch; never loosen the probe (`DW_STORAGE_VERIFY_BUCKETS=false` only for a deployed
 storage reachable only through something that starts after the server, checked from outside instead). The endpoint must be reachable **from the device** (it
 is signed into every URL): a phone or an Android emulator needs the machine's LAN address. A browser
-uploads cross-origin: the buckets' CORS allows `PUT` with `content-type` and `if-none-match`. Never log
+uploads cross-origin: the buckets' CORS allows `PUT` with `content-type` and `if-none-match`.
+On storage the project owns, `DwFileStorageSetup.provision` sets GET/PUT CORS on both buckets
+from `DW_ALLOWED_ORIGINS` (or its `allowedOrigins` argument), just as Compose `storage-init` does. Never log
 a key, an upload URL or a private link. Moving storage or renaming a bucket: copy each object into its
 visibility's new bucket under the same key — `dw_stored_file` names no bucket, so the rows need nothing.
 

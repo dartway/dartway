@@ -15,7 +15,8 @@ its checks and every page look fine. `dart run dartway_cli:dartway deploy check`
 
 `<project>_flutter/Dockerfile`, in the build stage, right after `flutter build web`:
 
-    RUN flutter build web --release
+    RUN flutter build web --release \
+        --dart-define="DW_BACKEND_URL=${DW_BACKEND_URL}"
     + RUN chmod -R a+rX build/web
 
 If you already normalise the modes in the runtime stage (`RUN chmod -R a+rX /usr/share/nginx/html`),

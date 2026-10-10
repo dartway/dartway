@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartway_core_shared/src/files/dw_storage_cors.dart';
 import 'package:path/path.dart' as p;
 
 import 'deploy_target.dart';
@@ -209,6 +210,7 @@ class DwStackRenderer {
       ..writeln('      context: ${_q(buildContext)}')
       ..writeln('      dockerfile: ${_q('${stack.flutterPackage}/Dockerfile')}')
       ..writeln('      args:')
+      ..writeln('        DW_BACKEND_URL: ${_q(stack.appOrigin)}')
       ..writeln(
         '        # Where this build answers, for the Studio binding: it '
         'admits a Studio',
@@ -435,16 +437,7 @@ class DwStackRenderer {
         },
       ],
     });
-    final cors = jsonEncode({
-      'CORSRules': [
-        {
-          'AllowedOrigins': [stack.appOrigin],
-          'AllowedMethods': ['GET', 'PUT'],
-          'AllowedHeaders': ['*'],
-          'MaxAgeSeconds': 3000,
-        },
-      ],
-    });
+    final cors = DwStorageCorsRule([stack.appOrigin]).json;
     String aws(String rest) => 'aws --endpoint-url $endpoint $rest';
     return [
       'set -e',
