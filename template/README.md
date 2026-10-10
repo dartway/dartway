@@ -139,10 +139,10 @@ rule, works too.
 On a private repository a required check needs a paid GitHub plan, and the
 runs spend the plan's minutes.
 
-`ci` runs on `ubuntu-latest` unless the repository or organisation variable
-`DW_CI_RUNS_ON` names other runner labels, as JSON: `["self-hosted","ci-nl"]`
-moves the job onto a self-hosted runner carrying those labels (Settings →
-Secrets and variables → Actions → Variables). Set on the organisation, it moves
+Both `ci.yml` and `claude-review.yml` run on `ubuntu-latest` unless the repository
+or organisation variable `DW_CI_RUNS_ON` names other runner labels, as JSON:
+`["self-hosted","ci-nl"]` moves both jobs onto a self-hosted runner carrying those
+labels (Settings → Secrets and variables → Actions → Variables). Set on the organisation, it moves
 every project at once. The runner needs Linux with Docker: the Postgres service
 and the acceptance gate's containers run there.
 
