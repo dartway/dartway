@@ -121,6 +121,122 @@ void main() {
     });
   });
 
+  group('reconnect', () {
+    test(
+      'a single request catches up on a publication during the gap',
+      () async {
+        final h = Harness()..serveRooms();
+        await h.start();
+        final watch = h.client.watch(const GetRoom(1));
+        await settle();
+        expect(dataOf(watch.state), a);
+        expect(watch.isLive, isTrue);
+
+        await h.disconnectLive();
+        const changed = RoomView(id: 1, name: 'changed in the gap', rank: 10);
+        h.rooms = [changed, b];
+        h.server.publish(const DwLiveChannel(AppChannel.room, 1), [changed]);
+        await settle();
+        expect(dataOf(watch.state), a);
+        expect(watch.isLive, isFalse);
+
+        h.server.acceptsConnections = true;
+        await until(
+          () => watch.isLive && !(watch.state as DwRequestData).refreshing,
+        );
+        await settle();
+        expect(dataOf(watch.state), changed);
+        expect(h.server.requestsOf<GetRoom>(), hasLength(2));
+      },
+    );
+
+    test(
+      'a list catches up on an insert and a deletion during the gap',
+      () async {
+        final h = Harness()..serveRooms();
+        await h.start();
+        final watch = h.client.watch(const ListRooms());
+        await settle();
+        expect(dataOf(watch.state), [a, b]);
+        expect(watch.isLive, isTrue);
+
+        await h.disconnectLive();
+        h.rooms = [c, b];
+        h.server.publish(roomsChannel, [
+          c,
+          DwDeletedObject.of<RoomView>(a.id, roomsProtocol),
+        ]);
+        await settle();
+        expect(dataOf(watch.state), [a, b]);
+        expect(watch.isLive, isFalse);
+
+        h.server.acceptsConnections = true;
+        await until(
+          () => watch.isLive && !(watch.state as DwRequestData).refreshing,
+        );
+        await settle();
+        expect(dataOf(watch.state), [c, b]);
+        expect(h.server.requestsOf<ListRooms>(), hasLength(2));
+      },
+    );
+
+    test(
+      'a publication during the reconnect read survives its older answer',
+      () async {
+        final h = Harness()..serveRooms();
+        await h.start();
+        final watch = h.client.watch(const GetRoom(1));
+        await settle();
+        expect(dataOf(watch.state), a);
+        expect(watch.isLive, isTrue);
+
+        await h.disconnectLive();
+        const inGap = RoomView(id: 1, name: 'in the gap', rank: 10);
+        const newer = RoomView(id: 1, name: 'after resubscribe', rank: 10);
+        const channel = DwLiveChannel(AppChannel.room, 1);
+        h.rooms = [inGap, b];
+        h.server.publish(channel, [inGap]);
+        final gate = Gate();
+        addTearDown(gate.open);
+        var readStarted = false;
+        h.server.onRequest<GetRoom>((request, call) async {
+          final snapshot = h.rooms.firstWhere(
+            (room) => room.id == request.roomId,
+          );
+          readStarted = true;
+          await gate.passed;
+          return DwCallOk(snapshot);
+        });
+
+        h.server.acceptsConnections = true;
+        await until(() => readStarted);
+        expect(h.server.subscriberCount(channel), 1);
+        expect(watch.isLive, isTrue);
+        expect((watch.state as DwRequestData).refreshing, isTrue);
+
+        h.rooms = [newer, b];
+        h.server.publish(channel, [newer]);
+        await until(() => dataOf(watch.state) == newer);
+        expect(
+          (watch.state as DwRequestData).refreshing,
+          isTrue,
+          reason: 'the read is still held',
+        );
+
+        gate.open();
+        await until(() => !(watch.state as DwRequestData).refreshing);
+        await settle();
+        expect(dataOf(watch.state), newer);
+        expect(h.server.requestsOf<GetRoom>(), hasLength(2));
+        expect(
+          (h.server.callsOf<GetRoom>().last.response as DwApiOk).result,
+          inGap.toJson(),
+          reason: 'the reconnect read really answered with the older snapshot',
+        );
+      },
+    );
+  });
+
   group('sharing and reference counting', () {
     test(
       'equal requests share one entry: one fetch, one subscription',

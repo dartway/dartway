@@ -5,6 +5,10 @@
 - Template: the app reads its version from the platform; `app_version.dart` and its
   version-equality test are removed. Release builds pass `--build-number` (#521).
 
+- Migration: projects created before #495 must hold their committed locks in CI with
+  `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
+  [the migration note](../../docs/migrations/2026-10-10-ci-holds-the-locks.md) (#529).
+
 - Deploy: a failed migration restores the healthy previous server on the containerd image store,
   with its live socket serving again without manual recovery (#519).
 
@@ -19,10 +23,17 @@
   the cache bytes shared with kept images. A cleanup failure closes its progress step and warns at
   exit 0; `--resume` retries cleanup and failed outside probes (#507, #519).
 
+- The toolkit's `dartway-migrations` requires expand, then contract across production releases
+  so the previous image can run on the new schema (#520). Contracting decisions and the
+  `dartway-finish` review gate reject contractions shipped with the code that stops using the old
+  shape; rename, nullability and default guidance now accounts for released readers and writers.
+
 - Toolkit: tests are mandatory only for six risk classes; other tests are rare and must pass the
   `dartway-testing` gate. Agent rules govern expectations and assertion changes. `dartway-plan`
   selects **Risks to guard** with a class and expected outcome, and the feature scaffold adds only
   risk-owned tests, including access refusals and restricted-channel leak checks (#517).
+
+- Toolkit: align checkup with must-test risk classes and clarify the scaffold's restricted-channel leak check (#528).
 
 - The template's Claude review job uses the same `DW_CI_RUNS_ON` expression as `ci.yml`, so one
   repository or organisation variable moves both jobs onto self-hosted runners. The review's
@@ -34,6 +45,16 @@
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
   then passes on the same commit without changes is quarantined with a linked record rather than
   re-running CI until green (#513).
+
+- `dartway test` defaults `--database-url` and `--storage-url` from `DW_TEST_DATABASE_URL` and
+  `DW_TEST_STORAGE_URL`; flags take precedence, including `--no-storage`, and empty variables
+  count as unset. The run banner and URL refusals name the source, and the existing
+  loopback guard, isolation, cleanup and `--keep` refusal apply. `dartway doctor` reports the
+  environment-selected hosts without credentials and skips the Docker check only when the
+  database URL is set; storage alone still needs Docker for Postgres. Both test URL variables
+  are removed from the suite and service workers' environment, including overridden defaults.
+  Doctor's remote-server refusal explains its loopback requirement and the test command's
+  explicit opt-in; Docker fixes name the test-only variables as well as the flags (#522).
 
 - Toolkit: `dartway-finish` always runs fast gates locally and checks pull-request workflows per
   suite. CI-covered suites run only changed and mirrored tests locally, with a full local fallback

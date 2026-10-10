@@ -65,6 +65,8 @@ subscriptions by themselves.
 **Hearing without reading** — a "new posts" badge: `dw.listen([channels])`, a stream subscribed while
 listened to. Never read a page just to get a subscription; missed publications are not replayed, so the
 exact number comes from a request.
+A phone's network blip is exactly this window, so whatever a screen shows comes from a watched
+request, never from `listen`'s stream.
 
 ## 3. What an update does to a request
 

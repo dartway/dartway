@@ -127,6 +127,18 @@ final class Harness {
     await settle();
   }
 
+  /// Holds the live socket down until [DwFakeServer.acceptsConnections] is
+  /// enabled again, so publications in the gap cannot reach the client.
+  Future<void> disconnectLive() async {
+    server.acceptsConnections = false;
+    await server.dropConnections();
+    await until(
+      () =>
+          server.openConnections.isEmpty &&
+          client.connectionStatus != DwConnectionStatus.connected,
+    );
+  }
+
   /// Takes the reports of type [E] out of [reported] and returns them.
   List<E> takeReported<E>() {
     final taken = reported.whereType<E>().toList();
