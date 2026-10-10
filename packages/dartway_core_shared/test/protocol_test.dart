@@ -173,6 +173,19 @@ void main() {
       ]);
       expect(DwSessionKeyInfo.fromJson(key.toJson()), key);
       expect(protocol.decodeValue<DwSessionKeyInfo>(key.toJson()), key);
+      expect(key.isUsed, isTrue);
+      // Never used: the field is left off the wire and reads back as `null`.
+      final unused = DwSessionKeyInfo(
+        id: 9,
+        accountId: 7,
+        kind: DwSessionKeyKind.personal,
+        label: 'Claude Code',
+        createdAt: created,
+      );
+      expect(unused.toJson().containsKey('lastUsedAt'), isFalse);
+      expect(DwSessionKeyInfo.fromJson(unused.toJson()), unused);
+      expect(unused.lastUsedAt, isNull);
+      expect(unused.isUsed, isFalse);
       final revoked = DwSessionKeyInfo(
         id: 9,
         accountId: 7,

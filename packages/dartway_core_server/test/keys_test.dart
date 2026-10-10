@@ -74,6 +74,37 @@ void main() {
       expect(everything.single['n'], 0);
     });
 
+    test('a key reads as never used until its first call, which is recorded '
+        'though it comes within the touch interval', () async {
+      final (_, session) = await harness().signedIn('first-use@example.com');
+      final (:key, :token) = await accounts().issueKey(
+        session.id,
+        label: 'first use',
+      );
+      expect(key.lastUsedAt, isNull);
+      expect(key.isUsed, isFalse);
+      Future<DwSessionKeyInfo> stored() async => [
+        for (final k in await accounts().listKeys(session.id))
+          if (k.id == key.id) k,
+      ].single;
+      expect((await stored()).lastUsedAt, isNull);
+
+      final tool = harness().caller(token: token);
+      final seen = (await tool.call(const WhichKey())).value(const WhichKey());
+      expect(seen!.lastUsedAt, isNotNull);
+      final used = await stored();
+      expect(used.isUsed, isTrue);
+      expect(used.lastUsedAt, seen.lastUsedAt);
+      expect(used.lastUsedAt!.isBefore(used.createdAt), isFalse);
+
+      await tool.call(const WhichKey());
+      expect(
+        (await stored()).lastUsedAt,
+        used.lastUsedAt,
+        reason: 'later uses within the interval write nothing',
+      );
+    });
+
     test('a command answering the token stores no outcome, so a retry runs '
         'again; a refused one leaves no key', () async {
       final (caller, session) = await harness().signedIn('cmd-key@example.com');

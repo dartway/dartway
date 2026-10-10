@@ -580,6 +580,13 @@ const String wireGolden = r'''
       "lastUsedAt": 1789468800000000,
       "revokedAt": 1789468800000000
     },
+    "dto.sessionKeyInfoUnused": {
+      "id": 5,
+      "accountId": 7,
+      "kind": "app",
+      "label": "",
+      "createdAt": 1789468200000000
+    },
     "dto.startUpload": {
       "purpose": "avatar",
       "fileName": "me.png",

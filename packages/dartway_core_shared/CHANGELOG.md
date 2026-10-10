@@ -2,6 +2,11 @@
 
 ## 0.21.0-dev.17
 
+- **BREAKING:** `DwSessionKeyInfo.lastUsedAt` is `DateTime?` — `null` until the key's first use —
+  and an optional constructor parameter; `isUsed` asks it. Left off the JSON when `null`, like
+  `revokedAt`; a used key encodes as before, and the framework never sends this object to an app,
+  so the protocol version stays (dartway/dartway#397).
+
 - `DwGetFileLink` takes `download` (default `false`): `true` asks for a link that has a browser save
   the file (`attachment`) rather than show it. Written to JSON only when true, so every existing
   encoding is byte-identical and the protocol version stays (dartway/dartway#481).

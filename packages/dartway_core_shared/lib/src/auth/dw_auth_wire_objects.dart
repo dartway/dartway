@@ -259,7 +259,7 @@ final class DwSessionKeyInfo extends DwDataObject {
     required this.kind,
     required this.label,
     required this.createdAt,
-    required this.lastUsedAt,
+    this.lastUsedAt,
     this.revokedAt,
   });
 
@@ -276,9 +276,10 @@ final class DwSessionKeyInfo extends DwDataObject {
   final String label;
   final DateTime createdAt;
 
-  /// When a call last used the key, written at most once per
+  /// When a call last used the key: `null` until its first use, which is
+  /// always written; afterwards it lags by up to
   /// `DwAuthConfig.keyTouchInterval`.
-  final DateTime lastUsedAt;
+  final DateTime? lastUsedAt;
 
   /// When the key was revoked; `null` while it signs calls in.
   final DateTime? revokedAt;
@@ -287,6 +288,9 @@ final class DwSessionKeyInfo extends DwDataObject {
   static const int maxLabelLength = 200;
 
   bool get isRevoked => revokedAt != null;
+
+  /// Whether a call has ever been signed in with the key.
+  bool get isUsed => lastUsedAt != null;
 
   @override
   String get dwTypeName => 'DwSessionKeyInfo';
@@ -298,7 +302,8 @@ final class DwSessionKeyInfo extends DwDataObject {
     'kind': kind.name,
     'label': label,
     'createdAt': DwJsonCodec.encodeDateTime(createdAt),
-    'lastUsedAt': DwJsonCodec.encodeDateTime(lastUsedAt),
+    if (lastUsedAt case final lastUsedAt?)
+      'lastUsedAt': DwJsonCodec.encodeDateTime(lastUsedAt),
     if (revokedAt case final revokedAt?)
       'revokedAt': DwJsonCodec.encodeDateTime(revokedAt),
   };
@@ -310,7 +315,9 @@ final class DwSessionKeyInfo extends DwDataObject {
         kind: DwJsonCodec.decodeEnum(json['kind'], DwSessionKeyKind.values),
         label: json['label']! as String,
         createdAt: DwJsonCodec.decodeDateTime(json['createdAt']),
-        lastUsedAt: DwJsonCodec.decodeDateTime(json['lastUsedAt']),
+        lastUsedAt: json['lastUsedAt'] == null
+            ? null
+            : DwJsonCodec.decodeDateTime(json['lastUsedAt']),
         revokedAt: json['revokedAt'] == null
             ? null
             : DwJsonCodec.decodeDateTime(json['revokedAt']),

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:crypto/crypto.dart';
 import 'package:dartway_core_server/dartway_core_server.dart';
@@ -20,6 +21,9 @@ import 'support/test_app.dart';
 /// Later the column went again: a file's bucket is the one the configuration
 /// names for its visibility (D-138), and a table whose rows of one visibility
 /// are split across buckets stops that migration until they are in one.
+///
+/// A key's `last_used_at` became `NULL` until its first use (D-139): a key
+/// whose time still equals its `created_at` was never touched.
 void main() {
   late DwTestDatabase database;
   late DwPostgresDatabase opened;
@@ -41,6 +45,7 @@ void main() {
       framework.singleWhere((migration) => migration.id == id);
   final bucket = named('20260914_180000_dw_stored_file_bucket');
   final fromConfig = named('20261009_000002_dw_stored_file_bucket_from_config');
+  final lastUsed = named('20261009_000003_dw_auth_key_last_used');
   List<DwDatabaseMigration> upTo(String id) => [
     for (final migration in framework)
       if (migration.id.compareTo(id) <= 0) migration,
@@ -165,6 +170,7 @@ void main() {
       '20260930_000000_dw_setting',
       '20261009_000001_dw_identity_provider_email',
       fromConfig.id,
+      lastUsed.id,
     ]);
     expect(
       (await runner(framework).status()).map((status) => status.state),
@@ -212,7 +218,9 @@ void main() {
     await insertInBucket(3, 'private', 'club-private');
     final before = await storedFiles();
 
-    final run = await runner(framework).apply();
+    final run = await runner(
+      upTo('20261009_000002_dw_stored_file_bucket_from_config'),
+    ).apply();
     expect(run.migrations.map((ref) => ref.id), [fromConfig.id]);
 
     final shape = await storedFileShape();
@@ -258,9 +266,54 @@ void main() {
       "UPDATE dw_stored_file SET bucket = 'club-public' "
       "WHERE visibility = 'public'",
     );
-    final run = await runner(framework).apply();
+    final run = await runner(
+      upTo('20261009_000002_dw_stored_file_bucket_from_config'),
+    ).apply();
     expect(run.migrations.map((ref) => ref.id), [fromConfig.id]);
     expect((await storedFiles()).map((row) => row['id']), [1, 2, 3]);
+  });
+
+  /// `last_used_at` of each key in `dw_auth_key`, by key id.
+  Future<Map<int, DateTime?>> lastUsedAt() async => {
+    for (final row in await opened.db.query(
+      'SELECT id, last_used_at FROM dw_auth_key ORDER BY id',
+    ))
+      row['id']! as int: row['last_used_at'] as DateTime?,
+  };
+
+  test('a key never touched reads NULL, a touched one keeps its time, and '
+      'the column takes no default from then on', () async {
+    await runner(upTo(fromConfig.id)).apply();
+    await opened.db.execute('INSERT INTO dw_account (id) VALUES (1)');
+    for (final id in [1, 2]) {
+      await opened.db.execute(
+        'INSERT INTO dw_auth_key (id, account_id, token_hash, kind, label) '
+        "VALUES (@id, 1, @hash, 'app', '')",
+        params: {
+          'id': id,
+          'hash': Uint8List.fromList([id]),
+        },
+      );
+    }
+    // Key 2 touched by a later call, in a later transaction.
+    await opened.db.execute(
+      "UPDATE dw_auth_key SET last_used_at = created_at + interval '1 minute' "
+      'WHERE id = 2',
+    );
+    final touched = (await lastUsedAt())[2];
+
+    final run = await runner(framework).apply();
+    expect(run.migrations.map((ref) => ref.id), [lastUsed.id]);
+    expect(await lastUsedAt(), {1: null, 2: touched});
+
+    await opened.db.execute(
+      'INSERT INTO dw_auth_key (id, account_id, token_hash, kind, label) '
+      "VALUES (3, 1, @hash, 'personal', 'new')",
+      params: {
+        'hash': Uint8List.fromList([3]),
+      },
+    );
+    expect((await lastUsedAt())[3], isNull);
   });
 }
 
