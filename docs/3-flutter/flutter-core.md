@@ -70,7 +70,7 @@ dw = DwFlutterCore(
 
 | Field | Required by `DwFlutterCore` | What it is for |
 |---|---|---|
-| `appVersion` | yes | The platform version, `<semver>+<build>` (`1.4.2+57`), using build `0` when the platform supplies no build number. Sent as `Dw-App-Version` to label sessions and included in error reports; compatibility is decided by the contract version. |
+| `appVersion` | yes | The platform version, `<semver>+<build>` (`1.4.2+57`), using build `0` when the platform supplies no build number and `0.0.0+0` when the version is empty or its read fails. Sent as `Dw-App-Version` to label sessions and included in error reports; compatibility is decided by the contract version. |
 | `refusalText` | yes | Turns a `DwCallRefusal` — a code with parameters, never a sentence — into words. `dw.action` shows it. See [actions and refusal texts](actions-and-refusal-texts.md). |
 | `readLoadingBuilder` | yes | What a read shows while it loads with no placeholder to draw a skeleton from — in `DwReadBuilder`, `DwPagedListView`, `DwWindowListView`. The kit's, once. See [the data layer](data-layer.md#showing-a-read-dwreadbuilder). |
 | `readFailedBuilder` | yes | What a read shows when it was refused with no `onRefused` branch, failed, or could not reach the server: the kit's view, given a `retry`. |

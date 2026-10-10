@@ -8,7 +8,8 @@ affects:
 
 Projects whose Flutter entrypoint passes a committed `appBuildVersion` constant.
 Apply this change on the next template sync. An empty platform build number maps
-to build `0`; `DwAppVersion` remains strict (`<semver>+<build>`).
+to build `0`; an empty version or a failed platform read uses `0.0.0+0` so startup
+continues. `DwAppVersion` remains strict (`<semver>+<build>`).
 
 ## What to change
 
@@ -25,12 +26,23 @@ to build `0`; `DwAppVersion` remains strict (`<semver>+<build>`).
 
    Future<void> main() async {
      WidgetsFlutterBinding.ensureInitialized();
-     final info = await PackageInfo.fromPlatform();
-     final appVersion = appVersionOf(info);
+     final appVersion = await readAppVersion();
      // Pass appVersion to the application's existing app constructor and run it.
    }
 
-   String appVersionOf(PackageInfo info) => info.buildNumber.isEmpty
+   Future<String> readAppVersion() async {
+     final PackageInfo info;
+     try {
+       info = await PackageInfo.fromPlatform();
+     } catch (_) {
+       return '0.0.0+0';
+     }
+     return appVersionOf(info);
+   }
+
+   String appVersionOf(PackageInfo info) => info.version.isEmpty
+       ? '0.0.0+0'
+       : info.buildNumber.isEmpty
        ? '${info.version}+0'
        : '${info.version}+${info.buildNumber}';
    ```
@@ -47,7 +59,9 @@ and decides nothing about compatibility.
 
 ## How to check
 
-Test `appVersionOf` with a supplied build number and an empty one (`+0`).
+Test `appVersionOf` with a supplied build number and an empty one (`+0`), and
+with an empty version (`0.0.0+0`). Test that `readAppVersion` returns `0.0.0+0`
+when reading the platform version throws.
 Run `flutter test`, then build and run web and a mobile simulator build with
 `--build-number=521`. `AppVersionLabel` should show the marketing version followed
 by `+521`, while `pubspec.yaml` remains unchanged.

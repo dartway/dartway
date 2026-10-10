@@ -4,7 +4,9 @@
 
 - Template: the app reads its version from the platform; `app_version.dart` and its
   version-equality test are removed. An empty platform build number maps to `+0`.
-  Release builds pass `--build-number` (#521).
+  Empty versions and failed platform reads use `0.0.0+0` so startup continues.
+  Release builds pass `--build-number` (#521). See
+  [migration note](../../docs/migrations/2026-10-10-version-from-platform.md).
 
 - Fix: `dartway doctor` always reports Docker, warning that development needs
   `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.

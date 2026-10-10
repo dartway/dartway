@@ -7,7 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  final info = await PackageInfo.fromPlatform();
+  final appVersion = await readAppVersion();
 
   // Firebase, when the build names a project: `--dart-define=FIREBASE_API_KEY=…`
   // with `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID` and
@@ -52,7 +52,7 @@ Future<void> main() async {
 
   DartwayExampleApp(
     baseUrl: Uri.parse(backendUrl),
-    appVersion: appVersionOf(info),
+    appVersion: appVersion,
     pushTransports: [
       if (await firebaseConfigured())
         DwFirebasePush(
@@ -62,6 +62,18 @@ Future<void> main() async {
   ).run();
 }
 
-String appVersionOf(PackageInfo info) => info.buildNumber.isEmpty
+Future<String> readAppVersion() async {
+  final PackageInfo info;
+  try {
+    info = await PackageInfo.fromPlatform();
+  } catch (_) {
+    return '0.0.0+0';
+  }
+  return appVersionOf(info);
+}
+
+String appVersionOf(PackageInfo info) => info.version.isEmpty
+    ? '0.0.0+0'
+    : info.buildNumber.isEmpty
     ? '${info.version}+0'
     : '${info.version}+${info.buildNumber}';
