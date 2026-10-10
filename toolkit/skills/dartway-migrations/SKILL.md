@@ -3,9 +3,10 @@ name: dartway-migrations
 description: >-
   Changing the database schema: row class → generate → `dart run bin/migrate.dart create <name>` →
   review the draft and resolve every decisionRequired (a drop that may be a rename, a NOT NULL
-  column on rows, a type change) → rehash → apply / status / rollback → check. Never edit an applied
-  migration, never import row classes into one, rows change only through m.backfill,
-  dataChecksAfter is the human's. What the server says when it refuses to start over the ledger.
+  column on rows, a type change) → rehash → apply / status / rollback → check. Expand, then contract
+  across releases. Never edit an applied migration, never import row classes into one, rows change
+  only through m.backfill, dataChecksAfter is the human's. What the server says when it refuses to
+  start over the ledger.
   Use when a row class, column, index or foreign key changes, or a migration refuses.
 ---
 
@@ -29,6 +30,32 @@ check                          files sealed, schema parity, up/down/up
 rehash [id ...]                re-seal edited, unapplied migrations
 ```
 
+## Expand, then contract
+
+A **release** here is a deploy to production; without release branches, it is the next production
+deploy carrying the code change. The previous release's code must run on the new schema, both for
+rollback to its image and while old and new code run side by side.
+
+**A release's migrations only expand:** new tables, nullable columns or columns with a default,
+indexes, and constraint relaxations that released readers and writers can still use.
+Relaxing `NOT NULL` to nullable is an expansion only while new code, including backfills, writes
+no `NULL` that released code reads as non-null. Dropping a default that released inserts rely on
+is a contraction.
+
+**Contracting goes out one release later**, once no running code relies on the old shape: a drop,
+a rename, a type change, `NOT NULL` on existing rows, a narrowed constraint, or removing a default
+that released inserts rely on.
+
+A rename takes four steps over two releases:
+
+1. Release N: add the new column or table.
+2. Release N: write both (or backfill).
+3. Release N: switch reads to the new one.
+4. Release N+1: drop the old one.
+
+A type change follows the same steps through a new column. A direct rename is only for a table or
+column **no released code reads**, typically one added in the same unreleased branch.
+
 ## The cycle
 
 A schema change always starts from `create`; a migration written by hand from scratch drifts from the
@@ -46,19 +73,23 @@ diff `check` compares against.
 
    | Decision | Write |
    |---|---|
-   | drop table — removed or renamed? | `m.dropTable('x')`, or `m.sql('ALTER TABLE "old" RENAME TO "new"')` and delete the new table's `createTable` |
-   | drop column — removed or renamed? | `m.dropColumn`, or `m.renameColumn(t, 'old', 'new')` and delete the matching `addColumn` |
-   | add a NOT NULL column to rows | `m.addColumn(t, column, backfill: '<SQL expression>')`, or a default in the row class |
-   | make a column NOT NULL | `m.alterColumnNullability(t, 'c', nullable: false, backfill: '…')` |
-   | change a type | `m.alterColumnType(t, 'c', '<type>', using: '"c"::<type>')` |
+   | drop table — removed or renamed? | `m.dropTable('x')` only in a release after the code stopped reading the old shape; in the same release, expand instead ([rule](#expand-then-contract)). `m.sql('ALTER TABLE "old" RENAME TO "new"')` and deleting the new table's `createTable` is only for a table no released code reads. |
+   | drop column — removed or renamed? | `m.dropColumn` only in a release after the code stopped reading the old shape; in the same release, expand instead ([rule](#expand-then-contract)). `m.renameColumn(t, 'old', 'new')` and deleting the matching `addColumn` is only for a column no released code reads. |
+   | add a NOT NULL column to rows | `m.addColumn(t, column, backfill: '<SQL expression>')` is an expand only if the previous code does not insert into that table; otherwise the column needs a default in the row class. |
+   | make a column NOT NULL | `m.alterColumnNullability(t, 'c', nullable: false, backfill: '…')` only in a release after the code stopped reading the old shape; in the same release, expand instead ([rule](#expand-then-contract)). |
+   | change a type | `m.alterColumnType(t, 'c', '<type>', using: '"c"::<type>')` only in a release after the code stopped reading the old shape; in the same release, expand instead through a new column ([rule](#expand-then-contract)). |
 
-   When changing a `timestamptz` column to a `DwCalendarDay`/PostgreSQL `date`, name the civil zone
-   in the expression: `using: '("c" AT TIME ZONE \'America/Los_Angeles\')::date'`. The zone decides
-   the date for each stored instant; never cast an instant to date without recording that choice.
+   When converting `timestamptz` values to a `DwCalendarDay`/PostgreSQL `date`, name the civil zone
+   in the conversion expression: `("c" AT TIME ZONE 'America/Los_Angeles')::date`. Use it to backfill
+   the new column, or as `using:` for a type change allowed by the [rule](#expand-then-contract).
+   The zone decides the date for each stored instant; never cast an instant to date without recording
+   that choice.
 
    **A drop and an add in one table are usually one rename** — accepting both empties the column on every
-   row. Decisions appear in `down` too; answer them or `down` is `m.irreversible()` (`m.noop()` when
-   nothing to undo). `backfill` is a SQL expression per row, in the migration's transaction. Never
+   row. A direct rename is only for a column no released code reads; otherwise follow the
+   [expand/contract rule](#expand-then-contract). Decisions appear in `down` too; answer them or `down`
+   is `m.irreversible()` (`m.noop()` when nothing to undo). `backfill` is a SQL expression per row,
+   in the migration's transaction. Never
    replace a decision with whatever compiles: a value existing rows cannot derive is the human's.
 4. **Rehash after every edit, before the migration is applied anywhere** (your own database included):
    `dart run bin/migrate.dart rehash`. Keep the `// dart format off` line; never reformat a migration.
