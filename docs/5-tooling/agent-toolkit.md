@@ -81,7 +81,7 @@ skills → `dartway-finish`.
 | `dartway-navigation` | The router: zones, route descriptors, guards |
 | `dartway-ui-kit` | The kit as source inside the app, and the ban on raw styles outside it |
 | `dartway-on-device` | What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |
-| `dartway-finish` | The definition of done before a commit or PR: audit the diff, apply only what is confirmed |
+| `dartway-finish` | Before a commit or PR: fast gates and changed/mirrored tests locally when CI carries full suites, full local fallback otherwise; audit the diff and apply only what is confirmed |
 | `dartway-update` | Plan an exact target, resolve the plugin, apply and verify notes, then record dispositions |
 | `dartway-push-delivery` | Server-side push delivery |
 | `dartway-analytics` | Events tracked in the app and on the server, stored in the project's Postgres |

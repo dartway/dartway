@@ -242,7 +242,17 @@ screen, so settling by frames waits out the timeout instead of the traffic.
 
 ## Before calling a change done
 
-The order the setup brief (`dartway quickstart`) gives an agent, from the project root:
+`dartway-finish` owns the gate list and runs fast gates locally: generation, the migration check
+when row classes or migrations changed, all three analyzers, and the conventions checker. It reads
+pull-request workflows per suite. Where CI runs a full suite, finish runs changed tests and tests
+in the directory mirroring each changed `lib/` file locally. A file with no mirror, including
+support, wiring or migrations, requires that package's full suite locally. An uncovered suite runs
+locally in full; with no workflow, all three do, reported as "no CI workflow: full suites run locally".
+The report names each gate's result, local test files and the workflow carrying each full suite (or
+"full suites: run locally, no CI"). After applying edits, the same rule selects the gates and targeted
+tests to re-run. `dartway-checkup` is a project audit and always runs every suite in full locally.
+
+The setup brief (`dartway quickstart`) lists the full-suite commands, from the project root:
 
 ```bash
 (cd <project>_flutter && dart run dartway_cli:dartway generate --check --contract-base <trusted-SHA>)
@@ -263,9 +273,13 @@ request, and every one runs even after an earlier one failed.
 The monorepo tests itself in four tiers, split by what a run needs.
 
 **`tool/checks.sh [analyze|test|services]`** — `analyze` and `test` by default, which need no
-Docker; the same command locally and in CI (`.github/workflows/checks.yml`, on every pull request
-and push to `master`, one job per mode, all three). It resolves the workspace and every package
-outside it, then:
+Docker. CI (`.github/workflows/checks.yml`, on every pull request and push to `master`, one job per
+mode, all three) runs tier 1 in full. Before a PR, run `dart analyze` over touched resolution roots,
+`dart run dartway_cli:dartway check` when `template/` or `example/` changed, and the touched packages'
+suites (`dart test`
+or `flutter test` in each package, or `tool/checks.sh services` for a services package). A completed
+run means those suites are green locally and `checks.yml` is green on the PR. The full script
+resolves the workspace and every package outside it, then:
 
 - **analyze**: `dart analyze --no-fatal-warnings` over `packages` and `tool`, and in every package
   that is not a workspace member. Errors fail; warnings do not, because the one standing warning is
