@@ -366,17 +366,21 @@ if [ ! -f '$_journalDirectory/$service.previous' ]; then
     container_image=\$(docker inspect -f '{{.Image}}' "\$previous_container")
     # With attestations .Image may be a platform manifest which Docker
     # cannot inspect. A tag is safe only if its exported image still holds
-    # this exact container; a failed earlier build may already have moved it.
+    # this exact container. An interrupted earlier deployment may have moved
+    # the name after pinning the serving image as dw-previous: try both.
     if ! docker image inspect -f '{{.Id}}' "\$container_image" >'$_journalDirectory/$service.previous.tmp' 2>/dev/null; then
-      if ! docker image inspect -f '{{.Id}}' "\$image_name" >'$_journalDirectory/$service.previous.tmp' 2>/dev/null; then
-        echo "Cannot resolve the running $service image (\$container_image); refusing to record a rollback image." >&2
-        exit 1
-      fi
-      candidate=\$(cat '$_journalDirectory/$service.previous.tmp')
-      holders=\$(docker ps -aq --no-trunc --filter "ancestor=\$candidate")
+      : >'$_journalDirectory/$service.previous.tmp'
       full_container=\$(docker inspect -f '{{.Id}}' "\$previous_container")
-      if ! printf '%s\\n' "\$holders" | grep -Fxq "\$full_container"; then
-        echo "Cannot resolve the running $service image (\$container_image): \$image_name points to a different image; refusing to record a rollback image." >&2
+      for name in "\$image_name" '${target.projectName}-$service:dw-previous'; do
+        candidate=\$(docker image inspect -f '{{.Id}}' "\$name" 2>/dev/null) || continue
+        holders=\$(docker ps -aq --no-trunc --filter "ancestor=\$candidate")
+        if printf '%s\\n' "\$holders" | grep -Fxq "\$full_container"; then
+          printf '%s\\n' "\$candidate" >'$_journalDirectory/$service.previous.tmp'
+          break
+        fi
+      done
+      if [ ! -s '$_journalDirectory/$service.previous.tmp' ]; then
+        echo "Cannot resolve the running $service image (\$container_image): neither \$image_name nor ${target.projectName}-$service:dw-previous holds the running container; refusing to record a rollback image." >&2
         exit 1
       fi
     fi
@@ -883,19 +887,26 @@ $dwDiskSpaceFunction
 $dwDockerRootScript
 space=\$(dw_disk_space "\$dw_docker_root")
 before=\$(printf '%s\\n' "\$space" | awk '{print \$3}')
+# One line per cache record: whether it is shared with an image, and its size.
 dw_cache_stats() {
-  docker system df --format '{{if eq .Type "Build Cache"}}{{.TotalCount}} {{.Size}}{{end}}'
+  docker system df -v --format '{{range .BuildCache}}{{.Shared}} {{.Size}}{{println}}{{end}}'
 }
+# Bytes of the records whose sharing is \$2 (true or false).
 dw_cache_bytes() {
-  printf '%s\\n' "\$1" | awk 'NF {
-    size=\$2; value=size+0; sub(/^[0-9.]+/, "", size)
-    units["B"]=1; units["kB"]=1000; units["MB"]=1000000; units["GB"]=1000000000; units["TB"]=1000000000000
-    if (!(size in units)) exit 1
-    printf "%.0f\\n", value*units[size]; found=1
-  } END {if (!found) exit 1}'
+  printf '%s\\n' "\$1" | awk -v shared="\$2" '
+    BEGIN {units["B"]=1; units["kB"]=1000; units["MB"]=1000000; units["GB"]=1000000000; units["TB"]=1000000000000}
+    NF {
+      if (\$1 != "true" && \$1 != "false") exit 1
+      size=\$2; value=size+0; sub(/^[0-9.]+/, "", size)
+      if (!(size in units)) exit 1
+      if (\$1 == shared) total+=value*units[size]
+    } END {printf "%.0f\\n", total}'
+}
+dw_cache_count() {
+  printf '%s\\n' "\$1" | awk 'NF {count++} END {print count+0}'
 }
 cache=\$(dw_cache_stats)
-cache_before=\$(printf '%s\\n' "\$cache" | awk 'NF {print \$1}')
+cache_before=\$(dw_cache_count "\$cache")
 removed=0
 code=0
 keep=" "
@@ -927,10 +938,13 @@ done
 # which remain on the daemon, so an unchanged build can reuse their layers.
 docker builder prune -a -f --keep-storage '${target.buildCacheKeep}' >'$_journalDirectory/cleanup-prune.out' || code=1
 cache=\$(dw_cache_stats)
-cache_bytes=\$(dw_cache_bytes "\$cache")
-cache_after=\$(printf '%s\\n' "\$cache" | awk 'NF {print \$1}')
-if [ "\$cache_bytes" -gt ${target.buildCacheKeepBytes} ]; then
-  echo "Build cache remains above ${target.buildCacheKeep}: \$cache_bytes bytes; Docker retains cache references. Inspect docker buildx du --builder default --verbose." >&2
+cache_after=\$(dw_cache_count "\$cache")
+# The budget limits the records no kept image shares. Shared records belong
+# to images on the daemon, and pruning cannot reclaim them while they remain.
+cache_private=\$(dw_cache_bytes "\$cache" false)
+cache_shared=\$(dw_cache_bytes "\$cache" true)
+if [ "\$cache_private" -gt ${target.buildCacheKeepBytes} ]; then
+  echo "Build cache not shared with kept images remains above ${target.buildCacheKeep}: \$cache_private bytes; Docker retains cache references. Inspect docker buildx du --builder default --verbose." >&2
   code=1
 fi
 cache_removed=\$((cache_before - cache_after))
@@ -939,7 +953,7 @@ space=\$(dw_disk_space "\$dw_docker_root")
 after=\$(printf '%s\\n' "\$space" | awk '{print \$3}')
 bytes=\$(((after - before) * 1024))
 [ "\$bytes" -ge 0 ] || bytes=0
-printf '{"images_removed":%s,"cache_records_removed":%s,"freed_bytes":%s}\\n' "\$removed" "\$cache_removed" "\$bytes"
+printf '{"images_removed":%s,"cache_records_removed":%s,"freed_bytes":%s,"cache_shared_bytes":%s}\\n' "\$removed" "\$cache_removed" "\$bytes" "\$cache_shared"
 exit "\$code"
 """);
 
@@ -950,7 +964,12 @@ exit "\$code"
       try {
         final decoded = jsonDecode(line);
         if (decoded is Map<String, dynamic> &&
-            ['images_removed', 'cache_records_removed', 'freed_bytes'].every(
+            [
+              'images_removed',
+              'cache_records_removed',
+              'freed_bytes',
+              'cache_shared_bytes',
+            ].every(
               (key) => decoded[key] is int && (decoded[key] as int) >= 0,
             )) {
           return decoded;

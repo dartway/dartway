@@ -346,6 +346,7 @@ void main() {
         bool healthy = true,
         bool digestResolvable = true,
         bool tagMatchesContainer = true,
+        bool pinned = false,
       }) async {
         final bin = Directory(p.join(temp.path, 'bin'))..createSync();
         final docker = File(p.join(bin.path, 'docker'))
@@ -359,8 +360,10 @@ case "\$*" in
   "inspect -f {{.Image}}"*) echo sha256:previous ;;
   "inspect -f {{.Id}}"*) echo old-container ;;
   "image inspect -f {{.Id}} sha256:previous") ${digestResolvable ? 'echo sha256:previous' : 'exit 1'} ;;
+  "image inspect -f {{.Id}} shop-server:dw-previous") ${pinned ? 'echo sha256:previous' : 'exit 1'} ;;
   "image inspect -f {{.Id}}"*) echo ${tagMatchesContainer ? 'sha256:previous' : 'sha256:unserved'} ;;
-  "ps -aq --no-trunc --filter ancestor="*) ${tagMatchesContainer ? 'echo old-container' : 'echo other-container'} ;;
+  "ps -aq --no-trunc --filter ancestor=sha256:previous") echo old-container ;;
+  "ps -aq --no-trunc --filter ancestor="*) echo other-container ;;
   *" run --rm --no-deps -T -e DW_MIGRATE_ONLY=true server"*) ${migrationFails ? 'echo "migration 42 failed" >&2; exit 1' : 'echo migrated'} ;;
   *"{{.State.Status}}"*) echo "running ${healthy ? 'healthy' : 'unhealthy'} 0 0" ;;
 esac
@@ -442,6 +445,27 @@ exit 0
             at(calls, 'image tag sha256:previous shop-server:dw-previous'),
             isNot(-1),
           );
+        },
+      );
+
+      test(
+        'a moved tag falls back to the pin that still holds the container',
+        () async {
+          // An interrupted deployment pinned the serving image and moved the
+          // tag; the next fresh deployment must not be refused.
+          final (result, calls) = await replace(
+            digestResolvable: false,
+            tagMatchesContainer: false,
+            pinned: true,
+          );
+          expect(result.ok, isTrue, reason: result.stderr);
+          expect(
+            File(
+              p.join(temp.path, 'state/deploy-run/server.previous'),
+            ).readAsStringSync().trim(),
+            'sha256:previous',
+          );
+          expect(at(calls, 'image tag sha256:unserved'), -1);
         },
       );
 
@@ -792,7 +816,9 @@ esac
           final fail = File(p.join(temp.path, 'fail'));
           if (!stuckCache) fail.writeAsStringSync('');
           final stats = File(p.join(temp.path, 'cache-stats'))
-            ..writeAsStringSync(stuckCache ? '105 11GB' : '0 0B');
+            // Only the unshared record counts against the budget; the shared
+            // one belongs to a kept image and is reported, not warned about.
+            ..writeAsStringSync(stuckCache ? 'false 11GB\ntrue 2GB\n' : '');
           final docker = File(p.join(bin.path, 'docker'))
             ..writeAsStringSync('''
 #!/bin/sh
@@ -841,7 +867,10 @@ esac
           );
           expect(
             first.human,
-            contains('0 images, 0 cache records removed, 0 bytes freed'),
+            contains(
+              '0 images, 0 cache records removed, 0 bytes freed; '
+              '${stuckCache ? 2000000000 : 0} bytes of build cache shared',
+            ),
           );
           final warning = first.events.singleWhere(
             (event) => event['event'] == 'cleanup',
@@ -850,6 +879,7 @@ esac
           expect(warning['images_removed'], 0);
           expect(warning['cache_records_removed'], 0);
           expect(warning['freed_bytes'], 0);
+          expect(warning['cache_shared_bytes'], stuckCache ? 2000000000 : 0);
           expect(
             warning['message'],
             contains(
@@ -874,7 +904,9 @@ esac
             containsPair('exit_code', 1),
           );
           if (fail.existsSync()) fail.deleteSync();
-          stats.writeAsStringSync('0 0B');
+          // Shared cache above the 10GB budget is held by kept images: the
+          // resumed cleanup reports it and succeeds.
+          stats.writeAsStringSync('true 11GB\n');
           final ids = DwDeployRunner(
             ssh: RecordingSsh(),
             stack: stackFrom(),
@@ -892,12 +924,11 @@ esac
           expect(second.code, 0);
           expect(resumed.started, hasLength(1));
           expect(resumed.started.single.command, contains("'cleanup'"));
-          expect(
-            second.events.singleWhere(
-              (event) => event['event'] == 'cleanup',
-            )['warning'],
-            isFalse,
+          final resumedCleanup = second.events.singleWhere(
+            (event) => event['event'] == 'cleanup',
           );
+          expect(resumedCleanup['warning'], isFalse);
+          expect(resumedCleanup['cache_shared_bytes'], 11000000000);
         },
       );
     }

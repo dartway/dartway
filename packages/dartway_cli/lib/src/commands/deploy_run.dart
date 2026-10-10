@@ -425,7 +425,9 @@ Future<String?> executeDeploySteps(
         out.writeln(
           '  Cleanup: ${summary['images_removed']} images, '
           '${summary['cache_records_removed']} cache records removed, '
-          '${summary['freed_bytes']} bytes freed.',
+          '${summary['freed_bytes']} bytes freed; '
+          '${summary['cache_shared_bytes']} bytes of build cache shared with '
+          'kept images.',
         );
       }
       report.event('cleanup', {

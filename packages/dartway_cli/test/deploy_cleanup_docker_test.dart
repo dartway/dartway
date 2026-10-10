@@ -105,37 +105,38 @@ echo ok >/stack/health
           "docker inspect -f '{{.Image}}' \"\$(cd /stack && docker compose ps -q server)\"",
         );
         expect(serving.ok, isTrue);
-        // An earlier build moved the tag but failed before the server step
-        // without a durable rollback pin; the original container still serves.
+        // An earlier deployment pinned the serving image, moved the tag with
+        // its build, and stopped before the server step (interrupted, or the
+        // other service's build failed); the next fresh one drops its journal.
         expect(
           (await shell.run(
             'rm -rf /state/deploy-run; echo bad >/stack/health',
           )).ok,
           isTrue,
         );
-        final interrupted = await shell.run(
-          'cd /stack && docker compose build',
-        );
+        final interrupted = await runner.build();
         expect(interrupted.ok, isTrue, reason: interrupted.stderr);
+        final moved = await shell.run(
+          "docker image inspect -f '{{.Id}}' shop-server:latest",
+        );
+        expect(moved.stdout.trim(), isNot(serving.stdout.trim()));
+        // A second fresh deployment must record the serving image, not the
+        // unserved build, and its failed server must give that image back.
         expect((await shell.run('rm -rf /state/deploy-run')).ok, isTrue);
         final fresh = await runner.build();
-        if (!fresh.ok) {
-          expect(
-            fresh.stderr,
-            contains('Cannot resolve the running server image'),
-          );
-          expect(
-            (await shell.run('test ! -f /state/deploy-run/server.previous')).ok,
-            isTrue,
-          );
-        } else {
-          final failed = await runner.replaceServer();
-          expect(failed.ok, isFalse);
-          expect(
-            failed.stderr,
-            contains('the previous server is running again'),
-          );
-        }
+        expect(fresh.ok, isTrue, reason: '${fresh.stdout}\n${fresh.stderr}');
+        final recorded = await shell.run(
+          "docker image inspect -f '{{.Id}}' \"\$(cat /state/deploy-run/server.previous)\"",
+        );
+        final pinned = await shell.run(
+          "docker image inspect -f '{{.Id}}' shop-server:dw-previous",
+        );
+        expect(recorded.stdout.trim(), isNotEmpty, reason: recorded.stderr);
+        expect(recorded.stdout.trim(), pinned.stdout.trim());
+        expect(recorded.stdout.trim(), isNot(moved.stdout.trim()));
+        final failed = await runner.replaceServer();
+        expect(failed.ok, isFalse);
+        expect(failed.stderr, contains('the previous server is running again'));
         final recovered = await shell.run(
           "docker inspect -f '{{.Image}}' \"\$(cd /stack && docker compose ps -q server)\"",
         );
@@ -145,6 +146,18 @@ echo ok >/stack/health
           'dw_wait_healthy "\$(cd /stack && docker compose ps -q server)" rollback',
         );
         expect(healthy.ok, isTrue, reason: healthy.stderr);
+        // And the stand deploys again: a fixed build replaces the server.
+        expect(
+          (await shell.run(
+            'rm -rf /state/deploy-run; echo ok >/stack/health',
+          )).ok,
+          isTrue,
+        );
+        final fixed = await runner.build();
+        expect(fixed.ok, isTrue, reason: fixed.stderr);
+        final replaced = await runner.replaceServer();
+        expect(replaced.ok, isTrue, reason: replaced.stderr);
+        expect((await runner.startWeb()).ok, isTrue);
       },
     );
 
@@ -244,15 +257,17 @@ docker tag nginx:fixture shop-web:accessory
               .steps(skipGitUpdate: true)
               .singleWhere((step) => step.id == 'cleanup');
           final cleaned = await cleanup.run();
-          // Kept images plus the current source exceed the 4 MB budget. Preserve their
-          // keys and warn; the private cache must still respect the budget.
+          // Kept images plus the current source exceed the 4 MB budget. Their
+          // shared keys are kept and reported; only the private cache is
+          // held to the budget, so cleanup succeeds without a warning.
           expect(
             cleaned.exitCode,
-            1,
+            0,
             reason: '${cleaned.stdout}\n${cleaned.stderr}',
           );
-          expect(cleaned.stderr, contains('Docker retains cache references'));
-          expect(DwDeployRunner.cleanupReport(cleaned), isNotNull);
+          expect(cleaned.stderr.trim(), isEmpty);
+          final report = DwDeployRunner.cleanupReport(cleaned);
+          expect(report, isNotNull, reason: cleaned.stdout);
           final privateCache = await shell.run(
             "docker buildx du --builder default --format '{{if not .Shared}}{{.Size}}{{end}}'",
           );
@@ -265,6 +280,13 @@ docker tag nginx:fixture shop-web:accessory
             privateBytes,
             lessThanOrEqualTo(4 * 1024 * 1024),
             reason: privateCache.stdout,
+          );
+          // At this size the whole cache is over the budget: the shared part
+          // is what the kept images hold.
+          expect(
+            privateBytes + (report!['cache_shared_bytes'] as int),
+            greaterThan(4 * 1000 * 1000),
+            reason: cleaned.stdout,
           );
           final usage = await shell.run(
             "docker system df --format '{{json .}}'",

@@ -424,7 +424,8 @@ converges with one `dart run dartway_cli:dartway deploy setup`, followed by
     project, keeping both rollback images and every image still used by a container, then trims the
     build cache with the `build_cache_keep` budget, retaining shared cache keys for kept images.
     Other stacks' images, Postgres, RustFS, Nginx and certbot are preserved. Cleanup reports the
-    removed image and cache-record counts and bytes freed in one line. A cleanup failure is a warning;
+    removed image and cache-record counts, bytes freed, and the build cache bytes shared with kept
+    images in one line. A cleanup failure is a warning;
     the deploy still exits 0.
     `--resume` retries only cleanup, without replacing services or repeating outside probes.
 
@@ -461,12 +462,15 @@ minimum; free space or lower `min_free_disk` in `deploy/config.yaml` before tryi
 **Disk.** A successful deploy cleans its old images automatically, including images left by earlier
 runs. The server and web rollback images are pinned before building and recorded in the deployment
 journal, so a resume keeps the same targets. If a container image digest cannot be inspected,
-the tag is accepted only when Docker proves that image still holds the running container. A tag
-moved by an earlier interrupted build is refused before stopping the service. Images go before cache:
+the tag is accepted only when Docker proves that image still holds the running container. After
+an interrupted deployment moved the tag, the next fresh deploy recovers by itself: it tries the
+`<project>-<service>:dw-previous` pin that deployment left, under the same proof. When neither
+holds the running container, it is refused before stopping the service. Images go before cache:
 the containerd image store shares BuildKit snapshots with exported images. Every prune uses
 `--keep-storage` with `build_cache_keep`; shared cache keys for retained images survive so unchanged
-builds can reuse their layers. Docker excludes shared bytes from that budget. If retained image references keep the reported cache above
-the limit, cleanup warns rather than removing their cache keys. The reported byte count is the
+builds can reuse their layers. Docker excludes shared bytes from that budget, and so does the check
+after the prune: cleanup warns only when the cache no kept image shares stays above the limit, and
+reports the shared bytes as information. The reported byte count is the
 observed increase in free space on Docker's data filesystem (negative changes are reported as zero;
 containerd may reclaim additional bytes asynchronously). The cache limit applies to the Docker daemon's builder across the machine, not only this stack.
 
@@ -504,7 +508,7 @@ reads the events; the prose may change wording at any time, the events may not.
 | `step_skipped` | `index`, `count`, `id` — done by the deployment being resumed |
 | `step_started` | `index`, `count`, `id`, `title`, `picked_up` — waiting for a step already on the server |
 | `step_finished` | `index`, `count`, `id`, `exit_code`; `stdout`, `stderr` for a step whose output is its result |
-| `cleanup` | `images_removed`, `cache_records_removed`, `freed_bytes` when measured; `warning`, optional `message`. A warning leaves `run_finished.exit_code` at 0 |
+| `cleanup` | `images_removed`, `cache_records_removed`, `freed_bytes`, `cache_shared_bytes` when measured; `warning`, optional `message`. A warning leaves `run_finished.exit_code` at 0 |
 | `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`, `exception`); `exit_code`, `stdout`, `stderr` or `message`; `state` (`diskFull` or `vanished`) for a step stopped without an exit code; `resumed: true` when the step failed in the deployment being resumed and was not run again |
 | `services` | `services` (`name`, `status`) |
 | `probe` | `title`, `passed`, `warning`, `detail` |
