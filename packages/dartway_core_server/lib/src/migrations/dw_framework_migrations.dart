@@ -40,6 +40,11 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _identityProviderEmailUp,
     _identityProviderEmailDown,
   ),
+  const _DwSqlMigration(
+    '20261009_000002_dw_stored_file_bucket_from_config',
+    _storedFileBucketFromConfigUp,
+    _storedFileBucketFromConfigDown,
+  ),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
@@ -200,7 +205,8 @@ const List<String> _storedFileDown = ['DROP TABLE dw_stored_file'];
 
 // Public and private files live in two buckets, so a row names its bucket: a
 // file stays where it was uploaded when the configuration names other buckets
-// later, and its object is found — and deleted — there.
+// later, and its object is found — and deleted — there. Reversed by
+// `20261009_000002_dw_stored_file_bucket_from_config` (D-138).
 //
 // No default and no guess for rows that predate the column: they were uploaded
 // to the single bucket `DW_STORAGE_BUCKET` named then, which is neither of the
@@ -299,6 +305,56 @@ const List<String> _identityProviderEmailUp = [
 const List<String> _identityProviderEmailDown = [
   'DROP INDEX dw_identity_provider_email',
   'ALTER TABLE dw_identity DROP COLUMN provider_email',
+];
+
+// A file's bucket is the one the configuration names for its visibility, at
+// every use (D-138): the row says what the file is, the configuration where
+// files are kept. A recorded bucket was a copy of the configuration and half an
+// address — the endpoint was never in it — so a storage moved elsewhere sent
+// every link to a bucket that was not there.
+//
+// A visibility whose rows name more than one bucket stops the migration: its
+// objects are in buckets the configuration no longer names, and only copying
+// them into one bucket under the same key keeps them readable. The failure
+// names each such visibility, its buckets, and the statement that records the
+// copy.
+const List<String> _storedFileBucketFromConfigUp = [
+  r'''
+DO $$
+DECLARE
+  split text := (
+    SELECT string_agg(
+      format(
+        '%s files are in %s — UPDATE dw_stored_file SET bucket = ''<bucket>'' WHERE visibility = %L;',
+        visibility, buckets, visibility
+      ),
+      ' ' ORDER BY visibility
+    )
+    FROM (
+      SELECT visibility,
+        string_agg(DISTINCT bucket, ', ' ORDER BY bucket) AS buckets
+      FROM dw_stored_file
+      GROUP BY visibility
+      HAVING count(DISTINCT bucket) > 1
+    ) AS visibilities
+  );
+BEGIN
+  IF split IS NOT NULL THEN
+    RAISE EXCEPTION 'dw_stored_file keeps files of one visibility in more than one bucket, and from now on a file is read from the one bucket the configuration names for its visibility. Copy those objects, under the same key, into that bucket, record it, then start the server again: %', split;
+  END IF;
+END
+$$''',
+  'ALTER TABLE dw_stored_file DROP CONSTRAINT dw_stored_file_object',
+  'ALTER TABLE dw_stored_file ADD CONSTRAINT dw_stored_file_object_key '
+      'UNIQUE (object_key)',
+  'ALTER TABLE dw_stored_file DROP COLUMN bucket',
+];
+
+const List<String> _storedFileBucketFromConfigDown = [
+  'ALTER TABLE dw_stored_file DROP CONSTRAINT dw_stored_file_object_key',
+  'ALTER TABLE dw_stored_file ADD COLUMN bucket text',
+  'ALTER TABLE dw_stored_file ADD CONSTRAINT dw_stored_file_object '
+      'UNIQUE (bucket, object_key)',
 ];
 
 const List<String> _initialDown = [

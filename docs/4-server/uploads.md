@@ -106,6 +106,13 @@ A bucket is public or private as a whole, never by key prefix: a prefix policy i
 resource away from making every file public, and a storage console shows a bucket's access, not a
 prefix's.
 
+**A `dw_stored_file` row says what the file is — its visibility and key — and the configuration
+says where files are kept** (D-138). Every link, read and deletion resolves the bucket from the
+row's visibility at the moment it runs, so a storage moved to other buckets, or to another storage
+altogether, serves every existing file from the new place once each object is copied there under
+the same key; the rows need nothing. A row whose visibility has no configured bucket fails as an
+incident naming the missing variable.
+
 Who reads a private file is `DwFileStorage.canRead(ctx, DwFileRecord file)`. Without it, only the
 uploader. A `false` answers `dw.forbidden` to a signed-in caller and `401` to an anonymous one, who
 may be allowed after signing in. The example lets chat members read chat attachments: the chat

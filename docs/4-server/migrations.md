@@ -170,7 +170,11 @@ migration id, or names none in `lib/src/migrations/`, is a finding of its own.
   before a file recorded its bucket and names the two statements that record it
   (`ALTER TABLE dw_stored_file ADD COLUMN bucket text; UPDATE dw_stored_file SET bucket = '…'`,
   the bucket `DW_STORAGE_BUCKET` named then); a database that applied its first text is accepted
-  by `supersededChecksums`.
+  by `supersededChecksums`. `20261009_000002_dw_stored_file_bucket_from_config` dropped the column
+  again — a file's bucket is the one the configuration names for its visibility (D-138) — and
+  stops while one visibility's rows name more than one bucket, naming the visibility, the buckets
+  and the statement to run once those objects are copied into one bucket under the same key
+  (`UPDATE dw_stored_file SET bucket = '…' WHERE visibility = '…'`).
 - `app` — the project's.
 
 Project tables may reference framework tables — a profile references `dw_account`, an attachment

@@ -337,9 +337,10 @@ final class DwFileRecord {
 /// the bytes. It answers `DwStartUpload` with a presigned PUT for a key it
 /// builds itself (`<purpose>/<account>/<random>.<ext>`) in the bucket of the
 /// rule's visibility, checks the stored object by `HEAD` on `DwFinishUpload`,
-/// and records every file, with its bucket, in `dw_stored_file`. Uploads that
-/// are not finished are removed with their objects by a framework job once
-/// their ticket and [uploadGrace] have passed.
+/// and records every file, with its visibility and key, in `dw_stored_file`.
+/// A file's bucket is the one [config] names for its visibility, at every
+/// use. Uploads that are not finished are removed with their objects by a
+/// framework job once their ticket and [uploadGrace] have passed.
 final class DwFileStorage {
   DwFileStorage(
     this.config, {

@@ -112,7 +112,7 @@ void main() {
       expect(file.contentType, 'image/png');
       expect(file.byteSize, 40);
       final key = pending.get<String>('object_key');
-      expect(pending['bucket'], storage.publicBucket);
+      expect(await storage.keys(storage.publicBucket), contains(key));
       expect(file.url, '${storage.config.publicBaseUrl}/$key');
       expect(Uri.parse(ticket.uploadUrl).path, '/${storage.publicBucket}/$key');
       expect((await rowOf(ticket.id))['confirmed_at'], isNotNull);
@@ -171,7 +171,6 @@ void main() {
 
       final row = await rowOf(file.id);
       final key = row.get<String>('object_key');
-      expect(row['bucket'], storage.privateBucket);
       expect(await storage.keys(storage.privateBucket), contains(key));
       expect(await storage.keys(storage.publicBucket), isNot(contains(key)));
       final direct = await getUrl(
@@ -747,7 +746,6 @@ void main() {
         expect(stored.byteSize, 30);
         final row = await rowOf(stored.id);
         expect(row['confirmed_at'], isNotNull);
-        expect(row.get<String>('bucket'), storage.privateBucket);
         expect(
           await storage.keys(storage.privateBucket),
           contains(row.get<String>('object_key')),
@@ -772,7 +770,7 @@ void main() {
           );
           expect((await alice.call(command)).status, 409);
           final rows = await harness().db.query(
-            'SELECT confirmed_at, bucket, object_key FROM dw_stored_file '
+            'SELECT confirmed_at, object_key FROM dw_stored_file '
             'WHERE id > @last',
             params: {'last': last},
           );
@@ -809,6 +807,152 @@ void main() {
       expect(answer.status, 500);
       expect(await rowOf(file.id), isNotNull);
       harness().app.alerts.incidents.clear();
+    });
+  });
+
+  // A row says what a file is; the configuration says where files are kept
+  // (dartway/dartway#369). Files uploaded on one pair of buckets, copied to
+  // another under the same keys, are served from the other once the server
+  // runs on it — with the first pair gone.
+  group('a storage moved to other buckets', () {
+    late TestStorage before;
+    late DwTestStorage after;
+    setUpAll(() async {
+      before = await TestStorage.create();
+      after = await DwTestStorage.create();
+    });
+    tearDownAll(() async {
+      await before.drop();
+      await after.drop();
+    });
+    final moved = useFilesHarness(() => before);
+
+    Future<void> restartOn(DwFileStorage files) async {
+      final app = moved().app;
+      await moved().server.stop();
+      moved().server = await DwTestServer.start(
+        app.server(
+          moved().database.config,
+          protocol: filesProtocol,
+          handlers: [...app.handlers(), ...fileHandlers()],
+          files: files,
+          settings: const DwServerSettings(
+            jobPollInterval: Duration(seconds: 30),
+          ),
+        ),
+      );
+    }
+
+    test('serves every file from them', () async {
+      final (owner, session) = await moved().signedIn('mover@example.com');
+      final publicBytes = bytesOf(24, 5);
+      final privateBytes = bytesOf(32, 7);
+      final public = await upload(owner, TestUpload.avatar, bytes: publicBytes);
+      final private = await upload(
+        owner,
+        TestUpload.document,
+        bytes: privateBytes,
+        type: 'text/plain',
+      );
+      final publicKey = (await moved().db.query(
+        'SELECT object_key FROM dw_stored_file WHERE id = @id',
+        params: {'id': public.id},
+      )).single.get<String>('object_key');
+      final privateKey = (await moved().db.query(
+        'SELECT object_key FROM dw_stored_file WHERE id = @id',
+        params: {'id': private.id},
+      )).single.get<String>('object_key');
+
+      // Copied under the same keys, then the old pair dropped.
+      for (final (from, to, key, type) in [
+        (before.publicBucket, after.publicBucket, publicKey, 'image/png'),
+        (before.privateBucket, after.privateBucket, privateKey, 'text/plain'),
+      ]) {
+        final bytes = await before.store.get(from, key, maxBytes: 64);
+        await before.putDirectly(to, key, bytes!, type);
+      }
+      await TestStorage.dropBuckets(before.store, [
+        before.publicBucket,
+        before.privateBucket,
+      ]);
+      await restartOn(testStorage(after.config));
+      final caller = moved().caller(token: session.token);
+
+      final urls = ResolveUrls([public.id]);
+      final resolved = (await caller.call(urls)).value(urls).urls;
+      expect(resolved, {
+        '${public.id}': '${after.config.publicBaseUrl}/$publicKey',
+      });
+      expect((await getUrl(resolved['${public.id}']!)).bytes, publicBytes);
+
+      final request = DwGetFileLink(fileId: private.id);
+      final link = (await caller.call(request)).value(request);
+      expect(Uri.parse(link.url).path, '/${after.privateBucket}/$privateKey');
+      final fetched = await getUrl(link.url);
+      expect(fetched.status, 200);
+      expect(fetched.bytes, privateBytes);
+
+      final read = ReadAsServer(private.id);
+      final answer = (await caller.call(read)).value(read).urls;
+      expect(answer['length'], '${privateBytes.length}');
+      expect(answer['sum'], '${privateBytes.fold<int>(0, (a, b) => a + b)}');
+
+      final drop = DropFile(private.id);
+      expect((await caller.call(drop)).value(drop), isTrue);
+      moved().server.wakeJobs();
+      await eventually(
+        () async =>
+            !(await after.keys(after.privateBucket)).contains(privateKey),
+        reason: 'the delete job removed the object from the new bucket',
+      );
+      expect(moved().app.alerts.incidents, isEmpty);
+    });
+
+    test('a private file on a server with no private bucket is an incident '
+        'naming the missing bucket', () async {
+      final (owner, session) = await moved().signedIn('unhoused@example.com');
+      final private = await upload(
+        owner,
+        TestUpload.document,
+        bytes: bytesOf(8),
+        type: 'text/plain',
+      );
+      final config = after.config;
+      await restartOn(
+        DwFileStorage(
+          DwFileStorageConfig(
+            endpoint: config.endpoint,
+            region: config.region,
+            accessKey: config.accessKey,
+            secretKey: config.secretKey,
+            pathStyle: config.pathStyle,
+            publicBucket: config.publicBucket,
+            publicBaseUrl: config.publicBaseUrl,
+          ),
+          rules: [
+            DwUploadRule(
+              TestUpload.avatar,
+              visibility: DwFileVisibility.public,
+              maxBytes: 64,
+              contentTypes: {'image/png'},
+              canUpload: (ctx) async => true,
+            ),
+          ],
+        ),
+      );
+      final caller = moved().caller(token: session.token);
+
+      final answer = await caller.call(DwGetFileLink(fileId: private.id));
+      expect(answer.status, 500);
+      expect(moved().app.alerts.incidents, hasLength(1));
+      expect(
+        '${moved().app.alerts.incidents.single.error}',
+        allOf(
+          contains('no private bucket'),
+          contains('DW_STORAGE_PRIVATE_BUCKET'),
+        ),
+      );
+      moved().app.alerts.incidents.clear();
     });
   });
 }
