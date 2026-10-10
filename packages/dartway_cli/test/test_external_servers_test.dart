@@ -343,19 +343,19 @@ wait "$child"
     });
     tearDown(() => pubHost.close(force: true));
 
-    for (final (mode, variables, expectedCode, needsDocker) in [
-      ('containers', <String, String>{}, 1, true),
+    for (final (mode, variables, expectedCode, dockerStatus) in [
+      ('containers', <String, String>{}, 1, 'FAIL'),
       (
         'database',
         {'DW_TEST_DATABASE_URL': 'postgres://user:private@127.0.0.1/postgres'},
         0,
-        false,
+        'warn',
       ),
       (
         'storage',
         {'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000'},
         1,
-        true,
+        'FAIL',
       ),
       (
         'both servers',
@@ -365,16 +365,46 @@ wait "$child"
           'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000',
         },
         0,
-        false,
+        'warn',
       ),
       (
-        'malformed URL',
+        'malformed database URL',
         {'DW_TEST_DATABASE_URL': 'postgres://user:private@localhost'},
         1,
-        false,
+        'FAIL',
       ),
-      ('empty database URL', {'DW_TEST_DATABASE_URL': ''}, 1, true),
-      ('empty storage URL', {'DW_TEST_STORAGE_URL': ''}, 1, true),
+      (
+        'malformed storage URL',
+        {'DW_TEST_STORAGE_URL': 'http://key:private@'},
+        1,
+        'FAIL',
+      ),
+      (
+        'unresolved storage URL',
+        {'DW_TEST_STORAGE_URL': 'http://key:private@dartway-test.invalid:9000'},
+        1,
+        'FAIL',
+      ),
+      (
+        'both malformed URLs',
+        {
+          'DW_TEST_DATABASE_URL': 'postgres://user:private@localhost',
+          'DW_TEST_STORAGE_URL': 'http://key:private@',
+        },
+        1,
+        'FAIL',
+      ),
+      (
+        'database with malformed storage URL',
+        {
+          'DW_TEST_DATABASE_URL': 'postgres://user:private@127.0.0.1/postgres',
+          'DW_TEST_STORAGE_URL': 'http://key:private@',
+        },
+        1,
+        'warn',
+      ),
+      ('empty database URL', {'DW_TEST_DATABASE_URL': ''}, 1, 'FAIL'),
+      ('empty storage URL', {'DW_TEST_STORAGE_URL': ''}, 1, 'FAIL'),
       (
         'empty database URL with storage',
         {
@@ -382,7 +412,7 @@ wait "$child"
           'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000',
         },
         1,
-        true,
+        'FAIL',
       ),
       (
         'database with empty storage URL',
@@ -392,7 +422,7 @@ wait "$child"
           'DW_TEST_STORAGE_URL': '',
         },
         0,
-        false,
+        'warn',
       ),
     ]) {
       test('reports $mode without credentials', () async {
@@ -410,15 +440,40 @@ wait "$child"
         final text = '${await output}${await errors}';
         expect(text, isNot(contains('private')));
         expect(code, expectedCode, reason: text);
-        expect(dockerCalled.existsSync(), needsDocker);
-        if (needsDocker) {
-          expect(text, contains('Docker'));
-          expect(text, contains('daemon is not responding'));
+        expect(dockerCalled.existsSync(), isTrue);
+        expect(
+          text,
+          matches(RegExp('^  $dockerStatus +Docker +', multiLine: true)),
+        );
+        expect(text, contains('daemon is not responding'));
+        if (dockerStatus == 'warn') {
+          expect(text, contains('development'));
+          expect(text, contains('docker compose up'));
+        } else {
           expect(text, contains('DW_TEST_DATABASE_URL'));
           expect(text, contains('DW_TEST_STORAGE_URL'));
         }
-        if (mode == 'malformed URL') {
-          expect(text, contains('DW_TEST_DATABASE_URL'));
+        if (mode.contains('malformed') || mode.contains('unresolved')) {
+          final failures = RegExp(
+            '^  FAIL +tests +(.+)\$',
+            multiLine: true,
+          ).allMatches(text).map((match) => match.group(1)!).toList();
+          expect(failures, hasLength(mode == 'both malformed URLs' ? 2 : 1));
+          for (final variable in variables.keys) {
+            if (variable == 'DW_TEST_DATABASE_URL' && dockerStatus == 'warn') {
+              expect(text, contains('explicit servers from environment'));
+              expect(text, contains('127.0.0.1:5432'));
+              continue;
+            }
+            expect(failures, contains(startsWith(variable)));
+          }
+          expect(
+            RegExp('^  FAIL +', multiLine: true).allMatches(text),
+            hasLength(
+              (mode == 'both malformed URLs' ? 2 : 1) +
+                  (dockerStatus == 'FAIL' ? 1 : 0),
+            ),
+          );
         } else {
           final selected = variables.entries.where(
             (entry) => entry.value.isNotEmpty,
@@ -460,7 +515,8 @@ wait "$child"
         expect(text, contains('Doctor has no remote-server override'));
         expect(text, contains('dartway test --allow-remote-test-server'));
         expect(text, isNot(contains('private')));
-        expect(dockerCalled.existsSync(), isFalse);
+        expect(dockerCalled.existsSync(), isTrue);
+        expect(text, matches(RegExp('^  FAIL +Docker +', multiLine: true)));
       });
     }
   });

@@ -6,6 +6,10 @@
   version-equality test are removed. An empty platform build number maps to `+0`.
   Release builds pass `--build-number` (#521).
 
+- Fix: `dartway doctor` always reports Docker, warning that development needs
+  `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.
+  Invalid or unresolvable test URLs are collected without hiding the Docker result (#539).
+
 - Migration: projects created before #495 must hold their committed locks in CI with
   `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
   [the migration note](../../docs/migrations/2026-10-10-ci-holds-the-locks.md) (#529).
@@ -51,9 +55,9 @@
   `DW_TEST_STORAGE_URL`; flags take precedence, including `--no-storage`, and empty variables
   count as unset. The run banner and URL refusals name the source, and the existing
   loopback guard, isolation, cleanup and `--keep` refusal apply. `dartway doctor` reports the
-  environment-selected hosts without credentials and skips the Docker check only when the
-  database URL is set; storage alone still needs Docker for Postgres. Both test URL variables
-  are removed from the suite and service workers' environment, including overridden defaults.
+  environment-selected hosts without credentials; storage alone still needs Docker for Postgres.
+  Both test URL variables are removed from the suite and service workers' environment, including
+  overridden defaults.
   Doctor's remote-server refusal explains its loopback requirement and the test command's
   explicit opt-in; Docker fixes name the test-only variables as well as the flags (#522).
 
