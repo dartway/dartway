@@ -49,7 +49,7 @@ The law list is therefore derived from `DwCheckType.severity`, not from how firm
 | Time is `ctx.now`; the environment is read in `core/environment.dart`; other services through `ctx.http` | `forbiddenDateTimeNow`, `forbiddenEnvironmentRead`, `forbiddenHttpClient` | `dartway-server` |
 | Startup work is a step before the port opens; settings are a typed object; a `!` on a row id is an error | `workAfterServerStart`, `settingsKeyValueTable`, `redundantBangAllowed` | `dartway-server` |
 | The shared package mirrors the server's features; DTO names follow law 5; a patch is read through its helpers | `invalidSharedLayout`, `contractNameInvalid`, `fieldPatchMatched` | `dartway-contract` |
-| Generated code matches its sources and installed clients are protected by the shared package breaking line | `generatedCodeStale`, `projectContractVersion` | `dartway-contract` |
+| Generated code matches its sources; installed clients receive compatible contract shapes and known update groups | `generatedCodeStale`, `projectContractVersion` | `dartway-contract` |
 | Migrations produce the declared schema and change rows only through `m.backfill` | `migrationsDrift`, `migrationChangesData` | `dartway-migrations` |
 | A test mirrors a `lib/` path and starts through `test/support/` | `testLayout`, `testHarnessBypassed` | `dartway-testing` |
 | `lib/` imports by `package:` only (`check --fix` rewrites) | `relativeImport` | — |

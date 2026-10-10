@@ -127,9 +127,13 @@ final class DwCallEndpoint {
         await _runRequest(
           handler,
           request,
-          handler.prepare(request, page ?? DwPageQuery.parse(request, const {})),
+          handler.prepare(
+            request,
+            page ?? DwPageQuery.parse(request, const {}),
+          ),
           session,
           name,
+          null,
           null,
         ),
       (DwActionCommand<Object?> command, DwCommandHandler handler) =>
@@ -141,6 +145,7 @@ final class DwCallEndpoint {
           null,
           name,
           (null, null),
+          null,
           null,
         ),
       _ => throw StateError('$name is handled by $handler'),
@@ -163,11 +168,13 @@ final class DwCallEndpoint {
         DwCallRefusal(DwCoreRefusal.protocolUnsupported),
       );
     }
+    DwContractVersion? clientContractVersion;
     if (_protocol.contractVersion case final served?) {
       final sent = _header(http, DwHttpContract.contractVersionHeader);
-      final DwContractVersion? client;
       try {
-        client = sent == null ? null : DwContractVersion.parse(sent);
+        clientContractVersion = sent == null
+            ? null
+            : DwContractVersion.parse(sent);
       } on FormatException catch (error) {
         _malformed(
           path,
@@ -176,7 +183,8 @@ final class DwCallEndpoint {
         );
       }
       // A client that says nothing is as old as a client can be.
-      if (client == null || client.isOlderLineThan(served)) {
+      if (clientContractVersion == null ||
+          clientContractVersion.isOlderLineThan(served)) {
         return DwApiResponse.incompatible(
           DwCallRefusal(DwCoreRefusal.updateRequired),
         );
@@ -298,6 +306,7 @@ final class DwCallEndpoint {
           session,
           name,
           callerUtcOffset,
+          clientContractVersion,
         ),
       (DwActionCommand<Object?> command, DwCommandHandler handler) =>
         await _runCommand(
@@ -309,6 +318,7 @@ final class DwCallEndpoint {
           name,
           (appVersion, _header(http, HttpHeaders.userAgentHeader)),
           callerUtcOffset,
+          clientContractVersion,
         ),
       _ => throw StateError('unreachable'),
     };
@@ -321,6 +331,7 @@ final class DwCallEndpoint {
     DwSessionKeyInfo? session,
     String name,
     Duration? callerUtcOffset,
+    DwContractVersion? clientContractVersion,
   ) async {
     final where = 'request $name';
     final ctx = runtime.context(
@@ -328,6 +339,7 @@ final class DwCallEndpoint {
       kind: DwContextKind.request,
       sessionKey: session,
       callerUtcOffset: callerUtcOffset,
+      clientContractVersion: clientContractVersion,
     );
     try {
       _requireSignIn(handler.access, ctx);
@@ -348,6 +360,7 @@ final class DwCallEndpoint {
     String name,
     (String?, String?) client,
     Duration? callerUtcOffset,
+    DwContractVersion? clientContractVersion,
   ) async {
     final where = 'command $name';
     final accountId = session?.accountId;
@@ -358,6 +371,7 @@ final class DwCallEndpoint {
       clientAppVersion: client.$1,
       clientUserAgent: client.$2,
       callerUtcOffset: callerUtcOffset,
+      clientContractVersion: clientContractVersion,
     );
     DwApiResponse response;
     try {
@@ -401,7 +415,14 @@ final class DwCallEndpoint {
     _requireSignIn(handler.access, ctx);
     _validate(command);
     if (!handler.transactional) {
-      return _runNonTransactional(handler, command, key, accountId, ctx, typeName);
+      return _runNonTransactional(
+        handler,
+        command,
+        key,
+        accountId,
+        ctx,
+        typeName,
+      );
     }
     try {
       // A conflict re-runs the whole transaction: `ctx.transaction` retries
@@ -692,7 +713,6 @@ final class DwCallEndpoint {
       DwApiResponse.failed(incident, failure: DwFailureKind.malformedCall),
     );
   }
-
 }
 
 final class _Rejected implements Exception {

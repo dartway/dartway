@@ -25,12 +25,14 @@ final class DwLiveConnection {
     required this.log,
     required this.outboundLimitBytes,
     required this.closeGrace,
+    this.clientContractVersion,
   });
 
   /// Unguessable: a `Dw-Live-Connection` header names a connection by it, and
   /// a guessed id would let a caller filter or suppress someone else's
   /// updates. It is further bound to the account that authenticated it.
   final String id;
+  final DwContractVersion? clientContractVersion;
   final Socket socket;
   final WebSocket webSocket;
   final DwServerLogger log;
@@ -84,8 +86,8 @@ final class DwLiveConnection {
     sendFrame(jsonEncode(message.toJson()));
   }
 
-  /// Queues an already encoded frame (an update encoded once for all
-  /// subscribers).
+  /// Queues an already encoded frame (an update encoded once per distinct
+  /// selection).
   void sendFrame(String frame) {
     if (isClosing) return;
     // The ceiling is on the backlog already waiting, not on this frame: one

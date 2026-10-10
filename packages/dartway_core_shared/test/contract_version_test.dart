@@ -3,6 +3,40 @@ import 'package:test/test.dart';
 
 void main() {
   group('DwContractVersion (#296)', () {
+    test('full semver precedence orders update-group introductions', () {
+      final ordered = [
+        '0.9.9',
+        '1.0.0-alpha',
+        '1.0.0-alpha.1',
+        '1.0.0-alpha.beta',
+        '1.0.0-beta',
+        '1.0.0-beta.2',
+        '1.0.0-beta.11',
+        '1.0.0-rc.1',
+        '1.0.0',
+        '1.0.1',
+        '1.1.0',
+        '2.0.0',
+      ];
+      for (var i = 0; i < ordered.length; i++) {
+        for (var j = 0; j < ordered.length; j++) {
+          expect(
+            DwContractVersion(ordered[i]) < DwContractVersion(ordered[j]),
+            i < j,
+            reason: '${ordered[i]} < ${ordered[j]}',
+          );
+        }
+      }
+      expect(
+        DwContractVersion('13.1.0+client') < DwContractVersion('13.1.0+server'),
+        isFalse,
+      );
+      expect(
+        DwContractVersion('13.1.0+server') < DwContractVersion('13.1.0+client'),
+        isFalse,
+      );
+    });
+
     test('the breaking line is the major version, or the minor below 1.0', () {
       expect(DwContractVersion('3.4.1').line, '3');
       expect(DwContractVersion('0.7.2').line, '0.7');

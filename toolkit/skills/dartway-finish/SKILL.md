@@ -42,7 +42,9 @@ CONTRACT_BASE="$(git merge-base HEAD origin/__BASE_BRANCH__)"  # resolve once; C
 - A test red after a refactor is "I broke it" until the base branch shows otherwise.
 - `projectContractVersion`: incompatible or unverified is an error, never a skipped gate. Keep the
   baseline SHA fixed after regeneration/feature commits; advance the shared breaking line for an
-  incompatible generated shape. Custom/domain/manual module behavior still needs its own review.
+  incompatible generated shape. A new data object requires a shared version above the base (a patch
+  is enough), with its introduction recorded by generation. Custom/domain/manual module behavior
+  still needs its own review.
 - `check`: read the features the task touched in its per-feature report, not only the counter;
   "migrations not checked" is not a pass.
 - `frameworkRefsDiverged` is fixed as its own change (`dartway-update`), not in this diff.

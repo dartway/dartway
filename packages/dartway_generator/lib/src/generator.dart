@@ -154,10 +154,14 @@ abstract final class DwCodeGenerator {
       skipped: check ? null : skipped,
     );
     if (diagnostics.isNotEmpty) return finish();
-    if (verifyContract || contractBase != null) {
-      try {
-        baselineSha = resolveContractBase(root, contractBase);
-      } on Exception catch (error) {
+    // Ordinary generation also needs trusted introduction metadata, but keeps
+    // its existing non-verifying mode for new projects and unsupported codecs.
+    // The check gate must still prove a baseline before accepting the output.
+    final verify = verifyContract || contractBase != null;
+    try {
+      baselineSha = resolveContractBase(root, contractBase);
+    } on Exception catch (error) {
+      if (verify) {
         diagnostics.add(
           DwGenerationDiagnostic(
             'contract not verified: $error. Supply --contract-base with a trusted committed revision; no feature-tree seed is accepted.',
@@ -177,8 +181,14 @@ abstract final class DwCodeGenerator {
       for (final package in packages) {
         await run.scanPackage(package, collection.contextFor(package.root));
       }
-      final files = run.emit();
-      if (diagnostics.isNotEmpty) return finish();
+      var files = run.emit();
+      var introductions = <String, String>{};
+      if (diagnostics.isNotEmpty) {
+        // Collect registry diagnostics too; failed runs still report every
+        // problem, and none of these provisional files will be written.
+        run.completeContracts(files, const {});
+        return finish();
+      }
       if (baselineSha != null) {
         try {
           final shared = packages
@@ -192,7 +202,7 @@ abstract final class DwCodeGenerator {
                         .content,
                   )
                   as Map<String, dynamic>;
-          validateContract(current);
+          if (verify) validateContract(current);
           final baseline = await readContractBaseline(
             root: root,
             sha: baselineSha,
@@ -201,44 +211,64 @@ abstract final class DwCodeGenerator {
             generatedPaths: {
               for (final file in files)
                 if (p.isWithin(shared.root, file.path)) file.path,
+              p.join(shared.lib, 'generated', 'dw_protocol.dart'),
             },
           );
           proof = baseline.proof;
-          final previousVersion = DwContractVersion.parse(
-            baseline.descriptor['contractVersion'] as String,
-          );
-          final nextVersion = DwContractVersion.parse(
+          introductions = contractIntroductions(baseline.descriptor, current);
+          final currentVersion = DwContractVersion.parse(
             current['contractVersion'] as String,
           );
-          final changes = compareContracts(baseline.descriptor, current);
-          if (nextVersion.isOlderLineThan(previousVersion)) {
-            throw const FormatException(
-              'shared package contract line moved backwards',
-            );
+          for (final since in introductions.values) {
+            if (currentVersion < DwContractVersion.parse(since)) {
+              throw const FormatException(
+                'data introduction version exceeds contract version',
+              );
+            }
           }
-          if (changes.isNotEmpty &&
-              !previousVersion.isOlderLineThan(nextVersion)) {
+          if (verify) {
+            final previousVersion = DwContractVersion.parse(
+              baseline.descriptor['contractVersion'] as String,
+            );
+            final nextVersion = DwContractVersion.parse(
+              current['contractVersion'] as String,
+            );
+            final changes = compareContracts(baseline.descriptor, current);
+            if (nextVersion.isOlderLineThan(previousVersion)) {
+              throw const FormatException(
+                'shared package contract line moved backwards',
+              );
+            }
+            if (changes.isNotEmpty &&
+                !previousVersion.isOlderLineThan(nextVersion)) {
+              diagnostics.add(
+                DwGenerationDiagnostic(
+                  changes.every((c) => c.startsWith('raise `version:`'))
+                      ? 'project contract incompatible: ${changes.join('; ')}'
+                      : 'project contract incompatible: ${changes.join('; ')}. Baseline $baselineSha has ${previousVersion.text} (line ${previousVersion.line}); current ${nextVersion.text} keeps that line. Raise the shared package breaking line and regenerate; a patch/prerelease bump is insufficient.',
+                  code: 'projectContractVersion',
+                ),
+              );
+            } else {
+              verdict = changes.isEmpty
+                  ? 'generated project contracts compatible'
+                  : 'breaking generated project contracts isolated by line ${nextVersion.line} (${changes.join('; ')})';
+            }
+          }
+        } catch (error) {
+          if (verify) {
             diagnostics.add(
               DwGenerationDiagnostic(
-                'project contract incompatible: ${changes.join('; ')}. Baseline $baselineSha has ${previousVersion.text} (line ${previousVersion.line}); current ${nextVersion.text} keeps that line. Raise the shared package breaking line and regenerate; a patch/prerelease bump is insufficient.',
+                'contract not verified: baseline $baselineSha: $error. A committed descriptor takes precedence; first adoption requires unchanged hand-written shared source and in-repo path dependencies.',
                 code: 'projectContractVersion',
               ),
             );
-          } else {
-            verdict = changes.isEmpty
-                ? 'generated project contracts compatible'
-                : 'breaking generated project contracts isolated by line ${nextVersion.line} (${changes.join('; ')})';
           }
-        } catch (error) {
-          diagnostics.add(
-            DwGenerationDiagnostic(
-              'contract not verified: baseline $baselineSha: $error. A committed descriptor takes precedence; first adoption requires unchanged hand-written shared source and in-repo path dependencies.',
-              code: 'projectContractVersion',
-            ),
-          );
         }
         if (diagnostics.isNotEmpty) return finish();
       }
+      files = run.completeContracts(files, introductions);
+      if (diagnostics.isNotEmpty) return finish();
       final plan = planOutput(files, packages);
       if (!check) plan.apply();
       return finish(plan: plan);
@@ -433,7 +463,6 @@ final class _Run {
         // it simply has none.
         case DwPackageRole.shared
             when _resolves(package, 'dartway_core_shared'):
-          files.add(_emitProtocol(package));
           final version =
               (loadYaml(
                     File(
@@ -462,6 +491,36 @@ final class _Run {
     }
     return files;
   }
+
+  List<GeneratedFile> completeContracts(
+    List<GeneratedFile> files,
+    Map<String, String> introductions,
+  ) => [
+    for (final file in files)
+      if (p.basename(file.path) == 'dw_contract.json' &&
+          introductions.isNotEmpty)
+        GeneratedFile(
+          file.path,
+          contractJson(
+            jsonDecode(file.content) as Map<String, dynamic>..update(
+              'objects',
+              (objects) => {
+                for (final entry in (objects as Map).entries)
+                  entry.key: {
+                    ...entry.value as Map,
+                    'since': ?introductions[entry.key],
+                  },
+              },
+            ),
+          ),
+        )
+      else
+        file,
+    for (final package in contexts.keys)
+      if (package.role == DwPackageRole.shared &&
+          _resolves(package, 'dartway_core_shared'))
+        _emitProtocol(package, introductions),
+  ];
 
   /// The package a server package's generated code imports the ORM through.
   /// A project depends on `dartway_core_server`, which re-exports the ORM
@@ -753,7 +812,10 @@ final class _Run {
     r'^\d+\.\d+\.\d+(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$',
   );
 
-  GeneratedFile _emitProtocol(DwProjectPackage package) {
+  GeneratedFile _emitProtocol(
+    DwProjectPackage package,
+    Map<String, String> introductions,
+  ) {
     final entries = <ProtocolEntry>[];
     final registered = <(ClassElement, _Library)>[];
     for (final library in libraries) {
@@ -826,6 +888,7 @@ final class _Run {
           variable: '${camelCase(package.baseName)}Protocol',
           entries: entries,
           contractVersion: version ?? '0.0.0',
+          introductions: introductions,
         ),
         languageVersion: package.languageVersion,
         options: _formatterOptions(package),

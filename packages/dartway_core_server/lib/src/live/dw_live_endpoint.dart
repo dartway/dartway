@@ -83,6 +83,9 @@ final class DwLiveEndpoint {
       ..headers.contentLength = 0;
     final socket = await response.detachSocket();
     final webSocket = WebSocket.fromUpgradedSocket(socket, serverSide: true);
+    final (incompatibility, clientContractVersion) = _compatibility(
+      request.uri.queryParameters,
+    );
     final connection = DwLiveConnection(
       id: _newConnectionId(),
       socket: socket,
@@ -90,11 +93,11 @@ final class DwLiveEndpoint {
       log: _log,
       outboundLimitBytes: settings.outboundLimitBytes,
       closeGrace: settings.closeGrace,
+      clientContractVersion: clientContractVersion,
     );
 
     // Compatibility is answered after the upgrade: a browser cannot read the
     // status of a refused upgrade, only the close code of an accepted one.
-    final incompatibility = _incompatibility(request.uri.queryParameters);
     if (incompatibility != null) {
       webSocket.listen(null, onDone: connection.markClosed, onError: (_) {});
       final (code, reason) = incompatibility;
@@ -115,25 +118,33 @@ final class DwLiveEndpoint {
     connection.send(DwHelloMessage(connection.id));
   }
 
-  /// The close code and reason for a client this server cannot talk to, or
-  /// `null`.
-  (int, String)? _incompatibility(Map<String, String> query) {
+  /// The incompatibility close code and reason (or null), together with the
+  /// parsed client contract version used to filter its live updates.
+  ((int, String)?, DwContractVersion?) _compatibility(
+    Map<String, String> query,
+  ) {
     if (query[DwHttpContract.liveProtocolParameter] != '$dwProtocolVersion') {
-      return (DwCloseCode.incompatible, DwCoreRefusal.protocolUnsupported.code);
+      return (
+        (DwCloseCode.incompatible, DwCoreRefusal.protocolUnsupported.code),
+        null,
+      );
     }
     final served = runtime.protocol.contractVersion;
-    if (served == null) return null;
+    if (served == null) return (null, null);
     final sent = query[DwHttpContract.liveContractVersionParameter];
     final DwContractVersion? client;
     try {
       client = sent == null ? null : DwContractVersion.parse(sent);
     } on FormatException {
-      return (DwCloseCode.protocolError, 'dw.protocol');
+      return ((DwCloseCode.protocolError, 'dw.protocol'), null);
     }
     if (client == null || client.isOlderLineThan(served)) {
-      return (DwCloseCode.incompatible, DwCoreRefusal.updateRequired.code);
+      return (
+        (DwCloseCode.incompatible, DwCoreRefusal.updateRequired.code),
+        client,
+      );
     }
-    return null;
+    return (null, client);
   }
 
   /// 128 random bits: the id is a capability of the connection, and must not

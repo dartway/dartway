@@ -16,6 +16,7 @@ import '../live/dw_live_hub.dart';
 import '../outbound/dw_outbound_http.dart';
 import 'dw_server_clock.dart';
 import 'dw_server_module.dart';
+import 'dw_update_filter.dart';
 
 /// What the running parts of a server share: the database, the live hub, the
 /// session cache, the alert gate, and the way contexts are made and their
@@ -61,6 +62,7 @@ final class DwRuntime {
 
   /// `DwServerSettings.outboundMaxResponseBytes`.
   final int outboundMaxResponseBytes;
+
   /// The server's clock: `ctx.now`, and the job queue's due times.
   final DwServerClock clock;
 
@@ -77,6 +79,7 @@ final class DwRuntime {
     DwSessionKeyInfo? sessionKey,
     DwJobAttempt? job,
     void Function(DwRuntimeContext ctx)? deliverOnCommit,
+    DwContractVersion? clientContractVersion,
     String? clientAppVersion,
     String? clientUserAgent,
     Duration? callerUtcOffset,
@@ -99,6 +102,7 @@ final class DwRuntime {
     sessionKey: sessionKey,
     job: job,
     deliverOnCommit: deliverOnCommit,
+    clientContractVersion: clientContractVersion,
     clientAppVersion: clientAppVersion,
     clientUserAgent: clientUserAgent,
     clock: clock,
@@ -112,7 +116,7 @@ final class DwRuntime {
     final effects = ctx.rootEffects;
     if (effects.isEmpty) return;
     _revoke(effects);
-    hub.publish(_byChannel(effects.publications));
+    hub.publish(_byChannel(effects.publications), protocol: protocol);
     effects.clear();
   }
 
@@ -142,7 +146,7 @@ final class DwRuntime {
     if (effects.isEmpty) return DwUpdateTransport.empty;
     _revoke(effects, author: author);
     final byChannel = _byChannel(effects.publications);
-    hub.publish(byChannel, author: author);
+    hub.publish(byChannel, protocol: protocol, author: author);
     final caller = ctx.sessionKey;
     final revoked = {
       for (final (channel, accountId) in effects.revocations)
@@ -185,7 +189,9 @@ final class DwRuntime {
       for (final MapEntry(key: name, value: items) in byChannel.entries)
         if (readable.contains(name))
           for (final (:item, :except) in items)
-            if (!except.contains(caller.accountId)) (name, item),
+            if (!except.contains(caller.accountId) &&
+                dwClientKnowsUpdate(protocol, ctx.clientContractVersion, item))
+              (name, item),
     ]);
   }
 
