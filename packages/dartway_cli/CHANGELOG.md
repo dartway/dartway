@@ -21,6 +21,8 @@
   selects **Risks to guard** with a class and expected outcome, and the feature scaffold adds only
   risk-owned tests, including access refusals and restricted-channel leak checks (#517).
 
+- Toolkit: align checkup with must-test risk classes and clarify the scaffold's restricted-channel leak check (#528).
+
 - The template's Claude review job uses the same `DW_CI_RUNS_ON` expression as `ci.yml`, so one
   repository or organisation variable moves both jobs onto self-hosted runners. The review's
   read-only token and disallowed tools remain unchanged. The local project CI runner refuses

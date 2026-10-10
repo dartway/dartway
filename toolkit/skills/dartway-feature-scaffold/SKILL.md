@@ -138,7 +138,8 @@ them. Extend the owner test's list or table:
 - One refused call per access rule, with its code, from a caller only that rule stops (class 1).
   If creating a per-feature acceptance test file, start with this refusal and nothing else by
   default. Where a channel narrows its audience — a member's own data or a team's channel — also
-  prove that an outsider attempting to subscribe receives nothing from that channel (class 1).
+  prove that an outsider subscribed to that channel receives none of the items published for its
+  audience (class 1).
 - A test for any other risk class the feature has: 2, 3 or 6; a bugfix follows class 4 and §5.
 - A widget test only where the screen has logic of its own and the risk calls for it.
 
