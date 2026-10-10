@@ -13,6 +13,31 @@ Matcher _refusal(List<String> fragments) => throwsA(
 );
 
 void main() {
+  group('build_cache_keep', () {
+    test('defaults to 10GB and accepts a configured limit', () {
+      expect(targetFrom().buildCacheKeep, '10GB');
+      expect(
+        targetFrom(extra: '  build_cache_keep: 512MB\n').buildCacheKeep,
+        '512MB',
+      );
+    });
+    for (final value in [
+      "''",
+      'null',
+      '[]',
+      'garbage',
+      '0GB',
+      '-1GB',
+      "'10GB; exit 0'",
+    ]) {
+      test('rejects $value before executing a remote command', () {
+        expect(
+          () => targetFrom(extra: '  build_cache_keep: $value\n'),
+          _refusal(['build_cache_keep']),
+        );
+      });
+    }
+  });
   group('min_free_disk', () {
     test('defaults to 10GB and reads MB, GB and fractional sizes', () {
       expect(targetFrom().minFreeDiskBytes, 10 * 1024 * 1024 * 1024);

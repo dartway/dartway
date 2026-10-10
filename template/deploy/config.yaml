@@ -170,6 +170,10 @@ local:
 #   # 1024-based). Defaults to 10GB. `deploy check` warns below it; `run`
 #   # refuses to build. Free old images or build cache, or lower this value.
 #   min_free_disk: 10GB
+#   # After outside verification passes, remove unused stack images (keep the
+#   # previous server and web images for rollback) and trim the daemon's cache.
+#   # Cleanup failures warn without failing the successful deploy. MB or GB.
+#   build_cache_keep: 10GB
 #
 #   # Optional. Ports to open beyond SSH, 80 and 443.
 #   firewall_ports: [5432]

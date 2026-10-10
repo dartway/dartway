@@ -138,6 +138,8 @@ void main() {
         'nginx-test',
         'certificate-started-proxy',
         'restart-proxy',
+        'verify-outside',
+        'cleanup',
       ]);
     });
 
@@ -342,6 +344,9 @@ void main() {
         bool running = true,
         bool migrationFails = false,
         bool healthy = true,
+        bool digestResolvable = true,
+        bool tagMatchesContainer = true,
+        bool pinned = false,
       }) async {
         final bin = Directory(p.join(temp.path, 'bin'))..createSync();
         final docker = File(p.join(bin.path, 'docker'))
@@ -353,6 +358,12 @@ case "\$*" in
   *" ps -q server"*) echo new-container ;;
   *"{{.Config.Image}}"*) echo shop-server ;;
   "inspect -f {{.Image}}"*) echo sha256:previous ;;
+  "inspect -f {{.Id}}"*) echo old-container ;;
+  "image inspect -f {{.Id}} sha256:previous") ${digestResolvable ? 'echo sha256:previous' : 'exit 1'} ;;
+  "image inspect -f {{.Id}} shop-server:dw-previous") ${pinned ? 'echo sha256:previous' : 'exit 1'} ;;
+  "image inspect -f {{.Id}}"*) echo ${tagMatchesContainer ? 'sha256:previous' : 'sha256:unserved'} ;;
+  "ps -aq --no-trunc --filter ancestor=sha256:previous") echo old-container ;;
+  "ps -aq --no-trunc --filter ancestor="*) echo other-container ;;
   *" run --rm --no-deps -T -e DW_MIGRATE_ONLY=true server"*) ${migrationFails ? 'echo "migration 42 failed" >&2; exit 1' : 'echo migrated'} ;;
   *"{{.State.Status}}"*) echo "running ${healthy ? 'healthy' : 'unhealthy'} 0 0" ;;
 esac
@@ -367,6 +378,7 @@ exit 0
           ),
           stack: stackFrom(),
           appDir: p.join(temp.path, 'shop'),
+          storeDir: p.join(temp.path, 'state'),
         ).replaceServer();
         final issued = calls.existsSync()
             ? calls.readAsLinesSync().map((line) => line.trim()).toList()
@@ -387,15 +399,84 @@ exit 0
         expect(stop, isNot(-1));
         expect(migrate, greaterThan(stop));
         expect(start, greaterThan(migrate));
-        expect(at(calls, 'image tag'), -1, reason: 'nothing to roll back');
+        expect(
+          at(calls, 'image tag sha256:previous shop-server:dw-previous'),
+          lessThan(stop),
+          reason: 'pin before removing the old container',
+        );
+        expect(
+          calls.where(
+            (call) => call.endsWith('image tag sha256:previous shop-server'),
+          ),
+          isEmpty,
+          reason: 'no rollback',
+        );
       });
+
+      test(
+        'an unresolvable container digest refuses a moved tag before stopping the server',
+        () async {
+          final (result, calls) = await replace(
+            digestResolvable: false,
+            tagMatchesContainer: false,
+          );
+          expect(result.exitCode, 1);
+          expect(
+            result.stderr,
+            contains('Cannot resolve the running server image'),
+          );
+          expect(at(calls, 'stop -t 45'), -1);
+          expect(at(calls, 'image tag sha256:unserved'), -1);
+          expect(
+            File(
+              p.join(temp.path, 'state/deploy-run/server.previous'),
+            ).existsSync(),
+            isFalse,
+          );
+        },
+      );
+
+      test(
+        'an unresolvable manifest uses a tag only when the container holds its image',
+        () async {
+          final (result, calls) = await replace(digestResolvable: false);
+          expect(result.ok, isTrue, reason: result.stderr);
+          expect(
+            at(calls, 'image tag sha256:previous shop-server:dw-previous'),
+            isNot(-1),
+          );
+        },
+      );
+
+      test(
+        'a moved tag falls back to the pin that still holds the container',
+        () async {
+          // An interrupted deployment pinned the serving image and moved the
+          // tag; the next fresh deployment must not be refused.
+          final (result, calls) = await replace(
+            digestResolvable: false,
+            tagMatchesContainer: false,
+            pinned: true,
+          );
+          expect(result.ok, isTrue, reason: result.stderr);
+          expect(
+            File(
+              p.join(temp.path, 'state/deploy-run/server.previous'),
+            ).readAsStringSync().trim(),
+            'sha256:previous',
+          );
+          expect(at(calls, 'image tag sha256:unserved'), -1);
+        },
+      );
 
       test('a failed migration starts the previous image again', () async {
         final (result, calls) = await replace(migrationFails: true);
         expect(result.ok, isFalse);
         expect(result.stderr, contains('migration 42 failed'));
         expect(result.stderr, contains('previous server is running again'));
-        final tag = at(calls, 'image tag sha256:previous shop-server');
+        final tag = calls.indexWhere(
+          (call) => call.endsWith('image tag sha256:previous shop-server'),
+        );
         expect(tag, greaterThan(at(calls, 'DW_MIGRATE_ONLY=true')));
         expect(at(calls.sublist(tag), 'up -d --no-deps server'), isNot(-1));
       });
@@ -656,12 +737,11 @@ esac
     const molodey =
         'molodey_postgres_data\n/home/deployer/.config/molodey/secrets.env\n';
 
-    Future<({int code, List<Map<String, Object?>> events})> deploy(
-      _IdentityServer server,
-      DwStack stack,
-      List<String> flags,
-    ) async {
-      final quiet = IOSink(StreamController<List<int>>()..stream.drain<void>());
+    Future<({int code, String human, List<Map<String, Object?>> events})>
+    deploy(_IdentityServer server, DwStack stack, List<String> flags) async {
+      final human = StreamController<List<int>>();
+      final humanText = human.stream.transform(utf8.decoder).join();
+      final quiet = IOSink(human.sink);
       final events = StreamController<List<int>>();
       final lines = events.stream
           .transform(utf8.decoder)
@@ -676,12 +756,180 @@ esac
         localChecks: const [],
       );
       await sink.close();
+      await quiet.close();
       return (
         code: code,
+        human: await humanText,
         events: [
           for (final line in await lines)
             jsonDecode(line) as Map<String, Object?>,
         ],
+      );
+    }
+
+    test(
+      'resume retries failed outside probes without replacing services',
+      () async {
+        final site = await _VerifiedSite.start();
+        addTearDown(site.close);
+        const ids = ['server', 'web', 'verify-outside', 'cleanup'];
+        final server = _IdentityServer(
+          listing: 'shop_postgres_data\n',
+          record: [
+            for (final id in ids)
+              '$id ${id == 'cleanup' ? 'pending' : 'exited ${id == 'verify-outside' ? 1 : 0}'}',
+          ].join('\n'),
+        );
+        final result = await HttpOverrides.runWithHttpOverrides(
+          () => deploy(server, stackFrom(), const ['--resume']),
+          site.overrides,
+        );
+        expect(result.code, 0, reason: result.human);
+        expect(
+          result.events
+              .where((event) => event['event'] == 'step_started')
+              .map((event) => event['id']),
+          ['verify-outside', 'cleanup'],
+        );
+        expect(
+          result.events.where((event) => event['event'] == 'probe'),
+          isNotEmpty,
+        );
+      },
+    );
+
+    for (final stuckCache in [false, true]) {
+      test(
+        '${stuckCache ? 'an unreclaimable cache' : 'a failing prune'} warns at exit 0; resume runs only cleanup',
+        () async {
+          final temp = Directory.systemTemp.createTempSync(
+            'dw_cleanup_warning_',
+          );
+          addTearDown(() => temp.deleteSync(recursive: true));
+          final bin = Directory(p.join(temp.path, 'bin'))..createSync();
+          final journal = Directory(p.join(temp.path, 'journal'))..createSync();
+          for (final service in ['server', 'web']) {
+            File(
+              p.join(journal.path, '$service.previous'),
+            ).writeAsStringSync('');
+          }
+          final fail = File(p.join(temp.path, 'fail'));
+          if (!stuckCache) fail.writeAsStringSync('');
+          final stats = File(p.join(temp.path, 'cache-stats'))
+            // Only the unshared record counts against the budget; the shared
+            // one belongs to a kept image and is reported, not warned about.
+            ..writeAsStringSync(stuckCache ? 'false 11GB\ntrue 2GB\n' : '');
+          final docker = File(p.join(bin.path, 'docker'))
+            ..writeAsStringSync('''
+#!/bin/sh
+case "\$*" in
+  info*) echo '${temp.path}' ;;
+  'system df'*) cat '${stats.path}' ;;
+  'builder prune'*)
+    if [ -f '${fail.path}' ]; then echo 'prune refused' >&2; exit 1; fi ;;
+esac
+''');
+          Process.runSync('chmod', ['+x', docker.path]);
+          Future<DwSshResult> cleanup(String input) =>
+              LocalShell(
+                environment: {
+                  'PATH': '${bin.path}:${Platform.environment['PATH']}',
+                },
+              ).run(
+                input
+                    .replaceAll('/home/deployer/shop', temp.path)
+                    .replaceAll(
+                      '/home/deployer/.config/shop/deploy-run',
+                      journal.path,
+                    ),
+              );
+          final site = await _VerifiedSite.start();
+          addTearDown(site.close);
+          final server = _IdentityServer(
+            listing: 'shop_postgres_data\n',
+            cleanupRun: cleanup,
+          );
+          final first = await HttpOverrides.runWithHttpOverrides(
+            () => deploy(server, stackFrom(), const []),
+            site.overrides,
+          );
+          expect(first.code, 0);
+          expect(first.human, isNot(contains('"images_removed"')));
+          expect(
+            first.human,
+            contains('Warning: deployment succeeded, but cleanup failed'),
+          );
+          expect(
+            first.human,
+            contains(
+              stuckCache ? 'Docker retains cache references' : 'prune refused',
+            ),
+          );
+          expect(
+            first.human,
+            contains(
+              '0 images, 0 cache records removed, 0 bytes freed; '
+              '${stuckCache ? 2000000000 : 0} bytes of build cache shared',
+            ),
+          );
+          final warning = first.events.singleWhere(
+            (event) => event['event'] == 'cleanup',
+          );
+          expect(warning['warning'], isTrue);
+          expect(warning['images_removed'], 0);
+          expect(warning['cache_records_removed'], 0);
+          expect(warning['freed_bytes'], 0);
+          expect(warning['cache_shared_bytes'], stuckCache ? 2000000000 : 0);
+          expect(
+            warning['message'],
+            contains(
+              stuckCache ? 'Docker retains cache references' : 'prune refused',
+            ),
+          );
+          final verify = first.events.indexWhere(
+            (event) =>
+                event['event'] == 'step_finished' &&
+                event['id'] == 'verify-outside',
+          );
+          final started = first.events.indexWhere(
+            (event) =>
+                event['event'] == 'step_started' && event['id'] == 'cleanup',
+          );
+          expect(started, greaterThan(verify));
+          expect(
+            first.events.singleWhere(
+              (event) =>
+                  event['event'] == 'step_finished' && event['id'] == 'cleanup',
+            ),
+            containsPair('exit_code', 1),
+          );
+          if (fail.existsSync()) fail.deleteSync();
+          // Shared cache above the 10GB budget is held by kept images: the
+          // resumed cleanup reports it and succeeds.
+          stats.writeAsStringSync('true 11GB\n');
+          final ids = DwDeployRunner(
+            ssh: RecordingSsh(),
+            stack: stackFrom(),
+          ).steps(skipGitUpdate: false).map((step) => step.id);
+          final resumed = _IdentityServer(
+            listing: 'shop_postgres_data\n',
+            cleanupRun: cleanup,
+            record: [
+              for (final id in ids) '$id exited ${id == 'cleanup' ? 1 : 0}',
+            ].join('\n'),
+          );
+          // No HTTP override: repeated verification would fail. All successful
+          // steps must be skipped, including steps with a verdict.
+          final second = await deploy(resumed, stackFrom(), const ['--resume']);
+          expect(second.code, 0);
+          expect(resumed.started, hasLength(1));
+          expect(resumed.started.single.command, contains("'cleanup'"));
+          final resumedCleanup = second.events.singleWhere(
+            (event) => event['event'] == 'cleanup',
+          );
+          expect(resumedCleanup['warning'], isFalse);
+          expect(resumedCleanup['cache_shared_bytes'], 11000000000);
+        },
       );
     }
 
@@ -1222,7 +1470,7 @@ esac
     setUp(() {
       temp = Directory.systemTemp.createTempSync('dw_revision_');
       remote = Directory(p.join(temp.path, 'remote.git'))..createSync();
-      git(remote, ['init', '--bare']);
+      git(remote, ['init', '--bare', '-b', 'master']);
       source = Directory(p.join(temp.path, 'source'))..createSync();
       git(source, ['init', '-b', 'master']);
       git(source, ['config', 'user.name', 'DartWay test']);
@@ -1307,7 +1555,14 @@ esac
 /// and every detached step — started or collected — reported as exited with
 /// [exitCode]. What it was asked to start is kept in [started].
 class _IdentityServer extends RecordingSsh {
-  _IdentityServer({required this.listing, this.record, this.exitCode = 0});
+  _IdentityServer({
+    required this.listing,
+    this.record,
+    this.exitCode = 0,
+    this.cleanupRun,
+  });
+
+  final Future<DwSshResult> Function(String)? cleanupRun;
 
   final String listing;
   final String? record;
@@ -1322,10 +1577,19 @@ class _IdentityServer extends RecordingSsh {
     if (command.contains('tcp_allowed_congestion_control')) {
       return const DwSshResult(exitCode: 0, stdout: 'cubic bbr\n', stderr: '');
     }
+    if (command.contains('df -Pk') &&
+        !_nonce.hasMatch(command) &&
+        !command.contains('while read -r id; do')) {
+      return const DwSshResult(
+        exitCode: 0,
+        stdout: '/docker\t31457280\t20971520\n',
+        stderr: '',
+      );
+    }
     if (command.contains('docker volume ls') && command.contains('secrets')) {
       return DwSshResult(exitCode: 0, stdout: listing, stderr: '');
     }
-    if (command.contains(r'[ -f "$d/plan" ]')) {
+    if (command.contains(r'[ -f "$d/plan" ]') && !_nonce.hasMatch(command)) {
       return DwSshResult(exitCode: 0, stdout: record ?? 'none\n', stderr: '');
     }
     final nonce = _nonce.firstMatch(command)?.group(0);
@@ -1348,8 +1612,18 @@ class _IdentityServer extends RecordingSsh {
     String deployUser,
     String command,
     String input,
-  ) {
+  ) async {
     started.add((command: command, script: input));
+    if (input.contains('docker builder prune') && cleanupRun != null) {
+      final result = await cleanupRun!(input);
+      final nonce = _nonce.firstMatch(command)!.group(0)!;
+      return DwSshResult(
+        exitCode: 0,
+        stdout:
+            '$nonce exited ${result.exitCode}\n${result.stdout}\n$nonce stderr\n${result.stderr}\n$nonce end 0\n',
+        stderr: '',
+      );
+    }
     return run(command);
   }
 }
