@@ -192,19 +192,12 @@ is the bug, not a compile error or a missing helper — and green after the fix;
 fake, not the fix. One test, at the boundary that owns the bug — not the same scenario replayed at
 every tier it crossed.
 
-**For any other new test, breaking the code is optional.** Use it when unsure the subject is reached
-at all — never mounted, or a code path the setup never enters: break the one thing it is about (a
-comparison, a flag, one line) and watch it go red. Two shapes survive a mutation while testing nothing:
-the subject is inert where it stands (never mounted, never reached), and a mutation that changed two
-things, going red for the wrong reason. These and the junk shapes of §4 are caught by reading. The
-reviewer reads.
+**For any other new test, breaking the code is optional.** Use it when unsure the test reaches its subject at all: break the one thing it is about (a comparison, a flag, one line) and watch it go red — a test that stays green never reached it. Break one thing only: a mutation that changed two goes red for the wrong reason. The junk shapes of §4 are caught by reading; the reviewer reads.
 
 ## 6. A flaky test is quarantined
 
 **Flaky means a test failed and then passed on the same commit, locally or in CI, with no change in
-between.** In the same change, the executor files an issue in the project's queue, routed by
-`dartway-documentation`, and quarantines the test with
-`skip: 'flaky: <issue link> — <what varied>'`. The issue either fixes the test or deletes it.
+between.** In the same change, the executor records the flake where `dartway-documentation` routes a finding — usually the feature's `knownIssues`, a `docs/dev_notes/` file when it is cross-cutting, plus an issue in the project's tracker when the project has one — and quarantines the test with `skip: 'flaky: <where it is recorded> — <what varied>'`. The record is closed by fixing the test or deleting it.
 
 **Re-running CI until green is not a fix.** It hides the flake and costs a full run each time.
 

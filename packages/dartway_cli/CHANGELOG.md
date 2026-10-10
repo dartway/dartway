@@ -4,7 +4,7 @@
 
 - Toolkit: `dartway-testing` requires red-before-fix proof only for bugfix tests; breaking code for
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
-  then passes on the same commit without changes is quarantined with a linked issue rather than
+  then passes on the same commit without changes is quarantined with a linked record rather than
   re-running CI until green (#513).
 
 - Toolkit: `dartway-finish` always runs fast gates locally and checks pull-request workflows per
