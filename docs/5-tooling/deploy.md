@@ -48,7 +48,8 @@ The generated Images workflow runs after the project's `CI` workflow completes
 successfully. Enable CI pushes on `master` and `release`; the template already
 does so. `workflow_run` loads workflows from the default branch, so the initial
 installation must be merged there before this trigger can run. PR CI successes
-build without pushing. Projects without a generated Studio manifest skip builds.
+build without pushing or writing shared caches. Fork PRs skip this privileged
+workflow. Projects without a generated Studio manifest skip builds.
 
 It respects `DW_CI_RUNS_ON`, builds `linux/amd64`, uses a GHA layer cache and
 pushes `<commit sha>` tags to GHCR with `GITHUB_TOKEN` on those two branches.

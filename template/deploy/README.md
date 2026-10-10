@@ -29,7 +29,8 @@ This refreshes `deploy/kamal/*`, `deploy/studio.yml` and
 `.github/workflows/images.yml`. Images runs after the required `CI` workflow
 succeeds. CI already runs on pushes to `master` and `release`. The generated
 workflow must first be merged into the default branch for `workflow_run` to
-trigger it. Unconfigured projects skip image builds. PR builds do not push.
+trigger it. Unconfigured projects skip image builds. Fork PRs skip this privileged workflow;
+other PR builds do not push or write shared caches.
 Successful branch CI
 builds each image once for `linux/amd64` and pushes its commit SHA to GHCR;
 existing tags are skipped, and GHA caches keep unchanged Flutter SDK layers.

@@ -19,6 +19,7 @@ jobs:
   images:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository &&
       (github.event.workflow_run.event == 'pull_request' ||
        github.event.workflow_run.head_branch == 'master' ||
        github.event.workflow_run.head_branch == 'release')
@@ -87,4 +88,4 @@ jobs:
           tags: ${{ steps.image.outputs.tag }}
           labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
           cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
+          cache-to: ${{ steps.image.outputs.publish == 'true' && format('type=gha,mode=max,scope={0}', matrix.service) || '' }}

@@ -1,8 +1,5 @@
 import 'dart:io';
 
-import 'package:args/command_runner.dart';
-import 'package:dartway_cli/src/commands/deploy_command.dart';
-
 import 'package:dartway_cli/src/deploy/kamal.dart';
 import 'package:dartway_cli/src/project_layout.dart';
 import 'package:path/path.dart' as p;
@@ -145,6 +142,32 @@ final routes = [
     );
   }
 
+  test('privileged image builds reject fork PRs and PRs cannot write caches', () {
+    final workflow = yaml(
+      DwKamalGenerator(root).render(),
+      '.github/workflows/images.yml',
+    );
+    final job = workflow['jobs']['images'] as YamlMap;
+    expect(
+      job['if'],
+      contains(
+        'github.event.workflow_run.head_repository.full_name == github.repository',
+      ),
+    );
+    final steps = (job['steps'] as YamlList).cast<YamlMap>();
+    final build = steps.singleWhere(
+      (step) => step['uses'] == 'docker/build-push-action@v6',
+    );
+    expect(
+      build['with']['cache-to'],
+      r"${{ steps.image.outputs.publish == 'true' && format('type=gha,mode=max,scope={0}', matrix.service) || '' }}",
+    );
+    final checkout = steps.singleWhere(
+      (step) => step['uses'] == 'actions/checkout@v4',
+    );
+    expect(checkout['with']['persist-credentials'], false);
+  });
+
   test('requires are names only and external database has no accessory', () {
     write(
       'deploy/config.yaml',
@@ -227,21 +250,22 @@ final routes = [
 
   test('CLI --check returns failure for the same stale route config', () async {
     final generator = DwKamalGenerator(root)..generate();
-    final originalDirectory = Directory.current;
-    Directory.current = root;
-    try {
-      final runner = CommandRunner<int>('dartway', 'test')
-        ..addCommand(DeployCommand());
-      expect(await runner.run(['deploy', 'kamal', '--check']), 0);
-      write(
-        'shop_server/lib/new_route.dart',
-        "DwHttpRoute.post('/new', handler);",
-      );
-      expect(await runner.run(['deploy', 'kamal', '--check']), 1);
-      expect(generator.generate(check: true), ['deploy/kamal/api.yml']);
-    } finally {
-      Directory.current = originalDirectory;
-    }
+    Future<ProcessResult> check() => Process.run(Platform.resolvedExecutable, [
+      '--packages=${p.absolute('../../.dart_tool/package_config.json')}',
+      p.absolute('bin/dartway.dart'),
+      'deploy',
+      'kamal',
+      '--check',
+    ], workingDirectory: root.path);
+    expect((await check()).exitCode, 0);
+    write(
+      'shop_server/lib/new_route.dart',
+      "DwHttpRoute.post('/new', handler);",
+    );
+    final stale = await check();
+    expect(stale.exitCode, 1);
+    expect(stale.stderr, contains('deploy/kamal/api.yml'));
+    expect(generator.generate(check: true), ['deploy/kamal/api.yml']);
   });
 
   test('decodes literal escapes and ignores route-looking strings', () {
