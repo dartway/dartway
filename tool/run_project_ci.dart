@@ -177,13 +177,13 @@ Future<String> _runStep(
   final envFile = File('${temp.path}/env_$index')..createSync();
   final outputFile = File('${temp.path}/output_$index')..createSync();
 
-  // GitHub's order: what earlier steps wrote to GITHUB_ENV, then the job's
-  // `env:` over it, then the step's own.
+  // GitHub's order: the job's `env:`, then what earlier steps wrote to
+  // GITHUB_ENV, then the step's own `env:`.
   final environment = {
     ...Platform.environment,
-    ...githubEnv,
     for (final MapEntry(:key, :value) in workflow.env.entries)
       key: context.resolve(value),
+    ...githubEnv,
     for (final MapEntry(:key, :value) in step.env.entries)
       key: context.resolve(value),
     'CI': 'true',
