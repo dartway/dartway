@@ -20,9 +20,20 @@ void main() {
             isNotNull,
             reason: 'Set DW_CHECK_STACK_IMAGE to the built deploy/check image.',
           );
-          final fixture = Directory(
-            'test/fixtures/check_stack/$storage',
-          ).absolute;
+          final source = Directory('test/fixtures/check_stack/$storage');
+          final fixture = Directory.systemTemp.createTempSync(
+            'dw-check-stack-',
+          );
+          addTearDown(() => fixture.deleteSync(recursive: true));
+          for (final file
+              in source.listSync(recursive: true).whereType<File>()) {
+            final relative = p
+                .relative(file.path, from: source.path)
+                .replaceFirst(RegExp(r'\.fixture$'), '');
+            final target = File(p.join(fixture.path, relative));
+            target.parent.createSync(recursive: true);
+            file.copySync(target.path);
+          }
           final result = await Process.run('docker', [
             'run',
             '--rm',
