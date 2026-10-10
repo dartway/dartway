@@ -344,6 +344,8 @@ void main() {
         bool running = true,
         bool migrationFails = false,
         bool healthy = true,
+        bool digestResolvable = true,
+        bool tagMatchesContainer = true,
       }) async {
         final bin = Directory(p.join(temp.path, 'bin'))..createSync();
         final docker = File(p.join(bin.path, 'docker'))
@@ -354,7 +356,11 @@ case "\$*" in
   *" ps -aq server"*) ${running ? 'echo old-container' : 'true'} ;;
   *" ps -q server"*) echo new-container ;;
   *"{{.Config.Image}}"*) echo shop-server ;;
-  "inspect -f {{.Image}}"*|"image inspect -f {{.Id}}"*) echo sha256:previous ;;
+  "inspect -f {{.Image}}"*) echo sha256:previous ;;
+  "inspect -f {{.Id}}"*) echo old-container ;;
+  "image inspect -f {{.Id}} sha256:previous") ${digestResolvable ? 'echo sha256:previous' : 'exit 1'} ;;
+  "image inspect -f {{.Id}}"*) echo ${tagMatchesContainer ? 'sha256:previous' : 'sha256:unserved'} ;;
+  "ps -aq --no-trunc --filter ancestor="*) ${tagMatchesContainer ? 'echo old-container' : 'echo other-container'} ;;
   *" run --rm --no-deps -T -e DW_MIGRATE_ONLY=true server"*) ${migrationFails ? 'echo "migration 42 failed" >&2; exit 1' : 'echo migrated'} ;;
   *"{{.State.Status}}"*) echo "running ${healthy ? 'healthy' : 'unhealthy'} 0 0" ;;
 esac
@@ -403,6 +409,41 @@ exit 0
           reason: 'no rollback',
         );
       });
+
+      test(
+        'an unresolvable container digest refuses a moved tag before stopping the server',
+        () async {
+          final (result, calls) = await replace(
+            digestResolvable: false,
+            tagMatchesContainer: false,
+          );
+          expect(result.exitCode, 1);
+          expect(
+            result.stderr,
+            contains('Cannot resolve the running server image'),
+          );
+          expect(at(calls, 'stop -t 45'), -1);
+          expect(at(calls, 'image tag sha256:unserved'), -1);
+          expect(
+            File(
+              p.join(temp.path, 'state/deploy-run/server.previous'),
+            ).existsSync(),
+            isFalse,
+          );
+        },
+      );
+
+      test(
+        'an unresolvable manifest uses a tag only when the container holds its image',
+        () async {
+          final (result, calls) = await replace(digestResolvable: false);
+          expect(result.ok, isTrue, reason: result.stderr);
+          expect(
+            at(calls, 'image tag sha256:previous shop-server:dw-previous'),
+            isNot(-1),
+          );
+        },
+      );
 
       test('a failed migration starts the previous image again', () async {
         final (result, calls) = await replace(migrationFails: true);
@@ -702,6 +743,37 @@ esac
       );
     }
 
+    test(
+      'resume retries failed outside probes without replacing services',
+      () async {
+        final site = await _VerifiedSite.start();
+        addTearDown(site.close);
+        const ids = ['server', 'web', 'verify-outside', 'cleanup'];
+        final server = _IdentityServer(
+          listing: 'shop_postgres_data\n',
+          record: [
+            for (final id in ids)
+              '$id ${id == 'cleanup' ? 'pending' : 'exited ${id == 'verify-outside' ? 1 : 0}'}',
+          ].join('\n'),
+        );
+        final result = await HttpOverrides.runWithHttpOverrides(
+          () => deploy(server, stackFrom(), const ['--resume']),
+          site.overrides,
+        );
+        expect(result.code, 0, reason: result.human);
+        expect(
+          result.events
+              .where((event) => event['event'] == 'step_started')
+              .map((event) => event['id']),
+          ['verify-outside', 'cleanup'],
+        );
+        expect(
+          result.events.where((event) => event['event'] == 'probe'),
+          isNotEmpty,
+        );
+      },
+    );
+
     for (final stuckCache in [false, true]) {
       test(
         '${stuckCache ? 'an unreclaimable cache' : 'a failing prune'} warns at exit 0; resume runs only cleanup',
@@ -794,6 +866,13 @@ esac
                 event['event'] == 'step_started' && event['id'] == 'cleanup',
           );
           expect(started, greaterThan(verify));
+          expect(
+            first.events.singleWhere(
+              (event) =>
+                  event['event'] == 'step_finished' && event['id'] == 'cleanup',
+            ),
+            containsPair('exit_code', 1),
+          );
           if (fail.existsSync()) fail.deleteSync();
           stats.writeAsStringSync('0 0B');
           final ids = DwDeployRunner(

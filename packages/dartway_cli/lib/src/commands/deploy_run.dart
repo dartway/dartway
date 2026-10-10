@@ -256,7 +256,11 @@ Future<int> runDeploy(
     remote: remote,
     resumeFrom: record,
     retryFailed: results.flag('retry-failed'),
-    retryFailedStepIds: {'cleanup', if (revision != null) 'update-checkout'},
+    retryFailedStepIds: {
+      'verify-outside',
+      'cleanup',
+      if (revision != null) 'update-checkout',
+    },
     trustedSucceededStepIds: {
       if (resumeVerifiedCheckout) 'update-checkout',
       // Outside success seals the deployment. A cleanup retry must not
@@ -390,6 +394,11 @@ Future<String?> executeDeploySteps(
         report.problems.writeln(
           'Warning: deployment succeeded, but cleanup failed: $error',
         );
+        report.event('step_failed', {
+          ...position,
+          'reason': 'exception',
+          'message': error.toString(),
+        });
         report.event('cleanup', {'warning': true, 'message': error.toString()});
         return null;
       }
@@ -430,6 +439,10 @@ Future<String?> executeDeploySteps(
           'Warning: deployment succeeded, but cleanup failed '
           '(exit ${result.exitCode}). Run --resume to retry cleanup.',
         );
+        report.event('step_finished', {
+          ...position,
+          'exit_code': result.exitCode,
+        });
         if (summary == null) _indent(report.problems, result.stdout);
         _indent(report.problems, result.stderr);
         return null;

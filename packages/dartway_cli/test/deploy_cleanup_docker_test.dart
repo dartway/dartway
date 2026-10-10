@@ -14,6 +14,141 @@ import 'support/deploy_fixtures.dart';
 void main() {
   for (final containerd in [false, true]) {
     test(
+      'unchanged deploy keeps its build cache (${containerd ? 'containerd' : 'classic'} store)',
+      () async {
+        final shell = await startEngine(containerd: containerd);
+        final setup = await shell.run(r'''
+set -e
+mkdir -p /stack /state
+cat >/stack/docker-compose.yml <<'YAML'
+name: shop
+services:
+  server:
+    build: .
+    healthcheck:
+      test: [CMD, test, -f, /payload]
+      interval: 1s
+      retries: 1
+  web:
+    build: .
+YAML
+cat >/stack/Dockerfile <<'DOCKER'
+FROM busybox:1.37
+COPY source /source
+RUN dd if=/dev/urandom of=/payload bs=1M count=3
+CMD ["sh", "-c", "if [ \"$DW_MIGRATE_ONLY\" = true ]; then exit 0; fi; trap 'exit 0' TERM; sleep 86400 & wait"]
+DOCKER
+echo unchanged >/stack/source
+''');
+        expect(setup.ok, isTrue, reason: setup.stderr);
+        final runner = DwDeployRunner(
+          ssh: shell,
+          stack: stackFrom(extra: '  min_free_disk: 1MB\n'),
+          appDir: '/stack',
+          storeDir: '/state',
+        );
+        expect((await runner.build()).ok, isTrue);
+        expect((await runner.replaceServer()).ok, isTrue);
+        expect((await runner.startWeb()).ok, isTrue);
+        final cleaned = await runner.cleanup();
+        expect(cleaned.ok, isTrue, reason: cleaned.stderr);
+        expect((await shell.run('rm -rf /state/deploy-run')).ok, isTrue);
+        final second = await runner.build();
+        expect(second.ok, isTrue, reason: second.stderr);
+        final output = '${second.stdout}\n${second.stderr}';
+        final cachedSteps = RegExp(
+          r'#(\d+) \[(server|web) \d+/\d+\] (COPY|RUN) ',
+        ).allMatches(output).toList();
+        expect(cachedSteps, isNotEmpty, reason: output);
+        for (final step in cachedSteps) {
+          expect(output, contains('#${step[1]} CACHED'), reason: output);
+        }
+      },
+    );
+
+    test(
+      'an interrupted build never becomes the rollback image (${containerd ? 'containerd' : 'classic'} store)',
+      () async {
+        final shell = await startEngine(containerd: containerd);
+        final setup = await shell.run(r'''
+set -e
+mkdir -p /stack /state
+cat >/stack/docker-compose.yml <<'YAML'
+name: shop
+services:
+  server:
+    build: .
+    healthcheck:
+      test: [CMD-SHELL, 'test "$$(cat /health)" = ok']
+      interval: 1s
+      retries: 1
+  web:
+    build: .
+YAML
+cat >/stack/Dockerfile <<'DOCKER'
+FROM busybox:1.37
+COPY health /health
+CMD ["sh", "-c", "if [ \"$DW_MIGRATE_ONLY\" = true ]; then exit 0; fi; trap 'exit 0' TERM; sleep 86400 & wait"]
+DOCKER
+echo ok >/stack/health
+''');
+        expect(setup.ok, isTrue, reason: setup.stderr);
+        final runner = DwDeployRunner(
+          ssh: shell,
+          stack: stackFrom(extra: '  min_free_disk: 1MB\n'),
+          appDir: '/stack',
+          storeDir: '/state',
+        );
+        expect((await runner.build()).ok, isTrue);
+        expect((await runner.replaceServer()).ok, isTrue);
+        final serving = await shell.run(
+          "docker inspect -f '{{.Image}}' \"\$(cd /stack && docker compose ps -q server)\"",
+        );
+        expect(serving.ok, isTrue);
+        // An earlier build moved the tag but failed before the server step
+        // without a durable rollback pin; the original container still serves.
+        expect(
+          (await shell.run(
+            'rm -rf /state/deploy-run; echo bad >/stack/health',
+          )).ok,
+          isTrue,
+        );
+        final interrupted = await shell.run(
+          'cd /stack && docker compose build',
+        );
+        expect(interrupted.ok, isTrue, reason: interrupted.stderr);
+        expect((await shell.run('rm -rf /state/deploy-run')).ok, isTrue);
+        final fresh = await runner.build();
+        if (!fresh.ok) {
+          expect(
+            fresh.stderr,
+            contains('Cannot resolve the running server image'),
+          );
+          expect(
+            (await shell.run('test ! -f /state/deploy-run/server.previous')).ok,
+            isTrue,
+          );
+        } else {
+          final failed = await runner.replaceServer();
+          expect(failed.ok, isFalse);
+          expect(
+            failed.stderr,
+            contains('the previous server is running again'),
+          );
+        }
+        final recovered = await shell.run(
+          "docker inspect -f '{{.Image}}' \"\$(cd /stack && docker compose ps -q server)\"",
+        );
+        expect(recovered.stdout.trim(), serving.stdout.trim());
+        final healthy = await shell.run(
+          '${DwDeployRunner.waitHealthyFunction(timeoutSeconds: 10)}\n'
+          'dw_wait_healthy "\$(cd /stack && docker compose ps -q server)" rollback',
+        );
+        expect(healthy.ok, isTrue, reason: healthy.stderr);
+      },
+    );
+
+    test(
       'three deploys bound images and cache (${containerd ? 'containerd' : 'classic'} store)',
       () async {
         final shell = await startEngine(containerd: containerd);
@@ -54,7 +189,7 @@ docker tag nginx:fixture shop-web:accessory
         final runner = DwDeployRunner(
           ssh: shell,
           stack: stackFrom(
-            extra: '  build_cache_keep: 1MB\n  min_free_disk: 1MB\n',
+            extra: '  build_cache_keep: 4MB\n  min_free_disk: 1MB\n',
           ),
           appDir: '/stack',
           storeDir: '/state',
@@ -109,10 +244,27 @@ docker tag nginx:fixture shop-web:accessory
               .steps(skipGitUpdate: true)
               .singleWhere((step) => step.id == 'cleanup');
           final cleaned = await cleanup.run();
+          // Kept images plus the current source exceed the 4 MB budget. Preserve their
+          // keys and warn; the private cache must still respect the budget.
           expect(
-            cleaned.ok,
-            isTrue,
+            cleaned.exitCode,
+            1,
             reason: '${cleaned.stdout}\n${cleaned.stderr}',
+          );
+          expect(cleaned.stderr, contains('Docker retains cache references'));
+          expect(DwDeployRunner.cleanupReport(cleaned), isNotNull);
+          final privateCache = await shell.run(
+            "docker buildx du --builder default --format '{{if not .Shared}}{{.Size}}{{end}}'",
+          );
+          expect(privateCache.ok, isTrue, reason: privateCache.stderr);
+          final privateBytes = privateCache.stdout
+              .split('\n')
+              .where((line) => line.trim().isNotEmpty)
+              .fold<int>(0, (sum, line) => sum + diskBytes(line.trim()));
+          expect(
+            privateBytes,
+            lessThanOrEqualTo(4 * 1024 * 1024),
+            reason: privateCache.stdout,
           );
           final usage = await shell.run(
             "docker system df --format '{{json .}}'",
@@ -145,13 +297,6 @@ docker tag nginx:fixture shop-web:accessory
               );
               expect(journal.stdout.trim(), entry.value[1]);
             }
-            expect(
-              diskBytes(
-                rows.singleWhere((row) => row['Type'] == 'Build Cache')['Size']
-                    as String,
-              ),
-              lessThanOrEqualTo(1024 * 1024),
-            );
             // Human sizes round and metadata varies; at most 1 MiB growth.
             expect(bytes, lessThanOrEqualTo(usedAfterTwo + 1024 * 1024));
           }
@@ -252,7 +397,7 @@ services:
     image: busybox:1.37
 YAML
 cat >/stack/Dockerfile <<'DOCKER'
-FROM dart:${Platform.version.split(' ').first} AS build
+FROM dart:stable AS build
 WORKDIR /app
 COPY pubspec.yaml .
 COPY packages packages

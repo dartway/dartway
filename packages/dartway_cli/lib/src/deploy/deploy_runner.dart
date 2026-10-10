@@ -364,10 +364,21 @@ if [ ! -f '$_journalDirectory/$service.previous' ]; then
   if [ -n "\$previous_container" ]; then
     image_name=\$(docker inspect -f '{{.Config.Image}}' "\$previous_container")
     container_image=\$(docker inspect -f '{{.Image}}' "\$previous_container")
-    # With attestations the container runs a platform manifest inside an
-    # image index. Resolve the exported image before the build moves its tag.
+    # With attestations .Image may be a platform manifest which Docker
+    # cannot inspect. A tag is safe only if its exported image still holds
+    # this exact container; a failed earlier build may already have moved it.
     if ! docker image inspect -f '{{.Id}}' "\$container_image" >'$_journalDirectory/$service.previous.tmp' 2>/dev/null; then
-      docker image inspect -f '{{.Id}}' "\$image_name" >'$_journalDirectory/$service.previous.tmp'
+      if ! docker image inspect -f '{{.Id}}' "\$image_name" >'$_journalDirectory/$service.previous.tmp' 2>/dev/null; then
+        echo "Cannot resolve the running $service image (\$container_image); refusing to record a rollback image." >&2
+        exit 1
+      fi
+      candidate=\$(cat '$_journalDirectory/$service.previous.tmp')
+      holders=\$(docker ps -aq --no-trunc --filter "ancestor=\$candidate")
+      full_container=\$(docker inspect -f '{{.Id}}' "\$previous_container")
+      if ! printf '%s\\n' "\$holders" | grep -Fxq "\$full_container"; then
+        echo "Cannot resolve the running $service image (\$container_image): \$image_name points to a different image; refusing to record a rollback image." >&2
+        exit 1
+      fi
     fi
     # The containerd store can drop an untagged exported image once its
     # container is removed. Pin it before replacement, not during cleanup.
@@ -912,25 +923,16 @@ for service in ${DwStack.serverService} ${DwStack.webService}; do
 done
 # The daemon's docker driver builds Compose images; this command prunes that
 # same builder, independent of a user's selected buildx builder.
-# Shared records are excluded from BuildKit's budget. Releasing them can
-# make parents private/reclaimable, so apply the budget again only when the
-# observed cache still exceeds it and a pass made progress.
-passes=0
-while :; do
-  old_cache="\$cache"
-  docker builder prune -a -f --keep-storage '${target.buildCacheKeep}' >'$_journalDirectory/cleanup-prune.out' || code=1
-  docker builder prune -a -f --filter 'shared=""' >'$_journalDirectory/cleanup-shared.out' || code=1
-  cache=\$(dw_cache_stats)
-  cache_bytes=\$(dw_cache_bytes "\$cache")
-  cache_after=\$(printf '%s\\n' "\$cache" | awk 'NF {print \$1}')
-  passes=\$((passes + 1))
-  [ "\$cache_bytes" -gt ${target.buildCacheKeepBytes} ] || break
-  if [ "\$cache" = "\$old_cache" ] || [ "\$passes" -ge 3 ] || [ "\$code" -ne 0 ]; then
-    echo "Build cache remains above ${target.buildCacheKeep}: \$cache_bytes bytes; Docker retains cache references. Inspect docker buildx du --builder default --verbose." >&2
-    code=1
-    break
-  fi
-done
+# Every prune uses the configured budget. Keep shared cache keys for images
+# which remain on the daemon, so an unchanged build can reuse their layers.
+docker builder prune -a -f --keep-storage '${target.buildCacheKeep}' >'$_journalDirectory/cleanup-prune.out' || code=1
+cache=\$(dw_cache_stats)
+cache_bytes=\$(dw_cache_bytes "\$cache")
+cache_after=\$(printf '%s\\n' "\$cache" | awk 'NF {print \$1}')
+if [ "\$cache_bytes" -gt ${target.buildCacheKeepBytes} ]; then
+  echo "Build cache remains above ${target.buildCacheKeep}: \$cache_bytes bytes; Docker retains cache references. Inspect docker buildx du --builder default --verbose." >&2
+  code=1
+fi
 cache_removed=\$((cache_before - cache_after))
 [ "\$cache_removed" -ge 0 ] || cache_removed=0
 space=\$(dw_disk_space "\$dw_docker_root")
