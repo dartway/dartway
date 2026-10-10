@@ -347,6 +347,7 @@ void main() {
         bool digestResolvable = true,
         bool tagMatchesContainer = true,
         bool pinned = false,
+        bool withoutRollbackImage = false,
       }) async {
         final bin = Directory(p.join(temp.path, 'bin'))..createSync();
         final docker = File(p.join(bin.path, 'docker'))
@@ -379,6 +380,7 @@ exit 0
           stack: stackFrom(),
           appDir: p.join(temp.path, 'shop'),
           storeDir: p.join(temp.path, 'state'),
+          withoutRollbackImage: withoutRollbackImage,
         ).replaceServer();
         final issued = calls.existsSync()
             ? calls.readAsLinesSync().map((line) => line.trim()).toList()
@@ -425,6 +427,12 @@ exit 0
             result.stderr,
             contains('Cannot resolve the running server image'),
           );
+          expect(
+            result.stderr.trim(),
+            endsWith(
+              'dartway deploy run --env staging --without-rollback-image',
+            ),
+          );
           expect(at(calls, 'stop -t 45'), -1);
           expect(at(calls, 'image tag sha256:unserved'), -1);
           expect(
@@ -435,6 +443,65 @@ exit 0
           );
         },
       );
+
+      test(
+        'an unresolved image can be explicitly waived, leaving no rollback after a failed migration',
+        () async {
+          final (result, calls) = await replace(
+            digestResolvable: false,
+            tagMatchesContainer: false,
+            withoutRollbackImage: true,
+            migrationFails: true,
+          );
+          expect(result.exitCode, 1);
+          expect(
+            File(
+              p.join(temp.path, 'state/deploy-run/server.previous'),
+            ).readAsStringSync(),
+            isEmpty,
+          );
+          expect(
+            result.stderr
+                .split('\n')
+                .where((line) => line.startsWith('WARNING:')),
+            [
+              'WARNING: this deploy has no rollback image for server; '
+                  'a failure leaves the service down until the next deploy.',
+            ],
+          );
+          expect(
+            result.stderr,
+            contains('there is no previous server to start again'),
+          );
+          expect(at(calls, 'stop -t 45 server'), isNot(-1));
+          expect(at(calls, 'image tag'), -1);
+          expect(at(calls, 'up -d --no-deps server'), -1);
+        },
+      );
+
+      for (final digestResolvable in [true, false]) {
+        test(
+          'the waiver still pins a resolvable ${digestResolvable ? 'digest' : 'tag'}',
+          () async {
+            final (result, calls) = await replace(
+              digestResolvable: digestResolvable,
+              withoutRollbackImage: true,
+            );
+            expect(result.ok, isTrue, reason: result.stderr);
+            expect(result.stderr, isNot(contains('WARNING:')));
+            expect(
+              File(
+                p.join(temp.path, 'state/deploy-run/server.previous'),
+              ).readAsStringSync().trim(),
+              'sha256:previous',
+            );
+            expect(
+              at(calls, 'image tag sha256:previous shop-server:dw-previous'),
+              isNot(-1),
+            );
+          },
+        );
+      }
 
       test(
         'an unresolvable manifest uses a tag only when the container holds its image',
@@ -766,6 +833,70 @@ esac
         ],
       );
     }
+
+    test(
+      'deploy run forwards the waiver and prints the successful build warning once',
+      () async {
+        final temp = Directory.systemTemp.createTempSync('dw_rollback_waiver_');
+        addTearDown(() => temp.deleteSync(recursive: true));
+        final bin = Directory(p.join(temp.path, 'bin'))..createSync();
+        final journal = Directory(p.join(temp.path, 'journal'))..createSync();
+        final calls = File(p.join(temp.path, 'calls'));
+        final docker = File(p.join(bin.path, 'docker'))
+          ..writeAsStringSync('''
+#!/bin/sh
+echo "\$*" >> '${calls.path}'
+case "\$*" in
+  *" ps -aq server"*) echo old-container ;;
+  "inspect -f {{.Config.Image}}"*) echo shop-server:latest ;;
+  "inspect -f {{.Image}}"*) echo sha256:manifest ;;
+  "inspect -f {{.Id}}"*) echo old-container ;;
+  "image inspect -f {{.Id}} shop-server:latest") echo sha256:unserved ;;
+  "image inspect"*) exit 1 ;;
+  "ps -aq --no-trunc --filter ancestor="*) echo other-container ;;
+esac
+''');
+        Process.runSync('chmod', ['+x', docker.path]);
+        final site = await _VerifiedSite.start();
+        addTearDown(site.close);
+        final server = _IdentityServer(
+          listing: 'shop_postgres_data\n',
+          buildRun: (input) =>
+              LocalShell(
+                environment: {
+                  'PATH': '${bin.path}:${Platform.environment['PATH']}',
+                },
+              ).run(
+                input
+                    .replaceAll('/home/deployer/shop', temp.path)
+                    .replaceAll(
+                      '/home/deployer/.config/shop/deploy-run',
+                      journal.path,
+                    ),
+              ),
+        );
+        final result = await HttpOverrides.runWithHttpOverrides(
+          () => deploy(server, stackFrom(), const ['--without-rollback-image']),
+          site.overrides,
+        );
+        expect(result.code, 0, reason: result.human);
+        expect(
+          File(p.join(journal.path, 'server.previous')).readAsStringSync(),
+          isEmpty,
+        );
+        expect(calls.readAsStringSync(), isNot(contains('image tag')));
+        const warning =
+            'WARNING: this deploy has no rollback image for server; '
+            'a failure leaves the service down until the next deploy.';
+        expect(
+          result.human.split('\n').where((line) => line.contains(warning)),
+          ['  $warning'],
+        );
+        expect(result.events.where((event) => event['event'] == 'notice'), [
+          containsPair('message', warning),
+        ]);
+      },
+    );
 
     test(
       'resume retries failed outside probes without replacing services',
@@ -1560,9 +1691,11 @@ class _IdentityServer extends RecordingSsh {
     this.record,
     this.exitCode = 0,
     this.cleanupRun,
+    this.buildRun,
   });
 
   final Future<DwSshResult> Function(String)? cleanupRun;
+  final Future<DwSshResult> Function(String)? buildRun;
 
   final String listing;
   final String? record;
@@ -1614,8 +1747,13 @@ class _IdentityServer extends RecordingSsh {
     String input,
   ) async {
     started.add((command: command, script: input));
-    if (input.contains('docker builder prune') && cleanupRun != null) {
-      final result = await cleanupRun!(input);
+    final execute = input.contains('docker builder prune')
+        ? cleanupRun
+        : input.contains(' build\n')
+        ? buildRun
+        : null;
+    if (execute != null) {
+      final result = await execute(input);
       final nonce = _nonce.firstMatch(command)!.group(0)!;
       return DwSshResult(
         exitCode: 0,

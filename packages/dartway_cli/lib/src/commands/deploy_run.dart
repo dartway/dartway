@@ -67,7 +67,12 @@ Future<int> runDeploy(
       report.event('notice', {'message': notice});
     },
   );
-  final runner = DwDeployRunner(ssh: ssh, stack: stack, remote: remote);
+  final runner = DwDeployRunner(
+    ssh: ssh,
+    stack: stack,
+    remote: remote,
+    withoutRollbackImage: results.flag('without-rollback-image'),
+  );
   var steps = runner.steps(
     skipGitUpdate: results.flag('skip-git-update'),
     revision: revision,
@@ -456,6 +461,13 @@ Future<String?> executeDeploySteps(
     // text comes out green and blank.
     if (step.showOutput) {
       _indent(out, '${result.stdout}\n${result.stderr}');
+    } else if (result.ok) {
+      for (final line in result.stderr.split('\n')) {
+        if (line.startsWith('WARNING: this deploy has no rollback image')) {
+          report.problems.writeln('  $line');
+          report.event('notice', {'message': line});
+        }
+      }
     }
 
     if (!result.ok) {

@@ -138,6 +138,13 @@ class DeployRunCommand extends Command<int> {
         help: 'Deploy this verified commit from the configured branch.',
       )
       ..addFlag(
+        'without-rollback-image',
+        negatable: false,
+        help:
+            'Allow this deploy when the running image cannot be resolved. '
+            'A failure leaves the service down until the next deploy.',
+      )
+      ..addFlag(
         'resume',
         negatable: false,
         help:
@@ -180,7 +187,7 @@ class DeployRunCommand extends Command<int> {
   @override
   String get invocation =>
       'dartway deploy run --env <environment> [--dry-run] [--skip-git-update] '
-      '[--revision <sha>] [--resume] [--progress json]';
+      '[--revision <sha>] [--without-rollback-image] [--resume] [--progress json]';
 
   @override
   Future<int> run() {
