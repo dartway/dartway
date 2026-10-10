@@ -2,6 +2,8 @@
 
 ## 0.24.0
 
+- Toolkit: align checkup with must-test risk classes and clarify the scaffold's restricted-channel leak check (#528).
+
 - Toolkit: tests are mandatory only for six risk classes; other tests are rare and must pass the
   `dartway-testing` gate. Agent rules govern expectations and assertion changes. `dartway-plan`
   selects **Risks to guard** with a class and expected outcome, and the feature scaffold adds only
