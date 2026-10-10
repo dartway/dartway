@@ -347,10 +347,7 @@ wait "$child"
       ('containers', <String, String>{}, 1, true),
       (
         'database',
-        {
-          'DW_TEST_DATABASE_URL':
-              'postgres://user:private@127.0.0.1:5432/postgres',
-        },
+        {'DW_TEST_DATABASE_URL': 'postgres://user:private@127.0.0.1/postgres'},
         0,
         false,
       ),
@@ -417,6 +414,8 @@ wait "$child"
         if (needsDocker) {
           expect(text, contains('Docker'));
           expect(text, contains('daemon is not responding'));
+          expect(text, contains('DW_TEST_DATABASE_URL'));
+          expect(text, contains('DW_TEST_STORAGE_URL'));
         }
         if (mode == 'malformed URL') {
           expect(text, contains('DW_TEST_DATABASE_URL'));
@@ -434,6 +433,34 @@ wait "$child"
             }
           }
         }
+      });
+    }
+
+    for (final (variable, url) in [
+      ('DW_TEST_DATABASE_URL', 'postgres://user:private@192.0.2.1/postgres'),
+      ('DW_TEST_STORAGE_URL', 'http://key:private@192.0.2.1:9000'),
+    ]) {
+      test('remote $variable has doctor-specific guidance', () async {
+        final process = await launch(
+          [],
+          command: 'doctor',
+          environment: {
+            'PUB_HOSTED_URL': 'http://127.0.0.1:${pubHost.port}',
+            variable: url,
+          },
+        );
+        final output = process.stdout.transform(utf8.decoder).join();
+        final errors = process.stderr.transform(utf8.decoder).join();
+        expect(await process.exitCode, 1);
+        final text = '${await output}${await errors}';
+        expect(
+          text,
+          contains('$variable: test servers must resolve only to loopback.'),
+        );
+        expect(text, contains('Doctor has no remote-server override'));
+        expect(text, contains('dartway test --allow-remote-test-server'));
+        expect(text, isNot(contains('private')));
+        expect(dockerCalled.existsSync(), isFalse);
       });
     }
   });
@@ -528,7 +555,7 @@ esac
   }
 
   test(
-    'compiled CLI uses Dart for both the suite and service workers',
+    'compiled CLI strips test URL defaults from the suite and service workers',
     () async {
       compiledCli = p.join(root.path, 'dartway');
       final compiled = await Process.run(Platform.resolvedExecutable, [
@@ -554,31 +581,58 @@ esac
       });
       containerDocker();
       File(p.join(server.path, 'test/compiled_test.dart')).writeAsStringSync('''
+import 'dart:io';
 import 'package:test/test.dart';
-void main() { test('suite ran', () => expect(2 + 2, 4)); }
+void main() {
+  test('suite receives only selected service coordinates', () {
+    expect(Platform.environment.containsKey('DW_TEST_DATABASE_URL'), isFalse);
+    expect(Platform.environment.containsKey('DW_TEST_STORAGE_URL'), isFalse);
+    expect(Platform.environment['DW_DATABASE_PORT'], '54321');
+    expect(Platform.environment['DW_STORAGE_ENDPOINT'], 'http://127.0.0.1:${storage.port}');
+  });
+}
 ''');
       final dartCalled = File(p.join(root.path, 'dart_called'));
       final dart = File(p.join(root.path, 'bin/dart'));
       dart.writeAsStringSync('''
 #!/bin/sh
 echo "\$1" >> '${dartCalled.path}'
+if [ "\${DW_TEST_DATABASE_URL+x}" = x ] || [ "\${DW_TEST_STORAGE_URL+x}" = x ]; then
+  echo 'Inherited test URL leaked to a child process' >&2
+  exit 42
+fi
 exec '${Platform.resolvedExecutable}' "\$@"
 ''');
       await Process.run('chmod', ['+x', dart.path]);
-      final process = await launch([
-        '--storage-url',
-        'http://key:secret@127.0.0.1:${storage.port}',
-      ], compiled: true);
-      addTearDown(() => process.kill(ProcessSignal.sigkill));
-      final output = process.stdout.transform(utf8.decoder).join();
-      final errors = process.stderr.transform(utf8.decoder).join();
-      final code = await process.exitCode.timeout(const Duration(seconds: 40));
-      expect(code, 0, reason: '${await output}${await errors}');
+      final storageUrl = 'http://key:secret@127.0.0.1:${storage.port}';
+      for (final fromFlag in [false, true]) {
+        final process = await launch(
+          [
+            if (fromFlag) ...['--storage-url', storageUrl],
+          ],
+          compiled: true,
+          environment: {
+            'DW_TEST_DATABASE_URL': '',
+            'DW_TEST_STORAGE_URL': fromFlag
+                ? 'http://key:private@192.0.2.1:9000'
+                : storageUrl,
+          },
+        );
+        addTearDown(() => process.kill(ProcessSignal.sigkill));
+        final output = process.stdout.transform(utf8.decoder).join();
+        final errors = process.stderr.transform(utf8.decoder).join();
+        final code = await process.exitCode.timeout(
+          const Duration(seconds: 40),
+        );
+        expect(code, 0, reason: '${await output}${await errors}');
+      }
       final calls = dartCalled.readAsLinesSync();
-      expect(calls, hasLength(3));
-      expect(calls[0], startsWith('--packages='));
-      expect(calls[1], 'test');
-      expect(calls[2], startsWith('--packages='));
+      expect(calls, hasLength(6));
+      for (final offset in [0, 3]) {
+        expect(calls[offset], startsWith('--packages='));
+        expect(calls[offset + 1], 'test');
+        expect(calls[offset + 2], startsWith('--packages='));
+      }
       expect(dockerCalled.readAsStringSync(), contains('rm database-id'));
     },
     timeout: const Timeout(Duration(minutes: 2)),
@@ -694,6 +748,8 @@ import 'package:dartway_core_server/testing.dart';
 import 'package:test/test.dart';
 void main() {
   test('creates isolated resources', () async {
+    expect(Platform.environment.containsKey('DW_TEST_DATABASE_URL'), isFalse);
+    expect(Platform.environment.containsKey('DW_TEST_STORAGE_URL'), isFalse);
     final database = await DwTestDatabase.create(prefix: 'custom_test');
     ${storage ? 'final storage = await DwTestStorage.create(prefix: "custom-test");' : ''}
     final ready = File('${root.path}/$name.json.tmp');

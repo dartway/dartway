@@ -237,14 +237,17 @@ class DoctorCommand extends Command<int> {
           database: database,
           source: variable,
         );
-        await server.environment(database: database, allowRemote: false);
+        await server.environment(
+          database: database,
+          allowRemote: false,
+          remoteServerGuidance:
+              'Doctor has no remote-server override; use a loopback URL here. '
+              'For a dedicated remote test server, run '
+              '`dartway test --allow-remote-test-server` deliberately.',
+        );
         if (database) needsDocker = false;
         final uri = server.uri;
-        final port = uri.hasPort
-            ? uri.port
-            : database
-            ? 5432
-            : uri.port;
+        final port = database && !uri.hasPort ? 5432 : uri.port;
         hosts.add('${database ? 'Postgres' : 'S3'} ${uri.host}:$port');
       } on FormatException catch (error) {
         return [
@@ -283,9 +286,10 @@ class DoctorCommand extends Command<int> {
         'not found on PATH',
         fix:
             'Install Docker Desktop — https://docs.docker.com/get-docker/ '
-            'for local development. Without Docker, run tests with '
-            '`dartway test --database-url postgres://user:password@localhost/postgres` '
-            '(and --storage-url for uploads).',
+            'for local development. Without Docker, set DW_TEST_DATABASE_URL '
+            'to postgres://user:password@localhost/postgres '
+            '(and DW_TEST_STORAGE_URL for uploads), or pass '
+            '--database-url / --storage-url to `dartway test`.',
       );
     }
     if (result.exitCode != 0) {
@@ -294,8 +298,9 @@ class DoctorCommand extends Command<int> {
         'installed, but the daemon is not responding',
         fix:
             'Start Docker Desktop and wait until it reports "running" '
-            'for container runs, or use `dartway test --database-url` '
-            'with an explicit test server (--storage-url for uploads).',
+            'for container runs, or set DW_TEST_DATABASE_URL '
+            '(and DW_TEST_STORAGE_URL for uploads). `dartway test` also accepts '
+            '--database-url / --storage-url; flags do not change doctor checks.',
       );
     }
     return _Check.ok('Docker', 'daemon responding');

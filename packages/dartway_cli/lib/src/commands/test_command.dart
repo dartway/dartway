@@ -135,12 +135,14 @@ class TestCommand extends Command<int> {
       16,
       (_) => random.nextInt(36).toRadixString(36),
     ).join();
-    // Drop every inherited service option, including CA, buckets and region.
-    // Without an explicit storage URL, inherited stage storage is unreachable.
+    // Children receive only this run's coordinates, never inherited service
+    // options or URL defaults that may name an overridden server.
     final environment = {
       for (final entry in Platform.environment.entries)
         if (!entry.key.startsWith('DW_DATABASE_') &&
-            !entry.key.startsWith('DW_STORAGE_'))
+            !entry.key.startsWith('DW_STORAGE_') &&
+            entry.key != 'DW_TEST_DATABASE_URL' &&
+            entry.key != 'DW_TEST_STORAGE_URL')
           entry.key: entry.value,
       'DW_TEST_RUN_ID': runId,
     };

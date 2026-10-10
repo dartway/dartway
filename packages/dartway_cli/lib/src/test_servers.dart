@@ -63,13 +63,15 @@ class TestServerUrl {
   Future<Map<String, String>> environment({
     required bool database,
     required bool allowRemote,
+    String remoteServerGuidance =
+        'Use --allow-remote-test-server only for a dedicated test server.',
   }) async {
     final addresses = await InternetAddress.lookup(uri.host);
     if (addresses.isEmpty ||
         (!allowRemote && addresses.any((address) => !address.isLoopback))) {
       throw FormatException(
         '$source: test servers must resolve only to loopback. '
-        'Use --allow-remote-test-server only for a dedicated test server.',
+        '$remoteServerGuidance',
       );
     }
     final host = uri.host;

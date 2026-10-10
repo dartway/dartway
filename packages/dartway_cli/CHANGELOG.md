@@ -23,7 +23,10 @@
   count as unset. The run banner and URL refusals name the source, and the existing
   loopback guard, isolation, cleanup and `--keep` refusal apply. `dartway doctor` reports the
   environment-selected hosts without credentials and skips the Docker check only when the
-  database URL is set; storage alone still needs Docker for Postgres (#522).
+  database URL is set; storage alone still needs Docker for Postgres. Both test URL variables
+  are removed from the suite and service workers' environment, including overridden defaults.
+  Doctor's remote-server refusal explains its loopback requirement and the test command's
+  explicit opt-in; Docker fixes name the test-only variables as well as the flags (#522).
 
 - Toolkit: `dartway-finish` always runs fast gates locally and checks pull-request workflows per
   suite. CI-covered suites run only changed and mirrored tests locally, with a full local fallback
