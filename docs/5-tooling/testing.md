@@ -95,12 +95,17 @@ export DW_TEST_STORAGE_URL=http://test_key:test_secret@127.0.0.1:9000
 dart run dartway_cli:dartway test
 ```
 
-Each flag overrides its environment variable. A supplied URL prevents Docker from being called
-for that service; with neither flag nor test-only variable, the container defaults apply.
+Each flag overrides its environment variable; `--no-storage` ignores `DW_TEST_STORAGE_URL`, but
+cannot be combined with an explicit `--storage-url`. An empty environment variable counts as unset.
+A supplied URL prevents Docker from being called for that service; with neither flag nor test-only
+variable, the container defaults apply.
 The run banner names the source (`--database-url` or `DW_TEST_DATABASE_URL`, and the storage
-equivalent). When either variable is set, `dartway doctor` reports
-`tests: explicit servers from environment` with the hosts and no credentials, and does not
-require Docker for tests.
+equivalent), and URL refusals name that source. `dartway doctor` reports
+`tests: explicit servers from environment` with the supplied hosts and no credentials. It skips the
+Docker check only when `DW_TEST_DATABASE_URL` is set: database-only mode disables storage, while
+storage-only mode still starts Postgres in Docker and keeps the Docker check. Doctor does not read
+the test command's flags; with a database URL supplied only by flag, its environment-based check
+still requires Docker.
 
 `--database-url` names the maintenance database on the test server; the role needs `CREATEDB`.
 The password is required and the port is optional (it defaults to 5432). `--storage-url` accepts HTTP or HTTPS with access and secret keys,

@@ -53,7 +53,7 @@ class DoctorCommand extends Command<int> {
       _checkFlutter(),
       _checkGit(),
       await _checkPubHost(),
-      await _checkTestServers(),
+      ...await _checkTestServers(),
       _checkPubGlobalBinOnPath(),
     ];
 
@@ -222,17 +222,23 @@ class DoctorCommand extends Command<int> {
       'you trust — `dart pub get` has no deadline of its own and will hang '
       'on this without printing anything';
 
-  Future<_Check> _checkTestServers() async {
+  Future<List<_Check>> _checkTestServers() async {
     final hosts = <String>[];
+    var needsDocker = true;
     for (final (variable, database) in [
       ('DW_TEST_DATABASE_URL', true),
       ('DW_TEST_STORAGE_URL', false),
     ]) {
-      final value = Platform.environment[variable];
+      final value = testServerUrlFromEnvironment(variable);
       if (value == null) continue;
       try {
-        final server = TestServerUrl.parse(value, database: database);
+        final server = TestServerUrl.parse(
+          value,
+          database: database,
+          source: variable,
+        );
         await server.environment(database: database, allowRemote: false);
+        if (database) needsDocker = false;
         final uri = server.uri;
         final port = uri.hasPort
             ? uri.port
@@ -241,26 +247,32 @@ class DoctorCommand extends Command<int> {
             : uri.port;
         hosts.add('${database ? 'Postgres' : 'S3'} ${uri.host}:$port');
       } on FormatException catch (error) {
-        return _Check.fail(
-          'tests',
-          '$variable: ${error.message}',
-          fix:
-              'Set $variable to a valid loopback test server URL, or unset it for container runs.',
-        );
+        return [
+          _Check.fail(
+            'tests',
+            error.message,
+            fix:
+                'Set $variable to a valid loopback test server URL, or unset it for container runs.',
+          ),
+        ];
       } on SocketException {
-        return _Check.fail(
-          'tests',
-          '$variable: could not resolve the test server host',
-          fix: 'Use a literal loopback address in $variable.',
-        );
+        return [
+          _Check.fail(
+            'tests',
+            '$variable: could not resolve the test server host',
+            fix: 'Use a literal loopback address in $variable.',
+          ),
+        ];
       }
     }
-    return hosts.isEmpty
-        ? _checkDocker()
-        : _Check.ok(
-            'tests',
-            'explicit servers from environment; ${hosts.join('; ')}',
-          );
+    return [
+      if (hosts.isNotEmpty)
+        _Check.ok(
+          'tests',
+          'explicit servers from environment; ${hosts.join('; ')}',
+        ),
+      if (needsDocker) _checkDocker(),
+    ];
   }
 
   _Check _checkDocker() {

@@ -219,10 +219,54 @@ wait "$child"
     });
   }
 
-  test('storage from environment refuses --no-storage', () async {
+  for (final (flag, variable, malformed) in [
+    (
+      '--database-url',
+      'DW_TEST_DATABASE_URL',
+      'postgres://user:private@localhost',
+    ),
+    (
+      '--storage-url',
+      'DW_TEST_STORAGE_URL',
+      'http://key:private@localhost/bucket',
+    ),
+  ]) {
+    for (final fromFlag in [false, true]) {
+      final source = fromFlag ? flag : variable;
+      test('malformed $source names its source without credentials', () async {
+        final (code, output) = await run(
+          fromFlag ? [flag, malformed] : [],
+          environment: {variable: malformed},
+        );
+        expect(code, 1);
+        expect(output, contains('$source must be'));
+        expect(output, isNot(contains('private')));
+        expect(dockerCalled.existsSync(), isFalse);
+      });
+    }
+  }
+
+  for (final keep in [false, true]) {
+    test(
+      '--no-storage overrides environment storage with keep=$keep',
+      () async {
+        final (code, output) = await run(
+          ['--no-storage', if (keep) '--keep'],
+          // Ignored storage must not be parsed or make this an external run.
+          environment: {'DW_TEST_STORAGE_URL': 'invalid'},
+        );
+        expect(code, 1); // The fake Docker daemon is unavailable.
+        expect(output, contains('storage disabled'));
+        expect(output, contains('Could not start the test database'));
+        expect(dockerCalled.existsSync(), isTrue);
+      },
+    );
+  }
+
+  test('explicit storage flag still refuses --no-storage', () async {
     final (code, output) = await run(
-      ['--no-storage'],
-      environment: {'DW_TEST_STORAGE_URL': 'http://key:secret@127.0.0.1:9000'},
+      ['--storage-url', 'http://key:secret@127.0.0.1:9000', '--no-storage'],
+      environment: {'DW_TEST_STORAGE_URL': 'invalid'},
     );
     expect(code, 1);
     expect(
@@ -231,6 +275,30 @@ wait "$child"
     );
     expect(dockerCalled.existsSync(), isFalse);
   });
+
+  test('--no-storage overrides storage with both environment URLs', () async {
+    final (code, output) = await run(
+      ['--no-storage'],
+      environment: {
+        'DW_TEST_DATABASE_URL': 'postgres://user:secret@127.0.0.1:1/postgres',
+        'DW_TEST_STORAGE_URL': 'invalid',
+      },
+    );
+    expect(code, 1); // The explicit database is deliberately unavailable.
+    expect(output, contains('explicit Postgres (DW_TEST_DATABASE_URL)'));
+    expect(output, contains('storage disabled'));
+    expect(output, isNot(contains('explicit S3')));
+    expect(dockerCalled.existsSync(), isFalse);
+  });
+
+  for (final variable in ['DW_TEST_DATABASE_URL', 'DW_TEST_STORAGE_URL']) {
+    test('empty $variable retains container defaults', () async {
+      final (code, output) = await run([], environment: {variable: ''});
+      expect(code, 1); // The fake Docker daemon is unavailable.
+      expect(output, contains('Could not start the test database'));
+      expect(dockerCalled.existsSync(), isTrue);
+    });
+  }
 
   test(
     'flags override environment URLs and the banner names the flags',
@@ -275,8 +343,8 @@ wait "$child"
     });
     tearDown(() => pubHost.close(force: true));
 
-    for (final (mode, variables, expectedCode) in [
-      ('containers', <String, String>{}, 1),
+    for (final (mode, variables, expectedCode, needsDocker) in [
+      ('containers', <String, String>{}, 1, true),
       (
         'database',
         {
@@ -284,11 +352,13 @@ wait "$child"
               'postgres://user:private@127.0.0.1:5432/postgres',
         },
         0,
+        false,
       ),
       (
         'storage',
         {'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000'},
-        0,
+        1,
+        true,
       ),
       (
         'both servers',
@@ -298,11 +368,34 @@ wait "$child"
           'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000',
         },
         0,
+        false,
       ),
       (
         'malformed URL',
         {'DW_TEST_DATABASE_URL': 'postgres://user:private@localhost'},
         1,
+        false,
+      ),
+      ('empty database URL', {'DW_TEST_DATABASE_URL': ''}, 1, true),
+      ('empty storage URL', {'DW_TEST_STORAGE_URL': ''}, 1, true),
+      (
+        'empty database URL with storage',
+        {
+          'DW_TEST_DATABASE_URL': '',
+          'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000',
+        },
+        1,
+        true,
+      ),
+      (
+        'database with empty storage URL',
+        {
+          'DW_TEST_DATABASE_URL':
+              'postgres://user:private@127.0.0.1:5432/postgres',
+          'DW_TEST_STORAGE_URL': '',
+        },
+        0,
+        false,
       ),
     ]) {
       test('reports $mode without credentials', () async {
@@ -320,20 +413,23 @@ wait "$child"
         final text = '${await output}${await errors}';
         expect(text, isNot(contains('private')));
         expect(code, expectedCode, reason: text);
-        if (variables.isEmpty) {
+        expect(dockerCalled.existsSync(), needsDocker);
+        if (needsDocker) {
           expect(text, contains('Docker'));
           expect(text, contains('daemon is not responding'));
-          expect(dockerCalled.existsSync(), isTrue);
+        }
+        if (mode == 'malformed URL') {
+          expect(text, contains('DW_TEST_DATABASE_URL'));
         } else {
-          expect(dockerCalled.existsSync(), isFalse);
-          if (expectedCode == 1) {
-            expect(text, contains('DW_TEST_DATABASE_URL'));
-          } else {
+          final selected = variables.entries.where(
+            (entry) => entry.value.isNotEmpty,
+          );
+          if (selected.isNotEmpty) {
             expect(text, contains('explicit servers from environment'));
-            if (variables.containsKey('DW_TEST_DATABASE_URL')) {
+            if (selected.any((entry) => entry.key == 'DW_TEST_DATABASE_URL')) {
               expect(text, contains('127.0.0.1:5432'));
             }
-            if (variables.containsKey('DW_TEST_STORAGE_URL')) {
+            if (selected.any((entry) => entry.key == 'DW_TEST_STORAGE_URL')) {
               expect(text, contains('localhost:9000'));
             }
           }

@@ -14,9 +14,11 @@
   re-running CI until green (#513).
 
 - `dartway test` defaults `--database-url` and `--storage-url` from `DW_TEST_DATABASE_URL` and
-  `DW_TEST_STORAGE_URL`; flags take precedence. The run banner names the source, and the existing
+  `DW_TEST_STORAGE_URL`; flags take precedence, including `--no-storage`, and empty variables
+  count as unset. The run banner and URL refusals name the source, and the existing
   loopback guard, isolation, cleanup and `--keep` refusal apply. `dartway doctor` reports the
-  environment-selected hosts without credentials and does not require Docker for tests (#522).
+  environment-selected hosts without credentials and skips the Docker check only when the
+  database URL is set; storage alone still needs Docker for Postgres (#522).
 
 - Toolkit: `dartway-finish` always runs fast gates locally and checks pull-request workflows per
   suite. CI-covered suites run only changed and mirrored tests locally, with a full local fallback

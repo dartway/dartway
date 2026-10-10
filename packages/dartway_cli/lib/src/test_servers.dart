@@ -3,15 +3,26 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+/// Empty test-only variables leave the container defaults in place.
+String? testServerUrlFromEnvironment(String variable) {
+  final value = Platform.environment[variable];
+  return value == null || value.isEmpty ? null : value;
+}
+
 /// Explicit server coordinates; no inherited DW_DATABASE_* / DW_STORAGE_*.
 class TestServerUrl {
-  TestServerUrl._(this.uri, this.user, this.password);
+  TestServerUrl._(this.uri, this.user, this.password, this.source);
 
   final Uri uri;
   final String user;
   final String password;
+  final String source;
 
-  static TestServerUrl parse(String value, {required bool database}) {
+  static TestServerUrl parse(
+    String value, {
+    required bool database,
+    required String source,
+  }) {
     // Never include the input in diagnostics: it carries credentials.
     try {
       final uri = Uri.parse(value);
@@ -37,12 +48,12 @@ class TestServerUrl {
               : (uri.path != '' && uri.path != '/') || password.isEmpty)) {
         throw const FormatException();
       }
-      return TestServerUrl._(uri.replace(userInfo: ''), user, password);
+      return TestServerUrl._(uri.replace(userInfo: ''), user, password, source);
     } on FormatException {
       throw FormatException(
         database
-            ? '--database-url must be postgres://user:password@host[:port]/maintenance-db'
-            : '--storage-url must be http[s]://access-key:secret-key@host[:port]',
+            ? '$source must be postgres://user:password@host[:port]/maintenance-db'
+            : '$source must be http[s]://access-key:secret-key@host[:port]',
       );
     }
   }
@@ -56,8 +67,8 @@ class TestServerUrl {
     final addresses = await InternetAddress.lookup(uri.host);
     if (addresses.isEmpty ||
         (!allowRemote && addresses.any((address) => !address.isLoopback))) {
-      throw const FormatException(
-        'Test servers must resolve only to loopback. '
+      throw FormatException(
+        '$source: test servers must resolve only to loopback. '
         'Use --allow-remote-test-server only for a dedicated test server.',
       );
     }

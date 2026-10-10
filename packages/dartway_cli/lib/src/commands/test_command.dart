@@ -102,11 +102,20 @@ class TestCommand extends Command<int> {
 
     final databaseFlag = argResults?['database-url'] as String?;
     final databaseUrl =
-        databaseFlag ?? Platform.environment['DW_TEST_DATABASE_URL'];
+        databaseFlag ?? testServerUrlFromEnvironment('DW_TEST_DATABASE_URL');
+    final databaseSource = databaseFlag != null
+        ? '--database-url'
+        : 'DW_TEST_DATABASE_URL';
     final storageFlag = argResults?['storage-url'] as String?;
-    final storageUrl =
-        storageFlag ?? Platform.environment['DW_TEST_STORAGE_URL'];
     final withStorage = argResults?['storage'] as bool? ?? true;
+    final storageUrl =
+        storageFlag ??
+        (withStorage
+            ? testServerUrlFromEnvironment('DW_TEST_STORAGE_URL')
+            : null);
+    final storageSource = storageFlag != null
+        ? '--storage-url'
+        : 'DW_TEST_STORAGE_URL';
     final keep = argResults?['keep'] as bool? ?? false;
     final allowRemote =
         argResults?['allow-remote-test-server'] as bool? ?? false;
@@ -116,7 +125,7 @@ class TestCommand extends Command<int> {
       );
       return 1;
     }
-    if (storageUrl != null && !withStorage) {
+    if (storageFlag != null && !withStorage) {
       stderr.writeln('--storage-url cannot be combined with --no-storage.');
       return 1;
     }
@@ -143,10 +152,18 @@ class TestCommand extends Command<int> {
     try {
       final db = databaseUrl == null
           ? null
-          : TestServerUrl.parse(databaseUrl, database: true);
+          : TestServerUrl.parse(
+              databaseUrl,
+              database: true,
+              source: databaseSource,
+            );
       final s3 = storageUrl == null
           ? null
-          : TestServerUrl.parse(storageUrl, database: false);
+          : TestServerUrl.parse(
+              storageUrl,
+              database: false,
+              source: storageSource,
+            );
       if (db != null)
         environment.addAll(
           await db.environment(database: true, allowRemote: allowRemote),
@@ -221,9 +238,9 @@ class TestCommand extends Command<int> {
     Future<int> runSuite() async {
       stdout.writeln(
         'Test run $runId: '
-        '${databaseUrl == null ? 'starting $image' : 'explicit Postgres (${databaseFlag != null ? '--database-url' : 'DW_TEST_DATABASE_URL'})'}; '
+        '${databaseUrl == null ? 'starting $image' : 'explicit Postgres ($databaseSource)'}; '
         '${storageUrl != null
-            ? 'explicit S3 (${storageFlag != null ? '--storage-url' : 'DW_TEST_STORAGE_URL'})'
+            ? 'explicit S3 ($storageSource)'
             : startStorage
             ? 'starting $storageImage'
             : 'storage disabled (no storage server supplied)'}.',
