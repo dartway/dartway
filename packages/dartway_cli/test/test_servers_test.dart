@@ -8,6 +8,7 @@ void main() {
       final server = TestServerUrl.parse(
         'postgres://test%40user:p%3A%2F%25@127.0.0.1:55460/maintenance',
         database: true,
+        source: '--database-url',
       );
       expect(await server.environment(database: true, allowRemote: false), {
         'DW_DATABASE_HOST': '127.0.0.1',
@@ -20,6 +21,7 @@ void main() {
       final storage = TestServerUrl.parse(
         'https://key:s%3Aecret@localhost:9000',
         database: false,
+        source: '--storage-url',
       );
       expect(await storage.environment(database: false, allowRemote: false), {
         'DW_STORAGE_ENDPOINT': 'https://localhost:9000',
@@ -31,36 +33,35 @@ void main() {
     },
   );
 
-  test(
-    'IPv6 loopback and dedicated remote opt-in',
-    () async {
-      final local = TestServerUrl.parse(
-        'postgres://test:secret@[::1]/postgres',
+  test('IPv6 loopback and dedicated remote opt-in', () async {
+    final local = TestServerUrl.parse(
+      'postgres://test:secret@[::1]/postgres',
+      database: true,
+      source: '--database-url',
+    );
+    final environment = await local.environment(
+      database: true,
+      allowRemote: false,
+    );
+    expect(environment['DW_DATABASE_PORT'], '5432');
+    expect(environment['DW_DATABASE_PASSWORD'], 'secret');
+    final remote = TestServerUrl.parse(
+      'postgres://test:secret@192.0.2.1/postgres',
+      database: true,
+      source: '--database-url',
+    );
+    await expectLater(
+      remote.environment(database: true, allowRemote: false),
+      throwsFormatException,
+    );
+    expect(
+      (await remote.environment(
         database: true,
-      );
-      final environment = await local.environment(
-        database: true,
-        allowRemote: false,
-      );
-      expect(environment['DW_DATABASE_PORT'], '5432');
-      expect(environment['DW_DATABASE_PASSWORD'], 'secret');
-      final remote = TestServerUrl.parse(
-        'postgres://test:secret@192.0.2.1/postgres',
-        database: true,
-      );
-      await expectLater(
-        remote.environment(database: true, allowRemote: false),
-        throwsFormatException,
-      );
-      expect(
-        (await remote.environment(
-          database: true,
-          allowRemote: true,
-        ))['DW_DATABASE_HOST'],
-        '192.0.2.1',
-      );
-    },
-  );
+        allowRemote: true,
+      ))['DW_DATABASE_HOST'],
+      '192.0.2.1',
+    );
+  });
 
   test(
     'malformed URLs fail without echoing input or accepting extra configuration',
@@ -78,7 +79,11 @@ void main() {
         ('https://test:private-value@localhost:0', false),
       ]) {
         expect(
-          () => TestServerUrl.parse(url, database: database),
+          () => TestServerUrl.parse(
+            url,
+            database: database,
+            source: database ? '--database-url' : '--storage-url',
+          ),
           throwsA(
             isA<FormatException>().having(
               (e) => e.message,

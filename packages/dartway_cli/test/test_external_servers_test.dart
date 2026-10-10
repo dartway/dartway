@@ -66,6 +66,8 @@ void main() {
     Map<String, String> environment = const {},
     bool compiled = false,
     bool processGroup = false,
+    String command = 'test',
+    String? workingDirectory,
   }) => Process.start(
     processGroup
         ? '/bin/bash'
@@ -94,12 +96,17 @@ wait "$child"
         '--packages=${config.path}',
         p.join(repo.path, 'packages/dartway_cli/bin/dartway.dart'),
       ],
-      'test',
+      command,
       ...arguments,
     ],
-    workingDirectory: root.path,
+    workingDirectory: workingDirectory ?? root.path,
     environment: {
-      ...Platform.environment,
+      for (final entry in Platform.environment.entries)
+        if (![
+          'DW_TEST_DATABASE_URL',
+          'DW_TEST_STORAGE_URL',
+        ].contains(entry.key))
+          entry.key: entry.value,
       'PATH': '${p.join(root.path, 'bin')}:${Platform.environment['PATH']}',
       ...environment,
     },
@@ -185,6 +192,277 @@ wait "$child"
     expect(output, contains('loopback'));
     expect(output, isNot(contains('Servers ready')));
     expect(dockerCalled.existsSync(), isFalse);
+  });
+
+  for (final (variable, url) in [
+    ('DW_TEST_DATABASE_URL', 'postgres://user:private@192.0.2.1/postgres'),
+    ('DW_TEST_STORAGE_URL', 'http://key:private@192.0.2.1:9000'),
+  ]) {
+    test(
+      '$variable retains the loopback guard without calling Docker',
+      () async {
+        final (code, output) = await run([], environment: {variable: url});
+        expect(code, 1);
+        expect(output, contains('loopback'));
+        expect(output, isNot(contains('private')));
+        expect(dockerCalled.existsSync(), isFalse);
+      },
+    );
+    test('$variable refuses --keep before calling Docker', () async {
+      final (code, output) = await run(
+        ['--keep'],
+        environment: {variable: url},
+      );
+      expect(code, 1);
+      expect(output, contains('--keep is only available for container runs'));
+      expect(dockerCalled.existsSync(), isFalse);
+    });
+  }
+
+  for (final (flag, variable, malformed) in [
+    (
+      '--database-url',
+      'DW_TEST_DATABASE_URL',
+      'postgres://user:private@localhost',
+    ),
+    (
+      '--storage-url',
+      'DW_TEST_STORAGE_URL',
+      'http://key:private@localhost/bucket',
+    ),
+  ]) {
+    for (final fromFlag in [false, true]) {
+      final source = fromFlag ? flag : variable;
+      test('malformed $source names its source without credentials', () async {
+        final (code, output) = await run(
+          fromFlag ? [flag, malformed] : [],
+          environment: {variable: malformed},
+        );
+        expect(code, 1);
+        expect(output, contains('$source must be'));
+        expect(output, isNot(contains('private')));
+        expect(dockerCalled.existsSync(), isFalse);
+      });
+    }
+  }
+
+  for (final keep in [false, true]) {
+    test(
+      '--no-storage overrides environment storage with keep=$keep',
+      () async {
+        final (code, output) = await run(
+          ['--no-storage', if (keep) '--keep'],
+          // Ignored storage must not be parsed or make this an external run.
+          environment: {'DW_TEST_STORAGE_URL': 'invalid'},
+        );
+        expect(code, 1); // The fake Docker daemon is unavailable.
+        expect(output, contains('storage disabled'));
+        expect(output, contains('Could not start the test database'));
+        expect(dockerCalled.existsSync(), isTrue);
+      },
+    );
+  }
+
+  test('explicit storage flag still refuses --no-storage', () async {
+    final (code, output) = await run(
+      ['--storage-url', 'http://key:secret@127.0.0.1:9000', '--no-storage'],
+      environment: {'DW_TEST_STORAGE_URL': 'invalid'},
+    );
+    expect(code, 1);
+    expect(
+      output,
+      contains('--storage-url cannot be combined with --no-storage'),
+    );
+    expect(dockerCalled.existsSync(), isFalse);
+  });
+
+  test('--no-storage overrides storage with both environment URLs', () async {
+    final (code, output) = await run(
+      ['--no-storage'],
+      environment: {
+        'DW_TEST_DATABASE_URL': 'postgres://user:secret@127.0.0.1:1/postgres',
+        'DW_TEST_STORAGE_URL': 'invalid',
+      },
+    );
+    expect(code, 1); // The explicit database is deliberately unavailable.
+    expect(output, contains('explicit Postgres (DW_TEST_DATABASE_URL)'));
+    expect(output, contains('storage disabled'));
+    expect(output, isNot(contains('explicit S3')));
+    expect(dockerCalled.existsSync(), isFalse);
+  });
+
+  for (final variable in ['DW_TEST_DATABASE_URL', 'DW_TEST_STORAGE_URL']) {
+    test('empty $variable retains container defaults', () async {
+      final (code, output) = await run([], environment: {variable: ''});
+      expect(code, 1); // The fake Docker daemon is unavailable.
+      expect(output, contains('Could not start the test database'));
+      expect(dockerCalled.existsSync(), isTrue);
+    });
+  }
+
+  test(
+    'flags override environment URLs and the banner names the flags',
+    () async {
+      final (code, output) = await run(
+        [
+          '--database-url',
+          'postgres://user:secret@127.0.0.1:1/postgres',
+          '--storage-url',
+          'http://key:secret@127.0.0.1:1',
+        ],
+        environment: {
+          'DW_TEST_DATABASE_URL': 'postgres://user:private@192.0.2.1/postgres',
+          'DW_TEST_STORAGE_URL': 'http://key:private@192.0.2.1:9000',
+        },
+      );
+      expect(code, 1); // Local services are deliberately unavailable.
+      expect(output, contains('explicit Postgres (--database-url)'));
+      expect(output, contains('explicit S3 (--storage-url)'));
+      expect(output, isNot(contains('loopback')));
+      expect(output, isNot(contains('private')));
+      expect(dockerCalled.existsSync(), isFalse);
+    },
+  );
+
+  group('doctor test service mode', () {
+    late HttpServer pubHost;
+    setUp(() async {
+      pubHost = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      pubHost.listen((request) async {
+        request.response.write('{}');
+        await request.response.close();
+      });
+      for (final (name, output) in [
+        ('flutter', 'Flutter 3.47.6'),
+        ('git', 'configured'),
+      ]) {
+        final script = File(p.join(root.path, 'bin', name));
+        script.writeAsStringSync("#!/bin/sh\necho '$output'\n");
+        await Process.run('chmod', ['+x', script.path]);
+      }
+    });
+    tearDown(() => pubHost.close(force: true));
+
+    for (final (mode, variables, expectedCode, needsDocker) in [
+      ('containers', <String, String>{}, 1, true),
+      (
+        'database',
+        {'DW_TEST_DATABASE_URL': 'postgres://user:private@127.0.0.1/postgres'},
+        0,
+        false,
+      ),
+      (
+        'storage',
+        {'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000'},
+        1,
+        true,
+      ),
+      (
+        'both servers',
+        {
+          'DW_TEST_DATABASE_URL':
+              'postgres://user:private@127.0.0.1:5432/postgres',
+          'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000',
+        },
+        0,
+        false,
+      ),
+      (
+        'malformed URL',
+        {'DW_TEST_DATABASE_URL': 'postgres://user:private@localhost'},
+        1,
+        false,
+      ),
+      ('empty database URL', {'DW_TEST_DATABASE_URL': ''}, 1, true),
+      ('empty storage URL', {'DW_TEST_STORAGE_URL': ''}, 1, true),
+      (
+        'empty database URL with storage',
+        {
+          'DW_TEST_DATABASE_URL': '',
+          'DW_TEST_STORAGE_URL': 'http://key:private@localhost:9000',
+        },
+        1,
+        true,
+      ),
+      (
+        'database with empty storage URL',
+        {
+          'DW_TEST_DATABASE_URL':
+              'postgres://user:private@127.0.0.1:5432/postgres',
+          'DW_TEST_STORAGE_URL': '',
+        },
+        0,
+        false,
+      ),
+    ]) {
+      test('reports $mode without credentials', () async {
+        final process = await launch(
+          [],
+          command: 'doctor',
+          environment: {
+            'PUB_HOSTED_URL': 'http://127.0.0.1:${pubHost.port}',
+            ...variables,
+          },
+        );
+        final output = process.stdout.transform(utf8.decoder).join();
+        final errors = process.stderr.transform(utf8.decoder).join();
+        final code = await process.exitCode;
+        final text = '${await output}${await errors}';
+        expect(text, isNot(contains('private')));
+        expect(code, expectedCode, reason: text);
+        expect(dockerCalled.existsSync(), needsDocker);
+        if (needsDocker) {
+          expect(text, contains('Docker'));
+          expect(text, contains('daemon is not responding'));
+          expect(text, contains('DW_TEST_DATABASE_URL'));
+          expect(text, contains('DW_TEST_STORAGE_URL'));
+        }
+        if (mode == 'malformed URL') {
+          expect(text, contains('DW_TEST_DATABASE_URL'));
+        } else {
+          final selected = variables.entries.where(
+            (entry) => entry.value.isNotEmpty,
+          );
+          if (selected.isNotEmpty) {
+            expect(text, contains('explicit servers from environment'));
+            if (selected.any((entry) => entry.key == 'DW_TEST_DATABASE_URL')) {
+              expect(text, contains('127.0.0.1:5432'));
+            }
+            if (selected.any((entry) => entry.key == 'DW_TEST_STORAGE_URL')) {
+              expect(text, contains('localhost:9000'));
+            }
+          }
+        }
+      });
+    }
+
+    for (final (variable, url) in [
+      ('DW_TEST_DATABASE_URL', 'postgres://user:private@192.0.2.1/postgres'),
+      ('DW_TEST_STORAGE_URL', 'http://key:private@192.0.2.1:9000'),
+    ]) {
+      test('remote $variable has doctor-specific guidance', () async {
+        final process = await launch(
+          [],
+          command: 'doctor',
+          environment: {
+            'PUB_HOSTED_URL': 'http://127.0.0.1:${pubHost.port}',
+            variable: url,
+          },
+        );
+        final output = process.stdout.transform(utf8.decoder).join();
+        final errors = process.stderr.transform(utf8.decoder).join();
+        expect(await process.exitCode, 1);
+        final text = '${await output}${await errors}';
+        expect(
+          text,
+          contains('$variable: test servers must resolve only to loopback.'),
+        );
+        expect(text, contains('Doctor has no remote-server override'));
+        expect(text, contains('dartway test --allow-remote-test-server'));
+        expect(text, isNot(contains('private')));
+        expect(dockerCalled.existsSync(), isFalse);
+      });
+    }
   });
 
   Future<void> waitFor(File marker) async {
@@ -277,7 +555,7 @@ esac
   }
 
   test(
-    'compiled CLI uses Dart for both the suite and service workers',
+    'compiled CLI strips test URL defaults from the suite and service workers',
     () async {
       compiledCli = p.join(root.path, 'dartway');
       final compiled = await Process.run(Platform.resolvedExecutable, [
@@ -303,31 +581,58 @@ esac
       });
       containerDocker();
       File(p.join(server.path, 'test/compiled_test.dart')).writeAsStringSync('''
+import 'dart:io';
 import 'package:test/test.dart';
-void main() { test('suite ran', () => expect(2 + 2, 4)); }
+void main() {
+  test('suite receives only selected service coordinates', () {
+    expect(Platform.environment.containsKey('DW_TEST_DATABASE_URL'), isFalse);
+    expect(Platform.environment.containsKey('DW_TEST_STORAGE_URL'), isFalse);
+    expect(Platform.environment['DW_DATABASE_PORT'], '54321');
+    expect(Platform.environment['DW_STORAGE_ENDPOINT'], 'http://127.0.0.1:${storage.port}');
+  });
+}
 ''');
       final dartCalled = File(p.join(root.path, 'dart_called'));
       final dart = File(p.join(root.path, 'bin/dart'));
       dart.writeAsStringSync('''
 #!/bin/sh
 echo "\$1" >> '${dartCalled.path}'
+if [ "\${DW_TEST_DATABASE_URL+x}" = x ] || [ "\${DW_TEST_STORAGE_URL+x}" = x ]; then
+  echo 'Inherited test URL leaked to a child process' >&2
+  exit 42
+fi
 exec '${Platform.resolvedExecutable}' "\$@"
 ''');
       await Process.run('chmod', ['+x', dart.path]);
-      final process = await launch([
-        '--storage-url',
-        'http://key:secret@127.0.0.1:${storage.port}',
-      ], compiled: true);
-      addTearDown(() => process.kill(ProcessSignal.sigkill));
-      final output = process.stdout.transform(utf8.decoder).join();
-      final errors = process.stderr.transform(utf8.decoder).join();
-      final code = await process.exitCode.timeout(const Duration(seconds: 40));
-      expect(code, 0, reason: '${await output}${await errors}');
+      final storageUrl = 'http://key:secret@127.0.0.1:${storage.port}';
+      for (final fromFlag in [false, true]) {
+        final process = await launch(
+          [
+            if (fromFlag) ...['--storage-url', storageUrl],
+          ],
+          compiled: true,
+          environment: {
+            'DW_TEST_DATABASE_URL': '',
+            'DW_TEST_STORAGE_URL': fromFlag
+                ? 'http://key:private@192.0.2.1:9000'
+                : storageUrl,
+          },
+        );
+        addTearDown(() => process.kill(ProcessSignal.sigkill));
+        final output = process.stdout.transform(utf8.decoder).join();
+        final errors = process.stderr.transform(utf8.decoder).join();
+        final code = await process.exitCode.timeout(
+          const Duration(seconds: 40),
+        );
+        expect(code, 0, reason: '${await output}${await errors}');
+      }
       final calls = dartCalled.readAsLinesSync();
-      expect(calls, hasLength(3));
-      expect(calls[0], startsWith('--packages='));
-      expect(calls[1], 'test');
-      expect(calls[2], startsWith('--packages='));
+      expect(calls, hasLength(6));
+      for (final offset in [0, 3]) {
+        expect(calls[offset], startsWith('--packages='));
+        expect(calls[offset + 1], 'test');
+        expect(calls[offset + 2], startsWith('--packages='));
+      }
       expect(dockerCalled.readAsStringSync(), contains('rm database-id'));
     },
     timeout: const Timeout(Duration(minutes: 2)),
@@ -443,6 +748,8 @@ import 'package:dartway_core_server/testing.dart';
 import 'package:test/test.dart';
 void main() {
   test('creates isolated resources', () async {
+    expect(Platform.environment.containsKey('DW_TEST_DATABASE_URL'), isFalse);
+    expect(Platform.environment.containsKey('DW_TEST_STORAGE_URL'), isFalse);
     final database = await DwTestDatabase.create(prefix: 'custom_test');
     ${storage ? 'final storage = await DwTestStorage.create(prefix: "custom-test");' : ''}
     final ready = File('${root.path}/$name.json.tmp');
@@ -450,6 +757,9 @@ void main() {
       'run': Platform.environment['DW_TEST_RUN_ID'], 'database': database.config.name,
       'pid': pid,
       ${storage ? "'public': storage.publicBucket, 'private': storage.privateBucket," : ''}
+      'environment': {for (final entry in Platform.environment.entries)
+        if (entry.key.startsWith('DW_DATABASE_') || entry.key.startsWith('DW_STORAGE_'))
+          entry.key: entry.value},
       'inheritedStorage': Platform.environment['DW_STORAGE_PUBLIC_BUCKET'],
     }));
     ready.renameSync('${root.path}/$name.json');
@@ -511,6 +821,107 @@ void main() {
       },
       timeout: const Timeout(Duration(minutes: 2)),
     );
+    test(
+      'environment URLs run isolated suites without Docker and clean on success and failure',
+      () async {
+        fixture('environment', storage: true);
+        for (final failed in [false, true]) {
+          if (failed) fixture('environment', storage: true, fail: true);
+          final (code, output) = await run(
+            [],
+            environment: {
+              'DW_TEST_DATABASE_URL': databaseUrl,
+              'DW_TEST_STORAGE_URL': storageUrl,
+              'DW_DATABASE_HOST': '192.0.2.1',
+              'DW_DATABASE_SSL_ROOT_CERT': '/stage/cert',
+              'DW_STORAGE_ENDPOINT': 'http://192.0.2.1:9000',
+              'DW_STORAGE_PUBLIC_BUCKET': 'stage-bucket',
+              'DW_STORAGE_PRIVATE_BUCKET': 'stage-private',
+              'DW_STORAGE_REGION': 'stage-region',
+            },
+          );
+          expect(code, failed ? isNot(0) : 0, reason: output);
+          expect(output, contains('explicit Postgres (DW_TEST_DATABASE_URL)'));
+          expect(output, contains('explicit S3 (DW_TEST_STORAGE_URL)'));
+          final owned = await created('environment');
+          expect(owned['database'], startsWith('dw_test_${owned['run']}_'));
+          expect(owned['public'], startsWith('dw-test-${owned['run']}-pub-'));
+          expect(owned['private'], startsWith('dw-test-${owned['run']}-prv-'));
+          expect(owned['environment'], {
+            for (final key in ['HOST', 'PORT', 'NAME', 'USER', 'PASSWORD'])
+              'DW_DATABASE_$key': env['DW_DATABASE_$key'],
+            'DW_DATABASE_SSL': 'false',
+            for (final key in ['ENDPOINT', 'ACCESS_KEY', 'SECRET_KEY'])
+              'DW_STORAGE_$key': env['DW_STORAGE_$key'],
+            'DW_STORAGE_PATH_STYLE': 'true',
+            'DW_STORAGE_REGION': 'us-east-1',
+          });
+          expect(
+            await databases(),
+            isNot(anyElement(contains(owned['run'] as String))),
+          );
+          expect(await buckets(), isNot(contains(owned['run'] as String)));
+          expect(dockerCalled.existsSync(), isFalse);
+        }
+      },
+      timeout: const Timeout(Duration(minutes: 2)),
+    );
+
+    test('database environment alone disables storage', () async {
+      fixture('environment');
+      final (code, output) = await run(
+        [],
+        environment: {
+          'DW_TEST_DATABASE_URL': databaseUrl,
+          'DW_STORAGE_ENDPOINT': 'http://192.0.2.1:9000',
+        },
+      );
+      expect(code, 0, reason: output);
+      expect(output, contains('storage disabled'));
+      final owned = await created('environment');
+      expect(
+        (owned['environment'] as Map).keys,
+        isNot(anyElement(startsWith('DW_STORAGE_'))),
+      );
+      expect(
+        await databases(),
+        isNot(anyElement(contains(owned['run'] as String))),
+      );
+      expect(dockerCalled.existsSync(), isFalse);
+    }, timeout: const Timeout(Duration(minutes: 1)));
+
+    test(
+      'example runs through environment URLs and leaves no run resources',
+      () async {
+        final process = await launch(
+          [],
+          workingDirectory: p.join(repo.path, 'example'),
+          environment: {
+            'DW_TEST_DATABASE_URL': databaseUrl,
+            'DW_TEST_STORAGE_URL': storageUrl,
+          },
+        );
+        addTearDown(() => process.kill(ProcessSignal.sigint));
+        final output = process.stdout.transform(utf8.decoder).join();
+        final errors = process.stderr.transform(utf8.decoder).join();
+        final code = await process.exitCode.timeout(const Duration(minutes: 4));
+        final text = '${await output}${await errors}';
+        expect(code, 0, reason: text);
+        expect(text, contains('explicit Postgres (DW_TEST_DATABASE_URL)'));
+        expect(text, contains('explicit S3 (DW_TEST_STORAGE_URL)'));
+        final runId = RegExp(
+          r'Test run ([a-z0-9]+):',
+        ).firstMatch(text)!.group(1)!;
+        expect(
+          await databases(),
+          isNot(anyElement(startsWith('dw_test_${runId}_'))),
+        );
+        expect(await buckets(), isNot(contains('dw-test-$runId-')));
+        expect(dockerCalled.existsSync(), isFalse);
+      },
+      timeout: const Timeout(Duration(minutes: 5)),
+    );
+
     for (final processGroup in [false, true]) {
       test(
         '${processGroup ? 'group' : 'pid-only'} SIGINT sweeps databases and nonempty buckets, leaving a concurrent run intact',
