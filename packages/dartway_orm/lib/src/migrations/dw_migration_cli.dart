@@ -188,6 +188,13 @@ usage: migrate <command>
         _out.writeln('  $ref');
       }
     }
+    for (final MapEntry(key: namespace, value: refs)
+        in run.ahead.groupListsBy((ref) => ref.namespace).entries) {
+      _out.writeln(
+        'warning: $namespace: ${refs.length} migration(s) applied by a newer release '
+        '(${refs.first.id} … ${refs.last.id}); serving on its schema',
+      );
+    }
     return exitOk;
   });
 
