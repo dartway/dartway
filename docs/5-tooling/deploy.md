@@ -292,7 +292,7 @@ bucket anyone can read, or a public one nobody can.
 is a copy, not a migration: copy every object of the public bucket into the new public bucket and
 every object of the private one into the new private bucket, **under the same keys**, then point
 the `DW_STORAGE_*` secrets at the new place and deploy. The database names no bucket: a file's
-bucket is the one the configuration names for its visibility (D-137), so every existing file is
+bucket is the one the configuration names for its visibility (D-138), so every existing file is
 served from the new buckets at once. Neither the bucket check nor the outside probe reads objects,
 so a key that was not copied surfaces only when someone opens that file.
 
