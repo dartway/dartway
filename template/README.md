@@ -142,9 +142,9 @@ runs spend the plan's minutes.
 Both `ci.yml` and `claude-review.yml` run on `ubuntu-latest` unless the repository
 or organisation variable `DW_CI_RUNS_ON` names other runner labels, as JSON:
 `["self-hosted","ci-nl"]` moves both jobs onto a self-hosted runner carrying those
-labels (Settings → Secrets and variables → Actions → Variables). Set on the organisation, it moves
-every project at once. The runner needs Linux with Docker: the Postgres service
-and the acceptance gate's containers run there.
+labels (Settings → Secrets and variables → Actions → Variables). Set on the
+organisation, it moves every project at once. The runner needs Linux with
+Docker: the Postgres service and the acceptance gate's containers run there.
 
 `.github/workflows/claude-review.yml` is separate and optional: it runs a Claude
 review on every pull request and posts findings as inline comments. It needs one
