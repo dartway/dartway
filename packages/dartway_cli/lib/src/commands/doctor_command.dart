@@ -224,6 +224,7 @@ class DoctorCommand extends Command<int> {
 
   Future<List<_Check>> _checkTestServers() async {
     final hosts = <String>[];
+    final errors = <_Check>[];
     var needsDocker = true;
     for (final (variable, database) in [
       ('DW_TEST_DATABASE_URL', true),
@@ -250,31 +251,40 @@ class DoctorCommand extends Command<int> {
         final port = database && !uri.hasPort ? 5432 : uri.port;
         hosts.add('${database ? 'Postgres' : 'S3'} ${uri.host}:$port');
       } on FormatException catch (error) {
-        return [
+        errors.add(
           _Check.fail(
             'tests',
             error.message,
             fix:
                 'Set $variable to a valid loopback test server URL, or unset it for container runs.',
           ),
-        ];
+        );
       } on SocketException {
-        return [
+        errors.add(
           _Check.fail(
             'tests',
             '$variable: could not resolve the test server host',
             fix: 'Use a literal loopback address in $variable.',
           ),
-        ];
+        );
       }
     }
+    final docker = _checkDocker();
     return [
+      ...errors,
       if (hosts.isNotEmpty)
         _Check.ok(
           'tests',
           'explicit servers from environment; ${hosts.join('; ')}',
         ),
-      if (needsDocker) _checkDocker(),
+      if (!needsDocker && docker.status == _Status.fail)
+        _Check.warn(
+          'Docker',
+          '${docker.detail}; needed for development (`docker compose up`)',
+          fix: 'Install or start Docker Desktop for local development.',
+        )
+      else
+        docker,
     ];
   }
 
