@@ -82,8 +82,11 @@ requests, health on both hosts, the live socket hello, web caching and bundled
 storage visibility and CORS preflights on both buckets, and exits nonzero on a failure.
 With bundled storage, the API's
 `DW_STORAGE_PROVISION=true` makes `DwFileStorageSetup.provision` create both buckets,
-set their policies, configure GET/PUT CORS for `DW_ALLOWED_ORIGINS`, and write the
-visibility probe into each before serving. This works with `DW_STORAGE_VERIFY_BUCKETS=false`; Kamal has no `storage-init` service.
+set their policies, configure GET/PUT CORS from the entry point's explicit
+`allowedOrigins: env.server.allowedOrigins`, and write the
+visibility probe into each before serving. No origins leaves CORS untouched. A storage
+answering `501 NotImplemented` warns with its endpoint and bucket and continues; the outside
+CORS probe still reports the actual state. Other CORS errors stop provisioning. This works with `DW_STORAGE_VERIFY_BUCKETS=false`; Kamal has no `storage-init` service.
 
 The check image tag follows the resolved `dartway_cli`: Git uses the lock's resolved ref SHA, path uses the checkout's
 HEAD, and pub.dev uses the lock's exact version. A path dependency on a vendored
@@ -230,7 +233,7 @@ The rendered Nginx:
 |---|---|
 | `postgres` | With `database: bundled`: `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck. Absent with `database: external` — no service, no volume, no `depends_on` on it |
 | `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080` always, and with `database: bundled` (and, with the bundled storage, `DW_STORAGE_*`) `DW_DATABASE_*` in the compose file too — with `database: external` none of `DW_DATABASE_*` is rendered at all, all five (`HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`) come from `.env` like any other secret. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
-| `web` | Built from `<project>_flutter/Dockerfile`; a web release calls `Uri.base.origin` |
+| `web` | Built from `<project>_flutter/Dockerfile`; `deploy run` passes `DW_BACKEND_URL` from `app_domain` as a build argument. The template's web release calls `Uri.base.origin` |
 | `storage`, `storage-init` | With `storage: bundled`: RustFS, and a one-shot job (a generic S3 client) that creates and configures both buckets on every deploy |
 | `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443 |
 | `certbot` | Renews the certificate every 12 hours |
@@ -636,6 +639,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `server-signals` | error | The server image's `ENTRYPOINT` (or `CMD`) is in exec form, so the binary is PID 1 and receives the SIGTERM a deploy sends; under `/bin/sh -c` it is killed mid-call when the grace period runs out |
 | `locked-dependencies` | error | Every image's `pub get` runs `--enforce-lockfile`, and the package has a committed `pubspec.lock` — otherwise pub may resolve a different set inside the container than the project was tested with, and a deploy has already failed that way |
 | `web-flutter-version` | error | The web image builds on the Flutter `.fvmrc` names — it installs it from `.fvmrc`, or its Flutter image carries that tag. Flutter pins some packages an app resolves, so a lock written on one Flutter fails `--enforce-lockfile` on another |
+| `web-backend-url` | error | If the web Dockerfile declares `ARG DW_BACKEND_URL`, its build consumes the argument that `deploy run` passes from `app_domain`. Skipped when the Dockerfile declares no such argument |
 | `web-file-modes` | warning | The web image grants everyone read on the files it serves (`chmod -R a+rX build/web`). `COPY` keeps modes, and under a deploy user's umask of `077` the files a commit adds are served as 403 while every page answers 200 |
 | `web-cache-policy` | warning | The web image's Nginx configuration revalidates every Flutter entry point |
 | `nginx-upstreams` | error | Every `proxy_pass` in the rendered Nginx and in `deploy/nginx.d/` names a service of the stack or the override |

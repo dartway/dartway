@@ -106,7 +106,10 @@ storage reachable only through something that starts after the server, checked f
 is signed into every URL): a phone or an Android emulator needs the machine's LAN address. A browser
 uploads cross-origin: the buckets' CORS allows `PUT` with `content-type` and `if-none-match`.
 On storage the project owns, `DwFileStorageSetup.provision` sets GET/PUT CORS on both buckets
-from `DW_ALLOWED_ORIGINS` (or its `allowedOrigins` argument), just as Compose `storage-init` does. Never log
+from its optional `allowedOrigins` argument, just as Compose `storage-init` does. Pass
+`env.server.allowedOrigins` from the entry point; provisioning never reads the process environment.
+Omitting origins leaves CORS untouched. A `501 NotImplemented` warns with the storage endpoint and
+bucket and continues; the outside CORS probe reports the actual state. Other errors stop provisioning. Never log
 a key, an upload URL or a private link. Moving storage or renaming a bucket: copy each object into its
 visibility's new bucket under the same key — `dw_stored_file` names no bucket, so the rows need nothing.
 

@@ -2,6 +2,11 @@
 
 ## 0.21.0-dev.17
 
+- Storage provisioning accepts optional `allowedOrigins` and writes GET/PUT CORS
+  to both buckets with `Content-MD5`. No origins leaves CORS untouched, without
+  reading the process environment. A storage answering `501 NotImplemented` logs
+  a warning naming its endpoint and bucket; other CORS errors remain fatal (#530).
+
 - Storage provisioning writes the same visibility probe as startup verification
   into each bucket after setting its policy. Outside checks now work with Kamal's
   provision-only startup and `verifyBuckets: false`, without `storage-init` (#530).

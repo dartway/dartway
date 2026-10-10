@@ -3,7 +3,6 @@ import 'dart:async';
 import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_studio_binding/dartway_studio_binding.dart';
-import 'package:dartway_studio_binding/src/dw_studio_access_origin.dart';
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -112,37 +111,6 @@ late final DwFlutterCore _core;
 late final DwFakeServer _server;
 
 void main() {
-  for (final (name, releaseWeb, define, expected) in [
-    (
-      'release with define',
-      true,
-      'https://configured.example',
-      'https://configured.example',
-    ),
-    ('release without define', true, '', 'https://app.example:8443'),
-    ('debug without define', false, '', ''),
-    ('profile without define', false, '', ''),
-    (
-      'debug with define',
-      false,
-      'https://configured.example',
-      'https://configured.example',
-    ),
-  ]) {
-    test('Studio access origin: $name', () async {
-      final origin = dwStudioAccessOrigin(
-        releaseWeb: releaseWeb,
-        definedOrigin: define,
-        baseUri: Uri.parse('https://app.example:8443/schedule?day=1'),
-      );
-      expect(origin, expected);
-      expect(
-        await studioSignedAccessValidator(origin)('unsigned'),
-        expected.isEmpty,
-      );
-    });
-  }
-
   setUpAll(() async {
     // The core exists so the binding can read the session and run the persona
     // flow; no test here reaches the server. One per process — the core claims

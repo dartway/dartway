@@ -14,13 +14,13 @@ executables:
   dartway:
 
 dependencies:
-  dartway_core_shared: ^0.21.0-dev.17
   args: ^2.6.0
   path: ^1.9.0
   pub_semver: ^2.1.4
   yaml: ^3.1.2
 
 dev_dependencies:
+  dartway_core_shared: ^0.21.0-dev.17
   # The local stack proof signs a presigned S3 upload the way the framework
   # does, to prove the rendered storage host lets one through.
   crypto: ^3.0.0

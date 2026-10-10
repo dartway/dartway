@@ -1,11 +1,9 @@
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart';
 
-import 'dw_studio_access_origin.dart';
 import 'dw_studio_features.dart';
 import 'dw_studio_locale.dart';
 import 'dw_studio_persona_switcher.dart';
@@ -119,11 +117,7 @@ class _DwStudioBindingState extends ConsumerState<DwStudioBinding>
       validateAccessToken:
           widget.validateAccessToken ??
           studioSignedAccessValidator(
-            dwStudioAccessOrigin(
-              releaseWeb: kIsWeb && kReleaseMode,
-              definedOrigin: const String.fromEnvironment('STUDIO_APP_ORIGIN'),
-              baseUri: Uri.base,
-            ),
+            const String.fromEnvironment('STUDIO_APP_ORIGIN'),
           ),
       inspectPoint: dwStudioFeatureAtPoint,
       channel: widget.channel,

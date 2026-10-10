@@ -6,7 +6,9 @@
   otherwise for `Uri.base.origin` in a web release. One Kamal web image can serve
   stage and prod while accepting only tokens issued for its current app origin.
   Debug/profile builds without the define remain open for local preview; an
-  explicit `validateAccessToken` overrides the default policy (#530).
+  explicit `validateAccessToken` overrides the default policy. Origin resolution
+  belongs to `studioSignedAccessValidator`, so an explicit call with `''` also
+  validates the current web release origin (#530).
 
 ## 0.2.1
 

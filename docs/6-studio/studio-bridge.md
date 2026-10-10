@@ -99,6 +99,8 @@ reason — an HMAC over a shared secret would put the secret back into a public 
 
 `DwStudioBinding` uses `--dart-define=STUDIO_APP_ORIGIN=https://app.example` when supplied.
 Without that define, a web release validates tokens for `Uri.base.origin`.
+The origin resolves inside `studioSignedAccessValidator` itself, including an explicit
+`studioSignedAccessValidator('')` passed as `validateAccessToken`.
 Debug/profile builds without the define accept a local Studio without a signed token,
 which keeps local preview zero-config. A custom `validateAccessToken` overrides this policy.
 

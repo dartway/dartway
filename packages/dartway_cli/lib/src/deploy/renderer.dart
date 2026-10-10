@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dartway_core_shared/src/files/dw_storage_cors.dart';
 import 'package:path/path.dart' as p;
 
 import 'deploy_target.dart';
 import 'stack.dart';
+import 'storage_policy.dart';
 
 /// Renders the two infrastructure files of a deployment: the compose file and
 /// the front proxy's configuration.
@@ -437,7 +437,7 @@ class DwStackRenderer {
         },
       ],
     });
-    final cors = DwStorageCorsRule([stack.appOrigin]).json;
+    final cors = dwStorageCorsJson([stack.appOrigin]);
     String aws(String rest) => 'aws --endpoint-url $endpoint $rest';
     return [
       'set -e',

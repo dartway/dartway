@@ -40,7 +40,7 @@ Destinations are `stage` and `prod`. Kamal 2.12 runs kamal-proxy v0.10.2; the AP
 routes `/dw`, `/health` and literal project HTTP-route prefixes on both hosts.
 Web release builds use `Uri.base.origin`, so the same image serves both
 destinations without build arguments. The Studio binding validates tokens for
-the same app origin. A non-literal route or a root proxy prefix (`/` or `/:x`)
+the same app origin. A non-literal route or the root path (`/`)
 refuses generation with its file and line. A project name that cannot be used
 as a service name is refused with its value and the `project:` key to configure.
 Regenerate after changing routes or deployment config;
