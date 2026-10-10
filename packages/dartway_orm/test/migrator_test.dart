@@ -50,6 +50,74 @@ void main() {
   ];
 
   group('apply', () {
+    for (final namespace in ['app', 'dw', 'module']) {
+      test('reports newer applied migrations as ahead in $namespace', () async {
+        final first = createTable('1_a', 'a');
+        final second = createTable('2_b', 'b');
+        await DwMigrationRunner(
+          db(),
+          migrations: {
+            namespace: [first, second],
+          },
+        ).apply();
+        final previous = DwMigrationRunner(
+          db(),
+          migrations: {
+            namespace: [first],
+            // Another namespace's later id does not make this one a gap.
+            'other': [createTable('9_z', 'z')],
+          },
+        );
+        final run = await previous.apply();
+        expect(run.migrations, const [DwMigrationRef('other', '9_z')]);
+        expect(run.ahead, [DwMigrationRef(namespace, '2_b')]);
+
+        final again = await previous.apply();
+        expect(again.isEmpty, isTrue);
+        expect(again.batch, isNull);
+        expect(again.ahead, [DwMigrationRef(namespace, '2_b')]);
+        expect(await ledger(), [
+          '$namespace/1_a:1:applied',
+          '$namespace/2_b:1:applied',
+          'other/9_z:2:applied',
+        ]);
+        final status = await previous.status();
+        expect(
+          status
+              .singleWhere((s) => s.ref == DwMigrationRef(namespace, '2_b'))
+              .state,
+          DwMigrationState.ahead,
+        );
+      });
+    }
+
+    test(
+      'an owned namespace with no migrations treats applied rows as ahead',
+      () async {
+        await DwMigrationRunner(
+          db(),
+          migrations: {
+            'app': [createTable('1_a', 'a'), createTable('2_b', 'b')],
+            'foreign': [createTable('3_c', 'c')],
+          },
+        ).apply();
+        final previous = DwMigrationRunner(db(), migrations: {'app': const []});
+        final run = await previous.apply();
+        expect(run.isEmpty, isTrue);
+        expect(run.ahead, const [
+          DwMigrationRef('app', '1_a'),
+          DwMigrationRef('app', '2_b'),
+        ]);
+        final status = await previous.status();
+        expect(status.map((s) => s.ref), run.ahead);
+        expect(
+          status.map((s) => s.state),
+          everyElement(DwMigrationState.ahead),
+        );
+        expect(await tables(), {'a', 'b', 'c', 'dw_migrations'});
+      },
+    );
+
     test('applies pending migrations as one batch and is idempotent', () async {
       final migrations = {
         'app': [
@@ -315,6 +383,103 @@ void main() {
   });
 
   group('refusals', () {
+    test(
+      'an unknown applied migration between registered ids is a gap',
+      () async {
+        final first = createTable('1_a', 'a');
+        final third = createTable('3_c', 'c');
+        await DwMigrationRunner(
+          db(),
+          migrations: {
+            'app': [first, createTable('2_b', 'b'), third],
+          },
+        ).apply();
+        final runner = DwMigrationRunner(
+          db(),
+          migrations: {
+            // Registration order must not decide the last known id.
+            'app': [third, first],
+          },
+        );
+        await expectLater(
+          runner.apply(),
+          throwsA(
+            isA<DwMigrationRefused>().having(
+              (e) => e.problems.single,
+              'problem',
+              isA<DwMissingMigration>().having(
+                (p) => p.ref,
+                'ref',
+                const DwMigrationRef('app', '2_b'),
+              ),
+            ),
+          ),
+        );
+        expect(
+          (await runner.status()).singleWhere((s) => s.ref.id == '2_b').state,
+          DwMigrationState.missing,
+        );
+      },
+    );
+
+    test('a dirty newer migration still refuses apply and rollback', () async {
+      final first = createTable('1_a', 'a');
+      await expectLater(
+        DwMigrationRunner(
+          db(),
+          migrations: {
+            'app': [
+              first,
+              TestMigration(
+                '2_dirty',
+                transactional: false,
+                onUp: (m) => throw StateError('crashed'),
+              ),
+            ],
+          },
+        ).apply(),
+        throwsA(isA<DwMigrationFailed>()),
+      );
+      final previous = DwMigrationRunner(
+        db(),
+        migrations: {
+          'app': [first],
+        },
+      );
+      final dirty = isA<DwDirtyMigration>().having(
+        (p) => p.ref,
+        'ref',
+        const DwMigrationRef('app', '2_dirty'),
+      );
+      await expectLater(
+        previous.apply(),
+        throwsA(
+          isA<DwMigrationRefused>().having(
+            (e) => e.problems.single,
+            'problem',
+            dirty,
+          ),
+        ),
+      );
+      await expectLater(
+        previous.rollback(),
+        throwsA(
+          isA<DwMigrationRefused>().having(
+            (e) => e.problems.single,
+            'problem',
+            dirty,
+          ),
+        ),
+      );
+      expect(
+        (await previous.status())
+            .singleWhere((s) => s.ref.id == '2_dirty')
+            .state,
+        DwMigrationState.dirty,
+      );
+      expect(await ledger(), ['app/1_a:1:applied', 'app/2_dirty:1:dirty']);
+    });
+
     test('an applied migration missing from the code', () async {
       await DwMigrationRunner(
         db(),
@@ -550,6 +715,60 @@ class M$id extends DwDatabaseMigration {
   });
 
   group('rollback', () {
+    test(
+      'ahead rows block the last batch, older batches and individual ids',
+      () async {
+        final first = createTable('1_a', 'a');
+        await DwMigrationRunner(
+          db(),
+          migrations: {
+            'app': [first],
+          },
+        ).apply();
+        await DwMigrationRunner(
+          db(),
+          migrations: {
+            'app': [first, createTable('2_b', 'b')],
+          },
+        ).apply();
+        final previous = DwMigrationRunner(
+          db(),
+          migrations: {
+            'app': [first],
+          },
+        );
+        for (final rollback in <Future<DwMigrationRun> Function()>[
+          () => previous.rollback(),
+          () => previous.rollback(batch: 1),
+          () => previous.rollback(id: const DwMigrationRef('app', '1_a')),
+          () => previous.rollback(id: const DwMigrationRef('app', '2_b')),
+        ]) {
+          await expectLater(
+            rollback(),
+            throwsA(
+              isA<DwMigrationRefused>().having(
+                (e) => e.problems.single,
+                'problem',
+                isA<DwRollbackTargetInvalid>()
+                    .having(
+                      (p) => p.ref,
+                      'ref',
+                      const DwMigrationRef('app', '2_b'),
+                    )
+                    .having(
+                      (p) => p.reason,
+                      'reason',
+                      'applied by a newer release; roll it back with that release\'s code',
+                    ),
+              ),
+            ),
+          );
+        }
+        expect(await ledger(), ['app/1_a:1:applied', 'app/2_b:2:applied']);
+        expect(await tables(), {'a', 'b', 'dw_migrations'});
+      },
+    );
+
     Map<String, List<DwDatabaseMigration>> threeBatches() => {
       'app': [
         createTable('1_a', 'a'),

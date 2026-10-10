@@ -241,7 +241,9 @@ usage: migrate <command>
         DwMigrationState.dirty ||
         DwMigrationState.changed ||
         DwMigrationState.missing => true,
-        _ => false,
+        DwMigrationState.applied ||
+        DwMigrationState.pending ||
+        DwMigrationState.ahead => false,
       },
     );
     return problems.isEmpty ? exitOk : exitRefused;

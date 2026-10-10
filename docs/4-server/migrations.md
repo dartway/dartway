@@ -123,12 +123,24 @@ so two processes starting at once apply each migration once; the second waits an
 Before applying anything, the runner compares the ledger with the code and **refuses** —
 `DwMigrationRefused`, nothing applied, every problem listed — when:
 
-- a migration is applied but no longer registered (**missing**);
+- a migration is applied but no longer registered and its id precedes a registered id in its
+  namespace (**missing**: a gap in the chain);
 - an applied migration's checksum differs from the code's and is not one of its
   `supersededChecksums` (**changed**: its source was edited);
 - a migration is **dirty** (a non-transactional one started and never finished);
 - a `dependsOn` names an unregistered migration, the dependencies form a cycle, or one id is
   registered twice.
+
+An unknown applied migration whose id sorts after every registered id in its namespace is
+**ahead**: applied by a newer release than this code. A registered namespace with no migrations
+treats every applied row as newer. This rule covers `dw`, modules and `app`; unregistered
+namespaces are ignored. A previous release boots on the newer schema, logging one warning per
+namespace, and the declared-table and column check still runs. `DwMigrationRun.ahead` reports
+these refs without including them in the migrations run; `status` lists them as `ahead` with no
+refusal. Gaps, edited checksums and dirty rows (including newer ones) still refuse. Any ahead row
+blocks rollback by batch or id: use the newer release's code to roll it back. Additive changes
+can support an image rollback; a removed or renamed table or column still needs a release that
+has stopped using it before the schema contracts.
 
 Otherwise the pending migrations run as one **batch**, ordered by `dependsOn` first, then by
 namespace — the framework's `dw`, then the modules' in the order they are given, then the
@@ -247,7 +259,7 @@ it compiles against the project's row classes and migrations.
 | `rollback` | rolls back the last batch | as `apply` |
 | `rollback --batch N` | rolls back batch N | |
 | `rollback --id X` | rolls back one migration; `X` is an id of the project or `namespace/id` | |
-| `status` | lists every migration: applied, pending, dirty, changed, missing | `2` when any is dirty, changed or missing |
+| `status` | lists every migration: applied, pending, ahead, dirty, changed, missing | `2` when any is dirty, changed or missing |
 | `create <name>` | writes a draft for the difference between the migrations and the row classes; `name` is snake_case | `0` |
 | `check` | verifies files, schema parity and up/down/up | `3` when it finds a difference |
 | `rehash [id …]` | re-seals the checksums of edited migrations (all, or the ids given) | `0` |
@@ -330,8 +342,9 @@ that the check did not run — never that the migrations are fine. See
 
 `DwAppServer.start()` runs the same runner over `{'dw': frameworkMigrations, 'app': migrations}`
 after opening the database. A refusal or a failure throws, and the process exits non-zero: a server
-never serves a schema that disagrees with its ledger. Then, when `schema` is given, it checks that
-every declared table and column exists ([app server](app-server.md#what-start-does-in-order)).
+never serves over a gap, edit or dirty migration. Ahead rows produce warnings and boot proceeds.
+Then, when `schema` is given, it checks that every declared table and column exists
+([app server](app-server.md#what-start-does-in-order)).
 
 So a deploy needs no separate migration step. `bin/migrate.dart` is for development (`create`,
 `check`, `rollback`) and for inspecting a database (`status`).

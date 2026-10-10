@@ -261,6 +261,48 @@ void main() {
     expect(ran(), ['update-checkout', 'update-checkout', 'after']);
   });
 
+  for (final throws in [false, true]) {
+    test(
+      'cleanup ${throws ? 'exception' : 'invalid summary'} closes its progress step at deploy success',
+      () async {
+        final cleanup = DwDeployStep(
+          id: 'cleanup',
+          title: 'Cleanup',
+          run: () async {
+            if (throws) throw StateError('SSH disconnected');
+            return const DwSshResult(
+              exitCode: 0,
+              stdout: 'invalid',
+              stderr: '',
+            );
+          },
+        );
+        expect(await execute([cleanup]), isNull);
+        await events.settle();
+        final decoded = events.lines
+            .map((line) => jsonDecode(line) as Map<String, Object?>)
+            .toList();
+        final terminal = decoded.singleWhere(
+          (event) =>
+              event['event'] == (throws ? 'step_failed' : 'step_finished'),
+        );
+        expect(terminal['id'], 'cleanup');
+        if (throws) {
+          expect(terminal['reason'], 'exception');
+          expect(terminal['message'], contains('SSH disconnected'));
+        } else {
+          expect(terminal['exit_code'], 0);
+        }
+        expect(
+          decoded.singleWhere(
+            (event) => event['event'] == 'cleanup',
+          )['warning'],
+          isTrue,
+        );
+      },
+    );
+  }
+
   test('the events name every step, its position and its end', () async {
     final steps = [step('a'), step('b', script: 'echo bad >&2; exit 2')];
     expect(await execute(steps), 'b');

@@ -2,6 +2,20 @@
 
 ## 0.24.0
 
+- Deploy: a failed migration restores the healthy previous server on the containerd image store,
+  with its live socket serving again without manual recovery (#519).
+
+- Successful deployments clean unused server and web images of their own stack and trim the
+  daemon's build cache to `build_cache_keep` (default `10GB`). Rollback images are pinned before
+  the build and kept in the step journal, including on resume. Every cache prune uses the budget;
+  retained images keep their shared cache keys for unchanged builds on both image stores, and
+  only the cache no kept image shares is held to the budget. A moved tag is refused unless Docker
+  proves it still holds the running container; after an interrupted deployment the
+  `<project>-<service>:dw-previous` pin is tried under the same proof, so the next fresh deploy
+  recovers. Text and JSON progress report removed images, cache records, observed freed bytes and
+  the cache bytes shared with kept images. A cleanup failure closes its progress step and warns at
+  exit 0; `--resume` retries cleanup and failed outside probes (#507, #519).
+
 - The toolkit's `dartway-migrations` requires expand, then contract across production releases
   so the previous image can run on the new schema (#520). Contracting decisions and the
   `dartway-finish` review gate reject contractions shipped with the code that stops using the old

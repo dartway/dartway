@@ -23,7 +23,7 @@ names (an exported `DW_DATABASE_*` wins); the user must be able to create databa
 ```text
 apply                          apply pending migrations, as one batch
 rollback [--batch N | --id X]  the last batch, batch N, or one migration
-status                         applied / pending / dirty / changed / missing (exit 2 on the last three)
+status                         applied / pending / ahead / dirty / changed / missing (exit 2 on the last three)
 create <name>                  write a draft from the row classes' schema
 check                          files sealed, schema parity, up/down/up
 rehash [id ...]                re-seal edited, unapplied migrations
@@ -119,12 +119,20 @@ diff `check` compares against.
 
 ## When the server refuses to start
 
+An unknown applied migration whose id sorts after every registered id in its namespace is
+`ahead`: applied by a newer release than this code. A registered namespace with no migrations
+treats every applied row as newer. A previous release boots on the newer schema with one warning
+per namespace (`dw`, modules or `app`), and still checks its declared tables and columns. `status`
+prints `ahead` without failing; gaps before registered ids, edited checksums and dirty rows still
+refuse. Any ahead row blocks rollback by batch or id: roll it back with the newer release's code.
+Keep newer schema changes additive until the release that stops using the old schema has shipped.
+
 It prints every problem at once (`DwMigrationRefused`):
 
 | The line | What to do |
 |---|---|
 | `… was edited after it was applied` | restore the applied text from git; a wanted change is a new migration |
-| `… is applied but no longer registered` | restore the file; after a branch switch the database is ahead — name it to the human |
+| `… is applied but no longer registered` | a gap before a registered id: restore the file and registration |
 | `… is dirty` | a non-transactional migration crashed: repair by hand with the human |
 | `registered twice` / `dependency cycle` | fix `migrations.dart` or `dependsOn` |
 | `up of app/… failed: <postgres error>` | read the SQL error: a NOT NULL without backfill, a unique index over duplicates, a missing cast |
