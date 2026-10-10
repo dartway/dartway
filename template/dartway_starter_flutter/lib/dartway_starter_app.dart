@@ -14,9 +14,7 @@ class DartwayStarterApp {
   /// Where the server's calls and live socket are: `http://localhost:8080`.
   final Uri baseUrl;
 
-  /// This platform version, `<semver>+<build>`: shown in
-  /// the corner of every page and in
-  /// error reports, and sent with every call.
+  /// This build as the platform reports it, `<semver>+<build>`.
   final String appVersion;
 
   void run() {

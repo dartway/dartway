@@ -6,8 +6,9 @@ description: The app, on DartWay.
 publish_to: 'none'
 
 # The marketing version; +1 is only the fallback for a local build.
-# Release builds pass --build-number=N, from Studio's per-project counter
-# (STD-E21); --build-name is only needed to override the marketing version.
+# Release builds pass --build-number=N.
+# N will come from Studio's per-project counter.
+# --build-name is only needed to override the marketing version.
 # Release build numbers are not committed. The shared package's contract
 # version decides which apps the server serves.
 version: 1.0.0+1

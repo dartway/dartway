@@ -37,14 +37,20 @@ Future<String> readAppVersion() async {
   final PackageInfo info;
   try {
     info = await PackageInfo.fromPlatform();
-  } catch (_) {
+  } catch (error, stackTrace) {
+    // The app's uncaught-error pipeline is installed after this read.
+    debugPrint('Could not read app version: $error\n$stackTrace');
     return '0.0.0+0';
   }
   return appVersionOf(info);
 }
 
-String appVersionOf(PackageInfo info) => info.version.isEmpty
-    ? '0.0.0+0'
-    : info.buildNumber.isEmpty
-    ? '${info.version}+0'
-    : '${info.version}+${info.buildNumber}';
+String appVersionOf(PackageInfo info) {
+  if (info.version.isEmpty) {
+    debugPrint('Platform app version is empty.\n${StackTrace.current}');
+    return '0.0.0+0';
+  }
+  return info.buildNumber.isEmpty
+      ? '${info.version}+0'
+      : '${info.version}+${info.buildNumber}';
+}

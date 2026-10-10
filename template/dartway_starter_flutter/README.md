@@ -18,11 +18,13 @@ browser: `../README.md`.
 
 The app reads this build's version from the platform with `PackageInfo.fromPlatform()`
 in `lib/main.dart`. On web, that reads the `version.json` written by `flutter build web`.
-An empty version or a failed platform read uses `0.0.0+0`, so the app still starts.
+An empty version or a failed platform read is reported with its stack trace via
+`debugPrint` before using `0.0.0+0`, so the app still starts. This read precedes
+the app's uncaught-error pipeline.
 `pubspec.yaml` keeps the marketing version; its `+1` is only a local-build fallback.
 Release builds pass `--build-number=N` and use `--build-name` only to override the
-marketing version. Studio's per-project counter will supply N (STD-E21); release
-build numbers are not committed. Until that release flow is wired, the web image
+marketing version. N will come from Studio's per-project counter. Release build
+numbers are not committed. Until that release flow is wired, the web image
 uses pubspec's fallback build number.
 
 This label is sent as `Dw-App-Version` and decides nothing. Which builds the server
