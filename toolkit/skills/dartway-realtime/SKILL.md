@@ -89,11 +89,13 @@ inserts live only while it shows the newest rows, and counts the rest as unseen.
 
 ## 4. Test it
 
-In the server's acceptance tests (`dartway-testing`): **two real clients** — one commands, the other's
-`watch(…)`, awaited until `watch.isLive` before the command, sees the change with `dwWaitUntil`, and `DwCountingTransport` proves it came live, not by a
-re-read; **the rule over a raw socket** — `server.openLive()`, `authenticate`, `subscribe('invoices:$other')`
-answers `DwSubscriptionRefusedMessage`. For a new channel or publishing command: the other client hears
-it; the unentitled are refused; A's "my" data never reaches B; a deletion leaves the other list; a revoked
-right closes the channel — **on the group's channel, not a caller channel** (which is never revoked), and
-proved by deleting the `ctx.revoke` and watching the test go red. `onUpdate` of each request is a
-contract test.
+Choose cases by `dartway-testing` §4. **Access (class 1)**: the rule over a raw socket —
+`server.openLive()`, `authenticate`, `subscribe('invoices:$other')` answers
+`DwSubscriptionRefusedMessage`; A's "my" data never reaches B. A revoked right closes the channel —
+**on the group's channel, not a caller channel** (which is never revoked). `onUpdate` of each request
+is a contract test (class 5).
+
+**Positive delivery is not mandatory**; it answers the §4 gate. When justified, use two real clients:
+one commands, the other's `watch(…)`, awaited until `watch.isLive` before the command, sees the change
+with `dwWaitUntil`; `DwCountingTransport` proves it came live, not by a re-read. A deletion leaving
+the other list is another case at that boundary. Red proof follows §5.

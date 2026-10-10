@@ -126,7 +126,11 @@ is one of the services packages. Tier 1 in full, both modes, belongs to CI (`che
 **"I ran the tests" means the touched packages' suites green locally and `checks.yml` green on the
 PR**, plus tier 2 for a wire or client change and tier 3 for a change that reaches a project's server.
 
-**Whether a test is written at all is the gate of `toolkit/skills/dartway-testing/SKILL.md` (§4, and §5 for a bugfix), and it binds this repository's suites too**: the owner boundary is the package whose behaviour it is, and what its suite proves is not restated in another package's.
+**Whether a test is written at all follows the six must-test risk classes and gate of
+`toolkit/skills/dartway-testing/SKILL.md` (§4, and §5 for a bugfix), and it binds this repository's
+suites too.** For the framework, the risks are mostly public API and wire contracts (class 5), and
+data integrity in migrations (class 3). Tests outside the six classes are rare. The owner boundary
+is the package whose behaviour it is, and what its suite proves is not restated in another package's.
 
 ## Standards
 

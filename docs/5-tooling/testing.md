@@ -1,15 +1,26 @@
 # How is a DartWay project tested, and how is the framework?
 
-Three tiers in a project, each where the thing it proves actually lives, and none of them a copy of
-another:
+Tests follow risk. A test is mandatory only for access (1), money and counted things (2), data
+integrity (3), a bug that happened (4), a contract others rely on (5), or complex pure logic (6).
+Tests outside those classes are rare and must pass the gate in
+[`dartway-testing` §4](https://github.com/dartway/dartway/blob/master/toolkit/skills/dartway-testing/SKILL.md).
+Layout and copy, instruction texts, wiring already proven at a boundary, reads that only map a table,
+declarations read back, and version literals or other change-detectors get no test by default.
+
+The shape is a honeycomb: each risk is tested at the boundary that owns it, with no copy at another
+tier. The project's test surfaces are:
 
 | Tier | Runs with | Proves | Needs |
 |---|---|---|---|
 | Contract | `dart test` in `<project>_shared` | every data object, request and command survives the wire and comes back equal | nothing |
-| Server acceptance | `dart run dartway_cli:dartway test` in the Flutter package | handlers, access rules, publishing, migrations — on a real Postgres and a real S3 storage, through real clients | Docker or explicit test servers |
-| Widgets | `flutter test` in `<project>_flutter` | a screen reads, commands, refuses and follows live updates as the user sees it | nothing: an in-memory server |
+| Server acceptance | `dart run dartway_cli:dartway test` in the Flutter package | server rules and stored outcomes — on a real Postgres and a real S3 storage, through real clients; one file per feature, new cases as rows in its table | Docker or explicit test servers |
+| Widgets | `flutter test` in `<project>_flutter` | a screen's own logic, only where it has some | nothing: an in-memory server |
+| Unit | the package's runner | complex pure logic (class 6), with table-driven cases | nothing |
 
-The skeleton ships a worked example of each, and the reference application in `example/` another:
+Goldens are only for a real surface. Mutation testing is never a gate.
+
+The skeleton ships worked contract, acceptance and widget tests; the reference application in
+`example/` has more:
 `template/dartway_starter_shared/test/dartway_starter_shared_test.dart`,
 `template/dartway_starter_server/test/` with its harness `test/support/app_harness.dart`, and
 `template/dartway_starter_flutter/test/` with `test/support/app_test_app.dart`. The example keeps both
@@ -19,8 +30,8 @@ per side, extended and never replaced.
 **A test sits at the path of what it tests, in every package**: `lib/admin/users/admin_users_page.dart`
 is tested in `test/admin/users/admin_users_page_test.dart`, `lib/src/core/files.dart` in
 `test/src/core/files_test.dart`. A test of a whole folder — a server feature through its calls — is
-named after the folder at its mirror: `lib/src/chat/` → `test/src/chat/chat_acceptance_test.dart`,
-and a scenario of it `test/src/chat/chat_attachments_acceptance_test.dart`.
+named after the folder at its mirror: `lib/src/chat/` → `test/src/chat/chat_acceptance_test.dart`;
+extend that feature's table for a new case.
 Helpers live in `test/support/` and are imported relatively, and a test builds no server and no
 `ProviderScope` of its own. `dart run dartway_cli:dartway check` holds all three (`testLayout`,
 `testHarnessBypassed`).
@@ -262,6 +273,17 @@ screen, so settling by frames waits out the timeout instead of the traffic.
 
 ## Before calling a change done
 
+`dartway-plan` selects **Risks to guard** from its risk survey and the spec: each item names a class
+(1–6) and the expected outcome from the spec. **`No must-test risk: <why>`** is a valid plan; a
+bugfix starts with its failing test. The feature scaffold extends the contract list for new DTOs
+(class 5) and starts a new acceptance file with an access refusal (class 1). A restricted channel also
+needs an outsider receiving nothing. Other tests follow the feature's risk classes; a second client
+hearing a publication must earn its place through the gate. It creates no test file for behaviour
+outside the six classes.
+
+`dartway-testing` §4 also owns the agent rules for expected values, assertion-change declarations and
+reds caused by intended changes. `dartway-finish` checks those rules and the plan's guarded risks.
+
 `dartway-finish` owns the gate list and runs fast gates locally: generation, the migration check
 when row classes or migrations changed, all three analyzers, and the conventions checker. It reads
 pull-request workflows per suite. Where CI runs a full suite, finish runs changed tests and tests
@@ -290,7 +312,8 @@ request, and every one runs even after an earlier one failed.
 
 ## The framework's own tiers
 
-The monorepo tests itself in four tiers, split by what a run needs.
+The monorepo tests itself in four tiers, split by what a run needs. The same six risk classes and
+test gate apply here: public API and wire contracts are class 5; migration integrity is class 3.
 
 **`tool/checks.sh [analyze|test|services]`** — `analyze` and `test` by default, which need no
 Docker. CI (`.github/workflows/checks.yml`, on every pull request and push to `master`, one job per
