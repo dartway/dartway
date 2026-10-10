@@ -211,6 +211,11 @@ client.requestNavigation('/schedule');
 client.requestLocale('ru');
 ```
 
+An iframe takes the pointer events over its area before the Flutter layer above
+it does, so while an overlay of yours (a dialog, a route) covers the frame,
+call `controller.setInteractive(false)`, and `setInteractive(true)` once it is
+gone. A new frame is interactive.
+
 The handshake is dual-initiated and survives reloads and hot restarts of either
 side. Protocol details live in `StudioBridgeProtocol`.
 
