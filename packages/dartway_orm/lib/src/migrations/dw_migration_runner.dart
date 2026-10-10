@@ -42,24 +42,26 @@ final class DwMigrationRunner {
   final Map<String, List<DwDatabaseMigration>> _migrations;
 
   /// Applies every pending migration as one batch and returns them in the
-  /// order applied.
+  /// order applied. Newer applied migrations stay applied and are reported in
+  /// [DwMigrationRun.ahead].
   ///
   /// Throws [DwMigrationRefused] without applying anything when the ledger
-  /// and the code disagree, and [DwMigrationFailed] when a migration throws —
-  /// the migrations before it stay applied.
+  /// has gaps, edits or dirty rows, and [DwMigrationFailed] when a migration
+  /// throws — the migrations before it stay applied.
   Future<DwMigrationRun> apply() => _locked((db) async {
     final ledger = await _readLedger(db);
     final registered = _registered();
+    final ahead = _aheadRefs(registered, ledger);
     _refuseOn([
       ..._checkRegistration(registered, ledger),
-      ..._checkLedger(registered, ledger),
+      ..._checkLedger(registered, ledger, ahead: ahead.toSet()),
     ]);
 
     final pending = _order([
       for (final migration in registered.values)
         if (!ledger.containsKey(migration.ref)) migration,
     ], satisfied: ledger.keys.toSet());
-    if (pending.isEmpty) return const DwMigrationRun(null, []);
+    if (pending.isEmpty) return DwMigrationRun(null, [], ahead: ahead);
     _refuseOn(_checkSealed(pending));
 
     final batch = (ledger.values.map((row) => row.batch).maxOrNull ?? 0) + 1;
@@ -68,7 +70,7 @@ final class DwMigrationRunner {
     }
     return DwMigrationRun(batch, [
       for (final migration in pending) migration.ref,
-    ]);
+    ], ahead: ahead);
   });
 
   /// Pending migrations whose source file, where it is on disk, no longer
@@ -86,6 +88,8 @@ final class DwMigrationRunner {
 
   /// Rolls back a batch (the last one by default) or a single migration, in
   /// reverse order of application.
+  /// Refuses while migrations applied by a newer release remain in any owned
+  /// namespace; those must be rolled back with that release's code.
   ///
   /// When every migration in the set is transactional the whole rollback is
   /// one transaction: an irreversible migration in the middle leaves the
@@ -99,7 +103,15 @@ final class DwMigrationRunner {
     return _locked((db) async {
       final ledger = await _readLedger(db);
       final registered = _registered();
-      _refuseOn(_checkLedger(registered, ledger));
+      final ahead = _aheadRefs(registered, ledger);
+      _refuseOn(_checkLedger(registered, ledger, ahead: ahead.toSet()));
+      _refuseOn([
+        for (final ref in ahead)
+          DwRollbackTargetInvalid(
+            ref,
+            'applied by a newer release; roll it back with that release\'s code',
+          ),
+      ]);
 
       final List<_LedgerRow> targets;
       if (id != null) {
@@ -176,6 +188,7 @@ final class DwMigrationRunner {
   Future<List<DwMigrationStatus>> status() async {
     final ledger = await _readLedger(_db, create: false);
     final registered = _registered();
+    final ahead = _aheadRefs(registered, ledger).toSet();
     final entries = <DwMigrationStatus>[
       for (final entry in registered.values)
         switch (ledger[entry.ref]) {
@@ -205,7 +218,11 @@ final class DwMigrationRunner {
             !registered.containsKey(row.ref))
           DwMigrationStatus(
             row.ref,
-            DwMigrationState.missing,
+            row.dirty
+                ? DwMigrationState.dirty
+                : ahead.contains(row.ref)
+                ? DwMigrationState.ahead
+                : DwMigrationState.missing,
             batch: row.batch,
             appliedAt: row.appliedAt,
           ),
@@ -336,14 +353,43 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
     return problems;
   }
 
-  List<DwMigrationProblem> _checkLedger(
+  /// Unknown rows after the last registered id belong to a newer release.
+  /// An owned namespace with no registered migrations has only newer rows.
+  List<DwMigrationRef> _aheadRefs(
     Map<DwMigrationRef, _Registered> registered,
     Map<DwMigrationRef, _LedgerRow> ledger,
   ) {
+    final latest = <String, String>{};
+    for (final ref in registered.keys) {
+      final last = latest[ref.namespace];
+      if (last == null || ref.id.compareTo(last) > 0) {
+        latest[ref.namespace] = ref.id;
+      }
+    }
+    return [
+      for (final ref in ledger.keys)
+        if (_migrations.containsKey(ref.namespace) &&
+            !registered.containsKey(ref) &&
+            (latest[ref.namespace] == null ||
+                ref.id.compareTo(latest[ref.namespace]!) > 0))
+          ref,
+    ].sorted((a, b) {
+      final namespace = a.namespace.compareTo(b.namespace);
+      return namespace == 0 ? a.id.compareTo(b.id) : namespace;
+    });
+  }
+
+  List<DwMigrationProblem> _checkLedger(
+    Map<DwMigrationRef, _Registered> registered,
+    Map<DwMigrationRef, _LedgerRow> ledger, {
+    required Set<DwMigrationRef> ahead,
+  }) {
     DwMigrationProblem? check(_LedgerRow row) {
       if (row.dirty) return DwDirtyMigration(row.ref);
       final entry = registered[row.ref];
-      if (entry == null) return DwMissingMigration(row.ref);
+      if (entry == null) {
+        return ahead.contains(row.ref) ? null : DwMissingMigration(row.ref);
+      }
       if (!_accepts(entry.migration, row.checksum)) {
         return DwChangedMigration(
           row.ref,
@@ -495,10 +541,14 @@ CREATE TABLE IF NOT EXISTS "$ledgerTable" (
 /// The outcome of `apply` or `rollback`: the batch and the migrations, in the
 /// order they ran. An empty run has no batch.
 final class DwMigrationRun {
-  const DwMigrationRun(this.batch, this.migrations);
+  const DwMigrationRun(this.batch, this.migrations, {this.ahead = const []});
 
   final int? batch;
   final List<DwMigrationRef> migrations;
+
+  /// Applied by a newer release than this code, ordered by namespace and id.
+  /// These migrations were left applied; they are not part of [migrations].
+  final List<DwMigrationRef> ahead;
 
   bool get isEmpty => migrations.isEmpty;
 
@@ -516,7 +566,10 @@ enum DwMigrationState {
   /// Applied, and its source changed since.
   changed,
 
-  /// Applied, and no longer registered.
+  /// Applied by a newer release than this code.
+  ahead,
+
+  /// Applied, and no longer registered, before a registered migration's id.
   missing,
 }
 

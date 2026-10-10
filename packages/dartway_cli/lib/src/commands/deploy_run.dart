@@ -71,6 +71,23 @@ Future<int> runDeploy(
   var steps = runner.steps(
     skipGitUpdate: results.flag('skip-git-update'),
     revision: revision,
+    verifyOutside: () async {
+      out.writeln('\nServices');
+      final status = await runner.status();
+      final services = <Map<String, String>>[];
+      for (final line in status.stdout.split('\n')) {
+        if (line.trim().isEmpty) continue;
+        out.writeln('  ${line.trim()}');
+        final [name, ...rest] = line.trim().split('\t');
+        services.add({'name': name, 'status': rest.join(' ')});
+      }
+      report.event('services', {'services': services});
+      final code = reportOutsideVerification(
+        await runner.verifyFromOutside(),
+        progress: report,
+      );
+      return remote.run('verify-outside', 'exit $code');
+    },
   );
 
   out
@@ -116,7 +133,7 @@ Future<int> runDeploy(
     for (var index = 0; index < steps.length; index++) {
       out.writeln('  ${index + 1}. ${steps[index].title}');
     }
-    out.writeln('  ${steps.length + 1}. Verify from outside:');
+    out.writeln('  Outside probes:');
     for (final probe in _describeProbes(stack)) {
       out.writeln('       $probe');
     }
@@ -239,15 +256,22 @@ Future<int> runDeploy(
     remote: remote,
     resumeFrom: record,
     retryFailed: results.flag('retry-failed'),
-    retryFailedStepIds: revision == null ? const {} : const {'update-checkout'},
-    trustedSucceededStepIds: resumeVerifiedCheckout
-        ? const {'update-checkout'}
-        : const {},
+    retryFailedStepIds: {
+      'verify-outside',
+      'cleanup',
+      if (revision != null) 'update-checkout',
+    },
+    trustedSucceededStepIds: {
+      if (resumeVerifiedCheckout) 'update-checkout',
+      // Outside success seals the deployment. A cleanup retry must not
+      // replace services or re-run probes which already passed.
+      if (record?['verify-outside']?.succeeded ?? false) ...record!.keys,
+    },
     progress: report,
     onUpdated: reportRevision,
   );
   if (failedStep != null) {
-    String? reason;
+    String? reason = failedStep == 'verify-outside' ? 'verification' : null;
     if (failedStep == 'update-checkout' && revision != null) {
       final failed = await remote.collect(failedStep);
       final output = '${failed.stdout}\n${failed.stderr}';
@@ -260,22 +284,8 @@ Future<int> runDeploy(
     return finish(1, failedStep: failedStep, reason: reason);
   }
 
-  out.writeln('\nServices');
-  final status = await runner.status();
-  final services = <Map<String, String>>[];
-  for (final line in status.stdout.split('\n')) {
-    if (line.trim().isEmpty) continue;
-    out.writeln('  ${line.trim()}');
-    final [name, ...rest] = line.trim().split('\t');
-    services.add({'name': name, 'status': rest.join(' ')});
-  }
-  report.event('services', {'services': services});
-
-  final code = reportOutsideVerification(
-    await runner.verifyFromOutside(),
-    progress: report,
-  );
-  return finish(code, reason: code == 0 ? null : 'verification');
+  out.writeln('\nDeployment completed.');
+  return finish(0);
 }
 
 List<Map<String, String>> _stepList(List<DwDeployStep> steps) => [
@@ -379,7 +389,21 @@ Future<String?> executeDeploySteps(
     final DwSshResult result;
     try {
       result = pickUp ? await remote.collect(step.id) : await step.run();
-    } on DwDeployBusy catch (busy) {
+    } catch (error) {
+      if (step.id == 'cleanup') {
+        report.problems.writeln(
+          'Warning: deployment succeeded, but cleanup failed: $error',
+        );
+        report.event('step_failed', {
+          ...position,
+          'reason': 'exception',
+          'message': error.toString(),
+        });
+        report.event('cleanup', {'warning': true, 'message': error.toString()});
+        return null;
+      }
+      if (error is! DwDeployBusy) rethrow;
+      final busy = error;
       report.problems.writeln(busy);
       report.event('step_failed', {
         ...position,
@@ -387,6 +411,44 @@ Future<String?> executeDeploySteps(
         'message': busy.toString(),
       });
       return step.id;
+    }
+
+    if (step.id == 'cleanup') {
+      final summary = DwDeployRunner.cleanupReport(result);
+      final warning = !result.ok || summary == null;
+      final message = result.stderr.trim().isNotEmpty
+          ? result.stderr.trim()
+          : summary == null
+          ? 'Cleanup returned no valid summary.'
+          : result.firstLine;
+      if (summary != null) {
+        out.writeln(
+          '  Cleanup: ${summary['images_removed']} images, '
+          '${summary['cache_records_removed']} cache records removed, '
+          '${summary['freed_bytes']} bytes freed; '
+          '${summary['cache_shared_bytes']} bytes of build cache shared with '
+          'kept images.',
+        );
+      }
+      report.event('cleanup', {
+        ...?summary,
+        'warning': warning,
+        if (warning) 'message': message,
+      });
+      if (warning) {
+        if (result.ok) await remote?.reject(step.id);
+        report.problems.writeln(
+          'Warning: deployment succeeded, but cleanup failed '
+          '(exit ${result.exitCode}). Run --resume to retry cleanup.',
+        );
+        report.event('step_finished', {
+          ...position,
+          'exit_code': result.exitCode,
+        });
+        if (summary == null) _indent(report.problems, result.stdout);
+        _indent(report.problems, result.stderr);
+        return null;
+      }
     }
 
     // A step that declares it prints its own output prints it whatever
@@ -486,7 +548,6 @@ int reportOutsideVerification(
     );
     return 1;
   }
-  report.human.writeln('\nDeployment completed.');
   return 0;
 }
 

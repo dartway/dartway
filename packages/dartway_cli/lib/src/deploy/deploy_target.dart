@@ -67,6 +67,7 @@ class DwDeployTarget {
     this.storageDomain,
     this.registryMirror,
     this.minFreeDisk = '10GB',
+    this.buildCacheKeep = '10GB',
     this.firewallPorts = const [],
     this.requiredSecrets = const [],
     this.requiredSecretFiles = const [],
@@ -119,7 +120,12 @@ class DwDeployTarget {
 
   int get minFreeDiskBytes => _diskBytes(minFreeDisk);
 
-  static int _diskBytes(String value) {
+  /// Maximum unused builder cache to retain after a successful deployment.
+  final String buildCacheKeep;
+
+  int get buildCacheKeepBytes => _diskBytes(buildCacheKeep, 'build_cache_keep');
+
+  static int _diskBytes(String value, [String key = 'min_free_disk']) {
     final match = RegExp(r'^(\d+(?:\.\d+)?)(MB|GB)$').firstMatch(value);
     final amount = match == null ? null : double.tryParse(match[1]!);
     final bytes = amount == null
@@ -127,7 +133,7 @@ class DwDeployTarget {
         : amount * (match![2] == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024);
     if (!bytes.isFinite || bytes < 1) {
       throw StateError(
-        '"min_free_disk" must be a positive size in MB or GB, got "$value"',
+        '"$key" must be a positive size in MB or GB, got "$value"',
       );
     }
     return bytes.ceil();
@@ -388,6 +394,14 @@ class DwDeployTarget {
         ) ??
         '10GB';
     guarded(() => _diskBytes(minFreeDisk));
+    final buildCacheKeep =
+        guarded(
+          () => section.containsKey('build_cache_keep')
+              ? reader.requiredString('build_cache_keep')
+              : '10GB',
+        ) ??
+        '10GB';
+    guarded(() => _diskBytes(buildCacheKeep, 'build_cache_keep'));
 
     if (problems.isEmpty) {
       final target = DwDeployTarget(
@@ -408,6 +422,7 @@ class DwDeployTarget {
         storageDomain: storageDomain,
         registryMirror: registryMirror,
         minFreeDisk: minFreeDisk,
+        buildCacheKeep: buildCacheKeep,
         firewallPorts: firewallPorts,
         requiredSecrets: requiredSecrets,
         requiredSecretFiles: requiredSecretFiles,
@@ -518,6 +533,7 @@ class DwDeployTarget {
     'storage_domain',
     'registry_mirror',
     'min_free_disk',
+    'build_cache_keep',
     'firewall_ports',
     'requires',
   };
