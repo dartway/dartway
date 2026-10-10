@@ -2,6 +2,9 @@
 
 ## 0.24.0
 
+- Toolkit: settings carry keeps the old table through release N and drops it in N+1; the
+  constitution lists expand/contract across production releases as a rule held by review (#542).
+
 - Migration: projects created before #495 must hold their committed locks in CI with
   `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
   [the migration note](../../docs/migrations/2026-10-10-ci-holds-the-locks.md) (#529).

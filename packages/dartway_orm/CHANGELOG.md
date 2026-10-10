@@ -2,6 +2,9 @@
 
 ## 0.21.0-dev.17
 
+- Fix migration drafts' rename advice: every rename option explains that a released table needs
+  the new name added and copied, reads switched, and the old name dropped one release later (#542).
+
 - Fix `migrate apply` silently accepting ahead migrations: print the same warning as server
   boot after the applied batch or `nothing to apply`, keeping exit code 0 (#536).
 

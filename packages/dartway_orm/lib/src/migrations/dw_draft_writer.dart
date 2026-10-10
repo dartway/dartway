@@ -149,6 +149,11 @@ abstract final class DwDraftWriter {
       );
       for (final option in options) {
         buffer.writeln('    //   await m.$option;');
+        if (option.startsWith('renameColumn(')) {
+          buffer.writeln(
+            '    // on a released table: add the new name and copy, stop reading the old one, drop it one release later',
+          );
+        }
       }
       buffer.writeln('    decisionRequired(${_string(question)});');
     }
@@ -164,6 +169,7 @@ abstract final class DwDraftWriter {
           [
             'The row classes no longer declare it. Dropping loses its rows; if it was',
             'renamed, rename it with m.sql(\'ALTER TABLE ... RENAME TO ...\') instead.',
+            'on a released table: add the new name and copy, stop reading the old one, drop it one release later',
           ],
           ['dropTable(${_string(schema.name)})'],
         );

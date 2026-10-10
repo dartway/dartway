@@ -406,7 +406,9 @@ A nullable field is changed by a `DwFieldPatch` field of the command, applied wi
 can be cleared — never an empty string meaning none.
 
 **Values kept elsewhere before** — a key/value table, a single-row table of the project's own — are
-carried by the migration that drops that table. A project never writes `dw_*` tables itself;
+carried across two production releases, following the same expand/contract rule as a rename.
+Release N carries the settings and stops reading the old table, keeping it so a rollback to the
+previous image can still pass its declared-table check. A project never writes `dw_*` tables itself;
 `m.carrySettings` is the one statement that does, merging one JSON object over what is stored:
 
 ```dart
@@ -415,9 +417,15 @@ await m.carrySettings('ClubSettings', fromSql: '''
     'clubName', (SELECT value FROM app_setting WHERE key = 'clubName'),
     'bookingEnabled',
       (SELECT lower(value) = 'true' FROM app_setting WHERE key = 'bookingEnabled')))''');
+```
+
+Release N+1 drops the old table, once no running code relies on it:
+
+```dart
 await m.dropTable('app_setting');
 ```
- A settings object is published like any data
+
+A settings object is published like any data
 object (`ctx.publish(AppChannels.settings, saved)`) and read by the app with a `DwSingleRequest`.
 The type argument names the object: left to inference it is `DwDataObject`, and the call throws
 `StateError`.
