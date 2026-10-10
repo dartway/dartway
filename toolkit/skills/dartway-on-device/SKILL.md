@@ -12,9 +12,9 @@ description: >-
 # DartWay — what only the device tells you (`dartway-on-device`)
 
 An entry here reproduces on a real device, is invisible in the iOS simulator, a desktop browser and a
-widget test, and has a known workaround. Anything a test can assert belongs in a test instead. A staging
-build is usually shown on a phone browser: if a change touches a field, a sheet or the web shell, open it
-on a phone once.
+widget test, and has a known workaround. Whether an automatable case needs a test follows the risk
+classes and gate of `dartway-testing` §4. A staging build is usually shown on a phone browser: if a
+change touches a field, a sheet or the web shell, open it on a phone once.
 
 ## The keyboard is a step, iOS says so, and it travels for 250 ms
 

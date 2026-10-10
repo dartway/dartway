@@ -81,7 +81,8 @@ fi
 ```
 
 - Analyze whole packages: `dart analyze lib` skips `test/`, where moves and API changes break.
-- A test red after a refactor is "I broke it" until the base branch shows otherwise.
+- Inspect a red against the intended behaviour and the base branch; for an intended change,
+  apply the agent rules in `dartway-testing` §4.
 - `projectContractVersion`: incompatible or unverified is an error, never a skipped gate. Keep the
   baseline SHA fixed after regeneration/feature commits; advance the shared breaking line for an
   incompatible generated shape. A new data object requires a shared version above the base (a patch
@@ -139,10 +140,11 @@ through the public kit widget.
 - Something wrong noticed on the way that this task does not fix is placed now — the routing is
   `dartway-documentation`. So is a statement in the root instruction file (`AGENTS.md` or `CLAUDE.md`) or a skill that the changed code now
   contradicts, either way; a managed file is a framework finding.
-- Non-trivial logic, money, a rule or a bugfix without a test is flagged; the test belongs where the
-  behaviour lives (`dartway-testing`). So is a new test that fails the gate — a question it cannot
-  answer, a junk shape it matches (`dartway-testing` §4). **For a bugfix, ask for the red its test
-  showed before the fix** (§5).
+- A risk in any of the six must-test classes without an owner test is flagged (`dartway-testing`
+  §4). Check the plan's **Risks to guard** against those classes and its expected outcomes; a
+  reasoned **"No must-test risk"** is valid. Flag a new test that fails the gate — a question it
+  cannot answer, a junk shape it matches. Review assertion changes against the agent rules there.
+  **For a bugfix, ask for the red its test showed before the fix** (§5).
 - When a Flutter harness changes, check the real error boundary as well as fake-server calls: an
   exception caught by `dw.action` must fail harness teardown; an explicitly consumed report must
   not hide another one; business refusals stay ordinary outcomes; and teardown errors must not leave
