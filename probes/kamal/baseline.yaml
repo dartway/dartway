@@ -1,0 +1,15 @@
+probe:
+  host: 82.26.151.195
+  ssh_user: root
+  deploy_user: dw_admin
+  os: ubuntu
+  repo: /opt/probe-source.git
+  branch: master
+  project: probe_dw
+  ssl_email: probe@stageserver.ru
+  api_domain: api.probe.stageserver.ru
+  app_domain: app.probe.stageserver.ru
+  database: bundled
+  storage: bundled
+  storage_domain: registry.probe.stageserver.ru
+  min_free_disk: 2GB

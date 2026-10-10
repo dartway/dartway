@@ -1,0 +1,27 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: probe_node
+      POSTGRES_USER: probe_node
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    volumes: [node_data:/var/lib/postgresql/data]
+    ports: ["127.0.0.1:5433:5432"]
+    networks:
+      default:
+        aliases: [probe-node-postgres]
+  node:
+    build: .
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?required}
+    depends_on: [postgres]
+    networks:
+      default:
+      front:
+        aliases: [probe-node]
+volumes:
+  node_data:
+networks:
+  front:
+    external: true
+    name: probe_dw_default

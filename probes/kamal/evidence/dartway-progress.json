@@ -1,0 +1,25 @@
+{
+  "baseline-B": {
+    "event": "run_finished",
+    "ok": true,
+    "exit_code": 0
+  },
+  "baseline-C-fail": {
+    "event": "run_finished",
+    "ok": false,
+    "exit_code": 1,
+    "failed_step": "server"
+  },
+  "baseline-G-drop": {
+    "event": "run_finished",
+    "ok": false,
+    "exit_code": 1,
+    "failed_step": "bridge-override"
+  },
+  "baseline-I-mid-full": {
+    "event": "run_finished",
+    "ok": false,
+    "exit_code": 1,
+    "failed_step": "build"
+  }
+}

@@ -1,0 +1,67 @@
+service: probe-dw-api
+image: probe-dw-api
+servers:
+  web:
+    hosts: [82.26.151.195]
+proxy:
+  host: api.probe.stageserver.ru
+  ssl: true
+  app_port: 8080
+  healthcheck:
+    path: /health
+  run:
+    version: v0.10.2
+registry:
+  server: registry.probe.stageserver.ru
+  username: probe
+  password: [PROBE_REGISTRY_PASSWORD]
+ssh:
+  user: root
+  keys: [~/.ssh/id_ed25519_global]
+  keys_only: true
+builder:
+  arch: amd64
+  dockerfile: probe_dw_server/Dockerfile
+  context: .
+deploy_timeout: 120
+drain_timeout: 30
+retain_containers: 5
+env:
+  clear:
+    PORT: 8080
+    DW_DATABASE_HOST: probe-dw-api-postgres
+    DW_DATABASE_PORT: 5432
+    DW_DATABASE_NAME: probe_dw
+    DW_DATABASE_USER: probe_dw
+    DW_DATABASE_SSL: "false"
+    DW_STORAGE_ENDPOINT: https://registry.probe.stageserver.ru
+    DW_STORAGE_PUBLIC_BUCKET: probe-dw-public
+    DW_STORAGE_PRIVATE_BUCKET: probe-dw-private
+    DW_STORAGE_PROVISION: "true"
+    DW_ALLOWED_ORIGINS: https://app.probe.stageserver.ru
+  secret: [DW_DATABASE_PASSWORD, DW_STORAGE_ACCESS_KEY, DW_STORAGE_SECRET_KEY]
+accessories:
+  postgres:
+    image: postgres:17-alpine
+    host: 82.26.151.195
+    port: "127.0.0.1:5432:5432"
+    env:
+      clear:
+        POSTGRES_DB: probe_dw
+        POSTGRES_USER: probe_dw
+      secret:
+        - POSTGRES_PASSWORD:DW_DATABASE_PASSWORD
+    directories: [postgres:/var/lib/postgresql/data]
+  storage:
+    image: rustfs/rustfs:1.0.0
+    host: 82.26.151.195
+    port: "127.0.0.1:9000:9000"
+    cmd: /data
+    env:
+      secret:
+        - RUSTFS_ACCESS_KEY:DW_STORAGE_ACCESS_KEY
+        - RUSTFS_SECRET_KEY:DW_STORAGE_SECRET_KEY
+    directories: [storage:/data]
+output:
+  otel:
+    endpoint: http://127.0.0.1:4318

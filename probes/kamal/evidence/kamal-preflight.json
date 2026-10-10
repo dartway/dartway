@@ -1,0 +1,99 @@
+{
+  "kamal_version": "2.12.0",
+  "kamal_proxy_binary_version": "v0.10.2",
+  "proxy_digest": "sha256:a686220c2aa42c4f9bbcfe851b1d21b2cedee0b5c389890c29d205282379da7c",
+  "config_exit_codes": {
+    "api": 0,
+    "web": 0,
+    "node": 0
+  },
+  "failed_deploy_exit": 1,
+  "failure_injection": "SSH port 1, before registry login or target mutations",
+  "successful_deploy": "not run: off-target Docker unavailable",
+  "output_otel": [
+    {
+      "timeUnixNano": "1791627800289854000",
+      "observedTimeUnixNano": "1791627800289854000",
+      "severityNumber": 9,
+      "severityText": "INFO",
+      "body": {
+        "stringValue": "kamal.start"
+      },
+      "eventName": "kamal.start",
+      "attributes": [
+        {
+          "key": "kamal.command",
+          "value": {
+            "stringValue": "deploy"
+          }
+        },
+        {
+          "key": "deployment.id",
+          "value": {
+            "stringValue": "b78894c1-41e0-4634-a48d-a5b21bed9cb2"
+          }
+        },
+        {
+          "key": "deployment.name",
+          "value": {
+            "stringValue": "deploy probe-dw-api"
+          }
+        }
+      ]
+    },
+    {
+      "timeUnixNano": "1791627875301748000",
+      "observedTimeUnixNano": "1791627875301748000",
+      "severityNumber": 17,
+      "severityText": "ERROR",
+      "body": {
+        "stringValue": "kamal.failed"
+      },
+      "eventName": "kamal.failed",
+      "attributes": [
+        {
+          "key": "kamal.command",
+          "value": {
+            "stringValue": "deploy"
+          }
+        },
+        {
+          "key": "kamal.runtime",
+          "value": {
+            "doubleValue": 75.0
+          }
+        },
+        {
+          "key": "exception.type",
+          "value": {
+            "stringValue": "SSHKit::Runner::ExecuteError"
+          }
+        },
+        {
+          "key": "exception.message",
+          "value": {
+            "stringValue": "Exception while executing on host 82.26.151.195: Net::SSH::ConnectionTimeout"
+          }
+        },
+        {
+          "key": "deployment.id",
+          "value": {
+            "stringValue": "b78894c1-41e0-4634-a48d-a5b21bed9cb2"
+          }
+        },
+        {
+          "key": "deployment.name",
+          "value": {
+            "stringValue": "deploy probe-dw-api"
+          }
+        },
+        {
+          "key": "deployment.status",
+          "value": {
+            "stringValue": "failed"
+          }
+        }
+      ]
+    }
+  ]
+}

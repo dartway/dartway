@@ -1,0 +1,8 @@
+{
+  "name": "probe-node",
+  "private": true,
+  "type": "module",
+  "scripts": {"build": "vite build", "start": "node server.mjs"},
+  "dependencies": {"express": "5.1.0", "pg": "8.16.3", "react": "19.1.1", "react-dom": "19.1.1"},
+  "devDependencies": {"vite": "7.1.9"}
+}

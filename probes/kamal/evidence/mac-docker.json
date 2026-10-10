@@ -1,0 +1,6 @@
+{
+  "command": "docker info --format {{.ServerVersion}}",
+  "seconds": 10.011,
+  "result": "timeout",
+  "timeout_seconds": 10
+}

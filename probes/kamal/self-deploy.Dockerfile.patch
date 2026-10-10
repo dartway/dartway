@@ -1,0 +1,13 @@
+--- a/probe_dw_server/Dockerfile
++++ b/probe_dw_server/Dockerfile
+@@ -25,0 +26,5 @@
++WORKDIR /workspace/dartway_framework/dartway_cli
++RUN sed -i '/^dev_dependencies:/,$d' pubspec.yaml \
++ && dart pub get \
++ && dart compile exe bin/dartway.dart -o /dartway
++
+@@ -33 +38 @@
+-RUN apk add --no-cache ca-certificates
++RUN apk add --no-cache ca-certificates openssh-client
+@@ -35,0 +41 @@
++COPY --from=build /dartway /app/dartway

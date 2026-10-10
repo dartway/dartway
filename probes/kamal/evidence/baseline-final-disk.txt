@@ -1,0 +1,24 @@
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          8         8         2.342GB   0B (0%)
+Containers      9         8         5.005MB   16.38kB (0%)
+Local Volumes   6         6         97.45MB   0B (0%)
+Build Cache     115       0         5.204GB   4.561GB
+probe_dw-server-1 Up 37 seconds (healthy)
+probe_node-node-1 Up 10 minutes
+probe_node-postgres-1 Up 11 minutes
+probe_dw-nginx-1 Up 18 seconds
+probe_dw-certbot-1 Up 26 minutes
+probe_dw-storage-init-1 Exited (0) 26 seconds ago
+probe_dw-web-1 Up 26 minutes (healthy)
+probe_dw-postgres-1 Up 27 minutes (healthy)
+probe_dw-storage-1 Up 27 minutes (healthy)
+probe_dw-server ef296cc6620d 264MB
+probe_node-node bca6b1172ea6 253MB
+probe_dw-web 0214f3d28c78 152MB
+nginx 0985e772fb9f 93.6MB
+postgres b0f9560a2de0 424MB
+rustfs/rustfs 8cc980175544 401MB
+certbot/certbot f70ad0adbb7e 293MB
+amazon/aws-cli e14216fb361c 595MB
+Filesystem                 1B-blocks        Used   Available Use% Mounted on
+/dev/mapper/vg38111-root 56879345664 11888697344 42332872704  22% /

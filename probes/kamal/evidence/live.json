@@ -1,0 +1,23 @@
+{
+  "emitted": 130,
+  "received": 130,
+  "missing": [],
+  "states": [
+    "idle",
+    "connecting",
+    "connected",
+    "disconnected",
+    "connecting",
+    "disconnected",
+    "connecting",
+    "disconnected",
+    "connecting",
+    "disconnected",
+    "connecting",
+    "connected",
+    "disconnected",
+    "connecting",
+    "connected"
+  ],
+  "emitted_during_add_column_deploy": 68
+}

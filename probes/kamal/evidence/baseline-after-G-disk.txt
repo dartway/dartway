@@ -1,0 +1,16 @@
+TYPE            TOTAL     ACTIVE    SIZE      RECLAIMABLE
+Images          8         8         2.132GB   0B (0%)
+Containers      9         8         5.001MB   16.38kB (0%)
+Local Volumes   6         6         97.46MB   0B (0%)
+Build Cache     99        0         4.588GB   4.155GB
+probe_node-node-1 Up 4 minutes
+probe_node-postgres-1 Up 5 minutes
+probe_dw-server-1 Up 36 seconds (healthy)
+probe_dw-nginx-1 Up 18 seconds
+probe_dw-certbot-1 Up 20 minutes
+probe_dw-storage-init-1 Exited (0) 25 seconds ago
+probe_dw-web-1 Up 20 minutes (healthy)
+probe_dw-postgres-1 Up 20 minutes (healthy)
+probe_dw-storage-1 Up 21 minutes (healthy)
+Filesystem                 1B-blocks        Used   Available Use% Mounted on
+/dev/mapper/vg38111-root 56879345664 11049459712 43172110336  21% /

@@ -1,0 +1,243 @@
+[
+  {
+    "name": "baseline-A-retry",
+    "exit": 0,
+    "seconds": 179.8648625840433,
+    "started_at": null,
+    "finished_at": null,
+    "loops": []
+  },
+  {
+    "name": "baseline-B",
+    "exit": 0,
+    "seconds": 63.000549749995116,
+    "started_at": 1791626178.0113332,
+    "finished_at": 1791626244.282869,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 67,
+        "failures": 1,
+        "failed_status_and_curl_exit": {
+          "502/0": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "baseline-C-add",
+    "exit": 0,
+    "seconds": 92.55947700003162,
+    "started_at": 1791626304.183292,
+    "finished_at": 1791626399.7497861,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 96,
+        "failures": 16,
+        "failed_status_and_curl_exit": {
+          "502/0": 6,
+          "000/7": 10
+        }
+      }
+    ]
+  },
+  {
+    "name": "baseline-C-fail",
+    "exit": 1,
+    "seconds": 44.71799658302916,
+    "started_at": 1791626475.613659,
+    "finished_at": 1791626523.552709,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 48,
+        "failures": 5,
+        "failed_status_and_curl_exit": {
+          "000/28": 5
+        }
+      }
+    ]
+  },
+  {
+    "name": "baseline-D",
+    "exit": 1,
+    "seconds": 1.1256144170183688,
+    "started_at": 1791626438.717588,
+    "finished_at": 1791626443.160606,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 5,
+        "failures": 0,
+        "failed_status_and_curl_exit": {}
+      }
+    ]
+  },
+  {
+    "name": "baseline-E-DW-valid",
+    "exit": 0,
+    "seconds": 64.33008312497986,
+    "started_at": 1791626961.498036,
+    "finished_at": 1791627028.831147,
+    "loops": [
+      {
+        "url": "https://node.probe.stageserver.ru/health",
+        "requests": 68,
+        "failures": 4,
+        "failed_status_and_curl_exit": {
+          "000/28": 3,
+          "000/7": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "baseline-E-node-valid",
+    "exit": 0,
+    "seconds": 12.482803374994546,
+    "started_at": 1791627028.888891,
+    "finished_at": 1791627044.3728042,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 16,
+        "failures": 0,
+        "failed_status_and_curl_exit": {}
+      }
+    ]
+  },
+  {
+    "name": "baseline-F",
+    "exit": 137,
+    "seconds": 14.375338833022397,
+    "started_at": 1791627065.4643662,
+    "finished_at": 1791627082.849073,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 18,
+        "failures": 1,
+        "failed_status_and_curl_exit": {
+          "502/0": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "baseline-F-manual-resume",
+    "exit": 0,
+    "seconds": 53.7212474590051,
+    "started_at": 1791627096.007976,
+    "finished_at": 1791627152.739787,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 57,
+        "failures": 2,
+        "failed_status_and_curl_exit": {
+          "502/0": 1,
+          "000/7": 1
+        }
+      }
+    ]
+  },
+  {
+    "name": "baseline-G-drop",
+    "exit": 1,
+    "seconds": 13.225779499975033,
+    "started_at": 1791627173.6755378,
+    "finished_at": 1791627190.311073,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 17,
+        "failures": 0,
+        "failed_status_and_curl_exit": {}
+      }
+    ]
+  },
+  {
+    "name": "baseline-G-rerun",
+    "exit": 0,
+    "seconds": 96.83556670800317,
+    "started_at": 1791627190.361469,
+    "finished_at": 1791627290.208902,
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 100,
+        "failures": 2,
+        "failed_status_and_curl_exit": {
+          "502/0": 1,
+          "000/7": 1
+        }
+      }
+    ]
+  },
+  {
+    "exit": 1,
+    "seconds": 18.22776470798999,
+    "started_at": 1791627329.400738,
+    "finished_at": 1791627350.7922509,
+    "name": "baseline-I-full",
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 22,
+        "failures": 0,
+        "failed_status_and_curl_exit": {}
+      }
+    ]
+  },
+  {
+    "exit": 0,
+    "seconds": 104.87925962498412,
+    "started_at": 1791627351.8811631,
+    "finished_at": 1791627459.77169,
+    "name": "baseline-I-rerun",
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 108,
+        "failures": 3,
+        "failed_status_and_curl_exit": {
+          "000/28": 3
+        }
+      }
+    ]
+  },
+  {
+    "exit": 1,
+    "seconds": 72.51391991600394,
+    "started_at": 1791627537.028221,
+    "finished_at": 1791627612.545046,
+    "name": "baseline-I-mid-full",
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 76,
+        "failures": 0,
+        "failed_status_and_curl_exit": {}
+      }
+    ]
+  },
+  {
+    "exit": 0,
+    "seconds": 55.139405750029255,
+    "started_at": 1791627613.622773,
+    "finished_at": 1791627671.9019141,
+    "name": "baseline-I-mid-rerun",
+    "loops": [
+      {
+        "url": "https://api.probe.stageserver.ru/health",
+        "requests": 59,
+        "failures": 2,
+        "failed_status_and_curl_exit": {
+          "000/28": 1,
+          "000/35": 1
+        }
+      }
+    ]
+  }
+]

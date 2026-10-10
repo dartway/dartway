@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
+export GEM_HOME="$root/.probe-private/gems"
+export GEM_PATH="$GEM_HOME"
+exec /opt/homebrew/opt/ruby/bin/ruby "$GEM_HOME/bin/kamal" "$@"

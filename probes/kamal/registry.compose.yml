@@ -1,0 +1,16 @@
+services:
+  registry:
+    image: registry:2
+    restart: unless-stopped
+    ports: ["127.0.0.1:5000:5000"]
+    volumes: [registry_data:/var/lib/registry]
+  gateway:
+    image: nginx:1.30.5-alpine
+    restart: unless-stopped
+    ports: ["80:80", "443:443"]
+    volumes:
+      - ./registry-nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./certs:/certs:ro
+      - ./auth:/auth:ro
+volumes:
+  registry_data:

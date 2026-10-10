@@ -1,0 +1,10 @@
+{
+  "anonymous": {
+    "status": 401
+  },
+  "authenticated": {
+    "status": 200,
+    "api_version": "registry/2.0",
+    "body": "{}"
+  }
+}

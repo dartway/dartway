@@ -1,0 +1,31 @@
+service: probe-dw-web
+image: probe-dw-web
+servers:
+  web:
+    hosts: [82.26.151.195]
+proxy:
+  host: app.probe.stageserver.ru
+  ssl: true
+  app_port: 80
+  healthcheck:
+    path: /health
+  run:
+    version: v0.10.2
+registry:
+  server: registry.probe.stageserver.ru
+  username: probe
+  password: [PROBE_REGISTRY_PASSWORD]
+ssh:
+  user: root
+  keys: [~/.ssh/id_ed25519_global]
+  keys_only: true
+builder:
+  arch: amd64
+  dockerfile: probe_dw_flutter/Dockerfile
+  context: .
+  args:
+    DW_BACKEND_URL: https://app.probe.stageserver.ru
+retain_containers: 5
+output:
+  otel:
+    endpoint: http://127.0.0.1:4318
