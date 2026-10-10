@@ -2,6 +2,11 @@
 
 ## 0.24.0
 
+- Toolkit: `dartway-testing` requires red-before-fix proof only for bugfix tests; breaking code for
+  other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
+  then passes on the same commit without changes is quarantined with a linked issue rather than
+  re-running CI until green (#513).
+
 - Toolkit: `dartway-finish` always runs fast gates locally and checks pull-request workflows per
   suite. CI-covered suites run only changed and mirrored tests locally, with a full local fallback
   for changes without a feature mirror; uncovered suites run locally in full. The report names

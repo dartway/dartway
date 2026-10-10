@@ -7,8 +7,8 @@ description: >-
   calls, DwTestClock, server.http); widget tests on the in-memory DwFakeServer through the skeleton's
   TestApp; where test files go; the timing traps; the gate a test passes before it is written (what it
   protects, the regression that fails it, why existing coverage misses it, no seam only the test needs)
-  and the junk shapes that fail it; a bugfix's test red before the fix; proving a test by breaking the
-  code. Use when writing, adding or reviewing tests, or when a test fails with "Dw is not initialized",
+  and the junk shapes that fail it; a bugfix test proved red before the fix; quarantining flaky tests.
+  Use when writing, adding or reviewing tests, or when a test fails with "Dw is not initialized",
   "Another dw core is alive", "found 0 widgets" or a pending Timer.
 ---
 
@@ -140,8 +140,8 @@ Four answers, a sentence each; a question it cannot answer means the test is not
 1. **What it protects** — an observable behaviour or contract: a refusal and its code, what a command
    writes and publishes, what a screen shows from an answer, a calculation's result. Cosmetics protect
    nothing.
-2. **Which credible regression turns it red** — a change someone could plausibly make, named; §5
-   proves it does.
+2. **Which credible regression turns it red** — a change someone could plausibly make, named. For a
+   bugfix test, §5 proves it does.
 3. **Why existing coverage misses it.** Each contract has one owner test, at the tier the table above
    gives it: a refusal is the acceptance test's, what a screen makes of the answer is the widget
    test's, a DTO's shape the contract test's. Another tier only for a risk of its own there — the
@@ -184,15 +184,28 @@ rewritten at the boundary that owns the behaviour. No coverage thresholds, and n
 - **A name the test does not keep**: "hides archived invoices" over a list with no archived one,
   "retries" with a single attempt.
 
-## 5. A test is proved by breaking the code
-
-Before committing a test, **break the one thing it is about** — a comparison, a flag, one line — and
-watch it go red; name the change in the review ("removed `isDeleted` from the mapper — red"). Two
-shapes survive this proof while testing nothing: the subject is inert where it stands (never mounted,
-never reached), and a mutation that changed two things, going red for the wrong reason.
+## 5. A bugfix test is proved red
 
 **A bugfix starts with its test, red on the unfixed code for the reason the bug names** — the failure
 is the bug, not a compile error or a missing helper — and green after the fix; the review says so
 ("red before the fix: expected `slotTaken`, got ok"). A regression test that never failed proves the
 fake, not the fix. One test, at the boundary that owns the bug — not the same scenario replayed at
 every tier it crossed.
+
+**For any other new test, breaking the code is optional.** Use it when unsure the subject is reached
+at all — never mounted, or a code path the setup never enters: break the one thing it is about (a
+comparison, a flag, one line) and watch it go red. Two shapes survive a mutation while testing nothing:
+the subject is inert where it stands (never mounted, never reached), and a mutation that changed two
+things, going red for the wrong reason. These and the junk shapes of §4 are caught by reading. The
+reviewer reads.
+
+## 6. A flaky test is quarantined
+
+**Flaky means a test failed and then passed on the same commit, locally or in CI, with no change in
+between.** In the same change, the executor files an issue in the project's queue, routed by
+`dartway-documentation`, and quarantines the test with
+`skip: 'flaky: <issue link> — <what varied>'`. The issue either fixes the test or deletes it.
+
+**Re-running CI until green is not a fix.** It hides the flake and costs a full run each time.
+
+**A test that fails on every run is not flaky.** It is a red test; §5 and the gates apply.
