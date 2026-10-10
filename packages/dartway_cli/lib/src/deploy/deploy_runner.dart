@@ -64,6 +64,7 @@ class DwDeployRunner {
     DwOutsideProbe? probe,
     this.remote,
     this.buildContext = '.',
+    this.withoutRollbackImage = false,
   }) : ssh = DwMaskedSshRunner(
          ssh,
          deployUser: stack.target.deployUser,
@@ -92,6 +93,10 @@ class DwDeployRunner {
   /// from a copy of the project elsewhere, and the stack is rendered again on
   /// every run (D-075), so the runner has to know it rather than the file.
   final String buildContext;
+
+  /// Allows this deployment to proceed only when its running image cannot
+  /// be resolved. A resolvable image is always pinned for rollback.
+  final bool withoutRollbackImage;
 
   /// Runs every step detached from the connection, when set — see
   /// [DwRemoteSteps]. Without it a step lives as long as its `ssh` call, which
@@ -356,8 +361,16 @@ dw_wait_healthy() {
 
   // Written before replacement, once per deployment: a retry or a resumed
   // cleanup must retain the original rollback image, not the newly serving one.
-  String _rememberImage(String service) =>
-      """
+  String _rememberImage(String service) {
+    final unresolved = withoutRollbackImage
+        ? 'echo "WARNING: this deploy has no rollback image for $service; '
+              'a failure leaves the service down until the next deploy." >&2'
+        : 'echo "Cannot resolve the running $service image (\$container_image): '
+              'neither \$image_name nor ${target.projectName}-$service:dw-previous '
+              'holds the running container; refusing to record a rollback image. '
+              'Rerun: dartway deploy run --env ${target.environment} '
+              '--without-rollback-image" >&2\n        exit 1';
+    return """
 mkdir -p '$_journalDirectory'
 if [ ! -f '$_journalDirectory/$service.previous' ]; then
   previous_container=\$(${DwComposeFiles.invoke} ps -aq $service | head -n 1)
@@ -380,19 +393,21 @@ if [ ! -f '$_journalDirectory/$service.previous' ]; then
         fi
       done
       if [ ! -s '$_journalDirectory/$service.previous.tmp' ]; then
-        echo "Cannot resolve the running $service image (\$container_image): neither \$image_name nor ${target.projectName}-$service:dw-previous holds the running container; refusing to record a rollback image." >&2
-        exit 1
+        $unresolved
       fi
     fi
     # The containerd store can drop an untagged exported image once its
     # container is removed. Pin it before replacement, not during cleanup.
-    docker image tag "\$(cat '$_journalDirectory/$service.previous.tmp')" '${target.projectName}-$service:dw-previous'
+    if [ -s '$_journalDirectory/$service.previous.tmp' ]; then
+      docker image tag "\$(cat '$_journalDirectory/$service.previous.tmp')" '${target.projectName}-$service:dw-previous'
+    fi
   else
     : >'$_journalDirectory/$service.previous.tmp'
   fi
   mv '$_journalDirectory/$service.previous.tmp' '$_journalDirectory/$service.previous'
 fi
 """;
+  }
 
   /// Replaces the server with the new image, one version at a time: the
   /// serving server stops gracefully (calls in flight are answered; clients

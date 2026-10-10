@@ -2,6 +2,11 @@
 
 ## 0.24.0
 
+- Fix: `deploy run --without-rollback-image` unblocks a stand whose running image cannot be
+  resolved after an older CLI moved its tag without leaving a rollback pin. The refusal names the
+  rerun command; opting in warns that a failure leaves the service down until the next deploy.
+  Resolvable images are still pinned, and the flag is not stored in config (#535).
+
 - Deploy: a failed migration restores the healthy previous server on the containerd image store,
   with its live socket serving again without manual recovery (#519).
 
