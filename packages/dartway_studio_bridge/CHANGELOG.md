@@ -2,9 +2,9 @@
 
 ## 0.11.0
 
-- `studioSignedAccessValidator` resolves an empty origin to `Uri.base.origin` in
-  web releases, including explicit calls with `''`. Debug/profile builds without
-  an origin remain open for local preview (#530).
+- `studioSignedAccessValidator` accepts Studio tokens only for the current web
+  release origin when its origin argument is empty. Debug/profile builds without
+  an origin allow local preview (#530).
 
 **Breaking: `StudioFrameController` gains `setInteractive(bool interactive)`.**
 An implementation of the interface outside this package — a test fake — adds

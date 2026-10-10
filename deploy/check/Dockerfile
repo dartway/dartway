@@ -17,8 +17,18 @@ COPY tool/ tool/
 RUN flutter pub get --enforce-lockfile \
  && dart compile exe packages/dartway_cli/bin/check_stack.dart -o /check-stack
 
-# Match the compiler's libc and loader without copying over system symlinks.
+# Runtime dependencies:
+# - bookworm-slim's libc6 supplies the ELF loader, libc, libm, libdl and
+#   libpthread, matching the compiler stage; TLS code is linked into the binary.
+# - ca-certificates in this layer supplies Dart's system TLS trust store.
+# - libc6 and the base's /etc/nsswitch.conf resolve DNS; Docker supplies
+#   /etc/resolv.conf and /etc/hosts when the container starts.
+# - the base's tzdata and /etc/localtime supply timezone data (UTC by default).
+# The AOT binary includes its Dart packages and reads only the mounted project;
+# its entry point launches no subprocesses and needs no Dart SDK or git.
 FROM debian:bookworm-slim
-COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates \
+ && rm -rf /var/lib/apt/lists/*
 COPY --from=build /check-stack /app/check-stack
 ENTRYPOINT ["/app/check-stack"]

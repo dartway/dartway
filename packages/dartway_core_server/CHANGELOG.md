@@ -2,14 +2,12 @@
 
 ## 0.21.0-dev.17
 
-- Storage provisioning accepts optional `allowedOrigins` and writes GET/PUT CORS
-  to both buckets with `Content-MD5`. No origins leaves CORS untouched, without
-  reading the process environment. A storage answering `501 NotImplemented` logs
-  a warning naming its endpoint and bucket; other CORS errors remain fatal (#530).
-
-- Storage provisioning writes the same visibility probe as startup verification
-  into each bucket after setting its policy. Outside checks now work with Kamal's
-  provision-only startup and `verifyBuckets: false`, without `storage-init` (#530).
+- `DwFileStorageSetup.provision` sets bucket policies, GET/PUT CORS for explicit
+  `allowedOrigins`, and the visibility probe object in both buckets, so outside
+  checks work with `verifyBuckets: false`. CORS writes carry `Content-MD5`;
+  omitting origins leaves CORS untouched. A storage answering `501 NotImplemented`
+  logs an endpoint/bucket warning and continues; other errors stop provisioning.
+  The CORS rule belongs to the server package (#530).
 
 - Boot on a newer migration chain after an image rollback, warning once per namespace about
   migrations applied by a newer release. Declared tables and columns are still checked (#527).

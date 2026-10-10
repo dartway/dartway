@@ -63,6 +63,11 @@ jobs:
           labels: org.opencontainers.image.source=https://github.com/dartway/dartway
           cache-from: type=gha,scope=check
           cache-to: type=gha,scope=check,mode=max
+      - name: Check image CA bundle
+        if: steps.tag.outputs.exists != 'true'
+        run: >-
+          docker run --rm --entrypoint /bin/sh '${{ steps.tag.outputs.image }}'
+          -c 'test -s /etc/ssl/certs/ca-certificates.crt'
       - name: Check image help
         if: steps.tag.outputs.exists != 'true'
         run: docker run --rm '${{ steps.tag.outputs.image }}' --help

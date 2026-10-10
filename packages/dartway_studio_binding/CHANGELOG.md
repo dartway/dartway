@@ -2,13 +2,10 @@
 
 ## 0.3.0
 
-- The binding validates Studio tokens for `STUDIO_APP_ORIGIN` when defined,
-  otherwise for `Uri.base.origin` in a web release. One Kamal web image can serve
-  stage and prod while accepting only tokens issued for its current app origin.
-  Debug/profile builds without the define remain open for local preview; an
-  explicit `validateAccessToken` overrides the default policy. Origin resolution
-  belongs to `studioSignedAccessValidator`, so an explicit call with `''` also
-  validates the current web release origin (#530).
+- `DwStudioBinding` validates Studio tokens for `STUDIO_APP_ORIGIN` when defined,
+  otherwise for the current web release origin, so one image can serve stage and
+  prod. Debug/profile builds without the define allow local preview; an explicit
+  `validateAccessToken` supplies the project's own policy (#530).
 
 ## 0.2.1
 

@@ -5,7 +5,7 @@ import 'dart:convert';
 import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:dartway_cli/src/deploy/storage_policy.dart';
 import 'package:dartway_core_server/src/files/dw_storage_buckets.dart';
-import 'package:dartway_core_shared/src/files/dw_storage_cors.dart';
+import 'package:dartway_core_server/src/files/dw_storage_cors.dart';
 import 'package:test/test.dart';
 
 void main() {

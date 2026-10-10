@@ -2,25 +2,21 @@
 
 ## 0.24.0
 
-- Kamal generation refuses `requires: files:`, deployed `site:` and a vendored
-  `dartway_cli` path dependency in the project's own git work tree. Diagnostics
-  name the unsupported key and `deploy run`, or recommend pinning by git ref.
-  Route proxy prefixes preserve exact literal paths (#530).
-
-- `deploy kamal` generates Kamal 2.12 configs with kamal-proxy v0.10.2, stage/prod
-  destinations, literal project route prefixes, the Studio manifest and cached GHCR
-  image builds. `--check` refuses stale generated files. Check-image tags follow
-  the project's resolved CLI source: Git SHA, path HEAD or hosted version.
-  Framework CI builds the outside-probe image on master and promotes an immutable
-  published-version tag on stable without rebuilding. An existing published tag
-  is skipped even when stable advances to a different SHA. The check image resolves
-  the full workspace with its committed lock and pinned Flutter (#530).
-  Invalid project names and root API proxy prefixes are refused by name; Postgres
-  accessories publish no host port. Images workflows are generated after deployment
-  configuration, never shipped as an idle template copy (#530).
+- `deploy kamal` generates Kamal 2.12 destinations with kamal-proxy v0.10.2,
+  literal server route prefixes, the Studio deployment manifest and cached GHCR
+  image builds from the project's deployment configuration. `--check` reports
+  stale output. Postgres stays private to the stack. Unsupported `requires: files:`,
+  deployed `site:`, root API proxy prefixes, invalid project names and a CLI path
+  dependency inside the project's own checkout are refused with a diagnostic (#530).
+- The check image runs outside probes from a read-only project checkout with its
+  own TLS trust store. Its immutable tag follows the resolved CLI source: Git SHA,
+  path HEAD or hosted version. Framework CI builds it on the pinned Flutter and
+  committed workspace lock, verifies the CA bundle and entry point, and publishes
+  the SHA tag; stable promotes the published CLI version tag without rebuilding
+  or replacing an existing tag (#530).
 - Template and example web releases call `Uri.base.origin` and build without a
-  backend address, so one image serves every destination. Deploy checks require the backend build argument only
-  when the Dockerfile declares it (#530).
+  backend address, so one image serves every destination. Deploy checks require
+  the backend build argument only when the Dockerfile declares it (#530).
 
 - Fix: `dartway doctor` always reports Docker, warning that development needs
   `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.

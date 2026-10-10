@@ -2,7 +2,7 @@ import 'dart:convert';
 
 /// Internal CORS policy used by server provisioning. The CLI satellite owns
 /// a matching constant, verified by its contract test.
-/// Not exported from the shared public library.
+/// Not exported from the server public library.
 final class DwStorageCorsRule {
   DwStorageCorsRule(Iterable<String> origins)
     : _rule = {

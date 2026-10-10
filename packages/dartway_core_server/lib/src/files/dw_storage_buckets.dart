@@ -1,16 +1,12 @@
 import 'dart:convert';
 
 import 'package:crypto/crypto.dart';
-
-// Deployment policy is internal to the family; the CLI owns its own constant.
-// ignore: implementation_imports
-import 'package:dartway_core_shared/src/files/dw_storage_cors.dart';
-
 import 'package:meta/meta.dart';
 
 import '../alerts/dw_server_logger.dart';
 import 'dw_file_storage.dart';
 import 'dw_object_store.dart';
+import 'dw_storage_cors.dart';
 
 /// Creates the two buckets of a [DwFileStorageConfig] on a storage the project
 /// runs itself — RustFS in development, in tests, in a `dartway deploy` stack —
