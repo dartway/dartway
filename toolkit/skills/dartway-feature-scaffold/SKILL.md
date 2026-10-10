@@ -131,6 +131,16 @@ The feature's only description, on its public widget (`dwFeature`); without one,
 
 ## Step 4 — tests, then finish
 
-Past the gate of `dartway-testing`: the new DTOs in the contract test's list, an acceptance test for
-each handler whose rule is the point — one refused call per rule, a second client hearing the
-publication — and a widget test on the in-memory server. Then `dartway-finish`.
+Use the six risk classes in `dartway-testing` §4. Do not scaffold test files for behaviour outside
+them. Extend the owner test's list or table:
+
+- New DTOs in the contract test's list (class 5).
+- One refused call per access rule, with its code, from a caller only that rule stops (class 1).
+  If creating a per-feature acceptance test file, start with this refusal and nothing else by
+  default. Where a channel narrows its audience — a member's own data or a team's channel — also
+  prove that an outsider attempting to subscribe receives nothing from that channel (class 1).
+- A test for any other risk class the feature has: 2, 3 or 6; a bugfix follows class 4 and §5.
+- A widget test only where the screen has logic of its own and the risk calls for it.
+
+A second client hearing the publication is not mandatory; it must answer the §4 gate.
+Then `dartway-finish`.

@@ -14,6 +14,11 @@
   closes its progress step and warns at exit 0; `--resume` retries cleanup and failed outside
   probes (#507, #519).
 
+- Toolkit: tests are mandatory only for six risk classes; other tests are rare and must pass the
+  `dartway-testing` gate. Agent rules govern expectations and assertion changes. `dartway-plan`
+  selects **Risks to guard** with a class and expected outcome, and the feature scaffold adds only
+  risk-owned tests, including access refusals and restricted-channel leak checks (#517).
+
 - The template's Claude review job uses the same `DW_CI_RUNS_ON` expression as `ci.yml`, so one
   repository or organisation variable moves both jobs onto self-hosted runners. The review's
   read-only token and disallowed tools remain unchanged. The local project CI runner refuses
