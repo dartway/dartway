@@ -152,13 +152,15 @@ class ProjectCiWorkflow {
     }
     _unknownKeys(job, _jobKeys, 'job $jobId', problems);
     final runsOn = job['runs-on'];
-    if (runsOn is String &&
-        runsOn.contains(r'${{') &&
-        runsOn.trim() != runsOnExpression) {
-      problems.add(
-        'job $jobId: runs-on: $runsOn — the one expression known is '
-        '`$runsOnExpression`',
-      );
+    for (final label in runsOn is List ? runsOn : [runsOn]) {
+      if (label is String &&
+          label.contains(r'${{') &&
+          label.trim() != runsOnExpression) {
+        problems.add(
+          'job $jobId: runs-on: $label — the one expression known is '
+          '`$runsOnExpression`',
+        );
+      }
     }
 
     final services = <String, ProjectCiService>{};
