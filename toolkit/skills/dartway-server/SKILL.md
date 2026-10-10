@@ -267,8 +267,13 @@ DwAppleSignIn(clientIds: [bundleId], signingKey: …)])` in `modules:` — one c
 `dwAuthProvidersProtocolEntries` in both protocols; the project never verifies a token itself. Apple's
 `signingKey` (the `.p8`, from the secret store) lets a deletion revoke the Apple token (App Store
 5.1.1(v)); Apple tells the name only at the first authorization, so the app sends it then. The app half
-is `dartway_auth_google` / `dartway_auth_apple`; `dw.providerUnreachable` may be retried,
-`dw.providerCredentialRejected` may not. Details:
+is `dartway_auth_google` / `dartway_auth_apple`: `DwGoogleAuth.signInCommand()` /
+`DwAppleSignIn.signInCommand()` make the `DwSignInWithProvider`, and the app sends it with `dw.command`
+and `dw.signIn` like `DwVerifyCode`. A sign-up `onExternalAccountCreated` refuses (`consentsRequired`)
+is finished by sending `withRegistration({...consents})` of the same held command — never by running
+the provider again (Apple would not tell the name twice). `dw.providerUnreachable` may be retried,
+`dw.providerCredentialRejected` may not: the token expired (Google ~1 h, Apple ~10 min), ask the
+provider again. Details:
 [`auth-identity.md`](https://github.com/dartway/dartway/blob/master/docs/4-server/auth-identity.md).
 
 **Everything else about accounts is `DwAccountService`** — `ctx.accounts` in a handler, job, route or

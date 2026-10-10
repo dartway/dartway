@@ -10,4 +10,7 @@ losing its contract version:
 final protocol = DwWireProtocol(dwAuthProvidersProtocolEntries, include: appProtocol);
 ```
 
+`withRegistration` is the same sign-in with more registration keys — the same token, nonce and
+code — which is how an app finishes a sign-up its project refused until the terms are accepted.
+
 Documentation: `docs/4-server/auth-identity.md`.
