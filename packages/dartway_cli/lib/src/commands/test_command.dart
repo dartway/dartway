@@ -19,12 +19,12 @@ class TestCommand extends Command<int> {
       ..addOption(
         'database-url',
         help:
-            'Explicit Postgres test server: postgres://user:password@host[:port]/maintenance-db (role needs CREATEDB).',
+            'Explicit Postgres test server: postgres://user:password@host[:port]/maintenance-db (role needs CREATEDB). Defaults to DW_TEST_DATABASE_URL.',
       )
       ..addOption(
         'storage-url',
         help:
-            'Explicit path-style S3 test server: http[s]://access-key:secret-key@host[:port].',
+            'Explicit path-style S3 test server: http[s]://access-key:secret-key@host[:port]. Defaults to DW_TEST_STORAGE_URL.',
       )
       ..addFlag(
         'allow-remote-test-server',
@@ -100,9 +100,22 @@ class TestCommand extends Command<int> {
       return 1;
     }
 
-    final databaseUrl = argResults?['database-url'] as String?;
-    final storageUrl = argResults?['storage-url'] as String?;
+    final databaseFlag = argResults?['database-url'] as String?;
+    final databaseUrl =
+        databaseFlag ?? testServerUrlFromEnvironment('DW_TEST_DATABASE_URL');
+    final databaseSource = databaseFlag != null
+        ? '--database-url'
+        : 'DW_TEST_DATABASE_URL';
+    final storageFlag = argResults?['storage-url'] as String?;
     final withStorage = argResults?['storage'] as bool? ?? true;
+    final storageUrl =
+        storageFlag ??
+        (withStorage
+            ? testServerUrlFromEnvironment('DW_TEST_STORAGE_URL')
+            : null);
+    final storageSource = storageFlag != null
+        ? '--storage-url'
+        : 'DW_TEST_STORAGE_URL';
     final keep = argResults?['keep'] as bool? ?? false;
     final allowRemote =
         argResults?['allow-remote-test-server'] as bool? ?? false;
@@ -112,7 +125,7 @@ class TestCommand extends Command<int> {
       );
       return 1;
     }
-    if (storageUrl != null && !withStorage) {
+    if (storageFlag != null && !withStorage) {
       stderr.writeln('--storage-url cannot be combined with --no-storage.');
       return 1;
     }
@@ -122,12 +135,14 @@ class TestCommand extends Command<int> {
       16,
       (_) => random.nextInt(36).toRadixString(36),
     ).join();
-    // Drop every inherited service option, including CA, buckets and region.
-    // Without a storage flag, even an inherited stage storage is unreachable.
+    // Children receive only this run's coordinates, never inherited service
+    // options or URL defaults that may name an overridden server.
     final environment = {
       for (final entry in Platform.environment.entries)
         if (!entry.key.startsWith('DW_DATABASE_') &&
-            !entry.key.startsWith('DW_STORAGE_'))
+            !entry.key.startsWith('DW_STORAGE_') &&
+            entry.key != 'DW_TEST_DATABASE_URL' &&
+            entry.key != 'DW_TEST_STORAGE_URL')
           entry.key: entry.value,
       'DW_TEST_RUN_ID': runId,
     };
@@ -139,10 +154,18 @@ class TestCommand extends Command<int> {
     try {
       final db = databaseUrl == null
           ? null
-          : TestServerUrl.parse(databaseUrl, database: true);
+          : TestServerUrl.parse(
+              databaseUrl,
+              database: true,
+              source: databaseSource,
+            );
       final s3 = storageUrl == null
           ? null
-          : TestServerUrl.parse(storageUrl, database: false);
+          : TestServerUrl.parse(
+              storageUrl,
+              database: false,
+              source: storageSource,
+            );
       if (db != null)
         environment.addAll(
           await db.environment(database: true, allowRemote: allowRemote),
@@ -217,9 +240,9 @@ class TestCommand extends Command<int> {
     Future<int> runSuite() async {
       stdout.writeln(
         'Test run $runId: '
-        '${databaseUrl == null ? 'starting $image' : 'explicit Postgres'}; '
+        '${databaseUrl == null ? 'starting $image' : 'explicit Postgres ($databaseSource)'}; '
         '${storageUrl != null
-            ? 'explicit S3'
+            ? 'explicit S3 ($storageSource)'
             : startStorage
             ? 'starting $storageImage'
             : 'storage disabled (no storage server supplied)'}.',

@@ -2,6 +2,9 @@
 
 ## 0.21.0-dev.17
 
+- Boot on a newer migration chain after an image rollback, warning once per namespace about
+  migrations applied by a newer release. Declared tables and columns are still checked (#527).
+
 - Filter published objects and deletions in call responses and live updates by the client
   contract version and generated `since`; drop empty channels and suppress empty live messages.
   Protocols without a project contract version retain unfiltered delivery (#504).

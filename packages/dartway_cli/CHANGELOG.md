@@ -2,6 +2,20 @@
 
 ## 0.24.0
 
+- Deploy: a failed migration restores the healthy previous server on the containerd image store,
+  with its live socket serving again without manual recovery (#519).
+
+- Successful deployments clean unused server and web images of their own stack and trim the
+  daemon's build cache to `build_cache_keep` (default `10GB`). Rollback images are pinned before
+  the build and kept in the step journal, including on resume. Every cache prune uses the budget;
+  retained images keep their shared cache keys for unchanged builds on both image stores, and
+  only the cache no kept image shares is held to the budget. A moved tag is refused unless Docker
+  proves it still holds the running container; after an interrupted deployment the
+  `<project>-<service>:dw-previous` pin is tried under the same proof, so the next fresh deploy
+  recovers. Text and JSON progress report removed images, cache records, observed freed bytes and
+  the cache bytes shared with kept images. A cleanup failure closes its progress step and warns at
+  exit 0; `--resume` retries cleanup and failed outside probes (#507, #519).
+
 - Toolkit: tests are mandatory only for six risk classes; other tests are rare and must pass the
   `dartway-testing` gate. Agent rules govern expectations and assertion changes. `dartway-plan`
   selects **Risks to guard** with a class and expected outcome, and the feature scaffold adds only
@@ -19,6 +33,16 @@
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
   then passes on the same commit without changes is quarantined with a linked record rather than
   re-running CI until green (#513).
+
+- `dartway test` defaults `--database-url` and `--storage-url` from `DW_TEST_DATABASE_URL` and
+  `DW_TEST_STORAGE_URL`; flags take precedence, including `--no-storage`, and empty variables
+  count as unset. The run banner and URL refusals name the source, and the existing
+  loopback guard, isolation, cleanup and `--keep` refusal apply. `dartway doctor` reports the
+  environment-selected hosts without credentials and skips the Docker check only when the
+  database URL is set; storage alone still needs Docker for Postgres. Both test URL variables
+  are removed from the suite and service workers' environment, including overridden defaults.
+  Doctor's remote-server refusal explains its loopback requirement and the test command's
+  explicit opt-in; Docker fixes name the test-only variables as well as the flags (#522).
 
 - Toolkit: `dartway-finish` always runs fast gates locally and checks pull-request workflows per
   suite. CI-covered suites run only changed and mirrored tests locally, with a full local fallback

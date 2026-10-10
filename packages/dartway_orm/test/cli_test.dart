@@ -112,6 +112,35 @@ final class M$id extends DwDatabaseMigration {
   });
 
   group('apply, status, rollback', () {
+    test(
+      'status prints ahead rows without refusing; gaps still refuse',
+      () async {
+        final migrations = [
+          for (final id in ['1_a', '2_b', '3_c'])
+            TestMigration(id, onUp: (m) async {}),
+        ];
+        expect(
+          await cli(migrations: migrations).run(['apply']),
+          DwMigrationCli.exitOk,
+        );
+        out.clear();
+        expect(
+          await cli(migrations: [migrations.first]).run(['status']),
+          DwMigrationCli.exitOk,
+        );
+        expect(out.toString(), contains('app/2_b ahead (batch 1'));
+        expect(out.toString(), contains('app/3_c ahead (batch 1'));
+        out.clear();
+        expect(
+          await cli(
+            migrations: [migrations.first, migrations.last],
+          ).run(['status']),
+          DwMigrationCli.exitRefused,
+        );
+        expect(out.toString(), contains('app/2_b missing (batch 1'));
+      },
+    );
+
     test('map outcomes to exit codes', () async {
       final first = TestMigration(
         '20260101_000000_note',
@@ -332,32 +361,35 @@ dev_dependencies:
       );
     });
 
-    test('a sealed migration is one the formatter leaves alone (#291)', () async {
-      expect(
-        await cli(schema: fixtureSchema).run(['create', 'initial']),
-        DwMigrationCli.exitOk,
-      );
-      final drafted = File(
-        p.join(migrationsDir(), 'm20260914_083005_initial.dart'),
-      ).readAsStringSync();
-      expect(drafted.split('\n').first, '// dart format off');
-      // Edited by hand in a shape the formatter would rewrite — a trailing
-      // comma it removes, which the checksum does not ignore — then sealed.
-      final edited = DwMigrationChecksum.seal(
-        drafted.replaceFirst(
-          "await m.dropTable('club_session');",
-          "await m.dropTable(\n      'club_session',\n    );",
-        ),
-      );
-      final formatted = DartFormatter(
-        languageVersion: Version(3, 11, 0),
-      ).format(edited);
-      expect(formatted, edited);
-      expect(
-        DwMigrationChecksum.declared(formatted),
-        DwMigrationChecksum.of(formatted),
-      );
-    });
+    test(
+      'a sealed migration is one the formatter leaves alone (#291)',
+      () async {
+        expect(
+          await cli(schema: fixtureSchema).run(['create', 'initial']),
+          DwMigrationCli.exitOk,
+        );
+        final drafted = File(
+          p.join(migrationsDir(), 'm20260914_083005_initial.dart'),
+        ).readAsStringSync();
+        expect(drafted.split('\n').first, '// dart format off');
+        // Edited by hand in a shape the formatter would rewrite — a trailing
+        // comma it removes, which the checksum does not ignore — then sealed.
+        final edited = DwMigrationChecksum.seal(
+          drafted.replaceFirst(
+            "await m.dropTable('club_session');",
+            "await m.dropTable(\n      'club_session',\n    );",
+          ),
+        );
+        final formatted = DartFormatter(
+          languageVersion: Version(3, 11, 0),
+        ).format(edited);
+        expect(formatted, edited);
+        expect(
+          DwMigrationChecksum.declared(formatted),
+          DwMigrationChecksum.of(formatted),
+        );
+      },
+    );
 
     test('a project that declares dartway_core_server only as a dev '
         'dependency imports dartway_orm', () {
