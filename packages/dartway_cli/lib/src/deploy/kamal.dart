@@ -43,6 +43,20 @@ class DwKamalGenerator {
     final first = targets.first;
     final owner = githubOwner(first.repo);
     for (final target in targets) {
+      if (target.requiredSecretFiles.isNotEmpty) {
+        throw StateError(
+          "deploy/config.yaml > ${target.environment}: requires: files: "
+          "Kamal topology doesn't support this yet. Use deploy run to deliver "
+          "secret files.",
+        );
+      }
+      if (target.site?.deployed == true) {
+        throw StateError(
+          "deploy/config.yaml > ${target.environment}: site: "
+          "Kamal topology doesn't support this yet. Use deploy run to deploy "
+          "a static site.",
+        );
+      }
       if (!DwDeployTarget.projectNamePattern.hasMatch(target.projectName)) {
         throw StateError(
           'deploy/config.yaml > ${target.environment}: project: '
@@ -274,20 +288,14 @@ class DwKamalGenerator {
             'DwHttpRoute path must be a literal absolute path for Kamal generation.',
           );
         }
-        final segments = path
-            .split('/')
-            .skip(1)
-            .takeWhile((s) => !s.startsWith(':'))
-            .toList();
-        final prefix = '/${segments.join('/')}';
-        if (prefix == '/') {
+        if (path == '/') {
           throw StateError(
             '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
             'DwHttpRoute "$path" has proxy prefix "/", which would capture '
-            'every web route. Declare a static route prefix before parameters.',
+            'every web route. Declare an exact non-root route path.',
           );
         }
-        prefixes.add(prefix);
+        prefixes.add(path);
       }
     }
     return prefixes.toList();
@@ -323,6 +331,25 @@ class DwKamalGenerator {
               ? path
               : p.join(lock.parent.path, path);
           try {
+            final projectTree = Process.runSync('git', [
+              '-C',
+              layout.root.path,
+              'rev-parse',
+              '--show-toplevel',
+            ]);
+            if (projectTree.exitCode == 0) {
+              final tree = Directory(
+                (projectTree.stdout as String).trim(),
+              ).resolveSymbolicLinksSync();
+              final cliPath = Directory(root).resolveSymbolicLinksSync();
+              if (p.equals(tree, cliPath) || p.isWithin(tree, cliPath)) {
+                throw StateError(
+                  '${lock.path}: dartway_cli path dependency is inside the '
+                  "project's own git work tree. A vendored framework cannot identify "
+                  'a published check image. Instead, pin dartway_cli by git ref.',
+                );
+              }
+            }
             final result = Process.runSync('git', [
               '-C',
               root,
@@ -332,6 +359,8 @@ class DwKamalGenerator {
             final sha = (result.stdout as String).trim();
             if (result.exitCode == 0 && RegExp(r'^[a-f0-9]{40}$').hasMatch(sha))
               return sha;
+          } on FileSystemException {
+            // A missing resolved path gets the same named lock diagnostic.
           } on ProcessException {
             // The caller reports the same named resolution failure as a
             // missing checkout or HEAD, rather than a process stack trace.

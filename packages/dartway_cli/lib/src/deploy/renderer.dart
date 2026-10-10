@@ -210,11 +210,6 @@ class DwStackRenderer {
       ..writeln('      dockerfile: ${_q('${stack.flutterPackage}/Dockerfile')}')
       ..writeln('      args:')
       ..writeln(
-        '        # The app calls its own origin: /dw/ and /health on it '
-        'reach the server.',
-      )
-      ..writeln('        DW_BACKEND_URL: ${_q(stack.appOrigin)}')
-      ..writeln(
         '        # Where this build answers, for the Studio binding: it '
         'admits a Studio',
       )
@@ -467,7 +462,7 @@ class DwStackRenderer {
           '--cors-configuration file:///tmp/dw-cors.json',
         ),
       for (final bucket in [public, private])
-        "printf '%s\\n' '${DwStack.visibilityProbeText}' "
+        "printf '%s' '${DwStack.visibilityProbeText}' "
             '| ${aws('s3 cp - s3://$bucket/${DwStack.visibilityProbeKey}')} '
             '>/dev/null',
       'echo "bucket $public reads objects anonymously, bucket $private does '

@@ -34,7 +34,7 @@ void main() {
 /* DwHttpRoute.get('/ignored', handler); */
 final routes = [
   DwHttpRoute.post('/github', handler),
-  DwHttpRoute.get('/orders/:id/events/:event', handler),
+  DwHttpRoute.get('/orders/events', handler),
   DwHttpRoute.any('/github', handler),
 ];
 ''');
@@ -68,7 +68,7 @@ final routes = [
           '/dw',
           '/health',
           '/github',
-          '/orders',
+          '/orders/events',
         ]);
         expect(api['proxy']['strip_path_prefix'], false);
         expect(api['proxy']['run']['version'], 'v0.10.2');
@@ -142,6 +142,81 @@ final routes = [
       },
     );
   }
+
+  for (final (extra, key) in [
+    ('  requires:\n    files: [fcm.json]\n', 'requires: files:'),
+    ('  site:\n    domain: example.com\n    source: app_site/build\n', 'site:'),
+  ]) {
+    test('refuses unsupported $key instead of silently omitting it', () {
+      write('deploy/config.yaml', configYaml(extra: extra));
+      expect(
+        () => DwKamalGenerator(root).generate(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(
+              contains(key),
+              contains("Kamal topology doesn't support this yet"),
+              contains('deploy run'),
+            ),
+          ),
+        ),
+      );
+      expect(Directory(p.join(root.path, 'deploy/kamal')).existsSync(), false);
+    });
+  }
+
+  test('an external site requires no Kamal service', () {
+    write(
+      'deploy/config.yaml',
+      configYaml(extra: '  site:\n    domain: example.com\n    source: none\n'),
+    );
+    expect(
+      DwKamalGenerator(root).render().containsKey('deploy/studio.yml'),
+      true,
+    );
+  });
+
+  test('refuses a vendored CLI path in the project git work tree', () {
+    write(
+      'shop_flutter/pubspec.lock',
+      File('test/fixtures/kamal/path.lock').readAsStringSync(),
+    );
+    write('framework/packages/dartway_cli/pubspec.yaml', 'name: dartway_cli\n');
+    for (final args in [
+      ['init'],
+      ['add', 'framework/packages/dartway_cli/pubspec.yaml'],
+      [
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.com',
+        'commit',
+        '-m',
+        'test: vendored CLI fixture',
+      ],
+    ]) {
+      final result = Process.runSync('git', ['-C', root.path, ...args]);
+      expect(result.exitCode, 0, reason: '${result.stderr}');
+    }
+    expect(
+      () => DwKamalGenerator(root).generate(),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          allOf(
+            contains('dartway_cli'),
+            contains('git work tree'),
+            contains('pin'),
+            contains('git ref'),
+          ),
+        ),
+      ),
+    );
+    expect(Directory(p.join(root.path, 'deploy/kamal')).existsSync(), false);
+  });
 
   test('privileged image builds reject fork PRs and PRs cannot write caches', () {
     final workflow = yaml(
@@ -265,7 +340,7 @@ final routes = [
     );
   });
 
-  for (final path in ['/', '/:x', '/:x/events']) {
+  for (final path in ['/']) {
     test('root route prefix $path is refused with the route and location', () {
       write(
         'shop_server/lib/routes.dart',
@@ -308,6 +383,19 @@ final routes = [
     });
   }
 
+  test('an exact route path containing a colon is preserved as its prefix', () {
+    write(
+      'shop_server/lib/routes.dart',
+      "DwHttpRoute.get('/orders/:literal/events', handler);",
+    );
+    expect(
+      DwKamalGenerator.routePrefixes(
+        ProjectLayout.detect(root).serverPackageDir,
+      ),
+      ['/dw', '/health', '/orders/:literal/events'],
+    );
+  });
+
   test('--check catches an added route without changing files', () {
     final generator = DwKamalGenerator(root);
     generator.generate();
@@ -348,14 +436,14 @@ final routes = [
     write('shop_server/lib/routes.dart', r'''
 final ignored = "DwHttpRoute.post('/ignored', handler)";
 DwHttpRoute.get('/\x67ithub', handler);
-DwHttpRoute.get(r'/orders/:id', handler);
+DwHttpRoute.get(r'/orders/events', handler);
 DwHttpRoute.get(/* comment */ '/\u{0066}iles', handler);
 ''');
     expect(
       DwKamalGenerator.routePrefixes(
         ProjectLayout.detect(root).serverPackageDir,
       ),
-      ['/dw', '/health', '/github', '/orders', '/files'],
+      ['/dw', '/health', '/github', '/orders/events', '/files'],
     );
   });
 

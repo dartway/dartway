@@ -2,6 +2,12 @@
 
 ## 0.24.0
 
+- Kamal generation refuses `requires: files:`, deployed `site:` and a vendored
+  `dartway_cli` path dependency in the project's own git work tree. Diagnostics
+  name the unsupported key and `deploy run`, or recommend pinning by git ref.
+  Route proxy prefixes preserve exact literal paths. Compose web builds no longer
+  pass a backend URL build argument (#530, round 2).
+
 - `deploy kamal` generates Kamal 2.12 configs with kamal-proxy v0.10.2, stage/prod
   destinations, literal project route prefixes, the Studio manifest and cached GHCR
   image builds. `--check` refuses stale generated files. Check-image tags follow
@@ -698,7 +704,7 @@
   restart checks the proxy is still running.
 
 - **New local checks**: the server image receives SIGTERM itself (exec-form `ENTRYPOINT`); the web
-  image declares `ARG DW_BACKEND_URL`; a deployed site directory is committed; required secret
+  image build configuration is checked; a deployed site directory is committed; required secret
   names are not ones the compose file sets. `.dockerignore` may admit packages by role glob
   (`!*_server/`), and the template and example ignore files do — they no longer restate the package
   list. The example's ignore file had admitted a package that no longer exists and kept out the

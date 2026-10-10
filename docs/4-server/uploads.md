@@ -155,7 +155,9 @@ Creates both buckets where missing, gives the public one an anonymous-read polic
 (not its listing) and deletes the private one's policy. Idempotent: an existing bucket keeps its
 objects. For a storage the project owns wholly — RustFS in development, in tests, in a deploy. For a
 bucket someone administers with policies of their own, configure it by hand and let the startup
-probe say whether it is right. The skeleton's `bin/server.dart` provisions when
+probe say whether it is right. Provisioning also writes the startup visibility probe into
+each bucket after setting its policy, so an outside check works when `verifyBuckets` is off.
+The skeleton's `bin/server.dart` provisions when
 `DW_STORAGE_PROVISION=true`.
 
 ## Configuration

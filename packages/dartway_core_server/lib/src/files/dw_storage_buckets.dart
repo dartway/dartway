@@ -20,7 +20,9 @@ abstract final class DwFileStorageSetup {
   /// [DwFileStorageConfig.privateBucket] where they are missing; sets the
   /// public bucket's policy to [publicReadPolicy] (anonymous `s3:GetObject`
   /// on its objects, nothing else — not its listing); deletes the private
-  /// bucket's policy, so nothing but a signed request reads it.
+  /// bucket's policy, so nothing but a signed request reads it. Writes the
+  /// visibility probe into each bucket after setting its policy, for outside
+  /// checks even when startup bucket verification is disabled.
   ///
   /// Deleting the policy is right for a storage the project owns wholly and
   /// wrong for a bucket somebody administers with policies of their own:
@@ -56,6 +58,7 @@ abstract final class DwFileStorageSetup {
             code,
           );
         }
+        await _writeVisibilityProbe(store, bucket);
       }
       if (config.privateBucket case final bucket?) {
         await _create(store, bucket);
@@ -72,6 +75,7 @@ abstract final class DwFileStorageSetup {
             code,
           );
         }
+        await _writeVisibilityProbe(store, bucket);
       }
     } finally {
       store.close();
@@ -177,18 +181,13 @@ abstract final class DwBucketCheck {
           ];
       }
 
-      final put = await store.send(
-        'PUT',
-        bucket: bucket,
-        key: probeKey,
-        body: probeBody,
-        headers: {'content-type': 'text/plain'},
-      );
-      final code = await DwObjectStore.errorCodeOf(put);
-      if (put.statusCode >= 300) {
+      try {
+        await _writeVisibilityProbe(store, bucket);
+      } on DwStorageException catch (error) {
         return [
           '$name does not accept writes with the configured keys: PUT '
-              'answered ${put.statusCode}${code == null ? '' : ' $code'}',
+              'answered ${error.status}'
+              '${error.errorCode == null ? '' : ' ${error.errorCode}'}',
         ];
       }
 
@@ -243,5 +242,25 @@ abstract final class DwBucketCheck {
       if (a[i] != b[i]) return false;
     }
     return true;
+  }
+}
+
+// Provisioning and verification leave the same constant object for outside
+// probes, even when startup verification is disabled (the Kamal topology).
+Future<void> _writeVisibilityProbe(DwObjectStore store, String bucket) async {
+  final response = await store.send(
+    'PUT',
+    bucket: bucket,
+    key: DwBucketCheck.probeKey,
+    body: DwBucketCheck.probeBody,
+    headers: {'content-type': 'text/plain'},
+  );
+  final code = await DwObjectStore.errorCodeOf(response);
+  if (response.statusCode >= 300) {
+    throw DwStorageException(
+      'PUT visibility probe of $bucket',
+      response.statusCode,
+      code,
+    );
   }
 }

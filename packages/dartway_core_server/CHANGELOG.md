@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- Storage provisioning writes the same visibility probe as startup verification
+  into each bucket after setting its policy. Outside checks now work with Kamal's
+  provision-only startup and `verifyBuckets: false`, without `storage-init` (#530).
+
 - Boot on a newer migration chain after an image rollback, warning once per namespace about
   migrations applied by a newer release. Declared tables and columns are still checked (#527).
 

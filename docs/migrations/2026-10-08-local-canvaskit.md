@@ -13,9 +13,8 @@ A project whose Flutter `Dockerfile` builds web without `--no-web-resources-cdn`
 In `<project>_flutter/Dockerfile`:
 
 ```diff
--RUN flutter build web --release \
-+RUN flutter build web --release --no-web-resources-cdn \
-     --dart-define="DW_BACKEND_URL=${DW_BACKEND_URL}"
+-RUN flutter build web --release
++RUN flutter build web --release --no-web-resources-cdn
 ```
 
 ## How to check

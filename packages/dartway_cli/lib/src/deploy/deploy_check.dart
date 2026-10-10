@@ -873,12 +873,9 @@ Future<DwDeployVerdict> _checkOverrideWebBuild(DwDeployContext context) async {
   return const DwDeployVerdict.fail(
     'deploy/compose.override.yml rebuilds the web service',
     fix:
-        'The deploy already builds web and passes it DW_BACKEND_URL from '
-        'app_domain in deploy/config.yaml. A build block here names the '
-        'address a second time and nothing compares the copies, so a changed '
-        'domain silently ships an app talking to the old one. Drop the build '
-        'block; change the Dockerfile instead when the image itself has to '
-        'differ.',
+        'The deploy already builds web from the project Dockerfile. Drop the '
+        'build block so the override cannot replace that build configuration; '
+        'change the Dockerfile when the image itself has to differ.',
   );
 }
 

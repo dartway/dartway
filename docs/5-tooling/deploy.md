@@ -37,13 +37,19 @@ dart run dartway_cli:dartway deploy kamal --check
 Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
 Generated files carry their source instructions. `--check` writes nothing and
 names every stale file, including the API config when a project route changes.
-`DwHttpRoute.get`, `.post` and `.any` must use literal paths; a parameter segment
-such as `:id` ends the proxy prefix. `/github` remains `/github`. A route at `/`
-or beginning with a parameter (such as `/:x`) is refused by name, because its
-proxy prefix would capture every web route. The API serves
+`DwHttpRoute.get`, `.post` and `.any` must use string literal paths. Server routes
+match exact paths, with no `:id` parameters; put identifiers in the query or body.
+Each proxy prefix is the route's path itself: `/github` remains `/github`.
+A `/` route is refused because its proxy prefix would capture every web route.
+After adding a route, run `deploy kamal` and commit the regenerated API config;
+otherwise CI's `deploy kamal --check` fails. The API serves
 these prefixes plus `/dw` and `/health` on both API and app hosts, preserving the
 path; the web service catches all other app paths. Proxy buffering is off for
-API and storage. Kamal 2.12 uses kamal-proxy v0.10.2, with 30-second deployment
+API and storage.
+
+Kamal generation refuses `requires: files:` and a deployed `site:` because this
+topology does not support them yet; use `deploy run` for those projects.
+Kamal 2.12 uses kamal-proxy v0.10.2, with 30-second deployment
 and drain timeouts and five retained containers.
 
 The generated Images workflow runs after the project's `CI` workflow completes
@@ -73,9 +79,15 @@ SSH credentials and `KAMAL_REGISTRY_PASSWORD`. `ssh_user` comes from the target.
 The Studio check image reads a checkout mounted read-only at `/project`, with
 `--project /project --env stage` (or `prod`). It verifies TLS by making HTTPS
 requests, health on both hosts, the live socket hello, web caching and bundled
-storage visibility, and exits nonzero on a failure. Its tag follows the resolved
-`dartway_cli`: Git uses the lock's resolved ref SHA, path uses the checkout's
-HEAD, and pub.dev uses the lock's exact version. A Git/path SHA tag becomes
+storage visibility, and exits nonzero on a failure. With bundled storage, the API's
+`DW_STORAGE_PROVISION=true` makes `DwFileStorageSetup.provision` create both buckets,
+set their policies and write the visibility probe into each before serving. This
+works with `DW_STORAGE_VERIFY_BUCKETS=false`; Kamal has no `storage-init` service.
+
+The check image tag follows the resolved `dartway_cli`: Git uses the lock's resolved ref SHA, path uses the checkout's
+HEAD, and pub.dev uses the lock's exact version. A path dependency on a vendored
+`dartway_cli` inside the project's own git work tree is refused; pin it by git ref
+so the tag identifies a framework commit. A Git/path SHA tag becomes
 available after that framework commit reaches master and its image build passes;
 uncommitted checkout changes do not get an image of their own. Framework CI builds SHA tags on
 `master`. A push to `stable` copies that image to the published CLI version,

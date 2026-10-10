@@ -94,10 +94,13 @@ and `release` (PR builds do not push). Install the workflow on the default branc
 before its `workflow_run` trigger can run. CI checks `deploy kamal --check` next
 to generation whenever a Studio manifest is present. The template ships no
 pre-generated deployment files or Images workflow.
-Regenerate when project HTTP routes change: their literal prefixes are read from
-`__SERVER_PKG__/lib/`. Non-literal paths and root proxy prefixes (`/` or `/:x`)
-refuse generation. Invalid project names are refused with the value and the
-`project:` key to configure. Web release builds without a define call
+After adding a project HTTP route, run `deploy kamal` and commit its output;
+otherwise CI's `deploy kamal --check` fails. Route paths are string literals read
+from `__SERVER_PKG__/lib/` and match exactly, with no `:id` parameters. Each proxy
+prefix is the path itself. Non-literal paths and a `/` route refuse generation.
+`requires: files:` and a deployed `site:` are refused because the Kamal topology
+does not support them yet; use `deploy run`. Invalid project names are refused
+with the value and the `project:` key to configure. Web release builds without a define call
 `Uri.base.origin`; they need no backend build argument. The Studio binding uses
 `STUDIO_APP_ORIGIN` when defined and otherwise the app's own origin in a web
 release; debug/profile preview without the define stays open. Studio owns running
