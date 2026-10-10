@@ -128,7 +128,4 @@ jobs:
           docker logs storage
           exit 1
 
-      - name: Resolve the example for the environment-selected test servers proof
-        run: cd example/dartway_example_server && dart pub get
-
       - run: tool/checks.sh services

@@ -112,11 +112,11 @@ A supplied URL prevents Docker from being called for that service; with neither 
 variable, the container defaults apply.
 The run banner names the source (`--database-url` or `DW_TEST_DATABASE_URL`, and the storage
 equivalent), and URL refusals name that source. `dartway doctor` reports
-`tests: explicit servers from environment` with the supplied hosts and no credentials. It skips the
-Docker check only when `DW_TEST_DATABASE_URL` is set: database-only mode disables storage, while
-storage-only mode still starts Postgres in Docker and keeps the Docker check. Doctor does not read
-the test command's flags; with a database URL supplied only by flag, its environment-based check
-still requires Docker.
+`tests: explicit servers from environment` with valid supplied hosts and no credentials. It always
+reports Docker: an unavailable daemon is a warning when `DW_TEST_DATABASE_URL` is valid, because
+development still needs `docker compose up`; otherwise it is a failure. URL errors are reported
+independently and do not stop the Docker check. Doctor does not read the test command's flags;
+with a database URL supplied only by flag, its environment-based check still requires Docker.
 
 `--database-url` names the maintenance database on the test server; the role needs `CREATEDB`.
 The password is required and the port is optional (it defaults to 5432). `--storage-url` accepts HTTP or HTTPS with access and secret keys,
