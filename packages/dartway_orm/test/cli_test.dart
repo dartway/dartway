@@ -112,6 +112,38 @@ final class M$id extends DwDatabaseMigration {
   });
 
   group('apply, status, rollback', () {
+    for (final withPending in [false, true]) {
+      test('apply warns about ahead rows with pending=$withPending', () async {
+        final migrations = [
+          for (final id in ['1_a', '2_b'])
+            TestMigration(id, onUp: (m) async {}),
+        ];
+        expect(
+          await cli(migrations: migrations).run(['apply']),
+          DwMigrationCli.exitOk,
+        );
+        out.clear();
+
+        expect(
+          await cli(
+            migrations: [migrations.first],
+            modules: {
+              if (withPending)
+                'dw': [TestMigration('1_framework', onUp: (m) async {})],
+            },
+          ).run(['apply']),
+          DwMigrationCli.exitOk,
+        );
+        expect(exitCode, 0);
+        expect(
+          out.toString(),
+          '${withPending ? 'applied batch 2:\n  dw/1_framework' : 'nothing to apply'}\n'
+          'warning: app: 1 migration(s) applied by a newer release '
+          '(2_b … 2_b); serving on its schema\n',
+        );
+      });
+    }
+
     test(
       'status prints ahead rows without refusing; gaps still refuse',
       () async {
