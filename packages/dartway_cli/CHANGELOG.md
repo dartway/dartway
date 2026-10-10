@@ -3,7 +3,8 @@
 ## 0.24.0
 
 - Template: the app reads its version from the platform; `app_version.dart` and its
-  version-equality test are removed. Release builds pass `--build-number` (#521).
+  version-equality test are removed. An empty platform build number maps to `+0`.
+  Release builds pass `--build-number` (#521).
 
 - Migration: projects created before #495 must hold their committed locks in CI with
   `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See

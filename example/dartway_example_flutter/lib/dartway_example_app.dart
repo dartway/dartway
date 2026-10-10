@@ -21,7 +21,7 @@ class DartwayExampleApp {
   /// Where the server's calls and live socket are: `http://localhost:8080`.
   final Uri baseUrl;
 
-  /// This platform version, `<semver>` with an optional `+<build>`: shown in
+  /// This platform version, `<semver>+<build>`: shown in
   /// the corner of every page and in
   /// error reports, and sent with every call.
   final String appVersion;

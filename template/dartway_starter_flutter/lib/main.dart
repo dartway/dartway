@@ -6,9 +6,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   final info = await PackageInfo.fromPlatform();
-  final appVersion = info.buildNumber.isEmpty
-      ? info.version
-      : '${info.version}+${info.buildNumber}';
 
   // Concrete development parameters live here; the app itself stays
   // environment agnostic.
@@ -32,6 +29,10 @@ Future<void> main() async {
 
   DartwayStarterApp(
     baseUrl: Uri.parse(backendUrl),
-    appVersion: appVersion,
+    appVersion: appVersionOf(info),
   ).run();
 }
+
+String appVersionOf(PackageInfo info) => info.buildNumber.isEmpty
+    ? '${info.version}+0'
+    : '${info.version}+${info.buildNumber}';

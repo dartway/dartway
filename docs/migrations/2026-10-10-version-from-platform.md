@@ -2,15 +2,13 @@
 title: Read the app version from the platform build
 affects:
   dartway_cli: "0.24.0"
-  dartway_core_shared: "0.21.0-dev.17"
 ---
 
 ## Who is affected
 
 Projects whose Flutter entrypoint passes a committed `appBuildVersion` constant.
-Apply this change on the next template sync. Code that reads `DwAppVersion.build`
-must also allow `null`, meaning the platform supplied no build number; do not
-invent a build number for the session label.
+Apply this change on the next template sync. An empty platform build number maps
+to build `0`; `DwAppVersion` remains strict (`<semver>+<build>`).
 
 ## What to change
 
@@ -28,11 +26,13 @@ invent a build number for the session label.
    Future<void> main() async {
      WidgetsFlutterBinding.ensureInitialized();
      final info = await PackageInfo.fromPlatform();
-     final appVersion = info.buildNumber.isEmpty
-         ? info.version
-         : '${info.version}+${info.buildNumber}';
+     final appVersion = appVersionOf(info);
      // Pass appVersion to the application's existing app constructor and run it.
    }
+
+   String appVersionOf(PackageInfo info) => info.buildNumber.isEmpty
+       ? '${info.version}+0'
+       : '${info.version}+${info.buildNumber}';
    ```
 
 4. Keep the marketing version in `pubspec.yaml`; its `+N` is only a fallback for
@@ -47,6 +47,7 @@ and decides nothing about compatibility.
 
 ## How to check
 
+Test `appVersionOf` with a supplied build number and an empty one (`+0`).
 Run `flutter test`, then build and run web and a mobile simulator build with
 `--build-number=521`. `AppVersionLabel` should show the marketing version followed
 by `+521`, while `pubspec.yaml` remains unchanged.

@@ -160,17 +160,14 @@ void main() {
       expect(other.refusal.isCode(DwCoreRefusal.protocolUnsupported), isTrue);
     });
 
-    test('Dw-App-Version: absent and a version without a build are accepted; '
+    test('Dw-App-Version: absent is build 0, which a minimum of 0 accepts; '
         'malformed is 400', () async {
-      for (final value in [null, '1.0.0']) {
-        final accepted = await anonymous.call(
-          const ListNotes(ownerId: -1),
-          headers: {DwHttpContract.appVersionHeader: value},
-        );
-        expect(accepted.status, 200);
-        expect(accepted.json, {'status': 'ok', 'result': <Object?>[]});
-      }
-      for (final value in ['1.0+3', 'x+1', '1.0.0+-1', '1.0.0+']) {
+      final absent = await anonymous.call(
+        const ListNotes(ownerId: -1),
+        headers: {DwHttpContract.appVersionHeader: null},
+      );
+      expect(absent.status, 200);
+      for (final value in ['1.0.0', '1.0+3', 'x+1', '1.0.0+-1']) {
         final malformed = await anonymous.call(
           const ListNotes(),
           headers: {DwHttpContract.appVersionHeader: value},
