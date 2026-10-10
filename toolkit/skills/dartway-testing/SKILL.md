@@ -234,10 +234,10 @@ goes red for the wrong reason. The junk shapes of §4 are caught by reading; the
 
 **Flaky means a test failed and then passed on the same commit, locally or in CI, with no change
 in between.** In the same change, the executor records the flake where `dartway-documentation`
-routes a finding — usually the feature's `knownIssues`, a `docs/dev_notes/` file when it is cross-
-cutting, plus an issue in the project's tracker when the project has one — and quarantines the
-test with `skip: 'flaky: <where it is recorded> — <what varied>'`. The record is closed by fixing
-the test or deleting it.
+routes a finding — usually the feature's `knownIssues`, a `docs/dev_notes/` file when it is
+cross-cutting, plus an issue in the project's tracker when the project has one — and quarantines
+the test with `skip: 'flaky: <where it is recorded> — <what varied>'`. The record is closed by
+fixing the test or deleting it.
 
 **Re-running CI until green is not a fix.** It hides the flake and costs a full run each time.
 
