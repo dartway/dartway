@@ -2,6 +2,13 @@
 
 ## 0.24.0
 
+- Successful deployments clean unused server and web images of their own stack and trim the
+  daemon's build cache to `build_cache_keep` (default `10GB`). Rollback images are pinned before
+  the build and kept in the step journal, including on resume. Shared BuildKit cache references
+  are released separately from the cache budget, including on the containerd image store.
+  Text and JSON progress report removed images, cache records and observed freed bytes. A
+  cleanup failure warns at exit 0; `--resume` retries only cleanup (#507).
+
 - The template ships `.github/workflows/ci.yml`: every mechanical gate of a project — `generate
   --check`, `migrate.dart check` on a Postgres service, `dart analyze` (`--fatal-infos` in the
   Flutter package, where the convention rules run as an analyzer plugin), `dart test`,

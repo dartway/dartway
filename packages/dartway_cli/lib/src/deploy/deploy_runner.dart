@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'compose_files.dart';
 import 'data_volumes.dart';
@@ -42,7 +43,8 @@ class DwDeployStep {
 
 /// Deploys an already-provisioned server: update the checkout, render the
 /// environment, build, start the server — which migrates as it starts — then
-/// the web image and the proxy, and finally ask the result from outside.
+/// the web image and the proxy, ask the result from outside, then clean
+/// unused stack images and the build cache.
 ///
 /// `docker-compose.yml` and `nginx.conf` are rendered here too, on every run.
 /// They used to be written by `setup` alone, so that a routine push would not
@@ -280,7 +282,14 @@ rm -f "\$dw_new"''';
       minimumBytes: target.minFreeDiskBytes,
     );
     if (!space.ok) return space;
-    return _compose('build');
+    return _as('''
+set -e
+cd '$appDir'
+${DwComposeFiles.selectFiles}
+${_rememberImage(DwStack.serverService)}
+${_rememberImage(DwStack.webService)}
+${DwComposeFiles.invoke} build
+''');
   }
 
   /// Starts the bundled storage and runs the initialisation of both buckets,
@@ -342,6 +351,34 @@ dw_wait_healthy() {
 }
 ''';
 
+  String get _journalDirectory =>
+      remote?.directory ?? '${store.directory}/deploy-run';
+
+  // Written before replacement, once per deployment: a retry or a resumed
+  // cleanup must retain the original rollback image, not the newly serving one.
+  String _rememberImage(String service) =>
+      """
+mkdir -p '$_journalDirectory'
+if [ ! -f '$_journalDirectory/$service.previous' ]; then
+  previous_container=\$(${DwComposeFiles.invoke} ps -aq $service | head -n 1)
+  if [ -n "\$previous_container" ]; then
+    image_name=\$(docker inspect -f '{{.Config.Image}}' "\$previous_container")
+    container_image=\$(docker inspect -f '{{.Image}}' "\$previous_container")
+    # With attestations the container runs a platform manifest inside an
+    # image index. Resolve the exported image before the build moves its tag.
+    if ! docker image inspect -f '{{.Id}}' "\$container_image" >'$_journalDirectory/$service.previous.tmp' 2>/dev/null; then
+      docker image inspect -f '{{.Id}}' "\$image_name" >'$_journalDirectory/$service.previous.tmp'
+    fi
+    # The containerd store can drop an untagged exported image once its
+    # container is removed. Pin it before replacement, not during cleanup.
+    docker image tag "\$(cat '$_journalDirectory/$service.previous.tmp')" '${target.projectName}-$service:dw-previous'
+  else
+    : >'$_journalDirectory/$service.previous.tmp'
+  fi
+  mv '$_journalDirectory/$service.previous.tmp' '$_journalDirectory/$service.previous'
+fi
+""";
+
   /// Replaces the server with the new image, one version at a time: the
   /// serving server stops gracefully (calls in flight are answered; clients
   /// retry through the gap), the new image applies the migrations in a
@@ -363,14 +400,15 @@ set -e
 cd '$appDir'
 ${DwComposeFiles.selectFiles}
 ${waitHealthyFunction()}
-# The image the serving server runs, to start again on a failure. Read from
-# the container: the build has already moved the image name to the new one.
+${_rememberImage(DwStack.serverService)}
+# The container supplies the image name to restore. The journal holds the
+# exported rollback image, pinned before the build moved that name.
 old=\$(${DwComposeFiles.invoke} ps -aq ${DwStack.serverService} | head -n 1)
 image=""
 previous=""
 if [ -n "\$old" ]; then
   image=\$(docker inspect -f '{{.Config.Image}}' "\$old")
-  previous=\$(docker inspect -f '{{.Image}}' "\$old")
+  previous=\$(cat '$_journalDirectory/${DwStack.serverService}.previous')
 fi
 dw_start_previous() {
   if [ -z "\$previous" ]; then
@@ -405,8 +443,13 @@ if ! dw_wait_healthy "\$cid" 'the new server'; then
 fi
 ''');
 
-  Future<DwSshResult> startWeb() =>
-      _compose('up -d --no-deps --wait ${DwStack.webService}');
+  Future<DwSshResult> startWeb() => _as("""
+set -e
+cd '$appDir'
+${DwComposeFiles.selectFiles}
+${_rememberImage(DwStack.webService)}
+${DwComposeFiles.invoke} up -d --no-deps --wait ${DwStack.webService}
+""");
 
   /// Converges everything else — the proxy, certbot, whatever the project's
   /// override adds — and removes services the stack no longer declares.
@@ -633,20 +676,27 @@ echo "nginx restarted and running"
   Future<DwSshResult> status() =>
       _compose("ps --format '{{.Name}}\t{{.Status}}'");
 
-  List<DwDeployStep> steps({required bool skipGitUpdate, String? revision}) => [
+  List<DwDeployStep> steps({
+    required bool skipGitUpdate,
+    String? revision,
+    Future<DwSshResult> Function()? verifyOutside,
+  }) => [
     for (final step in _plannedSteps(
       skipGitUpdate: skipGitUpdate,
       revision: revision,
+      verifyOutside: verifyOutside,
     ))
       DwDeployStep(
         id: step.id,
         title: step.title,
         showOutput: step.showOutput,
         verdict: step.verdict,
-        run: () {
-          _step = step.id;
+        run: () async {
+          // Outside verification includes read-only status calls. Only its
+          // final result is journalled, after the probes have answered.
+          _step = step.id == 'verify-outside' ? null : step.id;
           try {
-            return step.run();
+            return await step.run();
           } finally {
             _step = null;
           }
@@ -657,6 +707,7 @@ echo "nginx restarted and running"
   List<DwDeployStep> _plannedSteps({
     required bool skipGitUpdate,
     String? revision,
+    Future<DwSshResult> Function()? verifyOutside,
   }) => [
     if (!skipGitUpdate)
       DwDeployStep(
@@ -784,7 +835,130 @@ echo "nginx restarted and running"
       title: 'Restart nginx',
       run: restartProxy,
     ),
+    DwDeployStep(
+      id: 'verify-outside',
+      title: 'Verify from outside',
+      run:
+          verifyOutside ??
+          () async {
+            final results = await verifyFromOutside();
+            final code = results.every((result) => result.passed) ? 0 : 1;
+            if (remote case final detached?)
+              return detached.run('verify-outside', 'exit $code');
+            return ssh.runAs(target.deployUser, 'exit $code');
+          },
+    ),
+    cleanupStep,
   ];
+
+  /// Runs only after outside verification has succeeded.
+  DwDeployStep get cleanupStep => DwDeployStep(
+    id: 'cleanup',
+    title: 'Clean unused stack images and trim the build cache',
+    run: () {
+      _step = 'cleanup';
+      return cleanup();
+    },
+  );
+
+  /// Removes only this stack's built server and web images. Docker refuses
+  /// removal if a container starts using an image between listing and removal.
+  /// Image removal comes first: containerd's BuildKit records share snapshots
+  /// with exported images, so those references must go before pruning cache.
+  Future<DwSshResult> cleanup() => _as("""
+set -e
+cd '$appDir'
+$dwDiskSpaceFunction
+$dwDockerRootScript
+space=\$(dw_disk_space "\$dw_docker_root")
+before=\$(printf '%s\\n' "\$space" | awk '{print \$3}')
+dw_cache_stats() {
+  docker system df --format '{{if eq .Type "Build Cache"}}{{.TotalCount}} {{.Size}}{{end}}'
+}
+dw_cache_bytes() {
+  printf '%s\\n' "\$1" | awk 'NF {
+    size=\$2; value=size+0; sub(/^[0-9.]+/, "", size)
+    units["B"]=1; units["kB"]=1000; units["MB"]=1000000; units["GB"]=1000000000; units["TB"]=1000000000000
+    if (!(size in units)) exit 1
+    printf "%.0f\\n", value*units[size]; found=1
+  } END {if (!found) exit 1}'
+}
+cache=\$(dw_cache_stats)
+cache_before=\$(printf '%s\\n' "\$cache" | awk 'NF {print \$1}')
+removed=0
+code=0
+keep=" "
+for service in ${DwStack.serverService} ${DwStack.webService}; do
+  # A missing journal means we cannot know which image is the rollback
+  # target. Refuse cleanup rather than guessing from creation timestamps.
+  [ -f '$_journalDirectory/'"\$service.previous" ] || { echo "Missing rollback image record for \$service" >&2; exit 1; }
+  keep="\$keep\$(cat '$_journalDirectory/'"\$service.previous") "
+done
+for service in ${DwStack.serverService} ${DwStack.webService}; do
+  labelled=\$(docker image ls -a -q --no-trunc --filter 'label=com.docker.compose.project=${target.projectName}' --filter "label=com.docker.compose.service=\$service")
+  named=\$(docker image ls -a -q --no-trunc --filter "reference=${target.projectName}-\$service:*")
+  candidates=\$(printf '%s\\n' \$labelled \$named | sort -u)
+  for image in \$candidates; do
+    case "\$keep" in *" \$image "*) continue ;; esac
+    identity=\$(docker image inspect -f '{{if .Config.Labels}}{{index .Config.Labels "com.docker.compose.project"}},{{index .Config.Labels "com.docker.compose.service"}}{{end}}' "\$image")
+    owner=\${identity%%,*}
+    image_service=\${identity#*,}
+    case "\$owner" in ''|'${target.projectName}') ;; *) continue ;; esac
+    case "\$image_service" in ''|${DwStack.serverService}|${DwStack.webService}) ;; *) continue ;; esac
+    used=\$(docker ps -aq --filter "ancestor=\$image")
+    [ -z "\$used" ] || continue
+    if docker image rm "\$image" >/dev/null; then removed=\$((removed + 1)); else code=1; fi
+  done
+done
+# The daemon's docker driver builds Compose images; this command prunes that
+# same builder, independent of a user's selected buildx builder.
+# Shared records are excluded from BuildKit's budget. Releasing them can
+# make parents private/reclaimable, so apply the budget again only when the
+# observed cache still exceeds it and a pass made progress.
+passes=0
+while :; do
+  old_cache="\$cache"
+  docker builder prune -a -f --keep-storage '${target.buildCacheKeep}' >'$_journalDirectory/cleanup-prune.out' || code=1
+  docker builder prune -a -f --filter 'shared=""' >'$_journalDirectory/cleanup-shared.out' || code=1
+  cache=\$(dw_cache_stats)
+  cache_bytes=\$(dw_cache_bytes "\$cache")
+  cache_after=\$(printf '%s\\n' "\$cache" | awk 'NF {print \$1}')
+  passes=\$((passes + 1))
+  [ "\$cache_bytes" -gt ${target.buildCacheKeepBytes} ] || break
+  if [ "\$cache" = "\$old_cache" ] || [ "\$passes" -ge 3 ] || [ "\$code" -ne 0 ]; then
+    echo "Build cache remains above ${target.buildCacheKeep}: \$cache_bytes bytes; Docker retains cache references. Inspect docker buildx du --builder default --verbose." >&2
+    code=1
+    break
+  fi
+done
+cache_removed=\$((cache_before - cache_after))
+[ "\$cache_removed" -ge 0 ] || cache_removed=0
+space=\$(dw_disk_space "\$dw_docker_root")
+after=\$(printf '%s\\n' "\$space" | awk '{print \$3}')
+bytes=\$(((after - before) * 1024))
+[ "\$bytes" -ge 0 ] || bytes=0
+printf '{"images_removed":%s,"cache_records_removed":%s,"freed_bytes":%s}\\n' "\$removed" "\$cache_removed" "\$bytes"
+exit "\$code"
+""");
+
+  /// The single result line of cleanup, also used by JSON progress.
+  static Map<String, Object?>? cleanupReport(DwSshResult result) {
+    for (final line in result.stdout.split('\n').reversed) {
+      if (!line.startsWith('{')) continue;
+      try {
+        final decoded = jsonDecode(line);
+        if (decoded is Map<String, dynamic> &&
+            ['images_removed', 'cache_records_removed', 'freed_bytes'].every(
+              (key) => decoded[key] is int && (decoded[key] as int) >= 0,
+            )) {
+          return decoded;
+        }
+      } on FormatException {
+        return null;
+      }
+    }
+    return null;
+  }
 
   /// Runs every outside probe, retrying the failed ones while the stack
   /// settles, and answers with the last result of each.

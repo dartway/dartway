@@ -49,6 +49,7 @@ reads it.
 | `storage` | no | `bundled` or `external`; absent means no file storage |
 | `storage_domain` | with `bundled` | The public host of the bundled storage; refused without `storage: bundled` |
 | `min_free_disk` | no | Minimum free space on Docker's data root before building; defaults to `10GB`. Positive sizes in `MB` or `GB` (1024-based), for example `512MB` or `10GB` |
+| `build_cache_keep` | no | Build cache retained after a successful deploy; defaults to `10GB`. Positive sizes in `MB` or `GB`, for example `512MB` |
 | `registry_mirror` | no | Pull the official Docker Hub images of the stack (`postgres`, `nginx`) through a mirror such as `mirror.gcr.io`; the bundled storage and certbot come from where they live |
 | `firewall_ports` | no | TCP ports to open beyond SSH, 80 and 443 |
 | `requires.secrets` | no | Secrets nobody can generate, as environment variable names |
@@ -417,7 +418,14 @@ converges with one `dart run dartway_cli:dartway deploy setup`, followed by
    self-signed certificate back. On a routine deploy step 7 has already covered every host, and
    this asks nothing;
 14. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
-    a second later on its configuration.
+    a second later on its configuration;
+15. verifies the stack from outside (the probes below);
+16. **cleans up after success:** removes unused server and web images belonging to this Compose
+    project, keeping both rollback images and every image still used by a container, then trims the
+    build cache to `build_cache_keep`, releasing shared cache references separately. Other stacks' images,
+    Postgres, RustFS, Nginx and certbot are preserved. Cleanup reports the removed image and cache-record
+    counts and bytes freed in one line. A cleanup failure is a warning; the deploy still exits 0.
+    `--resume` retries only cleanup, without replacing services or repeating outside probes.
 
 What keeps a push routine is not that the rendering is skipped but that it is idempotent and
 reported: a run that changes nothing says "unchanged" for both files. Everything else infrastructural
@@ -427,7 +435,9 @@ reported: a run that changes nothing says "unchanged" for both files. Everything
 
 ### A step outlives the connection that started it
 
-Every step runs on the server **detached from the `ssh` session**: its script is written to
+Outside probes run on the invoking machine; their outcome is journalled before cleanup. If that
+invocation stops before recording their success, a resume verifies again. The remote steps run on
+the server **detached from the `ssh` session**: its script is written to
 `~/.config/<project>/deploy-run/` of the deploy user and started in a session of its own
 (`setsid`), streams to files, exit code written last. The call that starts a step waits for it, so a
 routine deploy still makes one connection per step; when that connection breaks, fresh ones wait for
@@ -447,14 +457,26 @@ Both interrupted states are retried by `--resume`, with or without `--retry-fail
 runs automatically. A build refused by the space check names Docker's data root and the configured
 minimum; free space or lower `min_free_disk` in `deploy/config.yaml` before trying again.
 
+**Disk.** A successful deploy cleans its old images automatically, including images left by earlier
+runs. The server and web rollback images are pinned before building and recorded in the deployment
+journal, so a resume keeps the same targets. Images go before cache: the containerd image store shares
+BuildKit snapshots with exported images. Shared cache records are released separately because Docker
+excludes their bytes from `--keep-storage`; image references still protect the retained layers.
+If releasing shared records makes their parents reclaimable, the budget is applied again. A cache
+that remains over the limit with no progress produces a warning rather than deleting active leases. The
+reported byte count is the observed increase in free space on Docker's data filesystem (negative
+changes are reported as zero; containerd may reclaim additional bytes asynchronously). The cache
+limit applies to the Docker daemon's builder across the machine, not only this stack.
+
 That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
 steps after the interruption still need someone to run them: **`dart run dartway_cli:dartway deploy run --env <env>
 --resume`**. It reads the record of the last deployment on the server and, in that deployment's
 plan, passes over the steps that finished, waits for a step still running instead of starting it a
 second time, judges again from its output a finished step whose success is checked beyond its exit
-code (the upstream check), and runs everything from the first step that actually runs — then the
-services and the probes, as always. A step that ended badly in the deployment being resumed is **not** run again: the resume stops with
-that step's reason and the output the server kept, because a self-deploy resumes after every
+code (the upstream check), and runs everything from the first step that actually runs — including the
+services and probes when verification has not finished. Once outside verification passed, a cleanup
+retry skips every successful step and runs only cleanup. Except for cleanup, a step that ended badly
+in the deployment being resumed is **not** run again: the resume stops with that step's reason and the output the server kept, because a self-deploy resumes after every
 interruption and a failing step would otherwise be repeated until the attempts ran out — each time
 stopping the server it had just started again. `--retry-failed` with `--resume` runs it once more
 (against the checkout that deployment updated to); after fixing code, deploy anew rather than
@@ -479,6 +501,7 @@ reads the events; the prose may change wording at any time, the events may not.
 | `step_skipped` | `index`, `count`, `id` — done by the deployment being resumed |
 | `step_started` | `index`, `count`, `id`, `title`, `picked_up` — waiting for a step already on the server |
 | `step_finished` | `index`, `count`, `id`, `exit_code`; `stdout`, `stderr` for a step whose output is its result |
+| `cleanup` | `images_removed`, `cache_records_removed`, `freed_bytes` when measured; `warning`, optional `message`. A warning leaves `run_finished.exit_code` at 0 |
 | `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message`; `state` (`diskFull` or `vanished`) for a step stopped without an exit code; `resumed: true` when the step failed in the deployment being resumed and was not run again |
 | `services` | `services` (`name`, `status`) |
 | `probe` | `title`, `passed`, `warning`, `detail` |
