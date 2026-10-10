@@ -277,16 +277,17 @@ class DwKamalGenerator {
         final segments = path
             .split('/')
             .skip(1)
-            .takeWhile((s) => s.isNotEmpty && !s.startsWith(':'))
+            .takeWhile((s) => !s.startsWith(':'))
             .toList();
-        if (segments.isEmpty) {
+        final prefix = '/${segments.join('/')}';
+        if (prefix == '/') {
           throw StateError(
             '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
             'DwHttpRoute "$path" has proxy prefix "/", which would capture '
             'every web route. Declare a static route prefix before parameters.',
           );
         }
-        prefixes.add('/${segments.join('/')}');
+        prefixes.add(prefix);
       }
     }
     return prefixes.toList();
