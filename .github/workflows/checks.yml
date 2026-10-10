@@ -73,6 +73,10 @@ jobs:
         with:
           node-version: '22.18.0'
 
+      # The `test` mode also runs the suites named in BROWSER in Chrome
+      # (`browser_suites`, D-136). No setup step: the ubuntu-latest image puts
+      # `google-chrome` on PATH, and `require_chrome` stops the job by name if
+      # an image ever comes without it.
       - run: tool/checks.sh ${{ matrix.mode }}
 
   services:

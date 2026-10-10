@@ -6,7 +6,7 @@
   and introduced name included — without sending it. The app sends it with `dw.command` and calls
   `dw.signIn` on success, as with a code; a sign-up the project refuses (`consentsRequired`) is
   finished by sending `withRegistration(...)` of the same command, so the name Apple tells only once
-  is not lost to a second run (dartway/dartway#374, D-136). Migration note
+  is not lost to a second run (dartway/dartway#374, D-137). Migration note
   `2026-10-09-provider-sign-in-command.md`.
 - No longer depends on `dartway_core_flutter`.
 

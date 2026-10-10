@@ -38,6 +38,7 @@ class _StudioFrameControllerWeb implements StudioFrameController {
 
   late final web.HTMLIFrameElement _frame;
   late final StudioClientWebChannel _channel;
+  bool _disposed = false;
 
   @override
   final String viewType;
@@ -46,5 +47,14 @@ class _StudioFrameControllerWeb implements StudioFrameController {
   StudioMessageChannel get channel => _channel;
 
   @override
-  void dispose() => _channel.dispose();
+  void setInteractive(bool interactive) {
+    if (_disposed) return;
+    _frame.style.pointerEvents = interactive ? 'auto' : 'none';
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _channel.dispose();
+  }
 }
