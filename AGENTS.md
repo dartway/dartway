@@ -95,6 +95,8 @@ Run the `framework-finish` skill before committing framework changes — it look
 - **In this repository** the generator resolves inside `example/` and `template/` through their `dependency_overrides`: from a project's server package, `dart run dartway_generator --project ..` (add `--check` to verify), or `dartway generate` from the project root with a CLI activated from this tree.
 - **A row class change is a migration**: `dart run bin/migrate.dart create <name>` in the server package, with `DW_DATABASE_*` set, then review the draft. The framework's own tables migrate in `packages/dartway_core_server/lib/src/migrations/dw_framework_migrations.dart` under the `dw` namespace, **appended, never rewritten** — an applied migration whose checksum changes stops every server that has applied it (D-050). The one exception is a migration that could not apply on databases holding rows: it is corrected with the same outcome where it did apply, and declares the text it replaces in `supersededChecksums` (D-056).
 
+- **Framework migrations follow expand, then contract** (`toolkit/skills/dartway-migrations/SKILL.md`): they ship inside a package version, so the previous image's framework version must run on the new `dw_*` schema; a contraction ships one production release after the code stops using the old shape.
+
 ### The wire is a protocol
 
 **A change of how calls, `DwApiResponse`, update transports, live messages or framework-generated DTO JSON look on the wire bumps `dwProtocolVersion`** (D-052). An installed app keeps speaking the wire it was compiled with; with the bump it is answered `426` and shows "update the app", without it it fails to decode.

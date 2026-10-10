@@ -16,6 +16,11 @@
   the cache bytes shared with kept images. A cleanup failure closes its progress step and warns at
   exit 0; `--resume` retries cleanup and failed outside probes (#507, #519).
 
+- The toolkit's `dartway-migrations` requires expand, then contract across production releases
+  so the previous image can run on the new schema (#520). Contracting decisions and the
+  `dartway-finish` review gate reject contractions shipped with the code that stops using the old
+  shape; rename, nullability and default guidance now accounts for released readers and writers.
+
 - Toolkit: tests are mandatory only for six risk classes; other tests are rare and must pass the
   `dartway-testing` gate. Agent rules govern expectations and assertion changes. `dartway-plan`
   selects **Risks to guard** with a class and expected outcome, and the feature scaffold adds only

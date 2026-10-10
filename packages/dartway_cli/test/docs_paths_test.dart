@@ -97,9 +97,7 @@ final _githubPath = RegExp(
 );
 
 /// A skeleton path under a package token.
-final _tokenPath = RegExp(
-  r'(__(?:SHARED|SERVER|FLUTTER)_PKG__)(/[\w./-]*)?',
-);
+final _tokenPath = RegExp(r'(__(?:SHARED|SERVER|FLUTTER)_PKG__)(/[\w./-]*)?');
 
 Directory _repositoryRoot() {
   var dir = Directory.current.absolute;
