@@ -2,6 +2,9 @@
 
 ## 0.21.0-dev.17
 
+- Fix `migrate apply` silently accepting ahead migrations: print the same warning as server
+  boot after the applied batch or `nothing to apply`, keeping exit code 0 (#536).
+
 - Treat unknown applied migrations after every registered id in their namespace as
   `DwMigrationState.ahead`, reported by `DwMigrationRun.ahead`; `apply` and CLI `status` accept
   them, while rollback refuses until the newer release's code rolls them back. Gaps, checksum
