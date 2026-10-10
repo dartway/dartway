@@ -5,6 +5,7 @@ library;
 
 export 'src/changelog_check.dart';
 export 'src/plain_version.dart';
+export 'src/project_ci.dart';
 export 'src/pub_rate_limit.dart';
 export 'src/pubspec_scan.dart';
 export 'src/release_cut.dart';

@@ -100,18 +100,17 @@ The shared toolkit in `.agents/` and selected `.claude/` integration guides an A
 
 ## Checks and tests
 
+The gates are the steps of `.github/workflows/ci.yml`, and that file is their
+one list: run one locally with its `run:` line from its `working-directory`.
+Outside CI, drop `--contract-base "$CONTRACT_BASE"`: the commands then compare
+with the merge-base of the project's base branch.
+
 The project's own commands run the CLI it pins, from the Flutter package:
 `dart run dartway_cli:dartway <command>` in `dartway_starter_flutter/`. A
 globally activated `dartway` refuses them when it is another version.
-
-```bash
-(cd dartway_starter_flutter && dart run dartway_cli:dartway generate --check) # generated code is up to date
-(cd dartway_starter_server && dart run bin/migrate.dart check)   # migrations produce the schema (DW_DATABASE_*)
-(cd dartway_starter_flutter && dart run dartway_cli:dartway test) # server acceptance, real Postgres and storage
-(cd dartway_starter_shared && dart test)                  # the contract
-(cd dartway_starter_flutter && flutter test)              # the app on an in-memory server
-(cd dartway_starter_flutter && dart run dartway_cli:dartway check) # the conventions
-```
+`dart run bin/migrate.dart check` and `dart run dartway_cli:dartway check` replay
+the migrations on the Postgres `DW_DATABASE_*` names (locally,
+`deploy/config.yaml > local`).
 
 `dart run dartway_cli:dartway test` starts a Postgres and a storage for the run, on ports Docker
 picks, and removes them when it ends: nothing is shared with the development
@@ -126,7 +125,29 @@ bundled storage — `dart run dartway_cli:dartway deploy setup`, then `dart run 
 
 ## Continuous integration
 
-`.github/workflows/claude-review.yml` runs a Claude review on every pull request
-and posts findings as inline comments. It needs one repository secret,
-`CLAUDE_CODE_OAUTH_TOKEN` (generate it with `claude setup-token`); without it the
-job fails. Delete the file to turn PR review off.
+`.github/workflows/ci.yml` runs every gate on every pull request as one check,
+`ci`. Each gate is a step of its own and runs even after an earlier one failed,
+so a red run names everything that broke; Flutter is the version
+`dartway_starter_flutter/.fvmrc` pins. Packages resolve with
+`--enforce-lockfile`, so commit the three `pubspec.lock` files.
+
+To make `ci` required, let it run once, then: Settings → Rules → Rulesets →
+New branch ruleset → target the default branch → "Require status checks to
+pass" → add `ci`. The classic route, Settings → Branches → a branch protection
+rule, works too.
+
+On a private repository a required check needs a paid GitHub plan, and the
+runs spend the plan's minutes.
+
+`ci` runs on `ubuntu-latest` unless the repository or organisation variable
+`DW_CI_RUNS_ON` names other runner labels, as JSON: `["self-hosted","ci-nl"]`
+moves the job onto a self-hosted runner carrying those labels (Settings →
+Secrets and variables → Actions → Variables). Set on the organisation, it moves
+every project at once. The runner needs Linux with Docker: the Postgres service
+and the acceptance gate's containers run there.
+
+`.github/workflows/claude-review.yml` is separate and optional: it runs a Claude
+review on every pull request and posts findings as inline comments. It needs one
+repository secret, `CLAUDE_CODE_OAUTH_TOKEN` (generate it with
+`claude setup-token`); without it the job fails. Delete the file to turn PR
+review off.

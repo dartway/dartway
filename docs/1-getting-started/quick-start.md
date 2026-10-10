@@ -210,7 +210,8 @@ full: [data objects and generation](../2-core/data-objects-and-generation.md),
 
 ## 7. The checks
 
-From the project root:
+CI runs these as `ci`, one step each, on every pull request (`.github/workflows/ci.yml`, see the
+project's README, "Continuous integration"). From the project root:
 
 ```bash
 (cd my_app_flutter && dart run dartway_cli:dartway generate --check) # generated code matches its sources

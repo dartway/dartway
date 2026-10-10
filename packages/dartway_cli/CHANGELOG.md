@@ -9,12 +9,23 @@
   `min_free_disk` (MB or GB, default `10GB`); `deploy check` reports low space as a warning.
   The check changes nothing and no cleanup runs (#506).
 
+- The template ships `.github/workflows/ci.yml`: every mechanical gate of a project — `generate
+  --check`, `migrate.dart check` on a Postgres service, `dart analyze` (`--fatal-infos` in the
+  Flutter package, where the convention rules run as an analyzer plugin), `dart test`,
+  `dartway test`, `flutter test` and `dartway check` — as the steps of one job, `ci`, on every pull
+  request. Each gate runs even after an earlier one failed, Flutter comes from the Flutter
+  package's `.fvmrc`, and packages resolve with `--enforce-lockfile`. The job runs on
+  `ubuntu-latest` unless the `DW_CI_RUNS_ON` repository or organisation variable names other
+  runner labels as JSON (`["self-hosted","ci-nl"]`). The README says how to make `ci` a required
+  check. A project created earlier may copy the file whenever it wants (#495).
+
 - `dartway test` pulls an image it does not have locally before starting a container from it,
   with up to three attempts (2 s, then 5 s apart) and one `pulling <image> (attempt n/3)` line per
   attempt on stderr. A transient registry error (a timeout, a 5xx, a rate limit) no longer fails
   the run, and a pull that fails three times is reported as `could not pull <image> after 3
   attempts: <last error line>` before "could not start". An image already present costs no network
   (#497).
+
 - The template's `.github/workflows/claude-review.yml` can no longer push code to a pull request.
   It passes the workflow's own `github_token` (held to `contents: read`) instead of letting the
   action exchange OIDC for the Claude App's writable installation token, drops `track_progress`,
