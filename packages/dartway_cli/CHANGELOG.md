@@ -2,6 +2,12 @@
 
 ## 0.24.0
 
+- Toolkit: `dartway-finish` always runs fast gates locally and checks pull-request workflows per
+  suite. CI-covered suites run only changed and mirrored tests locally, with a full local fallback
+  for changes without a feature mirror; uncovered suites run locally in full. The report names
+  local tests and the workflows carrying full suites. `dartway-checkup` keeps all three suites in
+  full locally (#496).
+
 - The template ships `.github/workflows/ci.yml`: every mechanical gate of a project — `generate
   --check`, `migrate.dart check` on a Postgres service, `dart analyze` (`--fatal-infos` in the
   Flutter package, where the convention rules run as an analyzer plugin), `dart test`,

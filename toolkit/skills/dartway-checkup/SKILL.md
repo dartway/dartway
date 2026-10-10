@@ -19,8 +19,10 @@ code-shape rules no layer skill owns.
 
 ## Phase 0 — the facts a command answers
 
-1. **Run every gate** in `dartway-finish` (A.2) and record each result. `migrationsDrift` without a
-   database is "not run", never a pass.
+1. **Run every gate** in `dartway-finish` (A.2) and record each result. Run all three test suites in
+   full locally, whatever CI does: use empty test-file arrays and enable all three suite commands.
+   A project audit is not a task; A.2's targeted-test mode does not apply here. `migrationsDrift`
+   without a database is "not run", never a pass.
 2. **Compare with CI.** Which of those does CI actually run? A gate configured and never executed reads
    as covered — the most valuable finding class. Watch for excluded test folders.
 3. **The distance to the framework.** The `dartway_*` versions in each `pubspec.lock` against the

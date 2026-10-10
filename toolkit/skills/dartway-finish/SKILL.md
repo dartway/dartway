@@ -2,9 +2,10 @@
 name: dartway-finish
 description: >-
   The definition of done for a DartWay task, run before the commit or PR: runs the gates
-  (generate --check, migrate check, analyzers with dartway_lints, the three test suites, dartway
-  check), reviews the diff against the skills of the layers it touches and the code-shape rules
-  owned here, reconciles the descriptions in the code (DwFeatureSpec, doc comments) and the tests,
+  (generate --check, migrate check, analyzers with dartway_lints, dartway check) and tests in
+  two modes: targeted locally when pull-request CI carries the full suite, otherwise full locally.
+  Reviews the diff against the skills of the layers it touches and the code-shape rules owned here,
+  reconciles the descriptions in the code (DwFeatureSpec, doc comments) and the tests,
   compares TODO(dartway, checked: …) markers with pubspec.lock, then shows suggestions and applies
   only what was confirmed. Runs as /dartway-finish.
 ---
@@ -24,17 +25,58 @@ did not change means `generate` ran over another tree, or not at all.
 ## A.2 The gates — run them, do not assume them
 
 In this order; report each as run with its result, or not run and why. This is the one list of gates
-every other skill refers to.
+every other skill refers to. Fast gates always run locally, whatever CI does: generation, the
+migration check when row classes or migrations changed, all three analyzers, and `check`.
+
+**Choose per suite, by reading the repository's `.github/workflows/*.yml` and `*.yaml`.** A workflow
+must run on `pull_request` and execute the suite's command in the right package: `dart test` in
+`__SHARED_PKG__`, the pinned CLI's `test` for server acceptance, or `flutter test` in
+`__FLUTTER_PKG__`. Read `run`, `working-directory` (including defaults and `cd`), and conditions;
+a comment, a push-only workflow, or a command restricted to some tests does not carry a full suite.
+Record the workflow file for each covered suite. A suite no pull-request workflow runs in full
+runs in full locally. With no CI workflow, run all three suites locally and report
+**"no CI workflow: full suites run locally"**.
+
+**For each suite CI carries, select from the A.1 diff, including uncommitted and untracked files:**
+
+- Include every changed or added runnable test file in that package.
+- For each changed `lib/` file, include the existing test files in its mirrored directory under
+  `test/`: the same `<zone>/<feature>` path, including nested directories. Server paths retain
+  `src/`. Use both paths of a rename or move, and the old path of a deletion; run surviving tests.
+- A changed file with no mirror makes that package's suite run in full locally. A harness or
+  support file, a shared helper, app factory or core wiring, server startup or registration, and
+  migrations have package-wide reach: run that suite in full rather than guess a feature. Changes
+  outside `lib/` and runnable test files with no feature mirror also use the full fallback. A
+  project-wide dependency or test configuration change reaches all affected packages.
+- Deduplicate paths. If the package is untouched and no tests are selected, omit its local suite
+  and report why; the fast gates still run.
+
+Before running the block, set Bash arrays `SHARED_TEST_FILES`, `SERVER_TEST_FILES`, and
+`FLUTTER_TEST_FILES` to the selected paths relative to their suite's package (`__SERVER_PKG__` for
+server acceptance even though the CLI runs from `__FLUTTER_PKG__`). Flutter accepts mirrored test
+directories as well as files. An empty array means the full local suite. Set `RUN_SHARED_TESTS`,
+`RUN_SERVER_TESTS`, and `RUN_FLUTTER_TESTS` to `true` for selected tests or a full fallback, `false`
+only for an unaffected suite CI carries. Set `RUN_MIGRATE_CHECK` to `true` when row classes or
+migrations changed, otherwise `false`.
 
 ```bash
 CONTRACT_BASE="$(git merge-base HEAD origin/__BASE_BRANCH__)"  # resolve once; CI supplies its trusted SHA
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check --contract-base "$CONTRACT_BASE")
-(cd __SERVER_PKG__ && dart run bin/migrate.dart check)      # row classes or migrations changed; needs a database
-(cd __SHARED_PKG__ && dart analyze && dart test)
+if "$RUN_MIGRATE_CHECK"; then
+  (cd __SERVER_PKG__ && dart run bin/migrate.dart check)  # needs a database
+fi
+(cd __SHARED_PKG__ && dart analyze)
+if "$RUN_SHARED_TESTS"; then
+  (cd __SHARED_PKG__ && dart test "${SHARED_TEST_FILES[@]}")
+fi
 (cd __SERVER_PKG__ && dart analyze)
 (cd __FLUTTER_PKG__ && dart analyze --fatal-infos)          # not flutter analyze: it skips the dartway_lints plugin
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test)   # server acceptance on a real Postgres and storage
-(cd __FLUTTER_PKG__ && flutter test)
+if "$RUN_SERVER_TESTS"; then
+  (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test -- "${SERVER_TEST_FILES[@]}")  # real Postgres and storage
+fi
+if "$RUN_FLUTTER_TESTS"; then
+  (cd __FLUTTER_PKG__ && flutter test "${FLUTTER_TEST_FILES[@]}")
+fi
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check --contract-base "$CONTRACT_BASE")
 ```
 
@@ -118,7 +160,11 @@ say nothing.** Different: one line, and a decision — still needed (refresh `ch
 1. 🔴 Critical — stops and hidden bugs · 🟡 Major — responsibilities, duplication, per-row queries ·
    🟢 Minor — naming, magic values. Each with `file:line` and a concrete edit.
 2. 📄 Descriptions — the proposed `DwFeatureSpec` and doc-comment diffs.
-3. 🧪 Tests and gates — what is uncovered or misplaced; each gate's result.
+3. 🧪 Tests and gates — what is uncovered or misplaced; each gate's result; the test files run
+   locally (expand directory selections), or the full local suite and its fallback reason. Name the
+   full-suite owner per suite: **"full suites: CI (`<workflow file>`)"** or
+   **"full suites: run locally, no CI"** for suites without coverage. If an unmapped change required a
+   full local run despite CI coverage, say so alongside its workflow.
 4. 📓 Findings that outlive the task — placed per `dartway-documentation`; a framework issue with its
    text and `impact:` label, shown and waiting for a yes.
 5. 🔖 Workarounds — only the markers A.5 found diverged; omit the item otherwise.
@@ -135,5 +181,7 @@ git diff --name-only -z origin/__BASE_BRANCH__...HEAD -- '*.dart' \
   xargs -0 sh -c 'if [ "$#" -gt 0 ]; then dart format "$@"; fi' sh
 ```
 
-Re-run the gates the edits reach, and end with what was applied, what is left to the author, which
-gates are green.
+Re-run the gates and targeted tests the applied edits reach, using the same per-suite CI and mirror
+rule in A.2, including its full local fallback. End with what was applied, what is left to the
+author, each gate's result, the test files run locally, and the same full-suite ownership line as
+Phase B item 3.

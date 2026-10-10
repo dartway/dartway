@@ -111,14 +111,20 @@ A new shape is recorded without a bump; a framework DTO without a recorded shape
 
 | Tier | What | Where it runs |
 |---|---|---|
-| 1 | `tool/checks.sh` — `dart analyze` over every resolution root, `dartway check` over `template/` and `example/`, and every suite that needs no services; `tool/checks.sh services` — the ORM, server and push suites against a Postgres and a storage | both locally before a PR, and `checks.yml` on every PR (one job per mode) |
+| 1 | `tool/checks.sh` — `dart analyze` over every resolution root, `dartway check` over `template/` and `example/`, and every suite that needs no services; `tool/checks.sh services` — the ORM, server and push suites against a Postgres and a storage | in full in CI: `checks.yml` on every PR (analyze, test and services jobs) |
 | 2 | Pure-Dart packages on node: `dart test -p vm,node` in `dartway_core_shared` and `dartway_client` — dart2js rejects what the VM accepts | by hand when the wire or the client changes |
 | 3 | Database and storage suites of the projects: `dartway test` in `example/`, and the template as `dartway create` produces it, run through its own `.github/workflows/ci.yml` by `tool/run_project_ci.dart` — `dartway test` is one of its gates (a Postgres and a storage per run, on ports Docker picks, removed afterwards) | `database.yml` nightly, and on a PR touching `packages/`, `template/` or `example/`; locally when a change reaches a project's server |
 | 4 | Docker proofs in the CLI: `dart test -t docker --run-skipped test/deploy_local_stack_test.dart` — builds the images and runs the rendered stack | by hand, when deploy changes; `images.yml` builds the template's images from what `dartway create` produces |
 
 **`dartway_orm` and `dartway_core_server` need services for their own suites**: a Postgres through `DW_DATABASE_*` (the ORM's suites default to `127.0.0.1:55460`, user and password `dartway`) and, for the file suites, a storage (RustFS) through `DW_STORAGE_ENDPOINT` / `_ACCESS_KEY` / `_SECRET_KEY` (`packages/dartway_core_server/test/support/files.dart` has the `docker run` line). A suite that cannot reach them fails in `setUpAll` — a tier that silently skips is a tier that does not exist. They run as `tool/checks.sh services` (with `dartway_push_server`), which refuses to start unless every `DW_DATABASE_*` and `DW_STORAGE_*` variable is set and both ports answer; the plain `tool/checks.sh` leaves them to that mode and says so, so it needs no Docker. The script's header has the `docker run` and `export` lines.
 
-**"I ran the tests" means tier 1 green, both modes**, plus tier 2 for a wire or client change and tier 3 for a change that reaches a project's server. Running only the suites you touched is what lets a broken one reach the trunk.
+**Before a PR, locally:** run `dart analyze` over the touched resolution roots, `dartway check` when
+`template/` or `example/` changed, and the suites of the packages the diff touches: `dart test` in
+that package (`flutter test` for a Flutter suite), or `tool/checks.sh services` when a touched package
+is one of the services packages. Tier 1 in full, both modes, belongs to CI (`checks.yml`).
+
+**"I ran the tests" means the touched packages' suites green locally and `checks.yml` green on the
+PR**, plus tier 2 for a wire or client change and tier 3 for a change that reaches a project's server.
 
 **Whether a test is written at all is the gate of `toolkit/skills/dartway-testing/SKILL.md` (§4, and §5 for a bugfix), and it binds this repository's suites too**: the owner boundary is the package whose behaviour it is, and what its suite proves is not restated in another package's.
 
@@ -185,7 +191,9 @@ Each item closes off a way for one session to destroy another's work.
 4. **Create the branch at the start of the task, not at the end.** While a branch has no commits, a collision between sessions is resolved by splitting files; after the first foreign commit lands on your branch, only `cherry-pick` and manual surgery remain.
 5. **Never branch from someone else's HEAD.** Branch from an explicit point: `git switch -c <name> master`.
 6. **Push and open PRs only when asked directly.** Never merge a PR, never push to `master` directly, never touch `stable` without an explicit instruction.
-7. **Before offering a PR** — `framework-finish`, then the testing tiers the change reaches (above), all green. `tool/checks.sh` is what CI runs, so running it here is the gate itself, answered earlier.
+7. **Before offering a PR** — `framework-finish`, then the local gates and touched packages' suites
+   from "Testing tiers", all green, plus tiers 2–4 when the change reaches them. Tier 1 in full,
+   both modes, runs in CI; wait for `checks.yml` green on the PR.
 8. **Clean up your worktree:** `git worktree remove ../dartway-wt/<slug>` once the branch is merged. Abandoned worktrees hold branches checked out.
 9. **Everything that travels to GitHub is written in English:** branch name, commit message, PR title and description, PR comments. Re-read the title before `gh pr create`.
 
