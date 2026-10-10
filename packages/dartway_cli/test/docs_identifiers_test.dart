@@ -115,7 +115,6 @@ void main() {
       reason: 'links to nothing',
     );
   });
-
 }
 
 final _typeName = RegExp(r'\bDw[A-Z][A-Za-z0-9]*\b');
@@ -196,8 +195,8 @@ final class _PublicSurface {
           _wireCodeLiteral.allMatches(source).map((m) => m.group(1)!),
         );
         // `dw.` is not only the core's own members: a package of the
-        // framework may add one by extension — `dw.signInWithApple()` lives
-        // in dartway_auth_apple — and the prose names those the same way.
+        // framework may add one by extension — `dw.action()` is one, on
+        // `DwFlutterToolbox` — and the prose names those the same way.
         for (final match in _extensionOnCore.allMatches(source)) {
           dwMembers.addAll(
             _membersOf(source, match.group(1)!, extension: true),

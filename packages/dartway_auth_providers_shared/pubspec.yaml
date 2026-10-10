@@ -1,6 +1,6 @@
 name: dartway_auth_providers_shared
 description: The contract of signing in with Google and Apple, shared by a DartWay server and its app — the command, the providers, and the refusals.
-version: 0.1.0
+version: 0.1.1
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 resolution: workspace

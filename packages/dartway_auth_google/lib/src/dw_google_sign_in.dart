@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:dartway_auth_providers_shared/dartway_auth_providers_shared.dart';
-import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 /// What Google signed in: the token the server verifies, and what Google
@@ -86,38 +85,40 @@ abstract final class DwGoogleAuth {
   /// calls `GoogleSignIn.initialize` itself and must tell us what it used.
   static void rememberNonce(String nonce) => _nonce = nonce;
 
-  static String _newNonce() {
-    final random = Random.secure();
-    return base64Url
-        .encode([for (var i = 0; i < 32; i++) random.nextInt(256)])
-        .replaceAll('=', '');
-  }
-}
-
-/// Signing in with Google from the app's `dw`.
-extension DwGoogleSignInCall on DwFlutterCore {
-  /// Runs the Google flow and signs the session in, answering what the server
-  /// said.
+  /// Runs the Google flow and answers the sign-in command it makes, sending
+  /// nothing.
+  ///
+  /// The app sends it with `dw.command` and keeps the session it answers with
+  /// `dw.signIn`, exactly as it does with a code. When the project refuses
+  /// the sign-up — `consentsRequired` from its `onExternalAccountCreated` —
+  /// the app keeps the command, shows its consent step, and sends
+  /// [DwSignInWithProvider.withRegistration] with the consent keys: the same
+  /// token and nonce, so Google is not asked again. The token lives about an
+  /// hour; `dw.providerCredentialRejected` on a re-send means "ask Google
+  /// again".
   ///
   /// [registration] is what the project collects at sign-up; the account
   /// Google signed in is handed to [introduce], whose answer is merged into
   /// it, so the project names its own fields:
   ///
   /// ```dart
-  /// await dw.signInWithGoogle(
+  /// final signIn = await DwGoogleAuth.signInCommand(
   ///   introduce: (account) => {
   ///     if (account.displayName case final name?) RegistrationKeys.firstName: name,
   ///   },
   /// );
+  /// final result = await dw.command(signIn);
+  /// if (result case DwCallOk(value: final session)) await dw.signIn(session);
   /// ```
   ///
   /// Throws [GoogleSignInException] when the person cancels or the SDK
-  /// refuses; [StateError] when [DwGoogleAuth.initialize] has not run.
-  Future<DwCallResult<DwAuthSession>> signInWithGoogle({
+  /// refuses; [StateError] when [initialize] has not run, or Google signed in
+  /// without an ID token.
+  static Future<DwSignInWithProvider> signInCommand({
     Map<String, String> registration = const {},
     Map<String, String> Function(DwGoogleAccount account)? introduce,
   }) async {
-    final nonce = DwGoogleAuth.nonce;
+    final nonce = _nonce;
     if (nonce == null) {
       throw StateError(
         'DwGoogleAuth.initialize() has not run: the Google SDK takes its '
@@ -125,7 +126,7 @@ extension DwGoogleSignInCall on DwFlutterCore {
         'the app cannot name',
       );
     }
-    final account = await DwGoogleAuth.authenticate();
+    final account = await authenticate();
     final idToken = account.idToken;
     if (idToken == null) {
       // Without an ID token there is nothing the server can verify. It
@@ -135,20 +136,21 @@ extension DwGoogleSignInCall on DwFlutterCore {
         'serverClientId in DwGoogleAuth.initialize()',
       );
     }
-    final result = await command(
-      DwSignInWithProvider(
-        provider: DwAuthProvider.google,
-        idToken: idToken,
-        nonce: nonce,
-        registration: {
-          ...registration,
-          if (introduce != null) ...introduce(account),
-        },
-      ),
+    return DwSignInWithProvider(
+      provider: DwAuthProvider.google,
+      idToken: idToken,
+      nonce: nonce,
+      registration: {
+        ...registration,
+        if (introduce != null) ...introduce(account),
+      },
     );
-    if (result case DwCallOk<DwAuthSession>(:final value)) {
-      await signIn(value);
-    }
-    return result;
+  }
+
+  static String _newNonce() {
+    final random = Random.secure();
+    return base64Url
+        .encode([for (var i = 0; i < 32; i++) random.nextInt(256)])
+        .replaceAll('=', '');
   }
 }

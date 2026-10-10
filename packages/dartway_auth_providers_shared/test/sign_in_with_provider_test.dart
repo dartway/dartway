@@ -17,8 +17,7 @@ void main() {
         as DwSignInWithProvider;
   }
 
-  test('travels and comes back equal, with and without its optional parts',
-      () {
+  test('travels and comes back equal, with and without its optional parts', () {
     for (final command in [
       const DwSignInWithProvider(
         provider: DwAuthProvider.apple,
@@ -47,6 +46,37 @@ void main() {
     expect(read.registration, {'firstName': 'Ada', 'marketing': 'true'});
   });
 
+  test('withRegistration adds to the registration, the later key winning, '
+      'and keeps everything else — it is the same sign-in sent again', () {
+    const sent = DwSignInWithProvider(
+      provider: DwAuthProvider.apple,
+      idToken: 'header.payload.signature',
+      nonce: 'n-1',
+      authorizationCode: 'code-1',
+      registration: {'firstName': 'Ada', 'terms': 'false'},
+    );
+    final again = sent.withRegistration({'terms': 'true', 'marketing': 'no'});
+
+    expect(again.provider, DwAuthProvider.apple);
+    expect(again.idToken, 'header.payload.signature');
+    expect(again.nonce, 'n-1');
+    expect(again.authorizationCode, 'code-1');
+    expect(again.registration, {
+      'firstName': 'Ada',
+      'terms': 'true',
+      'marketing': 'no',
+    });
+    expect(sent.registration, {
+      'firstName': 'Ada',
+      'terms': 'false',
+    }, reason: 'the command held in state is a value; the copy is another');
+
+    final read = readBack(again);
+    expect(read, again);
+    expect(read.authorizationCode, 'code-1');
+    expect(read.registration, again.registration);
+  });
+
   test('leaves out what it does not carry, so a default costs no bytes', () {
     expect(
       const DwSignInWithProvider(
@@ -69,10 +99,10 @@ void main() {
   });
 
   test('the refusal codes are the ones the server answers with', () {
-    expect(
-      DwProviderRefusal.values.map((r) => r.code),
-      ['dw.providerCredentialRejected', 'dw.providerUnreachable'],
-    );
+    expect(DwProviderRefusal.values.map((r) => r.code), [
+      'dw.providerCredentialRejected',
+      'dw.providerUnreachable',
+    ]);
   });
 
   test('is registered under its own name', () {
