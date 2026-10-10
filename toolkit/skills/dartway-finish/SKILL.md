@@ -102,8 +102,8 @@ ones the diff reaches. What `check` already failed is not re-reported.
 **Stops**, whatever the layer: an access rule wider than intended; a request handler that writes; a
 command that changes what a request shows and publishes nothing; an applied migration modified, a drop
 that may be a rename, `dataChecksAfter` moved (`dartway-migrations`); a contracting migration
-(drop, rename, type change, NOT NULL) in the same change as the code that stops using the old shape
-(`dartway-migrations`); a file id written without
+(drop, rename, type change, NOT NULL, removal of a relied-on default) in the same change as the code
+that stops using the old shape (`dartway-migrations`); a file id written without
 `requireOwned`; a swallowed error.
 
 **Code shape — the rules no layer skill owns:**

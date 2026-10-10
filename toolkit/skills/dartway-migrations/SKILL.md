@@ -3,9 +3,10 @@ name: dartway-migrations
 description: >-
   Changing the database schema: row class → generate → `dart run bin/migrate.dart create <name>` →
   review the draft and resolve every decisionRequired (a drop that may be a rename, a NOT NULL
-  column on rows, a type change) → rehash → apply / status / rollback → check. Never edit an applied
-  migration, never import row classes into one, rows change only through m.backfill,
-  dataChecksAfter is the human's. What the server says when it refuses to start over the ledger.
+  column on rows, a type change) → rehash → apply / status / rollback → check. Expand, then contract
+  across releases. Never edit an applied migration, never import row classes into one, rows change
+  only through m.backfill, dataChecksAfter is the human's. What the server says when it refuses to
+  start over the ledger.
   Use when a row class, column, index or foreign key changes, or a migration refuses.
 ---
 
@@ -36,9 +37,14 @@ deploy carrying the code change. The previous release's code must run on the new
 rollback to its image and while old and new code run side by side.
 
 **A release's migrations only expand:** new tables, nullable columns or columns with a default,
-indexes, and relaxing a constraint (`NOT NULL` → nullable). **Contracting goes out one release later**,
-once no running code reads the old shape: a drop, a rename, a type change, `NOT NULL` on existing rows,
-or a narrowed constraint.
+indexes, and constraint relaxations that released readers and writers can still use.
+Relaxing `NOT NULL` to nullable is an expansion only while new code, including backfills, writes
+no `NULL` that released code reads as non-null. Dropping a default that released inserts rely on
+is a contraction.
+
+**Contracting goes out one release later**, once no running code relies on the old shape: a drop,
+a rename, a type change, `NOT NULL` on existing rows, a narrowed constraint, or removing a default
+that released inserts rely on.
 
 A rename takes four steps over two releases:
 

@@ -18,9 +18,14 @@ without release branches. The previous release's code must run on the new schema
 its image and running old and new code side by side both depend on that.
 
 Expand in the release that changes the code: add tables, nullable columns or columns with a default,
-indexes, or relax a constraint (`NOT NULL` → nullable). Contract one release later, once no running
-code reads the old shape: drop, rename, change a type, make existing rows `NOT NULL`, or narrow a
-constraint. A rename of a released column or table takes four steps:
+indexes, or relax constraints that released readers and writers can still use.
+Relaxing `NOT NULL` to nullable is an expansion only while new code, including backfills, writes
+no `NULL` that released code reads as non-null. Dropping a default that released inserts rely on
+is a contraction.
+
+Contract one release later, once no running code relies on the old shape: drop, rename, change a
+type, make existing rows `NOT NULL`, narrow a constraint, or remove a default that released inserts
+rely on. A rename of a released column or table takes four steps:
 
 1. Release N: add the new column or table.
 2. Release N: write both (or backfill).
@@ -221,8 +226,7 @@ migration id, or names none in `lib/src/migrations/`, is a finding of its own.
 
 Framework migrations ship inside a package version and follow the same
 [expand/contract rule](#expand-then-contract-across-releases): a rollback runs the previous
-framework version on the new `dw_*` schema. Making `DwSessionKeyInfo.lastUsedAt` nullable (#509) was an
-expansion.
+framework version on the new `dw_*` schema.
 
 Project tables may reference framework tables — a profile references `dw_account`, an attachment
 `dw_stored_file` — but a project never writes migrations for, or queries, the `dw_*` tables
