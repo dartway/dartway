@@ -1,6 +1,7 @@
 import 'dart:convert';
 
-/// Internal deployment policy shared by server provisioning and the CLI.
+/// Internal CORS policy used by server provisioning. The CLI satellite owns
+/// a matching constant, verified by its contract test.
 /// Not exported from the shared public library.
 final class DwStorageCorsRule {
   DwStorageCorsRule(Iterable<String> origins)

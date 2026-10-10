@@ -229,9 +229,9 @@ Nine workflows in `.github/workflows/`:
 | `checks.yml` | A PR is opened, updated or taken out of draft; push to `master` | `tool/checks.sh analyze`, `tool/checks.sh test`, and `tool/checks.sh services` with a Postgres service container and a storage |
 | `database.yml` | Nightly, by hand, when this workflow's file changes, and on a PR touching `packages/`, `template/`, `example/` or the project CI runner | `dartway test` in `example/`; in `template`, a project created from this commit with its packages vendored in, committed, and run through its own `ci.yml` by `tool/run_project_ci.dart` |
 | `images.yml` | `template/` or the CLI changes, nightly, by hand | Builds the two images of a project **as `dartway create` produces it**, with this tree's packages vendored in (`tool/vendor_framework.dart`) |
-| `kamal.yml` | Deploy generator or template changes, by hand | Validates generated destinations with pinned Kamal 2.12 |
+| `kamal.yml` | PR or master push touching the deploy generator, template or workflow | Validates generated destinations with pinned Kamal 2.12 |
 | `check-image.yml` | Push to `master`, relevant PR changes, by hand | Builds the outside-probe image; checks `--help`; master publishes the immutable SHA tag |
-| `check-image-version.yml` | Push to `stable`, relevant PR changes, by hand | Calls `tool/tag_check_image.sh`: verifies publication and copies the SHA image to an immutable CLI version tag; PR runs are dry runs |
+| `check-image-version.yml` | Push to `stable` or relevant PR changes | Calls `tool/tag_check_image.sh`: verifies publication and copies the SHA image to an immutable CLI version tag; PR runs are dry runs |
 | `web-compile.yml` | A PR is opened or updated; push to `master` | `flutter build web --release` of `example/` on the pinned Flutter, and of `template/` on the oldest Flutter the framework claims: dart2js rejects code the VM accepts |
 | `claude-review.yml` | A PR is opened, updated or taken out of draft | Reviews the diff; beyond ordinary bugs it holds the synchronisation law, generated code being up to date, a wire change bumping the protocol, and the toolkit invariant |
 | `telegram-notify.yml` | A review finishes | Sends the verdict and a link to the PR to Telegram |
