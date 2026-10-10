@@ -6,6 +6,33 @@ import 'support.dart';
 /// `listen`: hearing a channel without reading anything — a badge counting
 /// new posts has its count from a request and needs only the publications.
 void main() {
+  test('a reconnect does not replay missed publications to listen', () async {
+    final h = Harness();
+    await h.start();
+    final heard = <DwWireObject>[];
+    final subscription = h.client.listen([roomsChannel]).listen(heard.add);
+    addTearDown(subscription.cancel);
+    await until(() => h.server.subscriberCount(roomsChannel) == 1);
+    h.server.publish(roomsChannel, [a]);
+    await until(() => heard.length == 1);
+    expect(heard, [a]);
+
+    await h.disconnectLive();
+    h.server.publish(roomsChannel, [b]);
+    await settle();
+    expect(heard, [a]);
+
+    h.server.acceptsConnections = true;
+    await until(() => h.server.subscriberCount(roomsChannel) == 1);
+    await settle();
+    expect(heard, [a], reason: 'the missed publication is not replayed');
+
+    h.server.publish(roomsChannel, [c]);
+    await until(() => heard.length == 2);
+    expect(heard, [a, c]);
+    expect(h.server.calls, isEmpty, reason: 'listen never reads');
+  });
+
   test('subscribes without a request and hears what is published', () async {
     final h = Harness()..serveRooms();
     await h.start();
