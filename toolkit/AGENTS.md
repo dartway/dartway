@@ -70,6 +70,11 @@ Two generators, both run by hand when their input changes, output committed: `da
 
 **A task:** `dartway-requirements` → `dartway-plan` → build with `dartway-feature-scaffold` and the layer skills (contract → server → app) → `dartway-finish` before the PR. Bringing the project up: `dartway-run`. A newer framework: `dartway-update`, as its own change. "Works in the simulator, not on the phone": `dartway-on-device`.
 
+**Tests follow risk.** `dartway-testing` §4 defines the six must-test classes and the agent rules;
+tests outside those classes are rare and must pass its gate. The plan's **Risks to guard** selects
+from its risk survey and the spec, with a class and expected outcome per item;
+**`No must-test risk: <why>`** is valid. A bugfix starts with its failing test (§5).
+
 **Legacy moves as you touch it, never as a sweep; a gap you leave is said out loud.** Old shapes and how to recognise them: `dartway-update`.
 
 **A rule that did not exist, an API the app had to work around, the urge to edit a managed file** — each is a finding for the framework: `dartway-framework-notes`, before creating any issue.

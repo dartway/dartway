@@ -6,33 +6,36 @@ description: >-
   (`dart run dartway_cli:dartway test`, the skeleton's AppHarness, DwTestServer, real clients, raw
   calls, DwTestClock, server.http); widget tests on the in-memory DwFakeServer through the skeleton's
   TestApp; where test files go; the timing traps; the gate a test passes before it is written (what it
-  protects, the regression that fails it, why existing coverage misses it, no seam only the test needs)
-  and the junk shapes that fail it; a bugfix test proved red before the fix; quarantining flaky tests.
+  protects, the regression that fails it, why existing coverage misses it, no seam only the test needs),
+  the six must-test risk classes and agent rules; a bugfix test proved red before the fix;
+  quarantining flaky tests.
   Use when writing, adding or reviewing tests, or when a test fails with "Dw is not initialized",
   "Another dw core is alive", "found 0 widgets" or a pending Timer.
 ---
 
 # DartWay — how a project tests itself
 
-A test is written for a behaviour — a rule, an edge case, a rollback path, a bug that happened — never
-for the fact that a line changed, and only past the gate (§4). **Where** it goes is decided by where the
-behaviour lives:
+A test is mandatory only for the six risk classes in §4. Tests outside them are rare and must earn
+their place through the gate there. **Where** a test goes is decided by where the behaviour lives:
 
 | The behaviour | Its test | Runs with |
 |---|---|---|
 | what a DTO carries, which field a command refuses, what an update does to a request, a request's channels | **contract test**, pure Dart | `dart test` in `__SHARED_PKG__` |
-| who may call what, what a command writes and publishes, who may subscribe, a job's effect, where a file lands | **acceptance test**: the real server, a real database and storage | `dart run dartway_cli:dartway test` |
-| what a screen shows, what the user's action sends, how a refusal or an update looks | **widget test** on the in-memory server | `flutter test` |
-| a calculation, a parse, a state machine without I/O | **unit test** | the package's runner |
+| server rules: access, calculations, stored outcomes, channel audiences | **acceptance test**: the real server, a real Postgres and storage; one file per feature, a new case as a row in its table | `dart run dartway_cli:dartway test` |
+| a screen's own logic: what an action sends, how it handles a refusal or update | **widget test** on the in-memory server, only where the screen has logic | `flutter test` |
+| complex pure logic (class 6): calculations, parsing, state machines, dates and time zones | **table-driven unit test**, only for class 6 | the package's runner |
+
+**The shape is a honeycomb, not a pyramid.** The table assigns each risk to its owner boundary;
+goldens are only for a real surface, and mutation testing is never a gate.
 
 A widget test cannot prove a member is refused — the hidden button is not the rule; an acceptance test
 cannot prove the button sends the right command.
 
 **Where the file goes** (`testLayout`, `testHarnessBypassed`): at the mirror of what it tests —
 `lib/src/core/files.dart` → `test/src/core/files_test.dart`; a server feature through its calls →
-`test/src/invoices/invoices_acceptance_test.dart` (a scenario: `invoices_<scenario>_acceptance_test.dart`;
-`check --fix` moves a root-level one); the contract → `test/<shared package>_test.dart`. A test walking
-through two features is split by feature, what they share moved into the harness. Helpers and the
+`test/src/invoices/invoices_acceptance_test.dart` (`check --fix` moves a root-level one);
+the contract → `test/<shared package>_test.dart`. A test walking through two features is split by
+feature, what they share moved into the harness. Helpers and the
 harness live in `test/support/`, imported relatively; a test builds no server, fake server or
 `ProviderScope` of its own — a configuration it needs is a method on the harness.
 
@@ -83,9 +86,7 @@ it or an extension on it.
   `server.http.reset()` between tests sharing a server. A rule throwing
   `DwOutboundException(request, cause: 'refused')` is an unreachable provider; one never completing runs
   into the timeout. Without a server, `DwFakeOutboundHttp()..when(…)` and `http.client()`.
-- Write one when the rule is the point — a boundary, a refusal with its code, a filter that must not
-  leak, a publication and its audience, an idempotent retry, a job's effect. Not for a read that maps a
-  table with no rule.
+- Choose cases by the risk classes and gate in §4, not by the number of handlers or publications.
 
 ## 3. Screens — widget tests on the in-memory server
 
@@ -135,6 +136,39 @@ re-read.
 
 ## 4. The gate — before a test is added
 
+**A test is mandatory only in these six risk classes:**
+
+| # | Risk class | The test |
+|---|---|---|
+| 1 | Access: who may call or see what | a refusal, with its code, from a caller only that rule stops; an outsider receives nothing from a channel whose audience is restricted |
+| 2 | Money and counted things: prices, billing, quotas, numbers a client sees | the calculation at its boundary, with edge values |
+| 3 | Data integrity: migrations, deletes and cascades, idempotent retries | what is stored after the operation |
+| 4 | A bug that happened | a regression test at the boundary that owns the bug, red before the fix (§5) |
+| 5 | A contract others rely on: public API, the wire between app and server | the round trip and its refusals |
+| 6 | Complex pure logic: calculations, state machines, parsing, dates and time zones | table-driven unit tests |
+
+**No test by default:**
+
+- layout and copy;
+- tool descriptions and instruction texts;
+- wiring already proven by a boundary test;
+- a read that maps a table with no rule;
+- a declaration read back;
+- version literals and other change-detectors.
+
+Outside the six classes, a test is rare: answer the gate below before adding one. Within them,
+extend the owner test rather than duplicate coverage; the same gate keeps the test at that boundary.
+
+**Agent rules:**
+
+- **The expected value comes from the spec, not from running the code.** Copying today's output
+  copies today's bugs.
+- **Changing an existing test's assertion is declared.** Name the test, what it asserted, what it
+  asserts now, and why. Use Studio's assertion-change list when available; without Studio, put the
+  declaration in the PR description.
+- **A red caused by an intended change means the test asserted the implementation.** Rewrite it at
+  the boundary or delete it. Never just bump the literal.
+
 Four answers, a sentence each; a question it cannot answer means the test is not written yet.
 
 1. **What it protects** — an observable behaviour or contract: a refusal and its code, what a command
@@ -156,8 +190,7 @@ Four answers, a sentence each; a question it cannot answer means the test is not
    seams are the framework's (`DwTestClock`, `server.http`, `DwFakeServer`). Production code whose only
    caller is a test is dead, not covered.
 
-**A test that breaks under a refactor that keeps the behaviour asserts the implementation** — it is
-rewritten at the boundary that owns the behaviour. No coverage thresholds, and none reported.
+No coverage thresholds, and none reported.
 
 **Junk** — each of these fails the gate:
 
@@ -186,18 +219,25 @@ rewritten at the boundary that owns the behaviour. No coverage thresholds, and n
 
 ## 5. A bugfix test is proved red
 
-**A bugfix starts with its test, red on the unfixed code for the reason the bug names** — the failure
-is the bug, not a compile error or a missing helper — and green after the fix; the review says so
-("red before the fix: expected `slotTaken`, got ok"). A regression test that never failed proves the
-fake, not the fix. One test, at the boundary that owns the bug — not the same scenario replayed at
-every tier it crossed.
+**A bugfix starts with its test, red on the unfixed code for the reason the bug names** — the
+failure is the bug, not a compile error or a missing helper — and green after the fix; the review
+says so ("red before the fix: expected `slotTaken`, got ok"). A regression test that never failed
+proves the fake, not the fix. One test, at the boundary that owns the bug — not the same scenario
+replayed at every tier it crossed.
 
-**For any other new test, breaking the code is optional.** Use it when unsure the test reaches its subject at all: break the one thing it is about (a comparison, a flag, one line) and watch it go red — a test that stays green never reached it. Break one thing only: a mutation that changed two goes red for the wrong reason. The junk shapes of §4 are caught by reading; the reviewer reads.
+**For any other new test, breaking the code is optional.** Use it when unsure the test reaches its
+subject at all: break the one thing it is about (a comparison, a flag, one line) and watch it go
+red — a test that stays green never reached it. Break one thing only: a mutation that changed two
+goes red for the wrong reason. The junk shapes of §4 are caught by reading; the reviewer reads.
 
 ## 6. A flaky test is quarantined
 
-**Flaky means a test failed and then passed on the same commit, locally or in CI, with no change in
-between.** In the same change, the executor records the flake where `dartway-documentation` routes a finding — usually the feature's `knownIssues`, a `docs/dev_notes/` file when it is cross-cutting, plus an issue in the project's tracker when the project has one — and quarantines the test with `skip: 'flaky: <where it is recorded> — <what varied>'`. The record is closed by fixing the test or deleting it.
+**Flaky means a test failed and then passed on the same commit, locally or in CI, with no change
+in between.** In the same change, the executor records the flake where `dartway-documentation`
+routes a finding — usually the feature's `knownIssues`, a `docs/dev_notes/` file when it is cross-
+cutting, plus an issue in the project's tracker when the project has one — and quarantines the
+test with `skip: 'flaky: <where it is recorded> — <what varied>'`. The record is closed by fixing
+the test or deleting it.
 
 **Re-running CI until green is not a fix.** It hides the flake and costs a full run each time.
 

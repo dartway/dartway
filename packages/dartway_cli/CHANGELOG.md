@@ -2,6 +2,11 @@
 
 ## 0.24.0
 
+- Toolkit: tests are mandatory only for six risk classes; other tests are rare and must pass the
+  `dartway-testing` gate. Agent rules govern expectations and assertion changes. `dartway-plan`
+  selects **Risks to guard** with a class and expected outcome, and the feature scaffold adds only
+  risk-owned tests, including access refusals and restricted-channel leak checks (#517).
+
 - Toolkit: `dartway-testing` requires red-before-fix proof only for bugfix tests; breaking code for
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
   then passes on the same commit without changes is quarantined with a linked record rather than

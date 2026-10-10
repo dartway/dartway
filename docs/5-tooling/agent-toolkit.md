@@ -67,7 +67,7 @@ skills → `dartway-finish`.
 | Skill | For |
 |---|---|
 | `dartway-requirements` | Read-only analysis before a task: what the project already has, the debt in the way, the questions worth asking, options with their trade-offs |
-| `dartway-plan` | Read-only planning once the requirements are agreed: an end-to-end plan and the checks to verify it against |
+| `dartway-plan` | Read-only planning once the requirements are agreed: an end-to-end plan; **Risks to guard** selects from the risk survey and spec, with a class (1–6) and expected outcome per item, or `No must-test risk: <why>` |
 | `dartway-run` | Bringing the project up locally — the order of the steps and the real ports — and confirming it is alive |
 | `dartway-feature-scaffold` | A feature end to end: its folder, its entry point and `DwFeatureSpec`, its layers |
 | `dartway-contract` | The shared package: data objects, requests and commands, refusal codes, validation, generation |
@@ -77,7 +77,7 @@ skills → `dartway-finish`.
 | `dartway-access` | Access rules, channel rules, roles, identities and keys |
 | `dartway-migrations` | Writing, checking and applying migrations |
 | `dartway-uploads` | Files: upload purposes and their rules, the public and the private bucket, rows that store a file id |
-| `dartway-testing` | Whether a test is written, where it goes and how to write it, tier by tier |
+| `dartway-testing` | Six must-test risk classes, rare tests outside them through the gate, agent rules and the boundary that owns each test |
 | `dartway-navigation` | The router: zones, route descriptors, guards |
 | `dartway-ui-kit` | The kit as source inside the app, and the ban on raw styles outside it |
 | `dartway-on-device` | What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |
