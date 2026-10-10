@@ -139,8 +139,8 @@ through the public kit widget.
   contradicts, either way; a managed file is a framework finding.
 - Non-trivial logic, money, a rule or a bugfix without a test is flagged; the test belongs where the
   behaviour lives (`dartway-testing`). So is a new test that fails the gate — a question it cannot
-  answer, a junk shape it matches (`dartway-testing` §4). **Ask which one change proved each new test
-  red**, and for a bugfix that its test was red before the fix (§5).
+  answer, a junk shape it matches (`dartway-testing` §4). **For a bugfix, ask for the red its test
+  showed before the fix** (§5).
 - When a Flutter harness changes, check the real error boundary as well as fake-server calls: an
   exception caught by `dw.action` must fail harness teardown; an explicitly consumed report must
   not hide another one; business refusals stay ordinary outcomes; and teardown errors must not leave
