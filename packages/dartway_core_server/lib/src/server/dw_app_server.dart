@@ -113,6 +113,7 @@ final class DwAppServer {
   final String? migrationsDirectory;
   final DwDatabaseConfig database;
   final DwAuthConfig auth;
+
   /// The project's areas: every call, channel rule, job and route it has
   /// comes from one of them. See [DwServerFeature].
   final List<DwServerFeature> features;
@@ -278,7 +279,7 @@ final class DwAppServer {
   }
 
   Future<void> _applyMigrations(DwPostgresDatabase opened) async {
-    await DwMigrationRunner(
+    final run = await DwMigrationRunner(
       opened.db,
       migrations: {
         dwFrameworkNamespace: dwFrameworkMigrations,
@@ -290,6 +291,17 @@ final class DwAppServer {
           if (Directory(directory).existsSync()) 'app': directory,
       },
     ).apply();
+    final aheadByNamespace = <String, List<DwMigrationRef>>{};
+    for (final ref in run.ahead) {
+      (aheadByNamespace[ref.namespace] ??= []).add(ref);
+    }
+    for (final MapEntry(key: namespace, value: refs)
+        in aheadByNamespace.entries) {
+      logger.warning(
+        '$namespace: ${refs.length} migration(s) applied by a newer release '
+        '(${refs.first.id} … ${refs.last.id}); serving on its schema',
+      );
+    }
     if (schema case final declared?) {
       final missing = await _missingFromDatabase(declared, opened.db);
       if (missing.isNotEmpty) throw DwStartupException(missing);
@@ -387,11 +399,7 @@ final class DwAppServer {
       final authService = DwAuthService(runtime);
       runner = jobRunner = DwJobRunner(
         runtime: runtime,
-        definitions: [
-          ...jobs,
-          _cleanupJob(),
-          ...?fileStore?.jobs(),
-        ],
+        definitions: [...jobs, _cleanupJob(), ...?fileStore?.jobs()],
         listen: openedDatabase.listen,
         workers: settings.jobWorkers,
         pollInterval: settings.jobPollInterval,

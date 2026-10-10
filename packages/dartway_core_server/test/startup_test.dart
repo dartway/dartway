@@ -18,6 +18,23 @@ final class _FailingMigration extends DwDatabaseMigration {
   Future<void> up(DwMigrationContext m) => m.sql('CREATE TABLE ( oops');
 }
 
+final class _AdditiveMigration extends DwDatabaseMigration {
+  const _AdditiveMigration();
+
+  @override
+  String get id => '20261010_120000_note_label';
+
+  @override
+  String get checksum => 'note-label';
+
+  @override
+  Future<void> up(DwMigrationContext m) =>
+      m.addColumn('note', DwColumnSchema('label', 'text', nullable: true));
+
+  @override
+  Future<void> down(DwMigrationContext m) => m.dropColumn('note', 'label');
+}
+
 void main() {
   final app = TestApp();
   const unused = DwDatabaseConfig(
@@ -111,9 +128,18 @@ void main() {
             ),
           ],
           jobs: [
-            DwQueuedJob(DwJobKind.withoutPayload('dw.mine'), handle: (ctx, _) async {}),
-            DwQueuedJob(DwJobKind.withoutPayload('twin'), handle: (ctx, _) async {}),
-            DwQueuedJob(DwJobKind.withoutPayload('twin'), handle: (ctx, _) async {}),
+            DwQueuedJob(
+              DwJobKind.withoutPayload('dw.mine'),
+              handle: (ctx, _) async {},
+            ),
+            DwQueuedJob(
+              DwJobKind.withoutPayload('twin'),
+              handle: (ctx, _) async {},
+            ),
+            DwQueuedJob(
+              DwJobKind.withoutPayload('twin'),
+              handle: (ctx, _) async {},
+            ),
             DwRecurringJob(
               'never',
               every: Duration.zero,
@@ -215,6 +241,53 @@ void main() {
       );
     });
     tearDown(() => database.drop());
+
+    test(
+      'a previous release serves on a newer additive schema and warns',
+      () async {
+        final previous = app.server(
+          database.config,
+          schema: DwDatabaseSchema.fromTables([
+            DwTableSchema(
+              'note',
+              columns: [
+                DwColumnSchema.primaryKey(),
+                DwColumnSchema('text', 'text'),
+                DwColumnSchema('owner_id', 'bigint', nullable: true),
+              ],
+            ),
+          ]),
+        );
+        final newer = await DwTestServer.start(
+          app.server(
+            database.config,
+            migrations: [...previous.migrations, const _AdditiveMigration()],
+          ),
+        );
+        final note = await TestApp.insertNote(newer.db, 'kept across rollback');
+        await newer.stop();
+
+        final logStart = RecordingLogger.lines.length;
+        final restored = await DwTestServer.start(previous);
+        addTearDown(restored.stop);
+        final caller = restored.caller();
+        addTearDown(caller.close);
+        const request = ListNotes();
+        final response = await caller.call(request);
+        expect(response.status, 200);
+        expect(response.value(request), [note]);
+        expect(
+          RecordingLogger.lines
+              .skip(logStart)
+              .where((line) => line.startsWith('warning ')),
+          [
+            'warning  app: 1 migration(s) applied by a newer release '
+                '(20261010_120000_note_label … 20261010_120000_note_label); '
+                'serving on its schema',
+          ],
+        );
+      },
+    );
 
     test('the framework namespace is applied before the app, once', () async {
       final server = await DwTestServer.start(app.server(database.config));
