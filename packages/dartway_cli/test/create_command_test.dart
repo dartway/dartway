@@ -68,6 +68,25 @@ void main() {
     expect(File(p.join(project.path, 'NOTICE')).existsSync(), isFalse);
   });
 
+  test(
+    'deployment files are generated after configuration, not at create',
+    () async {
+      final project = await create(['shop', '--local-repo', repository.path]);
+      expect(
+        File(p.join(project.path, '.github/workflows/images.yml')).existsSync(),
+        false,
+      );
+      expect(
+        File(p.join(project.path, 'deploy/studio.yml')).existsSync(),
+        false,
+      );
+      expect(
+        Directory(p.join(project.path, 'deploy/kamal')).existsSync(),
+        false,
+      );
+    },
+  );
+
   test('everything is named after the project, and nothing after the '
       'template', () async {
     final project = await create([

@@ -43,6 +43,14 @@ class DwKamalGenerator {
     final first = targets.first;
     final owner = githubOwner(first.repo);
     for (final target in targets) {
+      if (!DwDeployTarget.projectNamePattern.hasMatch(target.projectName)) {
+        throw StateError(
+          'deploy/config.yaml > ${target.environment}: project: '
+          '"${target.projectName}" must start with a lower case letter or digit '
+          'and contain only lower case letters, digits, "_" and "-". '
+          'Set project: explicitly when the repository name does not match.',
+        );
+      }
       if (githubOwner(target.repo) != owner ||
           target.projectName != first.projectName ||
           target.storage != first.storage) {
@@ -146,7 +154,6 @@ class DwKamalGenerator {
                   'service': '$identity-postgres-$destination',
                   'image': 'postgres:17-alpine',
                   'host': target.host,
-                  'port': '127.0.0.1:5432:5432',
                   'env': {
                     'clear': {
                       'POSTGRES_DB': stack.databaseName,
@@ -270,8 +277,15 @@ class DwKamalGenerator {
         final segments = path
             .split('/')
             .skip(1)
-            .takeWhile((s) => !s.startsWith(':'))
+            .takeWhile((s) => s.isNotEmpty && !s.startsWith(':'))
             .toList();
+        if (segments.isEmpty) {
+          throw StateError(
+            '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
+            'DwHttpRoute "$path" has proxy prefix "/", which would capture '
+            'every web route. Declare a static route prefix before parameters.',
+          );
+        }
         prefixes.add('/${segments.join('/')}');
       }
     }

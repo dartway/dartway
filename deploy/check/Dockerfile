@@ -1,16 +1,24 @@
-FROM dart:3.13.2 AS build
-WORKDIR /cli
-COPY packages/dartway_cli/ ./
-# The check binary uses only the CLI's runtime dependencies, outside the pub
-# workspace; Flutter and the server test dependencies do not enter this image.
-RUN sed -i '/^resolution: workspace$/d; /^dev_dependencies:/,$d' pubspec.yaml \
- && dart pub get \
- && dart compile exe bin/check_stack.dart -o /check-stack
+FROM debian:bookworm-slim AS build
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl git unzip xz-utils \
+ && rm -rf /var/lib/apt/lists/*
+# Resolve the real workspace on the same Flutter that wrote its committed lock.
+COPY .fvmrc /tmp/fvmrc
+RUN version="$(sed -n 's/.*"flutter"[^"]*"\([^"]*\)".*/\1/p' /tmp/fvmrc)" \
+ && test -n "$version" \
+ && git clone --quiet --depth 1 --branch "$version" \
+      https://github.com/flutter/flutter.git /opt/flutter
+ENV PATH="/opt/flutter/bin:$PATH"
+RUN flutter --disable-analytics
+WORKDIR /workspace
+COPY pubspec.yaml pubspec.lock ./
+COPY packages/ packages/
+COPY tool/ tool/
+RUN flutter pub get --enforce-lockfile \
+ && dart compile exe packages/dartway_cli/bin/check_stack.dart -o /check-stack
 
-# Dart's runtime tree supplies the dynamic loader and libraries. A scratch
-# image avoids overwriting /lib symlinks in distributions with merged /usr.
-FROM scratch
-COPY --from=build /runtime/ /
+# Match the compiler's libc and loader without copying over system symlinks.
+FROM debian:bookworm-slim
 COPY --from=build /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 COPY --from=build /check-stack /app/check-stack
 ENTRYPOINT ["/app/check-stack"]

@@ -92,9 +92,14 @@ For a project moving to Studio's Kamal deploy contract, configure `staging` and/
 Studio manifest and Images workflow; it runs after successful `CI` on `master`
 and `release` (PR builds do not push). Install the workflow on the default branch
 before its `workflow_run` trigger can run. CI checks `deploy kamal --check` next
-to generation whenever a Studio manifest is present.
+to generation whenever a Studio manifest is present. The template ships no
+pre-generated deployment files or Images workflow.
 Regenerate when project HTTP routes change: their literal prefixes are read from
-`__SERVER_PKG__/lib/`. Non-literal paths refuse generation. Web release builds
-call `Uri.base.origin`; they need no backend build argument. Studio owns running
+`__SERVER_PKG__/lib/`. Non-literal paths and root proxy prefixes (`/` or `/:x`)
+refuse generation. Invalid project names are refused with the value and the
+`project:` key to configure. Web release builds without a define call
+`Uri.base.origin`; they need no backend build argument. The Studio binding uses
+`STUDIO_APP_ORIGIN` when defined and otherwise the app's own origin in a web
+release; debug/profile preview without the define stays open. Studio owns running
 Kamal, SSH keys, registry credentials and secrets. Existing Compose deployments
 continue using `deploy run` until their project's separate move.

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.3.0
+
+- The binding validates Studio tokens for `STUDIO_APP_ORIGIN` when defined,
+  otherwise for `Uri.base.origin` in a web release. One Kamal web image can serve
+  stage and prod while accepting only tokens issued for its current app origin.
+  Debug/profile builds without the define remain open for local preview; an
+  explicit `validateAccessToken` overrides the default policy (#530).
+
 ## 0.2.1
 
 - **Requires `dartway_studio_bridge` 0.11.0** (#376), where `StudioFrameController` gains

@@ -38,7 +38,9 @@ Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
 Generated files carry their source instructions. `--check` writes nothing and
 names every stale file, including the API config when a project route changes.
 `DwHttpRoute.get`, `.post` and `.any` must use literal paths; a parameter segment
-such as `:id` ends the proxy prefix. `/github` remains `/github`. The API serves
+such as `:id` ends the proxy prefix. `/github` remains `/github`. A route at `/`
+or beginning with a parameter (such as `/:x`) is refused by name, because its
+proxy prefix would capture every web route. The API serves
 these prefixes plus `/dw` and `/health` on both API and app hosts, preserving the
 path; the web service catches all other app paths. Proxy buffering is off for
 API and storage. Kamal 2.12 uses kamal-proxy v0.10.2, with 30-second deployment
@@ -49,7 +51,9 @@ successfully. Enable CI pushes on `master` and `release`; the template already
 does so. `workflow_run` loads workflows from the default branch, so the initial
 installation must be merged there before this trigger can run. PR CI successes
 build without pushing or writing shared caches. Fork PRs skip this privileged
-workflow. Projects without a generated Studio manifest skip builds.
+workflow. The template ships no Images workflow or generated deployment files;
+configure targets, run `deploy kamal`, then commit its output. Projects without
+a generated Studio manifest skip builds.
 
 It respects `DW_CI_RUNS_ON`, builds `linux/amd64`, uses a GHA layer cache and
 pushes `<commit sha>` tags to GHCR with `GITHUB_TOKEN` on those two branches.
@@ -58,7 +62,11 @@ without pushing. The OCI source label links the packages to their repository.
 
 Bundled storage is a service built from `rustfs/rustfs:1.0.0` with a TLS host;
 external storage has no service and receives its environment through secrets.
-Bundled Postgres is an API accessory on `postgres:17-alpine`. Configs list secret
+Bundled Postgres is an API accessory on `postgres:17-alpine`, with no host port.
+Project names start with a lower case letter or digit and contain only lower case
+letters, digits, `_` and `-`. Invalid repository-derived names are refused with
+their value and the `project:` key to set explicitly. Kamal and
+Images use the same project identity without lowercasing it. Configs list secret
 names only, including required project secrets; Studio supplies their values,
 SSH credentials and `KAMAL_REGISTRY_PASSWORD`. `ssh_user` comes from the target.
 
@@ -71,7 +79,8 @@ HEAD, and pub.dev uses the lock's exact version. A Git/path SHA tag becomes
 available after that framework commit reaches master and its image build passes;
 uncommitted checkout changes do not get an image of their own. Framework CI builds SHA tags on
 `master`. A push to `stable` copies that image to the published CLI version,
-skipping prereleases and refusing to move an existing version tag. A missing
+skipping prereleases and existing version tags with a notice. A version tag
+belongs to the commit at which that CLI version was published. A missing
 pub.dev publication fails promotion. The PR runs this promotion in dry-run mode.
 Hosted projects get this capability with the first CLI release after #530.
 
@@ -649,6 +658,10 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
   argument. It runs `flutter build web --release --no-web-resources-cdn`, uses
   `Uri.base.origin` for calls, and serves the build with `nginx:1.30.5-alpine` and
   `<project>_flutter/nginx.conf`. The same image serves stage and prod.
+  `deploy run` supplies `STUDIO_APP_ORIGIN` (the app's own address) as a build
+  argument for projects whose Dockerfile forwards it to a Dart define; an app
+  without the binding needs no such argument. A Kamal web image omits the define:
+  the Studio binding takes its own `Uri.base.origin` in a web release.
 - **`.dockerignore` denies everything** and admits the packages by role suffix (`*_server/`,
   `*_flutter/`, `*_shared/`), minus build output and `.env` — so the working copy's history, build
   output and local secrets never reach the Docker daemon.

@@ -5,7 +5,11 @@ on:
     branches: [master]
   pull_request:
     paths:
-      - 'packages/dartway_cli/**'
+      - 'packages/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'tool/pubspec.yaml'
+      - '.fvmrc'
       - 'deploy/check/**'
       - '.github/workflows/check-image.yml'
   workflow_dispatch:

@@ -1,6 +1,6 @@
 name: dartway_studio_binding
 description: "The app half of the DartWay Studio wiring: one widget that attaches the bridge, reports route, features, session and language, and executes what Studio asks."
-version: 0.2.1
+version: 0.3.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues

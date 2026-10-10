@@ -98,6 +98,7 @@ final routes = [
           expect(target['accessories']['postgres']['env']['secret'], [
             'POSTGRES_PASSWORD:DW_DATABASE_PASSWORD',
           ]);
+          expect(target['accessories']['postgres'].containsKey('port'), false);
           expect(target['env']['secret'], contains('DW_DATABASE_PASSWORD'));
           if (bundled) {
             expect(clear['DW_STORAGE_PROVISION'], 'true');
@@ -207,6 +208,81 @@ final routes = [
       ),
     );
   });
+
+  for (final name in ['Shop', 'shop.name', '-shop']) {
+    test(
+      'invalid repository project name $name names project: and its value',
+      () {
+        write(
+          'deploy/config.yaml',
+          configYaml().replaceFirst('acme/shop.git', 'acme/$name.git'),
+        );
+        expect(
+          () => DwKamalGenerator(root).render(),
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'message',
+              allOf(contains('project:'), contains(name)),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  test(
+    'explicit valid project name owns both service and image identities',
+    () {
+      write(
+        'deploy/config.yaml',
+        configYaml(extra: '  project: shop_2-test\n'),
+      );
+      final files = DwKamalGenerator(root).render();
+      final api = yaml(files, 'deploy/kamal/api.yml');
+      expect(api['service'], 'shop_2-test-api');
+      expect(api['image'], 'acme/shop_2-test-api');
+      final workflow = yaml(files, '.github/workflows/images.yml');
+      final steps = (workflow['jobs']['images']['steps'] as YamlList)
+          .cast<YamlMap>();
+      final identity = steps.singleWhere((step) => step['id'] == 'image');
+      expect(identity['env']['REPOSITORY'], 'acme/shop_2-test');
+      expect(identity['run'], isNot(contains('tr ')));
+    },
+  );
+
+  test('invalid explicit project name is refused without lowercasing', () {
+    write('deploy/config.yaml', configYaml(extra: '  project: Shop\n'));
+    expect(
+      () => DwKamalGenerator(root).render(),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          allOf(contains('project:'), contains('Shop')),
+        ),
+      ),
+    );
+  });
+
+  for (final path in ['/', '/:x', '/:x/events']) {
+    test('root route prefix $path is refused with the route and location', () {
+      write(
+        'shop_server/lib/routes.dart',
+        "\nDwHttpRoute.get('$path', handler);\n",
+      );
+      expect(
+        () => DwKamalGenerator(root).render(),
+        throwsA(
+          isA<StateError>().having(
+            (e) => e.message,
+            'message',
+            allOf(contains(path), contains('shop_server/lib/routes.dart:2')),
+          ),
+        ),
+      );
+    });
+  }
 
   for (final expression in [
     'path',

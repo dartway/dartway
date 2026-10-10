@@ -16,7 +16,7 @@ if [[ "$version" == *-* ]]; then
 fi
 if [[ "$mode" == dry-run ]]; then
   echo "Would verify pub.dev has dartway_cli $version, then copy $source to $target without rebuilding."
-  echo 'Would refuse an existing version tag with a different digest. No images will be pushed.'
+  echo 'Would skip an existing published-version tag. No images will be pushed.'
   exit 0
 fi
 if ! published="$(curl --fail --silent --show-error "https://pub.dev/api/packages/dartway_cli/versions/$version" | jq -r .version)"; then
@@ -25,6 +25,13 @@ if ! published="$(curl --fail --silent --show-error "https://pub.dev/api/package
 fi
 if [[ "$published" != "$version" ]]; then
   echo "pub.dev lacks dartway_cli $version; stable moved without publishing." >&2
+  exit 1
+fi
+if docker buildx imagetools inspect "$target" --format '{{.Manifest.Digest}}' >existing-digest.txt 2>tag-error.txt; then
+  echo "$target already published; skipping."
+  exit 0
+elif ! grep -Eiq 'manifest unknown|not found|404' tag-error.txt; then
+  cat tag-error.txt >&2
   exit 1
 fi
 # master and stable can move while the master image is still building.
@@ -38,17 +45,6 @@ for attempt in {1..60}; do
   fi
   sleep 10
 done
-if existing="$(docker buildx imagetools inspect "$target" --format '{{.Manifest.Digest}}' 2>tag-error.txt)"; then
-  if [[ "$existing" != "$digest" ]]; then
-    echo "Refusing to move $target: $existing differs from $source ($digest)." >&2
-    exit 1
-  fi
-  echo "$target already points to $digest; skipping."
-  exit 0
-elif ! grep -Eiq 'manifest unknown|not found|404' tag-error.txt; then
-  cat tag-error.txt >&2
-  exit 1
-fi
 docker buildx imagetools create --prefer-index=false --tag "$target" "ghcr.io/dartway/dartway-check@$digest"
 copied="$(docker buildx imagetools inspect "$target" --format '{{.Manifest.Digest}}')"
 if [[ "$copied" != "$digest" ]]; then

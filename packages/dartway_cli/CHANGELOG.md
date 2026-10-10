@@ -7,7 +7,12 @@
   image builds. `--check` refuses stale generated files. Check-image tags follow
   the project's resolved CLI source: Git SHA, path HEAD or hosted version.
   Framework CI builds the outside-probe image on master and promotes an immutable
-  published-version tag on stable without rebuilding (#530).
+  published-version tag on stable without rebuilding. An existing published tag
+  is skipped even when stable advances to a different SHA. The check image resolves
+  the full workspace with its committed lock and pinned Flutter (#530).
+  Invalid project names and root API proxy prefixes are refused by name; Postgres
+  accessories publish no host port. Images workflows are generated after deployment
+  configuration, never shipped as an idle template copy (#530).
 - Template and example web releases call `Uri.base.origin` and build without a
   backend address, so one image serves every destination. Deploy checks no longer
   require a backend build argument (#530).

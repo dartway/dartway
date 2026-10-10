@@ -89,8 +89,7 @@ jobs:
           SHA: ${{ github.event.workflow_run.head_sha }}
           PUBLISH: ${{ github.event.workflow_run.event == 'push' && (github.event.workflow_run.head_branch == 'master' || github.event.workflow_run.head_branch == 'release') }}
         run: |
-          repository="$(printf '%s' "$REPOSITORY" | tr '[:upper:]' '[:lower:]')"
-          tag="ghcr.io/${repository}-${SERVICE}:${SHA}"
+          tag="ghcr.io/${REPOSITORY}-${SERVICE}:${SHA}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
           echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
           if [ "$PUBLISH" = true ]; then

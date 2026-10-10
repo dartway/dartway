@@ -31,7 +31,7 @@ Future<void> main() async {
   // Concrete development parameters live here; the app itself stays
   // environment agnostic.
   //
-  // A web release calls its own origin. Kamal routes /dw, /health and
+  // Without a define, a web release calls its own origin. Kamal routes /dw, /health and
   // project HTTP routes to the API; the same web image serves every environment.
   // Native releases keep the address supplied by --dart-define.
   const deployedBackendUrl = String.fromEnvironment('DW_BACKEND_URL');
@@ -42,10 +42,10 @@ Future<void> main() async {
   //
   // `defaultTargetPlatform` works on every platform — unlike `dart:io`'s
   // `Platform`, which does not compile for Flutter web.
-  final backendUrl = kIsWeb && kReleaseMode
-      ? Uri.base.origin
-      : deployedBackendUrl.isNotEmpty
+  final backendUrl = deployedBackendUrl.isNotEmpty
       ? deployedBackendUrl
+      : kIsWeb && kReleaseMode
+      ? Uri.base.origin
       : !kIsWeb && defaultTargetPlatform == TargetPlatform.android
       ? 'http://10.0.2.2:8080'
       : 'http://localhost:8080';

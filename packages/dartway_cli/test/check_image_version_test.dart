@@ -76,11 +76,15 @@ esac
     expect(File(p.join(root.path, 'created')).existsSync(), false);
   });
 
-  test('existing different version is refused', () {
+  test('existing published version is skipped even at a different SHA', () {
     final result = run(existing: 'sha256:other');
-    expect(result.exitCode, 1);
-    expect(result.stderr, contains('Refusing to move'));
+    expect(result.exitCode, 0);
+    expect(result.stdout, contains('already published; skipping'));
     expect(File(p.join(root.path, 'created')).existsSync(), false);
+    expect(
+      File(p.join(root.path, 'docker-calls')).readAsStringSync(),
+      isNot(contains(':framework-sha')),
+    );
   });
 
   test('registry failure is not treated as an absent tag', () {

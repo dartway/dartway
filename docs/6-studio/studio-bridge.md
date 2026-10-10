@@ -10,7 +10,7 @@ The package is a satellite (`packages/dartway_studio_bridge`, version `0.10.0`, 
 it depends on Flutter and nothing of the DartWay core, so it is true of any Flutter web app, and its
 README (`packages/dartway_studio_bridge/README.md`) is the full reference of its API.
 
-**The app half is `packages/dartway_studio_binding`** (`0.2.0`): one widget, `DwStudioBinding`,
+**The app half is `packages/dartway_studio_binding`**: one widget, `DwStudioBinding`,
 mounted in `MaterialApp.builder`. It attaches the bridge, reports the route (path and declared
 name), the features mounted on screen, the session and the language, and executes what Studio asks
 — navigate, switch persona, change language. Who is signed in comes from the project's own provider
@@ -20,7 +20,8 @@ the app ships no test users.
 
 `deploy run` passes the build the address it answers on as `STUDIO_APP_ORIGIN`, which
 `studioSignedAccessValidator` checks a connecting Studio's token against: a token taken from one
-stand is useless on another.
+stand is useless on another. A Kamal web image supplies no origin define; the binding
+uses `Uri.base.origin` in a web release, so the same image is protected on each stand.
 
 ## Why the app describes itself, and Studio stores nothing
 
@@ -96,10 +97,10 @@ no secret**: the public half of the key pair ships inside the package as `studio
 and a public key can only check signatures. The signature has to be asymmetric for exactly this
 reason — an HMAC over a shared secret would put the secret back into a public web bundle.
 
-A build names one thing, where it answers — `--dart-define=STUDIO_APP_ORIGIN=https://app.example` —
-through `studioSignedAccessValidator(const String.fromEnvironment('STUDIO_APP_ORIGIN'))`. **A build
-that names no origin accepts any connection**, which is what makes previewing a local build
-zero-config.
+`DwStudioBinding` uses `--dart-define=STUDIO_APP_ORIGIN=https://app.example` when supplied.
+Without that define, a web release validates tokens for `Uri.base.origin`.
+Debug/profile builds without the define accept a local Studio without a signed token,
+which keeps local preview zero-config. A custom `validateAccessToken` overrides this policy.
 
 **The gate is on everything.** Until a token is accepted the app runs no command it is sent and
 reports nothing, so a page that embedded the build without presenting a token can neither drive it

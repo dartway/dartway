@@ -25,7 +25,8 @@ dart run dartway_cli:dartway deploy kamal
 dart run dartway_cli:dartway deploy kamal --check
 ```
 
-This refreshes `deploy/kamal/*`, `deploy/studio.yml` and
+The template includes none of these generated files. This creates or refreshes
+`deploy/kamal/*`, `deploy/studio.yml` and
 `.github/workflows/images.yml`. Images runs after the required `CI` workflow
 succeeds. CI already runs on pushes to `master` and `release`. The generated
 workflow must first be merged into the default branch for `workflow_run` to
@@ -38,11 +39,15 @@ existing tags are skipped, and GHA caches keep unchanged Flutter SDK layers.
 Destinations are `stage` and `prod`. Kamal 2.12 runs kamal-proxy v0.10.2; the API
 routes `/dw`, `/health` and literal project HTTP-route prefixes on both hosts.
 Web release builds use `Uri.base.origin`, so the same image serves both
-destinations without build arguments. A non-literal route refuses generation
-with its file and line. Regenerate after changing routes or deployment config;
+destinations without build arguments. The Studio binding validates tokens for
+the same app origin. A non-literal route or a root proxy prefix (`/` or `/:x`)
+refuses generation with its file and line. A project name that cannot be used
+as a service name is refused with its value and the `project:` key to configure.
+Regenerate after changing routes or deployment config;
 `--check` names any stale generated file.
 
-Bundled RustFS is a service with its own TLS host; Postgres is an API accessory.
+Bundled RustFS is a service with its own TLS host; Postgres is an API accessory
+with no published host port.
 Studio supplies SSH keys, secret values and registry credentials, runs Kamal in
 manifest order, then runs the check image against a read-only checkout at
 `/project`. The check image tag follows the CLI lock: Git resolved SHA, path
