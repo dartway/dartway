@@ -36,8 +36,15 @@ does not know is answered as unknown.
 reads raises the breaking line of the shared package's version in the same pull request; nothing is
 set in an environment at deploy time. See [wire and versions](../2-core/wire-and-versions.md).
 
-`Dw-App-Version` (`DwFlutterConfig.appVersion`, `<semver>+<build>`) still travels: it labels the
-session key the app signs in with. It decides nothing.
+`Dw-App-Version` (`DwFlutterConfig.appVersion`) still travels: it labels the session key the app
+signs in with. It decides nothing. The template reads it from `PackageInfo.fromPlatform()` in
+`main`, as `<semver>+<build>` or `<semver>` if the platform supplies no build number.
+On web, the platform plugin reads the `version.json` written by `flutter build web`.
+
+`pubspec.yaml` keeps the marketing version, with a fallback build number for local builds.
+A release build passes `--build-number=N`; `--build-name` is only needed to override the marketing
+version. Studio's per-project counter will supply N (STD-E21), without committing release build
+numbers. Until that release flow is wired, the web image uses pubspec's fallback build number.
 
 ## What the client does
 

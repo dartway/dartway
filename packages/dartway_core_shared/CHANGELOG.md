@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- **BREAKING:** `DwAppVersion.build` is `int?`: a platform version without a build
+  number round-trips as its semantic version alone. Existing numeric-build header
+  encodings and compatibility decisions are unchanged (#521).
+
 - Add optional `DwProtocolEntry.since` and full semantic-version precedence on
   `DwContractVersion` (`<`) for update-group compatibility. The wire and strict decoder stay unchanged (#504).
 

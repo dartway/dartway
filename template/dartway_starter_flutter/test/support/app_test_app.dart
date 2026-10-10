@@ -1,7 +1,6 @@
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_client/testing.dart';
 import 'package:dartway_core_flutter/dartway_core_flutter.dart';
-import 'package:dartway_starter_flutter/core/app_version.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
 import 'package:dartway_starter_flutter/dartway_starter_app.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
@@ -177,7 +176,7 @@ final class TestApp {
     addTearDown(restoreGlobalHooks);
     final core = AppDwCore.create(
       baseUrl: fake.server.baseUrl,
-      appVersion: appBuildVersion,
+      appVersion: '0.0.0+0',
       httpTransport: fake.server.httpTransport,
       liveConnector: fake.server.liveConnector,
       storageTransport: storageTransport,
