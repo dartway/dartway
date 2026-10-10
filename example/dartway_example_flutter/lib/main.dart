@@ -1,11 +1,17 @@
-import 'package:dartway_example_flutter/core/app_version.dart';
 import 'package:dartway_example_flutter/dartway_example_app.dart';
 import 'package:dartway_push_firebase/dartway_push_firebase.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final info = await PackageInfo.fromPlatform();
+  final appVersion = info.buildNumber.isEmpty
+      ? info.version
+      : '${info.version}+${info.buildNumber}';
+
   // Firebase, when the build names a project: `--dart-define=FIREBASE_API_KEY=…`
   // with `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID` and
   // `FIREBASE_PROJECT_ID` (and the web push key, `FIREBASE_WEB_VAPID_KEY`). The
@@ -13,7 +19,6 @@ Future<void> main() async {
   Future<bool> firebaseConfigured() async {
     const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
     if (apiKey.isEmpty) return false;
-    WidgetsFlutterBinding.ensureInitialized();
     await Firebase.initializeApp(
       options: const FirebaseOptions(
         apiKey: apiKey,
@@ -50,7 +55,7 @@ Future<void> main() async {
 
   DartwayExampleApp(
     baseUrl: Uri.parse(backendUrl),
-    appVersion: appBuildVersion,
+    appVersion: appVersion,
     pushTransports: [
       if (await firebaseConfigured())
         DwFirebasePush(

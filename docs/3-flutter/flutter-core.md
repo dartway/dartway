@@ -70,7 +70,7 @@ dw = DwFlutterCore(
 
 | Field | Required by `DwFlutterCore` | What it is for |
 |---|---|---|
-| `appVersion` | yes | The build, `<semver>+<build>` (`1.4.2+57`). Sent on every call as `Dw-App-Version`; the server refuses a build below its minimum. Shown in error reports. |
+| `appVersion` | yes | The platform version, `<semver>+<build>` (`1.4.2+57`). Sent as `Dw-App-Version` to label sessions and included in error reports; compatibility is decided by the contract version. |
 | `refusalText` | yes | Turns a `DwCallRefusal` — a code with parameters, never a sentence — into words. `dw.action` shows it. See [actions and refusal texts](actions-and-refusal-texts.md). |
 | `readLoadingBuilder` | yes | What a read shows while it loads with no placeholder to draw a skeleton from — in `DwReadBuilder`, `DwPagedListView`, `DwWindowListView`. The kit's, once. See [the data layer](data-layer.md#showing-a-read-dwreadbuilder). |
 | `readFailedBuilder` | yes | What a read shows when it was refused with no `onRefused` branch, failed, or could not reach the server: the kit's view, given a `retry`. |
@@ -79,11 +79,11 @@ dw = DwFlutterCore(
 | `confirmDialogBuilder` | no | Replaces the built-in `DwConfirmDialog` for `dw.action(confirmation: ...)`. |
 
 **Why four fields are required.** A server answers "no" with a code, and an app that cannot render
-the code shows the user nothing at all. A server that stops supporting old builds needs to know
+the code shows the user nothing at all. Session labels and error reports need to identify
 which build is calling. A read that fails into nothing reads as "there is nothing here". All of
 these failures are silent at runtime, so the constructor refuses a config
 without them — with an `ArgumentError` naming the field, before the core exists. A malformed
-`appVersion` (not `<semver>+<build>`) throws `FormatException` at the same moment.
+`appVersion` (not `<semver>+<build>`, with a numeric build) throws `FormatException` at the same moment.
 
 ## Two phases: build, then start
 

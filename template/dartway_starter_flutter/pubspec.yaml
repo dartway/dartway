@@ -5,9 +5,11 @@ description: The app, on DartWay.
 # pub.dev using `pub publish`.
 publish_to: 'none'
 
-# `<semver>+<build>`, the app's own release. Which apps a server still serves is
-# decided by the shared package's version, the contract's; `lib/app_version.dart`
-# repeats this one, held equal by a test.
+# The marketing version; +1 is only the fallback for a local build.
+# Release builds pass --build-number=N, from Studio's per-project counter
+# (STD-E21); --build-name is only needed to override the marketing version.
+# Release build numbers are not committed. The shared package's contract
+# version decides which apps the server serves.
 version: 1.0.0+1
 
 environment:
@@ -20,6 +22,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
+  package_info_plus: ^9.0.1
 
   # The contract with the server: every request, command, data object, refusal
   # code and the identifier rule the app speaks. A path dependency, so the web

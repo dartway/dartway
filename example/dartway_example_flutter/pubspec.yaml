@@ -5,6 +5,11 @@ description: The DartWay example — a fitness club app on DartWay 1.0.
 # pub.dev using `pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
+# The marketing version; +1 is only the fallback for a local build.
+# Release builds pass --build-number=N, from Studio's per-project counter
+# (STD-E21); --build-name is only needed to override the marketing version.
+# Release build numbers are not committed. The shared package's contract
+# version decides which apps the server serves.
 version: 1.0.0+1
 
 environment:
@@ -17,6 +22,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   intl: any
+  package_info_plus: ^9.0.1
 
   # The contract with the server: every request, command, data object and
   # refusal code the app speaks.

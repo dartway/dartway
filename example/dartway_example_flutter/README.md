@@ -15,8 +15,16 @@ emulator). Another address is compiled in:
 
     flutter run --dart-define=DW_BACKEND_URL=http://localhost:18080
 
-The build it reports (`lib/core/app_version.dart`) is the `version` of
-`pubspec.yaml`; a test keeps the two equal.
+The app reads this build's version from the platform with `PackageInfo.fromPlatform()`
+in `lib/main.dart`. On web, that reads the `version.json` written by `flutter build web`.
+`pubspec.yaml` keeps the marketing version; its `+1` is only a local-build fallback.
+Release builds pass `--build-number=N` and use `--build-name` only to override the
+marketing version. Studio's per-project counter will supply N (STD-E21); release
+build numbers are not committed. Until that release flow is wired, the web image
+uses pubspec's fallback build number.
+
+`Dw-App-Version` labels sessions and decides nothing; the shared package's
+contract version decides compatibility.
 
 ## Tests
 

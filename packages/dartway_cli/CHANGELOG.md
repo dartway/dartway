@@ -2,6 +2,9 @@
 
 ## 0.24.0
 
+- Template: the app reads its version from the platform; `app_version.dart` and its
+  version-equality test are removed. Release builds pass `--build-number` (#521).
+
 - Deploy: a failed migration restores the healthy previous server on the containerd image store,
   with its live socket serving again without manual recovery (#519).
 
