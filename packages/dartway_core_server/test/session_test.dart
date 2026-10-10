@@ -89,15 +89,19 @@ void main() {
       expect((await victim.call(const MyNotes())).status, 401);
     });
 
-    test('last_used_at is written at most once per touch interval', () async {
+    test('last_used_at is written on first use, then at most once per touch '
+        'interval', () async {
       final (caller, session) = await harness().signedIn('touch@example.com');
-      Future<DateTime> lastUsed() async => (await harness().db.query(
-        'SELECT last_used_at FROM dw_auth_key WHERE account_id = @id',
-        params: {'id': session.id},
-      )).single.get<DateTime>('last_used_at');
+      Future<DateTime?> lastUsed() async =>
+          (await harness().db.query(
+                'SELECT last_used_at FROM dw_auth_key WHERE account_id = @id',
+                params: {'id': session.id},
+              )).single['last_used_at']
+              as DateTime?;
 
       await caller.call(const MyNotes());
       final first = await lastUsed();
+      expect(first, isNotNull);
       for (var i = 0; i < 5; i++) {
         await caller.call(const MyNotes());
       }
@@ -105,7 +109,7 @@ void main() {
       await Future<void>.delayed(const Duration(milliseconds: 450));
       await caller.call(const MyNotes());
       final touched = await lastUsed();
-      expect(touched.isAfter(first), isTrue);
+      expect(touched!.isAfter(first!), isTrue);
       await caller.call(const MyNotes());
       expect(await lastUsed(), touched);
     });

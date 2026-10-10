@@ -263,7 +263,7 @@ final class DwAuthConfig {
   final Duration resendDelay;
 
   /// `last_used_at` of a session key is written at most once per this
-  /// interval, not on every call.
+  /// interval, not on every call, and always on the key's first use.
   final Duration keyTouchInterval;
 }
 

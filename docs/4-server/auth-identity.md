@@ -71,7 +71,7 @@ DwAuthConfig({
 | `maxAttempts` | Wrong codes per ticket before it is dead. |
 | `maxRequestsPerWindow`, `requestWindow` | Code requests per identifier in the window, counted across sign-in and attach. |
 | `resendDelay` | Minimum time between two requests for one identifier; announced as `DwCodeTicket.resendAfter` and enforced. |
-| `keyTouchInterval` | A key's `last_used_at` is written at most once per interval, not on every call. |
+| `keyTouchInterval` | A key's `last_used_at` is written at most once per interval, not on every call, and always on the key's first use. |
 
 How long a resolved token is trusted without a query is a server setting, not an auth one
 (`tokenCacheSize`, `tokenCacheTtl` in [`DwServerSettings`](app-server.md#dwserversettings)).
@@ -454,8 +454,8 @@ its SHA-256: a leaked table signs nobody in.
   revocation.
 
 `ctx.sessionKey` is the `DwSessionKeyInfo` of the key that authenticated the call — `id`,
-`accountId`, `kind`, `label`, `createdAt`, `lastUsedAt` (lagging by up to `keyTouchInterval`),
-`revokedAt`. It is set on calls, on channel subscription checks and on routes declared with
+`accountId`, `kind`, `label`, `createdAt`, `lastUsedAt` (`null` until the key's first use, which is
+always recorded — `isUsed` asks it; afterwards lagging by up to `keyTouchInterval`), `revokedAt`. It is set on calls, on channel subscription checks and on routes declared with
 `DwRouteAuth.optional` or `DwRouteAuth.required` ([routes](routes.md)); it is `null` for an
 anonymous call and in jobs.
 

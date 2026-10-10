@@ -113,9 +113,9 @@ final class DwAuthService {
   /// The session key of [token], or `null` when it is unknown or revoked.
   ///
   /// A token seen within `DwServerSettings.tokenCacheTtl` costs no query;
-  /// `last_used_at` is written at most once per
-  /// `DwAuthConfig.keyTouchInterval`, awaited, so no write outlives the call
-  /// that caused it.
+  /// `last_used_at` is written on the key's first use and afterwards at most
+  /// once per `DwAuthConfig.keyTouchInterval`, awaited, so no write outlives
+  /// the call that caused it.
   Future<DwSessionKeyInfo?> resolve(String token) async {
     if (token.isEmpty || token.length > maxTokenLength) return null;
     final hash = DwAuthStore.hashToken(token);
@@ -139,11 +139,13 @@ final class DwAuthService {
     if (rows.isEmpty) return null;
     final row = rows.single;
     var key = DwAuthStore.keyOf(row);
-    final idle = Duration(
-      microseconds: (row.get<double>('idle_seconds') * 1e6).round(),
-    );
-    var touchedAt = _sessions.now.subtract(idle);
-    if (idle >= auth.keyTouchInterval) {
+    // `null` for a key never used: its first use is always written.
+    final idleSeconds = row['idle_seconds'] as double?;
+    final idle = idleSeconds == null
+        ? null
+        : Duration(microseconds: (idleSeconds * 1e6).round());
+    var touchedAt = idle == null ? _sessions.now : _sessions.now.subtract(idle);
+    if (idle == null || idle >= auth.keyTouchInterval) {
       key = await _touch(key);
       touchedAt = _sessions.now;
     }

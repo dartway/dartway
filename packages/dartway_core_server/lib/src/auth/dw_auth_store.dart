@@ -28,7 +28,7 @@ abstract final class DwAuthStore {
     kind: DwSessionKeyKind.values.byName(row.get<String>('kind')),
     label: row.get<String>('label'),
     createdAt: row.get<DateTime>('created_at'),
-    lastUsedAt: row.get<DateTime>('last_used_at'),
+    lastUsedAt: row['last_used_at'] as DateTime?,
     revokedAt: row['revoked_at'] as DateTime?,
   );
 

@@ -92,7 +92,9 @@ for any caller — the rule and why: `dartway-realtime` §1–2.
 - Tell a tool from the app by the server's record, `ctx.sessionKey?.kind == DwSessionKeyKind.personal`,
   never by something the client sends — and refuse there what a tool may not do.
 - `revokeKey(keyId, accountId: callerAccountId)` — always with the account when the id came from the
-  client; `revokeKeys(accountId)` signs out everywhere; `listKeys` for a sessions screen.
+  client; `revokeKeys(accountId)` signs out everywhere; `listKeys` for a sessions screen. A key's
+  `lastUsedAt` is `null` until its first use (`isUsed`) — never compare it with `createdAt` to ask
+  "used yet".
 - A second phone or e-mail is `DwRequestIdentifierCode` then `DwConfirmIdentifier`; a taken identifier
   is refused only after the right code (`DwAuthRefusal.identifierTaken`). **Never check "taken"
   earlier** — that is an account-existence oracle.

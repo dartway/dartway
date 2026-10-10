@@ -2,6 +2,12 @@
 
 ## 0.21.0-dev.17
 
+- **BREAKING (schema):** a session key's `last_used_at` is `NULL` until its first use, and the first
+  use is always written, whatever `DwAuthConfig.keyTouchInterval` says; later uses are throttled as
+  before. Framework migration `20261009_000003_dw_auth_key_last_used` drops the column's `NOT NULL`
+  and default and sets `NULL` on every key whose `last_used_at` still equals its `created_at`
+  (dartway/dartway#397).
+
 - **BREAKING (schema):** `dw_stored_file` no longer records a bucket. A file's bucket is the one
   the configuration names for its visibility, resolved at every link, read, deletion and cleanup, so
   a storage moved to other buckets or another storage serves every existing file once its objects

@@ -56,8 +56,9 @@ abstract class DwCallContext {
   /// ([DwSessionKeyKind.personal]) from the app. Present on calls, on channel
   /// subscription checks (the key the live socket authenticated with) and on
   /// routes declared with `DwRouteAuth.optional` or `DwRouteAuth.required`;
-  /// `null` in jobs. Its `lastUsedAt` is as of when the token was resolved
-  /// and may lag by `DwAuthConfig.keyTouchInterval`.
+  /// `null` in jobs. Its `lastUsedAt` is as of when the token was resolved:
+  /// written at most once per `DwAuthConfig.keyTouchInterval`, and always on
+  /// the key's first use, so it may lag by that interval.
   DwSessionKeyInfo? get sessionKey;
 
   /// The database. Inside a transactional command, and inside the body of

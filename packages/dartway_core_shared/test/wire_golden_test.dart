@@ -691,6 +691,17 @@ List<_WireShape> _wireShapes() {
         revokedAt: later,
       ),
     ),
+    // A key never used carries no `lastUsedAt`.
+    dto(
+      'dto.sessionKeyInfoUnused',
+      DwSessionKeyInfo(
+        id: 5,
+        accountId: 7,
+        kind: DwSessionKeyKind.app,
+        label: '',
+        createdAt: at,
+      ),
+    ),
     dto(
       'dto.startUpload',
       DwStartUpload(

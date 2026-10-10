@@ -45,6 +45,11 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _storedFileBucketFromConfigUp,
     _storedFileBucketFromConfigDown,
   ),
+  const _DwSqlMigration(
+    '20261009_000003_dw_auth_key_last_used',
+    _authKeyLastUsedUp,
+    _authKeyLastUsedDown,
+  ),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
@@ -355,6 +360,25 @@ const List<String> _storedFileBucketFromConfigDown = [
   'ALTER TABLE dw_stored_file ADD COLUMN bucket text',
   'ALTER TABLE dw_stored_file ADD CONSTRAINT dw_stored_file_object '
       'UNIQUE (bucket, object_key)',
+];
+
+// A key's `last_used_at` is `NULL` until its first use, which is always
+// written (D-139): a key issued with `now()` there could not be told from one
+// used only within its first `keyTouchInterval`. A key whose two times are
+// equal was never touched — a touch runs in a later transaction than the
+// insert, so its `now()` is later.
+const List<String> _authKeyLastUsedUp = [
+  'ALTER TABLE dw_auth_key ALTER COLUMN last_used_at DROP NOT NULL',
+  'ALTER TABLE dw_auth_key ALTER COLUMN last_used_at DROP DEFAULT',
+  'UPDATE dw_auth_key SET last_used_at = NULL '
+      'WHERE last_used_at = created_at',
+];
+
+const List<String> _authKeyLastUsedDown = [
+  'UPDATE dw_auth_key SET last_used_at = created_at '
+      'WHERE last_used_at IS NULL',
+  'ALTER TABLE dw_auth_key ALTER COLUMN last_used_at SET DEFAULT now()',
+  'ALTER TABLE dw_auth_key ALTER COLUMN last_used_at SET NOT NULL',
 ];
 
 const List<String> _initialDown = [
