@@ -21,6 +21,63 @@ environments `deploy/config.yaml` declares. Every one that connects takes `--as 
 `packages/dartway_cli/lib/src/commands/deploy_*.dart`, `secret_commands.dart` and
 `packages/dartway_cli/lib/src/deploy/`.
 
+## Kamal and GHCR
+
+`dart run dartway_cli:dartway deploy kamal` generates the Studio deployment contract from
+`deploy/config.yaml`, the server package's HTTP routes and the Flutter package's
+resolved CLI lock. Configure `staging` (destination `stage`) and/or `production`
+(destination `prod`); `local` is never a destination. Resolve the packages first.
+
+```bash
+cd <project>_flutter
+dart run dartway_cli:dartway deploy kamal
+dart run dartway_cli:dartway deploy kamal --check
+```
+
+Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
+Generated files carry their source instructions. `--check` writes nothing and
+names every stale file, including the API config when a project route changes.
+`DwHttpRoute.get`, `.post` and `.any` must use literal paths; a parameter segment
+such as `:id` ends the proxy prefix. `/github` remains `/github`. The API serves
+these prefixes plus `/dw` and `/health` on both API and app hosts, preserving the
+path; the web service catches all other app paths. Proxy buffering is off for
+API and storage. Kamal 2.12 uses kamal-proxy v0.10.2, with 30-second deployment
+and drain timeouts and five retained containers.
+
+The generated Images workflow runs after the project's `CI` workflow completes
+successfully. Enable CI pushes on `master` and `release`; the template already
+does so. `workflow_run` loads workflows from the default branch, so the initial
+installation must be merged there before this trigger can run. PR CI successes
+build without pushing. Projects without a generated Studio manifest skip builds.
+
+It respects `DW_CI_RUNS_ON`, builds `linux/amd64`, uses a GHA layer cache and
+pushes `<commit sha>` tags to GHCR with `GITHUB_TOKEN` on those two branches.
+Existing manifests are skipped; registry failures fail the job. PR runs build
+without pushing. The OCI source label links the packages to their repository.
+
+Bundled storage is a service built from `rustfs/rustfs:1.0.0` with a TLS host;
+external storage has no service and receives its environment through secrets.
+Bundled Postgres is an API accessory on `postgres:17-alpine`. Configs list secret
+names only, including required project secrets; Studio supplies their values,
+SSH credentials and `KAMAL_REGISTRY_PASSWORD`. `ssh_user` comes from the target.
+
+The Studio check image reads a checkout mounted read-only at `/project`, with
+`--project /project --env stage` (or `prod`). It verifies TLS by making HTTPS
+requests, health on both hosts, the live socket hello, web caching and bundled
+storage visibility, and exits nonzero on a failure. Its tag follows the resolved
+`dartway_cli`: Git uses the lock's resolved ref SHA, path uses the checkout's
+HEAD, and pub.dev uses the lock's exact version. Framework CI builds SHA tags on
+`master`. A push to `stable` copies that image to the published CLI version,
+skipping prereleases and refusing to move an existing version tag. A missing
+pub.dev publication fails promotion. The PR runs this promotion in dry-run mode.
+Hosted projects get this capability with the first CLI release after #530.
+
+Studio owns server preparation and deploy execution. A live project's move and
+its existing Postgres/RustFS volumes need a separate project migration. The
+Compose `deploy run` workflow below remains available for projects awaiting that
+move. After the first framework image push, the owner must make the
+`dartway-check` GHCR package public in its package settings.
+
 ## One file describes an environment
 
 `deploy/config.yaml` holds one environment per top-level key, plus three keys that belong to the
@@ -115,8 +172,7 @@ files.example.com →  the bundled storage                    (with storage: bun
 
 **The app calls its own origin.** On the app host the front Nginx serves the web image and
 sends `/dw/`, `/dw/live` and `/health` to the server, so a browser makes same-origin calls: no CORS,
-no preflight, and the server answers none. The web build is given that origin as
-`DW_BACKEND_URL`. The api host proxies everything to the server — calls, the live socket, and the
+no preflight, and the server answers none. Web release builds use `Uri.base.origin`. The api host proxies everything to the server — calls, the live socket, and the
 project's own doors (`DwHttpRoute`) such as a webhook. The server serves no static files. Local
 development has the same shape through `dart run dartway_cli:dartway dev` ([The CLI](cli.md)).
 
@@ -149,7 +205,7 @@ The rendered Nginx:
 |---|---|
 | `postgres` | With `database: bundled`: `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck. Absent with `database: external` — no service, no volume, no `depends_on` on it |
 | `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080` always, and with `database: bundled` (and, with the bundled storage, `DW_STORAGE_*`) `DW_DATABASE_*` in the compose file too — with `database: external` none of `DW_DATABASE_*` is rendered at all, all five (`HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`) come from `.env` like any other secret. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
-| `web` | Built from `<project>_flutter/Dockerfile` with the build argument `DW_BACKEND_URL` = the app origin |
+| `web` | Built from `<project>_flutter/Dockerfile`; a web release calls `Uri.base.origin` |
 | `storage`, `storage-init` | With `storage: bundled`: RustFS, and a one-shot job (a generic S3 client) that creates and configures both buckets on every deploy |
 | `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443 |
 | `certbot` | Renews the certificate every 12 hours |
@@ -553,7 +609,6 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `docker-context-packages` | error | Each image copies every package it depends on, and `.dockerignore` admits it — a missing one fails as `pub get` exit code 66, three layers from the cause |
 | `dependencies-inside-context` | error | No image resolves a package by a path outside the project — the context is the project root, so `pub get` in the image cannot find it though every checkout resolves. `pubspec_overrides.yaml` counts unless `.dockerignore` keeps it out. The usual cause is an unpublished framework taken from a local checkout: depend on it by git with a pinned ref instead |
 | `server-signals` | error | The server image's `ENTRYPOINT` (or `CMD`) is in exec form, so the binary is PID 1 and receives the SIGTERM a deploy sends; under `/bin/sh -c` it is killed mid-call when the grace period runs out |
-| `web-backend-url` | error | The web Dockerfile declares `ARG DW_BACKEND_URL` — Docker silently drops an undeclared build argument |
 | `locked-dependencies` | error | Every image's `pub get` runs `--enforce-lockfile`, and the package has a committed `pubspec.lock` — otherwise pub may resolve a different set inside the container than the project was tested with, and a deploy has already failed that way |
 | `web-flutter-version` | error | The web image builds on the Flutter `.fvmrc` names — it installs it from `.fvmrc`, or its Flutter image carries that tag. Flutter pins some packages an app resolves, so a lock written on one Flutter fails `--enforce-lockfile` on another |
 | `web-file-modes` | warning | The web image grants everyone read on the files it serves (`chmod -R a+rX build/web`). `COPY` keeps modes, and under a deploy user's umask of `077` the files a commit adds are served as 403 while every page answers 200 |
@@ -587,10 +642,10 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
   copies the shared and server packages by name, compiles `bin/server.dart` with `dart compile exe`,
   and runs the binary on Alpine with `ca-certificates` — without them every outbound HTTPS call from
   the server fails — and `ENTRYPOINT ["/app/server"]` in exec form.
-- **The web image** builds with Flutter from the project root, takes `ARG DW_BACKEND_URL` (and refuses
-  to build without it) and `ARG STUDIO_APP_ORIGIN` (the same address, for the Studio binding's access
-  check; an app without the binding declares no such ARG and Docker drops it), runs `flutter build web --release --no-web-resources-cdn --dart-define=DW_BACKEND_URL=…` so CanvasKit is served from the app's own origin, and serves
-  the build with `nginx:1.30.5-alpine` and `<project>_flutter/nginx.conf`. It serves files only.
+- **The web image** builds with Flutter from the project root, without a backend build
+  argument. It runs `flutter build web --release --no-web-resources-cdn`, uses
+  `Uri.base.origin` for calls, and serves the build with `nginx:1.30.5-alpine` and
+  `<project>_flutter/nginx.conf`. The same image serves stage and prod.
 - **`.dockerignore` denies everything** and admits the packages by role suffix (`*_server/`,
   `*_flutter/`, `*_shared/`), minus build output and `.env` — so the working copy's history, build
   output and local secrets never reach the Docker daemon.

@@ -140,15 +140,12 @@ jobs:
         run: df -h /
 
       - name: Build the ${{ matrix.image }} image
-        # Both Dockerfiles build from the project root — the web one needs two
-        # packages, and a context can only be one directory. DW_BACKEND_URL is
-        # compiled into the web build and the Dockerfile refuses an empty one;
-        # what it points at is irrelevant to whether the image builds.
+        # Both Dockerfiles build from the project root, without build args.
+        # Web releases call their own origin; one image serves all destinations.
         run: |
           cd "$RUNNER_TEMP/create/imagecheck"
           docker build \
             --file "${{ matrix.package }}/Dockerfile" \
-            --build-arg DW_BACKEND_URL=https://images.invalid \
             --tag "dartway-imagecheck-${{ matrix.image }}" \
             .
 

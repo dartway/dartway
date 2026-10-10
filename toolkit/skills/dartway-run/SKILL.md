@@ -83,3 +83,18 @@ Read the error before proposing to reinstall dependencies. Never print a secret,
 someone else or a signed upload URL; never delete the database volume without asking; never fix an empty list by
 loosening an access rule; never switch off a startup check to get the server up. After a DTO, row
 class or handler change: generate and restart; before calling it done: `dartway-finish`.
+
+## Kamal deployment files
+
+For a project moving to Studio's Kamal deploy contract, configure `staging` and/or
+`production` in `deploy/config.yaml`, resolve `__FLUTTER_PKG__` and run
+`dart run dartway_cli:dartway deploy kamal` there. Commit the generated configs,
+Studio manifest and Images workflow; it runs after successful `CI` on `master`
+and `release` (PR builds do not push). Install the workflow on the default branch
+before its `workflow_run` trigger can run. CI checks `deploy kamal --check` next
+to generation whenever a Studio manifest is present.
+Regenerate when project HTTP routes change: their literal prefixes are read from
+`__SERVER_PKG__/lib/`. Non-literal paths refuse generation. Web release builds
+call `Uri.base.origin`; they need no backend build argument. Studio owns running
+Kamal, SSH keys, registry credentials and secrets. Existing Compose deployments
+continue using `deploy run` until their project's separate move.

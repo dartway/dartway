@@ -60,12 +60,12 @@ flutter run                   # mobile or desktop: http://localhost:8080 (10.0.2
 ```
 
 In a browser the app calls its server on its own origin, as the deployment
-serves it — no CORS anywhere. Build it for that origin and serve both through
-the development proxy:
+serves it — no CORS anywhere. A web release uses `Uri.base.origin`; serve
+both through the development proxy:
 
 ```bash
 cd dartway_starter_flutter
-flutter build web --dart-define=DW_BACKEND_URL=http://localhost:8000
+flutter build web --release
 dart run dartway_cli:dartway dev proxy --web-dir build/web   # open http://localhost:8000
 # or, with hot restart: dart run dartway_cli:dartway dev web
 ```

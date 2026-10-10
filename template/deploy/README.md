@@ -14,13 +14,48 @@ dartway deploy check --env staging          # DNS, the server, the site
 dartway deploy run   --env staging          # update, build, start, verify
 ```
 
+## Kamal
+
+After configuring `staging` and/or `production` in `deploy/config.yaml` and
+resolving the packages, generate and commit the deployment contract:
+
+```sh
+cd dartway_starter_flutter
+dart run dartway_cli:dartway deploy kamal
+dart run dartway_cli:dartway deploy kamal --check
+```
+
+This refreshes `deploy/kamal/*`, `deploy/studio.yml` and
+`.github/workflows/images.yml`. Images runs after the required `CI` workflow
+succeeds. CI already runs on pushes to `master` and `release`. The generated
+workflow must first be merged into the default branch for `workflow_run` to
+trigger it. Unconfigured projects skip image builds. PR builds do not push.
+Successful branch CI
+builds each image once for `linux/amd64` and pushes its commit SHA to GHCR;
+existing tags are skipped, and GHA caches keep unchanged Flutter SDK layers.
+
+Destinations are `stage` and `prod`. Kamal 2.12 runs kamal-proxy v0.10.2; the API
+routes `/dw`, `/health` and literal project HTTP-route prefixes on both hosts.
+Web release builds use `Uri.base.origin`, so the same image serves both
+destinations without build arguments. A non-literal route refuses generation
+with its file and line. Regenerate after changing routes or deployment config;
+`--check` names any stale generated file.
+
+Bundled RustFS is a service with its own TLS host; Postgres is an API accessory.
+Studio supplies SSH keys, secret values and registry credentials, runs Kamal in
+manifest order, then runs the check image against a read-only checkout at
+`/project`. The check image tag follows the CLI lock: Git resolved SHA, path
+checkout HEAD, or pub.dev version. Server preparation and moving existing data
+belong to Studio and the project's migration. The existing `deploy run` flow
+below remains available until this project moves.
+
 ## What lives where
 
 | File | Owns |
 |---|---|
 | `config.yaml` | every environment of this project: `local` — what your own machine starts a server with — and each deployment's machine, repository, `api` / `app` / optional `site` hosts and optional storage. Plus `requires`, what the project needs wherever it runs |
 | `../dartway_starter_server/Dockerfile` | the server image: `dart compile exe`, the binary as PID 1 |
-| `../dartway_starter_flutter/Dockerfile` | the web image; the deploy passes it the app's origin as `DW_BACKEND_URL` |
+| `../dartway_starter_flutter/Dockerfile` | the web image; a release calls `Uri.base.origin` |
 | `../dartway_starter_flutter/nginx.conf` | how that image serves the build — files only — and above all **what a browser may keep** |
 | `compose.override.yml` | anything this project adds to a standard deployment — create it when that happens. Read from the checkout on every deploy |
 | `nginx.d/{http,api,app}/*.conf` | extra directives for the front proxy, if ever needed. A `proxy_pass` here must name a service the stack declares — `deploy check` and the deploy both refuse otherwise |

@@ -130,18 +130,6 @@ void main() {
       expect((await evaluate('server-signals')).passed, isFalse);
     });
 
-    test(
-      'web-backend-url: an undeclared build argument is dropped silently',
-      () async {
-        write('shop_flutter/Dockerfile', 'FROM nginx\nRUN flutter build web\n');
-        expect((await evaluate('web-backend-url')).passed, isFalse);
-        write('shop_flutter/Dockerfile', 'FROM nginx\nARG DW_BACKEND_URL\n');
-        final verdict = await evaluate('web-backend-url');
-        expect(verdict.passed, isTrue);
-        expect(verdict.detail, contains('https://app.example.com'));
-      },
-    );
-
     test('web-flutter-version: the image builds on the Flutter the lock '
         'was written with', () async {
       write('shop_flutter/.fvmrc', '{\n  "flutter": "3.47.2"\n}');
@@ -285,12 +273,18 @@ RUN dart pub get
 ''');
       final loose = await evaluate('locked-dependencies');
       expect(loose.passed, isFalse);
-      expect(loose.detail, contains('shop_server/Dockerfile: RUN dart pub get'));
+      expect(
+        loose.detail,
+        contains('shop_server/Dockerfile: RUN dart pub get'),
+      );
     });
 
     test('locked-dependencies says which image it could not read a pub get '
         'in: a green line must not read as "every image"', () async {
-      write('shop_server/Dockerfile', 'FROM dart\nRUN dart pub get --enforce-lockfile\n');
+      write(
+        'shop_server/Dockerfile',
+        'FROM dart\nRUN dart pub get --enforce-lockfile\n',
+      );
       write('shop_server/pubspec.lock', '# locked\n');
       write('shop_flutter/Dockerfile', 'FROM flutter\nRUN flutter build web\n');
       final verdict = await evaluate('locked-dependencies');
@@ -438,37 +432,33 @@ dependencies:
 
     // The example is the project the local stack proof deploys; its deploy
     // files have to pass everything a deployment checks before it builds.
-    test(
-      'the example passes every local check a deployment runs',
-      () async {
-        // On a vendored copy, as the local stack proof deploys it: in this
-        // repository the example takes the framework by path from
-        // `../../packages`, which no image can reach — exactly what
-        // `dependencies-inside-context` refuses in a project.
-        final sandbox = Directory.systemTemp.createTempSync('dw_example_');
-        addTearDown(() => sandbox.deleteSync(recursive: true));
-        final root = Directory(p.join(sandbox.path, 'example'));
-        copyProject(Directory(p.join(repository!.path, 'example')), root);
-        vendorFramework(project: root, monorepo: repository);
-        final context = DwDeployContext(
+    test('the example passes every local check a deployment runs', () async {
+      // On a vendored copy, as the local stack proof deploys it: in this
+      // repository the example takes the framework by path from
+      // `../../packages`, which no image can reach — exactly what
+      // `dependencies-inside-context` refuses in a project.
+      final sandbox = Directory.systemTemp.createTempSync('dw_example_');
+      addTearDown(() => sandbox.deleteSync(recursive: true));
+      final root = Directory(p.join(sandbox.path, 'example'));
+      copyProject(Directory(p.join(repository!.path, 'example')), root);
+      vendorFramework(project: root, monorepo: repository);
+      final context = DwDeployContext(
+        projectRoot: root,
+        stack: DwStack(
+          target: targetFrom(),
           projectRoot: root,
-          stack: DwStack(
-            target: targetFrom(),
-            projectRoot: root,
-            serverPackage: 'dartway_example_server',
-            flutterPackage: 'dartway_example_flutter',
-          ),
+          serverPackage: 'dartway_example_server',
+          flutterPackage: 'dartway_example_flutter',
+        ),
+      );
+      for (final check in dwLocalDeployChecks.where((c) => c.partOfDeploy)) {
+        final verdict = await check.evaluate(context);
+        expect(
+          verdict.passed || verdict.skipped,
+          isTrue,
+          reason: '${check.id}: ${verdict.detail}',
         );
-        for (final check in dwLocalDeployChecks.where((c) => c.partOfDeploy)) {
-          final verdict = await check.evaluate(context);
-          expect(
-            verdict.passed || verdict.skipped,
-            isTrue,
-            reason: '${check.id}: ${verdict.detail}',
-          );
-        }
-      },
-      skip: repository == null ? 'not inside the monorepo' : null,
-    );
+      }
+    }, skip: repository == null ? 'not inside the monorepo' : null);
   });
 }

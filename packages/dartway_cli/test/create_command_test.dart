@@ -330,6 +330,13 @@ void main() {
           'dart run dartway_cli:dartway generate --check $base',
         ),
         (
+          'deploy kamal --check',
+          'shop_flutter',
+          'if [ -f ../deploy/studio.yml ]; then\n'
+              '  dart run dartway_cli:dartway deploy kamal --check\n'
+              'fi\n',
+        ),
+        (
           'server / migrations',
           'shop_server',
           'dart run bin/migrate.dart check',

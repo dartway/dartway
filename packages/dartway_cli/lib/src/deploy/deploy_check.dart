@@ -182,13 +182,6 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     evaluate: _checkServerSignals,
   ),
   DwDeployCheck(
-    id: 'web-backend-url',
-    title: 'The web image takes the address it calls as a build argument',
-    stage: DwDeployCheckStage.local,
-    severity: DwCheckSeverity.error,
-    evaluate: _checkWebBackendUrl,
-  ),
-  DwDeployCheck(
     id: 'locked-dependencies',
     title: 'Every image builds the dependencies the lock file names',
     stage: DwDeployCheckStage.local,
@@ -475,30 +468,6 @@ Future<DwDeployVerdict> _checkServerSignals(DwDeployContext context) async {
         'PID 1 and receives the SIGTERM a deploy sends. Under /bin/sh -c the '
         'signal stops at the shell and the server is killed when the grace '
         'period runs out.',
-  );
-}
-
-Future<DwDeployVerdict> _checkWebBackendUrl(DwDeployContext context) async {
-  final file = context.dockerfileOf(context.flutterPackage);
-  if (!file.existsSync()) {
-    return const DwDeployVerdict.skip('no web Dockerfile');
-  }
-  final declares = file.readAsLinesSync().any(
-    (line) => RegExp(r'^\s*ARG\s+DW_BACKEND_URL(\s|=|$)').hasMatch(line),
-  );
-  if (declares) {
-    return DwDeployVerdict.pass(
-      'ARG DW_BACKEND_URL, given ${context.stack.appOrigin}',
-    );
-  }
-  return DwDeployVerdict.fail(
-    '${context.flutterPackage}/Dockerfile declares no ARG DW_BACKEND_URL',
-    fix:
-        'The deploy passes the app its own origin as the build argument '
-        'DW_BACKEND_URL; Docker drops an argument the Dockerfile does not '
-        'declare, without a word, and the app compiles against whatever '
-        'default it has. Declare it and pass it to flutter build web as a '
-        '--dart-define.',
   );
 }
 

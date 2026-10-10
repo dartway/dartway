@@ -1,0 +1,67 @@
+name: Check image
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    paths:
+      - 'packages/dartway_cli/**'
+      - 'deploy/check/**'
+      - '.github/workflows/check-image.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: check-image-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  check-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Immutable tag
+        id: tag
+        env:
+          SHA: ${{ github.sha }}
+          PUBLISH: ${{ github.event_name == 'push' }}
+        run: |
+          tag="ghcr.io/dartway/dartway-check:$SHA"
+          echo "image=$tag" >> "$GITHUB_OUTPUT"
+          if [ "$PUBLISH" = true ]; then
+            if docker buildx imagetools inspect "$tag" > manifest.txt 2>&1; then
+              echo "exists=true" >> "$GITHUB_OUTPUT"
+              echo "Skipping existing $tag"
+            elif ! grep -Eiq 'manifest unknown|not found|404' manifest.txt; then
+              cat manifest.txt
+              exit 1
+            fi
+          fi
+      - uses: docker/build-push-action@v6
+        if: steps.tag.outputs.exists != 'true'
+        with:
+          context: .
+          file: deploy/check/Dockerfile
+          platforms: linux/amd64
+          load: true
+          tags: ${{ steps.tag.outputs.image }}
+          labels: org.opencontainers.image.source=https://github.com/dartway/dartway
+          cache-from: type=gha,scope=check
+          cache-to: type=gha,scope=check,mode=max
+      - name: Check image help
+        if: steps.tag.outputs.exists != 'true'
+        run: docker run --rm '${{ steps.tag.outputs.image }}' --help
+      - name: Publish verified image
+        if: github.event_name == 'push' && steps.tag.outputs.exists != 'true'
+        run: docker push '${{ steps.tag.outputs.image }}'

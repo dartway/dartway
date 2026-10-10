@@ -2,6 +2,16 @@
 
 ## 0.24.0
 
+- `deploy kamal` generates Kamal 2.12 configs with kamal-proxy v0.10.2, stage/prod
+  destinations, literal project route prefixes, the Studio manifest and cached GHCR
+  image builds. `--check` refuses stale generated files. Check-image tags follow
+  the project's resolved CLI source: Git SHA, path HEAD or hosted version.
+  Framework CI builds the outside-probe image on master and promotes an immutable
+  published-version tag on stable without rebuilding (#530).
+- Template and example web releases call `Uri.base.origin` and build without a
+  backend address, so one image serves every destination. Deploy checks no longer
+  require a backend build argument (#530).
+
 - Migration: projects created before #495 must hold their committed locks in CI with
   `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
   [the migration note](../../docs/migrations/2026-10-10-ci-holds-the-locks.md) (#529).

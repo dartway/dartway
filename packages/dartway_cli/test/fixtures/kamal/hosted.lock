@@ -1,0 +1,8 @@
+packages:
+  dartway_cli:
+    dependency: direct dev
+    description:
+      name: dartway_cli
+      url: https://pub.dev
+    source: hosted
+    version: '0.24.0'
