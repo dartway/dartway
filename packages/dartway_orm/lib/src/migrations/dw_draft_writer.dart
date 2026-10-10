@@ -151,7 +151,7 @@ abstract final class DwDraftWriter {
         buffer.writeln('    //   await m.$option;');
         if (option.startsWith('renameColumn(')) {
           buffer.writeln(
-            '    // on a released table: add the new name and copy, stop reading the old one, drop it one release later',
+            '    // On a released table: add the new name and copy, stop reading the old one, drop it one release later.',
           );
         }
       }
@@ -167,9 +167,10 @@ abstract final class DwDraftWriter {
         decide(
           'drop table ${schema.name}',
           [
-            'The row classes no longer declare it. Dropping loses its rows; if it was',
-            'renamed, rename it with m.sql(\'ALTER TABLE ... RENAME TO ...\') instead.',
-            'on a released table: add the new name and copy, stop reading the old one, drop it one release later',
+            'The row classes no longer declare it. Dropping loses its rows.',
+            'If no released code reads it, rename it with',
+            'm.sql(\'ALTER TABLE ... RENAME TO ...\') instead.',
+            'On a released table: add the new name and copy, stop reading the old one, drop it one release later.',
           ],
           ['dropTable(${_string(schema.name)})'],
         );
@@ -195,8 +196,8 @@ abstract final class DwDraftWriter {
         decide(
           'drop column ${change.table}.${column.name}',
           [
-            'The row classes no longer declare it. Dropping loses its values; if it',
-            'was renamed, rename it (and delete the matching add below).',
+            'The row classes no longer declare it. Dropping loses its values.',
+            'If no released code reads it, rename it (and delete the matching add below).',
           ],
           [
             'dropColumn($table, ${_string(column.name)})',

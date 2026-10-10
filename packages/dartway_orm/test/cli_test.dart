@@ -478,7 +478,7 @@ dev_dependencies:
       );
       final renameOptions = RegExp(
         r"//   await m\.renameColumn\('note', 'title', 'heading'\);\n"
-        r'    // on a released table: add the new name and copy, stop reading the old one, drop it one release later',
+        r'    // On a released table: add the new name and copy, stop reading the old one, drop it one release later\.',
       ).allMatches(source);
       expect(renameOptions, hasLength(2));
       expect(source, contains('// 2 decisions required'));
@@ -500,8 +500,9 @@ dev_dependencies:
       expect(
         source,
         contains(
-          "// renamed, rename it with m.sql('ALTER TABLE ... RENAME TO ...') instead.\n"
-          '    // on a released table: add the new name and copy, stop reading the old one, drop it one release later',
+          '// If no released code reads it, rename it with\n'
+          "    // m.sql('ALTER TABLE ... RENAME TO ...') instead.\n"
+          '    // On a released table: add the new name and copy, stop reading the old one, drop it one release later.',
         ),
       );
     });
