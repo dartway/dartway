@@ -223,6 +223,8 @@ final class DwContractVersion {
     line = major > 0 ? '$major' : '0.${int.parse(match[2]!)}';
     _major = major;
     _minor = int.parse(match[2]!);
+    _patch = int.parse(match[3]!);
+    _prerelease = match[4]?.substring(1).split('.');
   }
 
   /// Reads a header value; [FormatException] for anything but a semantic
@@ -239,6 +241,8 @@ final class DwContractVersion {
     r'^(\d+)\.(\d+)\.(\d+)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$',
   );
 
+  static final _numericIdentifier = RegExp(r'^\d+$');
+
   final String text;
 
   /// The breaking line: `3` for `3.4.1`, `0.7` for `0.7.2`.
@@ -246,6 +250,32 @@ final class DwContractVersion {
 
   late final int _major;
   late final int _minor;
+
+  late final int _patch;
+  late final List<String>? _prerelease;
+
+  /// Semantic version precedence, including prereleases and ignoring build
+  /// metadata. Used to keep new update groups from older installed builds.
+  bool operator <(DwContractVersion other) {
+    if (_major != other._major) return _major < other._major;
+    if (_minor != other._minor) return _minor < other._minor;
+    if (_patch != other._patch) return _patch < other._patch;
+    final a = _prerelease;
+    final b = other._prerelease;
+    if (a == null) return false;
+    if (b == null) return true;
+    for (var i = 0; i < a.length && i < b.length; i++) {
+      if (a[i] == b[i]) continue;
+      final an = _numericIdentifier.hasMatch(a[i]);
+      final bn = _numericIdentifier.hasMatch(b[i]);
+      if (an && bn && a[i].length != b[i].length) {
+        return a[i].length < b[i].length;
+      }
+      if (an != bn) return an;
+      return a[i].compareTo(b[i]) < 0;
+    }
+    return a.length < b.length;
+  }
 
   /// Whether this version belongs to an older breaking line than [other]:
   /// an app on it cannot speak [other]'s contract.

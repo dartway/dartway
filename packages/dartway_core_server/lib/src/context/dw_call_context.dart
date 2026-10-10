@@ -261,6 +261,7 @@ final class DwRuntimeContext extends DwCallContext {
     this.sessionKey,
     this.job,
     void Function(DwRuntimeContext ctx)? deliverOnCommit,
+    this.clientContractVersion,
     String? clientAppVersion,
     String? clientUserAgent,
     required DwServerClock clock,
@@ -276,6 +277,8 @@ final class DwRuntimeContext extends DwCallContext {
        _modules = modules,
        _channelRules = channelRules,
        _files = files ?? ((_) => const DwUnconfiguredFiles());
+
+  final DwContractVersion? clientContractVersion;
 
   final _Scope _root;
   final Object _zoneKey = Object();
@@ -350,7 +353,8 @@ final class DwRuntimeContext extends DwCallContext {
     required String key,
     required int? accountId,
     required String typeName,
-  }) => _idempotencyTarget = (key: key, accountId: accountId, typeName: typeName);
+  }) =>
+      _idempotencyTarget = (key: key, accountId: accountId, typeName: typeName);
 
   /// Whether [recordProvisionalOutcome] wrote a row during this call —
   /// `DwCallEndpoint` reads this once the handler returns or throws, to

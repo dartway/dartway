@@ -2,6 +2,9 @@
 
 ## 0.21.0-dev.17
 
+- Add optional `DwProtocolEntry.since` and full semantic-version precedence on
+  `DwContractVersion` (`<`) for update-group compatibility. The wire and strict decoder stay unchanged (#504).
+
 - **BREAKING:** `DwSessionKeyInfo.lastUsedAt` is `DateTime?` — `null` until the key's first use —
   and an optional constructor parameter; `isUsed` asks it. Left off the JSON when `null`, like
   `revokedAt`; a used key encodes as before, and the framework never sends this object to an app,

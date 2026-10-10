@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- Emit contract descriptor format 2 and introduction `since` metadata for new data objects,
+  preserving trusted baseline metadata. New data objects need any shared version raise above the
+  trusted base, rather than a breaking-line raise. Format 1 baselines remain valid (#504).
+
 - First contract adoption compares shared's own path-dependency closure at both base and head,
   excluding app-only and dev-only packages. Repointed dependencies remain blocking, the lock walk
   stops at the Git root, and regular files are hashed in one Git call (dartway/dartway#460).

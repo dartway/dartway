@@ -162,7 +162,7 @@ Future<ContractBaseline> readContractBaseline({
     }
     return ContractBaseline(
       value as Map<String, dynamic>,
-      'committed descriptor (Git object, format 1 / codec 1)',
+      'committed descriptor (Git object, format ${value['format']} / codec 1)',
     );
   }
   final basePackage = p.posix.dirname(

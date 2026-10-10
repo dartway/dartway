@@ -29,8 +29,9 @@ If `projectContractVersion` reports an incompatible edit, raise the shared
 package breaking line (minor below 1.0, major above zero) and regenerate. A patch
 or prerelease-only bump is insufficient. Nullable/defaulted/patch additions and
 new calls are accepted only by the generated codec rules; removals, renames,
-changed defaults/types/result kinds and unknown data-object update groups are
-conservatively breaking. Custom/unsupported codecs block verification.
+changed defaults/types/result kinds are breaking. A new data object is additive, but
+requires a shared version above the trusted base (a patch is enough); generated `since`
+metadata keeps its updates and deletions from older builds. Custom/unsupported codecs block verification.
 
 This tooling gate covers generated project codecs/registry. Review domain
 semantics and manual external module contracts separately. It adds no runtime

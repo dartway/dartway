@@ -2,6 +2,10 @@
 
 ## 0.21.0-dev.17
 
+- Filter published objects and deletions in call responses and live updates by the client
+  contract version and generated `since`; drop empty channels and suppress empty live messages.
+  Protocols without a project contract version retain unfiltered delivery (#504).
+
 - **BREAKING (schema):** a session key's `last_used_at` is `NULL` until its first use, and the first
   use is always written, whatever `DwAuthConfig.keyTouchInterval` says; later uses are throttled as
   before. Framework migration `20261009_000003_dw_auth_key_last_used` drops the column's `NOT NULL`

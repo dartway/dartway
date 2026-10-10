@@ -16,6 +16,12 @@ A `DwAppServer`: the contract's calls, each answered by one handler that says wh
 it does; no endpoints, no generic CRUD. Access rules — `dartway-access`; what to publish — 
 `dartway-realtime`; schema changes — `dartway-migrations`; files — `dartway-uploads`.
 
+New generated data objects are additive when `__SHARED_PKG__/pubspec.yaml`'s `version:` is above
+the trusted contract base (a patch is enough). Generate records their introduction as `since`;
+the server filters their publications and deletions from response and live updates to older builds.
+Publishing remains dynamic server code; no channel list or manual filtering is needed. Existing
+shape changes still require a breaking-line raise (`dartway-contract`).
+
 ## 1. Layout
 
 ```

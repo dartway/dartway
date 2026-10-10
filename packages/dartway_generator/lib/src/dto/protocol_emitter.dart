@@ -18,6 +18,7 @@ abstract final class ProtocolEmitter {
     required String variable,
     required List<ProtocolEntry> entries,
     required String contractVersion,
+    Map<String, String> introductions = const {},
   }) {
     final sorted = [...entries]..sort((a, b) => a.name.compareTo(b.name));
     final imports = {for (final entry in sorted) entry.importUri}.toList()
@@ -42,7 +43,8 @@ abstract final class ProtocolEmitter {
                 // Dart would infer `DwWireObject` from the list, not the class
                 // from the factory, and the protocol refuses such an entry.
                 'DwProtocolEntry<${entry.name}>(${dartString(entry.name)}, '
-                '\$${entry.name}FromJson)',
+                '\$${entry.name}FromJson'
+                '${introductions[entry.name] == null ? '' : ', since: DwContractVersion(${dartString(introductions[entry.name]!)})'})',
           )
           .join(', '),
     );

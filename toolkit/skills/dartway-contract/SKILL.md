@@ -221,15 +221,15 @@ An installed build keeps calling with the contract it was built with, for weeks.
 | a wire name/field removed or renamed; a type, nullability, patch or default changed | may reject or discard installed-client data; breaking |
 | a value added to a strict enum | an old decoder rejects it; breaking |
 | a value added to an already-open enum with all old values retained | old decoders read the new name as `unknown` |
-| a new generated data object type | old update-group decoders do not know it; conservatively breaking |
+| a new generated data object type | additive with a shared version above the trusted base (a patch is enough); generated `since` keeps its updates and deletions from older builds |
 | a request/command renamed or removed | `404` |
 | a refusal code renamed | its generic refusal text |
 
 Prefer the additive change. When a breaking one is unavoidable, **raise the breaking line of
 `__SHARED_PKG__/pubspec.yaml`'s `version:`** in the same change — the minor below 1.0, the major after —
 and regenerate: an app of an older line is then answered `426` and shows its update screen instead of
-failing call by call. An additive change raises the patch, or nothing. Nothing is set in an environment
-at deploy time: the minimum ships with the code. The commit and the PR say which kind of change it is,
+failing call by call. A new data object must raise the shared version above the trusted base; a patch
+is enough. Other additive changes may keep the version. Nothing is set in an environment at deploy time: the minimum ships with the code. The commit and the PR say which kind of change it is,
 and a breaking one names the version it raises to.
 
 **Open enums** — `with DwOpenEnum` and a value `unknown` — only for display values an unknown one can be

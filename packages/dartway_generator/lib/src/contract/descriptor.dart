@@ -195,7 +195,7 @@ Map<String, Object?> describeContract(
     objects[dto.name] = shape;
   }
   return {
-    'format': 1,
+    'format': 2,
     'codec': 1,
     'contractVersion': version,
     'objects': objects,
@@ -350,7 +350,7 @@ void validateContract(Object? descriptor) {
   );
   if (root['format'] is! int ||
       root['codec'] is! int ||
-      root['format'] != 1 ||
+      !const {1, 2}.contains(root['format']) ||
       root['codec'] != 1) {
     invalid('unsupported descriptor/codec format');
   }
@@ -429,7 +429,13 @@ void validateContract(Object? descriptor) {
   for (final entry in objects.entries) {
     final shape = object(
       entry.value,
-      {'kind', 'fields', 'identity', 'result'},
+      {
+        'kind',
+        'fields',
+        'identity',
+        'result',
+        if (root['format'] == 2) 'since',
+      },
       {'kind', 'fields'},
     );
     if (!const {'data', 'request', 'command'}.contains(shape['kind']) ||
@@ -439,6 +445,15 @@ void validateContract(Object? descriptor) {
     for (final field in (shape['fields'] as Map<String, dynamic>).values) {
       final f = object(field, {'type', 'default'}, {'type'});
       type(f['type']);
+    }
+    if (shape.containsKey('since')) {
+      if (shape['kind'] != 'data' || shape['since'] is! String) {
+        invalid('malformed data introduction version');
+      }
+      final since = DwContractVersion.parse(shape['since'] as String);
+      if (DwContractVersion.parse(root['contractVersion'] as String) < since) {
+        invalid('data introduction version exceeds contract version');
+      }
     }
     if (shape['kind'] == 'data') {
       if (shape.containsKey('result') || !shape.containsKey('identity')) {
@@ -618,11 +633,31 @@ List<String> compareContracts(
     }
   }
   for (final name in after.keys.where((n) => !before.containsKey(n))) {
-    if (after[name]['kind'] == 'data') {
+    if (after[name]['kind'] == 'data' &&
+        !(DwContractVersion.parse(old['contractVersion'] as String) <
+            DwContractVersion.parse(current['contractVersion'] as String))) {
       changes.add(
-        '$name: new data-object update group is unknown to installed clients',
+        'raise `version:` above ${old['contractVersion']}: $name is new, and clients at ${old['contractVersion']} must not be sent it',
       );
     }
   }
   return changes..sort();
+}
+
+/// Introduction metadata comes only from the trusted descriptor. An object
+/// absent there is introduced by this version; legacy objects keep no since.
+Map<String, String> contractIntroductions(
+  Map<String, dynamic> base,
+  Map<String, dynamic> current,
+) {
+  final before = base['objects'] as Map;
+  final after = current['objects'] as Map;
+  return {
+    for (final name in after.keys)
+      if (after[name]['kind'] == 'data')
+        if (!before.containsKey(name))
+          name as String: current['contractVersion'] as String
+        else if (before[name]['since'] case final String since)
+          name as String: since,
+  };
 }
