@@ -2,10 +2,6 @@
 
 ## 0.24.0
 
-- Fix: `dartway doctor` always reports Docker, warning that development needs
-  `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.
-  Invalid or unresolvable test URLs are collected without hiding the Docker result (#539).
-
 - Migration: projects created before #495 must hold their committed locks in CI with
   `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
   [the migration note](../../docs/migrations/2026-10-10-ci-holds-the-locks.md) (#529).
@@ -46,6 +42,10 @@
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
   then passes on the same commit without changes is quarantined with a linked record rather than
   re-running CI until green (#513).
+
+- Fix: `dartway doctor` always reports Docker, warning that development needs
+  `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.
+  Invalid or unresolvable test URLs are collected without hiding the Docker result (#539).
 
 - `dartway test` defaults `--database-url` and `--storage-url` from `DW_TEST_DATABASE_URL` and
   `DW_TEST_STORAGE_URL`; flags take precedence, including `--no-storage`, and empty variables
