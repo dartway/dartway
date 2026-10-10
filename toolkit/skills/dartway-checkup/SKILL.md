@@ -68,7 +68,8 @@ offenders of Phase 1.
 For each, load the skills of the layers it spans and read it against them, with what grep cannot see:
 responsibilities, duplication, over-engineering, feature isolation, hacks and commented-out code, a
 second way across the contract, hardcoded user-visible text (judge by meaning), a `DwFeatureSpec`
-that no longer matches the widget, logic without tests, a bugfix without a regression test.
+that no longer matches the widget, a must-test risk (classes 1–6, `dartway-testing` §4) without a test,
+a bugfix without a regression test.
 
 **A finding a command could confirm is a hypothesis until the command ran**, and is labelled so. Ten
 verified findings beat thirty plausible ones.
