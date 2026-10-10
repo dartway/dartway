@@ -16,44 +16,7 @@ void main() {
     test(
       'three deploys bound images and cache (${containerd ? 'containerd' : 'classic'} store)',
       () async {
-        final name = 'dw-cleanup-${DateTime.now().microsecondsSinceEpoch}';
-        Future<ProcessResult> host(List<String> args) =>
-            Process.run('docker', args);
-        final started = await host([
-          'run',
-          '-d',
-          '--privileged',
-          '--name',
-          name,
-          '-e',
-          'DOCKER_TLS_CERTDIR=',
-          'docker:29.1.3-dind',
-          if (!containerd) '--storage-driver=overlay2',
-          '--feature=containerd-snapshotter=$containerd',
-        ]);
-        expect(started.exitCode, 0, reason: '${started.stderr}');
-        addTearDown(() async {
-          await host(['rm', '-f', '-v', name]);
-        });
-        final shell = EngineShell(name);
-        DwSshResult? ready;
-        for (var attempt = 0; attempt < 90; attempt++) {
-          ready = await shell.run('docker info');
-          if (ready.ok) break;
-          await Future<void>.delayed(const Duration(seconds: 1));
-        }
-        expect(
-          ready!.ok,
-          isTrue,
-          reason: '${(await host(['logs', name])).stderr}',
-        );
-        final driver = await shell.run(
-          "docker info -f '{{json .DriverStatus}}'",
-        );
-        expect(
-          driver.stdout.contains('io.containerd.snapshotter.v1'),
-          containerd,
-        );
+        final shell = await startEngine(containerd: containerd);
         final setup = await shell.run(r'''
 set -e
 mkdir -p /stack /state
@@ -210,7 +173,201 @@ docker tag nginx:fixture shop-web:accessory
         }
       },
     );
+    test('failed migration keeps the previous server serving '
+        '(${containerd ? 'containerd' : 'classic'} store)', () async {
+      final shell = await startEngine(containerd: containerd);
+      var monorepo = Directory.current.absolute;
+      while (!Directory('${monorepo.path}/packages').existsSync()) {
+        if (monorepo.parent.path == monorepo.path) {
+          throw StateError('not inside the monorepo');
+        }
+        monorepo = monorepo.parent;
+      }
+      const packages = [
+        'dartway_core_server',
+        'dartway_core_shared',
+        'dartway_client',
+        'dartway_orm',
+      ];
+      expect((await shell.run('mkdir -p /stack/packages /state')).ok, isTrue);
+      for (final package in packages) {
+        expect(
+          (await shell.run('mkdir -p /stack/packages/$package')).ok,
+          isTrue,
+        );
+        for (final source in ['lib', 'pubspec.yaml']) {
+          final copied = await Process.run('docker', [
+            'cp',
+            '${monorepo.path}/packages/$package/$source',
+            '${shell.name}:/stack/packages/$package/$source',
+          ]);
+          expect(copied.exitCode, 0, reason: '${copied.stderr}');
+        }
+      }
+      final copied = await Process.run('docker', [
+        'cp',
+        '${monorepo.path}/packages/dartway_cli/test/support/deploy_rollback_server.dart',
+        '${shell.name}:/stack/server.dart',
+      ]);
+      expect(copied.exitCode, 0, reason: '${copied.stderr}');
+      final setup = await shell.run("""
+set -e
+cat >/stack/pubspec.yaml <<'YAML'
+name: deploy_rollback_fixture
+environment:
+  sdk: ^3.11.0
+dependencies:
+  dartway_core_server:
+    path: packages/dartway_core_server
+dependency_overrides:
+${packages.map((package) => '  $package:\n    path: packages/$package').join('\n')}
+YAML
+sed -i '/^resolution: workspace/d' /stack/packages/*/pubspec.yaml
+cat >/stack/docker-compose.yml <<'YAML'
+name: shop
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_PASSWORD: fixture
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U postgres']
+      interval: 1s
+      timeout: 5s
+      retries: 30
+  server:
+    build: .
+    environment:
+      DW_DATABASE_HOST: postgres
+      DW_DATABASE_NAME: postgres
+      DW_DATABASE_USER: postgres
+      DW_DATABASE_PASSWORD: fixture
+      DW_DATABASE_SSL: 'false'
+    healthcheck:
+      test: [CMD, /server, health, localhost]
+      interval: 1s
+      timeout: 5s
+      retries: 10
+  web:
+    image: busybox:1.37
+YAML
+cat >/stack/Dockerfile <<'DOCKER'
+FROM dart:${Platform.version.split(' ').first} AS build
+WORKDIR /app
+COPY pubspec.yaml .
+COPY packages packages
+RUN dart pub get
+COPY server.dart .
+RUN dart compile exe server.dart -o /server
+FROM scratch
+COPY --from=build /runtime/ /
+COPY --from=build /server /server
+COPY migration /migration
+CMD ["/server"]
+DOCKER
+echo ok >/stack/migration
+cd /stack
+docker compose up -d --wait postgres
+""");
+      expect(setup.ok, isTrue, reason: '${setup.stdout}\n${setup.stderr}');
+      final runner = DwDeployRunner(
+        ssh: shell,
+        stack: stackFrom(extra: '  min_free_disk: 1MB\n'),
+        appDir: '/stack',
+        storeDir: '/state',
+      );
+      final firstBuild = await runner.build();
+      expect(firstBuild.ok, isTrue, reason: firstBuild.stderr);
+      final firstServer = await runner.replaceServer();
+      expect(firstServer.ok, isTrue, reason: firstServer.stderr);
+      final previous = await shell.run(
+        "docker inspect -f '{{.Image}}' \"\$(cd /stack && docker compose ps -q server)\"",
+      );
+      expect(previous.ok, isTrue, reason: previous.stderr);
+      expect(
+        (await shell.run(
+          'rm -rf /state/deploy-run; echo fail >/stack/migration',
+        )).ok,
+        isTrue,
+      );
+      final failingBuild = await runner.build();
+      expect(failingBuild.ok, isTrue, reason: failingBuild.stderr);
+      final failed = await runner.replaceServer();
+      final output = '${failed.stdout}\n${failed.stderr}';
+      expect(failed.exitCode, 1, reason: output);
+      expect(
+        output,
+        contains('relation "deliberately_missing" does not exist'),
+      );
+      expect(output, contains('they rolled back'));
+      // Check the transaction's actual effects, independently of its log.
+      final rolledBack = await shell.run("""
+cd /stack && docker compose exec -T postgres psql -U postgres -Atc "SELECT to_regclass('rollback_marker') IS NULL, (SELECT count(*) FROM dw_migrations WHERE namespace = 'app')"
+""");
+      expect(rolledBack.ok, isTrue, reason: rolledBack.stderr);
+      expect(rolledBack.stdout.trim(), 't|0');
+      expect(
+        output,
+        isNot(contains('could not be started again')),
+        reason: output,
+      );
+      expect(output, contains('the previous server is running again'));
+      final healthy = await shell.run(
+        '${DwDeployRunner.waitHealthyFunction(timeoutSeconds: 30)}\n'
+        'dw_wait_healthy "\$(cd /stack && docker compose ps -q server)" rollback',
+      );
+      expect(healthy.ok, isTrue, reason: healthy.stderr);
+      final serving = await shell.run(
+        "docker inspect -f '{{.Image}}' \"\$(cd /stack && docker compose ps -q server)\"",
+      );
+      expect(serving.ok, isTrue, reason: serving.stderr);
+      expect(serving.stdout.trim(), previous.stdout.trim());
+      // A separate client container must receive health and a real hello
+      // through /dw/live from the recovered server, without a manual start.
+      final answers = await shell.run(
+        'cd /stack && docker compose run --rm --no-deps -T server /server probe server',
+      );
+      expect(
+        answers.ok,
+        isTrue,
+        reason: '${answers.stdout}\n${answers.stderr}',
+      );
+      expect(answers.stdout, contains('/health 200'));
+      expect(answers.stdout, contains('/dw/live hello'));
+    });
   }
+}
+
+Future<EngineShell> startEngine({required bool containerd}) async {
+  final name = 'dw-cleanup-${DateTime.now().microsecondsSinceEpoch}';
+  Future<ProcessResult> host(List<String> args) => Process.run('docker', args);
+  final started = await host([
+    'run',
+    '-d',
+    '--privileged',
+    '--name',
+    name,
+    '-e',
+    'DOCKER_TLS_CERTDIR=',
+    'docker:29.1.3-dind',
+    if (!containerd) '--storage-driver=overlay2',
+    '--feature=containerd-snapshotter=$containerd',
+  ]);
+  expect(started.exitCode, 0, reason: '${started.stderr}');
+  addTearDown(() async {
+    await host(['rm', '-f', '-v', name]);
+  });
+  final shell = EngineShell(name);
+  DwSshResult? ready;
+  for (var attempt = 0; attempt < 90; attempt++) {
+    ready = await shell.run('docker info');
+    if (ready.ok) break;
+    await Future<void>.delayed(const Duration(seconds: 1));
+  }
+  expect(ready!.ok, isTrue, reason: '${(await host(['logs', name])).stderr}');
+  final driver = await shell.run("docker info -f '{{json .DriverStatus}}'");
+  expect(driver.stdout.contains('io.containerd.snapshotter.v1'), containerd);
+  return shell;
 }
 
 int diskBytes(String size) {

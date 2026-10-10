@@ -2,6 +2,9 @@
 
 ## 0.24.0
 
+- Deploy: a failed migration restores the healthy previous server on the containerd image store,
+  with its live socket serving again without manual recovery (#519).
+
 - Successful deployments clean unused server and web images of their own stack and trim the
   daemon's build cache to `build_cache_keep` (default `10GB`). Rollback images are pinned before
   the build and kept in the step journal, including on resume. Shared BuildKit cache references
