@@ -25,6 +25,26 @@
   the project default. **BREAKING (wire): protocol 3 refuses clients compiled against protocol 2
   with `426`; rebuild and deploy the client and server together.** No auth callback edit is required.
 
+- **Seeds are startup steps: `DwSeedRows(name, table: <Row>.tableDef, key:, rows:)`**
+  (dartway/dartway#388). At every start, before the port opens, a declared row missing from its
+  table is inserted, a changed one is written over the stored row with the same key (keeping its
+  id), an unchanged one is not touched and a row the declaration drops is left alone. A nullable or
+  non-unique key and two declared rows with one key refuse the start. **`DwServerFeature(startup:
+  [...])`**: a feature declares its own steps, run after the server's.
+
+- **`ctx.settings` (`DwSettingsStore`): the app's settings as one typed data object** (#388, #394).
+  `read<S>()` answers the stored value or the object's defaults, never `null`; `save(value)` is one
+  upsert; `update<S>(change)` locks the one row between the read and the write. Stored in the new
+  framework table `dw_setting` as the wire JSON — only what differs from the defaults. Reading is
+  per field: a stored field that no longer decodes reads as its default and is logged once, so a
+  read never fails over what is stored. **New framework migration `20260930_000000_dw_setting`**,
+  applied at the next start.
+
+- **`m.carrySettings(area, fromSql:)`** (`DwSettingsMigration` on `DwMigrationContext`): the
+  migration that drops a project's own settings table merges its values into `dw_setting`.
+
+- Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
+
 - **BREAKING (re-exported from `dartway_orm`): a row's `id` is `int`; inserts take the generated
   draft `New<Entity>Row`** (dartway/dartway#384). Nothing of the server's own changed: the
   framework's `dw_*` tables are written in SQL, not through row classes.
@@ -130,26 +150,6 @@
   `20261009_000001_dw_identity_provider_email`**: `dw_identity.provider_email`, rewritten on every
   provider sign-in (the normalized verified address under the option, `NULL` otherwise), so it fills
   in for identities made before the option was on (dartway/dartway#373).
-
-- **Seeds are startup steps: `DwSeedRows(name, table: <Row>.tableDef, key:, rows:)`**
-  (dartway/dartway#388). At every start, before the port opens, a declared row missing from its
-  table is inserted, a changed one is written over the stored row with the same key (keeping its
-  id), an unchanged one is not touched and a row the declaration drops is left alone. A nullable or
-  non-unique key and two declared rows with one key refuse the start. **`DwServerFeature(startup:
-  [...])`**: a feature declares its own steps, run after the server's.
-
-- **`ctx.settings` (`DwSettingsStore`): the app's settings as one typed data object** (#388, #394).
-  `read<S>()` answers the stored value or the object's defaults, never `null`; `save(value)` is one
-  upsert; `update<S>(change)` locks the one row between the read and the write. Stored in the new
-  framework table `dw_setting` as the wire JSON — only what differs from the defaults. Reading is
-  per field: a stored field that no longer decodes reads as its default and is logged once, so a
-  read never fails over what is stored. **New framework migration `20260930_000000_dw_setting`**,
-  applied at the next start.
-
-- **`m.carrySettings(area, fromSql:)`** (`DwSettingsMigration` on `DwMigrationContext`): the
-  migration that drops a project's own settings table merges its values into `dw_setting`.
-
-- Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
 
 - **`DwAccessRule.resource` takes `visible:` — a row the caller may see but not act on is refused
   `dw.forbidden`** (dartway/dartway#387, D-112). When `allows` answers `false` and `visible` answers
