@@ -48,6 +48,7 @@ reads it.
 | `database` | no | `bundled` or `external`; absent means `bundled` — a Postgres container in the stack |
 | `storage` | no | `bundled` or `external`; absent means no file storage |
 | `storage_domain` | with `bundled` | The public host of the bundled storage; refused without `storage: bundled` |
+| `min_free_disk` | no | Minimum free space on Docker's data root before building; defaults to `10GB`. Positive sizes in `MB` or `GB` (1024-based), for example `512MB` or `10GB` |
 | `registry_mirror` | no | Pull the official Docker Hub images of the stack (`postgres`, `nginx`) through a mirror such as `mirror.gcr.io`; the bundled storage and certbot come from where they live |
 | `firewall_ports` | no | TCP ports to open beyond SSH, 80 and 443 |
 | `requires.secrets` | no | Secrets nobody can generate, as environment variable names |
@@ -389,7 +390,9 @@ converges with one `dart run dartway_cli:dartway deploy setup`, followed by
    stops the deploy with the previous version still serving. With no
    proxy running — a first deploy, a stand that is down — nothing is serving that a failure could
    take down, and the certificate is left to step 13;
-8. builds the images;
+8. reads free space on Docker's data root (`docker info`, falling back to `/var/lib/docker`),
+   refuses below `min_free_disk` (default `10GB`), then builds the images. The space check is
+   read-only and runs again before every build, including a resumed build;
 9. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
    bundled`, starts Postgres — with `database: external` there is nothing of the database's to start,
    the server reaches it directly;
@@ -432,6 +435,18 @@ the same step for up to fifteen minutes, and past that `run` stops waiting and s
 running. Nothing the invoking machine does — losing its network, or dying because it is a container
 of the stack whose server step 10 replaces — stops a step midway.
 
+A step that stops without an exit code reports why:
+
+- A remaining `<id>.exit.tmp`, or less than 1 GiB free on the step directory's filesystem or
+  Docker's data root, reports `diskFull`, names the short path and its free and total space,
+  and asks to free old images or build cache and run again with `--resume`.
+- With room left, it keeps the message that the machine restarted or something killed the
+  process, followed by free space on both paths.
+
+Both interrupted states are retried by `--resume`, with or without `--retry-failed`. No cleanup
+runs automatically. A build refused by the space check names Docker's data root and the configured
+minimum; free space or lower `min_free_disk` in `deploy/config.yaml` before trying again.
+
 That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
 steps after the interruption still need someone to run them: **`dart run dartway_cli:dartway deploy run --env <env>
 --resume`**. It reads the record of the last deployment on the server and, in that deployment's
@@ -464,7 +479,7 @@ reads the events; the prose may change wording at any time, the events may not.
 | `step_skipped` | `index`, `count`, `id` — done by the deployment being resumed |
 | `step_started` | `index`, `count`, `id`, `title`, `picked_up` — waiting for a step already on the server |
 | `step_finished` | `index`, `count`, `id`, `exit_code`; `stdout`, `stderr` for a step whose output is its result |
-| `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message`; `resumed: true` when the step failed in the deployment being resumed and was not run again |
+| `step_failed` | `index`, `count`, `id`, `reason` (`exit`, `verdict`, `busy`); `exit_code`, `stdout`, `stderr` or `message`; `state` (`diskFull` or `vanished`) for a step stopped without an exit code; `resumed: true` when the step failed in the deployment being resumed and was not run again |
 | `services` | `services` (`name`, `status`) |
 | `probe` | `title`, `passed`, `warning`, `detail` |
 | `run_finished` | `ok`, `exit_code`; optional `failed_step` and `reason` (`bbr-unavailable`, `checks`, `nothing-to-resume`, `revision-mismatch`, `revision-not-found`, `revision-not-on-branch`, `stack-identity`, `superseded`, `unreachable`, `verification`) |
@@ -518,6 +533,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `ssh-reachable` | error | Key-based SSH works; when it fails the other server checks are skipped |
 | `deploy-user` | error | The deployment user exists |
 | `docker-available` | error | Docker Compose is usable by the deployment user |
+| `docker-free-space` | warning | Docker's data root has at least `min_free_disk` free (default `10GB`); names the path and available space below the threshold. The build itself refuses below this minimum |
 | `stack-identity` | error | The server runs this project's stack, or none at all — not only other ones; see [Moving the repository](#moving-the-repository) |
 | `proxy-congestion-control` | error | The running front proxy reports `bbr` from its own network namespace; the host's value cannot stand in for this reading |
 | `host-congestion-control` | warning | The host reports `bbr`; re-run `deploy setup` when it does not, so SSH and registry pulls use the framework setting too |

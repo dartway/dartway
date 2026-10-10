@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:path/path.dart' as p;
 
+import 'disk_space.dart';
 import 'output_mask.dart';
 import 'secret_store.dart';
 import 'ssh_runner.dart';
@@ -17,6 +18,9 @@ enum DwRemoteStepState {
   /// Its process is gone without an exit code: the machine restarted, or
   /// something killed it.
   vanished,
+
+  /// No exit code, with a failed exit write or less than 1 GiB available.
+  diskFull,
 
   /// It ran to its end; the code is in [DwRemoteStepRecord.exitCode].
   exited,
@@ -39,6 +43,18 @@ class DwRemoteStepRecord {
     DwRemoteStepState.exited => 'exited $exitCode',
     _ => state.name,
   };
+}
+
+/// A remote result whose missing exit code was diagnosed on the server.
+class DwRemoteStepResult extends DwSshResult {
+  const DwRemoteStepResult({
+    required this.state,
+    required super.exitCode,
+    required super.stdout,
+    required super.stderr,
+  });
+
+  final DwRemoteStepState state;
 }
 
 /// Refused to start a deployment while another one is still running a step on
@@ -143,6 +159,9 @@ while read -r id; do
   [ -n "\$id" ] || continue
   $_stateOf
   echo "\$id \$state"
+  if [ "\$state" = vanished ]; then
+    ${_diskFacts(r'$id')}
+  fi
 done <"\$d/plan"
 ''');
     if (!result.ok) {
@@ -157,10 +176,24 @@ done <"\$d/plan"
         .where((line) => line.isNotEmpty)
         .toList();
     if (lines.isEmpty || lines.first == 'none') return null;
-    return {
-      for (final line in lines)
-        line.split(' ').first: _record(line.split(' ').skip(1).toList()),
-    };
+    final records = <String, DwRemoteStepRecord>{};
+    for (final line in lines) {
+      final words = line.split(' ');
+      if (words.length < 2 ||
+          ![
+            'pending',
+            'running',
+            'vanished',
+            'rejected',
+            'exited',
+          ].contains(words[1])) {
+        continue;
+      }
+      records[words.first] = words[1] == 'vanished'
+          ? DwRemoteStepRecord(_StoppedStep.parse(lines, words.first).state)
+          : _record(words.skip(1).toList());
+    }
+    return records;
   }
 
   static DwRemoteStepRecord _record(List<String> words) =>
@@ -180,7 +213,7 @@ done <"\$d/plan"
 if [ -f "$d/$id.rejected" ]; then state=rejected
 elif [ -f "$d/$id.exit" ]; then state="exited $(cat "$d/$id.exit")"
 elif [ -f "$d/$id.pid" ] && kill -0 "$(cat "$d/$id.pid")" 2>/dev/null; then state=running
-elif [ -f "$d/$id.pid" ]; then state=vanished
+elif [ -f "$d/$id.pid" ] || [ -f "$d/$id.exit.tmp" ]; then state=vanished
 else state=pending
 fi''';
 
@@ -210,7 +243,7 @@ umask 077
 d='$directory'
 $fresh
 mkdir -p "\$d"
-rm -f "\$d/$id.exit" "\$d/$id.rejected" "\$d/$id.pid" "\$d/$id.out" "\$d/$id.err"
+rm -f "\$d/$id.exit" "\$d/$id.exit.tmp" "\$d/$id.rejected" "\$d/$id.pid" "\$d/$id.out" "\$d/$id.err"
 cat >"\$d/$id.sh"
 cat >"\$d/$id.run" <<'DW_RUN'
 trap '' HUP
@@ -260,7 +293,21 @@ if [ -f "\$d/$id.exit" ]; then
   exit "\$dw_mask_code"
 else
   echo "$nonce vanished"
+  ${_diskFacts(nonce)}
 fi
+''';
+
+  String _diskFacts(String prefix) =>
+      '''
+$dwDiskSpaceFunction
+$dwDockerRootScript
+if [ -f "\$d/\$id.exit.tmp" ]; then echo "$prefix exit-tmp 1"
+else echo "$prefix exit-tmp 0"; fi
+for dw_path in "\$d" "\$dw_docker_root"; do
+  printf '%s disk\\t' "$prefix"
+  dw_disk_space "\$dw_path" || printf '%s\\tunavailable\\tunavailable\\n' "\$dw_path"
+done
+echo "$prefix end"
 ''';
 
   Future<DwSshResult> _settle(
@@ -323,12 +370,20 @@ fi
                 )
               : started;
         case 'vanished':
-          return DwSshResult(
+          if (!lines.contains('$nonce end')) return null;
+          final stopped = _StoppedStep.parse(lines, nonce);
+          if (stopped.paths.length != 2) return null;
+          return DwRemoteStepResult(
+            state: stopped.state,
             exitCode: 1,
             stdout: '',
-            stderr:
-                'Step "$id" stopped on the server without an exit code — '
-                'the machine restarted, or something killed it.',
+            stderr: stopped.state == DwRemoteStepState.diskFull
+                ? 'Step "$id" stopped on the server: the disk is full — '
+                      '${stopped.shortPath}. Free space (old images, the build cache) '
+                      'and run again with --resume.'
+                : 'Step "$id" stopped on the server without an exit code — '
+                      'the machine restarted, or something killed it.\n'
+                      'Free space: ${stopped.spaceLine}.',
           );
         case 'exited':
           final rest = lines.sublist(index + 1).join('\n');
@@ -356,4 +411,36 @@ fi
     final random = Random.secure();
     return '--dw-step-${List.generate(8, (_) => random.nextInt(16).toRadixString(16)).join()}--';
   }
+}
+
+class _StoppedStep {
+  _StoppedStep(this.exitTmp, this.paths);
+
+  final bool exitTmp;
+  final List<(String, DwDiskSpace?)> paths;
+
+  static _StoppedStep parse(List<String> lines, String prefix) =>
+      _StoppedStep(lines.contains('$prefix exit-tmp 1'), [
+        for (final line in lines)
+          if (line.startsWith('$prefix disk\t'))
+            (
+              line.substring('$prefix disk\t'.length).split('\t').first,
+              DwDiskSpace.parse(line.substring('$prefix disk\t'.length)),
+            ),
+      ]);
+
+  DwDiskSpace? get shortSpace => paths
+      .map((path) => path.$2)
+      .whereType<DwDiskSpace>()
+      .where((space) => space.freeBytes < 1024 * 1024 * 1024)
+      .firstOrNull;
+
+  DwRemoteStepState get state => exitTmp || shortSpace != null
+      ? DwRemoteStepState.diskFull
+      : DwRemoteStepState.vanished;
+
+  String get shortPath => shortSpace?.description ?? _describe(paths.first);
+  String get spaceLine => paths.map(_describe).join('; ');
+  static String _describe((String, DwDiskSpace?) path) =>
+      path.$2?.description ?? '${path.$1}: free space unavailable';
 }

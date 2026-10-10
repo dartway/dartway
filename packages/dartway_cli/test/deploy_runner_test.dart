@@ -35,6 +35,77 @@ void main() {
     },
   );
 
+  group('room before building', () {
+    for (final free in [
+      10 * 1024 * 1024 - 1,
+      10 * 1024 * 1024,
+      12 * 1024 * 1024,
+    ]) {
+      test('Docker data root has $free KiB', () async {
+        final ssh = RecordingSsh([
+          (
+            'df -Pk',
+            DwSshResult(
+              exitCode: 0,
+              stdout: '/custom/docker\t31457280\t$free\n',
+              stderr: '',
+            ),
+          ),
+        ]);
+        final result = await DwDeployRunner(
+          ssh: ssh,
+          stack: stackFrom(),
+        ).build();
+        final enough = free >= 10 * 1024 * 1024;
+        expect(result.ok, enough);
+        expect(
+          ssh.issued.where((command) => command.contains(' build')).length,
+          enough ? 1 : 0,
+        );
+        if (!enough) {
+          expect(
+            ssh.issued.length,
+            1,
+            reason: 'only the read-only space query reaches the server',
+          );
+          expect(result.stderr, contains("Docker's data root /custom/docker"));
+          expect(result.stderr, contains('at least 10GB'));
+          expect(
+            result.stderr,
+            contains('min_free_disk in deploy/config.yaml'),
+          );
+        }
+      });
+    }
+    test('uses the environment threshold', () async {
+      final ssh = RecordingSsh([
+        (
+          'df -Pk',
+          const DwSshResult(
+            exitCode: 0,
+            stdout: '/docker\t31457280\t1048576\n',
+            stderr: '',
+          ),
+        ),
+      ]);
+      expect(
+        (await DwDeployRunner(
+          ssh: ssh,
+          stack: stackFrom(extra: '  min_free_disk: 512MB\n'),
+        ).build()).ok,
+        isTrue,
+      );
+    });
+    test('unreadable disk space refuses a build', () async {
+      final ssh = RecordingSsh();
+      expect(
+        (await DwDeployRunner(ssh: ssh, stack: stackFrom()).build()).ok,
+        isFalse,
+      );
+      expect(ssh.issued, hasLength(1));
+    });
+  });
+
   group('the order of a deployment', () {
     final runner = DwDeployRunner(
       ssh: RecordingSsh(),
@@ -199,7 +270,16 @@ void main() {
 
   group('the commands a deployment sends', () {
     test('every Compose call names the project override', () async {
-      final ssh = RecordingSsh();
+      final ssh = RecordingSsh([
+        (
+          'df -Pk',
+          const DwSshResult(
+            exitCode: 0,
+            stdout: '/docker\t31457280\t20971520\n',
+            stderr: '',
+          ),
+        ),
+      ]);
       final runner = DwDeployRunner(ssh: ssh, stack: stackFrom());
       await runner.checkComposeConfig();
       await runner.build();
@@ -209,8 +289,10 @@ void main() {
       await runner.startStack();
       await runner.restartProxy();
 
-      expect(ssh.issued, hasLength(7));
-      for (final command in ssh.issued) {
+      expect(ssh.issued, hasLength(8));
+      for (final command in ssh.issued.where(
+        (command) => !command.contains('df -Pk'),
+      )) {
         expect(
           command.replaceAll("'\\''", "'"),
           contains("cd '/home/deployer/shop'"),

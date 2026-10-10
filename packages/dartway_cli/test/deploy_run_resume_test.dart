@@ -63,6 +63,29 @@ void main() {
     progress: progress,
   );
 
+  for (final retryFailed in [false, true]) {
+    test('resume retries diskFull (retry-failed=$retryFailed)', () async {
+      final dir = Directory(remote.directory)..createSync();
+      File('${dir.path}/plan').writeAsStringSync('build\n');
+      File('${dir.path}/build.pid').writeAsStringSync('99999999\n');
+      File('${dir.path}/build.exit.tmp').writeAsStringSync('');
+      expect(
+        (await remote.read())!['build']!.state,
+        DwRemoteStepState.diskFull,
+      );
+      expect(
+        await execute(
+          [step('build', script: 'true')],
+          resume: true,
+          retryFailed: retryFailed,
+        ),
+        isNull,
+      );
+      expect(ran(), ['build']);
+      expect(File('${dir.path}/build.exit.tmp').existsSync(), isFalse);
+    });
+  }
+
   for (final resume in [false, true]) {
     test(
       'failed output is masked in prose and events (resume=$resume)',

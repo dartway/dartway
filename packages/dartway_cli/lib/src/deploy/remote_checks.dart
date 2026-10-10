@@ -8,6 +8,7 @@ import 'compose_files.dart';
 import 'data_volumes.dart';
 import 'deploy_check.dart';
 import 'deploy_target.dart';
+import 'disk_space.dart';
 import 'image_registry.dart';
 import 'local_secrets_file.dart';
 import 'outside_probe.dart';
@@ -55,6 +56,14 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
     severity: DwCheckSeverity.error,
     requiresSsh: true,
     evaluate: _checkDockerAvailable,
+  ),
+  DwDeployCheck(
+    id: 'docker-free-space',
+    title: "Docker's data root has room for a build",
+    stage: DwDeployCheckStage.remote,
+    severity: DwCheckSeverity.warning,
+    requiresSsh: true,
+    evaluate: _checkBuildDiskSpace,
   ),
   DwDeployCheck(
     id: 'stack-identity',
@@ -130,6 +139,18 @@ const List<DwDeployCheck> dwRemoteDeployChecks = [
   ),
 ];
 
+Future<DwDeployVerdict> _checkBuildDiskSpace(DwDeployContext context) async {
+  final result = await dwCheckBuildDiskSpace(
+    ssh: context.ssh!,
+    deployUser: context.target.deployUser,
+    minimum: context.target.minFreeDisk,
+    minimumBytes: context.target.minFreeDiskBytes,
+  );
+  return result.ok
+      ? DwDeployVerdict.pass(result.stdout)
+      : DwDeployVerdict.fail(result.firstLine);
+}
+
 Future<DwDeployVerdict> _checkProxyCongestionControl(
   DwDeployContext context,
 ) async {
@@ -164,7 +185,8 @@ Future<DwDeployVerdict> _checkHostCongestionControl(
           result.ok
               ? 'host reports ${value.isEmpty ? 'no value' : value}'
               : result.firstLine,
-          fix: 'Run "dart run dartway_cli:dartway deploy setup" once on this server.',
+          fix:
+              'Run "dart run dartway_cli:dartway deploy setup" once on this server.',
         );
 }
 

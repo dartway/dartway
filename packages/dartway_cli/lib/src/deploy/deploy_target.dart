@@ -66,6 +66,7 @@ class DwDeployTarget {
     this.storage = DwStorageMode.none,
     this.storageDomain,
     this.registryMirror,
+    this.minFreeDisk = '10GB',
     this.firewallPorts = const [],
     this.requiredSecrets = const [],
     this.requiredSecretFiles = const [],
@@ -112,6 +113,25 @@ class DwDeployTarget {
 
   /// Registry to pull the stack's base images through, e.g. `mirror.gcr.io`.
   final String? registryMirror;
+
+  /// Minimum available space on Docker's data root before building (MB or GB).
+  final String minFreeDisk;
+
+  int get minFreeDiskBytes => _diskBytes(minFreeDisk);
+
+  static int _diskBytes(String value) {
+    final match = RegExp(r'^(\d+(?:\.\d+)?)(MB|GB)$').firstMatch(value);
+    final amount = match == null ? null : double.tryParse(match[1]!);
+    final bytes = amount == null
+        ? 0.0
+        : amount * (match![2] == 'GB' ? 1024 * 1024 * 1024 : 1024 * 1024);
+    if (!bytes.isFinite || bytes < 1) {
+      throw StateError(
+        '"min_free_disk" must be a positive size in MB or GB, got "$value"',
+      );
+    }
+    return bytes.ceil();
+  }
 
   /// Extra TCP ports to open beyond SSH, 80 and 443.
   final List<int> firewallPorts;
@@ -360,6 +380,15 @@ class DwDeployTarget {
       () => reader.optionalString('registry_mirror'),
     );
 
+    final minFreeDisk =
+        guarded(
+          () => section.containsKey('min_free_disk')
+              ? reader.requiredString('min_free_disk')
+              : '10GB',
+        ) ??
+        '10GB';
+    guarded(() => _diskBytes(minFreeDisk));
+
     if (problems.isEmpty) {
       final target = DwDeployTarget(
         environment: environment,
@@ -378,6 +407,7 @@ class DwDeployTarget {
         storage: storage,
         storageDomain: storageDomain,
         registryMirror: registryMirror,
+        minFreeDisk: minFreeDisk,
         firewallPorts: firewallPorts,
         requiredSecrets: requiredSecrets,
         requiredSecretFiles: requiredSecretFiles,
@@ -487,6 +517,7 @@ class DwDeployTarget {
     'storage',
     'storage_domain',
     'registry_mirror',
+    'min_free_disk',
     'firewall_ports',
     'requires',
   };

@@ -51,6 +51,35 @@ class _PerRepoRegistry {
 }
 
 void main() {
+  group('the Docker free-space warning', () {
+    for (final free in [1024, 12 * 1024 * 1024]) {
+      test('$free KiB available', () async {
+        final check = dwRemoteDeployChecks.firstWhere(
+          (check) => check.id == 'docker-free-space',
+        );
+        final verdict = await check.evaluate(
+          DwDeployContext(
+            projectRoot: Directory.systemTemp,
+            stack: stackFrom(),
+            ssh: RecordingSsh([
+              (
+                'df -Pk',
+                DwSshResult(
+                  exitCode: 0,
+                  stdout: '/docker\t31457280\t$free\n',
+                  stderr: '',
+                ),
+              ),
+            ]),
+          ),
+        );
+        expect(check.severity, DwCheckSeverity.warning);
+        expect(verdict.passed, free >= 10 * 1024 * 1024);
+        expect(verdict.detail, contains('/docker'));
+      });
+    }
+  });
+
   group('the stack-identity check', () {
     final check = dwRemoteDeployChecks.firstWhere(
       (check) => check.id == 'stack-identity',

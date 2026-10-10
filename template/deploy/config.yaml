@@ -166,6 +166,11 @@ local:
 #   # themselves.
 #   registry_mirror: mirror.gcr.io
 #
+#   # Minimum free space on Docker's data root before a build (MB or GB,
+#   # 1024-based). Defaults to 10GB. `deploy check` warns below it; `run`
+#   # refuses to build. Free old images or build cache, or lower this value.
+#   min_free_disk: 10GB
+#
 #   # Optional. Ports to open beyond SSH, 80 and 443.
 #   firewall_ports: [5432]
 #

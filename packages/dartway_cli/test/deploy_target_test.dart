@@ -13,6 +13,42 @@ Matcher _refusal(List<String> fragments) => throwsA(
 );
 
 void main() {
+  group('min_free_disk', () {
+    test('defaults to 10GB and reads MB, GB and fractional sizes', () {
+      expect(targetFrom().minFreeDiskBytes, 10 * 1024 * 1024 * 1024);
+      for (final (text, bytes) in [
+        ('512MB', 512 * 1024 * 1024),
+        ('2GB', 2 * 1024 * 1024 * 1024),
+        ('1.5GB', 1536 * 1024 * 1024),
+      ]) {
+        expect(
+          targetFrom(extra: '  min_free_disk: $text\n').minFreeDiskBytes,
+          bytes,
+        );
+      }
+    });
+    for (final value in [
+      "''",
+      'null',
+      '[]',
+      'garbage',
+      '10',
+      '10TB',
+      '-1GB',
+      '0GB',
+      '10gb',
+      'true',
+      '1e99GB',
+    ]) {
+      test('rejects $value', () {
+        expect(
+          () => targetFrom(extra: '  min_free_disk: $value\n'),
+          _refusal(['min_free_disk']),
+        );
+      });
+    }
+  });
+
   group('deploy/config.yaml', () {
     test('what the project requires is declared once, above the machines', () {
       const text = '''
