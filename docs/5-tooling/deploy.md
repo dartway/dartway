@@ -475,7 +475,7 @@ observed increase in free space on Docker's data filesystem (negative changes ar
 containerd may reclaim additional bytes asynchronously). The cache limit applies to the Docker daemon's builder across the machine, not only this stack.
 
 If an older CLI moved the image tag before it failed and left no usable rollback pin, rerun with
-`dartway deploy run --env <env> --without-rollback-image` to consciously allow this one deployment
+`dart run dartway_cli:dartway deploy run --env <env> --without-rollback-image` to consciously allow this one deployment
 when the running image cannot be resolved. The flag is not stored in config. The CLI records an
 empty previous-image entry and warns that a failure leaves the service down until the next deploy.
 When the image can be resolved, it is still pinned for rollback even with the flag.
