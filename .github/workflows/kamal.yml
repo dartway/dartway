@@ -28,11 +28,16 @@ jobs:
           channel: stable
           cache: true
       - name: Create and resolve a project from this checkout
+        env:
+          GIT_AUTHOR_NAME: Config proof
+          GIT_AUTHOR_EMAIL: config-proof@example.com
+          GIT_COMMITTER_NAME: Config proof
+          GIT_COMMITTER_EMAIL: config-proof@example.com
         run: |
           dart pub global activate --source path packages/dartway_cli
           mkdir -p "$RUNNER_TEMP/kamal"
           cd "$RUNNER_TEMP/kamal"
-          dartway create kamalcheck --framework-path "$GITHUB_WORKSPACE" --no-git
+          dartway create kamalcheck --framework-path "$GITHUB_WORKSPACE"
           cd kamalcheck/kamalcheck_flutter
           flutter pub get
       - name: Configure destinations and generate their contract

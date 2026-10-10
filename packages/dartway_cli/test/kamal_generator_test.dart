@@ -274,6 +274,45 @@ DwHttpRoute.get(/* comment */ '/\u{0066}iles', handler);
     expect(generator.generate(check: true), isEmpty);
   });
 
+  test('a path checkout without git names the unresolved CLI lock', () async {
+    write(
+      'shop_flutter/pubspec.lock',
+      File('test/fixtures/kamal/path.lock').readAsStringSync(),
+    );
+    Directory(
+      p.join(root.path, 'framework/packages/dartway_cli'),
+    ).createSync(recursive: true);
+    Directory(p.join(root.path, 'empty-bin')).createSync();
+    write('resolve_tag.dart', '''
+import 'dart:io';
+import 'package:dartway_cli/src/deploy/kamal.dart';
+import 'package:dartway_cli/src/project_layout.dart';
+void main(List<String> args) {
+  try {
+    DwKamalGenerator.checkImageTag(ProjectLayout.detect(Directory(args.single)));
+  } on StateError catch (error) {
+    stderr.writeln(error.message);
+    exitCode = 1;
+  }
+}
+''');
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      [
+        '--packages=${p.absolute('../../.dart_tool/package_config.json')}',
+        p.join(root.path, 'resolve_tag.dart'),
+        root.path,
+      ],
+      environment: {'PATH': p.join(root.path, 'empty-bin')},
+    );
+    expect(result.exitCode, 1);
+    expect(
+      result.stderr,
+      contains('pubspec.lock: cannot resolve a check image tag'),
+    );
+    expect(result.stderr, isNot(contains('ProcessException')));
+  });
+
   for (final source in ['git', 'hosted', 'path']) {
     test('check image tag from $source lock fixture', () {
       write(

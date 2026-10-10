@@ -66,7 +66,9 @@ The Studio check image reads a checkout mounted read-only at `/project`, with
 requests, health on both hosts, the live socket hello, web caching and bundled
 storage visibility, and exits nonzero on a failure. Its tag follows the resolved
 `dartway_cli`: Git uses the lock's resolved ref SHA, path uses the checkout's
-HEAD, and pub.dev uses the lock's exact version. Framework CI builds SHA tags on
+HEAD, and pub.dev uses the lock's exact version. A Git/path SHA tag becomes
+available after that framework commit reaches master and its image build passes;
+uncommitted checkout changes do not get an image of their own. Framework CI builds SHA tags on
 `master`. A push to `stable` copies that image to the published CLI version,
 skipping prereleases and refusing to move an existing version tag. A missing
 pub.dev publication fails promotion. The PR runs this promotion in dry-run mode.

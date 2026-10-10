@@ -307,15 +307,20 @@ class DwKamalGenerator {
           final root = p.isAbsolute(path)
               ? path
               : p.join(lock.parent.path, path);
-          final result = Process.runSync('git', [
-            '-C',
-            root,
-            'rev-parse',
-            'HEAD',
-          ]);
-          final sha = (result.stdout as String).trim();
-          if (result.exitCode == 0 && RegExp(r'^[a-f0-9]{40}$').hasMatch(sha))
-            return sha;
+          try {
+            final result = Process.runSync('git', [
+              '-C',
+              root,
+              'rev-parse',
+              'HEAD',
+            ]);
+            final sha = (result.stdout as String).trim();
+            if (result.exitCode == 0 && RegExp(r'^[a-f0-9]{40}$').hasMatch(sha))
+              return sha;
+          } on ProcessException {
+            // The caller reports the same named resolution failure as a
+            // missing checkout or HEAD, rather than a process stack trace.
+          }
         }
     }
     throw StateError(
