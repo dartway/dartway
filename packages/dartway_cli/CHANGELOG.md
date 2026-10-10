@@ -2,6 +2,10 @@
 
 ## 0.24.0
 
+- Migration: projects created before #495 must hold their committed locks in CI with
+  `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
+  [the migration note](../../docs/migrations/2026-10-10-ci-holds-the-locks.md) (#529).
+
 - Deploy: a failed migration restores the healthy previous server on the containerd image store,
   with its live socket serving again without manual recovery (#519).
 

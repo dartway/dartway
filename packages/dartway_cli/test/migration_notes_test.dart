@@ -230,6 +230,26 @@ void main() {
   });
 
   group('the notes this repository ships', () {
+    test('ships the CI lock gate to projects updating the CLI', () {
+      final read = readMigrationNotes(monorepoRoot());
+      final lockNotes = read.notes.where(
+        (note) =>
+            note.path == 'docs/migrations/2026-10-10-ci-holds-the-locks.md',
+      );
+
+      expect(
+        lockNotes,
+        hasLength(1),
+        reason: 'projects created before #495 must receive the CI lock gate',
+      );
+      final note = lockNotes.single;
+      expect(note.affects, {'dartway_cli': '0.24.0'});
+      expect(
+        RegExp(r'pub get --enforce-lockfile').allMatches(note.body),
+        hasLength(3),
+      );
+    });
+
     test('all parse, and name packages at versions that exist', () {
       final root = monorepoRoot();
       final read = readMigrationNotes(root);
