@@ -23,6 +23,7 @@ Directory _monorepo() {
 
   package('dartway_core_shared', 'dependencies:\n  dartway_extra: ^0.13.0\n');
   package('dartway_extra', '');
+  package('dartway_lints', '');
   // Flutter-only, and nothing in the server package reaches it. An override is
   // resolved whether or not anything depends on it, so this is what a
   // whole-set override drags into a pure-Dart image.
@@ -175,6 +176,40 @@ void main() {
     ).readAsStringSync();
 
     expect('dependency_overrides:'.allMatches(pubspec), hasLength(1));
+  });
+
+  test('the lints plugin is resolved from the copy, not from pub.dev, where '
+      'an unreleased version does not exist', () {
+    final options =
+        File(p.join(project.path, 'shop_server', 'analysis_options.yaml'))
+          ..writeAsStringSync(
+            'include: package:lints/recommended.yaml\n'
+            '\n'
+            'plugins:\n'
+            '  dartway_lints: ^0.13.0\n'
+            '\n'
+            'linter:\n'
+            '  rules:\n'
+            '    - prefer_single_quotes\n',
+          );
+
+    final report = vendorFramework(project: project, monorepo: monorepo);
+
+    expect(
+      options.readAsStringSync(),
+      contains(
+        'plugins:\n'
+        '  dartway_lints:\n'
+        '    path: ../$vendorDirName/dartway_lints\n'
+        '\n'
+        'linter:',
+      ),
+    );
+    expect(report, contains(contains('lints plugin')));
+    // A second run finds nothing left to point.
+    final again = options.readAsStringSync();
+    vendorFramework(project: project, monorepo: monorepo);
+    expect(options.readAsStringSync(), again);
   });
 
   test('the build context admits the copies', () {

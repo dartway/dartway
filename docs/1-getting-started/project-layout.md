@@ -19,7 +19,7 @@ my_app/
   CLAUDE.md          the project's own rules for agents — yours, never overwritten
   README.md          bring-up, a feature end to end, the checks
   .vscode/           Server and Flutter launch configurations
-  .github/           a Claude review on every pull request (delete it to turn review off)
+  .github/           CI running every check as one check, ci; an optional Claude review
 ```
 
 ## Why three packages

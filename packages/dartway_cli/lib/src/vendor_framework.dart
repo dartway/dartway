@@ -47,6 +47,9 @@ List<String> vendorFramework({
     ))
       '  overrode dependencies in $path',
   ];
+  for (final path in _pointLintsPluginAtCopy(project, vendored)) {
+    report.add('  pointed the lints plugin in $path at the copy');
+  }
   if (_admitVendorDirToDockerContext(project)) {
     report.add('  admitted $vendorDirName/ into .dockerignore');
   }
@@ -200,6 +203,42 @@ void _stripWorkspaceResolution(File pubspec) {
       .toList();
   pubspec.writeAsStringSync('${kept.join('\n')}\n');
 }
+
+/// The `dartway_lints` analyzer plugin of every package that enables it,
+/// pointed at the copy.
+///
+/// The plugin is not a dependency, so no override reaches it: the analysis
+/// server resolves the version `analysis_options.yaml` names on its own, from
+/// pub.dev — where, between a bump and its release, it does not exist, and
+/// `dart analyze` fails on setting the plugin up rather than on the code.
+List<String> _pointLintsPluginAtCopy(
+  Directory project,
+  Map<String, String> vendored,
+) {
+  final copy = vendored['dartway_lints'];
+  if (copy == null) return const [];
+  final pointed = <String>[];
+  for (final entity in project.listSync()) {
+    if (entity is! Directory) continue;
+    final options = File(p.join(entity.path, 'analysis_options.yaml'));
+    if (!options.existsSync()) continue;
+    final content = options.readAsStringSync();
+    final rewritten = withLintsPluginPath(content, copy);
+    if (rewritten == content) continue;
+    options.writeAsStringSync(rewritten);
+    pointed.add(p.relative(options.path, from: project.path));
+  }
+  return pointed;
+}
+
+/// [options] with a `dartway_lints: <version>` plugin entry replaced by one
+/// naming [path]. A file with no such entry comes back as it was — the entry
+/// under `plugins:` is the only two-space `dartway_lints:` key an
+/// `analysis_options.yaml` of a project has.
+String withLintsPluginPath(String options, String path) => options.replaceFirst(
+  RegExp(r'^  dartway_lints:[ \t]*[^\s#][^\n]*$', multiLine: true),
+  '  dartway_lints:\n    path: $path',
+);
 
 /// The project's `.dockerignore` denies everything and admits the packages the
 /// Dockerfiles copy by name, so a folder that arrived after it was written is

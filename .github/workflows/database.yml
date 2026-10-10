@@ -10,9 +10,11 @@ name: Database
 # Until this workflow they were proved by nobody but a person running them by
 # hand.
 #
-# `dartway test` is the whole job: it starts a Postgres for the run on a port
-# Docker picks, applies the migrations, runs the suite and removes the container
-# afterwards. Nothing is shared between runs, so nothing is left to collide.
+# `dartway test` is the whole `example` job: it starts a Postgres for the run on
+# a port Docker picks, applies the migrations, runs the suite and removes the
+# container afterwards. Nothing is shared between runs, so nothing is left to
+# collide. The `template` job runs the created project's own `ci.yml`, of
+# which `dartway test` is one gate (#495).
 #
 # **On pull requests since 2026-09-17.** It ran on a schedule first, on
 # purpose: these are the only suites in the repository that test *races* — two
@@ -50,6 +52,8 @@ on:
       - 'packages/**'
       - 'template/**'
       - 'example/**'
+      - 'tool/run_project_ci.dart'
+      - 'tool/lib/src/project_ci.dart'
   schedule:
     - cron: '7 5 * * *'
   workflow_dispatch:
@@ -59,22 +63,11 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  suite:
+  example:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        # One job per project, so a red one names which without opening a log.
-        # They share nothing — each `dartway test` gets a container of its own.
-        include:
-          - project: example
-            directory: example
-            server: dartway_example_server
-          - project: template
-            directory: template
-            server: dartway_starter_server
-    name: ${{ matrix.project }}
+    # A job of its own, so a red one names which project without opening a log.
+    name: example
     steps:
       - uses: actions/checkout@v4
 
@@ -88,15 +81,69 @@ jobs:
 
       - name: Resolve the project
         # `dartway test` runs `dart test` in the server package; the workspace
-        # has to be resolved first, and these two trees are separate resolution
-        # roots rather than workspace members.
+        # has to be resolved first, and `example/` is a separate resolution
+        # root rather than a workspace member.
         run: |
           flutter pub get
-          cd "${{ matrix.directory }}/${{ matrix.server }}"
+          cd example/dartway_example_server
           dart pub get
 
       - name: Run the database suite
         # From the project root: the command finds the `*_server` sibling and
         # starts a Postgres and a storage of its own for the run — DW_DATABASE_*
         # and DW_STORAGE_* are set for it, not read from a file.
-        run: cd "${{ matrix.directory }}" && dartway test
+        run: cd example && dartway test
+
+  # The template as `dartway create` hands it out, proved by the project's own
+  # `.github/workflows/ci.yml` (#495): that file is the list of the project's
+  # gates, and `tool/run_project_ci.dart` runs its steps here in order — the
+  # database suite among them as `server / acceptance`. Running the file, not
+  # a copy of it, is the point: a gate added to it is run here the day it is
+  # added, and a construct the runner does not know stops the job instead of
+  # being skipped.
+  template:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    name: template
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.6
+          channel: stable
+
+      - name: Install the CLI from this commit
+        run: |
+          flutter pub get
+          dart pub global activate --source path packages/dartway_cli
+
+      - name: Create a project the way a stranger does
+        run: |
+          mkdir -p "$RUNNER_TEMP/create"
+          cd "$RUNNER_TEMP/create"
+          dartway create cicheck --local-repo "$GITHUB_WORKSPACE" --no-git
+
+      - name: Build the project against this commit, not against pub.dev
+        # As in `images.yml`: between a version bump and its release the
+        # carets of a created project name versions pub.dev does not have.
+        run: |
+          dart run tool/vendor_framework.dart \
+            "$RUNNER_TEMP/create/cicheck" "$GITHUB_WORKSPACE"
+
+      - name: Resolve and commit the project, as its developer has
+        # `ci.yml` resolves with `--enforce-lockfile` and compares the
+        # contract with a committed base, so the locks and a commit come
+        # first — the state of a project's first pull request.
+        run: |
+          cd "$RUNNER_TEMP/create/cicheck"
+          (cd cicheck_shared && dart pub get)
+          (cd cicheck_server && dart pub get)
+          (cd cicheck_flutter && flutter pub get)
+          git init --quiet --initial-branch main
+          git add --all
+          git -c user.name=ci -c user.email=ci@example.invalid \
+            commit --quiet --message "created by dartway create"
+
+      - name: Run the project's CI workflow
+        run: dart run tool/run_project_ci.dart "$RUNNER_TEMP/create/cicheck"
