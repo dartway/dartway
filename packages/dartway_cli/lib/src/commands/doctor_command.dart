@@ -5,6 +5,7 @@ import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 
 import '../pub_host.dart';
+import '../test_servers.dart';
 import '../version_check.dart';
 
 /// Checks that this machine can actually create and run a DartWay project.
@@ -52,7 +53,7 @@ class DoctorCommand extends Command<int> {
       _checkFlutter(),
       _checkGit(),
       await _checkPubHost(),
-      _checkDocker(),
+      ...await _checkTestServers(),
       _checkPubGlobalBinOnPath(),
     ];
 
@@ -221,6 +222,62 @@ class DoctorCommand extends Command<int> {
       'you trust — `dart pub get` has no deadline of its own and will hang '
       'on this without printing anything';
 
+  Future<List<_Check>> _checkTestServers() async {
+    final hosts = <String>[];
+    var needsDocker = true;
+    for (final (variable, database) in [
+      ('DW_TEST_DATABASE_URL', true),
+      ('DW_TEST_STORAGE_URL', false),
+    ]) {
+      final value = testServerUrlFromEnvironment(variable);
+      if (value == null) continue;
+      try {
+        final server = TestServerUrl.parse(
+          value,
+          database: database,
+          source: variable,
+        );
+        await server.environment(
+          database: database,
+          allowRemote: false,
+          remoteServerGuidance:
+              'Doctor has no remote-server override; use a loopback URL here. '
+              'For a dedicated remote test server, run '
+              '`dartway test --allow-remote-test-server` deliberately.',
+        );
+        if (database) needsDocker = false;
+        final uri = server.uri;
+        final port = database && !uri.hasPort ? 5432 : uri.port;
+        hosts.add('${database ? 'Postgres' : 'S3'} ${uri.host}:$port');
+      } on FormatException catch (error) {
+        return [
+          _Check.fail(
+            'tests',
+            error.message,
+            fix:
+                'Set $variable to a valid loopback test server URL, or unset it for container runs.',
+          ),
+        ];
+      } on SocketException {
+        return [
+          _Check.fail(
+            'tests',
+            '$variable: could not resolve the test server host',
+            fix: 'Use a literal loopback address in $variable.',
+          ),
+        ];
+      }
+    }
+    return [
+      if (hosts.isNotEmpty)
+        _Check.ok(
+          'tests',
+          'explicit servers from environment; ${hosts.join('; ')}',
+        ),
+      if (needsDocker) _checkDocker(),
+    ];
+  }
+
   _Check _checkDocker() {
     final result = _run('docker', ['ps']);
     if (result == null) {
@@ -229,9 +286,10 @@ class DoctorCommand extends Command<int> {
         'not found on PATH',
         fix:
             'Install Docker Desktop — https://docs.docker.com/get-docker/ '
-            'for local development. Without Docker, run tests with '
-            '`dartway test --database-url postgres://user:password@localhost/postgres` '
-            '(and --storage-url for uploads).',
+            'for local development. Without Docker, set DW_TEST_DATABASE_URL '
+            'to postgres://user:password@localhost/postgres '
+            '(and DW_TEST_STORAGE_URL for uploads), or pass '
+            '--database-url / --storage-url to `dartway test`.',
       );
     }
     if (result.exitCode != 0) {
@@ -240,8 +298,9 @@ class DoctorCommand extends Command<int> {
         'installed, but the daemon is not responding',
         fix:
             'Start Docker Desktop and wait until it reports "running" '
-            'for container runs, or use `dartway test --database-url` '
-            'with an explicit test server (--storage-url for uploads).',
+            'for container runs, or set DW_TEST_DATABASE_URL '
+            '(and DW_TEST_STORAGE_URL for uploads). `dartway test` also accepts '
+            '--database-url / --storage-url; flags do not change doctor checks.',
       );
     }
     return _Check.ok('Docker', 'daemon responding');
