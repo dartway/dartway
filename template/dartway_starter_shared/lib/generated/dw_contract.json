@@ -1,7 +1,7 @@
 {
   "codec": 1,
   "contractVersion": "0.1.0",
-  "format": 1,
+  "format": 2,
   "objects": {
     "AdminCounters": {
       "fields": {

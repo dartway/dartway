@@ -41,7 +41,7 @@ enum DwWireObjectKind {
 /// the entry, never probed from a `Type` object, which cannot be asked about
 /// subtyping.
 final class DwProtocolEntry<T extends DwWireObject> {
-  const DwProtocolEntry(this.name, this.fromJson);
+  const DwProtocolEntry(this.name, this.fromJson, {this.since});
 
   /// The name the class travels under: the call path (`/dw/<name>`) and the
   /// group name in a transport.
@@ -49,6 +49,10 @@ final class DwProtocolEntry<T extends DwWireObject> {
 
   /// The class's own factory — `$NameFromJson`, or a static `fromJson`.
   final DwWireObjectFactory<T> fromJson;
+
+  /// The project contract version that introduced this data object. Null
+  /// means every client of the contract line already knows its update group.
+  final DwContractVersion? since;
 
   /// The registered class.
   Type get type => T;

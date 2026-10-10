@@ -10,6 +10,91 @@ import 'support/temp_project.dart';
 
 void main() {
   test(
+    'new data objects retain their introduction version without raising the line',
+    () async {
+      final project = TempProject.create(['app_shared']);
+      void version(String value) => project.writeFile(
+        'app_shared/pubspec.yaml',
+        project
+            .readFile('app_shared/pubspec.yaml')
+            .replaceFirst(RegExp(r'version: [^\n]+'), 'version: $value'),
+      );
+      version('13.0.0');
+      project.writeFile('app_shared/lib/src/item.dart', itemSource());
+      await project.generateClean();
+      // A pre-format-2 baseline: every object was known at the line's start.
+      final path = 'app_shared/lib/generated/dw_contract.json';
+      final legacy = jsonDecode(project.readFile(path)) as Map;
+      legacy['format'] = 1;
+      project.writeFile(path, jsonEncode(legacy));
+      final base = baseline(project);
+      project.writeFile(
+        'app_shared/lib/src/extra.dart',
+        itemSource()
+            .replaceAll('ItemRecord', 'ExtraRecord')
+            .replaceAll('item.dw.dart', 'extra.dw.dart'),
+      );
+      version('13.1.0');
+      final generated = await generatorCli(project, ['--contract-base', base]);
+      expect(generated.exitCode, 0, reason: output(generated));
+      final checked = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        base,
+      ]);
+      expect(checked.exitCode, 0, reason: output(checked));
+      Map descriptor() => jsonDecode(project.readFile(path)) as Map;
+      expect(descriptor()['format'], 2);
+      expect(
+        descriptor()['objects']['ItemRecord'].containsKey('since'),
+        isFalse,
+      );
+      expect(descriptor()['objects']['ExtraRecord']['since'], '13.1.0');
+      project.writeFile('app_shared/bin/since_probe.dart', r"""
+import '../lib/generated/dw_protocol.dart';
+void main() { print(appProtocol.entryNamed('ExtraRecord')!.since); }
+""");
+      final probe = await project.runScript(
+        'app_shared',
+        'bin/since_probe.dart',
+      );
+      expect(probe.exitCode, 0, reason: output(probe));
+      expect(probe.stdout, '13.1.0\n');
+      // Once trusted, introduction metadata survives subsequent regeneration.
+      final nextBase = commit(project, 'added data object');
+      version('13.2.0');
+      final regenerated = await generatorCli(project, [
+        '--contract-base',
+        nextBase,
+      ]);
+      expect(regenerated.exitCode, 0, reason: output(regenerated));
+      expect(descriptor()['objects']['ExtraRecord']['since'], '13.1.0');
+      expect(
+        (await generatorCli(project, [
+          '--check',
+          '--contract-base',
+          nextBase,
+        ])).exitCode,
+        0,
+      );
+      version('13.0.0');
+      final unchangedVersion = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        base,
+      ]);
+      expect(unchangedVersion.exitCode, 3, reason: output(unchangedVersion));
+      expect(
+        output(unchangedVersion),
+        contains(
+          'raise `version:` above 13.0.0: ExtraRecord is new, and clients at 13.0.0 must not be sent it',
+        ),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
     'a user codec mixin cannot impersonate generated ownership by name',
     () async {
       final project = TempProject.create(['app_shared']);
@@ -868,7 +953,7 @@ void main() {
   );
 
   test(
-    'resolved nested/request/result/nullability/removal changes and unknown update groups are breaking',
+    'resolved nested/request/result/nullability/removal changes break codecs; new data needs a version raise',
     () async {
       final project = TempProject.create(['app_shared']);
       project.copyFixture('types');
@@ -972,7 +1057,10 @@ void main() {
         base,
       ]);
       expect(added.exitCode, 3, reason: output(added));
-      expect(output(added), contains('unknown to installed clients'));
+      expect(
+        output(added),
+        contains('raise `version:` above 0.1.0: ItemRecord is new'),
+      );
     },
     timeout: const Timeout(Duration(minutes: 4)),
   );
@@ -998,7 +1086,7 @@ void main() {
             relative,
             project
                 .readFile(relative)
-                .replaceFirst('"format": 1', '"format": 99'),
+                .replaceFirst('"format": 2', '"format": 99'),
           );
         }
         if (corruption == 'missing-version') {

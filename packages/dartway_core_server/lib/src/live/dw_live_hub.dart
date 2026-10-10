@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:meta/meta.dart';
 
+import '../server/dw_update_filter.dart';
 import 'dw_live_connection.dart';
 
 /// One object published to a channel, and the accounts it is kept from.
@@ -119,7 +120,7 @@ final class DwLiveHub {
   }
 
   /// Fans publications, grouped by channel wire name, out over the live
-  /// sockets: one message per channel, encoded once for all its subscribers;
+  /// sockets: one message per channel, encoded once per distinct selection;
   /// within a channel an object travels once, as it ended.
   ///
   /// [author] is the caller's own connection when the caller's response
@@ -133,6 +134,7 @@ final class DwLiveHub {
   /// declare that channel.
   void publish(
     Map<String, List<DwPublished>> byChannel, {
+    required DwWireProtocol protocol,
     DwLiveConnection? author,
   }) {
     for (final MapEntry(key: name, value: items) in byChannel.entries) {
@@ -147,25 +149,21 @@ final class DwLiveHub {
           updates: DwChannelUpdates(objects),
         ).toJson(),
       );
-      if (items.every((published) => published.except.isEmpty)) {
-        final frame = frameOf([for (final (:item, except: _) in items) item]);
-        // Iterated in place: `sendFrame` never changes subscriptions
-        // synchronously — a slow consumer's close leaves the hub on `done`.
-        for (final connection in subscribers) {
-          if (!identical(connection, author)) connection.sendFrame(frame);
-        }
-        continue;
-      }
-      // Some items are kept from some accounts: a connection receives what is
-      // not kept from its account, and each distinct selection is encoded
-      // once, however many connections share it.
+      // Each distinct selection is encoded once, even when connections have
+      // different contract versions or objects are kept from some accounts.
       final frames = <String, String?>{};
       for (final connection in subscribers) {
         if (identical(connection, author)) continue;
         final account = connection.accountId;
         final kept = [
           for (final (index, published) in items.indexed)
-            if (!published.except.contains(account)) index,
+            if (!published.except.contains(account) &&
+                dwClientKnowsUpdate(
+                  protocol,
+                  connection.clientContractVersion,
+                  published.item,
+                ))
+              index,
         ];
         final frame = frames.putIfAbsent(
           kept.join(','),
