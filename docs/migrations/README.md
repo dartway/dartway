@@ -128,3 +128,9 @@ happened, the note says what to do about it.
 - **What changed, for someone reading a release** — the package's `CHANGELOG.md`.
 - **How something works now** — `docs/`, and the toolkit skill that teaches it.
 - **A finding about a project's own code** — that project's `docs/dev_notes/`.
+
+## Project CI
+
+- [CI holds the committed dependency locks](2026-10-10-ci-holds-the-locks.md) — add
+  `--enforce-lockfile` to every package's CI dependency step, refreshing and committing the locks
+  first (`dartway_cli` 0.24.0).
