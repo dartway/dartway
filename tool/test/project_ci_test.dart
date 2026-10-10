@@ -141,6 +141,56 @@ jobs:
     );
   });
 
+  test('list-form runs-on refuses unknown expressions too (#508)', () {
+    String runsOn(String labels) =>
+        workflow().replaceFirst('runs-on: ubuntu-latest', 'runs-on: $labels');
+
+    expect(ProjectCiWorkflow.parse(runsOn('[self-hosted, linux]')).jobId, 'ci');
+    expect(problems(runsOn(r"[self-hosted, '${{ vars.OTHER_RUNNER }}']")), [
+      allOf(contains('runs-on:'), contains('vars.OTHER_RUNNER')),
+    ]);
+  });
+
+  test('GITHUB_ENV overrides job env in subsequent steps, with step env '
+      'taking precedence only for that step (#508)', () async {
+    final project = Directory(
+      '${repository.path}/.dart_tool',
+    ).createTempSync('project_ci_');
+    addTearDown(() => project.deleteSync(recursive: true));
+    final file = File('${project.path}/.github/workflows/ci.yml');
+    file.parent.createSync(recursive: true);
+    file.writeAsStringSync(r'''
+on: pull_request
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    env:
+      DW_CI_TEST_VALUE: job
+    steps:
+      - name: write environment
+        run: |
+          test "$DW_CI_TEST_VALUE" = job
+          echo "DW_CI_TEST_VALUE=updated" >> "$GITHUB_ENV"
+          test "$DW_CI_TEST_VALUE" = job
+      - name: read updated environment
+        run: test "$DW_CI_TEST_VALUE" = updated
+      - name: override for one step
+        env:
+          DW_CI_TEST_VALUE: step
+        run: test "$DW_CI_TEST_VALUE" = step
+      - name: read updated environment again
+        run: test "$DW_CI_TEST_VALUE" = updated
+''');
+
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      ['${repository.path}/tool/run_project_ci.dart', project.path],
+      workingDirectory: repository.path,
+      environment: {'DW_CI_TEST_VALUE': 'host'},
+    );
+    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+  });
+
   test('a guard or an output names only an earlier step', () {
     expect(
       problems(

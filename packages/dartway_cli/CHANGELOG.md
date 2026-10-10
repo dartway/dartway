@@ -2,6 +2,12 @@
 
 ## 0.24.0
 
+- The template's Claude review job uses the same `DW_CI_RUNS_ON` expression as `ci.yml`, so one
+  repository or organisation variable moves both jobs onto self-hosted runners. The review's
+  read-only token and disallowed tools remain unchanged. The local project CI runner refuses
+  unknown `runs-on` expressions in lists as well as strings, and applies earlier `GITHUB_ENV`
+  updates after job `env` and before step `env`, matching GitHub's precedence (#508).
+
 - Toolkit: `dartway-testing` requires red-before-fix proof only for bugfix tests; breaking code for
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
   then passes on the same commit without changes is quarantined with a linked record rather than

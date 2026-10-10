@@ -281,6 +281,18 @@ void main() {
     );
   });
 
+  test('the review workflow uses DW_CI_RUNS_ON too (#508)', () async {
+    final project = await create(['shop', '--local-repo', repository.path]);
+    final workflow =
+        loadYaml(read(project, '.github/workflows/claude-review.yml'))
+            as YamlMap;
+
+    expect(
+      workflow['jobs']['review']['runs-on'],
+      r'''${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}''',
+    );
+  });
+
   test('CI is one job named ci, every gate a guarded step of its own, on the '
       'pinned toolchain and the committed locks (#495)', () async {
     final project = await create(['shop', '--local-repo', repository.path]);
