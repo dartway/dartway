@@ -2,13 +2,6 @@
 
 ## 0.24.0
 
-- Deploy: a step stopped without an exit code reports `diskFull` when its exit-code write
-  failed or its step filesystem or Docker's data root has less than 1 GiB free, with the path
-  and available space. Other vanished steps include space on both paths. JSON progress carries
-  the state, and resume retries both interruptions. Builds now refuse below the environment's
-  `min_free_disk` (MB or GB, default `10GB`); `deploy check` reports low space as a warning.
-  The check changes nothing and no cleanup runs (#506).
-
 - The template ships `.github/workflows/ci.yml`: every mechanical gate of a project — `generate
   --check`, `migrate.dart check` on a Postgres service, `dart analyze` (`--fatal-infos` in the
   Flutter package, where the convention rules run as an analyzer plugin), `dart test`,
@@ -36,6 +29,13 @@
   `Uri(userInfo:)` produces (sub-delims and `:` kept, the rest percent-encoded), so a password
   logged inside a connection URL such as `postgres://app:p%40ss$word@db` is masked. The deploy
   guide names the forms the mask covers; other partial encodings are not recognised (#455).
+
+- Deploy: a step stopped without an exit code reports `diskFull` when its exit-code write
+  failed or its step filesystem or Docker's data root has less than 1 GiB free, with the path
+  and available space. Other vanished steps include space on both paths. JSON progress carries
+  the state, and resume retries both interruptions. Builds now refuse below the environment's
+  `min_free_disk` (MB or GB, default `10GB`); `deploy check` reports low space as a warning.
+  The check changes nothing and no cleanup runs (#506).
 
 - Deploy: the first certificate issuance moves the self-signed certificate of `deploy setup` aside
   instead of deleting it, and puts it back when certbot fails (Let's Encrypt down, a rate limit,
