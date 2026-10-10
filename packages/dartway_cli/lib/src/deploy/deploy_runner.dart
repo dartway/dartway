@@ -3,6 +3,7 @@ import 'dart:async';
 import 'compose_files.dart';
 import 'data_volumes.dart';
 import 'deploy_target.dart';
+import 'disk_space.dart';
 import 'nginx_upstreams.dart';
 import 'outside_probe.dart';
 import 'output_mask.dart';
@@ -271,7 +272,16 @@ rm -f "\$dw_new"''';
     );
   }
 
-  Future<DwSshResult> build() => _compose('build');
+  Future<DwSshResult> build() async {
+    final space = await dwCheckBuildDiskSpace(
+      ssh: ssh,
+      deployUser: target.deployUser,
+      minimum: target.minFreeDisk,
+      minimumBytes: target.minFreeDiskBytes,
+    );
+    if (!space.ok) return space;
+    return _compose('build');
+  }
 
   /// Starts the bundled storage and runs the initialisation of both buckets,
   /// whose output says what it did.

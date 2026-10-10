@@ -2,6 +2,13 @@
 
 ## 0.24.0
 
+- Deploy: a step stopped without an exit code reports `diskFull` when its exit-code write
+  failed or its step filesystem or Docker's data root has less than 1 GiB free, with the path
+  and available space. Other vanished steps include space on both paths. JSON progress carries
+  the state, and resume retries both interruptions. Builds now refuse below the environment's
+  `min_free_disk` (MB or GB, default `10GB`); `deploy check` reports low space as a warning.
+  The check changes nothing and no cleanup runs (#506).
+
 - `dartway test` pulls an image it does not have locally before starting a container from it,
   with up to three attempts (2 s, then 5 s apart) and one `pulling <image> (attempt n/3)` line per
   attempt on stderr. A transient registry error (a timeout, a 5xx, a rate limit) no longer fails

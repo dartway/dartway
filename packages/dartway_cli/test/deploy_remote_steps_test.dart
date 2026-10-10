@@ -28,6 +28,47 @@ void main() {
     onNotice: notices.add,
   );
 
+  group('a missing exit code', () {
+    for (final sample in [
+      (true, 20 * 1024 * 1024, 20 * 1024 * 1024, true),
+      (false, 100, 20 * 1024 * 1024, true),
+      (false, 20 * 1024 * 1024, 100, true),
+      (false, 20 * 1024 * 1024, 20 * 1024 * 1024, false),
+    ]) {
+      final (exitTmp, stepFree, dockerFree, full) = sample;
+      test('exit.tmp=$exitTmp step=$stepFree docker=$dockerFree', () async {
+        final result = await steps(
+          _WaitAnswer(
+            exitTmp: exitTmp,
+            stepFree: stepFree,
+            dockerFree: dockerFree,
+          ),
+        ).collect('build');
+        expect(result.ok, isFalse);
+        expect(
+          result.stderr,
+          contains(full ? 'the disk is full' : 'the machine restarted'),
+        );
+        expect(
+          result.stderr,
+          contains(
+            full && !exitTmp && dockerFree == 100 ? '/docker data' : '/steps',
+          ),
+        );
+        expect(
+          (result as DwRemoteStepResult).state,
+          full ? DwRemoteStepState.diskFull : DwRemoteStepState.vanished,
+        );
+        expect(result.stderr, contains('free of'));
+        if (!full) expect(result.stderr, contains('/docker data'));
+        if (full) expect(result.stderr, contains('--resume'));
+        if (!exitTmp && dockerFree == 100) {
+          expect(result.stderr, contains('— /docker data:'));
+        }
+      });
+    }
+  });
+
   group('a step run detached', () {
     test(
       'a complete masked answer survives a connection lost after it',
@@ -246,4 +287,32 @@ class _BrokenAfterStart extends DwSshRunner {
   /// is still running.
   static String _detachOnly(String command) =>
       command.substring(0, command.lastIndexOf("\nd='"));
+}
+
+class _WaitAnswer extends DwSshRunner {
+  _WaitAnswer({
+    required this.exitTmp,
+    required this.stepFree,
+    required this.dockerFree,
+  }) : super(host: 'localhost', user: 'local');
+  final bool exitTmp;
+  final int stepFree;
+  final int dockerFree;
+
+  @override
+  Future<DwSshResult> runAs(String deployUser, String command) async {
+    final nonce = RegExp(
+      r'--dw-step-[0-9a-f]+--',
+    ).firstMatch(command)!.group(0)!;
+    return DwSshResult(
+      exitCode: 0,
+      stdout:
+          '$nonce vanished\n'
+          '$nonce exit-tmp ${exitTmp ? 1 : 0}\n'
+          '$nonce disk\t/steps\t31457280\t$stepFree\n'
+          '$nonce disk\t/docker data\t31457280\t$dockerFree\n'
+          '$nonce end\n',
+      stderr: '',
+    );
+  }
 }

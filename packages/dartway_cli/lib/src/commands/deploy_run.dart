@@ -406,6 +406,7 @@ Future<String?> executeDeploySteps(
       report.event('step_failed', {
         ...position,
         'reason': 'exit',
+        if (result is DwRemoteStepResult) 'state': result.state.name,
         'exit_code': result.exitCode,
         'stdout': result.stdout,
         'stderr': result.stderr,
