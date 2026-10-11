@@ -9,6 +9,7 @@ import 'package:dartway_cli/src/deploy/data_volumes.dart';
 import 'package:dartway_cli/src/deploy/deploy_progress.dart';
 import 'package:dartway_cli/src/deploy/deploy_runner.dart';
 import 'package:dartway_cli/src/deploy/deploy_target.dart';
+import 'package:dartway_cli/src/deploy/remote_steps.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:path/path.dart' as p;
@@ -20,6 +21,21 @@ List<String> _ids(DwDeployRunner runner) =>
     runner.steps(skipGitUpdate: false).map((step) => step.id).toList();
 
 void main() {
+  test('a local deployment cannot reset a remote journal', () {
+    final ssh = RecordingSsh();
+    final runner = DwDeployRunner(
+      ssh: ssh,
+      stack: stackFrom(),
+      remote: DwRemoteSteps(
+        ssh: ssh,
+        deployUser: 'deployer',
+        directory: DwDeployRunner.remoteDirectoryOf(targetFrom()),
+      ),
+    );
+    expect(runner.beginLocalDeployment, throwsStateError);
+    expect(ssh.issued, isEmpty);
+  });
+
   test(
     'a pinned checkout stops when its deployment directory is unavailable',
     () async {
@@ -347,8 +363,11 @@ void main() {
         bool digestResolvable = true,
         bool tagMatchesContainer = true,
         bool pinned = false,
+        String image = 'sha256:previous',
+        bool fresh = true,
       }) async {
-        final bin = Directory(p.join(temp.path, 'bin'))..createSync();
+        final bin = Directory(p.join(temp.path, 'bin'))
+          ..createSync(recursive: true);
         final docker = File(p.join(bin.path, 'docker'))
           ..writeAsStringSync('''
 #!/bin/sh
@@ -357,9 +376,9 @@ case "\$*" in
   *" ps -aq server"*) ${running ? 'echo old-container' : 'true'} ;;
   *" ps -q server"*) echo new-container ;;
   *"{{.Config.Image}}"*) echo shop-server ;;
-  "inspect -f {{.Image}}"*) echo sha256:previous ;;
+  "inspect -f {{.Image}}"*) echo $image ;;
   "inspect -f {{.Id}}"*) echo old-container ;;
-  "image inspect -f {{.Id}} sha256:previous") ${digestResolvable ? 'echo sha256:previous' : 'exit 1'} ;;
+  "image inspect -f {{.Id}} $image") ${digestResolvable ? 'echo $image' : 'exit 1'} ;;
   "image inspect -f {{.Id}} shop-server:dw-previous") ${pinned ? 'echo sha256:previous' : 'exit 1'} ;;
   "image inspect -f {{.Id}}"*) echo ${tagMatchesContainer ? 'sha256:previous' : 'sha256:unserved'} ;;
   "ps -aq --no-trunc --filter ancestor=sha256:previous") echo old-container ;;
@@ -370,7 +389,7 @@ esac
 exit 0
 ''');
         Process.runSync('chmod', ['+x', docker.path]);
-        final result = await DwDeployRunner(
+        final runner = DwDeployRunner(
           ssh: LocalShell(
             environment: {
               'PATH': '${bin.path}:${Platform.environment['PATH']}',
@@ -379,7 +398,12 @@ exit 0
           stack: stackFrom(),
           appDir: p.join(temp.path, 'shop'),
           storeDir: p.join(temp.path, 'state'),
-        ).replaceServer();
+        );
+        if (fresh) {
+          final begun = await runner.beginLocalDeployment();
+          expect(begun.ok, isTrue, reason: begun.stderr);
+        }
+        final result = await runner.replaceServer();
         final issued = calls.existsSync()
             ? calls.readAsLinesSync().map((line) => line.trim()).toList()
             : <String>[];
@@ -388,6 +412,34 @@ exit 0
 
       int at(List<String> calls, String fragment) =>
           calls.indexWhere((call) => call.contains(fragment));
+
+      test('local deployments record their own rollback image and retries '
+          'keep the first record', () async {
+        final previous = File(
+          p.join(temp.path, 'state', 'deploy-run', 'server.previous'),
+        );
+        Future<void> deploy({
+          bool running = true,
+          String image = 'sha256:previous',
+          bool fresh = true,
+        }) async {
+          final (result, _) = await replace(
+            running: running,
+            image: image,
+            fresh: fresh,
+          );
+          expect(result.ok, isTrue, reason: result.stderr);
+        }
+
+        await deploy(running: false);
+        expect(previous.readAsStringSync(), isEmpty);
+        await deploy();
+        expect(previous.readAsStringSync().trim(), 'sha256:previous');
+        await deploy(image: 'sha256:replacement', fresh: false);
+        expect(previous.readAsStringSync().trim(), 'sha256:previous');
+        await deploy(image: 'sha256:replacement');
+        expect(previous.readAsStringSync().trim(), 'sha256:replacement');
+      });
 
       test('stops the old one, migrates in a one-off run, then starts the new '
           'one — never two at once', () async {
