@@ -96,10 +96,14 @@ The package confirms spans when the engine's position advances beyond the playba
 or seek anchor with play intent, outside its seeks and buffering. Pause, seek, speed,
 source change, error and end seal the current window. Waiting holds continuity;
 fullscreen and mini-player share one session. End adds no unobserved tail.
-For audio, UI position ticks before positive engine-position confirmation are
-provisional presentation only. A playback boundary or refused web play drops
-them; neither extrapolated positions nor an optimistically emitted playback event
-confirm playback or a seek.
+For web audio, UI position ticks are provisional presentation owned by the
+current `play()` call: pause, seek, speed, source change, error and end close
+spans without confirming them. Normal completion of that call commits all of
+its closed spans; refusal drops them, and a call that never settles commits
+nothing. Native audio cannot refuse play, so its coverage counts from the play
+call. Playback events and elapsed time are never treated as web confirmation.
+An audio seek settles only after the package's own platform seek completes, so
+an extrapolated position cannot confirm the jumped span.
 Do not re-derive spans from `onProgress` or position gaps, and do not add a manual
 confirmation adapter: the package sees its own seeks and excludes those gaps.
 

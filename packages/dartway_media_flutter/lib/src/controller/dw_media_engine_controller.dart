@@ -265,7 +265,14 @@ abstract class DwMediaEngineController extends DwMediaController {
   int get engineSeekEpoch => _playerState.seekEpoch;
 
   @protected
-  void reportPlayRefused() => _dispatch(const PlayRefused());
+  int get enginePlayEpoch => _playerState.playEpoch;
+
+  @protected
+  void reportPlayAccepted(int playEpoch) => _dispatch(PlayAccepted(playEpoch));
+
+  @protected
+  void reportPlayRefused([int? playEpoch]) =>
+      _dispatch(PlayRefused(playEpoch));
 
   void _dispatch(MediaEvent event) {
     if (_disposed) return;
@@ -274,6 +281,9 @@ abstract class DwMediaEngineController extends DwMediaController {
     final next = _playerState.playback;
     final interval = _playerState.interval;
     if (interval != null) _onPlayedInterval?.call(interval);
+    for (final committed in _playerState.committedIntervals) {
+      _onPlayedInterval?.call(committed);
+    }
     // Seal before listeners can move the queue and detach this controller.
     if (_playerState.sealPlayback) _onObservationBreak?.call();
     _state.value = next;
@@ -286,7 +296,9 @@ abstract class DwMediaEngineController extends DwMediaController {
         if (!_disposed) unawaited(_quietly(enginePause));
       });
     }
-    if (interval != null) _onRealPlayback(next);
+    if (interval != null || _playerState.committedIntervals.isNotEmpty) {
+      _onRealPlayback(next);
+    }
     if (next.isEnded && !previous.isEnded && _playerState.playedSinceSeek) {
       _reachEnd();
     }

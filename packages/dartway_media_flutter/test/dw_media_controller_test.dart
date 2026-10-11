@@ -163,7 +163,7 @@ void main() {
       await release(tester, controller);
     });
 
-    testWidgets('audio: optimistic ticks stay provisional until a native event', (
+    testWidgets('audio: native playback counts from the play call', (
       tester,
     ) async {
       var started = 0;
@@ -179,13 +179,33 @@ void main() {
       final acknowledgedEvents = track.playbackEventCount;
       await tester.pump(const Duration(seconds: 2));
       expect(track.playbackEventCount, acknowledgedEvents);
-      expect(started, 0);
+      expect(started, 1);
+      expect(intervals, [
+        DwMediaPlayedInterval(Duration.zero, const Duration(seconds: 2)),
+      ]);
+      expect(controller.hasReallyPlayed, isTrue);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: a completed web play call commits held coverage', (
+      tester,
+    ) async {
+      debugDwMediaIsWebOverride = true;
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('accepted-web-play'),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      final gate = Completer<void>();
+      track.playBarrier = gate.future;
+      await controller.play();
+      await tester.pump(const Duration(seconds: 2));
+      await controller.pause();
       expect(intervals, isEmpty);
       expect(controller.hasReallyPlayed, isFalse);
-      track.advanceTo(const Duration(seconds: 2));
-      track.stopBuffering();
-      await tester.pump();
-      expect(started, 1);
+      gate.complete();
+      await dwSettleMedia(tester);
       expect(intervals, [
         DwMediaPlayedInterval(Duration.zero, const Duration(seconds: 2)),
       ]);
@@ -293,6 +313,28 @@ void main() {
       gate.complete();
       await seeking;
       expect(controller.state.value.seekTarget, isNull);
+      expect(intervals, isEmpty);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: an observation created before a seek stays stale', (
+      tester,
+    ) async {
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('delayed-before-seek'),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      await controller.play();
+      track.advanceTo(const Duration(seconds: 20));
+      final eventGate = Completer<void>();
+      unawaited(track.reportReadyAfter(eventGate.future));
+      await controller.seek(Duration.zero);
+      intervals.clear();
+      eventGate.complete();
+      await tester.pump();
+      expect(controller.state.value.position, Duration.zero);
       expect(intervals, isEmpty);
       await release(tester, controller);
     });

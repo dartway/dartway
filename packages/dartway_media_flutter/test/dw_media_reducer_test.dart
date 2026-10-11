@@ -10,6 +10,7 @@ EngineFact fact(
   bool loading = false,
   bool ended = false,
   int seekEpoch = 0,
+  bool provisionalPlayback = false,
 }) => EngineFact(
   position: seconds(position),
   duration: seconds(100),
@@ -19,6 +20,7 @@ EngineFact fact(
   loading: loading,
   ended: ended,
   seekEpoch: seekEpoch,
+  provisionalPlayback: provisionalPlayback,
 );
 
 void main() {
@@ -216,6 +218,7 @@ void main() {
       for (final event in row.events) {
         state = reduceMedia(state, event);
         if (state.interval case final interval?) spans.add(interval);
+        spans.addAll(state.committedIntervals);
       }
       expect(state.playback.intent, row.intent);
       expect(state.playback.waiting, row.waiting);
@@ -246,6 +249,7 @@ void main() {
     ]) {
       state = reduceMedia(state, event);
       if (state.interval case final interval?) spans.add(interval);
+      spans.addAll(state.committedIntervals);
     }
     expect(spans, [DwMediaPlayedInterval(Duration.zero, seconds(50))]);
     expect(state.playback.position, seconds(51));
@@ -265,8 +269,43 @@ void main() {
     ]) {
       state = reduceMedia(state, event);
       if (state.interval case final interval?) spans.add(interval);
+      spans.addAll(state.committedIntervals);
     }
     expect(state.playback.position, seconds(51));
     expect(spans, [DwMediaPlayedInterval(seconds(50), seconds(51))]);
+  });
+
+  test('web audio commits only when its play call completes', () {
+    var state = const MediaPlayerState();
+    final spans = <DwMediaPlayedInterval>[];
+    for (final event in <MediaEvent>[
+      ready,
+      const PlayCommand(),
+      fact(2, provisionalPlayback: true),
+      const PauseCommand(),
+      const PlayAccepted(1),
+    ]) {
+      state = reduceMedia(state, event);
+      spans.addAll(state.committedIntervals);
+    }
+    expect(spans, [DwMediaPlayedInterval(Duration.zero, seconds(2))]);
+    expect(state.hasReallyPlayed, isTrue);
+  });
+
+  test('web audio refusal drops spans closed before it arrived', () {
+    var state = const MediaPlayerState();
+    final spans = <DwMediaPlayedInterval>[];
+    for (final event in <MediaEvent>[
+      ready,
+      const PlayCommand(),
+      fact(2, provisionalPlayback: true),
+      const PauseCommand(),
+      const PlayRefused(1),
+    ]) {
+      state = reduceMedia(state, event);
+      spans.addAll(state.committedIntervals);
+    }
+    expect(spans, isEmpty);
+    expect(state.hasReallyPlayed, isFalse);
   });
 }

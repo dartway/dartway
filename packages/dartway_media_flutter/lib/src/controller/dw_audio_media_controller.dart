@@ -28,6 +28,8 @@ final class DwAudioMediaController extends DwMediaEngineController {
   AudioPlayer? _player;
   PlaybackEvent? _playbackEvent;
   int? _seekInFlightEpoch;
+  DateTime? _seekStartedAt;
+  int? _preSeekEpoch;
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   @override
@@ -44,11 +46,14 @@ final class DwAudioMediaController extends DwMediaEngineController {
       player.playbackEventStream.listen((event) {
         if (!identical(_player, player)) return;
         _playbackEvent = event;
-        // `player.position` extrapolates from this event's timestamp. If the
-        // stream delivers the optimistic event made by `play()` late, that
-        // clock can have advanced even though the platform has produced no
-        // audio. Only the engine position captured in the event is evidence.
-        _onUpdate(player, event.updatePosition, nativePlaybackEvent: true);
+        final beforeSeek = _seekStartedAt case final started?
+            ? event.updateTime.isBefore(started)
+            : false;
+        _onUpdate(
+          player,
+          event.updatePosition,
+          seekEpoch: beforeSeek ? _preSeekEpoch : null,
+        );
       }),
       player.positionStream.listen((position) => _onUpdate(player, position)),
       player.errorStream.listen((error) {
@@ -62,12 +67,19 @@ final class DwAudioMediaController extends DwMediaEngineController {
   void _onUpdate(
     AudioPlayer player,
     Duration position, {
-    bool nativePlaybackEvent = false,
+    int? seekEpoch,
   }) {
     if (!identical(_player, player)) return;
     final event = _playbackEvent ?? player.playbackEvent;
     final processingState = event.processingState;
-    final seekEpoch = _seekInFlightEpoch ?? engineSeekEpoch;
+    final beforeSeek = _seekStartedAt case final started?
+        ? event.updateTime.isBefore(started)
+        : false;
+    final factSeekEpoch =
+        seekEpoch ??
+        (beforeSeek ? _preSeekEpoch : null) ??
+        _seekInFlightEpoch ??
+        engineSeekEpoch;
     reportEngine(
       EngineFact(
         loading:
@@ -80,9 +92,12 @@ final class DwAudioMediaController extends DwMediaEngineController {
         position: position,
         duration: event.duration ?? Duration.zero,
         buffered: event.bufferedPosition,
-        seekEpoch: seekEpoch,
-        provisionalPlayback:
-            !nativePlaybackEvent || processingState != ProcessingState.ready,
+        seekEpoch: factSeekEpoch,
+        // just_audio has no positive web playback event: all web coverage is
+        // owned by the pending play call and committed only if that call
+        // completes. Native players cannot refuse play, so their ticks count
+        // immediately.
+        provisionalPlayback: dwMediaIsWeb,
       ),
     );
   }
@@ -95,16 +110,24 @@ final class DwAudioMediaController extends DwMediaEngineController {
     // here for the same reason.
     final player = _player;
     if (player == null) return;
+    final playEpoch = enginePlayEpoch;
     unawaited(
-      player.play().catchError((Object error, StackTrace stackTrace) {
-        if (dwMediaIsPlayRefusal(error)) {
+      player.play().then(
+        (_) {
+          if (dwMediaIsWeb && identical(_player, player)) {
+            reportPlayAccepted(playEpoch);
+          }
+        },
+        onError: (Object error, StackTrace stackTrace) {
           if (!identical(_player, player)) return;
-          reportPlayRefused();
-          unawaited(player.pause());
-        } else {
-          reportFailure(error, stackTrace);
-        }
-      }),
+          if (dwMediaIsPlayRefusal(error)) {
+            reportPlayRefused(playEpoch);
+            unawaited(player.pause());
+          } else if (!dwMediaIsBenignError(error)) {
+            reportFailure(error, stackTrace);
+          }
+        },
+      ),
     );
   }
 
@@ -117,6 +140,8 @@ final class DwAudioMediaController extends DwMediaEngineController {
     if (player == null) return;
     final epoch = engineSeekEpoch - 1;
     _seekInFlightEpoch = epoch;
+    _preSeekEpoch = epoch;
+    _seekStartedAt = DateTime.now();
     try {
       await player.seek(position);
     } finally {
@@ -139,6 +164,8 @@ final class DwAudioMediaController extends DwMediaEngineController {
     _player = null;
     _playbackEvent = null;
     _seekInFlightEpoch = null;
+    _seekStartedAt = null;
+    _preSeekEpoch = null;
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
