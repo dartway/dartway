@@ -2,6 +2,9 @@
 
 ## 0.24.0
 
+- Fix: toolkit manifests no longer record machine-local pub-cache clone paths,
+  and `dartway check` skips inaccessible or revision-mismatched recorded checkouts.
+
 - Migration: projects created before #495 must hold their committed locks in CI with
   `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
   [the migration note](../../docs/migrations/2026-10-10-ci-holds-the-locks.md) (#529).
