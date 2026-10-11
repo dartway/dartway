@@ -131,6 +131,40 @@ void main() {
     await stop(tester, app);
   });
 
+  testWidgets('a repeated scrub stays on its pending seek target', (
+    tester,
+  ) async {
+    final app = await TestApp.start(tester, FakeApp());
+    await app.tap(tester, find.text('Workouts').last);
+    await app.tap(tester, find.text('Morning mobility'));
+    await playTo(tester, const Duration(seconds: 1));
+    final gate = Completer<void>();
+    video.latest.seekBarrier = gate.future;
+
+    var slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(20000);
+    await tester.pump();
+    slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.value, 20000);
+    slider.onChangeEnd!(20000);
+    expect(active().position.value.seekTarget, const Duration(seconds: 20));
+    await tester.pump();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
+
+    slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(20000);
+    await tester.pump();
+    slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.value, 20000);
+    slider.onChangeEnd!(20000);
+    await tester.pump();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
+
+    gate.complete();
+    await tester.pump();
+    await stop(tester, app);
+  });
+
   testWidgets('a longer controlsAutoHideDelay keeps the controls up longer', (
     tester,
   ) async {

@@ -17,37 +17,17 @@ class AppMediaTimeline extends HookWidget {
     final playback = useValueListenable(session.position);
     // Where the thumb is while it is dragged; `null` follows playback.
     final dragging = useState<double?>(null);
-    final released = useState<double?>(null);
-    final releasedWasTarget = useRef(false);
     useEffect(() {
       dragging.value = null;
-      released.value = null;
-      releasedWasTarget.value = false;
       return null;
-    }, [session, session.currentItem]);
-    useEffect(() {
-      void onPosition() {
-        final target = released.value;
-        if (target == null) return;
-        final seekTarget = session.position.value.seekTarget;
-        final releasedTarget = Duration(milliseconds: target.round());
-        if (seekTarget == releasedTarget) {
-          releasedWasTarget.value = true;
-        } else if (seekTarget != null || releasedWasTarget.value) {
-          dragging.value = null;
-          released.value = null;
-          releasedWasTarget.value = false;
-        }
-      }
-
-      session.position.addListener(onPosition);
-      return () => session.position.removeListener(onPosition);
     }, [session, session.currentItem]);
     final total = playback.duration.inMilliseconds.toDouble();
     final known = total > 0;
     final position =
         dragging.value ??
-        playback.position.inMilliseconds.clamp(0, max(total, 0)).toDouble();
+        (playback.seekTarget ?? playback.position).inMilliseconds
+            .clamp(0, max(total, 0))
+            .toDouble();
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
@@ -61,17 +41,12 @@ class AppMediaTimeline extends HookWidget {
                   ? playback.buffered.inMilliseconds.clamp(0, total).toDouble()
                   : null,
               onChanged: known
-                  ? (value) {
-                      released.value = null;
-                      releasedWasTarget.value = false;
-                      dragging.value = value;
-                    }
+                  ? (value) => dragging.value = value
                   : null,
               onChangeEnd: known
                   ? (value) {
-                      dragging.value = value;
-                      released.value = value;
                       session.seek(Duration(milliseconds: value.round()));
+                      dragging.value = null;
                     }
                   : null,
             ),

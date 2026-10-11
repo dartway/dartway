@@ -19,8 +19,9 @@ Projects using `dartway_media_flutter`, especially copied media chrome or manual
   a spinner. Draw play/pause from `status.intent == DwMediaPlayIntent.play` and
   call `session.togglePlay()`; waiting must not change the button or controls timer.
 - Listen to `session.status` for controls and `session.position` for the timeline.
-  `session.playback` remains their merged state. Hold a released drag until the
-  displayed position equals its target; `seekTarget` exposes pending seeks.
+  `session.playback` remains their merged state. Draw a timeline thumb from its
+  active drag, then `seekTarget`, then the playback position; call `seek` before
+  clearing the drag on release.
 - Replace application flags for whether the current item really played with
   `session.hasReallyPlayed`. Playback intent survives a source retry; pause first
   if the retry should remain paused.

@@ -29,6 +29,30 @@ void main() {
   });
 
   group('states', () {
+    testWidgets('video ignores a position poll started during a seek', (
+      tester,
+    ) async {
+      final controller = controllerFor(videoItem('seek-poll-during'));
+      final video = await rig.loadVideo(tester);
+      await controller.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 4));
+      final seekGate = Completer<void>();
+      video.seekBarrier = seekGate.future;
+      final seek = controller.seek(const Duration(seconds: 30));
+      await tester.pump();
+      expect(video.seekCalls, [const Duration(seconds: 30)]);
+      final positionReadStarted = video.holdNextPositionRead();
+      await tester.pump(const Duration(milliseconds: 100));
+      await positionReadStarted;
+      seekGate.complete();
+      await seek;
+      expect(controller.state.value.position, const Duration(seconds: 30));
+      video.releasePositionRead();
+      await tester.pump();
+      expect(controller.state.value.position, const Duration(seconds: 30));
+      await release(tester, controller);
+    });
+
     testWidgets('video ignores a pre-seek position poll that resolves later', (
       tester,
     ) async {
@@ -44,6 +68,20 @@ void main() {
       video.releasePositionRead();
       await tester.pump();
       expect(controller.state.value.position, const Duration(seconds: 30));
+      await release(tester, controller);
+    });
+
+    testWidgets('video accepts a position poll with no seek', (tester) async {
+      final controller = controllerFor(videoItem('clean-poll'));
+      final video = await rig.loadVideo(tester);
+      await controller.play();
+      final positionReadStarted = video.holdNextPositionRead();
+      video.advanceTo(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 100));
+      await positionReadStarted;
+      video.releasePositionRead();
+      await tester.pump();
+      expect(controller.state.value.position, const Duration(seconds: 4));
       await release(tester, controller);
     });
 

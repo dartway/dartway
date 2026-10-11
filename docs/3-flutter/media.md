@@ -95,8 +95,8 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
   seeks to zero and plays. `hasReallyPlayed` reports real playback of the current item.
   A seek sets `seekTarget` and the displayed position immediately; stale ticks are
   ignored until arrival within 200 ms or completion. One seek runs and only the latest
-  queued target follows it. Skips count from the displayed target. Timelines hold the
-  released drag until the session position equals it. **An error stays inside
+  queued target follows it. Skips count from the displayed target. A timeline thumb
+  reads its active drag, then `seekTarget`, then the playback position. **An error stays inside
   the player**: the state turns `error`, `onError` fires, and `retry()` re-resolves the source and
   returns to where playback failed. A retry shows `loading` at once, and a tap while any load runs —
   the first one included — joins it rather than loading twice. A load that does not settle within `loadTimeout` fails the

@@ -162,18 +162,25 @@ final class _DwVideoPlayerController extends VideoPlayerController {
   }) : super.networkUrl();
 
   int _seekEpoch = 0;
+  int _seeking = 0;
 
   @override
   Future<Duration?> get position async {
-    final seekEpoch = _seekEpoch;
+    final epoch = _seekEpoch;
+    final clean = _seeking == 0;
     final position = await super.position;
-    if (seekEpoch != _seekEpoch) return value.position;
-    return position;
+    return clean && epoch == _seekEpoch ? position : value.position;
   }
 
   @override
-  Future<void> seekTo(Duration position) {
+  Future<void> seekTo(Duration position) async {
     _seekEpoch++;
-    return super.seekTo(position);
+    _seeking++;
+    try {
+      await super.seekTo(position);
+    } finally {
+      _seeking--;
+      _seekEpoch++;
+    }
   }
 }

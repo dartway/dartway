@@ -61,8 +61,9 @@ into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle 
 - Controls listen to `session.status`; timelines listen to `session.position`.
   `playback` remains their merge. A seek publishes `seekTarget` immediately and
   ignores stale ticks; one seek runs and the latest queued target wins. Skips count
-  from the displayed position. Hold a released drag until that position equals its
-  target. `session.hasReallyPlayed` reports real playback of the current item.
+  from the displayed position. A timeline thumb reads its drag, then `seekTarget`,
+  then the playback position. `session.hasReallyPlayed` reports real playback of
+  the current item.
 - **Fullscreen**: `DwMediaFullscreenHost(session:, builder:, child:)` around the inline player — the one
   way in; `enterFullscreen()`/`exitFullscreen()` and back gestures.
 - **Mini-player**: `DwMiniPlayerHost(sessionManager:, onExpand:, builder:)` once, in
