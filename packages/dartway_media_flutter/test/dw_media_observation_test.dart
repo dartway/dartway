@@ -48,6 +48,34 @@ void main() {
     expect(manager.pendingPlaybackReports, isEmpty);
   });
 
+  testWidgets('audio buffering stops position ticks from earning coverage', (
+    tester,
+  ) async {
+    final held = Completer<void>();
+    final manager = DwMediaSessionManager(
+      config: DwMediaConfig(resume: null, playbackDelivery: (_) => held.future),
+    );
+    final session = manager.open(items: [audioItem('buffering')]);
+    final track = await rig.loadAudio(tester);
+    await session.play();
+    await dwSettleMedia(tester);
+    await tester.pump(const Duration(seconds: 2));
+    final beforeBuffering = session.position.value;
+    expect(session.hasReallyPlayed, isTrue);
+    track.startBuffering(at: beforeBuffering);
+    await dwSettleMedia(tester);
+    await tester.pump(const Duration(seconds: 2));
+    expect(session.position.value, beforeBuffering);
+    await session.pause();
+    expect(
+      manager.pendingPlaybackReports.single.intervals.single.end,
+      beforeBuffering,
+    );
+    await endSession(tester, session);
+    held.complete();
+    await tester.pump();
+  });
+
   testWidgets('an aborted backward seek cannot bridge to the next tick', (
     tester,
   ) async {
@@ -308,7 +336,7 @@ void main() {
       await session.play();
       await dwSettleMedia(tester);
       track.advanceTo(const Duration(seconds: 1));
-      await dwSettleMedia(tester);
+      await tester.pump(const Duration(seconds: 1));
       expect(session.hasReallyPlayed, isTrue);
       session.minimize();
       session.restore();

@@ -107,7 +107,7 @@ void main() {
       await release(tester, controller);
     });
 
-    testWidgets('audio: extrapolated position alone is not playback evidence', (
+    testWidgets('audio: ready play followed by position ticks confirms play', (
       tester,
     ) async {
       var started = 0;
@@ -115,11 +115,14 @@ void main() {
         audioItem('extrapolated'),
         callbacks: DwMediaCallbacks(onStarted: (_) => started++),
       );
-      await rig.loadAudio(tester);
+      final track = await rig.loadAudio(tester);
       await controller.play();
+      await dwSettleMedia(tester);
+      final acknowledgedEvents = track.playbackEventCount;
       await tester.pump(const Duration(seconds: 5));
-      expect(started, 0);
-      expect(controller.hasReallyPlayed, isFalse);
+      expect(track.playbackEventCount, acknowledgedEvents);
+      expect(started, 1);
+      expect(controller.hasReallyPlayed, isTrue);
       await release(tester, controller);
     });
 
@@ -286,7 +289,7 @@ void main() {
           await controller.play();
           await dwSettleMedia(tester);
           track.advanceTo(const Duration(seconds: 30));
-          await dwSettleMedia(tester);
+          await tester.pump(const Duration(seconds: 30));
           // just_audio's pause completes outside the fake clock.
           unawaited(controller.pause());
           await dwSettleMedia(tester);
@@ -303,7 +306,7 @@ void main() {
           await controller.play();
           await dwSettleMedia(tester);
           track.advanceTo(const Duration(seconds: 50));
-          await dwSettleMedia(tester);
+          await tester.pump(const Duration(seconds: 50));
           track.finish();
           await dwSettleMedia(tester);
         }),
@@ -318,7 +321,7 @@ void main() {
       final track = await rig.loadAudio(tester);
       await controller.play();
       track.advanceTo(const Duration(seconds: 50));
-      await dwSettleMedia(tester);
+      await tester.pump(const Duration(seconds: 50));
       track.finish();
       await dwSettleMedia(tester);
       expect(track.playing, isFalse);
@@ -392,7 +395,7 @@ void main() {
       await controller.play();
       await dwSettleMedia(tester);
       track.advanceTo(const Duration(seconds: 40));
-      await dwSettleMedia(tester);
+      await tester.pump(const Duration(seconds: 40));
       track.fail('link expired');
       await dwSettleMedia(tester);
       expect(controller.state.value.isError, isTrue);

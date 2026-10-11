@@ -27,7 +27,6 @@ final class DwAudioMediaController extends DwMediaEngineController {
 
   AudioPlayer? _player;
   PlaybackEvent? _playbackEvent;
-  Duration? _lastPlatformPosition;
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   @override
@@ -38,30 +37,24 @@ final class DwAudioMediaController extends DwMediaEngineController {
     final player = AudioPlayer();
     _player = player;
     _playbackEvent = null;
-    _lastPlatformPosition = null;
-    void onState(Object? _) => _onUpdate(player, platformAdvanced: false);
+    void onState(Object? _) => _onUpdate(player, player.position);
     _subscriptions.addAll([
       player.playerStateStream.listen(onState),
       player.playbackEventStream.listen((event) {
         if (!identical(_player, player)) return;
-        final previous = _lastPlatformPosition;
         _playbackEvent = event;
-        _lastPlatformPosition = event.updatePosition;
-        _onUpdate(
-          player,
-          platformAdvanced:
-              previous != null && event.updatePosition > previous,
-        );
+        _onUpdate(player, player.position);
       }),
+      player.positionStream.listen((position) => _onUpdate(player, position)),
       player.errorStream.listen((error) {
         if (identical(_player, player)) reportFailure(error);
       }),
     ]);
     await player.setUrl(uri.toString());
-    _onUpdate(player, platformAdvanced: false);
+    _onUpdate(player, player.position);
   }
 
-  void _onUpdate(AudioPlayer player, {required bool platformAdvanced}) {
+  void _onUpdate(AudioPlayer player, Duration position) {
     if (!identical(_player, player)) return;
     final event = _playbackEvent ?? player.playbackEvent;
     final processingState = event.processingState;
@@ -74,10 +67,8 @@ final class DwAudioMediaController extends DwMediaEngineController {
         buffering: processingState == ProcessingState.buffering,
         ended: processingState == ProcessingState.completed,
         playing:
-            player.playing &&
-            processingState == ProcessingState.ready &&
-            platformAdvanced,
-        position: event.updatePosition,
+            player.playing && processingState == ProcessingState.ready,
+        position: position,
         duration: event.duration ?? Duration.zero,
         buffered: event.bufferedPosition,
         seekEpoch: seekEpoch,
@@ -126,7 +117,6 @@ final class DwAudioMediaController extends DwMediaEngineController {
     final player = _player;
     _player = null;
     _playbackEvent = null;
-    _lastPlatformPosition = null;
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }

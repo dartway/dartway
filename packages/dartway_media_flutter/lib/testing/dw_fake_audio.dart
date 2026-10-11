@@ -77,6 +77,7 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   bool _released = false;
   bool playing = false;
   int pauseCalls = 0;
+  int playbackEventCount = 0;
   Object? refusePlayWith;
   final List<StreamController<PlaybackEventMessage>> _listeners = [];
 
@@ -85,6 +86,17 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   /// Playback has reached [to].
   void advanceTo(Duration to) {
     position = to;
+  }
+
+  /// The platform has stopped producing audio while it refills its buffer.
+  void startBuffering({Duration? at}) {
+    position = at ?? position;
+    _report(ProcessingStateMessage.buffering);
+  }
+
+  /// The platform is ready to produce audio again.
+  void stopBuffering({Duration? at}) {
+    position = at ?? position;
     _report(ProcessingStateMessage.ready);
   }
 
@@ -137,6 +149,7 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   Future<PlayResponse> play(PlayRequest request) async {
     playing = true;
     if (refusePlayWith case final error?) throw error;
+    _report(ProcessingStateMessage.ready);
     return PlayResponse();
   }
 
@@ -144,6 +157,7 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   Future<PauseResponse> pause(PauseRequest request) async {
     pauseCalls++;
     playing = false;
+    _report(ProcessingStateMessage.ready);
     return PauseResponse();
   }
 
@@ -225,6 +239,7 @@ final class DwFakeAudio extends AudioPlayerPlatform {
     int? errorCode,
     String? errorMessage,
   }) {
+    playbackEventCount++;
     final event = PlaybackEventMessage(
       processingState: processing,
       updateTime: DateTime.now(),
