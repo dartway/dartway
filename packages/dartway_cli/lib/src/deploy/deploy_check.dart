@@ -183,7 +183,7 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
   ),
   DwDeployCheck(
     id: 'web-backend-url',
-    title: 'The web image takes the address it calls as a build argument',
+    title: 'The web image receives its declared backend build argument',
     stage: DwDeployCheckStage.local,
     severity: DwCheckSeverity.error,
     evaluate: _checkWebBackendUrl,
@@ -478,27 +478,25 @@ Future<DwDeployVerdict> _checkServerSignals(DwDeployContext context) async {
   );
 }
 
+// Compose still supplies the argument while live projects move to Kamal.
 Future<DwDeployVerdict> _checkWebBackendUrl(DwDeployContext context) async {
   final file = context.dockerfileOf(context.flutterPackage);
   if (!file.existsSync()) {
     return const DwDeployVerdict.skip('no web Dockerfile');
   }
   final declares = file.readAsLinesSync().any(
-    (line) => RegExp(r'^\s*ARG\s+DW_BACKEND_URL(\s|=|$)').hasMatch(line),
+    (line) => RegExp(
+      r'^\s*ARG\s+DW_BACKEND_URL(\s|=|$)',
+      caseSensitive: false,
+    ).hasMatch(line),
   );
-  if (declares) {
-    return DwDeployVerdict.pass(
-      'ARG DW_BACKEND_URL, given ${context.stack.appOrigin}',
+  if (!declares) {
+    return const DwDeployVerdict.skip(
+      'the web Dockerfile uses no DW_BACKEND_URL argument',
     );
   }
-  return DwDeployVerdict.fail(
-    '${context.flutterPackage}/Dockerfile declares no ARG DW_BACKEND_URL',
-    fix:
-        'The deploy passes the app its own origin as the build argument '
-        'DW_BACKEND_URL; Docker drops an argument the Dockerfile does not '
-        'declare, without a word, and the app compiles against whatever '
-        'default it has. Declare it and pass it to flutter build web as a '
-        '--dart-define.',
+  return DwDeployVerdict.pass(
+    'ARG DW_BACKEND_URL, given ${context.stack.appOrigin}',
   );
 }
 
@@ -904,12 +902,9 @@ Future<DwDeployVerdict> _checkOverrideWebBuild(DwDeployContext context) async {
   return const DwDeployVerdict.fail(
     'deploy/compose.override.yml rebuilds the web service',
     fix:
-        'The deploy already builds web and passes it DW_BACKEND_URL from '
-        'app_domain in deploy/config.yaml. A build block here names the '
-        'address a second time and nothing compares the copies, so a changed '
-        'domain silently ships an app talking to the old one. Drop the build '
-        'block; change the Dockerfile instead when the image itself has to '
-        'differ.',
+        'The deploy already builds web from the project Dockerfile. Drop the '
+        'build block so the override cannot replace that build configuration; '
+        'change the Dockerfile when the image itself has to differ.',
   );
 }
 

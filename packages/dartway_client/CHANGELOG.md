@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.22.0-dev.0
+
+- The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).
+
 ## 0.21.0
 
 ### Changes

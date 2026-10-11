@@ -148,14 +148,22 @@ the `dart run dartway_cli:dartway deploy` bundled storage, which verifies from o
 ### `DwFileStorageSetup.provision`
 
 ```dart
-await DwFileStorageSetup.provision(config);
+await DwFileStorageSetup.provision(config, allowedOrigins: env.server.allowedOrigins);
 ```
 
 Creates both buckets where missing, gives the public one an anonymous-read policy for its objects
 (not its listing) and deletes the private one's policy. Idempotent: an existing bucket keeps its
 objects. For a storage the project owns wholly — RustFS in development, in tests, in a deploy. For a
 bucket someone administers with policies of their own, configure it by hand and let the startup
-probe say whether it is right. The skeleton's `bin/server.dart` provisions when
+probe say whether it is right. Provisioning sets GET/PUT CORS on both buckets for
+the optional `allowedOrigins` argument, using the same rule as Compose `storage-init`.
+The entry point passes `env.server.allowedOrigins`, parsed once from `DW_ALLOWED_ORIGINS`.
+With no allowed origins it leaves CORS untouched and reads no process environment.
+`PutBucketCors` carries `Content-MD5`. A storage answering `501 NotImplemented` logs a warning
+naming the endpoint and bucket and continues; the outside CORS probe reports the actual state.
+Every other CORS error stops provisioning. It also writes the startup visibility probe into
+each bucket after setting its policy, so an outside check works when `verifyBuckets` is off.
+The skeleton's `bin/server.dart` provisions when
 `DW_STORAGE_PROVISION=true`.
 
 ## Configuration

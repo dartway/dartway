@@ -278,7 +278,13 @@ abstract class DwMediaEngineController extends DwMediaController {
     if (_playerState.sealPlayback) _onObservationBreak?.call();
     _state.value = next;
     if (next.isEnded && !previous.isEnded) {
-      unawaited(_quietly(enginePause));
+      // Off the synchronous dispatch: an engine reports its end from inside
+      // its own event delivery, and `just_audio`'s `pause()` would reenter
+      // that delivery ("Cannot fire new event. Controller is already firing
+      // an event") — its subject is synchronous.
+      scheduleMicrotask(() {
+        if (!_disposed) unawaited(_quietly(enginePause));
+      });
     }
     if (interval != null) _onRealPlayback(next);
     if (next.isEnded && !previous.isEnded && _playerState.playedSinceSeek) {

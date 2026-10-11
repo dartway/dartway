@@ -122,8 +122,9 @@ void main() {
     await playTo(tester, const Duration(seconds: 2));
     expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
     gate.complete();
-    // Seek acknowledgement and the next platform position both notify the
-    // session before this one frame is drawn.
+    // The barriered seek lands first — its acknowledgement and position both
+    // notify the session before this frame is drawn.
+    await tester.pump();
     video.latest.advanceTo(const Duration(seconds: 21));
     await tester.pump(const Duration(milliseconds: 100));
     expect(tester.widget<Slider>(find.byType(Slider)).value, 21000);

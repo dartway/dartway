@@ -1,8 +1,10 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dartway_cli/src/deploy/nginx_upstreams.dart';
 import 'package:dartway_cli/src/deploy/renderer.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
@@ -50,7 +52,10 @@ void main() {
 
     test('bundled storage adds the storage volume, same prefix', () {
       final stack = stackVariants()['bundled storage and a site']!;
-      expect(stack.dataVolumeNames, {'shop_postgres_data', 'shop_storage_data'});
+      expect(stack.dataVolumeNames, {
+        'shop_postgres_data',
+        'shop_storage_data',
+      });
     });
 
     test('external database drops the postgres volume — nothing here for the '
@@ -60,8 +65,7 @@ void main() {
     });
 
     test('external storage adds no volume of its own', () {
-      final stack =
-          stackVariants()['external storage, external site, files']!;
+      final stack = stackVariants()['external storage, external site, files']!;
       expect(stack.dataVolumeNames, {'shop_postgres_data'});
     });
 
@@ -70,9 +74,8 @@ void main() {
     // while looking for a name the rendered stack never creates.
     test('exactly the volume names the rendered compose file declares', () {
       final stack = stackVariants()['bundled storage and a site']!;
-      final compose = loadYaml(
-        DwStackRenderer(stack: stack).composeFile,
-      ) as YamlMap;
+      final compose =
+          loadYaml(DwStackRenderer(stack: stack).composeFile) as YamlMap;
       final declaredVolumes = (compose['volumes'] as YamlMap).keys
           .map((key) => '$key')
           .toSet();
@@ -85,9 +88,10 @@ void main() {
       );
       expect(
         stack.dataVolumeNames,
-        {DwStack.postgresDataVolume, DwStack.storageDataVolume}.map(
-          (v) => '${stack.target.projectName}_$v',
-        ),
+        {
+          DwStack.postgresDataVolume,
+          DwStack.storageDataVolume,
+        }.map((v) => '${stack.target.projectName}_$v'),
       );
     });
   });
@@ -104,7 +108,8 @@ void main() {
     });
 
     test('bundled storage adds the storage and its init image', () {
-      final images = stackVariants()['bundled storage and a site']!.pinnedImages;
+      final images =
+          stackVariants()['bundled storage and a site']!.pinnedImages;
       expect(images.map((e) => e.$1), [
         'Postgres',
         'nginx',
@@ -117,8 +122,8 @@ void main() {
     });
 
     test('external storage pulls no storage image at all', () {
-      final images =
-          stackVariants()['external storage, external site, files']!.pinnedImages;
+      final images = stackVariants()['external storage, external site, files']!
+          .pinnedImages;
       expect(images.map((e) => e.$1), ['Postgres', 'nginx', 'certbot']);
     });
 
@@ -143,7 +148,8 @@ void main() {
       'a registry mirror is applied the same way the renderer applies it: '
       'the official images, and nothing that already names an organisation',
       () {
-        final unmirrored = stackVariants()['bundled storage and a site']!.pinnedImages;
+        final unmirrored =
+            stackVariants()['bundled storage and a site']!.pinnedImages;
         final mirrored = stackFrom(
           extra:
               '  site:\n    domain: example.com\n    source: app_site/build\n'
@@ -245,13 +251,21 @@ void main() {
       },
     );
 
-    test('the web image is given the app origin it calls, and the one Studio '
-        'signs for', () {
-      final web = _service(stackFrom(), 'web');
+    test('the web image receives the backend and Studio app origins', () {
+      final root = Directory.systemTemp.createTempSync('dw-old-web-');
+      addTearDown(() => root.deleteSync(recursive: true));
+      final dockerfile = File(p.join(root.path, 'shop_flutter/Dockerfile'));
+      dockerfile.parent.createSync(recursive: true);
+      dockerfile.writeAsStringSync(
+        'FROM flutter\nARG DW_BACKEND_URL\n'
+        r'RUN test -n "$DW_BACKEND_URL"'
+        '\n',
+      );
+      final web = _service(stackFrom(projectRoot: root), 'web');
       final args = (web['build'] as YamlMap)['args'] as YamlMap;
-      expect(args['DW_BACKEND_URL'], 'https://app.example.com');
       // Without it every app keeps its own address as a default in its
       // Dockerfile, where a stand rename makes it quietly wrong.
+      expect(args['DW_BACKEND_URL'], 'https://app.example.com');
       expect(args['STUDIO_APP_ORIGIN'], 'https://app.example.com');
     });
 
@@ -264,13 +278,12 @@ void main() {
       final corsStep = script
           .split('; ')
           .singleWhere(
-            (step) => step.contains('dw-cors.json') && step.startsWith('printf'),
+            (step) =>
+                step.contains('dw-cors.json') && step.startsWith('printf'),
           );
       final cors =
           jsonDecode(
-                RegExp(
-                  "printf '%s' '(.*)' >",
-                ).firstMatch(corsStep)!.group(1)!,
+                RegExp("printf '%s' '(.*)' >").firstMatch(corsStep)!.group(1)!,
               )
               as Map<String, Object?>;
       final rule = (cors['CORSRules']! as List).single as Map;
@@ -413,9 +426,9 @@ void main() {
       final volumes = compose['volumes'] as YamlMap?;
       expect(
         volumes == null ||
-            !volumes.keys.map((key) => '$key').contains(
-              DwStack.postgresDataVolume,
-            ),
+            !volumes.keys
+                .map((key) => '$key')
+                .contains(DwStack.postgresDataVolume),
         isTrue,
         reason: 'no rendered volume names the bundled Postgres data volume',
       );
@@ -464,21 +477,18 @@ void main() {
     // A managed provider's password is its own credential, delivered with
     // `dartway secret set` — inventing one here would never be the value
     // that actually opens the database.
-    test(
-      'external database: the password is delivered, never generated',
-      () {
-        final stack = stackFrom(extra: '  database: external\n');
-        expect(
-          stack.generatedSecrets.keys,
-          isNot(contains(DwStack.databasePasswordKey)),
-        );
-        expect(
-          stackFrom().generatedSecrets.keys,
-          contains(DwStack.databasePasswordKey),
-          reason: 'bundled must keep generating it, as before',
-        );
-      },
-    );
+    test('external database: the password is delivered, never generated', () {
+      final stack = stackFrom(extra: '  database: external\n');
+      expect(
+        stack.generatedSecrets.keys,
+        isNot(contains(DwStack.databasePasswordKey)),
+      );
+      expect(
+        stackFrom().generatedSecrets.keys,
+        contains(DwStack.databasePasswordKey),
+        reason: 'bundled must keep generating it, as before',
+      );
+    });
 
     test('a fully external stack (database and storage both external, plain '
         'HTTP) renders no volumes at all', () {
@@ -535,7 +545,10 @@ void main() {
     });
 
     test('a site is mounted from the checkout, read-only', () {
-      final nginx = _service(stackVariants()['bundled storage and a site']!, 'nginx');
+      final nginx = _service(
+        stackVariants()['bundled storage and a site']!,
+        'nginx',
+      );
       expect(nginx['volumes'], contains('./app_site/build:/srv/site:ro'));
     });
 
