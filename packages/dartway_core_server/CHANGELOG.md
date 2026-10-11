@@ -1,13 +1,8 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.21.0
 
-- Boot on a newer migration chain after an image rollback, warning once per namespace about
-  migrations applied by a newer release. Declared tables and columns are still checked (#527).
-
-- Filter published objects and deletions in call responses and live updates by the client
-  contract version and generated `since`; drop empty channels and suppress empty live messages.
-  Protocols without a project contract version retain unfiltered delivery (#504).
+### Breaking changes
 
 - **BREAKING (schema):** a session key's `last_used_at` is `NULL` until its first use, and the first
   use is always written, whatever `DwAuthConfig.keyTouchInterval` says; later uses are throttled as
@@ -24,58 +19,11 @@
   one visibility's rows name more than one bucket, with the statement to run once they are in one
   (dartway/dartway#369).
 
-- Every top-level `ctx.transaction` retries a deadlock (`40P01`) or a serialization failure, up to
-  three attempts with the memo cleared between them — in routes, non-transactional commands, leased
-  jobs, `runInContext` and startup steps, not only in transactional commands. A transactional
-  queued job or a recurring job re-runs its handler in place before an attempt is spent or an alert
-  raised. A savepoint never retries by itself; what a context published before the transaction
-  survives a retry and is delivered once. A `ctx.transaction` body may therefore run up to three
-  times (#378).
-
-- A file link asked with `DwGetFileLink(download: true)` answers `Content-Disposition: attachment`
-  with the file's name, and is always presigned and expiring — a public file's too, since its
-  permanent URL cannot carry the disposition. Without the flag nothing changes (dartway/dartway#481).
-
-- Test databases and storage buckets read optional `DW_TEST_RUN_ID` for run-scoped names,
-  allowing CLI cleanup after interrupted suites; plain `dart test` naming is unchanged (#463).
-  S3 requests support literal IPv6 loopback endpoints for explicit test servers; cleanup
-  decodes listed keys including spaces and fails when deletion makes no progress.
-
 - Sign-in code requests accept an optional project-defined `deliveryHint`. The server validates it
   against `DwAuthConfig.allowedDeliveryHints` and auth hooks read `ctx.deliveryHint`, with unchanged
   callback signatures and identifier cooldown, request-window and idempotency rules. Null retains
   the project default. **BREAKING (wire): protocol 3 refuses clients compiled against protocol 2
   with `426`; rebuild and deploy the client and server together.** No auth callback edit is required.
-
-- The family moves in lockstep to deliver the migration note for the router
-  that follows a provider (dartway/dartway#407).
-
-- `DwAuthConfig.linkByVerifiedEmail` links both ways: an e-mail code sign-in to an address no `email`
-  identity holds lands on the account whose provider identity's token proved that address verified,
-  instead of making a second account — the `email` identity is attached verified,
-  `onIdentifierChanged` runs (`DwIdentifierChangeCause.linked`, `kind` set) and `onAccountCreated`
-  does not. Provider identities of two or more accounts proving one address make it ambiguous: a new
-  account as before, and a logged warning. **New framework migration
-  `20261009_000001_dw_identity_provider_email`**: `dw_identity.provider_email`, rewritten on every
-  provider sign-in (the normalized verified address under the option, `NULL` otherwise), so it fills
-  in for identities made before the option was on (dartway/dartway#373).
-
-## 0.21.0-dev.16
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
-  test layout and spacing checks of `dartway check` (dartway/dartway#391).
-
-## 0.21.0-dev.15
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
-  (dartway/dartway#390).
-
-## 0.21.0-dev.14
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
-  state and command checks of `dartway check` (dartway/dartway#389).
-
-## 0.21.0-dev.13
 
 - **Seeds are startup steps: `DwSeedRows(name, table: <Row>.tableDef, key:, rows:)`**
   (dartway/dartway#388). At every start, before the port opens, a declared row missing from its
@@ -83,6 +31,7 @@
   id), an unchanged one is not touched and a row the declaration drops is left alone. A nullable or
   non-unique key and two declared rows with one key refuse the start. **`DwServerFeature(startup:
   [...])`**: a feature declares its own steps, run after the server's.
+
 - **`ctx.settings` (`DwSettingsStore`): the app's settings as one typed data object** (#388, #394).
   `read<S>()` answers the stored value or the object's defaults, never `null`; `save(value)` is one
   upsert; `update<S>(change)` locks the one row between the read and the write. Stored in the new
@@ -90,29 +39,15 @@
   per field: a stored field that no longer decodes reads as its default and is logged once, so a
   read never fails over what is stored. **New framework migration `20260930_000000_dw_setting`**,
   applied at the next start.
+
 - **`m.carrySettings(area, fromSql:)`** (`DwSettingsMigration` on `DwMigrationContext`): the
   migration that drops a project's own settings table merges its values into `dw_setting`.
-- Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
 
-## 0.21.0-dev.12
+- Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
 
 - **BREAKING (re-exported from `dartway_orm`): a row's `id` is `int`; inserts take the generated
   draft `New<Entity>Row`** (dartway/dartway#384). Nothing of the server's own changed: the
   framework's `dw_*` tables are written in SQL, not through row classes.
-
-## 0.21.0-dev.11
-
-- **`DwAccessRule.resource` takes `visible:` — a row the caller may see but not act on is refused
-  `dw.forbidden`** (dartway/dartway#387, D-112). When `allows` answers `false` and `visible` answers
-  `true`, the refusal is `dw.forbidden` instead of `dw.notFound`; a missing row, and one `visible`
-  does not admit, stay `dw.notFound`. Ends the second check a handler wrote in its body after the
-  rule for "a message of my chat that someone else wrote". `allows` carries the whole permission;
-  `visible` is not a gate, it only picks the refusal code. Additive; the recipe for moving inline
-  owner checks into rules is `docs/migrations/2026-09-30-ownership-through-access-rules.md`. The rule's
-  resource may be a record (`(MessageRow, ConversationMemberRow)`) for a row reached through its
-  parent — documented, and now tested.
-
-## 0.21.0-dev.10
 
 - **BREAKING: the environment is read one way — typed, once, at start** (dartway/dartway#386,
   D-111). `DwEnvironmentReader.read(variables, (read) => …)` builds a project's `AppEnvironment` in
@@ -131,6 +66,7 @@
   its own read of `DW_MIGRATE_ONLY` (`DwAppServer.migrateOnlyVariable` moved to
   `DwServerEnvironment`). `DwFileStorageConfig` no longer repeats the user info of a URL in a
   problem. `AppFiles.storageConfig` is gone from the template. Migration note: `docs/migrations/2026-09-29-environment-and-outbound-http.md`.
+
 - **BREAKING: `ctx.http` — one outbound HTTP client, `DwOutboundHttp`, over `package:http`**
   (dartway/dartway#386, D-111). `get`/`post`/`put`/`patch`/`delete`/`send`, a body as `json:` or
   `body:` (text, bytes, a form map); the whole exchange bounded by the new
@@ -146,8 +82,6 @@
   network through `ctx.http`; `fake.client()` is a `DwOutboundHttp` over it for a unit test without
   a server. `dartway_core_server` now depends on `http` directly.
 
-## 0.21.0-dev.9
-
 - **BREAKING: `ctx.now` — the server's clock — is the time, and `DwTestClock` sets it in tests
   (dartway/dartway#385, D-110).** `DwAppServer(clock:)` takes a `DwServerClock`
   (`DwServerClock.system` by default); every context reads it as `ctx.now` (UTC, read anew on each
@@ -161,6 +95,72 @@
   test to move it. `DwCallContext` gains abstract `now` and `callerUtcOffset`: a class implementing
   it (a test double) has to add them. Migration note:
   `docs/migrations/2026-09-29-server-clock-and-caller-offset.md`.
+
+- **BREAKING: a provider identity (`google`, `apple`) is a first-class identity — `listIdentities`,
+  `listIdentitiesOf`, `moveIdentities` and `removeIdentities` no longer throw `ArgumentError` the
+  moment an account has one (dartway/dartway#355).** `DwIdentityInfo.kind`/`DwIdentifierChange.kind`
+  are `DwIdentifierKind?`, `provider: String?` joined both; `DwAuthStore.identityOf` tells the two
+  apart instead of assuming every stored `kind` is `phone`/`email`. `DwIdentifierChangeCause` gained
+  `linked`. Migration note: `docs/migrations/2026-09-27-provider-identity-kind-nullable.md`.
+
+- **BREAKING: `DwRouteContext` is gone — a route handler's `ctx` is typed `DwCallContext`
+  directly.** Same type, same members, no signature or behaviour change; one way to name it, not
+  two. Migration note: `docs/migrations/2026-09-25-route-context-typedef-removed.md`.
+
+- **BREAKING: a server is its features. `DwAppServer(features: [...])` replaces `handlers:`, `channels:`, `jobs:` and `routes:`; each `DwServerFeature(name, handlers:, channels:, jobs:, routes:)` declares one area of the project** (D-093). `server.handlers`, `channels`, `jobs` and `routes` read them all together. A feature's name is its folder under `lib/src/` — lower-case, declared once, or the server does not start. Projects spread an area's pieces over the server's lists by hand, each in its own way; the dartway CLI now holds the layout this names. Migration note: `docs/migrations/2026-09-25-server-features.md`.
+
+- **BREAKING: jobs are typed. `DwJobKind<P>(name, encode:, decode:)` is what a job is; `DwQueuedJob<P>(kind, handle: (ctx, P payload) …)` is how it runs; `ctx.jobs.enqueue(kind, payload)` replaces `enqueue(String name, Map payload)`** (D-092). The `DwJobDefinition(...)` constructor is gone; `DwJobKind.withoutPayload(name)` is a `DwJobKind<void>` enqueued with `null`. Every project spelled each payload as a map at every enqueue and cast it back in every handler (`payload['runId']! as int`), and named jobs by string constants in three conventions. Migration note: `docs/migrations/2026-09-25-typed-jobs.md`.
+
+- **BREAKING: `DwAuthConfig.accountDeletion` is required — `DwAccountDeletion.byMember` answers `DwDeleteMyAccount`, `byOperator` refuses it `dw.forbidden`** (D-089). The framework used to answer the command in every project, and two of them learned it had gone live only when their pin moved; each switched it off by refusing inside `onAccountDeleting`, which refused the operator's own `ctx.accounts.deleteAccount` as well. Migration note: `docs/migrations/2026-09-24-account-deletion-choice.md`.
+
+- **BREAKING: `DwAuthConfig.fixedCode` is gone; `generateCode` and `deliverCode` are independent, and `deliverCode` now runs after the ticket's transaction has committed** (#310, D-087). `generateCode(ctx, kind, identifier, accountId)` decides the code — `null` (the default) draws `codeLength` random digits, exported as `dwRandomCode`; `deliverCode(ctx, kind, identifier, code, accountId)` now runs **always**, whatever the code is, and decides for itself whether to send it. The framework used to infer "do not send" from "the code was not random" — a fixed code that also had to be sent (a default code out of a project's own settings, SMS turned on for it) could not be expressed without working around `deliverCode` entirely. Separately, `deliverCode` no longer runs inside the transaction that writes the ticket: a project's `deliverCode` is commonly an HTTP call to a provider, and running it under the identifier's advisory lock held a pooled connection for as long as the call took — one slow provider could exhaust the pool for the whole server. The ticket is written, and counted against the limit, before delivery runs; a `deliverCode` that throws or refuses no longer undoes it. Migration note: `docs/migrations/2026-09-24-generate-deliver-code-split.md`.
+
+### Changes
+
+- Boot on a newer migration chain after an image rollback, warning once per namespace about
+  migrations applied by a newer release. Declared tables and columns are still checked (#527).
+
+- Filter published objects and deletions in call responses and live updates by the client
+  contract version and generated `since`; drop empty channels and suppress empty live messages.
+  Protocols without a project contract version retain unfiltered delivery (#504).
+
+- Every top-level `ctx.transaction` retries a deadlock (`40P01`) or a serialization failure, up to
+  three attempts with the memo cleared between them — in routes, non-transactional commands, leased
+  jobs, `runInContext` and startup steps, not only in transactional commands. A transactional
+  queued job or a recurring job re-runs its handler in place before an attempt is spent or an alert
+  raised. A savepoint never retries by itself; what a context published before the transaction
+  survives a retry and is delivered once. A `ctx.transaction` body may therefore run up to three
+  times (#378).
+
+- A file link asked with `DwGetFileLink(download: true)` answers `Content-Disposition: attachment`
+  with the file's name, and is always presigned and expiring — a public file's too, since its
+  permanent URL cannot carry the disposition. Without the flag nothing changes (dartway/dartway#481).
+
+- Test databases and storage buckets read optional `DW_TEST_RUN_ID` for run-scoped names,
+  allowing CLI cleanup after interrupted suites; plain `dart test` naming is unchanged (#463).
+  S3 requests support literal IPv6 loopback endpoints for explicit test servers; cleanup
+  decodes listed keys including spaces and fails when deletion makes no progress.
+
+- `DwAuthConfig.linkByVerifiedEmail` links both ways: an e-mail code sign-in to an address no `email`
+  identity holds lands on the account whose provider identity's token proved that address verified,
+  instead of making a second account — the `email` identity is attached verified,
+  `onIdentifierChanged` runs (`DwIdentifierChangeCause.linked`, `kind` set) and `onAccountCreated`
+  does not. Provider identities of two or more accounts proving one address make it ambiguous: a new
+  account as before, and a logged warning. **New framework migration
+  `20261009_000001_dw_identity_provider_email`**: `dw_identity.provider_email`, rewritten on every
+  provider sign-in (the normalized verified address under the option, `NULL` otherwise), so it fills
+  in for identities made before the option was on (dartway/dartway#373).
+
+- **`DwAccessRule.resource` takes `visible:` — a row the caller may see but not act on is refused
+  `dw.forbidden`** (dartway/dartway#387, D-112). When `allows` answers `false` and `visible` answers
+  `true`, the refusal is `dw.forbidden` instead of `dw.notFound`; a missing row, and one `visible`
+  does not admit, stay `dw.notFound`. Ends the second check a handler wrote in its body after the
+  rule for "a message of my chat that someone else wrote". `allows` carries the whole permission;
+  `visible` is not a gate, it only picks the refusal code. Additive; the recipe for moving inline
+  owner checks into rules is `docs/migrations/2026-09-30-ownership-through-access-rules.md`. The rule's
+  resource may be a record (`(MessageRow, ConversationMemberRow)`) for a row reached through its
+  parent — documented, and now tested.
+
 - **`ctx.callerUtcOffset` and `ctx.callerLocalTime`: the caller's UTC offset, carried by the
   framework.** A call's `Dw-Utc-Offset` header (whole minutes, within 18 hours) becomes
   `ctx.callerUtcOffset` on requests and commands. `ctx.callerLocalTime` is a `DwCallerLocalTime` —
@@ -169,12 +169,11 @@
   or compared as an instant by mistake. Both are `null` when the header is absent and in contexts
   with no device behind them (jobs, routes, startup steps, subscription checks, `callAs`); a
   malformed header is a malformed call (`400`). An offset, not a time zone: nothing is stored.
+
 - **Tests pin the caller's offset.** `DwTestServer.utcOffset` (`Duration.zero` by default) is what
   every `caller()` and `connectClient()` reports; `connectClient(utcOffset:)` names another, and a
   raw `DwTestCaller` with `utcOffset: null` or `headers: {DwHttpContract.utcOffsetHeader: null}`
   sends none.
-
-## 0.21.0-dev.8
 
 - **`DwAppServer.handlers` and `.jobs` now include modules' calls and jobs, not just features'**
   (dartway/dartway#366, D-106). Before, both getters read `features` only, while `start` separately
@@ -183,12 +182,7 @@
   (`DwAnalyticsModule`'s report/catalog/dashboards, `DwPushModule`'s). `channels` and `routes` are
   unaffected: `DwServerModule` exposes neither. Not breaking in type; the lists these getters return
   are simply more complete than before.
-- **BREAKING: a provider identity (`google`, `apple`) is a first-class identity — `listIdentities`,
-  `listIdentitiesOf`, `moveIdentities` and `removeIdentities` no longer throw `ArgumentError` the
-  moment an account has one (dartway/dartway#355).** `DwIdentityInfo.kind`/`DwIdentifierChange.kind`
-  are `DwIdentifierKind?`, `provider: String?` joined both; `DwAuthStore.identityOf` tells the two
-  apart instead of assuming every stored `kind` is `phone`/`email`. `DwIdentifierChangeCause` gained
-  `linked`. Migration note: `docs/migrations/2026-09-27-provider-identity-kind-nullable.md`.
+
 - **`DwAuthConfig.linkByVerifiedEmail`** (opt-in, default `false`): a provider identity's first
   sign-in whose token proves a verified e-mail matching an existing `email` identity attaches to
   that account instead of making a second one — `onIdentifierChanged` fires
@@ -198,40 +192,15 @@
   parameter. Refuses to link when the matched account already holds a *different* identity of the
   same provider (the shape a lapsed custom domain re-registered by someone else would take).
 
-## 0.21.0-dev.7
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).
-
-## 0.21.0-dev.6
-
-- **BREAKING: `DwRouteContext` is gone — a route handler's `ctx` is typed `DwCallContext`
-  directly.** Same type, same members, no signature or behaviour change; one way to name it, not
-  two. Migration note: `docs/migrations/2026-09-25-route-context-typedef-removed.md`.
-
-## 0.21.0-dev.5
-
-- **BREAKING: a server is its features. `DwAppServer(features: [...])` replaces `handlers:`, `channels:`, `jobs:` and `routes:`; each `DwServerFeature(name, handlers:, channels:, jobs:, routes:)` declares one area of the project** (D-093). `server.handlers`, `channels`, `jobs` and `routes` read them all together. A feature's name is its folder under `lib/src/` — lower-case, declared once, or the server does not start. Projects spread an area's pieces over the server's lists by hand, each in its own way; the dartway CLI now holds the layout this names. Migration note: `docs/migrations/2026-09-25-server-features.md`.
-
-## 0.21.0-dev.4
-
-- **BREAKING: jobs are typed. `DwJobKind<P>(name, encode:, decode:)` is what a job is; `DwQueuedJob<P>(kind, handle: (ctx, P payload) …)` is how it runs; `ctx.jobs.enqueue(kind, payload)` replaces `enqueue(String name, Map payload)`** (D-092). The `DwJobDefinition(...)` constructor is gone; `DwJobKind.withoutPayload(name)` is a `DwJobKind<void>` enqueued with `null`. Every project spelled each payload as a map at every enqueue and cast it back in every handler (`payload['runId']! as int`), and named jobs by string constants in three conventions. Migration note: `docs/migrations/2026-09-25-typed-jobs.md`.
-
-## 0.21.0-dev.3
-
 - **`DwAppServer.callAs(call, token:, idempotencyKey:, page:)`** (D-091): a contract call answered inside the process as the session of `token`, through everything an HTTP call goes through after decoding — access, validation, idempotency, the transaction, publications — answering `DwCallResult<R>`. Studio's MCP door posted to its own port over loopback, carried the wire's headers by hand, and claimed a build number to pass the app-version gate.
-- **`DwAccessRule.resource<C, R>(load:, allows:)` and `ctx.accessed<R>()`** (D-090): the access rule that reads the row a call names, decides whether the caller may reach it, and hands it to the handler. Absent and not the caller's are both `dw.notFound`. It replaces `signedIn` with the ownership check written inline — 132 handlers of one project, and three diverging answers there to "is this person in this chat". A rule written for another call class fails the startup, as `check` does.
-- **BREAKING: `DwAuthConfig.accountDeletion` is required — `DwAccountDeletion.byMember` answers `DwDeleteMyAccount`, `byOperator` refuses it `dw.forbidden`** (D-089). The framework used to answer the command in every project, and two of them learned it had gone live only when their pin moved; each switched it off by refusing inside `onAccountDeleting`, which refused the operator's own `ctx.accounts.deleteAccount` as well. Migration note: `docs/migrations/2026-09-24-account-deletion-choice.md`.
 
-## 0.21.0-dev.2
+- **`DwAccessRule.resource<C, R>(load:, allows:)` and `ctx.accessed<R>()`** (D-090): the access rule that reads the row a call names, decides whether the caller may reach it, and hands it to the handler. Absent and not the caller's are both `dw.notFound`. It replaces `signedIn` with the ownership check written inline — 132 handlers of one project, and three diverging answers there to "is this person in this chat". A rule written for another call class fails the startup, as `check` does.
 
 - **`testing.dart` carries what every project's harness copied from the skeleton**: `DwCountingTransport` (real HTTP, posts counted per wire name, the last answer kept), `DwRecordingConnector` (the real live socket, every frame kept — `updatesOn`, `refusalsOf`, `closuresOf` a channel) and `dwWaitUntil(condition, reason:)`, the polling wait that throws a `TimeoutException` naming its reason. u90, Molodey and Studio each carried a copy, and the copies drifted.
-- **BREAKING: `DwAuthConfig.fixedCode` is gone; `generateCode` and `deliverCode` are independent, and `deliverCode` now runs after the ticket's transaction has committed** (#310, D-087). `generateCode(ctx, kind, identifier, accountId)` decides the code — `null` (the default) draws `codeLength` random digits, exported as `dwRandomCode`; `deliverCode(ctx, kind, identifier, code, accountId)` now runs **always**, whatever the code is, and decides for itself whether to send it. The framework used to infer "do not send" from "the code was not random" — a fixed code that also had to be sent (a default code out of a project's own settings, SMS turned on for it) could not be expressed without working around `deliverCode` entirely. Separately, `deliverCode` no longer runs inside the transaction that writes the ticket: a project's `deliverCode` is commonly an HTTP call to a provider, and running it under the identifier's advisory lock held a pooled connection for as long as the call took — one slow provider could exhaust the pool for the whole server. The ticket is written, and counted against the limit, before delivery runs; a `deliverCode` that throws or refuses no longer undoes it. Migration note: `docs/migrations/2026-09-24-generate-deliver-code-split.md`.
+
 - **Internal: a duplicate send of the same idempotency key, arriving while `deliverCode` is still running, now replays the ticket its own transaction already committed instead of re-running `_requestCode` and meeting its own resend-delay refusal.** Not a new public API — a slow delivery used to leave a window where a duplicate send re-ran `_requestCode`, hit the ticket's own resend-delay refusal, and that refusal's `dw_command_outcome` row raced the real answer's — whichever finished writing first stood forever, so a client retrying with the same key could get stuck reading "too many requests" for a code that had, in fact, gone out. `_requestCode` now records the ticket from inside its own transaction, before `deliverCode` runs, through an internal hook (`DwRuntimeContext.recordProvisionalOutcome`) no project handler can reach. If the handler then throws once that row exists: a refusal upserts it into a refused outcome (a plain update would miss a row that itself rolled back with a transaction the handler's post-write work still threw inside of); anything else removes it (an incident is never stored under the idempotency key at all, so a later resend runs the handler again — and meets the ticket's own resend-delay refusal, correctly, since the ticket is real either way).
+
 - **A refusal from `_validate` or `_check` is no longer stored under the idempotency key.** Both moved out of the transaction/try they used to run inside, as part of the above; a validation or access-check refusal is a pure function of the call's own input, so a replay refuses identically anyway — but a project reading `dw_command_outcome` directly (nothing in this repository does) would no longer find a row for one. Transactional commands: only `_validate`'s refusal is affected — `_check` still runs, and is still recorded, inside the transaction.
-
-## 0.21.0-dev.1
-
-- Nothing changed here; the family moves in lockstep with `dartway_client`, fixed for #309.
 
 ## 0.20.0
 

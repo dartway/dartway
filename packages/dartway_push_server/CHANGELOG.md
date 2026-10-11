@@ -1,4 +1,6 @@
-## 0.5.1
+## 0.6.0
+
+- Targets DartWay 0.21 (`dartway_core_*` `^0.21.0`, `dartway_push_shared` `^0.6.0`).
 
 - **A delivery is due by the server's clock, the one its job runs by** (dartway/dartway#385).
   `ctx.push.send` schedules on `ctx.now` (a missing `scheduledAt` is `ctx.now`, not the database's
@@ -8,7 +10,7 @@
   `dw.push.deliver` job became due by the server's clock while the deliveries it covers were due by
   the database's: with skew between the two, or a `DwTestClock`, a job could run before its
   delivery was due, claim nothing and leave it without a job, and a retry never ran under a clock
-  that stood still. Needs `dartway_core_server` `0.21.0-dev.9` (`ctx.now`). Nothing to change in a
+  that stood still. Needs `dartway_core_server` `0.21.0` (`ctx.now`). Nothing to change in a
   project; a test on a `DwTestClock` moves the clock to send a scheduled push or run a retry.
 
 ## 0.5.0

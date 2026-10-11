@@ -17,13 +17,13 @@ dependencies:
     sdk: flutter
 
   crypto: ^3.0.6
-  dartway_auth_providers_shared: ^0.1.1
+  dartway_auth_providers_shared: ^0.2.0
   sign_in_with_apple: ^7.0.1
 
 dev_dependencies:
   # `DwFakeServer`: the command is sent through a real client against it.
-  dartway_client: ^0.21.0-dev.17
-  dartway_core_flutter: ^0.21.0-dev.17
+  dartway_client: ^0.21.0
+  dartway_core_flutter: ^0.21.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

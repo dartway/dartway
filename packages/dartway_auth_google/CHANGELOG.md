@@ -1,5 +1,7 @@
 ## 0.2.0
 
+- Targets `dartway_auth_providers_shared` `^0.2.0` (DartWay 0.21).
+
 - **Breaking:** `dw.signInWithGoogle()` (the `DwGoogleSignInCall` extension) is replaced by
   `DwGoogleAuth.signInCommand({registration, introduce})`, which runs the Google flow and answers the
   `DwSignInWithProvider` it makes without sending it. The app sends it with `dw.command` and calls

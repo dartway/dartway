@@ -1,5 +1,7 @@
 ## 0.6.0
 
+- Targets DartWay 0.21 (`dartway_core_flutter` `^0.21.0`, `dartway_push_shared` `^0.6.0`).
+
 - **BREAKING: `DwPushPermission` gained `unanswered` (#338).** `requestPermission()` and
   `permission()` awaited the background start's `_attached` future with no bound of their own: on
   iOS `attach` awaits an APNs registration a wrong bundle id, or no signal at all, never delivers,

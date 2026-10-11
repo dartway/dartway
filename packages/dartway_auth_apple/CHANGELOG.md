@@ -1,5 +1,7 @@
 ## 0.2.0
 
+- Targets `dartway_auth_providers_shared` `^0.2.0` (DartWay 0.21).
+
 - **Breaking:** `dw.signInWithApple()` (the `DwAppleSignInCall` extension) is replaced by
   `DwAppleSignIn.signInCommand({registration, introduce, scopes, webAuthenticationOptions})`, which
   runs the Apple flow and answers the `DwSignInWithProvider` it makes — raw nonce, authorization code

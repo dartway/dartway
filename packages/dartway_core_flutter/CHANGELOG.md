@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.21.0
+
+### Breaking changes
 
 - **BREAKING (re-exported `dartway_router` 3.0.0): the router's guards follow a provider**
   (dartway/dartway#407, D-120). `DwAppRouter(ref: ref, routerState: appRouterStateProvider, …)` is
@@ -8,13 +10,6 @@
   app's `AppRouterState` becomes a record held by a provider, and the `ChangeNotifier` — the last
   `// dw:allow-stateful` in the skeleton and the example — goes. The version moves to deliver the
   migration note.
-
-## 0.21.0-dev.16
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
-  test layout and spacing checks of `dartway check` (dartway/dartway#391).
-
-## 0.21.0-dev.15
 
 - **BREAKING: one way to show a read — `DwReadBuilder` — and a paged list, `DwPagedListView`**
   (dartway/dartway#390, D-116). `DwReadBuilder(read, builder:, placeholder:, onRefused:)` takes
@@ -32,52 +27,19 @@
   more follow keeps loading rather than showing empty; `header`, `placeholder`/`placeholderCount`,
   `onRefused`, `edgeBuilder`, `controller`, `padding`. `DwPagedListView.sliver` is the same list as
   a sliver for a page's own `CustomScrollView`.
+
 - **BREAKING: `DwFlutterConfig.readLoadingBuilder` and `readFailedBuilder`**, required by
   `DwFlutterCore` (an `ArgumentError` naming them otherwise): the app's loading and failed views,
   supplied once from its kit and shown by `DwReadBuilder`, `DwPagedListView` and `DwWindowListView`.
+
 - **BREAKING: `dwBuildAsync` and `dwBuildListAsync` are removed** — their silent default on error
   is what three projects each patched with an extension of their own. `DwReadBuilder` replaces
   both.
+
 - **BREAKING: `DwWindowListView` loses `loadingBuilder` and `errorBuilder`** — its first answer is
   shown as `DwReadBuilder` shows a read, with an `onRefused` of its own — and **`emptyBuilder` is
   required**, as it is on `DwPagedListView`: an empty list says what empty means. Its edge slots
   show the app's `readLoadingBuilder` while loading; the framework draws no spinner of its own.
-- **`DwWatchNotifier<S>`** — the public base of the four read notifiers (`refetch()`, `isLive`) —
-  and **`DwWatchProvider<S>`**, what `DwReadBuilder` takes. **`DwRefusedBuilder`**, the type of an
-  `onRefused` branch.
-
-## 0.21.0-dev.14
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
-  state and command checks of `dartway check` (dartway/dartway#389).
-
-## 0.21.0-dev.13
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#388).
-
-## 0.21.0-dev.12
-
-- Nothing changed here; the family moves in lockstep with `dartway_orm` (dartway/dartway#384).
-
-## 0.21.0-dev.11
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
-
-## 0.21.0-dev.10
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
-
-## 0.21.0-dev.9
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` and
-  `dartway_client` (dartway/dartway#385). An app on `dartway_core_flutter` sends its UTC offset with
-  every call through the client.
-
-## 0.21.0-dev.8
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#355, #356).
-
-## 0.21.0-dev.7
 
 - **Requires `dartway_router` 3.0.0** (#314), where a simple route's `extraPathSegment`
   replaces its name in the URL instead of doubling it, and every descendant of such a route
@@ -86,8 +48,6 @@
   on a `.simple()` route — the family moves in lockstep for the same reason it did for the
   router's previous breaking change (#302).
 
-## 0.21.0-dev.6
-
 - **BREAKING: `DwFlutterConfig.defaultModelGetter`, `isDefaultModelsGetterSetUp`,
   `getDefaultModel` and `DwFlutterToolbox.hasCustomErrorHandling` are gone.**
   `dwBuildAsync`/`dwBuildListAsync` with no `loadingValue`/`loadingItem` render nothing while
@@ -95,25 +55,11 @@
   project configured; `hasCustomErrorHandling` had no caller either. Migration note:
   `docs/migrations/2026-09-25-default-model-getter-removed.md`.
 
-## 0.21.0-dev.5
+### Changes
 
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.4
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.3
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.2
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (#310, D-087).
-
-## 0.21.0-dev.1
-
-- Nothing changed here; the family moves in lockstep with `dartway_client`, fixed for #309.
+- **`DwWatchNotifier<S>`** — the public base of the four read notifiers (`refetch()`, `isLive`) —
+  and **`DwWatchProvider<S>`**, what `DwReadBuilder` takes. **`DwRefusedBuilder`**, the type of an
+  `onRefused` branch.
 
 ## 0.20.0
 
