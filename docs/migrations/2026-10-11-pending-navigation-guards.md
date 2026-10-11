@@ -18,6 +18,14 @@ answers as follows: `null` becomes `DwGuardDecision.allow`, and a path becomes
 in the router-state record; handle null explicitly with
 `DwGuardDecision.pending`.
 
+```dart
+List<DwDecisionGuard<AppRouterState>> get zoneGuards => [
+  (state, _) => state.isSignedIn
+      ? DwGuardDecision.allow
+      : const DwGuardDecision.redirect('/sign-in'),
+];
+```
+
 Supply the app's one loading page as `DwGoRouterOptions.pendingBuilder` when any
 guard can return pending. Without it, a pending answer fails with a diagnostic.
 Keep the router-state provider immutable and the router provider watched: its
