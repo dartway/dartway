@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- `deploy kamal` now gives the API TLS root service only its API host and
+  configures each web destination to proxy same-origin server paths to that
+  public API origin. The template web image renders the validated proxy routes
+  at container start, including WebSocket forwarding for `/dw/` (#564).
 - `deploy kamal` generates Kamal 2.12 destinations with kamal-proxy v0.10.2,
   literal server route prefixes, the Studio deployment manifest and cached GHCR
   image builds from the project's deployment configuration. Image publication

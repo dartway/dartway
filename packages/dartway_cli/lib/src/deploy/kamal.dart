@@ -100,10 +100,6 @@ class DwKamalGenerator {
             _ => 80,
           },
           'healthcheck': {'path': service == 'web' ? '/' : '/health'},
-          if (service == 'api') ...{
-            'path_prefixes': prefixes,
-            'strip_path_prefix': false,
-          },
           if (service != 'web')
             'buffering': {'requests': false, 'responses': false},
         },
@@ -145,7 +141,7 @@ class DwKamalGenerator {
             'volumes': ['$identity-data-$destination:/data'],
           'proxy': {
             'hosts': switch (service) {
-              'api' => [target.apiDomain, target.appDomain],
+              'api' => [target.apiDomain],
               'web' => [target.appDomain],
               _ => [target.storageDomain!],
             },
@@ -179,6 +175,13 @@ class DwKamalGenerator {
                 },
               },
           },
+          if (service == 'web')
+            'env': {
+              'clear': {
+                'DW_API_ORIGIN': stack.apiOrigin,
+                'DW_API_PATHS': prefixes.join(' '),
+              },
+            },
           if (service == 'storage')
             'env': {
               'clear': {'RUSTFS_CONSOLE_ENABLE': 'false'},

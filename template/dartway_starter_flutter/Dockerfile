@@ -55,8 +55,9 @@ COPY --from=build /workspace/dartway_starter_flutter/build/web /usr/share/nginx/
 # own rather than a heredoc: the caching split is the part of a deployment that
 # fails silently — a stale entry point serves the previous build to a browser
 # that never asks again — so it has to be readable, diffable, and something
-# `dartway deploy check` can interrogate. This image serves files only; the
-# deployment's front proxy routes `/dw/` and `/health` to the server.
+# `dartway deploy check` can interrogate. At container start the entrypoint
+# adds same-origin API routes only when a Kamal destination supplies them.
 COPY dartway_starter_flutter/nginx.conf /etc/nginx/conf.d/default.conf
+COPY dartway_starter_flutter/docker-entrypoint.d/ /docker-entrypoint.d/
 
 EXPOSE 80

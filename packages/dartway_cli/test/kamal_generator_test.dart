@@ -76,13 +76,8 @@ final routes = [
         final files = DwKamalGenerator(root).render();
         final api = yaml(files, 'deploy/kamal/api.yml');
         expect(api['image'], 'acme/shop-api');
-        expect(api['proxy']['path_prefixes'], [
-          '/dw',
-          '/health',
-          '/github',
-          '/orders/events',
-        ]);
-        expect(api['proxy']['strip_path_prefix'], false);
+        expect(api['proxy'].containsKey('path_prefixes'), false);
+        expect(api['proxy'].containsKey('strip_path_prefix'), false);
         expect(api['proxy']['run']['version'], 'v0.10.2');
         expect(api['proxy']['buffering'], {
           'requests': false,
@@ -106,7 +101,7 @@ final routes = [
               : 'files.example.com';
           final host = production ? '203.0.113.20' : '203.0.113.10';
           final target = yaml(files, 'deploy/kamal/api.$dest.yml');
-          expect(target['proxy']['hosts'], [apiHost, appHost]);
+          expect(target['proxy']['hosts'], [apiHost]);
           expect(target['servers']['web']['hosts'], [host]);
           expect(target['ssh'], {
             'user': production ? 'production_operator' : 'root',
@@ -115,6 +110,10 @@ final routes = [
           expect(webTarget['proxy']['hosts'], [appHost]);
           expect(webTarget['servers']['web']['hosts'], [host]);
           expect(webTarget['ssh'], target['ssh']);
+          expect(webTarget['env']['clear'], {
+            'DW_API_ORIGIN': 'https://$apiHost',
+            'DW_API_PATHS': '/dw /health /github /orders/events',
+          });
           final clear = target['env']['clear'];
           expect(clear['DW_DATABASE_HOST'], 'shop-api-postgres-$dest');
           expect(clear['DW_ALLOWED_ORIGINS'], 'https://$appHost');
@@ -173,6 +172,16 @@ final routes = [
         );
         final web = yaml(files, 'deploy/kamal/web.yml');
         expect(web['proxy']['healthcheck']['path'], '/');
+        for (final path in files.keys.where(
+          (path) => RegExp(r'deploy/kamal/.*\.yml$').hasMatch(path),
+        )) {
+          final proxy = yaml(files, path)['proxy'] as YamlMap;
+          expect(
+            proxy.containsKey('ssl') && proxy.containsKey('path_prefixes'),
+            false,
+            reason: path,
+          );
+        }
         expect(web['builder'].containsKey('args'), false);
         expect(
           files.values.every((text) => text.startsWith(kamalGeneratedHeader)),
@@ -476,7 +485,7 @@ final routes = [
       'shop_server/lib/new_route.dart',
       "DwHttpRoute.post('/new-webhook', handler);",
     );
-    expect(generator.generate(check: true), ['deploy/kamal/api.yml']);
+    expect(generator.generate(check: true), ['deploy/kamal/web.stage.yml']);
     expect(api.readAsStringSync(), before);
     generator.generate();
     expect(generator.generate(check: true), isEmpty);
@@ -498,8 +507,8 @@ final routes = [
     );
     final stale = await check();
     expect(stale.exitCode, 1);
-    expect(stale.stderr, contains('deploy/kamal/api.yml'));
-    expect(generator.generate(check: true), ['deploy/kamal/api.yml']);
+    expect(stale.stderr, contains('deploy/kamal/web.stage.yml'));
+    expect(generator.generate(check: true), ['deploy/kamal/web.stage.yml']);
   });
 
   test('decodes literal escapes and ignores route-looking strings', () {
