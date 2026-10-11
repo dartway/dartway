@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.22.0-dev.0
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
+
+## 0.21.0
 
 - **BREAKING (re-exported `dartway_router` 3.0.0): the router's guards follow a provider**
   (dartway/dartway#407, D-120). `DwAppRouter(ref: ref, routerState: appRouterStateProvider, …)` is

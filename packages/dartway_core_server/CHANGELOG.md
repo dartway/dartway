@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.22.0-dev.0
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
+
+## 0.21.0
 
 - Boot on a newer migration chain after an image rollback, warning once per namespace about
   migrations applied by a newer release. Declared tables and columns are still checked (#527).

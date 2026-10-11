@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.22.0-dev.0
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
+
+## 0.21.0
 
 - Fix `migrate apply` silently accepting ahead migrations: print the same warning as server
   boot after the applied batch or `nothing to apply`, keeping exit code 0 (#536).

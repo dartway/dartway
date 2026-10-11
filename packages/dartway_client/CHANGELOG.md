@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.22.0-dev.0
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
+
+## 0.21.0
 
 - `dw.files.getLink(fileId, download: true)` asks for a link that saves the file rather than shows
   it; `DwFakeStorage` marks such a link with `&disposition=attachment` (dartway/dartway#481).

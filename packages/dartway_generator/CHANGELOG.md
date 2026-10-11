@@ -1,6 +1,10 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.22.0-dev.0
+
+- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
+
+## 0.21.0
 
 - Emit contract descriptor format 2 and introduction `since` metadata for new data objects,
   preserving trusted baseline metadata. New data objects need any shared version raise above the

@@ -66,9 +66,21 @@ void main() {
       expect(DwAppVersion.parse('2.0.0-beta.1+3').name, '2.0.0-beta.1');
     });
 
+    test('a version without a platform build round-trips', () {
+      for (final name in ['1.4.2', '2.0.0-beta.1']) {
+        final version = DwAppVersion.parse(name);
+        expect(version.name, name);
+        expect(version.build, isNull);
+        expect('$version', name);
+        expect(version, DwAppVersion(name, null));
+        expect(version, isNot(DwAppVersion(name, 0)));
+      }
+    });
+
     test('anything else is a FormatException', () {
       for (final text in [
-        '1.4.2',
+        '',
+        '1.4',
         '1.4+2',
         '+3',
         '1.4.2+',

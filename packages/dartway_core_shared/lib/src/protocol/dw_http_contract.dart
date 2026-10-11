@@ -59,8 +59,8 @@ abstract final class DwHttpContract {
   /// [dwProtocolVersion]; required on every call.
   static const String protocolHeader = 'Dw-Protocol';
 
-  /// The app build, `<semver>+<build>` (see `DwAppVersion`). For people: the
-  /// label of the session key the app signs in with. Compatibility is the
+  /// The app version, `<semver>` with an optional `+<build>` (see `DwAppVersion`).
+  /// For people: the label of the session key the app signs in with. Compatibility is the
   /// contract's, in [contractVersionHeader].
   static const String appVersionHeader = 'Dw-App-Version';
 
@@ -155,25 +155,28 @@ final class DwAppVersion {
   /// Throws [ArgumentError] for a negative build or a name that is not a
   /// semantic version.
   DwAppVersion(this.name, this.build) {
-    if (build < 0) throw ArgumentError.value(build, 'build', 'is negative');
+    if (build != null && build! < 0) {
+      throw ArgumentError.value(build, 'build', 'is negative');
+    }
     if (!_semver.hasMatch(name)) {
       throw ArgumentError.value(name, 'name', 'is not a semantic version');
     }
   }
 
-  /// Reads `<semver>+<build>`. Throws [FormatException] for anything else.
+  /// Reads `<semver>` with an optional numeric `+<build>`.
+  /// Throws [FormatException] for anything else.
   static DwAppVersion parse(String text) {
     final plus = text.lastIndexOf('+');
-    if (plus < 0) {
-      throw FormatException('An app version is <semver>+<build>', text);
-    }
-    final buildText = text.substring(plus + 1);
-    final build = int.tryParse(buildText);
-    if (build == null || '$build' != buildText) {
-      throw FormatException('The build of an app version is a number', text);
+    int? build;
+    if (plus >= 0) {
+      final buildText = text.substring(plus + 1);
+      build = int.tryParse(buildText);
+      if (build == null || '$build' != buildText) {
+        throw FormatException('The build of an app version is a number', text);
+      }
     }
     try {
-      return DwAppVersion(text.substring(0, plus), build);
+      return DwAppVersion(plus < 0 ? text : text.substring(0, plus), build);
     } on ArgumentError catch (error) {
       throw FormatException('${error.message}', text);
     }
@@ -184,7 +187,9 @@ final class DwAppVersion {
   );
 
   final String name;
-  final int build;
+
+  /// The platform build number, or null when the platform supplies none.
+  final int? build;
 
   @override
   bool operator ==(Object other) =>
@@ -195,7 +200,7 @@ final class DwAppVersion {
 
   /// The header value.
   @override
-  String toString() => '$name+$build';
+  String toString() => build == null ? name : '$name+$build';
 }
 
 /// The version of a project's contract — its shared package's `version:`,

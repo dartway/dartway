@@ -1,7 +1,8 @@
 ---
 title: Read the app version from the platform build
 affects:
-  dartway_cli: "0.24.0"
+  dartway_cli: "0.25.0-dev.0"
+  dartway_core_shared: "0.22.0-dev.0"
 ---
 
 ## Who is affected
@@ -11,7 +12,8 @@ Apply this change on the next template sync. An empty platform build number maps
 to build `0`. In the template, an empty version or a failed platform read is
 reported with its stack trace via `debugPrint` before using `0.0.0+0` so startup
 continues. The read precedes the app's uncaught-error pipeline; these fallbacks
-are template behaviour. `DwAppVersion.parse` remains strict (`<semver>+<build>`).
+are template behaviour. Code that reads `DwAppVersion.build` must also allow
+`null` for callers that send a semantic version without a build number.
 
 ## What to change
 

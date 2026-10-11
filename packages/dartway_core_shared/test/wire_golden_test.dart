@@ -336,6 +336,11 @@ List<_WireShape> _wireShapes() {
       readBack: (json) => DwAppVersion.parse(json! as String).toString(),
     ),
     _WireShape(
+      'http.appVersionWithoutBuild',
+      () => DwAppVersion('1.4.2', null).toString(),
+      readBack: (json) => DwAppVersion.parse(json! as String).toString(),
+    ),
+    _WireShape(
       'http.closeCodes',
       () => {
         'serverStopping': DwCloseCode.serverStopping,
