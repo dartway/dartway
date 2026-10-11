@@ -8,6 +8,7 @@ import 'package:test/test.dart';
 void main() {
   late Directory project;
   late Directory recordedCheckout;
+  late Directory fallbackCheckout;
 
   setUp(() {
     project = Directory.systemTemp.createTempSync('dw_template_project');
@@ -15,12 +16,22 @@ void main() {
       'dw_recorded_checkout',
     );
     Directory(p.join(recordedCheckout.path, 'template')).createSync();
+    fallbackCheckout = Directory.systemTemp.createTempSync(
+      'dw_fallback_checkout',
+    );
+    final fallbackTemplate = Directory(
+      p.join(fallbackCheckout.path, 'template'),
+    )..createSync();
+    File(
+      p.join(fallbackTemplate.path, 'pubspec.yaml'),
+    ).writeAsStringSync('name: dartway_starter_flutter\n');
   });
 
   tearDown(() {
     if (recordedCheckout.existsSync()) {
       recordedCheckout.deleteSync(recursive: true);
     }
+    fallbackCheckout.deleteSync(recursive: true);
     project.deleteSync(recursive: true);
   });
 
@@ -31,11 +42,16 @@ void main() {
       Process.runSync('chmod', ['700', recordedCheckout.path]);
     });
 
-    final template = DwProjectTemplate.forProject(project, 'sample_app');
+    final template = DwProjectTemplate.forProject(
+      project,
+      'sample_app',
+      fallbackCandidates: [fallbackCheckout.path],
+    );
 
     expect(template, isNotNull);
-    expect(template!.description, isNot(contains(recordedCheckout.path)));
-    expect(template.fileFor('pubspec.yaml'), isNotNull);
+    expect(template!.description, contains(fallbackCheckout.path));
+    expect(template.description, isNot(contains(recordedCheckout.path)));
+    expect(template.fileFor('pubspec.yaml'), 'name: sample_app_flutter\n');
   }, skip: _runsWithElevatedFileAccess());
 
   test('skips a recorded checkout that does not hold its recorded commit', () {
@@ -45,11 +61,16 @@ void main() {
       commit: List.filled(40, 'f').join(),
     );
 
-    final template = DwProjectTemplate.forProject(project, 'sample_app');
+    final template = DwProjectTemplate.forProject(
+      project,
+      'sample_app',
+      fallbackCandidates: [fallbackCheckout.path],
+    );
 
     expect(template, isNotNull);
-    expect(template!.description, isNot(contains(recordedCheckout.path)));
-    expect(template.fileFor('pubspec.yaml'), isNotNull);
+    expect(template!.description, contains(fallbackCheckout.path));
+    expect(template.description, isNot(contains(recordedCheckout.path)));
+    expect(template.fileFor('pubspec.yaml'), 'name: sample_app_flutter\n');
   });
 }
 

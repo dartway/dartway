@@ -30,14 +30,24 @@ abstract interface class DwProjectTemplate {
   /// `dartway create` and `update` clone into. The template is read at the
   /// commit the manifest records when that checkout has it, and as the
   /// checkout holds it otherwise.
-  static DwProjectTemplate? forProject(Directory projectRoot, String baseName) {
+  ///
+  /// [fallbackCandidates] replaces the CLI checkout and home-cache candidates
+  /// when supplied by tests.
+  static DwProjectTemplate? forProject(
+    Directory projectRoot,
+    String baseName, {
+    List<String?>? fallbackCandidates,
+  }) {
     final provenance = ToolkitProvenance.read(projectRoot);
-    final home =
-        Platform.environment['HOME'] ?? Platform.environment['USERPROFILE'];
+    final home = fallbackCandidates == null
+        ? Platform.environment['HOME'] ?? Platform.environment['USERPROFILE']
+        : null;
     final candidates = <String?>[
       provenance?.source,
-      MonorepoSource.findCliCheckout()?.path,
-      if (home != null) p.join(home, '.dartway', 'monorepo'),
+      ...?fallbackCandidates,
+      if (fallbackCandidates == null) MonorepoSource.findCliCheckout()?.path,
+      if (fallbackCandidates == null && home != null)
+        p.join(home, '.dartway', 'monorepo'),
     ];
     for (var index = 0; index < candidates.length; index++) {
       final candidate = candidates[index];
