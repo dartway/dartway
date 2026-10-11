@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/misc.dart' show ProviderListenable;
 import 'package:go_router/go_router.dart';
 
+import '../navigation_zones/dw_guard_adapter.dart';
 import '../navigation_zones/dw_navigation_route.dart';
 import '../navigation_zones/dw_navigation_route_extension.dart';
 import '../navigation_zones/dw_navigation_types.dart';
@@ -80,11 +81,8 @@ class DwAppRouter<RouterState> {
   /// ```dart
   /// pageBuilder: DwPageBuilder.fade
   /// ```
-  final Page<dynamic> Function(
-    BuildContext context,
-    LocalKey key,
-    Widget child,
-  ) pageBuilder;
+  final Page<dynamic> Function(BuildContext context, LocalKey key, Widget child)
+  pageBuilder;
 
   /// Runtime configuration options for GoRouter.
   ///
@@ -120,7 +118,10 @@ class DwAppRouter<RouterState> {
     if (source == null) return;
 
     final refresh = _refresh = _RouterRefresh();
-    _state = ref.listen<RouterState>(source, (_, _) => refresh.notify());
+    _state = ref.listen<RouterState>(source, (_, _) {
+      _decisions.clear();
+      refresh.notify();
+    });
   }
 
   void _dispose() {
@@ -147,9 +148,7 @@ class DwAppRouter<RouterState> {
   ///   // Handle profile route
   /// }
   /// ```
-  DwNavigationRoute<RouterState>? topRouteFromState(
-    GoRouterState state,
-  ) {
+  DwNavigationRoute<RouterState>? topRouteFromState(GoRouterState state) {
     final name = state.topRoute?.name;
     return name == null ? null : _routeRegistry[name];
   }
@@ -170,9 +169,7 @@ class DwAppRouter<RouterState> {
   ///   // Show authenticated shell
   /// }
   /// ```
-  DwNavigationRoute<RouterState>? rootRouteFromState(
-    GoRouterState state,
-  ) {
+  DwNavigationRoute<RouterState>? rootRouteFromState(GoRouterState state) {
     final top = topRouteFromState(state);
     if (top == null) return null;
 
@@ -193,7 +190,25 @@ class DwAppRouter<RouterState> {
   /// and redirect logic. It handles zone guards and custom redirects.
   GoRouter _buildRouter() {
     return GoRouter(
-      routes: _buildRoutes(),
+      routes: options.pendingBuilder == null
+          ? _buildRoutes()
+          : [
+              ShellRoute(
+                builder: (context, state, child) => ListenableBuilder(
+                  listenable: _refresh ?? const AlwaysStoppedAnimation(0),
+                  builder: (context, _) {
+                    final decision = _guardDecision(state);
+                    // Also hide a previously allowed target while a newly known
+                    // fact redirects it; refresh parsing completes asynchronously.
+                    if (decision.isPending || decision.redirectPath != null) {
+                      return options.pendingBuilder!(context, state);
+                    }
+                    return child;
+                  },
+                ),
+                routes: _buildRoutes(),
+              ),
+            ],
       errorBuilder: options.errorBuilder,
 
       // Pass through all GoRouter options
@@ -212,33 +227,46 @@ class DwAppRouter<RouterState> {
       extraCodec: options.extraCodec,
       onEnter: options.onEnter,
       redirect: (context, state) {
-        // First, check zone guards
-        final targetRoute = topRouteFromState(state);
-
-        final subscription = _state;
-        if (targetRoute != null &&
-            targetRoute.zoneGuards.isNotEmpty &&
-            subscription != null) {
-          final target = DwNavigationTarget(
-            uri: state.uri,
-            routeName: state.topRoute?.name,
-            pathParameters: state.pathParameters,
-          );
-          // Read once: every guard of this redirect decides by one value.
-          final current = subscription.read();
-          // Execute guards in order until one returns a redirect path
-          for (final guard in targetRoute.zoneGuards) {
-            final redirectPath = guard(current, target);
-            if (redirectPath != null) {
-              return redirectPath;
-            }
-          }
-        }
+        final decision = _guardDecision(state);
+        if (decision.isPending) return null;
+        if (decision.redirectPath != null) return decision.redirectPath;
 
         // Then check custom redirect from options
         return options.redirect?.call(context, state);
       },
     );
+  }
+
+  final Map<DwNavigationTarget, DwGuardDecision> _decisions = {};
+
+  DwGuardDecision _guardDecision(GoRouterState state) {
+    final route = topRouteFromState(state);
+    final subscription = _state;
+    if (route == null || subscription == null) return DwGuardDecision.allow;
+    final target = DwNavigationTarget(
+      uri: state.uri,
+      routeName: state.topRoute?.name,
+      pathParameters: state.pathParameters,
+    );
+    // Retain only the location being decided, rather than every URL visited.
+    if (!_decisions.containsKey(target)) _decisions.clear();
+    return _decisions.putIfAbsent(target, () {
+      final current = subscription.read();
+      for (final guard in route.zoneGuards) {
+        final decision = resolveGuardDecision(guard(current, target));
+        if (decision.isPending) {
+          if (options.pendingBuilder == null) {
+            throw StateError(
+              'DwGoRouterOptions.pendingBuilder is required when a guard '
+              'returns DwGuardDecision.pending for ${target.location}.',
+            );
+          }
+          return decision;
+        }
+        if (decision.redirectPath != null) return decision;
+      }
+      return DwGuardDecision.allow;
+    });
   }
 
   // ------------------------------------------------------------
@@ -257,12 +285,7 @@ class DwAppRouter<RouterState> {
           // Find all root routes in this zone (routes without a parent)
           final rootRoutes = zone
               .where((e) => e.descriptor.parent == null)
-              .map(
-                (route) => _buildRoute(
-                  route,
-                  navigationZones,
-                ),
-              )
+              .map((route) => _buildRoute(route, navigationZones))
               .toList();
 
           // StatefulShellRoute: each root route becomes an independent branch,
@@ -317,34 +340,27 @@ class DwAppRouter<RouterState> {
       onExit: exit == null
           ? null
           : (context, state) => exit(
-                context,
-                DwNavigationTarget(
-                  uri: state.uri,
-                  routeName: route.name,
-                  pathParameters: state.pathParameters,
-                ),
+              context,
+              DwNavigationTarget(
+                uri: state.uri,
+                routeName: route.name,
+                pathParameters: state.pathParameters,
               ),
+            ),
       pageBuilder: (context, state) {
         // Use go_router's own per-page key, which is unique for every entry on
         // the stack (a random key for imperative pushes, preserved across
         // rebuilds). Deriving the key from name + path instead would collide
         // whenever the same location appears twice on the stack and trip the
         // Navigator's _debugCheckDuplicatedPageKeys assertion.
-        return pageBuilder(
-          context,
-          state.pageKey,
-          route.descriptor.pageWidget,
-        );
+        return pageBuilder(context, state.pageKey, route.descriptor.pageWidget);
       },
       // Recursively build child routes
       routes: zones
           .expand(
-            (zone) => zone.where((e) => e.descriptor.parent == route).map(
-                  (e) => _buildRoute(
-                    e,
-                    zones,
-                  ),
-                ),
+            (zone) => zone
+                .where((e) => e.descriptor.parent == route)
+                .map((e) => _buildRoute(e, zones)),
           )
           .toList(),
     );
@@ -434,8 +450,9 @@ class DwAppRouter<RouterState> {
     // Validate that all paths start with '/'
     for (final zoned in allRoutes) {
       final route = zoned.route;
-      final path =
-          route.descriptor.parent == null ? route.routePath : route.fullPath;
+      final path = route.descriptor.parent == null
+          ? route.routePath
+          : route.fullPath;
 
       if (!path.startsWith('/')) {
         throw ArgumentError(
@@ -445,8 +462,9 @@ class DwAppRouter<RouterState> {
     }
 
     // Check that routerState is provided when guards are used
-    final hasGuards =
-        navigationZones.expand((z) => z).any((r) => r.zoneGuards.isNotEmpty);
+    final hasGuards = navigationZones
+        .expand((z) => z)
+        .any((r) => r.zoneGuards.isNotEmpty);
 
     if (hasGuards && routerState == null) {
       throw ArgumentError(
@@ -471,14 +489,16 @@ class DwAppRouter<RouterState> {
       grouped.putIfAbsent(key(zoned), () => []).add(zoned);
     }
 
-    final duplicates =
-        grouped.entries.where((e) => e.value.length > 1).toList();
+    final duplicates = grouped.entries
+        .where((e) => e.value.length > 1)
+        .toList();
     if (duplicates.isEmpty) return;
 
     throw ArgumentError(
       duplicates
           .map(
-            (entry) => '${summary(entry.key)}\n'
+            (entry) =>
+                '${summary(entry.key)}\n'
                 'Declared by:\n'
                 '${entry.value.map((z) => '  - ${z.describe()}').join('\n')}\n'
                 '\n$explanation',

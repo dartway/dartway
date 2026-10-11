@@ -59,34 +59,37 @@ final class DwNavigationTarget {
       a.length == b.length && a.entries.every((e) => b[e.key] == e.value);
 }
 
-/// Type definition for navigation guards.
+/// A guard's answer about a target. Unknown facts must answer [pending].
+final class DwGuardDecision {
+  const DwGuardDecision._(this.redirectPath, this.isPending);
+
+  /// The facts are known and the target may be shown.
+  static const allow = DwGuardDecision._(null, false);
+
+  /// The facts needed to decide have not arrived. Show the app's loading page.
+  static const pending = DwGuardDecision._(null, true);
+
+  /// Send the person to [path] instead of showing the target.
+  const DwGuardDecision.redirect(String path) : this._(path, false);
+
+  final String? redirectPath;
+  final bool isPending;
+}
+
+/// Guards decide in order: allow continues, redirect changes the location,
+/// pending waits at the same location without building the target.
 ///
-/// A guard is a function that can redirect navigation based on the router state.
-/// Guards are executed in order when navigating to a route. If a guard returns
-/// a non-null path, the user will be redirected to that path instead of the
-/// intended route.
-///
-/// Guards receive the current [RouterState] value — what the router's
-/// `routerState` provider holds — to check authentication, permissions or any
-/// other condition, and the [DwNavigationTarget] being entered, so a guard
-/// that says no can say where the person was going.
-///
-/// Return `null` to allow navigation to proceed, or return a path string to
-/// redirect to a different route.
-///
-/// Example — a sign-in gate that brings the person back afterwards:
-/// ```dart
-/// List<DwNavigationGuard<AppSession>> get zoneGuards => [
-///   (session, target) => session.isAuthenticated
-///       ? null
-///       : Uri(path: '/login', queryParameters: {'from': target.location})
-///           .toString(),
-/// ];
-/// ```
-typedef DwNavigationGuard<RouterState> = String? Function(
-  RouterState state,
-  DwNavigationTarget target,
-);
+/// The current router state and the target include everything needed to decide
+/// and to remember a deep link for after sign-in. Handle nullable facts
+/// explicitly: unknown means [DwGuardDecision.pending], never allow.
+typedef DwDecisionGuard<RouterState> =
+    DwGuardDecision Function(RouterState state, DwNavigationTarget target);
+
+/// Legacy guards cannot express unknown facts. The router adapts null to allow
+/// and a path to redirect. Existing declarations still compile during adoption.
+@Deprecated('Use DwDecisionGuard and return pending for unknown facts.')
+typedef DwNavigationGuard<RouterState> =
+    String? Function(RouterState state, DwNavigationTarget target);
 
 /// Type definition for route exit hooks.
 ///
@@ -120,10 +123,8 @@ typedef DwNavigationGuard<RouterState> = String? Function(
 ///   return answer ?? false;
 /// }
 /// ```
-typedef DwNavigationExitGuard = FutureOr<bool> Function(
-  BuildContext context,
-  DwNavigationTarget leaving,
-);
+typedef DwNavigationExitGuard =
+    FutureOr<bool> Function(BuildContext context, DwNavigationTarget leaving);
 
 /// Type definition for shell route page builders.
 ///
@@ -149,11 +150,12 @@ typedef DwNavigationExitGuard = FutureOr<bool> Function(
 ///       );
 ///     };
 /// ```
-typedef DwShellRoutePageBuilder = Page<dynamic> Function(
-  BuildContext context,
-  GoRouterState state,
-  Widget child,
-);
+typedef DwShellRoutePageBuilder =
+    Page<dynamic> Function(
+      BuildContext context,
+      GoRouterState state,
+      Widget child,
+    );
 
 /// Type definition for stateful shell route page builders.
 ///
@@ -191,8 +193,9 @@ typedef DwShellRoutePageBuilder = Page<dynamic> Function(
 ///       );
 ///     };
 /// ```
-typedef DwStatefulShellRouteBuilder = Page<dynamic> Function(
-  BuildContext context,
-  GoRouterState state,
-  StatefulNavigationShell navigationShell,
-);
+typedef DwStatefulShellRouteBuilder =
+    Page<dynamic> Function(
+      BuildContext context,
+      GoRouterState state,
+      StatefulNavigationShell navigationShell,
+    );

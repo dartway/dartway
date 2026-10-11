@@ -32,16 +32,31 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
   // … descriptor, zoneRoot, shell builders
 
   @override
-  List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-    (state, target) => state.isSignedIn ? null : AuthNavigationZone.signInFrom(target),
+  List<DwDecisionGuard<AppRouterState>> get zoneGuards => [
+    (state, target) => switch (state.isSignedIn) {
+      null => DwGuardDecision.pending,
+      false => DwGuardDecision.redirect(AuthNavigationZone.signInFrom(target)),
+      true => DwGuardDecision.allow,
+    },
   ];
 }
 ```
 
-- **Guards live in the zone**, return a redirect path or `null`, and decide what the user is shown —
-  never what they may read (`dartway-access`). A role guard acts only once the role is known
-  (`state.role != null && …`). A gate into a new zone uses `signInFrom(target)`, which returns the
-  person to the link after sign-in; the sign-in screen never navigates on its own.
+- **Guards live in the zone** and return `DwGuardDecision.allow`, `.redirect(path)` or `.pending`.
+  A guard decides only on known facts; unknown → `pending`, never `allow`. Unknown fields in the
+  router-state record are nullable; a guard reading one handles `null` explicitly. A guard that
+  lets `null` through to a page is a **review blocker**. Guards decide what the user is shown,
+  never what they may read (`dartway-access`). A gate into a new zone uses `signInFrom(target)`;
+  the sign-in screen never navigates on its own.
+- **One loading page**: provide `DwGoRouterOptions.pendingBuilder` when guards can be pending.
+  The router shows it in place of the target and zone shell, keeps the URL and history, and
+  re-runs guards on state changes. It never builds a target frame while undecided.
+- **Guard tests**: import `package:dartway_router/testing.dart` and run `dwCheckPendingGuards`
+  with every zone, representative known states (including redirecting values), and a `nullableFields`
+  map from each nullable field's name to a function replacing it with null. Dart records cannot
+  enumerate fields at runtime, so list every nullable field explicitly. Supply concrete `targets`
+  for parameterized or query-sensitive guards. The helper fails if an unknown value allows a
+  target where a known value redirects. Keep a widget regression proving no target frame builds.
 - **The router state** is an immutable record from `appRouterStateProvider`, holding only what guards
   read; the router re-runs the guards when it changes — sign-in and sign-out navigate by themselves.
 - **`DwAppRouter(ref:, routerState: appRouterStateProvider, …)`** is built in a provider that watches

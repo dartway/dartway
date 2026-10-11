@@ -35,7 +35,7 @@ import 'dw_navigation_types.dart';
 ///   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 ///
 ///   @override
-///   List<DwNavigationGuard<AppSession>> get zoneGuards => [];
+///   List<DwDecisionGuard<AppSession>> get zoneGuards => [];
 /// }
 /// ```
 ///
@@ -131,8 +131,9 @@ abstract class DwNavigationRoute<RouterState> implements Enum {
 
   /// Navigation guards executed before entering any route in this zone.
   ///
-  /// Guards run in order. If one returns a non-null path the user is redirected
-  /// there instead. Return `null` to allow navigation to proceed.
+  /// Guards run in order: allow continues, redirect changes the location, and
+  /// pending waits without building the target. Unknown facts must be pending.
+  /// String? guards are accepted through the deprecated legacy adapter.
   ///
   /// Guards receive the current [RouterState] value and can check
   /// authentication, permissions, or any other condition. They run again
@@ -141,11 +142,14 @@ abstract class DwNavigationRoute<RouterState> implements Enum {
   /// Example:
   /// ```dart
   /// @override
-  /// List<DwNavigationGuard<AppSession>> get zoneGuards => [
-  ///   (session) => !session.isAuthenticated ? '/login' : null,
+  /// List<DwDecisionGuard<AppSession>> get zoneGuards => [
+  ///   (session, _) => session.isAuthenticated
+  ///       ? DwGuardDecision.allow
+  ///       : const DwGuardDecision.redirect('/login'),
   /// ];
   /// ```
   ///
   /// Returns an empty list if no guards are needed.
-  List<DwNavigationGuard<RouterState>> get zoneGuards;
+  List<Object? Function(RouterState state, DwNavigationTarget target)>
+  get zoneGuards;
 }

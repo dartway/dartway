@@ -3,7 +3,6 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-
 /// Runtime configuration options for the underlying [GoRouter].
 ///
 /// These options are passed through to [GoRouter] when [DwAppRouter] builds
@@ -21,6 +20,7 @@ class DwGoRouterOptions {
     this.initialLocation,
     this.initialExtra,
     this.errorBuilder,
+    this.pendingBuilder,
     this.redirect,
     this.redirectLimit = defaultRedirectLimit,
     this.routerNeglect = false,
@@ -48,11 +48,13 @@ class DwGoRouterOptions {
   /// Builder for the error page when no route matches or navigation fails.
   final Widget Function(BuildContext, GoRouterState)? errorBuilder;
 
+  /// The app's one loading page, used while a zone guard is undecided.
+  /// Required when a guard returns pending. The URL and history stay unchanged;
+  /// no target or zone shell is built until the guards decide.
+  final Widget Function(BuildContext, GoRouterState)? pendingBuilder;
+
   /// Optional global redirect; can override the current location.
-  final String? Function(
-    BuildContext context,
-    GoRouterState state,
-  )? redirect;
+  final String? Function(BuildContext context, GoRouterState state)? redirect;
 
   /// Maximum number of redirects before treating as a redirect loop.
   final int redirectLimit;
@@ -80,7 +82,8 @@ class DwGoRouterOptions {
     BuildContext context,
     GoRouterState state,
     GoRouter router,
-  )? onException;
+  )?
+  onException;
 
   /// Optional codec for encoding/decoding [extra] state in the location.
   final Codec<Object?, Object?>? extraCodec;

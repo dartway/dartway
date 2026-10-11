@@ -13,6 +13,9 @@ import 'package:dartway_example_flutter/auth/auth_page.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/core/router/app_router_state.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
+import 'package:dartway_example_flutter/ui_kit/ui_kit.dart'
+    show AppProgressIndicator;
+import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 export 'package:dartway_example_flutter/core/router/app_router_state.dart';
@@ -39,6 +42,8 @@ final appRouterProvider = Provider<DwAppRouter<AppRouterState>>((ref) {
     options: DwGoRouterOptions(
       initialLocation: AppNavigationZone.schedule.fullPath,
       debugLogDiagnostics: false,
+      pendingBuilder: (context, state) =>
+          const Center(child: AppProgressIndicator()),
     ),
   );
 
