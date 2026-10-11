@@ -29,7 +29,10 @@ final DwMediaPositionStore _inMemoryPositionStore =
 /// `ProcessingState.completed` after a seek made while paused. And
 /// `video_player` reports `isPlaying` the moment `play()` is called, before
 /// the platform answers — a web `play()` the browser refuses still reads as
-/// playing. So a tick counts as **real playback** only when the engine plays,
+/// playing. A ready position tick before that refusal therefore earns its
+/// short interval; the web audio engine exposes no separate start proof and
+/// delivered evidence is not retracted. A tick counts as **real playback**
+/// only when the engine plays,
 /// no seek of this controller is in flight, and the position has moved past
 /// where playback started or the last seek landed. `onStarted`, `onProgress`,
 /// the periodic resume save and `reachedEndTolerance` read only such ticks,
@@ -90,7 +93,8 @@ abstract class DwMediaEngineController extends DwMediaController {
   double _volumeBeforeMute = 1;
 
   Future<void>? _seekRunning;
-  Duration? _queuedSeek;
+  _SeekRequest? _queuedSeek;
+  int? _activeSeekEpoch;
   bool _startedFired = false;
   bool _completedFired = false;
   bool _reachedEndFired = false;
@@ -262,17 +266,10 @@ abstract class DwMediaEngineController extends DwMediaController {
   /// The seek generation an engine observation belongs to. Polling adapters
   /// capture this before starting a poll and put it on the resulting fact.
   @protected
-  int get engineSeekEpoch => _playerState.seekEpoch;
+  int get engineSeekEpoch => _activeSeekEpoch ?? _playerState.seekEpoch;
 
   @protected
-  int get enginePlayEpoch => _playerState.playEpoch;
-
-  @protected
-  void reportPlayAccepted(int playEpoch) => _dispatch(PlayAccepted(playEpoch));
-
-  @protected
-  void reportPlayRefused([int? playEpoch]) =>
-      _dispatch(PlayRefused(playEpoch));
+  void reportPlayRefused() => _dispatch(const PlayRefused());
 
   void _dispatch(MediaEvent event) {
     if (_disposed) return;
@@ -281,9 +278,6 @@ abstract class DwMediaEngineController extends DwMediaController {
     final next = _playerState.playback;
     final interval = _playerState.interval;
     if (interval != null) _onPlayedInterval?.call(interval);
-    for (final committed in _playerState.committedIntervals) {
-      _onPlayedInterval?.call(committed);
-    }
     // Seal before listeners can move the queue and detach this controller.
     if (_playerState.sealPlayback) _onObservationBreak?.call();
     _state.value = next;
@@ -296,7 +290,7 @@ abstract class DwMediaEngineController extends DwMediaController {
         if (!_disposed) unawaited(_quietly(enginePause));
       });
     }
-    if (interval != null || _playerState.committedIntervals.isNotEmpty) {
+    if (interval != null) {
       _onRealPlayback(next);
     }
     if (next.isEnded && !previous.isEnded && _playerState.playedSinceSeek) {
@@ -410,7 +404,10 @@ abstract class DwMediaEngineController extends DwMediaController {
     if (_disposed) return Future.value();
     _dispatch(SeekCommand(position));
     _endedByPlayback = false;
-    _queuedSeek = _state.value.seekTarget;
+    final target = _state.value.seekTarget;
+    if (target != null) {
+      _queuedSeek = _SeekRequest(target, _playerState.seekEpoch);
+    }
     if (!_loaded) return _reloading ?? Future.value();
     return _startSeeks();
   }
@@ -428,8 +425,10 @@ abstract class DwMediaEngineController extends DwMediaController {
     bool stale() => _disposed || generation != _loadGeneration;
     try {
       while (_queuedSeek != null && !stale() && !_failed) {
-        final target = _queuedSeek!;
+        final request = _queuedSeek!;
+        final target = request.target;
         _queuedSeek = null;
+        _activeSeekEpoch = request.epoch - 1;
         try {
           await engineSeek(target);
         } catch (error, stackTrace) {
@@ -441,12 +440,14 @@ abstract class DwMediaEngineController extends DwMediaController {
           reportFailure(error, stackTrace);
           return;
         }
+        _activeSeekEpoch = null;
         if (stale() || _failed) return;
         _dispatch(SeekSettled(target));
       }
     } finally {
       // Release ownership before completing the callers' future: a seek from
       // their continuation or a state listener must start its own drain.
+      _activeSeekEpoch = null;
       if (identical(_seekRunning, completion.future)) _seekRunning = null;
       completion.complete();
     }
@@ -509,4 +510,11 @@ abstract class DwMediaEngineController extends DwMediaController {
     }
     _state.dispose();
   }
+}
+
+final class _SeekRequest {
+  const _SeekRequest(this.target, this.epoch);
+
+  final Duration target;
+  final int epoch;
 }

@@ -93,11 +93,6 @@ final class DwAudioMediaController extends DwMediaEngineController {
         duration: event.duration ?? Duration.zero,
         buffered: event.bufferedPosition,
         seekEpoch: factSeekEpoch,
-        // just_audio has no positive web playback event: all web coverage is
-        // owned by the pending play call and committed only if that call
-        // completes. Native players cannot refuse play, so their ticks count
-        // immediately.
-        provisionalPlayback: dwMediaIsWeb,
       ),
     );
   }
@@ -110,18 +105,13 @@ final class DwAudioMediaController extends DwMediaEngineController {
     // here for the same reason.
     final player = _player;
     if (player == null) return;
-    final playEpoch = enginePlayEpoch;
     unawaited(
       player.play().then(
-        (_) {
-          if (dwMediaIsWeb && identical(_player, player)) {
-            reportPlayAccepted(playEpoch);
-          }
-        },
+        (_) {},
         onError: (Object error, StackTrace stackTrace) {
           if (!identical(_player, player)) return;
           if (dwMediaIsPlayRefusal(error)) {
-            reportPlayRefused(playEpoch);
+            reportPlayRefused();
             unawaited(player.pause());
           } else if (!dwMediaIsBenignError(error)) {
             reportFailure(error, stackTrace);
@@ -138,7 +128,7 @@ final class DwAudioMediaController extends DwMediaEngineController {
   Future<void> engineSeek(Duration position) async {
     final player = _player;
     if (player == null) return;
-    final epoch = engineSeekEpoch - 1;
+    final epoch = engineSeekEpoch;
     _seekInFlightEpoch = epoch;
     _preSeekEpoch = epoch;
     _seekStartedAt = DateTime.now();

@@ -10,11 +10,11 @@
   confirms spans from real playback and seals them through `playbackDelivery` on
   pause, seek, speed, source, error or end. Waiting does not break continuity;
   pending delivery and explicit retry keep their existing lifecycle.
-- Web audio keeps every span under a `play()` call provisional until that call
-  completes normally. Boundaries close but do not commit those spans; refusal
-  drops them, while native audio counts immediately because its play cannot be
-  refused. Playback events and elapsed time never confirm web coverage. An
-  audio seek settles only when the platform seek completes.
+- Audio coverage follows ready, playing position ticks on every platform. A
+  refused web play can therefore credit the short interval before the browser's
+  refusal arrives; `just_audio_web` exposes no separate positive start signal.
+  Refusal stops playback but does not retract delivered coverage. Audio seeks
+  settle only when the platform seek completes.
 - Add `session.status`, `session.position` and `session.hasReallyPlayed`;
   `playback` remains their merge. Video surfaces rebuild only for size changes.
   Example controls follow intent, waiting and pending seek positions.

@@ -53,6 +53,43 @@ void main() {
       await release(tester, controller);
     });
 
+    testWidgets('video facts from an active seek cannot settle its queued seek', (
+      tester,
+    ) async {
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        videoItem('queued-seek-facts'),
+        onPlayedInterval: intervals.add,
+      );
+      final video = await rig.loadVideo(tester);
+      await controller.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 10));
+      intervals.clear();
+
+      final gate = Completer<void>();
+      video.seekBarrier = gate.future;
+      final first = controller.seek(const Duration(seconds: 20));
+      await tester.pump();
+      final second = controller.seek(const Duration(seconds: 10));
+      video.startBuffering();
+      video.stopBuffering();
+      await tester.pump();
+
+      expect(controller.state.value.seekTarget, const Duration(seconds: 10));
+      expect(intervals, isEmpty);
+      gate.complete();
+      await first;
+      await second;
+      expect(video.seekCalls, [
+        const Duration(seconds: 20),
+        const Duration(seconds: 10),
+      ]);
+      expect(controller.state.value.position, const Duration(seconds: 10));
+      expect(controller.state.value.seekTarget, isNull);
+      expect(intervals, isEmpty);
+      await release(tester, controller);
+    });
+
     testWidgets('video ignores a pre-seek position poll that resolves later', (
       tester,
     ) async {
@@ -146,23 +183,6 @@ void main() {
       await release(tester, controller);
     });
 
-    testWidgets('audio: an optimistic play refused by the platform starts '
-        'nothing', (tester) async {
-      debugDwMediaIsWebOverride = true;
-      var started = 0;
-      final controller = controllerFor(
-        audioItem('refused'),
-        callbacks: DwMediaCallbacks(onStarted: (_) => started++),
-      );
-      final track = await rig.loadAudio(tester);
-      track.refusePlayWith = PlatformException(code: 'NotAllowedError');
-      await controller.play();
-      await dwSettleMedia(tester);
-      expect(started, 0);
-      expect(controller.hasReallyPlayed, isFalse);
-      await release(tester, controller);
-    });
-
     testWidgets('audio: native playback counts from the play call', (
       tester,
     ) async {
@@ -187,103 +207,43 @@ void main() {
       await release(tester, controller);
     });
 
-    testWidgets('audio: a completed web play call commits held coverage', (
+    testWidgets('audio: refusal before a ready tick earns no coverage', (
       tester,
     ) async {
       debugDwMediaIsWebOverride = true;
+      var started = 0;
       final intervals = <DwMediaPlayedInterval>[];
       final controller = controllerFor(
-        audioItem('accepted-web-play'),
+        audioItem('immediate-refusal'),
+        callbacks: DwMediaCallbacks(onStarted: (_) => started++),
         onPlayedInterval: intervals.add,
       );
       final track = await rig.loadAudio(tester);
-      final gate = Completer<void>();
-      track.playBarrier = gate.future;
-      await controller.play();
-      await tester.pump(const Duration(seconds: 2));
-      await controller.pause();
-      expect(intervals, isEmpty);
-      expect(controller.hasReallyPlayed, isFalse);
-      gate.complete();
-      await dwSettleMedia(tester);
-      expect(intervals, [
-        DwMediaPlayedInterval(Duration.zero, const Duration(seconds: 2)),
-      ]);
-      expect(controller.hasReallyPlayed, isTrue);
-      await release(tester, controller);
-    });
-
-    testWidgets('audio: delayed play refusal drops optimistic coverage', (
-      tester,
-    ) async {
-      debugDwMediaIsWebOverride = true;
-      final intervals = <DwMediaPlayedInterval>[];
-      final controller = controllerFor(
-        audioItem('delayed-refusal'),
-        onPlayedInterval: intervals.add,
-      );
-      final track = await rig.loadAudio(tester);
-      final gate = Completer<void>();
-      track.playBarrier = gate.future;
-      await controller.play();
-      await tester.pump(const Duration(seconds: 2));
       track.refusePlayWith = PlatformException(code: 'NotAllowedError');
-      gate.complete();
+      await controller.play();
       await dwSettleMedia(tester);
       expect(intervals, isEmpty);
+      expect(started, 0);
       expect(controller.hasReallyPlayed, isFalse);
       await release(tester, controller);
     });
 
-    testWidgets('audio: pause before a delayed refusal earns no coverage', (
+    testWidgets('audio: the first ready tick confirms normal web play', (
       tester,
     ) async {
       debugDwMediaIsWebOverride = true;
-      final intervals = <DwMediaPlayedInterval>[];
+      var started = 0;
       final controller = controllerFor(
-        audioItem('pause-provisional'),
-        onPlayedInterval: intervals.add,
+        audioItem('web-ready'),
+        callbacks: DwMediaCallbacks(onStarted: (_) => started++),
       );
       final track = await rig.loadAudio(tester);
-      final gate = Completer<void>();
-      track.playBarrier = gate.future;
       await controller.play();
-      await tester.pump(const Duration(seconds: 2));
-      await controller.pause();
-      expect(intervals, isEmpty);
-      expect(controller.hasReallyPlayed, isFalse);
-      track.refusePlayWith = PlatformException(code: 'NotAllowedError');
-      gate.complete();
-      await dwSettleMedia(tester);
-      expect(intervals, isEmpty);
-      expect(controller.hasReallyPlayed, isFalse);
-      await release(tester, controller);
-    });
-
-    testWidgets('audio: a delayed optimistic playback event is not native '
-        'evidence', (tester) async {
-      debugDwMediaIsWebOverride = true;
-      final intervals = <DwMediaPlayedInterval>[];
-      final controller = controllerFor(
-        audioItem('delayed-event-refusal'),
-        onPlayedInterval: intervals.add,
-      );
-      final track = await rig.loadAudio(tester);
-      final playGate = Completer<void>();
-      final eventGate = Completer<void>();
-      track.playBarrier = playGate.future;
-      await controller.play();
-      unawaited(track.reportReadyAfter(eventGate.future));
-      await tester.pump(const Duration(seconds: 2));
-      eventGate.complete();
+      track.advanceTo(const Duration(seconds: 1));
       await tester.pump();
-      expect(intervals, isEmpty);
-      expect(controller.hasReallyPlayed, isFalse);
-      track.refusePlayWith = PlatformException(code: 'NotAllowedError');
-      playGate.complete();
-      await dwSettleMedia(tester);
-      expect(intervals, isEmpty);
-      expect(controller.hasReallyPlayed, isFalse);
+      expect(controller.state.value.waiting, isFalse);
+      expect(controller.hasReallyPlayed, isTrue);
+      expect(started, 1);
       await release(tester, controller);
     });
 

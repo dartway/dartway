@@ -13,14 +13,8 @@ final class PauseCommand extends MediaEvent {
   const PauseCommand();
 }
 
-final class PlayAccepted extends MediaEvent {
-  const PlayAccepted(this.playEpoch);
-  final int playEpoch;
-}
-
 final class PlayRefused extends MediaEvent {
-  const PlayRefused([this.playEpoch]);
-  final int? playEpoch;
+  const PlayRefused();
 }
 
 final class SeekCommand extends MediaEvent {
@@ -64,7 +58,6 @@ final class EngineFact extends MediaEvent {
     this.buffering = false,
     this.ended = false,
     this.seekEpoch = 0,
-    this.provisionalPlayback = false,
   });
   final Duration position;
   final Duration duration;
@@ -74,14 +67,13 @@ final class EngineFact extends MediaEvent {
   final bool buffering;
   final bool ended;
   final int seekEpoch;
-  final bool provisionalPlayback;
 }
 
 /// Pure state and evidence: engine adapters never choose UI state.
 ///
-/// Engine positions are the UI clock. Until audio playback is positively
-/// confirmed, movement on that clock is provisional evidence: it may update
-/// the displayed position, but cannot report coverage or set playback flags.
+/// Engine positions are both the UI clock and playback evidence. In particular,
+/// web audio may credit the short interval before a delayed browser refusal;
+/// `just_audio_web` exposes no separate positive signal that sound began.
 final class MediaPlayerState {
   const MediaPlayerState({
     this.playback = const DwMediaPlaybackState(),
@@ -93,9 +85,6 @@ final class MediaPlayerState {
     this.sealPlayback = false,
     this.seekEpoch = 0,
     this.needsEngineAnchor = false,
-    this.playEpoch = 0,
-    this.provisionalIntervals = const {},
-    this.committedIntervals = const [],
   });
   final DwMediaPlaybackState playback;
   final Duration anchor;
@@ -110,9 +99,6 @@ final class MediaPlayerState {
   final bool sealPlayback;
   final int seekEpoch;
   final bool needsEngineAnchor;
-  final int playEpoch;
-  final Map<int, List<DwMediaPlayedInterval>> provisionalIntervals;
-  final List<DwMediaPlayedInterval> committedIntervals;
 }
 
 const mediaSeekTolerance = Duration(milliseconds: 200);
@@ -124,21 +110,14 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
   var ever = state.hasReallyPlayed;
   var confirmed = state.playConfirmed;
   DwMediaPlayedInterval? interval;
-  var committedIntervals = <DwMediaPlayedInterval>[];
   var seal = false;
   var seekEpoch = state.seekEpoch;
   var needsEngineAnchor = state.needsEngineAnchor;
-  var playEpoch = state.playEpoch;
-  final provisionalByPlay = <int, List<DwMediaPlayedInterval>>{
-    for (final entry in state.provisionalIntervals.entries)
-      entry.key: [...entry.value],
-  };
   DwMediaPlayState resting() =>
       ever ? DwMediaPlayState.paused : DwMediaPlayState.ready;
   switch (event) {
     case PlayCommand():
       if (next.intent == DwMediaPlayIntent.play && !next.isEnded) break;
-      playEpoch++;
       confirmed = false;
       if (next.isEnded) {
         anchor = Duration.zero;
@@ -173,24 +152,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
             ? next.playState
             : resting(),
       );
-    case PlayAccepted(:final playEpoch):
-      final accepted = provisionalByPlay.remove(playEpoch) ?? const [];
-      if (playEpoch == state.playEpoch &&
-          next.intent == DwMediaPlayIntent.play) {
-        confirmed = true;
-        next = next.copyWith(waiting: false);
-      }
-      if (accepted.isNotEmpty) {
-        committedIntervals = accepted;
-        played = ever = true;
-        seal = true;
-      }
-    case PlayRefused(:final playEpoch):
-      if (playEpoch != null && playEpoch != state.playEpoch) {
-        provisionalByPlay.remove(playEpoch);
-        break;
-      }
-      provisionalByPlay.remove(playEpoch ?? state.playEpoch);
+    case PlayRefused():
       seal = true;
       confirmed = false;
       anchor = next.position;
@@ -293,20 +255,8 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
       if (real) {
         final earned = DwMediaPlayedInterval(anchor, position);
         anchor = position;
-        if (confirmed || !event.provisionalPlayback) {
-          interval = earned;
-          played = ever = confirmed = true;
-        } else {
-          final spans = provisionalByPlay.putIfAbsent(playEpoch, () => []);
-          if (spans.isNotEmpty && spans.last.end == earned.start) {
-            spans[spans.length - 1] = DwMediaPlayedInterval(
-              spans.last.start,
-              earned.end,
-            );
-          } else {
-            spans.add(earned);
-          }
-        }
+        interval = earned;
+        played = ever = confirmed = true;
       }
       if (needsEngineAnchor) {
         anchor = position;
@@ -352,8 +302,5 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
     sealPlayback: seal,
     seekEpoch: seekEpoch,
     needsEngineAnchor: needsEngineAnchor,
-    playEpoch: playEpoch,
-    provisionalIntervals: provisionalByPlay,
-    committedIntervals: committedIntervals,
   );
 }
