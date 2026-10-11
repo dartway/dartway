@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Fix: `deploy run --without-rollback-image` unblocks a stand whose running image cannot be
+  resolved after an older CLI moved its tag without leaving a rollback pin. The refusal names the
+  rerun command; opting in warns that a failure leaves the service down until the next deploy.
+  Resolvable images are still pinned, and the flag is not stored in config (#535).
 - Template: the app reads its version from the platform; `app_version.dart` and its
   version-equality test are removed. An empty platform build number maps to `+0`.
   Empty versions and failed platform reads report the problem and stack trace via
