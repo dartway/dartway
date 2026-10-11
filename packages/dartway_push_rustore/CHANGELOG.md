@@ -1,3 +1,8 @@
+## 0.7.0-dev.0
+
+- Dependency carets follow DartWay 0.22 and its satellites on their next
+  development lines; public dependency types follow those releases (#530).
+
 ## 0.6.0
 
 - Targets `dartway_push_flutter` `^0.6.0` (DartWay 0.21), which added `DwPushPermission.unanswered`

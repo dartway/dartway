@@ -140,8 +140,9 @@ flutter run
 ```
 
 The app calls `http://localhost:8080`, or `http://10.0.2.2:8080` on the Android emulator, where
-`localhost` is the emulator itself. `lib/main.dart` picks between them; a deployed build is compiled
-against a fixed address with `--dart-define=DW_BACKEND_URL=…`.
+`localhost` is the emulator itself. `lib/main.dart` picks between them. A mobile or desktop
+deployment names its backend with `--dart-define=DW_BACKEND_URL=…`; a web release without
+that define calls `Uri.base.origin`.
 
 **In a browser the app calls its server on its own origin**, as a deployment serves it, so there is no
 CORS to configure — locally either. The development proxy puts Flutter's web server and the API
@@ -164,7 +165,7 @@ For a release build behind the same proxy:
 
 ```bash
 cd my_app_flutter
-flutter build web --dart-define=DW_BACKEND_URL=http://localhost:8000
+flutter build web
 dart run dartway_cli:dartway dev proxy --web-dir build/web
 ```
 

@@ -199,13 +199,13 @@ class DwStack {
   String get privateBucketName =>
       '${projectPrefix.replaceAll('_', '-')}-private';
 
-  /// The object `storage-init` writes into both buckets, and the outside
-  /// probe reads without credentials: the key and text the server's own
+  /// The object provisioning and `storage-init` write into both buckets,
+  /// and the outside probe reads without credentials: the key and text the server's own
   /// startup check uses (`_dartway/visibility-probe`).
   static const String visibilityProbeKey = '_dartway/visibility-probe';
   static const String visibilityProbeText =
       'DartWay checks at startup that this bucket is exactly as public as it '
-      'is declared.';
+      'is declared.\n';
 
   /// Where public files are read: the public bucket on the storage host,
   /// path-style.

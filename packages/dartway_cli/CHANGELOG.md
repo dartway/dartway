@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.25.0-dev.0
+
+- `deploy kamal` generates Kamal 2.12 destinations with kamal-proxy v0.10.2,
+  literal server route prefixes, the Studio deployment manifest and cached GHCR
+  image builds from the project's deployment configuration. Image publication
+  follows each destination's `branch:` after successful CI. `--check` reports
+  stale output. Postgres stays private to the stack. Unsupported `requires: files:`,
+  deployed `site:`, root API proxy prefixes, invalid project names and a CLI path
+  dependency inside the project's own checkout are refused with a diagnostic (#530).
+- The check image runs outside probes from a read-only project checkout with its
+  own TLS trust store. Its immutable tag follows the resolved CLI source: Git SHA,
+  path HEAD or hosted version. Framework CI builds it on the pinned Flutter and
+  committed workspace lock, verifies the CA bundle and entry point, and publishes
+  the SHA tag; stable promotes the published CLI version tag without rebuilding
+  or replacing an existing tag (#530).
+- Template and example web releases call `Uri.base.origin` and build without a
+  backend address, so one image serves every destination. Deploy checks require
+  the backend build argument only when the Dockerfile declares it (#530).
+
 ## 0.24.0
 
 - Fix: toolkit manifests no longer record machine-local pub-cache clone paths,

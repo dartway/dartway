@@ -35,7 +35,9 @@ typedef DwRouteHandler =
 ```
 
 **Paths match exactly** — a map lookup, no patterns and no path parameters; an id goes in the query
-or the body. An unknown path is `404`; a known path with another method is `405` with `Allow`.
+or the body. Use a string literal for the route's path.
+After adding a route, run `deploy kamal` and commit its output, or CI's `--check` fails.
+An unknown path is `404`; a known path with another method is `405` with `Allow`.
 
 The server refuses to start on a route at `/dw`, under `/dw/` or at `/health` (the framework's), on
 a path that does not start with `/`, or on the same method and path declared twice.
@@ -120,8 +122,10 @@ the project's, with a unique constraint on the event id.
 
 ## Where routes are reachable
 
-In a deploy, the API domain proxies every path to the server; the app's own domain proxies only
-`/dw/` and `/health`. So a webhook URL given to a provider is on the API domain
+With `deploy kamal`, each literal route path is also a proxy prefix on both the API and app
+domains, alongside `/dw` and `/health`; a `/` route is refused. With `deploy run`, the API domain
+proxies every path to the server and the app domain proxies `/dw/` and `/health`.
+A webhook URL on the API domain works in either topology
 ([deploy](../5-tooling/deploy.md)). In development, `dart run dartway_cli:dartway dev` forwards `/dw/*` and `/health`,
 and a project door only when named with `--api-path /webhooks/payments`
 ([CLI](../5-tooling/cli.md)).

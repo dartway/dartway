@@ -417,7 +417,7 @@ class DwOutsideProbe {
     }
   }
 
-  /// Without credentials, the probe object `storage-init` writes reads from
+  /// Without credentials, the probe object provisioning and `storage-init` write reads from
   /// [publicBucket] and is refused from [privateBucket], and neither bucket
   /// lists its keys: the public files open, the private ones are not public.
   Future<DwProbeResult> storageVisibility({
@@ -439,8 +439,7 @@ class DwOutsideProbe {
       final publicListing = await get('$publicBucket?list-type=2');
       final privateListing = await get('$privateBucket?list-type=2');
       final problems = [
-        if (public.status != 200 ||
-            public.body.trim() != DwStack.visibilityProbeText)
+        if (public.status != 200 || public.body != DwStack.visibilityProbeText)
           '$publicBucket answered ${public.status} — public files will not '
               'open',
         if (private.status < 300)

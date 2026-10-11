@@ -1,0 +1,39 @@
+name: Check image version
+
+on:
+  push:
+    branches: [stable]
+  pull_request:
+    paths:
+      - 'packages/dartway_cli/pubspec.yaml'
+      - 'tool/tag_check_image.sh'
+      - '.github/workflows/check-image-version.yml'
+
+permissions:
+  contents: read
+  packages: write
+
+# Serialise promotions: a version tag is immutable.
+concurrency:
+  group: check-image-version
+  cancel-in-progress: false
+
+jobs:
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        if: github.event_name == 'push'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Dry run on PR
+        if: github.event_name == 'pull_request'
+        run: tool/tag_check_image.sh dry-run
+      - name: Tag the published version
+        if: github.event_name == 'push'
+        run: tool/tag_check_image.sh publish
