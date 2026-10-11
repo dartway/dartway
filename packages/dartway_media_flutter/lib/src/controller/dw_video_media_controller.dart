@@ -50,7 +50,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
       previous.removeListener(_onValue);
       unawaited(_disposeAfterFrame(previous));
     }
-    final controller = VideoPlayerController.networkUrl(
+    final controller = _DwVideoPlayerController.networkUrl(
       uri,
       videoPlayerOptions: VideoPlayerOptions(
         allowBackgroundPlayback: true,
@@ -150,5 +150,30 @@ final class DwVideoMediaController extends DwMediaEngineController {
     controller?.removeListener(_onValue);
     DwWakelockCoordinator.instance.setWants(this, false);
     await controller?.dispose();
+  }
+}
+
+final class _DwVideoPlayerController extends VideoPlayerController {
+  _DwVideoPlayerController.networkUrl(
+    super.url, {
+    super.closedCaptionFile,
+    super.videoPlayerOptions,
+    super.httpHeaders,
+  }) : super.networkUrl();
+
+  int _seekEpoch = 0;
+
+  @override
+  Future<Duration?> get position async {
+    final seekEpoch = _seekEpoch;
+    final position = await super.position;
+    if (seekEpoch != _seekEpoch) return value.position;
+    return position;
+  }
+
+  @override
+  Future<void> seekTo(Duration position) {
+    _seekEpoch++;
+    return super.seekTo(position);
   }
 }

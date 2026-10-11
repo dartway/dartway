@@ -29,6 +29,24 @@ void main() {
   });
 
   group('states', () {
+    testWidgets('video ignores a pre-seek position poll that resolves later', (
+      tester,
+    ) async {
+      final controller = controllerFor(videoItem('seek-poll'));
+      final video = await rig.loadVideo(tester);
+      await controller.play();
+      video.advanceTo(const Duration(seconds: 4));
+      final positionReadStarted = video.holdNextPositionRead();
+      await tester.pump(const Duration(milliseconds: 100));
+      await positionReadStarted;
+      await controller.seek(const Duration(seconds: 30));
+      expect(controller.state.value.position, const Duration(seconds: 30));
+      video.releasePositionRead();
+      await tester.pump();
+      expect(controller.state.value.position, const Duration(seconds: 30));
+      await release(tester, controller);
+    });
+
     testWidgets('video: loading, ready, playing, paused', (tester) async {
       final controller = controllerFor(videoItem('v'));
       expect(controller.state.value.playState, DwMediaPlayState.loading);

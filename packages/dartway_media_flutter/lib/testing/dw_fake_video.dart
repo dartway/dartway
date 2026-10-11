@@ -86,7 +86,14 @@ base class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
   }
 
   @override
-  Future<Duration> getPosition(int playerId) async => _video(playerId).position;
+  Future<Duration> getPosition(int playerId) async {
+    final video = _video(playerId);
+    final position = video.position;
+    video._positionReadStarted?.complete();
+    video._positionReadStarted = null;
+    await video._positionReadBarrier?.future;
+    return position;
+  }
 
   @override
   Future<void> setVolume(int playerId, double volume) async =>
@@ -135,6 +142,9 @@ final class DwFakeVideo {
   final List<Duration> seekCalls = [];
   int playCalls = 0;
 
+  Completer<void>? _positionReadStarted;
+  Completer<void>? _positionReadBarrier;
+
   bool _playing = false;
   bool _ready = false;
   bool _released = false;
@@ -168,6 +178,19 @@ final class DwFakeVideo {
 
   /// Playback has reached [to] — seen by the app on its next 100 ms poll.
   void advanceTo(Duration to) => position = to;
+
+  /// Holds the next platform position read after it has captured its result.
+  Future<void> holdNextPositionRead() {
+    _positionReadStarted = Completer<void>();
+    _positionReadBarrier = Completer<void>();
+    return _positionReadStarted!.future;
+  }
+
+  /// Lets a position read held by [holdNextPositionRead] return.
+  void releasePositionRead() {
+    _positionReadBarrier?.complete();
+    _positionReadBarrier = null;
+  }
 
   /// The platform's own end of playback.
   void finish() {

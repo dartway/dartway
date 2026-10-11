@@ -13,7 +13,8 @@
 - Add `session.status`, `session.position` and `session.hasReallyPlayed`;
   `playback` remains their merge. Video surfaces rebuild only for size changes.
   Example controls follow intent, waiting and pending seek positions.
-- Test fakes can hold seek completion and expose play/seek calls.
+- Test fakes can hold seek completion or a position read and expose play/seek
+  calls.
 - Migration: `docs/migrations/2026-10-11-media-player-state.md`.
 - Dependency carets follow DartWay 0.22 and its satellites on their next
   development lines; public dependency types follow those releases (#530).

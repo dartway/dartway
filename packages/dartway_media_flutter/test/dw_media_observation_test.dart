@@ -62,14 +62,14 @@ void main() {
     await tester.pump(const Duration(seconds: 2));
     final beforeBuffering = session.position.value;
     expect(session.hasReallyPlayed, isTrue);
-    track.startBuffering(at: beforeBuffering);
+    track.startBuffering(at: beforeBuffering.position);
     await dwSettleMedia(tester);
     await tester.pump(const Duration(seconds: 2));
     expect(session.position.value, beforeBuffering);
     await session.pause();
     expect(
       manager.pendingPlaybackReports.single.intervals.single.end,
-      beforeBuffering,
+      beforeBuffering.position,
     );
     await endSession(tester, session);
     held.complete();
