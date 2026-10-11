@@ -2,6 +2,9 @@
 
 ## 0.24.0
 
+- Fix: toolkit manifests no longer record machine-local pub-cache clone paths,
+  and `dartway check` skips inaccessible or revision-mismatched recorded checkouts.
+
 - Deploy: local-mode callers can start each deployment with a fresh rollback journal.
   Retries keep the original rollback image; the local stack proof now starts a new
   journal for each simulated deployment (#550).

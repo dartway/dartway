@@ -39,25 +39,34 @@ abstract interface class DwProjectTemplate {
       MonorepoSource.findCliCheckout()?.path,
       if (home != null) p.join(home, '.dartway', 'monorepo'),
     ];
-    for (final candidate in candidates) {
+    for (var index = 0; index < candidates.length; index++) {
+      final candidate = candidates[index];
       if (candidate == null) continue;
-      if (!Directory(p.join(candidate, 'template')).existsSync()) continue;
-      final commit = provenance?.commit;
-      final hasCommit =
-          commit != null &&
-          Process.runSync('git', [
-                '-C',
-                candidate,
-                'cat-file',
-                '-e',
-                '$commit^{commit}',
-              ]).exitCode ==
-              0;
-      return _CheckoutTemplate(
-        Directory(candidate),
-        hasCommit ? commit : null,
-        baseName,
-      );
+      try {
+        if (!Directory(p.join(candidate, 'template')).existsSync()) continue;
+        final commit = provenance?.commit;
+        final isManifestCandidate = index == 0 && provenance?.source != null;
+        final hasCommit =
+            commit != null &&
+            Process.runSync('git', [
+                  '-C',
+                  candidate,
+                  'cat-file',
+                  '-e',
+                  '$commit^{commit}',
+                ]).exitCode ==
+                0;
+        if (isManifestCandidate && commit != null && !hasCommit) continue;
+        return _CheckoutTemplate(
+          Directory(candidate),
+          hasCommit ? commit : null,
+          baseName,
+        );
+      } on FileSystemException {
+        continue;
+      } on ProcessException {
+        continue;
+      }
     }
     return null;
   }

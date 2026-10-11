@@ -41,6 +41,7 @@ class MonorepoSource {
              : (environment ?? Platform.environment)['DARTWAY_MONOREPO_DIR'],
          channelChosen: channelChosen,
          cliCheckout: cliCheckout,
+         environment: environment ?? Platform.environment,
        );
 
   MonorepoSource._({
@@ -48,7 +49,9 @@ class MonorepoSource {
     required String? namedDir,
     required bool channelChosen,
     required Directory? Function() cliCheckout,
+    required Map<String, String> environment,
   }) : isNamedCheckout = namedDir != null && namedDir.isNotEmpty,
+       _environment = environment,
        localDir = (namedDir != null && namedDir.isNotEmpty)
            ? namedDir
            : (channelChosen ? null : cliCheckout()?.path);
@@ -65,6 +68,7 @@ class MonorepoSource {
   /// Whether [localDir] was named — by `--local-repo`, `--framework-path` or
   /// `DARTWAY_MONOREPO_DIR` — rather than found beside the CLI.
   final bool isNamedCheckout;
+  final Map<String, String> _environment;
 
   /// The checkout this CLI runs from, or null when there is none beside it.
   ///
@@ -105,13 +109,12 @@ class MonorepoSource {
   /// never going to be touched.
   bool get isLocalCheckout => localDir != null && localDir!.isNotEmpty;
 
-  String get repoUrl =>
-      Platform.environment['DARTWAY_REPO_URL'] ?? defaultRepoUrl;
+  String get repoUrl => _environment['DARTWAY_REPO_URL'] ?? defaultRepoUrl;
 
   Directory get _cacheDir {
     final home =
-        Platform.environment['USERPROFILE'] ??
-        Platform.environment['HOME'] ??
+        _environment['USERPROFILE'] ??
+        _environment['HOME'] ??
         '.';
     return Directory(p.join(home, '.dartway', 'monorepo'));
   }
@@ -125,13 +128,45 @@ class MonorepoSource {
     Directory resolved, {
     Map<String, String> settings = const {},
   }) async => ToolkitProvenance(
-    source: isLocalCheckout ? resolved.path : repoUrl,
+    source: await manifestSource(resolved),
     channel: isLocalCheckout ? null : branch,
     commit: await monorepoCommit(resolved),
     cliVersion: dartwayCliVersion,
     installedAt: DateTime.now().toUtc().toIso8601String(),
     settings: settings,
   );
+
+  /// The portable source recorded in a project's committed manifest.
+  ///
+  /// Pub's git cache is an implementation detail local to one machine, not a
+  /// working checkout selected by the caller. Its repository URL identifies
+  /// the source on every machine; an explicitly named checkout always keeps
+  /// its path.
+  Future<String> manifestSource(Directory checkout) async {
+    if (!isLocalCheckout || isNamedCheckout || !_isInPubGitCache(checkout)) {
+      return isLocalCheckout ? checkout.path : repoUrl;
+    }
+    final origin = await Process.run('git', [
+      '-C',
+      checkout.path,
+      'config',
+      '--get',
+      'remote.origin.url',
+    ]);
+    if (origin.exitCode != 0) return repoUrl;
+    final url = (origin.stdout as String).trim();
+    return url.isEmpty ? repoUrl : url;
+  }
+
+  bool _isInPubGitCache(Directory checkout) {
+    final configured = _environment['PUB_CACHE'];
+    final home = _environment['HOME'] ?? _environment['USERPROFILE'];
+    if (configured == null && home == null) return false;
+    final cache = p.absolute(configured ?? p.join(home!, '.pub-cache'));
+    final gitCache = p.normalize(p.join(cache, 'git'));
+    final path = p.normalize(checkout.absolute.path);
+    return path == gitCache || p.isWithin(gitCache, path);
+  }
 
   /// Returns the monorepo root, cloning or updating the cache if needed.
   Future<Directory> resolve({String? target}) async {
