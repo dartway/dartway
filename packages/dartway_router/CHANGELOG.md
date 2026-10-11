@@ -1,11 +1,11 @@
-## 3.1.0-dev.0
+## 4.0.0-dev.0
 
 Guards can wait for unknown facts (#556). `DwDecisionGuard` returns
 `DwGuardDecision.allow`, `.redirect(path)` or `.pending`. While undecided,
 `DwGoRouterOptions.pendingBuilder` shows the app's loading page at the same URL,
-without adding history or building the target or its zone shell chrome. A shell's
-Navigator stays mounted offstage, preserving normal system Back behaviour. State
-changes re-run the guards and replace the loading page with the allowed page or redirect.
+without adding history or building the target. Existing zone shell chrome remains
+around whichever target content is shown. State changes re-run the guards and replace
+the loading page with the allowed page or redirect.
 The builder is required when a guard returns pending; a missing builder fails
 with a diagnostic. All guards use the decision contract.
 

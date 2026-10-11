@@ -21,9 +21,8 @@ The preceding sign-in guard redirects a signed-out person before checking the ro
 Guards decide in order; allow continues, redirect or pending ends that evaluation.
 
 The app supplies one loading page through `DwGoRouterOptions.pendingBuilder`.
-While pending, the router builds that page in place of the target and the zone's
-shell chrome. A shell's Navigator remains mounted offstage, so system Back keeps
-go_router's normal pop behaviour. The URL stays the same, no extra history entry
+While pending, the router builds that page in place of the target, inside the
+zone's unchanged shell. The URL stays the same, no extra history entry
 appears, and the target's widget never builds. When the router-state provider
 changes, guards run again and the allowed page or redirect replaces loading. A
 pending answer without a loading builder fails with an error naming the missing

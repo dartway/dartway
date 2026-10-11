@@ -31,7 +31,7 @@ dependencies:
   # router and the shared contract, re-exported — one framework import.
   dartway_core_flutter: ^0.22.0-dev.0
   # The skeleton adopts decision guards before the family raises its router pin.
-  dartway_router: ^3.1.0-dev.0
+  dartway_router: ^4.0.0-dev.0
   # Where the signed-in session is kept: the core asks the plugins for whoever
   # claimed the DwKeyValueStorePlugin role, and without one there is nowhere to
   # put the session.

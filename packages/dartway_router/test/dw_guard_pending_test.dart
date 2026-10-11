@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:dartway_router/dartway_router.dart';
 import 'package:dartway_router/testing.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,18 +25,6 @@ int detailsBuilds = 0;
 int shellBuilds = 0;
 int pendingBuilds = 0;
 int signInBuilds = 0;
-
-final class RecordingObserver extends NavigatorObserver {
-  PageRoute<dynamic>? shellRoute;
-
-  @override
-  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
-    super.didPush(route, previousRoute);
-    if (route is PageRoute<dynamic> && route.fullscreenDialog) {
-      shellRoute = route;
-    }
-  }
-}
 
 class CountedPage extends StatelessWidget {
   const CountedPage(this.label, {super.key});
@@ -109,20 +98,18 @@ enum PublicRoutes implements DwNavigationRoute<SessionState> {
   ];
 }
 
-Page<dynamic> semanticsPage(Widget child, LocalKey key) =>
-    CustomTransitionPage<void>(
-      key: key,
-      child: child,
-      opaque: false,
-      barrierDismissible: true,
-      barrierColor: Colors.black38,
-      barrierLabel: 'Shell barrier',
-      fullscreenDialog: true,
-      transitionDuration: const Duration(milliseconds: 137),
-      reverseTransitionDuration: const Duration(milliseconds: 83),
-      transitionsBuilder: (_, animation, _, child) =>
-          FadeTransition(opacity: animation, child: child),
-    );
+bool useCupertinoShell = false;
+
+Widget shellChrome(Widget child) => Directionality(
+  textDirection: TextDirection.ltr,
+  child: Column(
+    children: [const Text('Shell chrome'), Expanded(child: child)],
+  ),
+);
+
+Page<dynamic> shellPage(Widget child, LocalKey key) => useCupertinoShell
+    ? CupertinoPage<void>(key: key, child: shellChrome(child))
+    : MaterialPage<void>(key: key, child: shellChrome(child));
 
 enum ShellSemanticsRoutes implements DwNavigationRoute<SessionState> {
   shellSemantics(
@@ -139,12 +126,14 @@ enum ShellSemanticsRoutes implements DwNavigationRoute<SessionState> {
   String get zoneRoot => '';
   @override
   DwShellRoutePageBuilder? get shellRouteBuilder =>
-      (_, state, child) => semanticsPage(child, state.pageKey);
+      (_, state, child) => shellPage(child, state.pageKey);
   @override
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
   @override
   List<DwDecisionGuard<SessionState>> get zoneGuards => [
-    (_, _) => DwGuardDecision.allow,
+    (state, _) => state.signedIn == null
+        ? DwGuardDecision.pending
+        : DwGuardDecision.allow,
   ];
 }
 
@@ -162,10 +151,12 @@ enum StatefulShellSemanticsRoutes implements DwNavigationRoute<SessionState> {
   DwShellRoutePageBuilder? get shellRouteBuilder => null;
   @override
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder =>
-      (_, state, shell) => semanticsPage(shell, state.pageKey);
+      (_, state, shell) => shellPage(shell, state.pageKey);
   @override
   List<DwDecisionGuard<SessionState>> get zoneGuards => [
-    (_, _) => DwGuardDecision.allow,
+    (state, _) => state.signedIn == null
+        ? DwGuardDecision.pending
+        : DwGuardDecision.allow,
   ];
 }
 
@@ -181,6 +172,7 @@ void main() {
     shellBuilds = 0;
     pendingBuilds = 0;
     signInBuilds = 0;
+    useCupertinoShell = false;
   });
 
   Future<DwAppRouter<SessionState>> mount(
@@ -363,47 +355,43 @@ void main() {
     ShellSemanticsRoutes.values,
     StatefulShellSemanticsRoutes.values,
   ]) {
-    testWidgets('${zone.first.name} preserves its shell Page semantics', (
-      tester,
-    ) async {
-      final container = scope((signedIn: true, surveyDone: true));
-      final observer = RecordingObserver();
-      final app = buildRouter(
-        (ref) => DwAppRouter<SessionState>(
-          ref: ref,
-          routerState: session,
-          navigationZones: [zone],
-          pageBuilder: DwPageBuilder.material,
-          options: DwGoRouterOptions(
-            pendingBuilder: pendingPage,
-            observers: [observer],
-          ),
-        ),
-        container: container,
-      );
-      await tester.pumpWidget(MaterialApp.router(routerConfig: app.router));
-      await tester.pumpAndSettle();
+    for (final cupertino in [false, true]) {
+      testWidgets(
+        '${zone.first.name} keeps ${cupertino ? 'Cupertino' : 'Material'} '
+        'shell chrome around allowed and pending targets',
+        (tester) async {
+          useCupertinoShell = cupertino;
+          final container = scope((signedIn: true, surveyDone: true));
+          final app = buildRouter(
+            (ref) => DwAppRouter<SessionState>(
+              ref: ref,
+              routerState: session,
+              navigationZones: [zone],
+              pageBuilder: DwPageBuilder.material,
+              options: const DwGoRouterOptions(pendingBuilder: pendingPage),
+            ),
+            container: container,
+          );
+          await tester.pumpWidget(
+            MaterialApp.router(routerConfig: app.router),
+          );
+          await tester.pumpAndSettle();
 
-      final route = observer.shellRoute!;
-      expect(route.fullscreenDialog, isTrue);
-      expect(route.opaque, isFalse);
-      expect(route.barrierDismissible, isTrue);
-      expect(route.barrierColor, Colors.black38);
-      expect(route.barrierLabel, 'Shell barrier');
-      expect(route.transitionDuration, const Duration(milliseconds: 137));
-      expect(
-        route.reverseTransitionDuration,
-        const Duration(milliseconds: 83),
+          expect(find.text('Shell chrome'), findsOneWidget);
+          expect(find.text('Home'), findsOneWidget);
+          expect(find.text('Pending'), findsNothing);
+
+          container.read(session.notifier).update((
+            signedIn: null,
+            surveyDone: true,
+          ));
+          await tester.pumpAndSettle();
+          expect(find.text('Shell chrome'), findsOneWidget);
+          expect(find.text('Pending'), findsOneWidget);
+          expect(find.text('Home'), findsNothing);
+        },
       );
-      expect(find.byType(FadeTransition), findsWidgets);
-      expect(find.text('Home'), findsOneWidget);
-      if (zone.first == ShellSemanticsRoutes.shellSemantics) {
-        app.router.go('/shellDetails');
-        await tester.pumpAndSettle();
-        expect(find.text('Details'), findsOneWidget);
-        expect(find.text('Home'), findsNothing);
-      }
-    });
+    }
   }
 
   test(

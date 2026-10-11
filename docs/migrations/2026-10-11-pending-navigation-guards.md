@@ -1,7 +1,7 @@
 ---
 title: Navigation guards wait for unknown facts
 affects:
-  dartway_router: "3.1.0-dev.0"
+  dartway_router: "4.0.0-dev.0"
 ---
 
 ## Who is affected
@@ -12,8 +12,8 @@ Every project declaring zone guards. The String? guard contract is replaced by
 
 ## What to change
 
-Declare `zoneGuards` as `List<DwDecisionGuard<AppRouterState>>`. Replace null
-with `DwGuardDecision.allow` only where the facts are known, and paths with
+Declare `zoneGuards` as `List<DwDecisionGuard<AppRouterState>>`. Map the old
+answers as follows: `null` becomes `DwGuardDecision.allow`, and a path becomes
 `DwGuardDecision.redirect(path)`. A field that can be unknown must be nullable
 in the router-state record; handle null explicitly with
 `DwGuardDecision.pending`.

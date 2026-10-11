@@ -314,9 +314,8 @@ They run in order until a redirect or pending answer. A nullable fact is unknown
 handle `null` explicitly with pending, so the target never builds before the decision.
 
 Provide `DwGoRouterOptions.pendingBuilder` whenever a guard can be pending. This
-one app loading page replaces the target and its zone shell's chrome at the same
-URL without another history entry. The shell Navigator stays mounted offstage, so
-system Back remains go_router's normal pop. The router refreshes its guards when
+one app loading page replaces the target inside the zone's unchanged shell at the
+same URL without another history entry. The router refreshes its guards when
 the state provider changes. A pending answer without a builder fails with a diagnostic.
 
 ```dart

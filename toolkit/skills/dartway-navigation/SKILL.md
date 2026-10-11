@@ -49,8 +49,8 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
   never what they may read (`dartway-access`). A gate into a new zone uses `signInFrom(target)`;
   the sign-in screen never navigates on its own.
 - **One loading page**: provide `DwGoRouterOptions.pendingBuilder` when guards can be pending.
-  The router shows it in place of the target and zone shell chrome, keeps the shell Navigator
-  mounted for normal system Back, preserves the URL and history, and re-runs guards on state
+  The router shows it in place of the target inside the zone's unchanged shell, preserves the
+  URL and history, and re-runs guards on state
   changes. It never builds a target frame while undecided.
 - **Guard tests**: import `package:dartway_router/testing.dart` and run `dwCheckPendingGuards`
   with every zone, representative known states (including redirecting values), and a `nullableFields`
