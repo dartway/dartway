@@ -67,8 +67,8 @@ enum RoutesWithGuards implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [
-        (state, target) => null,
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [
+        (state, target) => DwGuardDecision.allow,
       ];
 }
 
@@ -97,7 +97,7 @@ enum NestedRoutes implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 /// Every target the vault's guard was asked about.
@@ -122,13 +122,17 @@ enum VaultRoutes implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [
         (state, target) {
           vaultTargets.add(target);
           return state.isAuthorized
-              ? null
-              : Uri(path: '/sign-in', queryParameters: {'from': target.location})
-                  .toString();
+              ? DwGuardDecision.allow
+              : DwGuardDecision.redirect(
+                  Uri(
+                    path: '/sign-in',
+                    queryParameters: {'from': target.location},
+                  ).toString(),
+                );
         },
       ];
 }
@@ -152,9 +156,13 @@ enum SignInRoutes implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [
-        (state, target) =>
-            state.isAuthorized ? target.uri.queryParameters['from'] : null,
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [
+        (state, target) {
+          final redirect = target.uri.queryParameters['from'];
+          return state.isAuthorized && redirect != null
+              ? DwGuardDecision.redirect(redirect)
+              : DwGuardDecision.allow;
+        },
       ];
 }
 
@@ -180,7 +188,7 @@ enum TestRoutes implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 enum AuthRoutes implements DwNavigationRoute<TestRouterState> {
@@ -203,7 +211,7 @@ enum AuthRoutes implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 // Two zones that each own a concept called `projects`. Nothing inside either
@@ -232,7 +240,7 @@ enum ProjectsZone implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 // Lives under /admin, so its `projects` builds a different path: the name is
@@ -261,7 +269,7 @@ enum AdminProjectsZone implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 // Sits at the site root as well, so its `projects` collides on the path too.
@@ -283,7 +291,7 @@ enum SecondProjectsZone implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 // /reports, reached through a route named `reports`.
@@ -305,7 +313,7 @@ enum ReportsZone implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 // /reports as well, this time as a zone root — same address, different name.
@@ -327,7 +335,7 @@ enum OverviewZone implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 void main() {

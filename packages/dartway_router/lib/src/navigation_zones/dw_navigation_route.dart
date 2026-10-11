@@ -133,7 +133,6 @@ abstract class DwNavigationRoute<RouterState> implements Enum {
   ///
   /// Guards run in order: allow continues, redirect changes the location, and
   /// pending waits without building the target. Unknown facts must be pending.
-  /// String? guards are accepted through the deprecated legacy adapter.
   ///
   /// Guards receive the current [RouterState] value and can check
   /// authentication, permissions, or any other condition. They run again
@@ -150,6 +149,5 @@ abstract class DwNavigationRoute<RouterState> implements Enum {
   /// ```
   ///
   /// Returns an empty list if no guards are needed.
-  List<Object? Function(RouterState state, DwNavigationTarget target)>
-  get zoneGuards;
+  List<DwDecisionGuard<RouterState>> get zoneGuards;
 }

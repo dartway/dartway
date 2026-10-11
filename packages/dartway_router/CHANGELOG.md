@@ -1,4 +1,6 @@
-## 3.1.0-dev.0
+## 4.0.0-dev.0
+
+### Breaking
 
 Guards can wait for unknown facts (#556). `DwDecisionGuard` returns
 `DwGuardDecision.allow`, `.redirect(path)` or `.pending`. While undecided,
@@ -7,8 +9,9 @@ without adding history or building the target or its zone shell chrome. A shell'
 Navigator stays mounted offstage, preserving normal system Back behaviour. State
 changes re-run the guards and replace the loading page with the allowed page or redirect.
 The builder is required when a guard returns pending; a missing builder fails
-with a diagnostic. The deprecated `DwNavigationGuard` String? contract still
-compiles through an adapter (`null` means allow).
+with a diagnostic. `zoneGuards` now requires
+`List<DwDecisionGuard<RouterState>>`; the former nullable-string guard type and
+its adapter are removed so unknown facts cannot silently compile as allow.
 
 `package:dartway_router/testing.dart` provides `dwCheckPendingGuards`: every zone's
 guards are checked against representative states with each nullable field set to

@@ -310,24 +310,3 @@ void main() {
     },
   );
 }
-
-// This intentionally retains the old declaration to prove it still compiles.
-// ignore_for_file: deprecated_member_use_from_same_package
-
-enum LegacyNullThroughRoutes implements DwNavigationRoute<SessionState> {
-  legacy(DwNavigationRouteDescriptor.zoneRoot(pageWidget: Text('Legacy')));
-
-  const LegacyNullThroughRoutes(this.descriptor);
-  @override
-  final DwNavigationRouteDescriptor<SessionState> descriptor;
-  @override
-  String get zoneRoot => 'legacy';
-  @override
-  DwShellRoutePageBuilder? get shellRouteBuilder => null;
-  @override
-  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
-  @override
-  List<DwNavigationGuard<SessionState>> get zoneGuards => [
-    (state, _) => state.surveyDone == false ? '/survey' : null,
-  ];
-}
