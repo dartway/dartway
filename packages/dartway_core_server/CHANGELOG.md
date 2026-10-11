@@ -2,7 +2,12 @@
 
 ## 0.22.0-dev.0
 
-- No code changes; the family moves in lockstep with the ORM migration-draft advice fix (#542).
+- `DwFileStorageSetup.provision` sets bucket policies, GET/PUT CORS for explicit
+  `allowedOrigins`, and the visibility probe object in both buckets, so outside
+  checks work with `verifyBuckets: false`. CORS writes carry `Content-MD5`;
+  omitting origins leaves CORS untouched. A storage answering `501 NotImplemented`
+  logs an endpoint/bucket warning and continues; other errors stop provisioning.
+  The CORS rule belongs to the server package (#530).
 
 ## 0.21.0
 

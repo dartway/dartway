@@ -13,11 +13,13 @@ name: CI
 
 on:
   pull_request:
+  push:
+    branches: [master, release]
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: ci-${{ github.event_name == 'pull_request' && github.ref || github.sha }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -92,6 +94,14 @@ jobs:
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         working-directory: dartway_starter_flutter
         run: dart run dartway_cli:dartway generate --check --contract-base "$CONTRACT_BASE"
+
+      - name: deploy kamal --check
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_flutter
+        run: |
+          if [ -f ../deploy/studio.yml ]; then
+            dart run dartway_cli:dartway deploy kamal --check
+          fi
 
       - name: server / migrations
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}

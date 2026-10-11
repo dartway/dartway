@@ -37,16 +37,8 @@ WORKDIR /workspace/dartway_starter_flutter
 # honest error naming both.
 RUN flutter pub get --enforce-lockfile
 
-# A web build compiles the server address into itself, so it has to be given
-# one: the app's own origin (`https://app.example.com`), where `/dw/` and
-# `/health` are proxied to the server. The deploy passes it from app_domain in
-# deploy/config.yaml, which keeps it declared in a single place — do not
-# hardcode it here or in the app. Building this image by hand means passing it
-# by hand.
-ARG DW_BACKEND_URL
-RUN test -n "$DW_BACKEND_URL"
-RUN flutter build web --release --no-web-resources-cdn \
-    --dart-define="DW_BACKEND_URL=${DW_BACKEND_URL}"
+# Web releases call their own origin, so this image serves every environment.
+RUN flutter build web --release --no-web-resources-cdn
 
 # `COPY` keeps each file's mode, and the checkout's modes come from the umask
 # of whoever pulled it on the server: under `077` a newly added asset reaches

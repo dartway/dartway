@@ -2,7 +2,8 @@
 
 ## 0.5.0-dev.0
 
-- Target `dartway_core_flutter` `^0.22.0-dev.0` (#542).
+- Dependency carets follow DartWay 0.22 and its satellites on their next
+  development lines; public dependency types follow those releases (#530).
 
 ## 0.4.0
 

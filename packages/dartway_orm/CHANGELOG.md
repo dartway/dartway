@@ -5,6 +5,8 @@
 - Fix migration drafts' rename advice: every rename option explains that a released table needs
   the new name added and copied, reads switched, and the old name dropped one release later (#542).
 
+- The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).
+
 ## 0.21.0
 
 ### Breaking changes

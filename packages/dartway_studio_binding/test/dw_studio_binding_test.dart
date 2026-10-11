@@ -209,6 +209,14 @@ void main() {
     expect(studio.of<LocaleChangedMessage>().last.locale, 'pt-BR');
   });
 
+  testWidgets('debug binding without a define accepts a local Studio', (
+    tester,
+  ) async {
+    await mountBinding(tester);
+    expect(studio.of<ManifestMessage>(), hasLength(1));
+    await drainRescanWindow(tester);
+  });
+
   testWidgets('an empty early re-scan is not reported as an empty screen', (
     tester,
   ) async {

@@ -1,6 +1,7 @@
 ## 0.7.0-dev.0
 
-- Target `dartway_core_server` `^0.22.0-dev.0`, `dartway_push_shared` `^0.7.0-dev.0` (#542).
+- Dependency carets follow DartWay 0.22 and its satellites on their next
+  development lines; public dependency types follow those releases (#530).
 
 ## 0.6.0
 

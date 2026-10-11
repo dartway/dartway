@@ -21,6 +21,92 @@ environments `deploy/config.yaml` declares. Every one that connects takes `--as 
 `packages/dartway_cli/lib/src/commands/deploy_*.dart`, `secret_commands.dart` and
 `packages/dartway_cli/lib/src/deploy/`.
 
+## Kamal and GHCR
+
+`dart run dartway_cli:dartway deploy kamal` generates the Studio deployment contract from
+`deploy/config.yaml`, the server package's HTTP routes and the Flutter package's
+resolved CLI lock. Configure `staging` (destination `stage`) and/or `production`
+(destination `prod`); `local` is never a destination. Resolve the packages first.
+
+```bash
+cd <project>_flutter
+dart run dartway_cli:dartway deploy kamal
+dart run dartway_cli:dartway deploy kamal --check
+```
+
+Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
+Generated files carry their source instructions. `--check` writes nothing and
+names every stale file, including the API config when a project route changes.
+`DwHttpRoute.get`, `.post` and `.any` must use string literal paths. Server routes
+match exact paths, with no `:id` parameters; put identifiers in the query or body.
+Each proxy prefix is the route's path itself: `/github` remains `/github`.
+A `/` route is refused because its proxy prefix would capture every web route.
+After adding a route, run `deploy kamal` and commit the regenerated API config;
+otherwise CI's `deploy kamal --check` fails. The API serves
+these prefixes plus `/dw` and `/health` on both API and app hosts, preserving the
+path; the web service catches all other app paths. Proxy buffering is off for
+API and storage.
+
+Kamal generation refuses `requires: files:` and a deployed `site:` because this
+topology does not support them yet; use `deploy run` for those projects.
+Kamal 2.12 uses kamal-proxy v0.10.2, with 30-second deployment
+and drain timeouts and five retained containers.
+
+The generated Images workflow runs after the project's `CI` workflow completes
+successfully. Image publication follows the `branch:` values of the configured
+deployments; enable CI pushes on those branches. The template enables `master`
+and `release` by default. `workflow_run` loads workflows from the default branch, so the initial
+installation must be merged there before this trigger can run. PR CI successes
+build without pushing or writing shared caches. Fork PRs skip this privileged
+workflow. The template ships no Images workflow or generated deployment files;
+configure targets, run `deploy kamal`, then commit its output. Projects without
+a generated Studio manifest skip builds.
+
+It respects `DW_CI_RUNS_ON`, builds `linux/amd64`, uses a GHA layer cache and
+pushes `<commit sha>` tags to GHCR with `GITHUB_TOKEN` on those two branches.
+Existing manifests are skipped; registry failures fail the job. PR runs build
+without pushing. The OCI source label links the packages to their repository.
+
+Bundled storage is a service built from `rustfs/rustfs:1.0.0` with a TLS host;
+external storage has no service and receives its environment through secrets.
+Bundled Postgres is an API accessory on `postgres:17-alpine`, with no host port.
+Project names start with a lower case letter or digit and contain only lower case
+letters, digits, `_` and `-`. Invalid repository-derived names are refused with
+their value and the `project:` key to set explicitly. Kamal and
+Images use the same project identity without lowercasing it. Configs list secret
+names only, including required project secrets; Studio supplies their values,
+SSH credentials and `KAMAL_REGISTRY_PASSWORD`. `ssh_user` comes from the target.
+
+The Studio check image reads a checkout mounted read-only at `/project`, with
+`--project /project --env stage` (or `prod`). It verifies TLS by making HTTPS
+requests, health on both hosts, the live socket hello, web caching and bundled
+storage visibility and CORS preflights on both buckets, and exits nonzero on a failure.
+With bundled storage, the API's
+`DW_STORAGE_PROVISION=true` makes `DwFileStorageSetup.provision` create both buckets,
+set their policies, configure GET/PUT CORS from the entry point's explicit
+`allowedOrigins: env.server.allowedOrigins`, and write the
+visibility probe into each before serving. No origins leaves CORS untouched. A storage
+answering `501 NotImplemented` warns with its endpoint and bucket and continues; the outside
+CORS probe still reports the actual state. Other CORS errors stop provisioning. This works with `DW_STORAGE_VERIFY_BUCKETS=false`; Kamal has no `storage-init` service.
+
+The check image tag follows the resolved `dartway_cli`: Git uses the lock's resolved ref SHA, path uses the checkout's
+HEAD, and pub.dev uses the lock's exact version. A path dependency on a vendored
+`dartway_cli` inside the project's own git work tree is refused; pin it by git ref
+so the tag identifies a framework commit. A Git/path SHA tag becomes
+available after that framework commit reaches master and its image build passes;
+uncommitted checkout changes do not get an image of their own. Framework CI builds SHA tags on
+`master`. A push to `stable` copies that image to the published CLI version,
+skipping prereleases and existing version tags with a notice. A version tag
+belongs to the commit at which that CLI version was published. A missing
+pub.dev publication fails promotion. The PR runs this promotion in dry-run mode.
+Hosted projects get this capability with the first CLI release after #530.
+
+Studio owns server preparation and deploy execution. A live project's move and
+its existing Postgres/RustFS volumes need a separate project migration. The
+Compose `deploy run` workflow below remains available for projects awaiting that
+move. After the first framework image push, the owner must make the
+`dartway-check` GHCR package public in its package settings.
+
 ## One file describes an environment
 
 `deploy/config.yaml` holds one environment per top-level key, plus three keys that belong to the
@@ -115,8 +201,7 @@ files.example.com →  the bundled storage                    (with storage: bun
 
 **The app calls its own origin.** On the app host the front Nginx serves the web image and
 sends `/dw/`, `/dw/live` and `/health` to the server, so a browser makes same-origin calls: no CORS,
-no preflight, and the server answers none. The web build is given that origin as
-`DW_BACKEND_URL`. The api host proxies everything to the server — calls, the live socket, and the
+no preflight, and the server answers none. Web release builds use `Uri.base.origin`. The api host proxies everything to the server — calls, the live socket, and the
 project's own doors (`DwHttpRoute`) such as a webhook. The server serves no static files. Local
 development has the same shape through `dart run dartway_cli:dartway dev` ([The CLI](cli.md)).
 
@@ -149,7 +234,7 @@ The rendered Nginx:
 |---|---|
 | `postgres` | With `database: bundled`: `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck. Absent with `database: external` — no service, no volume, no `depends_on` on it |
 | `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080` always, and with `database: bundled` (and, with the bundled storage, `DW_STORAGE_*`) `DW_DATABASE_*` in the compose file too — with `database: external` none of `DW_DATABASE_*` is rendered at all, all five (`HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`) come from `.env` like any other secret. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
-| `web` | Built from `<project>_flutter/Dockerfile` with the build argument `DW_BACKEND_URL` = the app origin |
+| `web` | Built from `<project>_flutter/Dockerfile`; `deploy run` passes `DW_BACKEND_URL` from `app_domain` as a build argument. The template's web release calls `Uri.base.origin` |
 | `storage`, `storage-init` | With `storage: bundled`: RustFS, and a one-shot job (a generic S3 client) that creates and configures both buckets on every deploy |
 | `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443 |
 | `certbot` | Renews the certificate every 12 hours |
@@ -553,9 +638,9 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `docker-context-packages` | error | Each image copies every package it depends on, and `.dockerignore` admits it — a missing one fails as `pub get` exit code 66, three layers from the cause |
 | `dependencies-inside-context` | error | No image resolves a package by a path outside the project — the context is the project root, so `pub get` in the image cannot find it though every checkout resolves. `pubspec_overrides.yaml` counts unless `.dockerignore` keeps it out. The usual cause is an unpublished framework taken from a local checkout: depend on it by git with a pinned ref instead |
 | `server-signals` | error | The server image's `ENTRYPOINT` (or `CMD`) is in exec form, so the binary is PID 1 and receives the SIGTERM a deploy sends; under `/bin/sh -c` it is killed mid-call when the grace period runs out |
-| `web-backend-url` | error | The web Dockerfile declares `ARG DW_BACKEND_URL` — Docker silently drops an undeclared build argument |
 | `locked-dependencies` | error | Every image's `pub get` runs `--enforce-lockfile`, and the package has a committed `pubspec.lock` — otherwise pub may resolve a different set inside the container than the project was tested with, and a deploy has already failed that way |
 | `web-flutter-version` | error | The web image builds on the Flutter `.fvmrc` names — it installs it from `.fvmrc`, or its Flutter image carries that tag. Flutter pins some packages an app resolves, so a lock written on one Flutter fails `--enforce-lockfile` on another |
+| `web-backend-url` | error | If the web Dockerfile declares `ARG DW_BACKEND_URL`, its build consumes the argument that `deploy run` passes from `app_domain`. Skipped when the Dockerfile declares no such argument |
 | `web-file-modes` | warning | The web image grants everyone read on the files it serves (`chmod -R a+rX build/web`). `COPY` keeps modes, and under a deploy user's umask of `077` the files a commit adds are served as 403 while every page answers 200 |
 | `web-cache-policy` | warning | The web image's Nginx configuration revalidates every Flutter entry point |
 | `nginx-upstreams` | error | Every `proxy_pass` in the rendered Nginx and in `deploy/nginx.d/` names a service of the stack or the override |
@@ -587,10 +672,14 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
   copies the shared and server packages by name, compiles `bin/server.dart` with `dart compile exe`,
   and runs the binary on Alpine with `ca-certificates` — without them every outbound HTTPS call from
   the server fails — and `ENTRYPOINT ["/app/server"]` in exec form.
-- **The web image** builds with Flutter from the project root, takes `ARG DW_BACKEND_URL` (and refuses
-  to build without it) and `ARG STUDIO_APP_ORIGIN` (the same address, for the Studio binding's access
-  check; an app without the binding declares no such ARG and Docker drops it), runs `flutter build web --release --no-web-resources-cdn --dart-define=DW_BACKEND_URL=…` so CanvasKit is served from the app's own origin, and serves
-  the build with `nginx:1.30.5-alpine` and `<project>_flutter/nginx.conf`. It serves files only.
+- **The web image** builds with Flutter from the project root, without a backend build
+  argument. It runs `flutter build web --release --no-web-resources-cdn`, uses
+  `Uri.base.origin` for calls, and serves the build with `nginx:1.30.5-alpine` and
+  `<project>_flutter/nginx.conf`. The same image serves stage and prod.
+  `deploy run` supplies `STUDIO_APP_ORIGIN` (the app's own address) as a build
+  argument for projects whose Dockerfile forwards it to a Dart define; an app
+  without the binding needs no such argument. A Kamal web image omits the define:
+  the Studio binding takes its own `Uri.base.origin` in a web release.
 - **`.dockerignore` denies everything** and admits the packages by role suffix (`*_server/`,
   `*_flutter/`, `*_shared/`), minus build output and `.env` — so the working copy's history, build
   output and local secrets never reach the Docker daemon.

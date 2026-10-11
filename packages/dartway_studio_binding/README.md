@@ -46,9 +46,6 @@ MaterialApp.router(
       select: (code) =>
           ref.read(appLocaleProvider.notifier).selectLanguageCode(code),
     ),
-    validateAccessToken: studioSignedAccessValidator(
-      const String.fromEnvironment('STUDIO_APP_ORIGIN'),
-    ),
     child: child ?? const SizedBox.shrink(),
   ),
 );
@@ -57,16 +54,21 @@ MaterialApp.router(
 The widget renders `child` untouched and stays inert outside an iframe, so a
 production build carries it at no cost and needs no flag to turn it off.
 
+The default access check uses `STUDIO_APP_ORIGIN` when defined, otherwise
+`Uri.base.origin` in a web release. Only a Studio token signed for that app
+origin gets in. Debug/profile builds without the define stay open for local
+preview. A Kamal image therefore needs no origin build argument.
+
 ## What the project still supplies
 
-Four things, because the framework cannot know them:
+The app supplies its own manifest, user and locale:
 
 | | |
 |---|---|
 | `manifest` | What the app declares about itself: its zones and their screens |
 | `user` | The project's own provider of who is signed in, as `DwStudioUser`: which field is the identity Studio matches its personas against, and which one names the user on screen |
 | `locale` | The app's own language provider and switcher — omit it and Studio's language switcher stays inert, which is right for an app that ships one language |
-| `validateAccessToken` | Who may drive this app. Pass `studioSignedAccessValidator(...)`; left null, any Studio is accepted — right on a laptop, wide open in production |
+| `validateAccessToken` | Optional override of the default signed-token policy |
 
 Screen passports stay in the project too. Build them from routes rather than
 from path strings, so a path refactor cannot leave a passport pointing at a

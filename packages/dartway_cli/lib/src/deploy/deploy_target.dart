@@ -269,7 +269,7 @@ class DwDeployTarget {
       problems.add(
         '$source: "project" must be a Compose project name — lower case '
         'letters, digits, "_" and "-", starting with a letter or a digit — '
-        'got "$project"',
+        'got "$project"; set project: to a valid name',
       );
     }
     final branch = guarded(() => reader.requiredString('branch'));
