@@ -79,6 +79,8 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   int pauseCalls = 0;
   int playbackEventCount = 0;
   Object? refusePlayWith;
+  Future<void>? playBarrier;
+  Future<void>? seekBarrier;
   final List<StreamController<PlaybackEventMessage>> _listeners = [];
 
   bool get isReleased => _released;
@@ -137,6 +139,7 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   @override
   Future<SeekResponse> seek(SeekRequest request) async {
     position = request.position ?? position;
+    await seekBarrier;
     _report(
       position >= length
           ? ProcessingStateMessage.completed
@@ -148,6 +151,7 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   @override
   Future<PlayResponse> play(PlayRequest request) async {
     playing = true;
+    await playBarrier;
     if (refusePlayWith case final error?) throw error;
     _report(ProcessingStateMessage.ready);
     return PlayResponse();

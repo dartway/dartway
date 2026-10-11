@@ -163,22 +163,109 @@ void main() {
       await release(tester, controller);
     });
 
-    testWidgets('audio: ready play followed by position ticks confirms play', (
+    testWidgets('audio: optimistic ticks stay provisional until a native event', (
       tester,
     ) async {
       var started = 0;
+      final intervals = <DwMediaPlayedInterval>[];
       final controller = controllerFor(
         audioItem('extrapolated'),
         callbacks: DwMediaCallbacks(onStarted: (_) => started++),
+        onPlayedInterval: intervals.add,
       );
       final track = await rig.loadAudio(tester);
       await controller.play();
       await dwSettleMedia(tester);
       final acknowledgedEvents = track.playbackEventCount;
-      await tester.pump(const Duration(seconds: 5));
+      await tester.pump(const Duration(seconds: 2));
       expect(track.playbackEventCount, acknowledgedEvents);
+      expect(started, 0);
+      expect(intervals, isEmpty);
+      expect(controller.hasReallyPlayed, isFalse);
+      track.advanceTo(const Duration(seconds: 2));
+      track.stopBuffering();
+      await tester.pump();
       expect(started, 1);
+      expect(intervals, [
+        DwMediaPlayedInterval(Duration.zero, const Duration(seconds: 2)),
+      ]);
       expect(controller.hasReallyPlayed, isTrue);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: delayed play refusal drops optimistic coverage', (
+      tester,
+    ) async {
+      debugDwMediaIsWebOverride = true;
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('delayed-refusal'),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      final gate = Completer<void>();
+      track.playBarrier = gate.future;
+      await controller.play();
+      await tester.pump(const Duration(seconds: 2));
+      track.refusePlayWith = PlatformException(code: 'NotAllowedError');
+      gate.complete();
+      await dwSettleMedia(tester);
+      expect(intervals, isEmpty);
+      expect(controller.hasReallyPlayed, isFalse);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: pause commits optimistic coverage exactly once', (
+      tester,
+    ) async {
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('pause-provisional'),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      final gate = Completer<void>();
+      track.playBarrier = gate.future;
+      await controller.play();
+      await tester.pump(const Duration(seconds: 2));
+      await controller.pause();
+      expect(intervals, [
+        DwMediaPlayedInterval(Duration.zero, const Duration(seconds: 2)),
+      ]);
+      expect(controller.hasReallyPlayed, isTrue);
+      gate.complete();
+      await dwSettleMedia(tester);
+      expect(intervals, hasLength(1));
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: optimistic seek position cannot settle its target', (
+      tester,
+    ) async {
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('held-seek'),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      await controller.play();
+      track.advanceTo(const Duration(seconds: 4));
+      track.stopBuffering();
+      await tester.pump();
+      intervals.clear();
+      final gate = Completer<void>();
+      track.seekBarrier = gate.future;
+      final seeking = controller.seek(const Duration(seconds: 30));
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        controller.state.value.seekTarget,
+        const Duration(seconds: 30),
+      );
+      expect(intervals, isEmpty);
+      gate.complete();
+      await seeking;
+      expect(controller.state.value.seekTarget, isNull);
+      expect(intervals, isEmpty);
       await release(tester, controller);
     });
 

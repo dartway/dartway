@@ -27,6 +27,7 @@ final class DwAudioMediaController extends DwMediaEngineController {
 
   AudioPlayer? _player;
   PlaybackEvent? _playbackEvent;
+  int? _seekInFlightEpoch;
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   @override
@@ -43,7 +44,7 @@ final class DwAudioMediaController extends DwMediaEngineController {
       player.playbackEventStream.listen((event) {
         if (!identical(_player, player)) return;
         _playbackEvent = event;
-        _onUpdate(player, player.position);
+        _onUpdate(player, player.position, nativePlaybackEvent: true);
       }),
       player.positionStream.listen((position) => _onUpdate(player, position)),
       player.errorStream.listen((error) {
@@ -54,11 +55,15 @@ final class DwAudioMediaController extends DwMediaEngineController {
     _onUpdate(player, player.position);
   }
 
-  void _onUpdate(AudioPlayer player, Duration position) {
+  void _onUpdate(
+    AudioPlayer player,
+    Duration position, {
+    bool nativePlaybackEvent = false,
+  }) {
     if (!identical(_player, player)) return;
     final event = _playbackEvent ?? player.playbackEvent;
     final processingState = event.processingState;
-    final seekEpoch = engineSeekEpoch;
+    final seekEpoch = _seekInFlightEpoch ?? engineSeekEpoch;
     reportEngine(
       EngineFact(
         loading:
@@ -72,6 +77,8 @@ final class DwAudioMediaController extends DwMediaEngineController {
         duration: event.duration ?? Duration.zero,
         buffered: event.bufferedPosition,
         seekEpoch: seekEpoch,
+        provisionalPlayback:
+            !nativePlaybackEvent || processingState != ProcessingState.ready,
       ),
     );
   }
@@ -101,7 +108,17 @@ final class DwAudioMediaController extends DwMediaEngineController {
   Future<void> enginePause() async => _player?.pause();
 
   @override
-  Future<void> engineSeek(Duration position) async => _player?.seek(position);
+  Future<void> engineSeek(Duration position) async {
+    final player = _player;
+    if (player == null) return;
+    final epoch = engineSeekEpoch - 1;
+    _seekInFlightEpoch = epoch;
+    try {
+      await player.seek(position);
+    } finally {
+      if (_seekInFlightEpoch == epoch) _seekInFlightEpoch = null;
+    }
+  }
 
   @override
   Future<void> engineSetSpeed(double speed) async => _player?.setSpeed(speed);
@@ -117,6 +134,7 @@ final class DwAudioMediaController extends DwMediaEngineController {
     final player = _player;
     _player = null;
     _playbackEvent = null;
+    _seekInFlightEpoch = null;
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }

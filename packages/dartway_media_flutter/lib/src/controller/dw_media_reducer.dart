@@ -58,6 +58,7 @@ final class EngineFact extends MediaEvent {
     this.buffering = false,
     this.ended = false,
     this.seekEpoch = 0,
+    this.provisionalPlayback = false,
   });
   final Duration position;
   final Duration duration;
@@ -67,9 +68,14 @@ final class EngineFact extends MediaEvent {
   final bool buffering;
   final bool ended;
   final int seekEpoch;
+  final bool provisionalPlayback;
 }
 
 /// Pure state and evidence: engine adapters never choose UI state.
+///
+/// Engine positions are the UI clock. Until audio playback is positively
+/// confirmed, movement on that clock is provisional evidence: it may update
+/// the displayed position, but cannot report coverage or set playback flags.
 final class MediaPlayerState {
   const MediaPlayerState({
     this.playback = const DwMediaPlaybackState(),
@@ -81,6 +87,7 @@ final class MediaPlayerState {
     this.sealPlayback = false,
     this.seekEpoch = 0,
     this.needsEngineAnchor = false,
+    this.provisionalInterval,
   });
   final DwMediaPlaybackState playback;
   final Duration anchor;
@@ -95,6 +102,7 @@ final class MediaPlayerState {
   final bool sealPlayback;
   final int seekEpoch;
   final bool needsEngineAnchor;
+  final DwMediaPlayedInterval? provisionalInterval;
 }
 
 const mediaSeekTolerance = Duration(milliseconds: 200);
@@ -109,6 +117,13 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
   var seal = false;
   var seekEpoch = state.seekEpoch;
   var needsEngineAnchor = state.needsEngineAnchor;
+  var provisional = state.provisionalInterval;
+  void commitProvisional() {
+    if (provisional == null) return;
+    interval = provisional;
+    provisional = null;
+    played = ever = confirmed = true;
+  }
   DwMediaPlayState resting() =>
       ever ? DwMediaPlayState.paused : DwMediaPlayState.ready;
   switch (event) {
@@ -134,7 +149,8 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
             ? DwMediaPlayState.loading
             : DwMediaPlayState.playing,
       );
-    case PauseCommand() || PlayRefused():
+    case PauseCommand():
+      commitProvisional();
       seal = true;
       confirmed = false;
       anchor = next.position;
@@ -148,8 +164,21 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
             ? next.playState
             : resting(),
       );
+    case PlayRefused():
+      provisional = null;
+      seal = true;
+      confirmed = false;
+      anchor = next.position;
+      next = next.copyWith(
+        intent: DwMediaPlayIntent.pause,
+        waiting: false,
+        playState: next.isEnded || next.isError
+            ? next.playState
+            : resting(),
+      );
     case SeekCommand(:final target):
       if (next.isError) break;
+      commitProvisional();
       seal = true;
       var clamped = target < Duration.zero ? Duration.zero : target;
       if (next.duration > Duration.zero && clamped > next.duration) {
@@ -183,6 +212,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
         needsEngineAnchor = true;
       }
     case LoadCommand():
+      commitProvisional();
       seal = true;
       confirmed = false;
       anchor = next.position;
@@ -194,6 +224,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
         errorMessage: null,
       );
     case FailureFact(:final message):
+      commitProvisional();
       seal = true;
       confirmed = false;
       anchor = next.position;
@@ -206,6 +237,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
       );
     case SettingsCommand(:final speed, :final volume, :final muted):
       if (speed != null && speed != next.speed) {
+        commitProvisional();
         anchor = next.position;
         seal = true;
       }
@@ -228,6 +260,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
           target == null &&
           (!seeking || next.position >= event.duration);
       seal = ended && !next.isEnded;
+      if (ended) commitProvisional();
       final real =
           !needsEngineAnchor &&
           !seeking &&
@@ -238,9 +271,24 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
           next.intent == DwMediaPlayIntent.play &&
           position > anchor;
       if (real) {
-        interval = DwMediaPlayedInterval(anchor, position);
+        final earned = DwMediaPlayedInterval(anchor, position);
         anchor = position;
-        played = ever = confirmed = true;
+        if (!event.provisionalPlayback && provisional != null) {
+          provisional = DwMediaPlayedInterval(provisional.start, earned.end);
+          commitProvisional();
+        } else if (confirmed || !event.provisionalPlayback) {
+          interval = earned;
+          played = ever = confirmed = true;
+        } else {
+          provisional = provisional == null
+              ? earned
+              : DwMediaPlayedInterval(provisional.start, earned.end);
+        }
+      }
+      if (!event.provisionalPlayback &&
+          provisional != null &&
+          position > provisional.start) {
+        commitProvisional();
       }
       if (needsEngineAnchor) {
         anchor = position;
@@ -286,5 +334,6 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
     sealPlayback: seal,
     seekEpoch: seekEpoch,
     needsEngineAnchor: needsEngineAnchor,
+    provisionalInterval: provisional,
   );
 }
