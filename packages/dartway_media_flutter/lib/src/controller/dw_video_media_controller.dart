@@ -83,6 +83,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
   }
 
   void _onValue() {
+    final seekEpoch = engineSeekEpoch;
     final controller = _controller;
     if (controller == null) return;
     final value = controller.value;
@@ -110,6 +111,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
         buffered: value.buffered.isEmpty
             ? Duration.zero
             : value.buffered.last.end,
+        seekEpoch: seekEpoch,
       ),
     );
   }

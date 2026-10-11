@@ -122,9 +122,10 @@ void main() {
     await playTo(tester, const Duration(seconds: 2));
     expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
     gate.complete();
-    await tester.pump();
-    expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
-    await playTo(tester, const Duration(seconds: 21));
+    // Seek acknowledgement and the next platform position both notify the
+    // session before this one frame is drawn.
+    video.latest.advanceTo(const Duration(seconds: 21));
+    await tester.pump(const Duration(milliseconds: 100));
     expect(tester.widget<Slider>(find.byType(Slider)).value, 21000);
     await stop(tester, app);
   });

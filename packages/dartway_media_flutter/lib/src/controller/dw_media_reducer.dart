@@ -27,6 +27,11 @@ final class SeekSettled extends MediaEvent {
   final Duration target;
 }
 
+final class SeekAborted extends MediaEvent {
+  const SeekAborted(this.target);
+  final Duration target;
+}
+
 final class LoadCommand extends MediaEvent {
   const LoadCommand();
 }
@@ -52,6 +57,7 @@ final class EngineFact extends MediaEvent {
     this.loading = false,
     this.buffering = false,
     this.ended = false,
+    this.seekEpoch = 0,
   });
   final Duration position;
   final Duration duration;
@@ -60,6 +66,7 @@ final class EngineFact extends MediaEvent {
   final bool loading;
   final bool buffering;
   final bool ended;
+  final int seekEpoch;
 }
 
 /// Pure state and evidence: engine adapters never choose UI state.
@@ -72,6 +79,8 @@ final class MediaPlayerState {
     this.playConfirmed = false,
     this.interval,
     this.sealPlayback = false,
+    this.seekEpoch = 0,
+    this.needsEngineAnchor = false,
   });
   final DwMediaPlaybackState playback;
   final Duration anchor;
@@ -84,6 +93,8 @@ final class MediaPlayerState {
 
   /// This event closes the current report window after its evidence is recorded.
   final bool sealPlayback;
+  final int seekEpoch;
+  final bool needsEngineAnchor;
 }
 
 const mediaSeekTolerance = Duration(milliseconds: 200);
@@ -96,6 +107,8 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
   var confirmed = state.playConfirmed;
   DwMediaPlayedInterval? interval;
   var seal = false;
+  var seekEpoch = state.seekEpoch;
+  var needsEngineAnchor = state.needsEngineAnchor;
   DwMediaPlayState resting() =>
       ever ? DwMediaPlayState.paused : DwMediaPlayState.ready;
   switch (event) {
@@ -144,6 +157,8 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
       }
       anchor = clamped;
       played = false;
+      seekEpoch++;
+      needsEngineAnchor = false;
       next = next.copyWith(position: clamped, seekTarget: clamped);
     case SeekSettled(:final target):
       if (next.seekTarget == target && !next.isError) {
@@ -161,6 +176,11 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
               ? DwMediaPlayState.playing
               : resting(),
         );
+      }
+    case SeekAborted(:final target):
+      if (next.seekTarget == target && !next.isError) {
+        next = next.copyWith(seekTarget: null);
+        needsEngineAnchor = true;
       }
     case LoadCommand():
       seal = true;
@@ -192,6 +212,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
       next = next.copyWith(speed: speed, volume: volume, muted: muted);
     case EngineFact():
       if (next.isError) break;
+      if (event.seekEpoch < seekEpoch) break;
       var target = next.seekTarget;
       final seeking = target != null;
       if (target != null &&
@@ -208,6 +229,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
           (!seeking || next.position >= event.duration);
       seal = ended && !next.isEnded;
       final real =
+          !needsEngineAnchor &&
           !seeking &&
           !event.loading &&
           !event.buffering &&
@@ -219,6 +241,10 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
         interval = DwMediaPlayedInterval(anchor, position);
         anchor = position;
         played = ever = confirmed = true;
+      }
+      if (needsEngineAnchor) {
+        anchor = position;
+        needsEngineAnchor = false;
       }
       // Buffering holds the evidence anchor. A stopped engine cannot prove a gap.
       if (!seeking &&
@@ -258,5 +284,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
     playConfirmed: confirmed,
     interval: interval,
     sealPlayback: seal,
+    seekEpoch: seekEpoch,
+    needsEngineAnchor: needsEngineAnchor,
   );
 }

@@ -9,6 +9,7 @@ EngineFact fact(
   bool buffering = false,
   bool loading = false,
   bool ended = false,
+  int seekEpoch = 0,
 }) => EngineFact(
   position: seconds(position),
   duration: seconds(100),
@@ -17,6 +18,7 @@ EngineFact fact(
   buffering: buffering,
   loading: loading,
   ended: ended,
+  seekEpoch: seekEpoch,
 );
 
 void main() {
@@ -94,8 +96,8 @@ void main() {
             const PlayCommand(),
             fact(1),
             SeekCommand(seconds(50)),
-            fact(2),
-            fact(100, playing: false, ended: true),
+            fact(2, seekEpoch: 1),
+            fact(100, playing: false, ended: true, seekEpoch: 1),
           ],
           intent: DwMediaPlayIntent.play,
           waiting: false,
@@ -112,7 +114,7 @@ void main() {
             SeekCommand(seconds(10)),
             SeekCommand(seconds(20)),
             SeekSettled(seconds(10)),
-            fact(10, playing: false),
+            fact(10, playing: false, seekEpoch: 2),
           ],
           intent: DwMediaPlayIntent.pause,
           waiting: false,
@@ -159,7 +161,7 @@ void main() {
             SeekCommand(seconds(50)),
             const FailureFact('failed'),
             SeekSettled(seconds(50)),
-            fact(50),
+            fact(50, seekEpoch: 1),
           ],
           intent: DwMediaPlayIntent.play,
           waiting: false,
@@ -176,9 +178,9 @@ void main() {
             const PlayCommand(),
             fact(1),
             SeekCommand(seconds(50)),
-            fact(2),
+            fact(2, seekEpoch: 1),
             SeekSettled(seconds(50)),
-            fact(51),
+            fact(51, seekEpoch: 1),
           ],
           intent: DwMediaPlayIntent.play,
           waiting: false,
@@ -195,8 +197,8 @@ void main() {
             const PlayCommand(),
             fact(1),
             SeekCommand(seconds(50)),
-            fact(50),
-            fact(51),
+            fact(50, seekEpoch: 1),
+            fact(51, seekEpoch: 1),
           ],
           intent: DwMediaPlayIntent.play,
           waiting: false,
@@ -230,4 +232,41 @@ void main() {
       ]);
     });
   }
+
+  test('an aborted seek anchors at the next engine fact', () {
+    var state = const MediaPlayerState();
+    final spans = <DwMediaPlayedInterval>[];
+    for (final event in <MediaEvent>[
+      ready,
+      const PlayCommand(),
+      fact(50),
+      SeekCommand(seconds(10)),
+      SeekAborted(seconds(10)),
+      fact(51, seekEpoch: 1),
+    ]) {
+      state = reduceMedia(state, event);
+      if (state.interval case final interval?) spans.add(interval);
+    }
+    expect(spans, [DwMediaPlayedInterval(Duration.zero, seconds(50))]);
+    expect(state.playback.position, seconds(51));
+    expect(state.playback.seekTarget, isNull);
+  });
+
+  test('a poll from before a seek cannot rewind settled playback', () {
+    var state = const MediaPlayerState();
+    final spans = <DwMediaPlayedInterval>[];
+    for (final event in <MediaEvent>[
+      ready,
+      const PlayCommand(),
+      SeekCommand(seconds(50)),
+      SeekSettled(seconds(50)),
+      fact(2),
+      fact(51, seekEpoch: 1),
+    ]) {
+      state = reduceMedia(state, event);
+      if (state.interval case final interval?) spans.add(interval);
+    }
+    expect(state.playback.position, seconds(51));
+    expect(spans, [DwMediaPlayedInterval(seconds(50), seconds(51))]);
+  });
 }

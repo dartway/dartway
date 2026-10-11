@@ -48,6 +48,27 @@ void main() {
     expect(manager.pendingPlaybackReports, isEmpty);
   });
 
+  testWidgets('an aborted backward seek cannot bridge to the next tick', (
+    tester,
+  ) async {
+    debugDwMediaIsWebOverride = true;
+    final held = Completer<void>();
+    final manager = DwMediaSessionManager(
+      config: DwMediaConfig(resume: null, playbackDelivery: (_) => held.future),
+    );
+    final session = manager.open(items: [videoItem('aborted')]);
+    final video = await rig.loadVideo(tester);
+    await session.play();
+    await rig.playVideoTo(tester, const Duration(seconds: 50));
+    video.refuseSeekWith = PlatformException(code: 'AbortError');
+    await session.seek(const Duration(seconds: 10));
+    await rig.playVideoTo(tester, const Duration(seconds: 51));
+    await session.pause();
+    expect(manager.pendingPlaybackReports.single.intervals, [span(0, 50)]);
+    await endSession(tester, session);
+    held.complete();
+  });
+
   testWidgets('without an adapter no coverage is retained', (tester) async {
     final manager = DwMediaSessionManager(
       config: const DwMediaConfig(resume: null),

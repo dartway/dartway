@@ -18,20 +18,31 @@ class AppMediaTimeline extends HookWidget {
     // Where the thumb is while it is dragged; `null` follows playback.
     final dragging = useState<double?>(null);
     final released = useState<double?>(null);
+    final releasedWasTarget = useRef(false);
     useEffect(() {
       dragging.value = null;
       released.value = null;
+      releasedWasTarget.value = false;
       return null;
     }, [session, session.currentItem]);
     useEffect(() {
-      final target = released.value;
-      if (target != null &&
-          playback.position.inMilliseconds == target.round()) {
-        dragging.value = null;
-        released.value = null;
+      void onPosition() {
+        final target = released.value;
+        if (target == null) return;
+        final seekTarget = session.position.value.seekTarget;
+        final releasedTarget = Duration(milliseconds: target.round());
+        if (seekTarget == releasedTarget) {
+          releasedWasTarget.value = true;
+        } else if (seekTarget != null || releasedWasTarget.value) {
+          dragging.value = null;
+          released.value = null;
+          releasedWasTarget.value = false;
+        }
       }
-      return null;
-    }, [playback, released.value]);
+
+      session.position.addListener(onPosition);
+      return () => session.position.removeListener(onPosition);
+    }, [session, session.currentItem]);
     final total = playback.duration.inMilliseconds.toDouble();
     final known = total > 0;
     final position =
@@ -52,6 +63,7 @@ class AppMediaTimeline extends HookWidget {
               onChanged: known
                   ? (value) {
                       released.value = null;
+                      releasedWasTarget.value = false;
                       dragging.value = value;
                     }
                   : null,

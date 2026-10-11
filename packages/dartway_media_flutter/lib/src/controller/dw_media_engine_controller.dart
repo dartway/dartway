@@ -259,6 +259,11 @@ abstract class DwMediaEngineController extends DwMediaController {
   @protected
   void reportEngine(EngineFact fact) => _dispatch(fact);
 
+  /// The seek generation an engine observation belongs to. Polling adapters
+  /// capture this before starting a poll and put it on the resulting fact.
+  @protected
+  int get engineSeekEpoch => _playerState.seekEpoch;
+
   @protected
   void reportPlayRefused() => _dispatch(const PlayRefused());
 
@@ -272,6 +277,9 @@ abstract class DwMediaEngineController extends DwMediaController {
     // Seal before listeners can move the queue and detach this controller.
     if (_playerState.sealPlayback) _onObservationBreak?.call();
     _state.value = next;
+    if (next.isEnded && !previous.isEnded) {
+      unawaited(_quietly(enginePause));
+    }
     if (interval != null) _onRealPlayback(next);
     if (next.isEnded && !previous.isEnded && _playerState.playedSinceSeek) {
       _reachEnd();
@@ -407,7 +415,13 @@ abstract class DwMediaEngineController extends DwMediaController {
         try {
           await engineSeek(target);
         } catch (error, stackTrace) {
-          if (!stale()) reportFailure(error, stackTrace);
+          if (stale()) return;
+          if (dwMediaIsBenignError(error)) {
+            if (_queuedSeek == null) _dispatch(SeekAborted(target));
+            continue;
+          }
+          reportFailure(error, stackTrace);
+          return;
         }
         if (stale() || _failed) return;
         _dispatch(SeekSettled(target));

@@ -26,6 +26,8 @@ final class DwAudioMediaController extends DwMediaEngineController {
   });
 
   AudioPlayer? _player;
+  PlaybackEvent? _playbackEvent;
+  Duration? _lastPlatformPosition;
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   @override
@@ -35,33 +37,50 @@ final class DwAudioMediaController extends DwMediaEngineController {
     unawaited(_release().catchError((Object _) {}));
     final player = AudioPlayer();
     _player = player;
-    void onChange(Object? _) => _onUpdate(player);
+    _playbackEvent = null;
+    _lastPlatformPosition = null;
+    void onState(Object? _) => _onUpdate(player, platformAdvanced: false);
     _subscriptions.addAll([
-      player.playerStateStream.listen(onChange),
-      player.positionStream.listen(onChange),
-      player.bufferedPositionStream.listen(onChange),
+      player.playerStateStream.listen(onState),
+      player.playbackEventStream.listen((event) {
+        if (!identical(_player, player)) return;
+        final previous = _lastPlatformPosition;
+        _playbackEvent = event;
+        _lastPlatformPosition = event.updatePosition;
+        _onUpdate(
+          player,
+          platformAdvanced:
+              previous != null && event.updatePosition > previous,
+        );
+      }),
       player.errorStream.listen((error) {
         if (identical(_player, player)) reportFailure(error);
       }),
     ]);
     await player.setUrl(uri.toString());
-    _onUpdate(player);
+    _onUpdate(player, platformAdvanced: false);
   }
 
-  void _onUpdate(AudioPlayer player) {
+  void _onUpdate(AudioPlayer player, {required bool platformAdvanced}) {
     if (!identical(_player, player)) return;
-    final playerState = player.playerState;
+    final event = _playbackEvent ?? player.playbackEvent;
+    final processingState = event.processingState;
+    final seekEpoch = engineSeekEpoch;
     reportEngine(
       EngineFact(
         loading:
-            playerState.processingState == ProcessingState.idle ||
-            playerState.processingState == ProcessingState.loading,
-        buffering: playerState.processingState == ProcessingState.buffering,
-        ended: playerState.processingState == ProcessingState.completed,
-        playing: playerState.playing,
-        position: player.position,
-        duration: player.duration ?? Duration.zero,
-        buffered: player.bufferedPosition,
+            processingState == ProcessingState.idle ||
+            processingState == ProcessingState.loading,
+        buffering: processingState == ProcessingState.buffering,
+        ended: processingState == ProcessingState.completed,
+        playing:
+            player.playing &&
+            processingState == ProcessingState.ready &&
+            platformAdvanced,
+        position: event.updatePosition,
+        duration: event.duration ?? Duration.zero,
+        buffered: event.bufferedPosition,
+        seekEpoch: seekEpoch,
       ),
     );
   }
@@ -106,6 +125,8 @@ final class DwAudioMediaController extends DwMediaEngineController {
   Future<void> _release() async {
     final player = _player;
     _player = null;
+    _playbackEvent = null;
+    _lastPlatformPosition = null;
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }

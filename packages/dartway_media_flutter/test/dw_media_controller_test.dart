@@ -90,6 +90,39 @@ void main() {
       await release(tester, controller);
     });
 
+    testWidgets('audio: an optimistic play refused by the platform starts '
+        'nothing', (tester) async {
+      debugDwMediaIsWebOverride = true;
+      var started = 0;
+      final controller = controllerFor(
+        audioItem('refused'),
+        callbacks: DwMediaCallbacks(onStarted: (_) => started++),
+      );
+      final track = await rig.loadAudio(tester);
+      track.refusePlayWith = PlatformException(code: 'NotAllowedError');
+      await controller.play();
+      await dwSettleMedia(tester);
+      expect(started, 0);
+      expect(controller.hasReallyPlayed, isFalse);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: extrapolated position alone is not playback evidence', (
+      tester,
+    ) async {
+      var started = 0;
+      final controller = controllerFor(
+        audioItem('extrapolated'),
+        callbacks: DwMediaCallbacks(onStarted: (_) => started++),
+      );
+      await rig.loadAudio(tester);
+      await controller.play();
+      await tester.pump(const Duration(seconds: 5));
+      expect(started, 0);
+      expect(controller.hasReallyPlayed, isFalse);
+      await release(tester, controller);
+    });
+
     testWidgets('a play that never moves — what a refused web play looks like '
         'to video_player — reads as playing, yet starts nothing', (
       tester,
@@ -276,6 +309,25 @@ void main() {
         }),
         1,
       );
+    });
+
+    testWidgets('audio: ending pauses the engine and a scrub back stays paused', (
+      tester,
+    ) async {
+      final controller = controllerFor(audioItem('ended-paused'));
+      final track = await rig.loadAudio(tester);
+      await controller.play();
+      track.advanceTo(const Duration(seconds: 50));
+      await dwSettleMedia(tester);
+      track.finish();
+      await dwSettleMedia(tester);
+      expect(track.playing, isFalse);
+      expect(track.pauseCalls, greaterThan(0));
+      await controller.seek(const Duration(seconds: 40));
+      await dwSettleMedia(tester);
+      expect(track.playing, isFalse);
+      expect(controller.state.value.intent, DwMediaPlayIntent.pause);
+      await release(tester, controller);
     });
   });
 

@@ -75,6 +75,9 @@ final class DwFakeAudio extends AudioPlayerPlatform {
 
   Duration position = Duration.zero;
   bool _released = false;
+  bool playing = false;
+  int pauseCalls = 0;
+  Object? refusePlayWith;
   final List<StreamController<PlaybackEventMessage>> _listeners = [];
 
   bool get isReleased => _released;
@@ -131,10 +134,18 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   }
 
   @override
-  Future<PlayResponse> play(PlayRequest request) async => PlayResponse();
+  Future<PlayResponse> play(PlayRequest request) async {
+    playing = true;
+    if (refusePlayWith case final error?) throw error;
+    return PlayResponse();
+  }
 
   @override
-  Future<PauseResponse> pause(PauseRequest request) async => PauseResponse();
+  Future<PauseResponse> pause(PauseRequest request) async {
+    pauseCalls++;
+    playing = false;
+    return PauseResponse();
+  }
 
   @override
   Future<SetVolumeResponse> setVolume(SetVolumeRequest request) async =>
