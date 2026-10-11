@@ -10,9 +10,9 @@ Future<void> main() async {
   // Concrete development parameters live here; the app itself stays
   // environment agnostic.
   //
-  // A deployed build is compiled against a fixed server address, the origin
-  // the app's calls go to: `--dart-define=DW_BACKEND_URL=https://app.example.com`
-  // (the web app's own host, where `/dw/` is proxied to the server).
+  // Without a define, a web release calls its own origin. Kamal routes /dw, /health and
+  // project HTTP routes to the API; the same web image serves every environment.
+  // Native releases keep the address supplied by --dart-define.
   const deployedBackendUrl = String.fromEnvironment('DW_BACKEND_URL');
 
   // Empty on a local run, where the machine decides instead: the Android
@@ -23,6 +23,8 @@ Future<void> main() async {
   // `Platform`, which does not compile for Flutter web.
   final backendUrl = deployedBackendUrl.isNotEmpty
       ? deployedBackendUrl
+      : kIsWeb && kReleaseMode
+      ? Uri.base.origin
       : !kIsWeb && defaultTargetPlatform == TargetPlatform.android
       ? 'http://10.0.2.2:8080'
       : 'http://localhost:8080';

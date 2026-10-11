@@ -63,6 +63,7 @@ Future<void> main(List<String> args) async {
 
   final commits = _git([
     'log',
+    '--no-merges',
     '--format=%s',
     '$from..$toSha',
   ]).split('\n').where((line) => line.trim().isNotEmpty).toList();
@@ -243,8 +244,9 @@ Future<Map<String, DateTime>?> _publishedVersions(String package) async {
     if (versions == null) return null;
     return {
       for (final entry in versions.cast<Map>())
-        entry['version'] as String:
-            DateTime.parse(entry['published'] as String).toUtc(),
+        entry['version'] as String: DateTime.parse(
+          entry['published'] as String,
+        ).toUtc(),
     };
   } catch (_) {
     return null;
@@ -276,9 +278,10 @@ void _writeChanges(StringBuffer out, List<String> commits) {
   final ungrouped = <String>[];
 
   for (final subject in commits) {
+    final title = subject.replaceFirst(RegExp(r'^#\d+\s+'), '');
     final match = RegExp(
       r'^([a-z]+)(?:\(([^)]*)\))?(!)?:\s*(.+)$',
-    ).firstMatch(subject);
+    ).firstMatch(title);
     if (match == null) {
       ungrouped.add(subject);
       continue;
@@ -297,8 +300,10 @@ void _writeChanges(StringBuffer out, List<String> commits) {
   if (breaking.isNotEmpty) {
     out.writeln('## Breaking');
     out.writeln();
-    out.writeln('Read these before upgrading — each one changes something an '
-        'application already depends on.');
+    out.writeln(
+      'Read these before upgrading — each one changes something an '
+      'application already depends on.',
+    );
     out.writeln();
     for (final line in breaking) {
       out.writeln(line);
@@ -358,8 +363,10 @@ String? _fieldIn(String revision, String path, String field) {
   if (result.exitCode != 0) return null;
   final text = result.stdout as String;
   if (RegExp(r'^publish_to:', multiLine: true).hasMatch(text)) return null;
-  final match = RegExp('^$field:\\s*(\\S+)\\s*\$', multiLine: true)
-      .firstMatch(text);
+  final match = RegExp(
+    '^$field:\\s*(\\S+)\\s*\$',
+    multiLine: true,
+  ).firstMatch(text);
   return match?.group(1);
 }
 

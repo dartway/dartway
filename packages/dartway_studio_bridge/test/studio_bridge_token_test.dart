@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:dartway_studio_bridge/dartway_studio_bridge.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// Studio's half of the contract, written out here rather than imported: the
@@ -226,6 +227,25 @@ void main() {
   });
 
   group('studioSignedAccessValidator', () {
+    test('explicit empty origin uses the web release origin', () async {
+      final validator = studioSignedAccessValidator(
+        '',
+        publicKey: studioPublicKey,
+      );
+      if (kIsWeb && kReleaseMode) {
+        final ownToken = await _signToken(
+          signingKeyPair: studioKeyPair,
+          origin: Uri.base.origin,
+          expiresAt: DateTime.now().add(const Duration(minutes: 10)),
+        );
+        expect(await validator(ownToken), isTrue);
+        expect(await validator(validToken), isFalse);
+        expect(await validator('unsigned'), isFalse);
+        expect(await validator(''), isFalse);
+      } else {
+        expect(await validator('unsigned'), isTrue);
+      }
+    });
     test('lets a valid token in and keeps everything else out', () async {
       final validator = studioSignedAccessValidator(
         appOrigin,
@@ -243,12 +263,13 @@ void main() {
     });
 
     test(
-      'a build with no origin named accepts any connection (local dev)',
+      'a debug/profile build with no origin named accepts any connection',
       () async {
         final validator = studioSignedAccessValidator('');
         expect(await validator(''), isTrue);
         expect(await validator('anything at all'), isTrue);
       },
+      skip: kIsWeb && kReleaseMode,
     );
   });
 }

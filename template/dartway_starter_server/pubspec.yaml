@@ -9,7 +9,7 @@ dependencies:
   dartway_core_server: ^0.22.0-dev.0
   # Events from the app in this project's Postgres, and the reports and
   # dashboards the admin panel reads from them.
-  dartway_analytics_server: ^0.2.0
+  dartway_analytics_server: ^0.3.0-dev.0
   # The contract with the app. A path dependency, so the server image copies
   # this directory too — an image that does not is unbuildable, and pub says
   # so three layers from the cause.

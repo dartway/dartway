@@ -37,10 +37,10 @@ dependencies:
   # Where the signed-in session is kept: the core asks the plugins for whoever
   # claimed the DwKeyValueStorePlugin role, and without one there is nowhere to
   # put the session.
-  dartway_shared_preferences: ^0.6.0
+  dartway_shared_preferences: ^0.8.0-dev.0
   # Analytics: the app's events, sent in batches to the server, and the calls
   # the admin panel's dashboards change through (`dw.plugins.analytics`).
-  dartway_analytics_flutter: ^0.2.0
+  dartway_analytics_flutter: ^0.3.0-dev.0
 
   flutter_hooks: ^0.21.2
   hooks_riverpod: ^3.0.0

@@ -183,9 +183,11 @@ void main() {
         await DwFileStorageSetup.provision(config);
 
         expect(await TestStorage.keysIn(admin, config.publicBucket!), [
+          '_dartway/visibility-probe',
           'avatar/1/a.png',
         ]);
         expect(await TestStorage.keysIn(admin, config.privateBucket!), [
+          '_dartway/visibility-probe',
           'document/1/a.pdf',
         ]);
         expect(
@@ -232,7 +234,9 @@ void main() {
       final bucket = testBucketName('prv');
       created.add(bucket);
       await DwFileStorageSetup.provision(storageConfig(privateBucket: bucket));
-      expect(await TestStorage.keysIn(admin, bucket), isEmpty);
+      expect(await TestStorage.keysIn(admin, bucket), [
+        '_dartway/visibility-probe',
+      ]);
     });
 
     test('DwTestStorage gives a test a provisioned pair and takes it away, '
@@ -254,7 +258,10 @@ void main() {
         (await anonymous(storage.privateBucket, 'document/1/a.pdf')).object,
         403,
       );
-      expect(await storage.keys(storage.privateBucket), ['document/1/a.pdf']);
+      expect(await storage.keys(storage.privateBucket), [
+        '_dartway/visibility-probe',
+        'document/1/a.pdf',
+      ]);
 
       await storage.drop();
       for (final bucket in [storage.publicBucket, storage.privateBucket]) {

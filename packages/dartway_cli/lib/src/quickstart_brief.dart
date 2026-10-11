@@ -115,7 +115,7 @@ In a browser the app calls its server **on its own origin**, as the deployment s
     cd my_app/my_app_flutter
     dart run dartway_cli:dartway dev web            # flutter's web server + the API on http://localhost:8000
     # or a release build:
-    flutter build web --dart-define=DW_BACKEND_URL=http://localhost:8000
+    flutter build web
     dart run dartway_cli:dartway dev proxy --web-dir build/web
 
 Open `http://localhost:8000` exactly — to a browser `127.0.0.1` is another origin.

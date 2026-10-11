@@ -3,86 +3,24 @@
 ## 0.22.0-dev.0
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
+- The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).
 
 ## 0.21.0
 
+### Changes
+
 - `dw.files.getLink(fileId, download: true)` asks for a link that saves the file rather than shows
   it; `DwFakeStorage` marks such a link with `&disposition=attachment` (dartway/dartway#481).
-
-- The family moves in lockstep to deliver the migration note for the router that follows a provider
-  (dartway/dartway#407).
-
-## 0.21.0-dev.16
 
 - A call that times out names the failure of its attempts as `DwTimeoutException.lastError`, as
   documented, and no longer an attempt that hung: the last attempt is cut to what is left of the
   deadline, and on the web that sliver ended in its own `TimeoutException`, hiding the network error
   before it (dartway/dartway#400). A server that never answers times out with no `lastError`.
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
-  test layout and spacing checks of `dartway check` (dartway/dartway#391).
-
-## 0.21.0-dev.15
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
-  (dartway/dartway#390).
-
-## 0.21.0-dev.14
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
-  state and command checks of `dartway check` (dartway/dartway#389).
-
-## 0.21.0-dev.13
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#388).
-
-## 0.21.0-dev.12
-
-- Nothing changed here; the family moves in lockstep with `dartway_orm` (dartway/dartway#384).
-
-## 0.21.0-dev.11
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
-
-## 0.21.0-dev.10
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
-
-## 0.21.0-dev.9
 
 - **Every call carries the device's UTC offset** (`Dw-Utc-Offset`), read at each send, so a change
   of zone or of daylight saving time reaches the server with the next call; the server reads it as
   `ctx.callerUtcOffset` (dartway/dartway#385). `DwAppClient(utcOffset:)` reports a fixed offset
   instead — for tests; `DwFakeServer.newClient` pins zero unless told otherwise.
-
-## 0.21.0-dev.8
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#355, #356).
-
-## 0.21.0-dev.7
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).
-
-## 0.21.0-dev.6
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.5
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.4
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.3
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.2
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (#310, D-087).
-
-## 0.21.0-dev.1
 
 - **A browser upload no longer stalls and restarts on a large file** (#309). `DwAppClient` picks `XMLHttpRequest` for storage puts on the web by default now — `fetch` (still `DwHttpStorageTransport`'s implementation, still the default off the web) reads the whole request body before sending it, so its progress jumped to the end immediately and the client's stall watchdog, seeing nothing more, aborted a transfer that was still going. `DwStoragePut` gained `reportSent`, the seam a transport uses to report bytes actually reaching the network separately from reading its body; existing custom transports need no change — before the first call, progress still comes from reading the body, exactly as before this existed. `DwXhrStorageTransport` calls `reportSent(0)` before it reads anything, since it too has to read the whole body into memory before it can send it (a browser cannot stream a request body into `XMLHttpRequest`) — without that call the read itself would still read as progress, the same jump-to-the-end this exists to fix, just from the fallback path instead of from `fetch`. See D-088 for the fuller account, including a first version of the fix that made a silent, fully-accepted-but-never-answered connection *worse* on `dart:io`, caught in review before merging.
 

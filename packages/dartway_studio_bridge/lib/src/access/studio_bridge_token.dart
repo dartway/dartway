@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
+import 'package:flutter/foundation.dart';
 
 /// The public half of the key pair DartWay Studio signs bridge access tokens
 /// with: base64 of the 32 raw Ed25519 public-key bytes.
@@ -133,25 +134,29 @@ bool looksLikeStudioBridgeToken(String accessToken) {
 /// A stolen token is therefore worthless anywhere but here, which is the
 /// property the whole scheme exists for.
 ///
-/// **An empty [appOrigin] accepts any connection.** That is the zero-config
-/// local-dev mode: a build that was never told what address it answers at (no
-/// `STUDIO_APP_ORIGIN` define) lets a Studio on the same machine drive it
-/// without anyone issuing keys. A deployed build names its address and from
-/// then on only a signed token gets in.
+/// An empty [appOrigin] resolves to [Uri.base.origin] in a web release, so
+/// even an explicit `studioSignedAccessValidator('')` requires a signed token
+/// for the current app address. Debug/profile and non-web builds with an empty
+/// origin accept any connection for local preview. A nonempty origin always
+/// requires a signed token issued for that address.
 ///
 /// [publicKey] exists for tests and for the day an app has to trust a Studio
 /// running on someone else's servers; a normal build leaves it alone.
 Future<bool> Function(String accessToken) studioSignedAccessValidator(
   String appOrigin, {
   String publicKey = studioSigningPublicKey,
-}) =>
-    (accessToken) async =>
-        appOrigin.trim().isEmpty ||
-        await verifyStudioBridgeToken(
-          accessToken,
-          appOrigin: appOrigin,
-          publicKey: publicKey,
-        );
+}) {
+  final origin = appOrigin.trim().isEmpty && kIsWeb && kReleaseMode
+      ? Uri.base.origin
+      : appOrigin;
+  return (accessToken) async =>
+      origin.trim().isEmpty ||
+      await verifyStudioBridgeToken(
+        accessToken,
+        appOrigin: origin,
+        publicKey: publicKey,
+      );
+}
 
 /// Decodes one unpadded base64url segment, restoring the padding `base64Url`
 /// insists on.

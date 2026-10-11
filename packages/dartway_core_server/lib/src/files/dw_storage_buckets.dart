@@ -1,9 +1,12 @@
 import 'dart:convert';
 
+import 'package:crypto/crypto.dart';
 import 'package:meta/meta.dart';
 
+import '../alerts/dw_server_logger.dart';
 import 'dw_file_storage.dart';
 import 'dw_object_store.dart';
+import 'dw_storage_cors.dart';
 
 /// Creates the two buckets of a [DwFileStorageConfig] on a storage the project
 /// runs itself — RustFS in development, in tests, in a `dartway deploy` stack —
@@ -20,7 +23,13 @@ abstract final class DwFileStorageSetup {
   /// [DwFileStorageConfig.privateBucket] where they are missing; sets the
   /// public bucket's policy to [publicReadPolicy] (anonymous `s3:GetObject`
   /// on its objects, nothing else — not its listing); deletes the private
-  /// bucket's policy, so nothing but a signed request reads it.
+  /// bucket's policy, so nothing but a signed request reads it. Writes the
+  /// visibility probe into each bucket after setting its policy, for outside
+  /// checks even when startup bucket verification is disabled. Configures
+  /// both buckets' browser CORS for GET and PUT from [allowedOrigins]. With
+  /// no origins, CORS is left untouched; no process environment is read.
+  /// Storage answering `501 NotImplemented` logs a warning with its endpoint
+  /// and bucket and continues; every other CORS error stops provisioning.
   ///
   /// Deleting the policy is right for a storage the project owns wholly and
   /// wrong for a bucket somebody administers with policies of their own:
@@ -33,10 +42,13 @@ abstract final class DwFileStorageSetup {
   static Future<void> provision(
     DwFileStorageConfig config, {
     Duration requestTimeout = const Duration(seconds: 30),
+    Iterable<String>? allowedOrigins,
   }) async {
     if (config.problems case final problems when problems.isNotEmpty) {
       throw ArgumentError('file storage configuration: ${problems.join('; ')}');
     }
+    final origins = allowedOrigins?.toSet() ?? const <String>{};
+    final cors = origins.isEmpty ? null : DwStorageCorsRule(origins).xml;
     final store = DwObjectStore(config, requestTimeout: requestTimeout);
     try {
       if (config.publicBucket case final bucket?) {
@@ -56,6 +68,8 @@ abstract final class DwFileStorageSetup {
             code,
           );
         }
+        if (cors != null) await _setCors(store, bucket, cors);
+        await _writeVisibilityProbe(store, bucket);
       }
       if (config.privateBucket case final bucket?) {
         await _create(store, bucket);
@@ -72,6 +86,8 @@ abstract final class DwFileStorageSetup {
             code,
           );
         }
+        if (cors != null) await _setCors(store, bucket, cors);
+        await _writeVisibilityProbe(store, bucket);
       }
     } finally {
       store.close();
@@ -95,6 +111,40 @@ abstract final class DwFileStorageSetup {
       },
     ],
   });
+
+  static Future<void> _setCors(
+    DwObjectStore store,
+    String bucket,
+    String cors,
+  ) async {
+    final body = utf8.encode(cors);
+    final response = await store.send(
+      'PUT',
+      bucket: bucket,
+      query: [('cors', '')],
+      body: body,
+      headers: {
+        'content-type': 'application/xml',
+        'content-md5': base64.encode(md5.convert(body).bytes),
+      },
+    );
+    final code = await DwObjectStore.errorCodeOf(response);
+    if (response.statusCode == 501 && code == 'NotImplemented') {
+      const DwConsoleLogger().warning(
+        'file storage ${store.config.endpoint.replace(userInfo: '')} bucket "$bucket" does not '
+        'implement CORS (501 NotImplemented); provisioning continues. '
+        'The outside storageCors probe reports the actual CORS state.',
+      );
+      return;
+    }
+    if (response.statusCode >= 300) {
+      throw DwStorageException(
+        'PUT CORS of $bucket',
+        response.statusCode,
+        code,
+      );
+    }
+  }
 
   static Future<void> _create(DwObjectStore store, String bucket) async {
     final region = store.config.region;
@@ -177,18 +227,13 @@ abstract final class DwBucketCheck {
           ];
       }
 
-      final put = await store.send(
-        'PUT',
-        bucket: bucket,
-        key: probeKey,
-        body: probeBody,
-        headers: {'content-type': 'text/plain'},
-      );
-      final code = await DwObjectStore.errorCodeOf(put);
-      if (put.statusCode >= 300) {
+      try {
+        await _writeVisibilityProbe(store, bucket);
+      } on DwStorageException catch (error) {
         return [
           '$name does not accept writes with the configured keys: PUT '
-              'answered ${put.statusCode}${code == null ? '' : ' $code'}',
+              'answered ${error.status}'
+              '${error.errorCode == null ? '' : ' ${error.errorCode}'}',
         ];
       }
 
@@ -243,5 +288,25 @@ abstract final class DwBucketCheck {
       if (a[i] != b[i]) return false;
     }
     return true;
+  }
+}
+
+// Provisioning and verification leave the same constant object for outside
+// probes, even when startup verification is disabled (the Kamal topology).
+Future<void> _writeVisibilityProbe(DwObjectStore store, String bucket) async {
+  final response = await store.send(
+    'PUT',
+    bucket: bucket,
+    key: DwBucketCheck.probeKey,
+    body: DwBucketCheck.probeBody,
+    headers: {'content-type': 'text/plain'},
+  );
+  final code = await DwObjectStore.errorCodeOf(response);
+  if (response.statusCode >= 300) {
+    throw DwStorageException(
+      'PUT visibility probe of $bucket',
+      response.statusCode,
+      code,
+    );
   }
 }

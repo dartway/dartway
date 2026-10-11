@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.6.1
+## 0.8.0-dev.0
+
+- Dependency carets follow DartWay 0.22 and its satellites on their next
+  development lines; public dependency types follow those releases (#530).
+
+## 0.7.0
+
+- Targets DartWay 0.21 (`dartway_core_flutter` `^0.21.0`). `DwSharedPreferences` extends that
+  package's `DwKeyValueStorePlugin`, so the caret moves this package a minor.
 
 - Fixed: `provider`, `mappedProvider`, `providerFamily` and `mappedProviderFamily` no longer bind to
   the `DwSharedPreferences` instance they were called on. The store is now resolved when the

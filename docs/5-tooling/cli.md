@@ -149,7 +149,7 @@ lands in that repository.
 | `--[no-]git` | on | Initialize a repository with an initial commit |
 
 **`--framework-path` is how a project is built against a framework checkout that is not published** —
-this tree's own unreleased changes, or a fork. The rewrite's package family (`^0.20.0`) is on
+this tree's own unreleased changes, or a fork. The rewrite's package family (`^0.21.0`) is on
 pub.dev, so a project created normally resolves on its own; `--framework-path` instead resolves the
 same pubspecs against the local checkout the template was written against. The block it writes says
 to remove it once the versions it points at are published.
@@ -402,12 +402,20 @@ Why a database per run rather than a compose service, and how a suite uses it, i
 
 ```bash
 cd <project>_flutter
+dart run dartway_cli:dartway deploy kamal                 # generate Studio/Kamal files
+dart run dartway_cli:dartway deploy kamal --check         # reject stale generated files
 dart run dartway_cli:dartway deploy setup --env staging
 dart run dartway_cli:dartway deploy check --env staging
 dart run dartway_cli:dartway deploy run   --env staging
 dart run dartway_cli:dartway deploy run   --env staging --revision "$GITHUB_SHA"
 dartway secret set SMS_API_TOKEN --env staging
 ```
+
+`kamal` generates stage/prod Kamal configs, the Studio manifest and a CI image
+workflow from `deploy/config.yaml`, literal project routes and the resolved CLI
+lock. `kamal --check` rejects stale output without writing; web release builds
+call `Uri.base.origin`, so one image serves both destinations. See
+[Kamal and GHCR](deploy.md#kamal-and-ghcr).
 
 `setup` provisions a server and renders its Compose and Nginx configuration, `run` deploys, and
 `check` asserts that a deployment would work without changing anything. `run --revision <sha>`

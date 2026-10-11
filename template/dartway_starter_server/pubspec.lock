@@ -111,14 +111,14 @@ packages:
       path: "../../packages/dartway_analytics_server"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0-dev.0"
   dartway_analytics_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_analytics_shared"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0-dev.0"
   dartway_client:
     dependency: "direct overridden"
     description:

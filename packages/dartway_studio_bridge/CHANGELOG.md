@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0-dev.0
+
+- `studioSignedAccessValidator` accepts Studio tokens only for the current web
+  release origin when its origin argument is empty. Debug/profile builds without
+  an origin allow local preview (#530).
+
 ## 0.11.0
 
 **Breaking: `StudioFrameController` gains `setInteractive(bool interactive)`.**

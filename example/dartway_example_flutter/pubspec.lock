@@ -159,14 +159,14 @@ packages:
       path: "../../packages/dartway_analytics_flutter"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0-dev.0"
   dartway_analytics_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_analytics_shared"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0-dev.0"
   dartway_cli:
     dependency: "direct dev"
     description:
@@ -208,28 +208,28 @@ packages:
       path: "../../packages/dartway_media_flutter"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0-dev.0"
   dartway_push_firebase:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_push_firebase"
       relative: true
     source: path
-    version: "0.5.1"
+    version: "0.7.0-dev.0"
   dartway_push_flutter:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_push_flutter"
       relative: true
     source: path
-    version: "0.6.0"
+    version: "0.7.0-dev.0"
   dartway_push_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_push_shared"
       relative: true
     source: path
-    version: "0.5.0"
+    version: "0.7.0-dev.0"
   dartway_router:
     dependency: "direct overridden"
     description:
@@ -243,7 +243,7 @@ packages:
       path: "../../packages/dartway_shared_preferences"
       relative: true
     source: path
-    version: "0.6.1"
+    version: "0.8.0-dev.0"
   dbus:
     dependency: transitive
     description:

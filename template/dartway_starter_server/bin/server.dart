@@ -44,7 +44,10 @@ Future<void> main() async {
   );
   final storage = env.server.storage;
   if (storage != null && env.server.provisionStorage) {
-    await DwFileStorageSetup.provision(storage);
+    await DwFileStorageSetup.provision(
+      storage,
+      allowedOrigins: env.server.allowedOrigins,
+    );
   }
   final server = DartwayStarterServer.build(
     database: env.server.database,

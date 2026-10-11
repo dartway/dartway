@@ -1,0 +1,8 @@
+packages:
+  dartway_cli:
+    dependency: direct dev
+    description:
+      path: ../framework/packages/dartway_cli
+      relative: true
+    source: path
+    version: '0.24.0'

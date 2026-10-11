@@ -75,14 +75,11 @@ class DwStudioBinding extends ConsumerStatefulWidget {
   /// token it presents. Until it says yes, the bridge answers nothing and
   /// executes nothing.
   ///
-  /// Pass
-  /// `studioSignedAccessValidator(const String.fromEnvironment('STUDIO_APP_ORIGIN'))`
-  /// — a token signed by Studio and issued for this app's own address gets in,
-  /// so a token taken from here is useless anywhere else. The key that checks
-  /// the signature ships inside the bridge package; the build names nothing but
-  /// where it answers, and an empty define means local development with no
-  /// check. Left null, any Studio is accepted: right on a laptop, wide open in
-  /// production.
+  /// When omitted, the binding checks Studio's signature against this app's
+  /// own address: `STUDIO_APP_ORIGIN` when defined, otherwise `Uri.base.origin`
+  /// in a web release. Debug and profile builds without the define accept a
+  /// local Studio without a token. The public signing key ships in the bridge;
+  /// the build contains no secret. Supply a validator to override this policy.
   final Future<bool> Function(String accessToken)? validateAccessToken;
 
   /// The pipe to talk over. Defaults to the embedding window — the only thing
@@ -117,7 +114,11 @@ class _DwStudioBindingState extends ConsumerState<DwStudioBinding>
       // freshly connected Studio sees them without waiting for navigation.
       currentFeatures: dwStudioMountedFeatures,
       currentLocale: _currentLocale,
-      validateAccessToken: widget.validateAccessToken,
+      validateAccessToken:
+          widget.validateAccessToken ??
+          studioSignedAccessValidator(
+            const String.fromEnvironment('STUDIO_APP_ORIGIN'),
+          ),
       inspectPoint: dwStudioFeatureAtPoint,
       channel: widget.channel,
     );

@@ -64,30 +64,26 @@ framework is a note's business.
 
 ```markdown
 ---
-title: The web image takes the app's origin as a build argument
+title: Bundle CanvasKit into the web image
 affects:
   dartway_cli: "0.11.0"
 ---
 
 ## Who is affected
 
-A project whose `<project>_flutter/Dockerfile` declares no `ARG DW_BACKEND_URL` — every project
-created before `dartway_cli` 0.11.0. `dartway deploy` passes the app its own origin under that name,
-and Docker drops a build argument the Dockerfile does not declare, without a word.
+A project whose `<project>_flutter/Dockerfile` builds web without `--no-web-resources-cdn`.
 
 ## What to change
 
-`<project>_flutter/Dockerfile`, before `flutter build web`:
+`<project>_flutter/Dockerfile`:
 
-    + ARG DW_BACKEND_URL
-    + RUN test -n "$DW_BACKEND_URL"
     - RUN flutter build web --release
-    + RUN flutter build web --release \
-    +     --dart-define="DW_BACKEND_URL=${DW_BACKEND_URL}"
+    + RUN flutter build web --release --no-web-resources-cdn
 
 ## How to check
 
-`dartway deploy check --env <environment> --local`: `web-backend-url` passes.
+Deploy the image and run `dartway deploy check --env <environment>`:
+`web-resources-local` passes.
 ```
 
 (An illustration of the form, not a real note: the version is made up.)
