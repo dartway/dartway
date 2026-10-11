@@ -2,6 +2,9 @@
 
 ## 0.25.0-dev.0
 
+- The generated Images workflow labels each image with its Kamal `service`;
+  without it `kamal deploy` refuses the CI-built image (found by the #530
+  end-to-end deploy).
 - `deploy kamal` generates Kamal 2.12 destinations with kamal-proxy v0.10.2,
   literal server route prefixes, the Studio deployment manifest and cached GHCR
   image builds from the project's deployment configuration. Image publication
