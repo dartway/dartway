@@ -59,8 +59,8 @@ Sign in as **79990000003** (a client), **79990000002** or **79990000004**
 phones get a code printed in the server log.
 
 A browser app calls its server on the same origin (`/dw/` proxied next to the
-web build, as the deploy does), so the web build names that origin:
-`flutter build web --dart-define=DW_BACKEND_URL=https://app.example.com`.
+web build, as the deploy does). A release uses `Uri.base.origin`:
+`flutter build web --release`.
 The server's `DW_ALLOWED_ORIGINS` lists further origins allowed to open the
 live socket — full origins, `https://app.example.com,http://localhost:5000`.
 Which app builds it still serves is the shared package's `version:` — the

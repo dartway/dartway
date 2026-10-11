@@ -1,0 +1,10 @@
+packages:
+  dartway_cli:
+    dependency: direct dev
+    description:
+      path: packages/dartway_cli
+      ref: master
+      resolved-ref: 0123456789abcdef0123456789abcdef01234567
+      url: https://github.com/dartway/dartway.git
+    source: git
+    version: '0.24.0'

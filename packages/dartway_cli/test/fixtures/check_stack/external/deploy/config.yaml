@@ -1,0 +1,20 @@
+staging:
+  host: 203.0.113.10
+  ssh_user: root
+  os: ubuntu
+  repo: git@github.com:acme/probe.git
+  branch: master
+  ssl_email: ops@example.com
+  api_domain: api.stage.invalid
+  app_domain: app.stage.invalid
+  storage: external
+production:
+  host: 203.0.113.10
+  ssh_user: root
+  os: ubuntu
+  repo: git@github.com:acme/probe.git
+  branch: master
+  ssl_email: ops@example.com
+  api_domain: api.prod.invalid
+  app_domain: app.prod.invalid
+  storage: external

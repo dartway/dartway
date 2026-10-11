@@ -188,11 +188,11 @@ update the package. There is nothing to copy out of Studio, store, or rotate.
 The signature must be asymmetric for exactly this reason — an HMAC over a
 shared secret would put that secret back into a public web bundle.
 
-`studioSignedAccessValidator('')` — a build that names no origin — **accepts
-any connection**. That is the zero-config local-dev mode: Studio on your laptop
-previews your local build without anyone issuing keys. A deployed build names
-its address (`--dart-define=STUDIO_APP_ORIGIN=https://app.example`) and from
-then on only a signed token gets in.
+`studioSignedAccessValidator('')` uses `Uri.base.origin` in a web release and
+requires a signed token for that address. The same image can serve stage and prod.
+Debug/profile and non-web builds with no origin accept any connection for local
+preview. An explicit origin (`--dart-define=STUDIO_APP_ORIGIN=https://app.example`)
+always requires a signed token issued for that address.
 
 ## Connecting (Studio side)
 

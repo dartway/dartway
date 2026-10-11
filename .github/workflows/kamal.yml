@@ -1,0 +1,89 @@
+name: Kamal config
+
+on:
+  pull_request:
+    paths:
+      - 'packages/dartway_cli/**'
+      - 'template/**'
+      - '.github/workflows/kamal.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'packages/dartway_cli/**'
+      - 'template/**'
+      - '.github/workflows/kamal.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  config:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.6
+          channel: stable
+          cache: true
+      - name: Create and resolve a project from this checkout
+        env:
+          GIT_AUTHOR_NAME: Config proof
+          GIT_AUTHOR_EMAIL: config-proof@example.com
+          GIT_COMMITTER_NAME: Config proof
+          GIT_COMMITTER_EMAIL: config-proof@example.com
+        run: |
+          dart pub global activate --source path packages/dartway_cli
+          mkdir -p "$RUNNER_TEMP/kamal"
+          cd "$RUNNER_TEMP/kamal"
+          dartway create kamalcheck --framework-path "$GITHUB_WORKSPACE"
+          cd kamalcheck/kamalcheck_flutter
+          flutter pub get
+      - name: Configure destinations and generate their contract
+        run: |
+          cd "$RUNNER_TEMP/kamal/kamalcheck"
+          cat > deploy/config.yaml <<'YAML'
+          staging:
+            host: 203.0.113.10
+            ssh_user: root
+            os: ubuntu
+            repo: git@github.com:acme/kamalcheck.git
+            branch: master
+            ssl_email: ops@example.com
+            api_domain: api.example.com
+            app_domain: app.example.com
+            storage: bundled
+            storage_domain: files.example.com
+          production:
+            host: 203.0.113.20
+            ssh_user: deploy
+            os: ubuntu
+            repo: git@github.com:acme/kamalcheck.git
+            branch: release
+            ssl_email: ops@example.com
+            api_domain: api.production.example.com
+            app_domain: app.production.example.com
+            storage: bundled
+            storage_domain: files.production.example.com
+          YAML
+          cd kamalcheck_flutter
+          dart run dartway_cli:dartway deploy kamal
+          dart run dartway_cli:dartway deploy kamal --check
+      - name: Validate every service and destination with Kamal 2.12
+        run: |
+          cd "$RUNNER_TEMP/kamal/kamalcheck"
+          mkdir -p .kamal
+          cat > .kamal/secrets-common <<'SECRETS'
+          KAMAL_REGISTRY_PASSWORD=config-proof
+          DW_DATABASE_PASSWORD=config-proof
+          DW_STORAGE_ACCESS_KEY=config-proof
+          DW_STORAGE_SECRET_KEY=config-proof
+          SECRETS
+          for destination in stage prod; do
+            for service in storage api web; do
+              docker run --rm -v "$PWD:/work:ro" -w /work \
+                ghcr.io/basecamp/kamal:v2.12.0 \
+                config -c "deploy/kamal/$service.yml" -d "$destination"
+            done
+          done
