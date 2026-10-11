@@ -63,6 +63,7 @@ Future<void> main(List<String> args) async {
 
   final commits = _git([
     'log',
+    '--no-merges',
     '--format=%s',
     '$from..$toSha',
   ]).split('\n').where((line) => line.trim().isNotEmpty).toList();
