@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartway_router/dartway_router.dart';
 import 'package:dartway_router/testing.dart';
 import 'package:flutter/material.dart';
@@ -329,4 +331,3 @@ enum LegacyNullThroughRoutes implements DwNavigationRoute<SessionState> {
     (state, _) => state.surveyDone == false ? '/survey' : null,
   ];
 }
-import 'dart:async';

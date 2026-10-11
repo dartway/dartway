@@ -119,6 +119,11 @@ class DwAppRouter<RouterState> {
 
     final refresh = _refresh = _RouterRefresh();
     _state = ref.listen<RouterState>(source, (_, _) {
+      // A state change can flip the guards' answer for the location already
+      // shown — pending to allowed or back — without moving the URL. `refresh`
+      // makes go_router re-run the redirect, which handles the answers that
+      // move the location; the answers that keep it are re-decided by the
+      // pending switch inside each page, which follows the same notifier.
       _decisions.clear();
       refresh.notify();
     });
@@ -270,26 +275,35 @@ class DwAppRouter<RouterState> {
               .map((route) => _buildRoute(route, navigationZones))
               .toList();
 
+          // A zone that cannot answer pending keeps go_router's page exactly
+          // as its shell builder declares it: no decision to re-evaluate.
+          final gatesPending =
+              options.pendingBuilder != null &&
+              zone.any((route) => route.zoneGuards.isNotEmpty);
+
           // StatefulShellRoute: each root route becomes an independent branch,
           // preserving its navigation stack across tab switches.
           if (zone.first.statefulShellRouteBuilder != null) {
             final shellBuilder = zone.first.statefulShellRouteBuilder!;
             return <RouteBase>[
               StatefulShellRoute.indexedStack(
-                pageBuilder: (context, state, navigationShell) {
-                  if (_showsPending(state)) {
-                    return pageBuilder(
-                      context,
-                      state.pageKey,
-                      _pendingOver(
+                pageBuilder: gatesPending
+                    ? (context, state, navigationShell) => pageBuilder(
                         context,
-                        state,
-                        child: navigationShell,
-                      ),
-                    );
-                  }
-                  return shellBuilder(context, state, navigationShell);
-                },
+                        state.pageKey,
+                        _PendingSwitch(
+                          listenable: _refresh,
+                          showsPending: _showsPending,
+                          pendingBuilder: options.pendingBuilder,
+                          state: state,
+                          offstageChild: navigationShell,
+                          allowedBuilder: (context) => _hostPage(
+                            context,
+                            shellBuilder(context, state, navigationShell),
+                          ),
+                        ),
+                      )
+                    : shellBuilder,
                 notifyRootObserver: options.shellNotifyRootObserver,
                 branches: rootRoutes
                     .map((r) => StatefulShellBranch(routes: <RouteBase>[r]))
@@ -303,16 +317,23 @@ class DwAppRouter<RouterState> {
             final shellBuilder = zone.first.shellRouteBuilder!;
             return <RouteBase>[
               ShellRoute(
-                pageBuilder: (context, state, child) {
-                  if (_showsPending(state)) {
-                    return pageBuilder(
-                      context,
-                      state.pageKey,
-                      _pendingOver(context, state, child: child),
-                    );
-                  }
-                  return shellBuilder(context, state, child);
-                },
+                pageBuilder: gatesPending
+                    ? (context, state, child) => pageBuilder(
+                        context,
+                        state.pageKey,
+                        _PendingSwitch(
+                          listenable: _refresh,
+                          showsPending: _showsPending,
+                          pendingBuilder: options.pendingBuilder,
+                          state: state,
+                          offstageChild: child,
+                          allowedBuilder: (context) => _hostPage(
+                            context,
+                            shellBuilder(context, state, child),
+                          ),
+                        ),
+                      )
+                    : shellBuilder,
                 notifyRootObserver: options.shellNotifyRootObserver,
                 routes: rootRoutes,
               ),
@@ -359,9 +380,18 @@ class DwAppRouter<RouterState> {
         // rebuilds). Deriving the key from name + path instead would collide
         // whenever the same location appears twice on the stack and trip the
         // Navigator's _debugCheckDuplicatedPageKeys assertion.
-        final child = _showsPending(state)
-            ? options.pendingBuilder!(context, state)
-            : route.descriptor.pageWidget;
+        final Widget child;
+        if (options.pendingBuilder == null) {
+          child = route.descriptor.pageWidget;
+        } else {
+          child = _PendingSwitch(
+            listenable: _refresh,
+            showsPending: _showsPending,
+            pendingBuilder: options.pendingBuilder,
+            state: state,
+            allowedBuilder: (_) => route.descriptor.pageWidget,
+          );
+        }
         return pageBuilder(context, state.pageKey, child);
       },
       // Recursively build child routes
@@ -376,22 +406,36 @@ class DwAppRouter<RouterState> {
   }
 
   bool _showsPending(GoRouterState state) {
+    if (options.pendingBuilder == null) return false;
     final decision = _guardDecision(state);
-    return options.pendingBuilder != null &&
-        (decision.isPending || decision.redirectPath != null);
+    return decision.isPending || decision.redirectPath != null;
   }
 
-  Widget _pendingOver(
-    BuildContext context,
-    GoRouterState state, {
-    required Widget child,
-  }) => Stack(
-    fit: StackFit.expand,
-    children: [
-      Offstage(offstage: true, child: child),
-      options.pendingBuilder!(context, state),
-    ],
-  );
+  /// Renders a zone shell's own [Page] as the content of the router's page.
+  ///
+  /// go_router caches the pages it built for a location and rebuilds them only
+  /// when the location changes, so a decision that flips without moving the
+  /// URL cannot re-run the shell's page builder. The shell's page is asked for
+  /// when the switch builds and its content — the shell chrome around the
+  /// zone's navigator — is hosted inside the router's own page, whose child
+  /// re-decides pending vs. allowed on every router-state change. The
+  /// transition belongs to the router's `pageBuilder`, as it already does for
+  /// every plain route.
+  Widget _hostPage(BuildContext context, Page<dynamic> page) {
+    final Route<dynamic> route = page.createRoute(context);
+    if (route is! ModalRoute<dynamic>) {
+      throw StateError(
+        'A zone shell page must be a modal route page (MaterialPage, '
+        'CupertinoPage, CustomTransitionPage) to re-decide pending guards: '
+        '${page.runtimeType} creates ${route.runtimeType}.',
+      );
+    }
+    return route.buildPage(
+      context,
+      kAlwaysCompleteAnimation,
+      kAlwaysCompleteAnimation,
+    );
+  }
 
   // ------------------------------------------------------------
   // Registry
@@ -539,6 +583,103 @@ class DwAppRouter<RouterState> {
 /// state changes. Internal: an app never holds a `Listenable` for the router.
 class _RouterRefresh extends ChangeNotifier {
   void notify() => notifyListeners();
+}
+
+/// The pending-or-allowed half of a page, re-decided when the router state
+/// changes without moving the location.
+///
+/// go_router asks a page builder for its [Page] only when the location
+/// changes; a decision that flips at the URL already shown would leave the
+/// page showing the answer it was built with. The router therefore builds one
+/// page whose child is this switch, and the switch follows the router's
+/// refresh notifier: while the guards are undecided — or have decided on a
+/// redirect that has not moved the location yet — it shows the app's one
+/// pending page, with [offstageChild] (a shell's navigator) kept mounted
+/// offstage so system Back keeps its behaviour; once they allow, it builds
+/// [allowedBuilder]. The location, the history and the page key never change.
+class _PendingSwitch extends StatefulWidget {
+  const _PendingSwitch({
+    required this.listenable,
+    required this.showsPending,
+    required this.pendingBuilder,
+    required this.state,
+    required this.allowedBuilder,
+    this.offstageChild,
+  });
+
+  /// Notified whenever the router state changes; the decisions are re-run
+  /// before it fires. `null` when the router follows no state.
+  final Listenable? listenable;
+
+  /// Asks the guards about [state]; the router's own `_showsPending`.
+  final bool Function(GoRouterState state) showsPending;
+
+  /// The app's one loading page.
+  final Widget Function(BuildContext context, GoRouterState state)?
+  pendingBuilder;
+
+  /// The location this page was built for.
+  final GoRouterState state;
+
+  /// Builds the page's allowed content: the target, or a zone shell's chrome.
+  final Widget Function(BuildContext context) allowedBuilder;
+
+  /// A shell zone's navigator, kept mounted offstage while pending so system
+  /// Back pops normally once the decision lands. `null` on plain routes.
+  final Widget? offstageChild;
+
+  @override
+  State<_PendingSwitch> createState() => _PendingSwitchState();
+}
+
+class _PendingSwitchState extends State<_PendingSwitch> {
+  late bool _pending = widget.showsPending(widget.state);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.listenable?.addListener(_decisionChanged);
+  }
+
+  @override
+  void didUpdateWidget(_PendingSwitch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.listenable != widget.listenable) {
+      oldWidget.listenable?.removeListener(_decisionChanged);
+      widget.listenable?.addListener(_decisionChanged);
+    }
+    _syncDecision();
+  }
+
+  @override
+  void dispose() {
+    widget.listenable?.removeListener(_decisionChanged);
+    super.dispose();
+  }
+
+  void _decisionChanged() => _syncDecision();
+
+  void _syncDecision() {
+    final pending = widget.showsPending(widget.state);
+    if (pending == _pending) return;
+    setState(() => _pending = pending);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_pending) return widget.allowedBuilder(context);
+    final offstageChild = widget.offstageChild;
+    if (offstageChild == null) {
+      return widget.pendingBuilder!(context, widget.state);
+    }
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        Offstage(offstage: true, child: offstageChild),
+        widget.pendingBuilder!(context, widget.state),
+      ],
+    );
+  }
 }
 
 /// A route paired with the index of the zone that declares it.
