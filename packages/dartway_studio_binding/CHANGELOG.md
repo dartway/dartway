@@ -1,13 +1,19 @@
 # Changelog
 
-## 0.3.0
+## 0.4.0-dev.0
 
 - `DwStudioBinding` validates Studio tokens for `STUDIO_APP_ORIGIN` when defined,
   otherwise for the current web release origin, so one image can serve stage and
   prod. Debug/profile builds without the define allow local preview; an explicit
   `validateAccessToken` supplies the project's own policy (#530).
 
-## 0.2.1
+- Targets DartWay 0.22 and Studio bridge 0.12; dependency carets follow the new development lines.
+
+## 0.3.0
+
+- Targets DartWay 0.21 (`dartway_core_flutter` and `dartway_client` `^0.21.0`, `dartway_router`
+  `^3.0.0`, `dartway_studio_bridge` `^0.11.0`). `DwStudioBinding` takes those packages' types
+  (`DwFlutterCore`, `DwAppRouter`, `StudioProjectManifest`), so the carets move this package a minor.
 
 - **Requires `dartway_studio_bridge` 0.11.0** (#376), where `StudioFrameController` gains
   `setInteractive` on the Studio side. Nothing this package uses changed.

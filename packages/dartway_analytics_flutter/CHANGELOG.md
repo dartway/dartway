@@ -1,3 +1,8 @@
+## 0.3.0-dev.0
+
+- Dependency carets follow DartWay 0.22 and its satellites on their next
+  development lines; public dependency types follow those releases (#530).
+
 ## 0.2.0
 
 - `dw.plugins.analytics.saveDashboard` and `deleteDashboard` (#360): run the dashboard commands and

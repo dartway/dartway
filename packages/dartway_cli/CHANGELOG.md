@@ -1,10 +1,11 @@
 # Changelog
 
-## 0.24.0
+## 0.25.0-dev.0
 
 - `deploy kamal` generates Kamal 2.12 destinations with kamal-proxy v0.10.2,
   literal server route prefixes, the Studio deployment manifest and cached GHCR
-  image builds from the project's deployment configuration. `--check` reports
+  image builds from the project's deployment configuration. Image publication
+  follows each destination's `branch:` after successful CI. `--check` reports
   stale output. Postgres stays private to the stack. Unsupported `requires: files:`,
   deployed `site:`, root API proxy prefixes, invalid project names and a CLI path
   dependency inside the project's own checkout are refused with a diagnostic (#530).
@@ -18,9 +19,10 @@
   backend address, so one image serves every destination. Deploy checks require
   the backend build argument only when the Dockerfile declares it (#530).
 
-- Fix: `dartway doctor` always reports Docker, warning that development needs
-  `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.
-  Invalid or unresolvable test URLs are collected without hiding the Docker result (#539).
+## 0.24.0
+
+- Fix: toolkit manifests no longer record machine-local pub-cache clone paths,
+  and `dartway check` skips inaccessible or revision-mismatched recorded checkouts (#552).
 
 - Migration: projects created before #495 must hold their committed locks in CI with
   `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
@@ -62,6 +64,10 @@
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
   then passes on the same commit without changes is quarantined with a linked record rather than
   re-running CI until green (#513).
+
+- Fix: `dartway doctor` always reports Docker, warning that development needs
+  `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.
+  Invalid or unresolvable test URLs are collected without hiding the Docker result (#539).
 
 - `dartway test` defaults `--database-url` and `--storage-url` from `DW_TEST_DATABASE_URL` and
   `DW_TEST_STORAGE_URL`; flags take precedence, including `--no-storage`, and empty variables

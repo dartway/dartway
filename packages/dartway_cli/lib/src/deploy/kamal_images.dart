@@ -7,6 +7,7 @@ String kamalImagesWorkflow(
   ProjectLayout layout,
   List<String> services,
   String imageRepository,
+  Iterable<String> branches,
 ) {
   final matrix = [
     for (final service in services)
@@ -22,7 +23,11 @@ String kamalImagesWorkflow(
   ];
   return _workflow
       .replaceAll('__MATRIX__', jsonEncode(matrix))
-      .replaceAll('__IMAGE_REPOSITORY__', imageRepository);
+      .replaceAll('__IMAGE_REPOSITORY__', imageRepository)
+      .replaceAll(
+        '__DEPLOYMENT_BRANCHES__',
+        jsonEncode(branches.toSet().toList()).replaceAll("'", "''"),
+      );
 }
 
 const _workflow = r'''name: Images
@@ -47,8 +52,7 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.head_repository.full_name == github.repository &&
       (github.event.workflow_run.event == 'pull_request' ||
-       github.event.workflow_run.head_branch == 'master' ||
-       github.event.workflow_run.head_branch == 'release')
+       contains(fromJSON('__DEPLOYMENT_BRANCHES__'), github.event.workflow_run.head_branch))
     name: images / ${{ matrix.service }}
     runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 45
@@ -87,7 +91,8 @@ jobs:
           SERVICE: ${{ matrix.service }}
           REPOSITORY: __IMAGE_REPOSITORY__
           SHA: ${{ github.event.workflow_run.head_sha }}
-          PUBLISH: ${{ github.event.workflow_run.event == 'push' && (github.event.workflow_run.head_branch == 'master' || github.event.workflow_run.head_branch == 'release') }}
+          PUBLISH: >-
+            ${{ github.event.workflow_run.event == 'push' && contains(fromJSON('__DEPLOYMENT_BRANCHES__'), github.event.workflow_run.head_branch) }}
         run: |
           tag="ghcr.io/${REPOSITORY}-${SERVICE}:${SHA}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -102,7 +107,7 @@ jobs:
             fi
           fi
 
-      - name: Build once, push on master and release
+      - name: Build once, push on configured deployment branches
         if: steps.deployment.outputs.configured == 'true' && steps.image.outputs.exists != 'true'
         uses: docker/build-push-action@v6
         with:

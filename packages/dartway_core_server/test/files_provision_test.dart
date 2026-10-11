@@ -50,7 +50,7 @@ void main() {
 
   Future<ProcessResult> worker(String mode) => Process.run(
     Platform.resolvedExecutable,
-    ['run', 'test/fixtures/provision_storage.dart', mode],
+    ['test/fixtures/provision_storage.dart', mode],
     environment: {
       'DW_STORAGE_ENDPOINT': '${config.endpoint}',
       'DW_STORAGE_ACCESS_KEY': config.accessKey,

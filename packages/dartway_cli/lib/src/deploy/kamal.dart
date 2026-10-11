@@ -204,7 +204,7 @@ class DwKamalGenerator {
       },
     });
     files['.github/workflows/images.yml'] =
-        '$kamalGeneratedHeader${kamalImagesWorkflow(layout, services, '$owner/${first.projectName}')}';
+        '$kamalGeneratedHeader${kamalImagesWorkflow(layout, services, '$owner/${first.projectName}', targets.map((target) => target.branch))}';
     return files;
   }
 

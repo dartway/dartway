@@ -28,7 +28,8 @@ dart run dartway_cli:dartway deploy kamal --check
 The template includes none of these generated files. This creates or refreshes
 `deploy/kamal/*`, `deploy/studio.yml` and
 `.github/workflows/images.yml`. Images runs after the required `CI` workflow
-succeeds. CI already runs on pushes to `master` and `release`. The generated
+succeeds. Image publication follows each deployment's `branch:`; enable CI
+pushes on those branches. CI defaults to `master` and `release`. The generated
 workflow must first be merged into the default branch for `workflow_run` to
 trigger it. Unconfigured projects skip image builds. Fork PRs skip this privileged workflow;
 other PR builds do not push or write shared caches.

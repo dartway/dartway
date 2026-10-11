@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:dartway_cli/src/monorepo_source.dart';
 import 'package:dartway_cli/src/toolkit_manifest.dart';
+import 'package:dartway_cli/src/update_target.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -315,6 +316,53 @@ void main() {
       );
     });
 
+    test(
+      'a pub-cache git checkout records the configured repository URL',
+      () async {
+        final cache = Directory.systemTemp.createTempSync('dw_pub_cache');
+        addTearDown(() => cache.deleteSync(recursive: true));
+        final mirror = Directory(p.join(cache.path, 'git', 'cache', 'dartway'))
+          ..createSync(recursive: true);
+        final checkout = Directory(
+          p.join(cache.path, 'git', 'dartway-a1b2c3d4'),
+        )..createSync(recursive: true);
+        _makeGitCheckout(checkout, origin: mirror.path);
+        final source = MonorepoSource(
+          branch: 'stable',
+          environment: {
+            'PUB_CACHE': cache.path,
+            'DARTWAY_REPO_URL': 'https://example.test/framework.git',
+          },
+          cliCheckout: () => checkout,
+        );
+
+        final target = await DwUpdateTarget.resolve(source);
+        addTearDown(target.dispose);
+
+        expect(target.source, 'https://example.test/framework.git');
+        expect(target.source, isNot(checkout.absolute.path));
+        expect(target.source, isNot(mirror.path));
+      },
+    );
+
+    test('a named checkout in the pub cache still records its path', () async {
+      final cache = Directory.systemTemp.createTempSync('dw_pub_cache_named');
+      addTearDown(() => cache.deleteSync(recursive: true));
+      final checkout = Directory(p.join(cache.path, 'git', 'dartway-test'))
+        ..createSync(recursive: true);
+      _makeGitCheckout(checkout, origin: 'https://example.test/framework.git');
+      final source = MonorepoSource(
+        branch: 'stable',
+        localDir: checkout.path,
+        environment: {'PUB_CACHE': cache.path},
+      );
+
+      final target = await DwUpdateTarget.resolve(source);
+      addTearDown(target.dispose);
+
+      expect(target.source, checkout.absolute.path);
+    });
+
     test('is not found for a package outside a monorepo, as pub.dev unpacks '
         'one', () {
       final cache = Directory.systemTemp.createTempSync('dw_hosted');
@@ -356,4 +404,25 @@ void main() {
       );
     });
   });
+}
+
+void _makeGitCheckout(Directory checkout, {required String origin}) {
+  void git(List<String> arguments) {
+    final result = Process.runSync(
+      'git',
+      arguments,
+      workingDirectory: checkout.path,
+    );
+    if (result.exitCode != 0) {
+      throw StateError('git ${arguments.join(' ')} failed: ${result.stderr}');
+    }
+  }
+
+  git(['init']);
+  git(['config', 'user.name', 'DartWay Test']);
+  git(['config', 'user.email', 'test@example.test']);
+  git(['remote', 'add', 'origin', origin]);
+  File(p.join(checkout.path, 'README.md')).writeAsStringSync('test\n');
+  git(['add', 'README.md']);
+  git(['commit', '-m', 'test']);
 }

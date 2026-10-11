@@ -53,8 +53,9 @@ Kamal 2.12 uses kamal-proxy v0.10.2, with 30-second deployment
 and drain timeouts and five retained containers.
 
 The generated Images workflow runs after the project's `CI` workflow completes
-successfully. Enable CI pushes on `master` and `release`; the template already
-does so. `workflow_run` loads workflows from the default branch, so the initial
+successfully. Image publication follows the `branch:` values of the configured
+deployments; enable CI pushes on those branches. The template enables `master`
+and `release` by default. `workflow_run` loads workflows from the default branch, so the initial
 installation must be merged there before this trigger can run. PR CI successes
 build without pushing or writing shared caches. Fork PRs skip this privileged
 workflow. The template ships no Images workflow or generated deployment files;

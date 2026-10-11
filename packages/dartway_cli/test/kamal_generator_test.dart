@@ -59,7 +59,19 @@ final routes = [
         ).readAsStringSync();
         write(
           'deploy/config.yaml',
-          '$staging${staging.replaceFirst('staging:', 'production:')}',
+          staging +
+              File('test/fixtures/kamal/production.yaml')
+                  .readAsStringSync()
+                  .replaceFirst(
+                    'storage: bundled',
+                    'storage: ${bundled ? 'bundled' : 'external'}',
+                  )
+                  .replaceFirst(
+                    '  storage_domain: files.production.example.com\n',
+                    bundled
+                        ? '  storage_domain: files.production.example.com\n'
+                        : '',
+                  ),
         );
         final files = DwKamalGenerator(root).render();
         final api = yaml(files, 'deploy/kamal/api.yml');
@@ -82,15 +94,31 @@ final routes = [
         expect(api['builder']['arch'], 'amd64');
         expect(api['registry']['password'], ['KAMAL_REGISTRY_PASSWORD']);
         for (final dest in ['stage', 'prod']) {
+          final production = dest == 'prod';
+          final apiHost = production
+              ? 'api.production.example.com'
+              : 'api.example.com';
+          final appHost = production
+              ? 'app.production.example.com'
+              : 'app.example.com';
+          final storageHost = production
+              ? 'files.production.example.com'
+              : 'files.example.com';
+          final host = production ? '203.0.113.20' : '203.0.113.10';
           final target = yaml(files, 'deploy/kamal/api.$dest.yml');
-          expect(target['proxy']['hosts'], [
-            'api.example.com',
-            'app.example.com',
-          ]);
-          expect(target['servers']['web']['hosts'], ['203.0.113.10']);
-          expect(target['ssh'], {'user': 'root'});
+          expect(target['proxy']['hosts'], [apiHost, appHost]);
+          expect(target['servers']['web']['hosts'], [host]);
+          expect(target['ssh'], {
+            'user': production ? 'production_operator' : 'root',
+          });
+          final webTarget = yaml(files, 'deploy/kamal/web.$dest.yml');
+          expect(webTarget['proxy']['hosts'], [appHost]);
+          expect(webTarget['servers']['web']['hosts'], [host]);
+          expect(webTarget['ssh'], target['ssh']);
           final clear = target['env']['clear'];
           expect(clear['DW_DATABASE_HOST'], 'shop-api-postgres-$dest');
+          expect(clear['DW_ALLOWED_ORIGINS'], 'https://$appHost');
+          expect(target['accessories']['postgres']['host'], host);
           expect(
             target['accessories']['postgres']['image'],
             'postgres:17-alpine',
@@ -103,13 +131,15 @@ final routes = [
           if (bundled) {
             expect(clear['DW_STORAGE_PROVISION'], 'true');
             expect(clear['DW_STORAGE_VERIFY_BUCKETS'], 'false');
-            expect(clear['DW_STORAGE_ENDPOINT'], 'https://files.example.com');
+            expect(clear['DW_STORAGE_ENDPOINT'], 'https://$storageHost');
             expect(
               target['env']['secret'],
               containsAll(['DW_STORAGE_ACCESS_KEY', 'DW_STORAGE_SECRET_KEY']),
             );
             final storage = yaml(files, 'deploy/kamal/storage.$dest.yml');
-            expect(storage['proxy']['hosts'], ['files.example.com']);
+            expect(storage['proxy']['hosts'], [storageHost]);
+            expect(storage['servers']['web']['hosts'], [host]);
+            expect(storage['ssh'], target['ssh']);
             expect(storage['env']['secret'], [
               'RUSTFS_ACCESS_KEY:DW_STORAGE_ACCESS_KEY',
               'RUSTFS_SECRET_KEY:DW_STORAGE_SECRET_KEY',
@@ -122,6 +152,15 @@ final routes = [
         final studio = yaml(files, 'deploy/studio.yml');
         expect(studio['services'], [if (bundled) 'storage', 'api', 'web']);
         expect(studio['environments'], ['stage', 'prod']);
+        final workflow = yaml(files, '.github/workflows/images.yml');
+        final imageJob = workflow['jobs']['images'];
+        const configuredBranches =
+            '''contains(fromJSON('["master","production"]'), github.event.workflow_run.head_branch)''';
+        expect(imageJob['if'], contains(configuredBranches));
+        final imageStep = (imageJob['steps'] as YamlList)
+            .cast<YamlMap>()
+            .singleWhere((step) => step['id'] == 'image');
+        expect(imageStep['env']['PUBLISH'], contains(configuredBranches));
         expect(studio['check']['args'], [
           '--project',
           '/project',
@@ -243,6 +282,37 @@ final routes = [
     );
     expect(checkout['with']['persist-credentials'], false);
   });
+
+  for (final branch in ['main', 'deploy/production', "deploy/o'hare"]) {
+    test('image publication follows the configured branch $branch', () {
+      write(
+        'deploy/config.yaml',
+        configYaml().replaceFirst('branch: master', 'branch: $branch'),
+      );
+      final workflow = yaml(
+        DwKamalGenerator(root).render(),
+        '.github/workflows/images.yml',
+      );
+      final job = workflow['jobs']['images'] as YamlMap;
+      final branches = '["${branch.replaceAll("'", "''")}"]';
+      final predicate =
+          "contains(fromJSON('$branches'), github.event.workflow_run.head_branch)";
+      expect(job['if'], contains(predicate));
+      expect(
+        job['if'],
+        contains("github.event.workflow_run.event == 'pull_request'"),
+      );
+      final image = (job['steps'] as YamlList).cast<YamlMap>().singleWhere(
+        (step) => step['id'] == 'image',
+      );
+      expect(
+        image['env']['PUBLISH'],
+        r"${{ github.event.workflow_run.event == 'push' && " +
+            predicate +
+            ' }}',
+      );
+    });
+  }
 
   test('requires are names only and external database has no accessory', () {
     write(
