@@ -22,7 +22,7 @@ DW_API_HOST=${DW_API_ORIGIN#https://}
 export DW_API_ORIGIN DW_API_HOST
 
 for path in $DW_API_PATHS; do
-  if ! printf '%s\n' "$path" | grep -Eq '^/[A-Za-z0-9._~:@%+-]+(/[A-Za-z0-9._~:@%+-]+)*$'; then
+  if ! printf '%s\n' "$path" | grep -Eq '^/[A-Za-z0-9._~:@%+-]+(/[A-Za-z0-9._~:@%+-]+)*/?$'; then
     echo "DW_API_PATHS contains invalid path: $path" >&2
     exit 1
   fi
@@ -30,8 +30,13 @@ for path in $DW_API_PATHS; do
   if [ "$path" = /dw ]; then
     cat >> "$output" <<'EOF'
 location ^~ /dw/ {
+  client_max_body_size 0;
   proxy_pass ${DW_API_ORIGIN};
+  proxy_request_buffering off;
   proxy_ssl_server_name on;
+  proxy_ssl_verify on;
+  proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+  proxy_ssl_verify_depth 2;
   proxy_set_header Host ${DW_API_HOST};
   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
   proxy_set_header X-Forwarded-Proto $http_x_forwarded_proto;
@@ -45,8 +50,13 @@ EOF
   else
     cat >> "$output" <<EOF
 location ^~ $path {
+  client_max_body_size 0;
   proxy_pass \${DW_API_ORIGIN};
+  proxy_request_buffering off;
   proxy_ssl_server_name on;
+  proxy_ssl_verify on;
+  proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
+  proxy_ssl_verify_depth 2;
   proxy_set_header Host \${DW_API_HOST};
   proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
   proxy_set_header X-Forwarded-Proto \$http_x_forwarded_proto;

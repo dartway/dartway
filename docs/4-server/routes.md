@@ -122,9 +122,10 @@ the project's, with a unique constraint on the event id.
 
 ## Where routes are reachable
 
-With `deploy kamal`, each literal route path is also a proxy prefix on both the API and app
-domains, alongside `/dw` and `/health`; a `/` route is refused. With `deploy run`, the API domain
-proxies every path to the server and the app domain proxies `/dw/` and `/health`.
+With `deploy kamal`, the API service is the root service on its own host only. On the app host,
+the web container's nginx proxies `DW_API_PATHS` — every literal route path, `/dw` and `/health` —
+to `DW_API_ORIGIN`; a `/` route is refused. With `deploy run`, the API domain proxies every path
+to the server and the app domain proxies `/dw/` and `/health`.
 A webhook URL on the API domain works in either topology
 ([deploy](../5-tooling/deploy.md)). In development, `dart run dartway_cli:dartway dev` forwards `/dw/*` and `/health`,
 and a project door only when named with `--api-path /webhooks/payments`

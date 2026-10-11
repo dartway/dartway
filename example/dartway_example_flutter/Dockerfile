@@ -56,6 +56,6 @@ COPY --from=build /workspace/dartway_example_flutter/build/web /usr/share/nginx/
 # `dartway deploy check` can interrogate. At container start the entrypoint
 # adds same-origin API routes only when a Kamal destination supplies them.
 COPY dartway_example_flutter/nginx.conf /etc/nginx/conf.d/default.conf
-COPY dartway_example_flutter/docker-entrypoint.d/ /docker-entrypoint.d/
+COPY --chmod=755 dartway_example_flutter/docker-entrypoint.d/ /docker-entrypoint.d/
 
 EXPOSE 80

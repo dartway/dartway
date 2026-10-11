@@ -493,6 +493,39 @@ final routes = [
     );
   });
 
+  test('a trailing slash route is preserved as its prefix', () {
+    write(
+      'shop_server/lib/routes.dart',
+      "DwHttpRoute.post('/hooks/', handler);",
+    );
+    expect(
+      DwKamalGenerator.routePrefixes(
+        ProjectLayout.detect(root).serverPackageDir,
+      ),
+      ['/dw', '/health', '/hooks/'],
+    );
+  });
+
+  test('an unsupported proxy path is refused with the route location', () {
+    write(
+      'shop_server/lib/routes.dart',
+      "\nDwHttpRoute.post('/hooks?source=one', handler);\n",
+    );
+    expect(
+      () => DwKamalGenerator(root).render(),
+      throwsA(
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          allOf(
+            contains('/hooks?source=one'),
+            contains('shop_server/lib/routes.dart:2'),
+          ),
+        ),
+      ),
+    );
+  });
+
   test('--check catches an added route without changing files', () {
     final generator = DwKamalGenerator(root);
     generator.generate();

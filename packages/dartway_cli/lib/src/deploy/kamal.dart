@@ -298,6 +298,14 @@ class DwKamalGenerator {
             'every web route. Declare an exact non-root route path.',
           );
         }
+        if (!RegExp(
+          r'^/[A-Za-z0-9._~:@%+\-]+(?:/[A-Za-z0-9._~:@%+\-]+)*/?$',
+        ).hasMatch(path)) {
+          throw StateError(
+            '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
+            'DwHttpRoute "$path" cannot be represented as an nginx proxy prefix.',
+          );
+        }
         prefixes.add(path);
       }
     }
