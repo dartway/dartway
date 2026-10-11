@@ -146,16 +146,7 @@ class MonorepoSource {
     if (!isLocalCheckout || isNamedCheckout || !_isInPubGitCache(checkout)) {
       return isLocalCheckout ? checkout.path : repoUrl;
     }
-    final origin = await Process.run('git', [
-      '-C',
-      checkout.path,
-      'config',
-      '--get',
-      'remote.origin.url',
-    ]);
-    if (origin.exitCode != 0) return repoUrl;
-    final url = (origin.stdout as String).trim();
-    return url.isEmpty ? repoUrl : url;
+    return repoUrl;
   }
 
   bool _isInPubGitCache(Directory checkout) {

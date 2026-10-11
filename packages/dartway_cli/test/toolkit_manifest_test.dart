@@ -317,19 +317,22 @@ void main() {
     });
 
     test(
-      'a pub-cache git clone records its origin instead of its path',
+      'a pub-cache git checkout records the configured repository URL',
       () async {
         final cache = Directory.systemTemp.createTempSync('dw_pub_cache');
         addTearDown(() => cache.deleteSync(recursive: true));
-        final checkout = Directory(p.join(cache.path, 'git', 'dartway-test'))
+        final mirror = Directory(p.join(cache.path, 'git', 'cache', 'dartway'))
           ..createSync(recursive: true);
-        _makeGitCheckout(
-          checkout,
-          origin: 'https://example.test/framework.git',
-        );
+        final checkout = Directory(
+          p.join(cache.path, 'git', 'dartway-a1b2c3d4'),
+        )..createSync(recursive: true);
+        _makeGitCheckout(checkout, origin: mirror.path);
         final source = MonorepoSource(
           branch: 'stable',
-          environment: {'PUB_CACHE': cache.path},
+          environment: {
+            'PUB_CACHE': cache.path,
+            'DARTWAY_REPO_URL': 'https://example.test/framework.git',
+          },
           cliCheckout: () => checkout,
         );
 
@@ -338,6 +341,7 @@ void main() {
 
         expect(target.source, 'https://example.test/framework.git');
         expect(target.source, isNot(checkout.absolute.path));
+        expect(target.source, isNot(mirror.path));
       },
     );
 
