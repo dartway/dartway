@@ -1,84 +1,23 @@
 # Changelog
 
-## 0.21.0-dev.17
+## 0.22.0-dev.0
 
-- Add optional `DwProtocolEntry.since` and full semantic-version precedence on
-  `DwContractVersion` (`<`) for update-group compatibility. The wire and strict decoder stay unchanged (#504).
+- No code changes; the family moves in lockstep with the ORM migration-draft advice fix (#542).
+
+## 0.21.0
+
+### Breaking changes
 
 - **BREAKING:** `DwSessionKeyInfo.lastUsedAt` is `DateTime?` — `null` until the key's first use —
   and an optional constructor parameter; `isUsed` asks it. Left off the JSON when `null`, like
   `revokedAt`; a used key encodes as before, and the framework never sends this object to an app,
   so the protocol version stays (dartway/dartway#397).
 
-- `DwGetFileLink` takes `download` (default `false`): `true` asks for a link that has a browser save
-  the file (`attachment`) rather than show it. Written to JSON only when true, so every existing
-  encoding is byte-identical and the protocol version stays (dartway/dartway#481).
-
-- Add opt-in `DwCalendarDay`, a validated Gregorian Y/M/D value (`0001`–`9999`) with canonical
-  `YYYY-MM-DD` JSON, civil arithmetic and ordering. Window cursors accept it with a distinct `d`
-  discriminator; existing timestamp, cursor and runtime protocol encodings are unchanged.
-
 - Sign-in code requests accept an optional project-defined `deliveryHint`. The server validates it
   against `DwAuthConfig.allowedDeliveryHints` and auth hooks read `ctx.deliveryHint`, with unchanged
   callback signatures and identifier cooldown, request-window and idempotency rules. Null retains
   the project default. **BREAKING (wire): protocol 3 refuses clients compiled against protocol 2
   with `426`; rebuild and deploy the client and server together.** No auth callback edit is required.
-
-- **`DwListRequest.refetchOnUpdate()` re-runs on every object and deletion on its channels, whatever
-  the type**, as documented (dartway/dartway#428). It accepted only its item type before, so a
-  derived list never heard the other types on its channels — often the objects it is derived from. The
-  channels are its only scope: the client asks `DwDataRequest.updateActionFor`, which re-runs such a
-  list on an object or a deletion of another type without calling `onUpdate`; `acceptsItem`,
-  `acceptsDeletion` and `onUpdate` keep their meaning, and `onUpdate` still sees only the item type.
-  A project that overrode `acceptsItem`/`acceptsDeletion` to `true` by hand may drop the override.
-- The family moves in lockstep to deliver the migration note for the router
-  that follows a provider (dartway/dartway#407).
-
-## 0.21.0-dev.16
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the import,
-  test layout and spacing checks of `dartway check` (dartway/dartway#391).
-
-## 0.21.0-dev.15
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`
-  (dartway/dartway#390).
-
-## 0.21.0-dev.14
-
-- Nothing changed here; the family moves in lockstep to deliver the migration note for the new
-  state and command checks of `dartway check` (dartway/dartway#389).
-
-## 0.21.0-dev.13
-
-- **`DwFieldPatch` is read through helpers** (dartway/dartway#388): `isSet` and `isCleared` beside
-  `isKept`; `newValue` (the value a set patch writes, `null` otherwise) and `map` (the same patch
-  over another type) beside `apply`; and `DwTextFieldPatch.trimmedOrCleared`, which trims a set text
-  and turns a blank one into a clear. A kept field on insert is `apply(theDefault)`. `dartway check`
-  now fails a project that matches `DwSetField`/`DwClearField`/`DwKeepField` by hand
-  (`fieldPatchMatched`). Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
-
-## 0.21.0-dev.12
-
-- Nothing changed here; the family moves in lockstep with `dartway_orm` (dartway/dartway#384).
-
-## 0.21.0-dev.11
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#387).
-
-## 0.21.0-dev.10
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (dartway/dartway#386).
-
-## 0.21.0-dev.9
-
-- **`DwHttpContract.utcOffsetHeader` (`Dw-Utc-Offset`)**: the caller's UTC offset at the call, whole
-  minutes east of UTC, optional; `utcOffsetValue` writes it and `parseUtcOffset` reads it
-  (`FormatException` beyond `maxUtcOffset`, 18 hours) — one parser for both sides
-  (dartway/dartway#385, D-110). Additive: `dwProtocolVersion` stays 2, the header is recorded as a
-  wire shape of its own (`http.utcOffset`).
-
-## 0.21.0-dev.8
 
 - **BREAKING: `DwIdentityInfo.kind` is `DwIdentifierKind?` now, and `provider: String?` joined it —
   exactly one of the two is ever set.** A provider identity (`google`, `apple`) used to be stored
@@ -88,33 +27,39 @@
   new golden shape, not a changed one — the framework's own `DwConfirmIdentifier` never answers one.
   Migration note: `docs/migrations/2026-09-27-provider-identity-kind-nullable.md`.
 
-## 0.21.0-dev.7
+### Changes
 
-- Nothing changed here; the family moves in lockstep with `dartway_core_flutter`, whose `dartway_router` bump changed URLs for `extraPathSegment` (#314).
+- Add optional `DwProtocolEntry.since` and full semantic-version precedence on
+  `DwContractVersion` (`<`) for update-group compatibility. The wire and strict decoder stay unchanged (#504).
 
-## 0.21.0-dev.6
+- `DwGetFileLink` takes `download` (default `false`): `true` asks for a link that has a browser save
+  the file (`attachment`) rather than show it. Written to JSON only when true, so every existing
+  encoding is byte-identical and the protocol version stays (dartway/dartway#481).
 
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
+- Add opt-in `DwCalendarDay`, a validated Gregorian Y/M/D value (`0001`–`9999`) with canonical
+  `YYYY-MM-DD` JSON, civil arithmetic and ordering. Window cursors accept it with a distinct `d`
+  discriminator; existing timestamp, cursor and runtime protocol encodings are unchanged.
 
-## 0.21.0-dev.5
+- **`DwListRequest.refetchOnUpdate()` re-runs on every object and deletion on its channels, whatever
+  the type**, as documented (dartway/dartway#428). It accepted only its item type before, so a
+  derived list never heard the other types on its channels — often the objects it is derived from. The
+  channels are its only scope: the client asks `DwDataRequest.updateActionFor`, which re-runs such a
+  list on an object or a deletion of another type without calling `onUpdate`; `acceptsItem`,
+  `acceptsDeletion` and `onUpdate` keep their meaning, and `onUpdate` still sees only the item type.
+  A project that overrode `acceptsItem`/`acceptsDeletion` to `true` by hand may drop the override.
 
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
+- **`DwFieldPatch` is read through helpers** (dartway/dartway#388): `isSet` and `isCleared` beside
+  `isKept`; `newValue` (the value a set patch writes, `null` otherwise) and `map` (the same patch
+  over another type) beside `apply`; and `DwTextFieldPatch.trimmedOrCleared`, which trims a set text
+  and turns a blank one into a clear. A kept field on insert is `apply(theDefault)`. `dartway check`
+  now fails a project that matches `DwSetField`/`DwClearField`/`DwKeepField` by hand
+  (`fieldPatchMatched`). Migration note: `docs/migrations/2026-09-30-seeds-settings-patches.md`.
 
-## 0.21.0-dev.4
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.3
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server`.
-
-## 0.21.0-dev.2
-
-- Nothing changed here; the family moves in lockstep with `dartway_core_server` (#310, D-087).
-
-## 0.21.0-dev.1
-
-- Nothing changed here; the family moves in lockstep with `dartway_client`, fixed for #309.
+- **`DwHttpContract.utcOffsetHeader` (`Dw-Utc-Offset`)**: the caller's UTC offset at the call, whole
+  minutes east of UTC, optional; `utcOffsetValue` writes it and `parseUtcOffset` reads it
+  (`FormatException` beyond `maxUtcOffset`, 18 hours) — one parser for both sides
+  (dartway/dartway#385, D-110). Additive: `dwProtocolVersion` stays 2, the header is recorded as a
+  wire shape of its own (`http.utcOffset`).
 
 ## 0.20.0
 

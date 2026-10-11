@@ -1,3 +1,7 @@
+## 0.3.0-dev.0
+
+- Target `dartway_core_shared` `^0.22.0-dev.0` (#542).
+
 ## 0.2.0
 
 - Reads of what was recorded (#360): `DwGetAnalyticsReport` — a count of events, distinct

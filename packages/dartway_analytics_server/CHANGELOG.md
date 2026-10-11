@@ -1,3 +1,7 @@
+## 0.3.0-dev.0
+
+- Target `dartway_analytics_shared` `^0.3.0-dev.0`, `dartway_core_server` `^0.22.0-dev.0` (#542).
+
 ## 0.2.0
 
 - Reports, the catalog and dashboards (#360): `DwAnalyticsModule` answers `DwGetAnalyticsReport`

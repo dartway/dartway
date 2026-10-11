@@ -1,3 +1,8 @@
+## 0.3.0-dev.0
+
+- Target `dartway_analytics_shared` `^0.3.0-dev.0`, `dartway_core_flutter` `^0.22.0-dev.0`,
+  `dartway_client` `^0.22.0-dev.0` (#542).
+
 ## 0.2.0
 
 - `dw.plugins.analytics.saveDashboard` and `deleteDashboard` (#360): run the dashboard commands and

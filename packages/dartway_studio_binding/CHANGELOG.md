@@ -1,6 +1,14 @@
 # Changelog
 
-## 0.2.1
+## 0.4.0-dev.0
+
+- Target `dartway_core_flutter` `^0.22.0-dev.0`, `dartway_client` `^0.22.0-dev.0` (#542).
+
+## 0.3.0
+
+- Targets DartWay 0.21 (`dartway_core_flutter` and `dartway_client` `^0.21.0`, `dartway_router`
+  `^3.0.0`, `dartway_studio_bridge` `^0.11.0`). `DwStudioBinding` takes those packages' types
+  (`DwFlutterCore`, `DwAppRouter`, `StudioProjectManifest`), so the carets move this package a minor.
 
 - **Requires `dartway_studio_bridge` 0.11.0** (#376), where `StudioFrameController` gains
   `setInteractive` on the Studio side. Nothing this package uses changed.

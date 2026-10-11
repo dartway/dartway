@@ -1,4 +1,11 @@
+## 0.3.0-dev.0
+
+- Target `dartway_auth_providers_shared` `^0.3.0-dev.0`, `dartway_client` `^0.22.0-dev.0`,
+  `dartway_core_flutter` `^0.22.0-dev.0` (#542).
+
 ## 0.2.0
+
+- Targets `dartway_auth_providers_shared` `^0.2.0` (DartWay 0.21).
 
 - **Breaking:** `dw.signInWithGoogle()` (the `DwGoogleSignInCall` extension) is replaced by
   `DwGoogleAuth.signInCommand({registration, introduce})`, which runs the Google flow and answers the

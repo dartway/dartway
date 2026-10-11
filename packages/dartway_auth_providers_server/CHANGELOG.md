@@ -1,4 +1,13 @@
-## 0.1.1
+## 0.3.0-dev.0
+
+- Target `dartway_auth_providers_shared` `^0.3.0-dev.0`, `dartway_core_server` `^0.22.0-dev.0`
+  (#542).
+
+## 0.2.0
+
+- Targets DartWay 0.21 (`dartway_core_server` `^0.21.0`, `dartway_auth_providers_shared`
+  `^0.2.0`). `DwSignInProvidersModule` extends that package's `DwServerModule`, so the caret moves
+  this package a minor.
 
 - Reads a first-of-its-kind provider identity against `DwAuthConfig.linkByVerifiedEmail`, taking the
   token's verified e-mail straight off its own claims and handing it to

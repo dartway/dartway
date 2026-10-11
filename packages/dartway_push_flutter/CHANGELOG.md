@@ -1,4 +1,11 @@
+## 0.7.0-dev.0
+
+- Target `dartway_core_flutter` `^0.22.0-dev.0`, `dartway_push_shared` `^0.7.0-dev.0`,
+  `dartway_client` `^0.22.0-dev.0` (#542).
+
 ## 0.6.0
+
+- Targets DartWay 0.21 (`dartway_core_flutter` `^0.21.0`, `dartway_push_shared` `^0.6.0`).
 
 - **BREAKING: `DwPushPermission` gained `unanswered` (#338).** `requestPermission()` and
   `permission()` awaited the background start's `_attached` future with no bound of their own: on

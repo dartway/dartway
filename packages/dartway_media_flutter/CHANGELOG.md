@@ -1,3 +1,7 @@
+## 0.3.0-dev.0
+
+- Target `dartway_core_flutter` `^0.22.0-dev.0` (#542).
+
 ## 0.2.0
 
 - Optional explicit confirmed-playback intervals: sorted union and unique covered

@@ -1,3 +1,11 @@
+## 0.7.0-dev.0
+
+- Target `dartway_core_shared` `^0.22.0-dev.0` (#542).
+
+## 0.6.0
+
+- Targets DartWay 0.21 (`dartway_core_*` `^0.21.0`).
+
 ## 0.5.0
 
 - First publication. The shared contract of push notifications on the rewritten DartWay framework (`dartway_core_shared` 0.20.0) — this package never shipped before.
