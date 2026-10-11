@@ -100,8 +100,7 @@ class DwKamalGenerator {
             _ => 80,
           },
           'healthcheck': {'path': service == 'web' ? '/' : '/health'},
-          if (service != 'web')
-            'buffering': {'requests': false, 'responses': false},
+          'buffering': {'requests': false, 'responses': false},
         },
         'registry': {
           'server': 'ghcr.io',

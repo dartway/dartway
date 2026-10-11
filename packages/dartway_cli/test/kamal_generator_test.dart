@@ -83,6 +83,11 @@ final routes = [
           'requests': false,
           'responses': false,
         });
+        final web = yaml(files, 'deploy/kamal/web.yml');
+        expect(web['proxy']['buffering'], {
+          'requests': false,
+          'responses': false,
+        });
         expect(api['deploy_timeout'], 30);
         expect(api['drain_timeout'], 30);
         expect(api['retain_containers'], 5);
