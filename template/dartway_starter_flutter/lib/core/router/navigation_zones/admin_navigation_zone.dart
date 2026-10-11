@@ -43,6 +43,8 @@ enum AdminNavigationZone implements DwNavigationRoute<AppRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
+  // The skeleton keeps the released router API until its caret is raised.
+  // ignore: deprecated_member_use
   List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
     (state, target) =>
         state.isSignedIn ? null : AuthNavigationZone.signInFrom(target),
