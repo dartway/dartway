@@ -1,11 +1,14 @@
-import 'package:dartway_example_flutter/core/app_version.dart';
 import 'package:dartway_example_flutter/dartway_example_app.dart';
 import 'package:dartway_push_firebase/dartway_push_firebase.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final appVersion = await readAppVersion();
+
   // Firebase, when the build names a project: `--dart-define=FIREBASE_API_KEY=…`
   // with `FIREBASE_APP_ID`, `FIREBASE_MESSAGING_SENDER_ID` and
   // `FIREBASE_PROJECT_ID` (and the web push key, `FIREBASE_WEB_VAPID_KEY`). The
@@ -13,7 +16,6 @@ Future<void> main() async {
   Future<bool> firebaseConfigured() async {
     const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
     if (apiKey.isEmpty) return false;
-    WidgetsFlutterBinding.ensureInitialized();
     await Firebase.initializeApp(
       options: const FirebaseOptions(
         apiKey: apiKey,
@@ -52,7 +54,7 @@ Future<void> main() async {
 
   DartwayExampleApp(
     baseUrl: Uri.parse(backendUrl),
-    appVersion: appBuildVersion,
+    appVersion: appVersion,
     pushTransports: [
       if (await firebaseConfigured())
         DwFirebasePush(
@@ -60,4 +62,26 @@ Future<void> main() async {
         ),
     ],
   ).run();
+}
+
+Future<String> readAppVersion() async {
+  final PackageInfo info;
+  try {
+    info = await PackageInfo.fromPlatform();
+  } catch (error, stackTrace) {
+    // The app's uncaught-error pipeline is installed after this read.
+    debugPrint('Could not read app version: $error\n$stackTrace');
+    return '0.0.0+0';
+  }
+  return appVersionOf(info);
+}
+
+String appVersionOf(PackageInfo info) {
+  if (info.version.isEmpty) {
+    debugPrint('Platform app version is empty.\n${StackTrace.current}');
+    return '0.0.0+0';
+  }
+  return info.buildNumber.isEmpty
+      ? '${info.version}+0'
+      : '${info.version}+${info.buildNumber}';
 }

@@ -3,7 +3,7 @@
 ## 0.22.0-dev.0
 
 - Requires `dartway_router` 4.0.0-dev.0 for decision guards and pending navigation.
-
+- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
 - The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).
 
 ## 0.21.0

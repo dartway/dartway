@@ -6,6 +6,12 @@
   resolved after an older CLI moved its tag without leaving a rollback pin. The refusal names the
   rerun command; opting in warns that a failure leaves the service down until the next deploy.
   Resolvable images are still pinned, and the flag is not stored in config (#535).
+- Template: the app reads its version from the platform; `app_version.dart` and its
+  version-equality test are removed. An empty platform build number maps to `+0`.
+  Empty versions and failed platform reads report the problem and stack trace via
+  `debugPrint` before using `0.0.0+0` so startup continues.
+  Release builds pass `--build-number` (#521). See
+  [migration note](../../docs/migrations/2026-10-10-version-from-platform.md).
 - The generated Images workflow labels each image with its Kamal `service`;
   without it `kamal deploy` refuses the CI-built image (found by the #530
   end-to-end deploy).

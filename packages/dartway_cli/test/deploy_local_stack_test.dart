@@ -20,6 +20,7 @@ import 'package:dartway_cli/src/vendor_framework.dart';
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
+import 'package:yaml/yaml.dart';
 
 import 'support/deploy_fixtures.dart';
 
@@ -148,6 +149,7 @@ void main() {
     // What the copied build actually embeds — the generated contract
     // version and the app's own build string — read out rather than
     // hardcoded, so a version bump in the example cannot go stale here.
+    // These images pass no build-number override: pubspec is their fallback.
     contractVersion = RegExp(r"contractVersion: '([^']+)'")
         .firstMatch(
           File(
@@ -161,19 +163,10 @@ void main() {
           ).readAsStringSync(),
         )!
         .group(1)!;
-    exampleAppVersion = RegExp(r"appBuildVersion = '([^']+)'")
-        .firstMatch(
-          File(
-            p.join(
-              project.path,
-              'dartway_example_flutter',
-              'lib',
-              'core',
-              'app_version.dart',
-            ),
-          ).readAsStringSync(),
-        )!
-        .group(1)!;
+    exampleAppVersion = (loadYaml(
+      File(p.join(project.path, 'dartway_example_flutter', 'pubspec.yaml'))
+          .readAsStringSync(),
+    ) as YamlMap)['version'] as String;
     // The example has no site; the proof gives it one, committed-shaped.
     File(p.join(project.path, 'app_site', 'build', 'index.html'))
       ..createSync(recursive: true)
