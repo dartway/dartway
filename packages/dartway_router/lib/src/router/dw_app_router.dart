@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../navigation_zones/dw_navigation_route.dart';
 import '../navigation_zones/dw_navigation_route_extension.dart';
+import '../navigation_zones/dw_guard_adapter.dart';
 import '../navigation_zones/dw_navigation_types.dart';
 import 'dw_go_router_options.dart';
 
@@ -239,7 +240,7 @@ class DwAppRouter<RouterState> {
     return _decisions.putIfAbsent(target, () {
       final current = subscription.read();
       for (final guard in route.zoneGuards) {
-        final decision = guard(current, target);
+        final decision = resolveGuardDecision(guard(current, target));
         if (decision.isPending) {
           if (options.pendingBuilder == null) {
             throw StateError(
@@ -287,19 +288,20 @@ class DwAppRouter<RouterState> {
             return <RouteBase>[
               StatefulShellRoute.indexedStack(
                 pageBuilder: gatesPending
-                    ? (context, state, navigationShell) => pageBuilder(
-                        context,
-                        state.pageKey,
-                        _PendingSwitch(
+                    ? (context, state, navigationShell) => _guardedShellPage(
+                        context: context,
+                        shellPage: shellBuilder(
+                          context,
+                          state,
+                          navigationShell,
+                        ),
+                        switcher: _PendingSwitch(
                           listenable: _refresh,
                           showsPending: _showsPending,
                           pendingBuilder: options.pendingBuilder,
                           state: state,
                           offstageChild: navigationShell,
-                          allowedBuilder: (context) => _hostPage(
-                            context,
-                            shellBuilder(context, state, navigationShell),
-                          ),
+                          allowedBuilder: (_) => navigationShell,
                         ),
                       )
                     : shellBuilder,
@@ -317,19 +319,16 @@ class DwAppRouter<RouterState> {
             return <RouteBase>[
               ShellRoute(
                 pageBuilder: gatesPending
-                    ? (context, state, child) => pageBuilder(
-                        context,
-                        state.pageKey,
-                        _PendingSwitch(
+                    ? (context, state, child) => _guardedShellPage(
+                        context: context,
+                        shellPage: shellBuilder(context, state, child),
+                        switcher: _PendingSwitch(
                           listenable: _refresh,
                           showsPending: _showsPending,
                           pendingBuilder: options.pendingBuilder,
                           state: state,
                           offstageChild: child,
-                          allowedBuilder: (context) => _hostPage(
-                            context,
-                            shellBuilder(context, state, child),
-                          ),
+                          allowedBuilder: (_) => child,
                         ),
                       )
                     : shellBuilder,
@@ -410,29 +409,23 @@ class DwAppRouter<RouterState> {
     return decision.isPending || decision.redirectPath != null;
   }
 
-  /// Renders a zone shell's own [Page] as the content of the router's page.
-  ///
-  /// go_router caches the pages it built for a location and rebuilds them only
-  /// when the location changes, so a decision that flips without moving the
-  /// URL cannot re-run the shell's page builder. The shell's page is asked for
-  /// when the switch builds and its content — the shell chrome around the
-  /// zone's navigator — is hosted inside the router's own page, whose child
-  /// re-decides pending vs. allowed on every router-state change. The
-  /// transition belongs to the router's `pageBuilder`, as it already does for
-  /// every plain route.
-  Widget _hostPage(BuildContext context, Page<dynamic> page) {
-    final Route<dynamic> route = page.createRoute(context);
-    if (route is! ModalRoute<dynamic>) {
+  Page<dynamic> _guardedShellPage({
+    required BuildContext context,
+    required Page<dynamic> shellPage,
+    required _PendingSwitch switcher,
+  }) {
+    final route = shellPage.createRoute(context);
+    if (route is! PageRoute<dynamic>) {
       throw StateError(
-        'A zone shell page must be a modal route page (MaterialPage, '
+        'A guarded zone shell page must create a PageRoute (MaterialPage, '
         'CupertinoPage, CustomTransitionPage) to re-decide pending guards: '
-        '${page.runtimeType} creates ${route.runtimeType}.',
+        '${shellPage.runtimeType} creates ${route.runtimeType}.',
       );
     }
-    return route.buildPage(
-      context,
-      kAlwaysCompleteAnimation,
-      kAlwaysCompleteAnimation,
+    return _GuardedShellPage(
+      sourcePage: shellPage,
+      sourceRoute: route,
+      switcher: switcher,
     );
   }
 
@@ -582,6 +575,92 @@ class DwAppRouter<RouterState> {
 /// state changes. Internal: an app never holds a `Listenable` for the router.
 class _RouterRefresh extends ChangeNotifier {
   void notify() => notifyListeners();
+}
+
+/// A shell page with its original route contract and guard-controlled content.
+///
+/// The source route remains authoritative for transitions, modal barriers,
+/// opacity, state retention, and fullscreen-dialog behavior. Only buildPage is
+/// interposed so an undecided guard can substitute the application's pending
+/// page without changing the URL or creating a different navigation entry.
+class _GuardedShellPage extends Page<dynamic> {
+  _GuardedShellPage({
+    required this.sourcePage,
+    required this.sourceRoute,
+    required this.switcher,
+  }) : super(
+         key: sourcePage.key,
+         name: sourcePage.name,
+         arguments: sourcePage.arguments,
+         restorationId: sourcePage.restorationId,
+       );
+
+  final Page<dynamic> sourcePage;
+  final PageRoute<dynamic> sourceRoute;
+  final _PendingSwitch switcher;
+
+  @override
+  Route<dynamic> createRoute(BuildContext context) =>
+      _GuardedShellPageRoute(page: this);
+}
+
+class _GuardedShellPageRoute extends PageRoute<dynamic> {
+  _GuardedShellPageRoute({required _GuardedShellPage page})
+    : _page = page,
+      super(settings: page, fullscreenDialog: page.sourceRoute.fullscreenDialog);
+
+  final _GuardedShellPage _page;
+  PageRoute<dynamic> get _source => _page.sourceRoute;
+
+  @override
+  bool get allowSnapshotting => _source.allowSnapshotting;
+  @override
+  bool get barrierDismissible => _source.barrierDismissible;
+  @override
+  Color? get barrierColor => _source.barrierColor;
+  @override
+  String? get barrierLabel => _source.barrierLabel;
+  @override
+  Curve get barrierCurve => _source.barrierCurve;
+  @override
+  bool get maintainState => _source.maintainState;
+  @override
+  bool get opaque => _source.opaque;
+  @override
+  Duration get transitionDuration => _source.transitionDuration;
+  @override
+  Duration get reverseTransitionDuration => _source.reverseTransitionDuration;
+
+  @override
+  Widget buildPage(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+  ) {
+    final allowed = _source.buildPage(context, animation, secondaryAnimation);
+    final switcher = _page.switcher;
+    return _PendingSwitch(
+      listenable: switcher.listenable,
+      showsPending: switcher.showsPending,
+      pendingBuilder: switcher.pendingBuilder,
+      state: switcher.state,
+      offstageChild: switcher.offstageChild,
+      allowedBuilder: (_) => allowed,
+    );
+  }
+
+  @override
+  Widget buildTransitions(
+    BuildContext context,
+    Animation<double> animation,
+    Animation<double> secondaryAnimation,
+    Widget child,
+  ) => _source.buildTransitions(
+    context,
+    animation,
+    secondaryAnimation,
+    child,
+  );
 }
 
 /// The pending-or-allowed half of a page, re-decided when the router state

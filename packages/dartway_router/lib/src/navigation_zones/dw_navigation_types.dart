@@ -85,6 +85,12 @@ final class DwGuardDecision {
 typedef DwDecisionGuard<RouterState> =
     DwGuardDecision Function(RouterState state, DwNavigationTarget target);
 
+/// Legacy guards cannot express unknown facts. The router adapts null to allow
+/// and a path to redirect. Existing declarations still compile during adoption.
+@Deprecated('Use DwDecisionGuard and return pending for unknown facts.')
+typedef DwNavigationGuard<RouterState> =
+    String? Function(RouterState state, DwNavigationTarget target);
+
 /// Type definition for route exit hooks.
 ///
 /// Set as [DwNavigationRouteDescriptor.onExit], it is asked before the person

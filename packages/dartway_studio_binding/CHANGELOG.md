@@ -2,8 +2,6 @@
 
 ## 0.4.0-dev.0
 
-- Targets `dartway_router` 4.0.0-dev.0 and uses decision guards in its route fixtures (#556).
-
 - `DwStudioBinding` validates Studio tokens for `STUDIO_APP_ORIGIN` when defined,
   otherwise for the current web release origin, so one image can serve stage and
   prod. Debug/profile builds without the define allow local preview; an explicit

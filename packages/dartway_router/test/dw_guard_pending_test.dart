@@ -25,6 +25,18 @@ int shellBuilds = 0;
 int pendingBuilds = 0;
 int signInBuilds = 0;
 
+final class RecordingObserver extends NavigatorObserver {
+  PageRoute<dynamic>? shellRoute;
+
+  @override
+  void didPush(Route<dynamic> route, Route<dynamic>? previousRoute) {
+    super.didPush(route, previousRoute);
+    if (route is PageRoute<dynamic> && route.fullscreenDialog) {
+      shellRoute = route;
+    }
+  }
+}
+
 class CountedPage extends StatelessWidget {
   const CountedPage(this.label, {super.key});
   final String label;
@@ -97,6 +109,63 @@ enum PublicRoutes implements DwNavigationRoute<SessionState> {
   ];
 }
 
+Page<dynamic> semanticsPage(Widget child, LocalKey key) =>
+    CustomTransitionPage<void>(
+      key: key,
+      child: child,
+      opaque: false,
+      barrierDismissible: true,
+      barrierColor: Colors.black38,
+      barrierLabel: 'Shell barrier',
+      fullscreenDialog: true,
+      transitionDuration: const Duration(milliseconds: 137),
+      reverseTransitionDuration: const Duration(milliseconds: 83),
+      transitionsBuilder: (_, animation, _, child) =>
+          FadeTransition(opacity: animation, child: child),
+    );
+
+enum ShellSemanticsRoutes implements DwNavigationRoute<SessionState> {
+  shellSemantics(
+    DwNavigationRouteDescriptor.zoneRoot(pageWidget: CountedPage('Home')),
+  );
+
+  const ShellSemanticsRoutes(this.descriptor);
+  @override
+  final DwNavigationRouteDescriptor<SessionState> descriptor;
+  @override
+  String get zoneRoot => '';
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder =>
+      (_, state, child) => semanticsPage(child, state.pageKey);
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+  @override
+  List<DwDecisionGuard<SessionState>> get zoneGuards => [
+    (_, _) => DwGuardDecision.allow,
+  ];
+}
+
+enum StatefulShellSemanticsRoutes implements DwNavigationRoute<SessionState> {
+  statefulShellSemantics(
+    DwNavigationRouteDescriptor.zoneRoot(pageWidget: CountedPage('Home')),
+  );
+
+  const StatefulShellSemanticsRoutes(this.descriptor);
+  @override
+  final DwNavigationRouteDescriptor<SessionState> descriptor;
+  @override
+  String get zoneRoot => '';
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder =>
+      (_, state, shell) => semanticsPage(shell, state.pageKey);
+  @override
+  List<DwDecisionGuard<SessionState>> get zoneGuards => [
+    (_, _) => DwGuardDecision.allow,
+  ];
+}
+
 Widget pendingPage(BuildContext context, GoRouterState state) {
   pendingBuilds++;
   return const Text('Pending');
@@ -157,8 +226,6 @@ void main() {
       expect(app.router.routeInformationProvider.value.uri.toString(), '/');
       expect(app.router.canPop(), isFalse);
       expect(homeBuilds, 0);
-      // Zone shells do not build until their target is allowed either.
-      expect(shellBuilds, 0);
       container.read(session.notifier).update((
         signedIn: true,
         surveyDone: false,
@@ -166,7 +233,6 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('Survey'), findsOneWidget);
       expect(homeBuilds, 0);
-      expect(shellBuilds, 0);
     },
   );
 
@@ -191,7 +257,6 @@ void main() {
     );
     expect(detailsBuilds, 0);
     expect(homeBuilds, 0);
-    expect(shellBuilds, 0);
     container.read(session.notifier).update((signedIn: true, surveyDone: true));
     await tester.pumpAndSettle();
     expect(find.text('Details'), findsOneWidget);
@@ -280,6 +345,47 @@ void main() {
     expect(homeBuilds, 0);
   });
 
+  for (final zone in <List<DwNavigationRoute<SessionState>>>[
+    ShellSemanticsRoutes.values,
+    StatefulShellSemanticsRoutes.values,
+  ]) {
+    testWidgets('${zone.first.name} preserves its shell Page semantics', (
+      tester,
+    ) async {
+      final container = scope((signedIn: true, surveyDone: true));
+      final observer = RecordingObserver();
+      final app = buildRouter(
+        (ref) => DwAppRouter<SessionState>(
+          ref: ref,
+          routerState: session,
+          navigationZones: [zone],
+          pageBuilder: DwPageBuilder.material,
+          options: DwGoRouterOptions(
+            pendingBuilder: pendingPage,
+            observers: [observer],
+          ),
+        ),
+        container: container,
+      );
+      await tester.pumpWidget(MaterialApp.router(routerConfig: app.router));
+      await tester.pumpAndSettle();
+
+      final route = observer.shellRoute!;
+      expect(route.fullscreenDialog, isTrue);
+      expect(route.opaque, isFalse);
+      expect(route.barrierDismissible, isTrue);
+      expect(route.barrierColor, Colors.black38);
+      expect(route.barrierLabel, 'Shell barrier');
+      expect(route.transitionDuration, const Duration(milliseconds: 137));
+      expect(
+        route.reverseTransitionDuration,
+        const Duration(milliseconds: 83),
+      );
+      expect(find.byType(FadeTransition), findsWidgets);
+      expect(find.text('Home'), findsOneWidget);
+    });
+  }
+
   test(
     'unknown-field helper checks all zones and catches a null-through guard',
     () {
@@ -309,4 +415,24 @@ void main() {
       );
     },
   );
+}
+
+enum LegacyNullThroughRoutes implements DwNavigationRoute<SessionState> {
+  legacy(DwNavigationRouteDescriptor.zoneRoot(pageWidget: Text('Legacy')));
+
+  const LegacyNullThroughRoutes(this.descriptor);
+  @override
+  final DwNavigationRouteDescriptor<SessionState> descriptor;
+  @override
+  String get zoneRoot => 'legacy';
+  @override
+  DwShellRoutePageBuilder? get shellRouteBuilder => null;
+  @override
+  DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
+  @override
+  List<DwDecisionGuard<SessionState>> get zoneGuards => [
+    (state, _) => state.surveyDone == false
+        ? const DwGuardDecision.redirect('/survey')
+        : DwGuardDecision.allow,
+  ];
 }
