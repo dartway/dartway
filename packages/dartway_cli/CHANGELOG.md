@@ -2,6 +2,10 @@
 
 ## 0.24.0
 
+- Deploy: local-mode callers can start each deployment with a fresh rollback journal.
+  Retries keep the original rollback image; the local stack proof now starts a new
+  journal for each simulated deployment (#550).
+
 - Fix: `dartway doctor` always reports Docker, warning that development needs
   `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.
   Invalid or unresolvable test URLs are collected without hiding the Docker result (#539).
