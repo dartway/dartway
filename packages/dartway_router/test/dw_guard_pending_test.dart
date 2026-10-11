@@ -127,6 +127,9 @@ Page<dynamic> semanticsPage(Widget child, LocalKey key) =>
 enum ShellSemanticsRoutes implements DwNavigationRoute<SessionState> {
   shellSemantics(
     DwNavigationRouteDescriptor.zoneRoot(pageWidget: CountedPage('Home')),
+  ),
+  shellDetails(
+    DwNavigationRouteDescriptor.simple(pageWidget: CountedPage('Details')),
   );
 
   const ShellSemanticsRoutes(this.descriptor);
@@ -235,6 +238,17 @@ void main() {
       expect(homeBuilds, 0);
     },
   );
+
+  testWidgets('a MaterialPage shell keeps its installed route', (tester) async {
+    final container = scope((signedIn: true, surveyDone: true));
+    final app = await mount(tester, container);
+    expect(find.text('Home'), findsOneWidget);
+
+    app.router.go('/details');
+    await tester.pumpAndSettle();
+    expect(find.text('Details'), findsOneWidget);
+    expect(find.text('Home'), findsNothing);
+  });
 
   testWidgets('a completed survey opens home directly', (tester) async {
     final container = scope((signedIn: true, surveyDone: true));
@@ -383,6 +397,12 @@ void main() {
       );
       expect(find.byType(FadeTransition), findsWidgets);
       expect(find.text('Home'), findsOneWidget);
+      if (zone.first == ShellSemanticsRoutes.shellSemantics) {
+        app.router.go('/shellDetails');
+        await tester.pumpAndSettle();
+        expect(find.text('Details'), findsOneWidget);
+        expect(find.text('Home'), findsNothing);
+      }
     });
   }
 

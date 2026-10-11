@@ -289,7 +289,6 @@ class DwAppRouter<RouterState> {
               StatefulShellRoute.indexedStack(
                 pageBuilder: gatesPending
                     ? (context, state, navigationShell) => _guardedShellPage(
-                        context: context,
                         shellPage: shellBuilder(
                           context,
                           state,
@@ -320,7 +319,6 @@ class DwAppRouter<RouterState> {
               ShellRoute(
                 pageBuilder: gatesPending
                     ? (context, state, child) => _guardedShellPage(
-                        context: context,
                         shellPage: shellBuilder(context, state, child),
                         switcher: _PendingSwitch(
                           listenable: _refresh,
@@ -410,23 +408,50 @@ class DwAppRouter<RouterState> {
   }
 
   Page<dynamic> _guardedShellPage({
-    required BuildContext context,
     required Page<dynamic> shellPage,
     required _PendingSwitch switcher,
   }) {
-    final route = shellPage.createRoute(context);
-    if (route is! PageRoute<dynamic>) {
-      throw StateError(
-        'A guarded zone shell page must create a PageRoute (MaterialPage, '
-        'CupertinoPage, CustomTransitionPage) to re-decide pending guards: '
-        '${shellPage.runtimeType} creates ${route.runtimeType}.',
-      );
-    }
-    return _GuardedShellPage(
-      sourcePage: shellPage,
-      sourceRoute: route,
-      switcher: switcher,
-    );
+    // Keep the shell's own PageRoute installed in the Navigator. Delegating to
+    // a route created only for inspection is not safe: MaterialPageRoute reads
+    // its navigator while computing transitions. Replace only the Page's
+    // child, so Flutter retains every route behavior and can update the child
+    // when go_router supplies a Page for a new target in the same shell.
+    final gatedChild = switcher;
+    return switch (shellPage) {
+      MaterialPage<dynamic> page => MaterialPage<dynamic>(
+        key: page.key,
+        name: page.name,
+        arguments: page.arguments,
+        restorationId: page.restorationId,
+        child: gatedChild,
+        maintainState: page.maintainState,
+        fullscreenDialog: page.fullscreenDialog,
+        allowSnapshotting: page.allowSnapshotting,
+        canPop: page.canPop,
+        onPopInvoked: page.onPopInvoked,
+      ),
+      CustomTransitionPage<dynamic> page => CustomTransitionPage<dynamic>(
+        key: page.key,
+        name: page.name,
+        arguments: page.arguments,
+        restorationId: page.restorationId,
+        child: gatedChild,
+        transitionsBuilder: page.transitionsBuilder,
+        transitionDuration: page.transitionDuration,
+        reverseTransitionDuration: page.reverseTransitionDuration,
+        maintainState: page.maintainState,
+        fullscreenDialog: page.fullscreenDialog,
+        opaque: page.opaque,
+        barrierDismissible: page.barrierDismissible,
+        barrierColor: page.barrierColor,
+        barrierLabel: page.barrierLabel,
+      ),
+      _ => throw StateError(
+        'A guarded zone shell page must be a MaterialPage or '
+        'CustomTransitionPage so pending content can preserve its route '
+        'behavior: got ${shellPage.runtimeType}.',
+      ),
+    };
   }
 
   // ------------------------------------------------------------
@@ -575,92 +600,6 @@ class DwAppRouter<RouterState> {
 /// state changes. Internal: an app never holds a `Listenable` for the router.
 class _RouterRefresh extends ChangeNotifier {
   void notify() => notifyListeners();
-}
-
-/// A shell page with its original route contract and guard-controlled content.
-///
-/// The source route remains authoritative for transitions, modal barriers,
-/// opacity, state retention, and fullscreen-dialog behavior. Only buildPage is
-/// interposed so an undecided guard can substitute the application's pending
-/// page without changing the URL or creating a different navigation entry.
-class _GuardedShellPage extends Page<dynamic> {
-  _GuardedShellPage({
-    required this.sourcePage,
-    required this.sourceRoute,
-    required this.switcher,
-  }) : super(
-         key: sourcePage.key,
-         name: sourcePage.name,
-         arguments: sourcePage.arguments,
-         restorationId: sourcePage.restorationId,
-       );
-
-  final Page<dynamic> sourcePage;
-  final PageRoute<dynamic> sourceRoute;
-  final _PendingSwitch switcher;
-
-  @override
-  Route<dynamic> createRoute(BuildContext context) =>
-      _GuardedShellPageRoute(page: this);
-}
-
-class _GuardedShellPageRoute extends PageRoute<dynamic> {
-  _GuardedShellPageRoute({required _GuardedShellPage page})
-    : _page = page,
-      super(settings: page, fullscreenDialog: page.sourceRoute.fullscreenDialog);
-
-  final _GuardedShellPage _page;
-  PageRoute<dynamic> get _source => _page.sourceRoute;
-
-  @override
-  bool get allowSnapshotting => _source.allowSnapshotting;
-  @override
-  bool get barrierDismissible => _source.barrierDismissible;
-  @override
-  Color? get barrierColor => _source.barrierColor;
-  @override
-  String? get barrierLabel => _source.barrierLabel;
-  @override
-  Curve get barrierCurve => _source.barrierCurve;
-  @override
-  bool get maintainState => _source.maintainState;
-  @override
-  bool get opaque => _source.opaque;
-  @override
-  Duration get transitionDuration => _source.transitionDuration;
-  @override
-  Duration get reverseTransitionDuration => _source.reverseTransitionDuration;
-
-  @override
-  Widget buildPage(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-  ) {
-    final allowed = _source.buildPage(context, animation, secondaryAnimation);
-    final switcher = _page.switcher;
-    return _PendingSwitch(
-      listenable: switcher.listenable,
-      showsPending: switcher.showsPending,
-      pendingBuilder: switcher.pendingBuilder,
-      state: switcher.state,
-      offstageChild: switcher.offstageChild,
-      allowedBuilder: (_) => allowed,
-    );
-  }
-
-  @override
-  Widget buildTransitions(
-    BuildContext context,
-    Animation<double> animation,
-    Animation<double> secondaryAnimation,
-    Widget child,
-  ) => _source.buildTransitions(
-    context,
-    animation,
-    secondaryAnimation,
-    child,
-  );
 }
 
 /// The pending-or-allowed half of a page, re-decided when the router state
