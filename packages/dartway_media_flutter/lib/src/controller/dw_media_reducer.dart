@@ -124,6 +124,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
     provisional = null;
     played = ever = confirmed = true;
   }
+  void discardProvisional() => provisional = null;
   DwMediaPlayState resting() =>
       ever ? DwMediaPlayState.paused : DwMediaPlayState.ready;
   switch (event) {
@@ -150,7 +151,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
             : DwMediaPlayState.playing,
       );
     case PauseCommand():
-      commitProvisional();
+      discardProvisional();
       seal = true;
       confirmed = false;
       anchor = next.position;
@@ -178,7 +179,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
       );
     case SeekCommand(:final target):
       if (next.isError) break;
-      commitProvisional();
+      discardProvisional();
       seal = true;
       var clamped = target < Duration.zero ? Duration.zero : target;
       if (next.duration > Duration.zero && clamped > next.duration) {
@@ -212,7 +213,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
         needsEngineAnchor = true;
       }
     case LoadCommand():
-      commitProvisional();
+      discardProvisional();
       seal = true;
       confirmed = false;
       anchor = next.position;
@@ -224,7 +225,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
         errorMessage: null,
       );
     case FailureFact(:final message):
-      commitProvisional();
+      discardProvisional();
       seal = true;
       confirmed = false;
       anchor = next.position;
@@ -237,7 +238,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
       );
     case SettingsCommand(:final speed, :final volume, :final muted):
       if (speed != null && speed != next.speed) {
-        commitProvisional();
+        discardProvisional();
         anchor = next.position;
         seal = true;
       }
@@ -260,7 +261,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
           target == null &&
           (!seeking || next.position >= event.duration);
       seal = ended && !next.isEnded;
-      if (ended) commitProvisional();
+      if (ended) discardProvisional();
       final real =
           !needsEngineAnchor &&
           !seeking &&

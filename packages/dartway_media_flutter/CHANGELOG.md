@@ -10,9 +10,10 @@
   confirms spans from real playback and seals them through `playbackDelivery` on
   pause, seek, speed, source, error or end. Waiting does not break continuity;
   pending delivery and explicit retry keep their existing lifecycle.
-- Audio keeps optimistic position ticks as provisional coverage until a native
-  playback event confirms play or a normal boundary seals it. A refused web
-  play drops that coverage, and extrapolated positions cannot settle a seek.
+- Audio keeps optimistic position ticks as provisional presentation until an
+  engine event proves that its captured position advanced. Boundaries and a
+  refused web play drop unconfirmed coverage; extrapolated positions and an
+  optimistic playback event cannot confirm play or settle a seek.
 - Add `session.status`, `session.position` and `session.hasReallyPlayed`;
   `playback` remains their merge. Video surfaces rebuild only for size changes.
   Example controls follow intent, waiting and pending seek positions.

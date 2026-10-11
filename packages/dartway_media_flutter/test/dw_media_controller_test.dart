@@ -215,9 +215,10 @@ void main() {
       await release(tester, controller);
     });
 
-    testWidgets('audio: pause commits optimistic coverage exactly once', (
+    testWidgets('audio: pause before a delayed refusal earns no coverage', (
       tester,
     ) async {
+      debugDwMediaIsWebOverride = true;
       final intervals = <DwMediaPlayedInterval>[];
       final controller = controllerFor(
         audioItem('pause-provisional'),
@@ -229,13 +230,40 @@ void main() {
       await controller.play();
       await tester.pump(const Duration(seconds: 2));
       await controller.pause();
-      expect(intervals, [
-        DwMediaPlayedInterval(Duration.zero, const Duration(seconds: 2)),
-      ]);
-      expect(controller.hasReallyPlayed, isTrue);
+      expect(intervals, isEmpty);
+      expect(controller.hasReallyPlayed, isFalse);
+      track.refusePlayWith = PlatformException(code: 'NotAllowedError');
       gate.complete();
       await dwSettleMedia(tester);
-      expect(intervals, hasLength(1));
+      expect(intervals, isEmpty);
+      expect(controller.hasReallyPlayed, isFalse);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: a delayed optimistic playback event is not native '
+        'evidence', (tester) async {
+      debugDwMediaIsWebOverride = true;
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('delayed-event-refusal'),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      final playGate = Completer<void>();
+      final eventGate = Completer<void>();
+      track.playBarrier = playGate.future;
+      await controller.play();
+      unawaited(track.reportReadyAfter(eventGate.future));
+      await tester.pump(const Duration(seconds: 2));
+      eventGate.complete();
+      await tester.pump();
+      expect(intervals, isEmpty);
+      expect(controller.hasReallyPlayed, isFalse);
+      track.refusePlayWith = PlatformException(code: 'NotAllowedError');
+      playGate.complete();
+      await dwSettleMedia(tester);
+      expect(intervals, isEmpty);
+      expect(controller.hasReallyPlayed, isFalse);
       await release(tester, controller);
     });
 

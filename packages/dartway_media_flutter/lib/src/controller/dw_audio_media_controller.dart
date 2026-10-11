@@ -44,7 +44,11 @@ final class DwAudioMediaController extends DwMediaEngineController {
       player.playbackEventStream.listen((event) {
         if (!identical(_player, player)) return;
         _playbackEvent = event;
-        _onUpdate(player, player.position, nativePlaybackEvent: true);
+        // `player.position` extrapolates from this event's timestamp. If the
+        // stream delivers the optimistic event made by `play()` late, that
+        // clock can have advanced even though the platform has produced no
+        // audio. Only the engine position captured in the event is evidence.
+        _onUpdate(player, event.updatePosition, nativePlaybackEvent: true);
       }),
       player.positionStream.listen((position) => _onUpdate(player, position)),
       player.errorStream.listen((error) {

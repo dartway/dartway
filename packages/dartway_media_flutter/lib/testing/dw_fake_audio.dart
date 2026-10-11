@@ -102,6 +102,16 @@ final class DwFakeAudio extends AudioPlayerPlatform {
     _report(ProcessingStateMessage.ready);
   }
 
+  /// Creates a ready event now and delivers it after [barrier] completes.
+  ///
+  /// This reproduces an engine event waiting in an asynchronous stream while
+  /// `just_audio`'s presentation clock keeps extrapolating from its timestamp.
+  Future<void> reportReadyAfter(Future<void> barrier) async {
+    final event = _event(ProcessingStateMessage.ready);
+    await barrier;
+    _send(event);
+  }
+
   /// The platform's own end of playback.
   void finish() {
     position = length;
@@ -243,19 +253,34 @@ final class DwFakeAudio extends AudioPlayerPlatform {
     int? errorCode,
     String? errorMessage,
   }) {
-    playbackEventCount++;
-    final event = PlaybackEventMessage(
-      processingState: processing,
-      updateTime: DateTime.now(),
-      updatePosition: position,
-      bufferedPosition: position,
-      duration: length,
-      icyMetadata: null,
-      currentIndex: 0,
-      androidAudioSessionId: null,
-      errorCode: errorCode,
-      errorMessage: errorMessage,
+    _send(
+      _event(
+        processing,
+        errorCode: errorCode,
+        errorMessage: errorMessage,
+      ),
     );
+  }
+
+  PlaybackEventMessage _event(
+    ProcessingStateMessage processing, {
+    int? errorCode,
+    String? errorMessage,
+  }) => PlaybackEventMessage(
+    processingState: processing,
+    updateTime: DateTime.now(),
+    updatePosition: position,
+    bufferedPosition: position,
+    duration: length,
+    icyMetadata: null,
+    currentIndex: 0,
+    androidAudioSessionId: null,
+    errorCode: errorCode,
+    errorMessage: errorMessage,
+  );
+
+  void _send(PlaybackEventMessage event) {
+    playbackEventCount++;
     for (final listener in List.of(_listeners)) {
       listener.add(event);
     }
