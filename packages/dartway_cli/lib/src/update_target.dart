@@ -52,7 +52,7 @@ class DwUpdateTarget {
       return DwUpdateTarget._(
         tree,
         resolved,
-        source.isLocalCheckout ? checkout.absolute.path : source.repoUrl,
+        await source.manifestSource(checkout.absolute),
         scratch,
       );
     } catch (_) {

@@ -43,7 +43,8 @@ The core family moves in lockstep (one version across all six); every other pack
 | `example/` | The reference project (a fitness club: schedule, bookings, a staff chat on `DwWindowListView`, news, admin). **The CLI does not hand it out**: read it, do not inherit from it |
 | `toolkit/` | The agent toolkit for application projects: `AGENTS.md` (the shared project constitution), `dartway-*` skills, commands, `__*__` tokens |
 | `docs/` | The public documentation, the source of dartway.dev; `docs/1.0/DECISIONS.md` is the rewrite's record (above); `docs/migrations/` is addressed to projects that are behind |
-| `tool/` | Scripts this repository runs on itself: `checks.sh` (the CI gate), `self_check.dart`, `caret_check.dart`, `lock_check.dart`, `git_config_check.dart`, `release.dart`, `release_notes.dart`, `vendor_framework.dart`, `run_project_ci.dart` |
+| `tool/` | Scripts this repository runs on itself: `checks.sh` (the CI gate), `self_check.dart`, `caret_check.dart`, `lock_check.dart`, `git_config_check.dart`, `release.dart`, `release_notes.dart`, `vendor_framework.dart`, `run_project_ci.dart`, `tag_check_image.sh` (immutable published-version tags for the check image) |
+| `deploy/check/` | The outside-probe check image and its Docker build context rules |
 | `js/studio-bridge` | The bridge's application half for JavaScript apps (`@dartway/studio-bridge` on npm). Outside `packages/`, which is the pub workspace; held to the Dart side by golden wire strings in its tests |
 | `.agents/skills/framework-finish` | The synchronisation audit for changes to this repository |
 
@@ -94,6 +95,8 @@ Run the `framework-finish` skill before committing framework changes — it look
 - **Generated files are never edited by hand.** The output is deterministic and formatted; a hand edit is overwritten by the next run and reported as stale by `--check` until then. The one exception proves the rule: `packages/dartway_core_shared/test/fixtures/club_booking.dw.dart` is hand-written in the generator's exact shape so the shared package tests the contract without the generator, and `packages/dartway_generator/test/dto_test.dart` regenerates it and fails on any difference — change the two together.
 - **In this repository** the generator resolves inside `example/` and `template/` through their `dependency_overrides`: from a project's server package, `dart run dartway_generator --project ..` (add `--check` to verify), or `dartway generate` from the project root with a CLI activated from this tree.
 - **A row class change is a migration**: `dart run bin/migrate.dart create <name>` in the server package, with `DW_DATABASE_*` set, then review the draft. The framework's own tables migrate in `packages/dartway_core_server/lib/src/migrations/dw_framework_migrations.dart` under the `dw` namespace, **appended, never rewritten** — an applied migration whose checksum changes stops every server that has applied it (D-050). The one exception is a migration that could not apply on databases holding rows: it is corrected with the same outcome where it did apply, and declares the text it replaces in `supersededChecksums` (D-056).
+
+- **Framework migrations follow expand, then contract** (`toolkit/skills/dartway-migrations/SKILL.md`): they ship inside a package version, so the previous image's framework version must run on the new `dw_*` schema; a contraction ships one production release after the code stops using the old shape.
 
 ### The wire is a protocol
 
@@ -219,13 +222,16 @@ git config rerere.enabled true   # a conflict resolved once is remembered
 
 ### CI
 
-Six workflows in `.github/workflows/`:
+Nine workflows in `.github/workflows/`:
 
 | File | When | What it does |
 |---|---|---|
 | `checks.yml` | A PR is opened, updated or taken out of draft; push to `master` | `tool/checks.sh analyze`, `tool/checks.sh test`, and `tool/checks.sh services` with a Postgres service container and a storage |
 | `database.yml` | Nightly, by hand, when this workflow's file changes, and on a PR touching `packages/`, `template/`, `example/` or the project CI runner | `dartway test` in `example/`; in `template`, a project created from this commit with its packages vendored in, committed, and run through its own `ci.yml` by `tool/run_project_ci.dart` |
 | `images.yml` | `template/` or the CLI changes, nightly, by hand | Builds the two images of a project **as `dartway create` produces it**, with this tree's packages vendored in (`tool/vendor_framework.dart`) |
+| `kamal.yml` | PR or master push touching the deploy generator, template or workflow | Validates generated destinations with pinned Kamal 2.12 |
+| `check-image.yml` | Push to `master`, relevant PR changes, by hand | Builds the outside-probe image; checks `--help`; master publishes the immutable SHA tag |
+| `check-image-version.yml` | Push to `stable` or relevant PR changes | Calls `tool/tag_check_image.sh`: verifies publication and copies the SHA image to an immutable CLI version tag; PR runs are dry runs |
 | `web-compile.yml` | A PR is opened or updated; push to `master` | `flutter build web --release` of `example/` on the pinned Flutter, and of `template/` on the oldest Flutter the framework claims: dart2js rejects code the VM accepts |
 | `claude-review.yml` | A PR is opened, updated or taken out of draft | Reviews the diff; beyond ordinary bugs it holds the synchronisation law, generated code being up to date, a wire change bumping the protocol, and the toolkit invariant |
 | `telegram-notify.yml` | A review finishes | Sends the verdict and a link to the PR to Telegram |

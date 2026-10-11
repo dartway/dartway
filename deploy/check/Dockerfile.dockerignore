@@ -1,0 +1,13 @@
+# Only the workspace sources and lock enter the compiler stage.
+**
+!.fvmrc
+!pubspec.yaml
+!pubspec.lock
+!packages/
+!packages/**
+!tool/
+!tool/**
+**/.dart_tool
+**/.fvm
+**/build
+**/.env

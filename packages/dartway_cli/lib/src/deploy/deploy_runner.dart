@@ -359,6 +359,18 @@ dw_wait_healthy() {
   String get _journalDirectory =>
       remote?.directory ?? '${store.directory}/deploy-run';
 
+  /// Starts a deployment without [remote], discarding the previous journal.
+  /// Call once before its first build or replacement, never on a retry.
+  /// Remote deployments start through [DwRemoteSteps.beginFresh] instead.
+  Future<DwSshResult> beginLocalDeployment() {
+    if (remote != null) {
+      throw StateError(
+        'Remote deployments start through DwRemoteSteps.beginFresh.',
+      );
+    }
+    return _as("rm -rf '$_journalDirectory'\n");
+  }
+
   // Written before replacement, once per deployment: a retry or a resumed
   // cleanup must retain the original rollback image, not the newly serving one.
   String _rememberImage(String service) {

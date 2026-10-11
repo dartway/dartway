@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 /// executable has no reliable way back to its own pubspec. It is a checked
 /// copy: `toolkit_manifest_test.dart` compares the two and goes red when they
 /// part.
-const dartwayCliVersion = '0.24.0';
+const dartwayCliVersion = '0.25.0-dev.0';
 
 /// Where an installed harness came from.
 ///
@@ -97,8 +97,10 @@ class ToolkitProvenance {
   /// when the framework itself was being worked on.
   final String source;
 
-  /// The branch, or null when the source was a local checkout — a working
-  /// directory's branch says nothing about what a project should follow.
+  /// The selected branch, or null when no channel was selected.
+  ///
+  /// Local checkouts and pub-cache installs record no channel; a pub-cache
+  /// install records a repository URL as its source.
   final String? channel;
 
   /// The commit the toolkit was read at, or null when it could not be resolved.

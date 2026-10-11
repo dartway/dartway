@@ -10,12 +10,14 @@ import '../deploy/remote_checks.dart';
 import '../deploy/ssh_runner.dart';
 import '../deploy/stack.dart';
 import '../project_layout.dart';
+import 'deploy_kamal.dart';
 import 'deploy_run.dart';
 import 'deploy_setup.dart';
 
 /// Deployment commands.
 class DeployCommand extends Command<int> {
   DeployCommand() {
+    addSubcommand(DeployKamalCommand());
     addSubcommand(DeploySetupCommand());
     addSubcommand(DeployRunCommand());
     addSubcommand(DeployCheckCommand());

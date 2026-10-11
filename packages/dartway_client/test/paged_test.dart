@@ -17,6 +17,32 @@ List<int> idsOf(List<DwDataObject> items) => [
 
 void main() {
   group('pages', () {
+    test('a page catches up on an insert published during the gap', () async {
+      final h = Harness()..serveRooms();
+      h.rooms = [b, c];
+      await h.start();
+      final watch = h.client.watchPages(const FeedRooms());
+      await settle();
+      expect(pagedItems(watch.state), [b, c]);
+      expect(watch.isLive, isTrue);
+
+      await h.disconnectLive();
+      h.rooms = [a, b, c];
+      h.server.publish(roomsChannel, [a]);
+      await settle();
+      expect(pagedItems(watch.state), [b, c]);
+      expect(watch.isLive, isFalse);
+
+      h.server.acceptsConnections = true;
+      await until(
+        () => watch.isLive && !(watch.state as DwRequestData).refreshing,
+      );
+      await settle();
+      expect(pagedItems(watch.state), [a, b]);
+      expect(watch.hasMore, isTrue);
+      expect(h.server.requestsOf<FeedRooms>(), hasLength(2));
+    });
+
     test('loads the first page, then the next on loadMore', () async {
       final h = Harness()..serveRooms();
       h.rooms = [a, b, c, d, e];

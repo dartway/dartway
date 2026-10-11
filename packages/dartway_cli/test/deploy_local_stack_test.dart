@@ -261,6 +261,10 @@ void main() {
       throw StateError('secret store: ${created.stderr}${generated.stderr}');
     }
 
+    final begun = await runner.beginLocalDeployment();
+    if (!begun.ok) {
+      throw StateError('deployment journal: ${begun.stderr}');
+    }
     final failed = await executeDeploySteps(runner.steps(skipGitUpdate: true));
     if (failed != null) {
       log.writeln((await compose('logs --no-color --tail 100')).stdout);
@@ -584,6 +588,7 @@ void main() {
     final storeFile = File(runner.store.file);
     final original = storeFile.readAsStringSync();
     try {
+      expect((await runner.beginLocalDeployment()).ok, isTrue);
       await runner.store.setSecret(
         key: DwStack.databasePasswordKey,
         value: 'not-the-password',
@@ -606,6 +611,7 @@ void main() {
       storeFile.writeAsStringSync(original);
       expect((await runner.renderEnvironment()).ok, isTrue);
     }
+    expect((await runner.beginLocalDeployment()).ok, isTrue);
     final recovered = await runner.replaceServer();
     expect(recovered.ok, isTrue, reason: recovered.stderr);
     expect((await probe.health(stack.apiOrigin)).passed, isTrue);

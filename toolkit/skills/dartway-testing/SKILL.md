@@ -52,11 +52,12 @@ round-trips a value of every DTO through the project's protocol
 
 `dart run dartway_cli:dartway test` (from `__FLUTTER_PKG__`; `-- --name x` passes arguments, `--keep`
 keeps the database up, `--no-storage`) starts a Postgres and a storage on ports Docker picks, runs
-`dart test` in `__SERVER_PKG__`, and removes both. Never a test database in compose or a fixed port. Without Docker, pass explicit
-`--database-url postgres://user:password@localhost[:port]/postgres` (CREATEDB role) and, for uploads,
-`--storage-url http[s]://key:secret@localhost:port`; database-only disables storage, hosts must resolve
-to loopback unless `--allow-remote-test-server` is deliberate, and `DW_TEST_RUN_ID` scopes cleanup
-on success, failure and SIGINT; inherited service variables never select servers.
+`dart test` in `__SERVER_PKG__`, and removes both. Never a test database in compose or a fixed port.
+
+`DW_TEST_DATABASE_URL` and `DW_TEST_STORAGE_URL` select explicit test server URLs.
+The `--database-url` and `--storage-url` flags win over the variables; empty variables count as unset.
+See [Testing](https://github.com/dartway/dartway/blob/master/docs/5-tooling/testing.md)
+for URL requirements, cleanup and `dartway doctor` details.
 
 **One harness, extended, never replaced**: `AppHarness` in `__SERVER_PKG__/test/support/app_harness.dart`
 — `start`, `stop`, `client`, `signUp`, `admin`, with the matcher `refusedWith` beside it — builds the

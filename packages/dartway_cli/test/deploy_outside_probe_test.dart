@@ -1,7 +1,11 @@
+// ignore_for_file: invalid_use_of_internal_member
+
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_cli/src/deploy/outside_probe.dart';
 import 'package:dartway_cli/src/deploy/stack.dart';
+import 'package:dartway_core_server/src/files/dw_storage_buckets.dart';
 import 'package:test/test.dart';
 
 /// A stand-in for a deployed host: answers by path, as configured per test,
@@ -342,6 +346,11 @@ void main() {
     });
   });
 
+  test('outside storage probe uses the exact server probe key and bytes', () {
+    expect(DwStack.visibilityProbeKey, DwBucketCheck.probeKey);
+    expect(utf8.encode(DwStack.visibilityProbeText), DwBucketCheck.probeBody);
+  });
+
   group('storage visibility', () {
     const probeText = DwStack.visibilityProbeText;
 
@@ -356,10 +365,10 @@ void main() {
         return text(r, listing, listing < 300 ? '<ListBucketResult/>' : '');
       }
       if (path == '/shop-public/${DwStack.visibilityProbeKey}') {
-        return text(r, public, public == 200 ? '$probeText\n' : '');
+        return text(r, public, public == 200 ? probeText : '');
       }
       if (path == '/shop-private/${DwStack.visibilityProbeKey}') {
-        return text(r, private, private == 200 ? '$probeText\n' : '');
+        return text(r, private, private == 200 ? probeText : '');
       }
       return text(r, 404, '');
     }

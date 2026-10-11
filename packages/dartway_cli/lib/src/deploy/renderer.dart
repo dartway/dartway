@@ -5,6 +5,7 @@ import 'package:path/path.dart' as p;
 
 import 'deploy_target.dart';
 import 'stack.dart';
+import 'storage_policy.dart';
 
 /// Renders the two infrastructure files of a deployment: the compose file and
 /// the front proxy's configuration.
@@ -209,10 +210,6 @@ class DwStackRenderer {
       ..writeln('      context: ${_q(buildContext)}')
       ..writeln('      dockerfile: ${_q('${stack.flutterPackage}/Dockerfile')}')
       ..writeln('      args:')
-      ..writeln(
-        '        # The app calls its own origin: /dw/ and /health on it '
-        'reach the server.',
-      )
       ..writeln('        DW_BACKEND_URL: ${_q(stack.appOrigin)}')
       ..writeln(
         '        # Where this build answers, for the Studio binding: it '
@@ -440,16 +437,7 @@ class DwStackRenderer {
         },
       ],
     });
-    final cors = jsonEncode({
-      'CORSRules': [
-        {
-          'AllowedOrigins': [stack.appOrigin],
-          'AllowedMethods': ['GET', 'PUT'],
-          'AllowedHeaders': ['*'],
-          'MaxAgeSeconds': 3000,
-        },
-      ],
-    });
+    final cors = dwStorageCorsJson([stack.appOrigin]);
     String aws(String rest) => 'aws --endpoint-url $endpoint $rest';
     return [
       'set -e',
@@ -467,7 +455,7 @@ class DwStackRenderer {
           '--cors-configuration file:///tmp/dw-cors.json',
         ),
       for (final bucket in [public, private])
-        "printf '%s\\n' '${DwStack.visibilityProbeText}' "
+        "printf '%s' '${DwStack.visibilityProbeText}' "
             '| ${aws('s3 cp - s3://$bucket/${DwStack.visibilityProbeKey}')} '
             '>/dev/null',
       'echo "bucket $public reads objects anonymously, bucket $private does '

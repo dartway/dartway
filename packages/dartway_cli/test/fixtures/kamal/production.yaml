@@ -1,0 +1,12 @@
+production:
+  host: 203.0.113.20
+  ssh_user: production_operator
+  deploy_user: production_deployer
+  os: ubuntu
+  repo: git@github.com:acme/shop.git
+  branch: production
+  ssl_email: production-ops@example.com
+  api_domain: api.production.example.com
+  app_domain: app.production.example.com
+  storage: bundled
+  storage_domain: files.production.example.com

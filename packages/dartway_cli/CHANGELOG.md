@@ -6,8 +6,34 @@
   resolved after an older CLI moved its tag without leaving a rollback pin. The refusal names the
   rerun command; opting in warns that a failure leaves the service down until the next deploy.
   Resolvable images are still pinned, and the flag is not stored in config (#535).
+- The generated Images workflow labels each image with its Kamal `service`;
+  without it `kamal deploy` refuses the CI-built image (found by the #530
+  end-to-end deploy).
+- `deploy kamal` generates Kamal 2.12 destinations with kamal-proxy v0.10.2,
+  literal server route prefixes, the Studio deployment manifest and cached GHCR
+  image builds from the project's deployment configuration. Image publication
+  follows each destination's `branch:` after successful CI. `--check` reports
+  stale output. Postgres stays private to the stack. Unsupported `requires: files:`,
+  deployed `site:`, root API proxy prefixes, invalid project names and a CLI path
+  dependency inside the project's own checkout are refused with a diagnostic (#530).
+- The check image runs outside probes from a read-only project checkout with its
+  own TLS trust store. Its immutable tag follows the resolved CLI source: Git SHA,
+  path HEAD or hosted version. Framework CI builds it on the pinned Flutter and
+  committed workspace lock, verifies the CA bundle and entry point, and publishes
+  the SHA tag; stable promotes the published CLI version tag without rebuilding
+  or replacing an existing tag (#530).
+- Template and example web releases call `Uri.base.origin` and build without a
+  backend address, so one image serves every destination. Deploy checks require
+  the backend build argument only when the Dockerfile declares it (#530).
 
 ## 0.24.0
+
+- Fix: toolkit manifests no longer record machine-local pub-cache clone paths,
+  and `dartway check` skips inaccessible or revision-mismatched recorded checkouts (#552).
+
+- Migration: projects created before #495 must hold their committed locks in CI with
+  `--enforce-lockfile`; refresh and commit the locks before enabling the gate. See
+  [the migration note](../../docs/migrations/2026-10-10-ci-holds-the-locks.md) (#529).
 
 - Deploy: a failed migration restores the healthy previous server on the containerd image store,
   with its live socket serving again without manual recovery (#519).
@@ -23,10 +49,17 @@
   the cache bytes shared with kept images. A cleanup failure closes its progress step and warns at
   exit 0; `--resume` retries cleanup and failed outside probes (#507, #519).
 
+- The toolkit's `dartway-migrations` requires expand, then contract across production releases
+  so the previous image can run on the new schema (#520). Contracting decisions and the
+  `dartway-finish` review gate reject contractions shipped with the code that stops using the old
+  shape; rename, nullability and default guidance now accounts for released readers and writers.
+
 - Toolkit: tests are mandatory only for six risk classes; other tests are rare and must pass the
   `dartway-testing` gate. Agent rules govern expectations and assertion changes. `dartway-plan`
   selects **Risks to guard** with a class and expected outcome, and the feature scaffold adds only
   risk-owned tests, including access refusals and restricted-channel leak checks (#517).
+
+- Toolkit: align checkup with must-test risk classes and clarify the scaffold's restricted-channel leak check (#528).
 
 - The template's Claude review job uses the same `DW_CI_RUNS_ON` expression as `ci.yml`, so one
   repository or organisation variable moves both jobs onto self-hosted runners. The review's
@@ -38,6 +71,20 @@
   other new tests is optional, and `dartway-finish` reviews the bugfix's red. A test that fails and
   then passes on the same commit without changes is quarantined with a linked record rather than
   re-running CI until green (#513).
+
+- Fix: `dartway doctor` always reports Docker, warning that development needs
+  `docker compose up` when a valid `DW_TEST_DATABASE_URL` removes the test dependency.
+  Invalid or unresolvable test URLs are collected without hiding the Docker result (#539).
+
+- `dartway test` defaults `--database-url` and `--storage-url` from `DW_TEST_DATABASE_URL` and
+  `DW_TEST_STORAGE_URL`; flags take precedence, including `--no-storage`, and empty variables
+  count as unset. The run banner and URL refusals name the source, and the existing
+  loopback guard, isolation, cleanup and `--keep` refusal apply. `dartway doctor` reports the
+  environment-selected hosts without credentials; storage alone still needs Docker for Postgres.
+  Both test URL variables are removed from the suite and service workers' environment, including
+  overridden defaults.
+  Doctor's remote-server refusal explains its loopback requirement and the test command's
+  explicit opt-in; Docker fixes name the test-only variables as well as the flags (#522).
 
 - Toolkit: `dartway-finish` always runs fast gates locally and checks pull-request workflows per
   suite. CI-covered suites run only changed and mirrored tests locally, with a full local fallback
