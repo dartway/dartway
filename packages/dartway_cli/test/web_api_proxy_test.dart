@@ -9,14 +9,14 @@ void main() {
     p.join(
       repository.path,
       'template/dartway_starter_flutter/docker-entrypoint.d/'
-          '20-dartway-api-proxy.sh',
+      '20-dartway-api-proxy.sh',
     ),
   ).readAsStringSync();
   final exampleScript = File(
     p.join(
       repository.path,
       'example/dartway_example_flutter/docker-entrypoint.d/'
-          '20-dartway-api-proxy.sh',
+      '20-dartway-api-proxy.sh',
     ),
   ).readAsStringSync();
 

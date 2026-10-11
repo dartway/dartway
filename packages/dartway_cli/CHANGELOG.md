@@ -6,6 +6,13 @@
   configures each web destination to proxy same-origin server paths to that
   public API origin. The template web image renders the validated proxy routes
   at container start, including WebSocket forwarding for `/dw/` (#564).
+- Fix: `deploy run --without-rollback-image` unblocks a stand whose running image cannot be
+  resolved after an older CLI moved its tag without leaving a rollback pin. The refusal names the
+  rerun command; opting in warns that a failure leaves the service down until the next deploy.
+  Resolvable images are still pinned, and the flag is not stored in config (#535).
+- The generated Images workflow labels each image with its Kamal `service`;
+  without it `kamal deploy` refuses the CI-built image (found by the #530
+  end-to-end deploy).
 - `deploy kamal` generates Kamal 2.12 destinations with kamal-proxy v0.10.2,
   literal server route prefixes, the Studio deployment manifest and cached GHCR
   image builds from the project's deployment configuration. Image publication
