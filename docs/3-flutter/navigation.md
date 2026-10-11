@@ -29,10 +29,6 @@ changes, guards run again and the allowed page or redirect replaces loading. A
 pending answer without a loading builder fails with an error naming the missing
 option.
 
-`DwNavigationGuard` remains accepted as a deprecated String? guard; its adapter
-reads null as allow and a path as redirect. Adopt decision guards wherever facts
-can still be loading. The compatibility adapter cannot prevent null-through flashes.
-
 A test can import `package:dartway_router/testing.dart` and call
 `dwCheckPendingGuards` with all zones, representative known states and a setter for
 every nullable field. Each setter returns the state with that field null; Dart

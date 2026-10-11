@@ -1,7 +1,6 @@
 /// Guard checks for an application's router-state records.
 library;
 
-import 'src/navigation_zones/dw_guard_adapter.dart';
 import 'src/navigation_zones/dw_navigation_route.dart';
 import 'src/navigation_zones/dw_navigation_route_extension.dart';
 import 'src/navigation_zones/dw_navigation_types.dart';
@@ -35,14 +34,11 @@ void dwCheckPendingGuards<S>({
         for (final known in states) {
           for (var index = 0; index < guards.length; index++) {
             final guard = guards[index];
-            if (resolveGuardDecision(guard(known, target)).redirectPath ==
-                null) {
+            if (guard(known, target).redirectPath == null) {
               continue;
             }
             for (final field in nullableFields.entries) {
-              final unknown = resolveGuardDecision(
-                guard(field.value(known), target),
-              );
+              final unknown = guard(field.value(known), target);
               if (!unknown.isPending && unknown.redirectPath == null) {
                 throw StateError(
                   'Zone $zone, route ${route.name}, guard $index allows '

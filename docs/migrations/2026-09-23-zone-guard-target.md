@@ -7,7 +7,7 @@ affects:
 
 ## Who is affected
 
-Every project: each zone declares `zoneGuards`, and `DwNavigationGuard` now takes two arguments —
+Every project: each zone declares `zoneGuards`, and the zone guard callback now takes two arguments —
 the router state, as before, and the `DwNavigationTarget` being entered. A guard written with one
 parameter no longer compiles.
 
@@ -25,7 +25,7 @@ What the parameter is for. The skeleton's gates now do this; to do the same, sen
 person to sign-in with where they were going, and send them on once signed in.
 `<project>_flutter/lib/core/router/navigation_zones/auth_navigation_zone.dart`:
 
-    List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
+    List<DwDecisionGuard<AppRouterState>> get zoneGuards => [
       (state, target) => state.isSignedIn
           ? _returnTo(target) ?? AppNavigationZone.home.fullPath
           : null,

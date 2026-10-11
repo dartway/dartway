@@ -318,8 +318,6 @@ one app loading page replaces the target and its zone shell's chrome at the same
 URL without another history entry. The shell Navigator stays mounted offstage, so
 system Back remains go_router's normal pop. The router refreshes its guards when
 the state provider changes. A pending answer without a builder fails with a diagnostic.
-The deprecated `DwNavigationGuard` String? functions remain accepted: the adapter
-reads null as allow and a path as redirect. They cannot express unknown facts.
 
 ```dart
 enum AppRoutes implements DwNavigationRoute<AppSession> {
@@ -736,7 +734,7 @@ Abstract interface for navigation routes. Routes are defined as enums implementi
 - `shellRouteBuilder` - Simple shell builder (state not preserved across tabs)
 - `statefulShellRouteBuilder` - Stateful shell builder (state preserved per branch)
 - `shellRouteBuilder` - Optional shell route builder
-- `zoneGuards` - List of navigation guards, each `(routerState, DwNavigationTarget target) => DwGuardDecision` (legacy String? guards are deprecated)
+- `zoneGuards` - List of navigation guards, each `(routerState, DwNavigationTarget target) => DwGuardDecision`
 
 #### `DwNavigationRouteDescriptor<RouterState>`
 

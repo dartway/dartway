@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../navigation_zones/dw_navigation_route.dart';
 import '../navigation_zones/dw_navigation_route_extension.dart';
-import '../navigation_zones/dw_guard_adapter.dart';
 import '../navigation_zones/dw_navigation_types.dart';
 import 'dw_go_router_options.dart';
 
@@ -240,7 +239,7 @@ class DwAppRouter<RouterState> {
     return _decisions.putIfAbsent(target, () {
       final current = subscription.read();
       for (final guard in route.zoneGuards) {
-        final decision = resolveGuardDecision(guard(current, target));
+        final decision = guard(current, target);
         if (decision.isPending) {
           if (options.pendingBuilder == null) {
             throw StateError(

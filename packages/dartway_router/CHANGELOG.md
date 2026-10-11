@@ -7,8 +7,7 @@ without adding history or building the target or its zone shell chrome. A shell'
 Navigator stays mounted offstage, preserving normal system Back behaviour. State
 changes re-run the guards and replace the loading page with the allowed page or redirect.
 The builder is required when a guard returns pending; a missing builder fails
-with a diagnostic. The deprecated `DwNavigationGuard` String? contract still
-compiles through an adapter (`null` means allow).
+with a diagnostic. All guards use the decision contract.
 
 `package:dartway_router/testing.dart` provides `dwCheckPendingGuards`: every zone's
 guards are checked against representative states with each nullable field set to
@@ -18,7 +17,7 @@ null, detecting unknown values that allow a target a known value would redirect.
 
 ### Breaking
 
-**The guards follow a Riverpod provider; the app holds no `Listenable`** (#407). `DwAppRouter` is built inside a provider and takes its `ref`, and `routerState` is a provider of the value the guards decide by — an immutable record or a class with value equality — instead of a `Listenable` the app kept and notified by hand. The router listens to it through `ref`, hands each guard the current value, and re-runs the guards whenever the value changes, so signing in leaves the sign-in screen and signing out returns to it with nothing else wired; an equal value re-runs nothing. go_router's `refreshListenable` is the router's own, internal. The router also disposes itself with the provider that built it. `RouterState` has no `Listenable` bound any more (`DwAppRouter`, `DwNavigationRoute`, `DwNavigationRouteDescriptor`, `DwNavigationGuard`), and the package depends on `flutter_riverpod`. The router provider has to be watched for the guards to follow — `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)` does; Riverpod pauses the subscriptions of a provider nobody listens to.
+**The guards follow a Riverpod provider; the app holds no `Listenable`** (#407). `DwAppRouter` is built inside a provider and takes its `ref`, and `routerState` is a provider of the value the guards decide by — an immutable record or a class with value equality — instead of a `Listenable` the app kept and notified by hand. The router listens to it through `ref`, hands each guard the current value, and re-runs the guards whenever the value changes, so signing in leaves the sign-in screen and signing out returns to it with nothing else wired; an equal value re-runs nothing. go_router's `refreshListenable` is the router's own, internal. The router also disposes itself with the provider that built it. `RouterState` has no `Listenable` bound any more (`DwAppRouter`, `DwNavigationRoute`, `DwNavigationRouteDescriptor`, `DwDecisionGuard`), and the package depends on `flutter_riverpod`. The router provider has to be watched for the guards to follow — `MaterialApp.router(routerConfig: ref.watch(appRouterProvider).router)` does; Riverpod pauses the subscriptions of a provider nobody listens to.
 
     - final appRouterStateProvider = Provider<AppRouterState>((ref) { … AppRouterState(ref) … });
     - DwAppRouter<AppRouterState>(routerState: ref.watch(appRouterStateProvider), …)
@@ -47,7 +46,7 @@ Any project relying on the old, doubled URL of a simple route with `extraPathSeg
 
 ### Breaking
 
-**A zone guard is told where the person was going** (#288). `DwNavigationGuard` takes a second argument, a `DwNavigationTarget` — the location asked for (`uri`, `location`), the route's name and its path parameters — so a guard that turns someone away can name the place: "sign in, then back to `/orders/42`". The guard could only answer no, and `options.redirect`, which sees the destination, never runs once a guard has answered: the two did not compose. Every guard gains the parameter: `(state) => …` becomes `(state, target) => …`, or `(state, _) => …`.
+**A zone guard is told where the person was going** (#288). `DwDecisionGuard` takes a second argument, a `DwNavigationTarget` — the location asked for (`uri`, `location`), the route's name and its path parameters — so a guard that turns someone away can name the place: "sign in, then back to `/orders/42`". The guard could only answer no, and `options.redirect`, which sees the destination, never runs once a guard has answered: the two did not compose. Every guard gains the parameter: `(state) => …` becomes `(state, target) => …`, or `(state, _) => …`.
 
 ## 1.1.2 - 2026-08-19
 
