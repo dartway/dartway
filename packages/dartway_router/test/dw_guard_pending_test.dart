@@ -21,6 +21,7 @@ int homeBuilds = 0;
 int detailsBuilds = 0;
 int shellBuilds = 0;
 int pendingBuilds = 0;
+int signInBuilds = 0;
 
 class CountedPage extends StatelessWidget {
   const CountedPage(this.label, {super.key});
@@ -29,6 +30,7 @@ class CountedPage extends StatelessWidget {
   Widget build(BuildContext context) {
     if (label == 'Home') homeBuilds++;
     if (label == 'Details') detailsBuilds++;
+    if (label == 'Sign in') signInBuilds++;
     return Text(label);
   }
 }
@@ -67,7 +69,9 @@ enum PendingRoutes implements DwNavigationRoute<SessionState> {
 }
 
 enum PublicRoutes implements DwNavigationRoute<SessionState> {
-  signIn(DwNavigationRouteDescriptor.simple(pageWidget: Text('Sign in'))),
+  signIn(
+    DwNavigationRouteDescriptor.simple(pageWidget: CountedPage('Sign in')),
+  ),
   survey(DwNavigationRouteDescriptor.simple(pageWidget: Text('Survey')));
 
   const PublicRoutes(this.descriptor);
@@ -102,6 +106,7 @@ void main() {
     detailsBuilds = 0;
     shellBuilds = 0;
     pendingBuilds = 0;
+    signInBuilds = 0;
   });
 
   Future<DwAppRouter<SessionState>> mount(
@@ -216,6 +221,54 @@ void main() {
     expect(homeBuilds, builds);
   });
 
+  testWidgets('system Back pops normally while a shell target is pending', (
+    tester,
+  ) async {
+    final container = scope((signedIn: true, surveyDone: true));
+    final app = await mount(tester, container);
+    container.read(session.notifier).update((signedIn: true, surveyDone: null));
+    unawaited(app.router.push('/details'));
+    await tester.pumpAndSettle();
+    expect(detailsBuilds, 0);
+
+    await expectLater(tester.binding.handlePopRoute(), completes);
+    await tester.pumpAndSettle();
+    expect(detailsBuilds, 0);
+    expect(app.router.routeInformationProvider.value.uri.toString(), '/');
+  });
+
+  testWidgets('system Back pops normally while a plain target is pending', (
+    tester,
+  ) async {
+    final container = scope((signedIn: null, surveyDone: true));
+    final app = await mount(tester, container, location: '/survey');
+    unawaited(app.router.push('/signIn'));
+    await tester.pumpAndSettle();
+    expect(signInBuilds, 0);
+
+    await expectLater(tester.binding.handlePopRoute(), completes);
+    await tester.pumpAndSettle();
+    expect(signInBuilds, 0);
+    expect(app.router.routeInformationProvider.value.uri.toString(), '/survey');
+  });
+
+  testWidgets('system Back still pops after a pending decision lands', (
+    tester,
+  ) async {
+    final container = scope((signedIn: true, surveyDone: null));
+    final app = await mount(tester, container);
+    unawaited(app.router.push('/details'));
+    await tester.pumpAndSettle();
+    expect(detailsBuilds, 0);
+
+    container.read(session.notifier).update((signedIn: true, surveyDone: true));
+    await tester.pumpAndSettle();
+    expect(find.text('Details'), findsOneWidget);
+    await expectLater(tester.binding.handlePopRoute(), completes);
+    await tester.pumpAndSettle();
+    expect(app.router.routeInformationProvider.value.uri.toString(), '/');
+  });
+
   testWidgets('pending without a builder fails without building the target', (
     tester,
   ) async {
@@ -276,3 +329,4 @@ enum LegacyNullThroughRoutes implements DwNavigationRoute<SessionState> {
     (state, _) => state.surveyDone == false ? '/survey' : null,
   ];
 }
+import 'dart:async';

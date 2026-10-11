@@ -190,25 +190,7 @@ class DwAppRouter<RouterState> {
   /// and redirect logic. It handles zone guards and custom redirects.
   GoRouter _buildRouter() {
     return GoRouter(
-      routes: options.pendingBuilder == null
-          ? _buildRoutes()
-          : [
-              ShellRoute(
-                builder: (context, state, child) => ListenableBuilder(
-                  listenable: _refresh ?? const AlwaysStoppedAnimation(0),
-                  builder: (context, _) {
-                    final decision = _guardDecision(state);
-                    // Also hide a previously allowed target while a newly known
-                    // fact redirects it; refresh parsing completes asynchronously.
-                    if (decision.isPending || decision.redirectPath != null) {
-                      return options.pendingBuilder!(context, state);
-                    }
-                    return child;
-                  },
-                ),
-                routes: _buildRoutes(),
-              ),
-            ],
+      routes: _buildRoutes(),
       errorBuilder: options.errorBuilder,
 
       // Pass through all GoRouter options
@@ -291,9 +273,23 @@ class DwAppRouter<RouterState> {
           // StatefulShellRoute: each root route becomes an independent branch,
           // preserving its navigation stack across tab switches.
           if (zone.first.statefulShellRouteBuilder != null) {
+            final shellBuilder = zone.first.statefulShellRouteBuilder!;
             return <RouteBase>[
               StatefulShellRoute.indexedStack(
-                pageBuilder: zone.first.statefulShellRouteBuilder!,
+                pageBuilder: (context, state, navigationShell) {
+                  if (_showsPending(state)) {
+                    return pageBuilder(
+                      context,
+                      state.pageKey,
+                      _pendingOver(
+                        context,
+                        state,
+                        child: navigationShell,
+                      ),
+                    );
+                  }
+                  return shellBuilder(context, state, navigationShell);
+                },
                 notifyRootObserver: options.shellNotifyRootObserver,
                 branches: rootRoutes
                     .map((r) => StatefulShellBranch(routes: <RouteBase>[r]))
@@ -304,9 +300,19 @@ class DwAppRouter<RouterState> {
 
           // ShellRoute: simple shell wrapper (state not preserved across tabs).
           if (zone.first.shellRouteBuilder != null) {
+            final shellBuilder = zone.first.shellRouteBuilder!;
             return <RouteBase>[
               ShellRoute(
-                pageBuilder: zone.first.shellRouteBuilder!,
+                pageBuilder: (context, state, child) {
+                  if (_showsPending(state)) {
+                    return pageBuilder(
+                      context,
+                      state.pageKey,
+                      _pendingOver(context, state, child: child),
+                    );
+                  }
+                  return shellBuilder(context, state, child);
+                },
                 notifyRootObserver: options.shellNotifyRootObserver,
                 routes: rootRoutes,
               ),
@@ -353,7 +359,10 @@ class DwAppRouter<RouterState> {
         // rebuilds). Deriving the key from name + path instead would collide
         // whenever the same location appears twice on the stack and trip the
         // Navigator's _debugCheckDuplicatedPageKeys assertion.
-        return pageBuilder(context, state.pageKey, route.descriptor.pageWidget);
+        final child = _showsPending(state)
+            ? options.pendingBuilder!(context, state)
+            : route.descriptor.pageWidget;
+        return pageBuilder(context, state.pageKey, child);
       },
       // Recursively build child routes
       routes: zones
@@ -365,6 +374,24 @@ class DwAppRouter<RouterState> {
           .toList(),
     );
   }
+
+  bool _showsPending(GoRouterState state) {
+    final decision = _guardDecision(state);
+    return options.pendingBuilder != null &&
+        (decision.isPending || decision.redirectPath != null);
+  }
+
+  Widget _pendingOver(
+    BuildContext context,
+    GoRouterState state, {
+    required Widget child,
+  }) => Stack(
+    fit: StackFit.expand,
+    children: [
+      Offstage(offstage: true, child: child),
+      options.pendingBuilder!(context, state),
+    ],
+  );
 
   // ------------------------------------------------------------
   // Registry

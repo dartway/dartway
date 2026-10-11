@@ -20,12 +20,12 @@ enum AuthNavigationZone implements DwNavigationRoute<AppRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  // The skeleton keeps the released router API until its caret is raised.
-  // ignore: deprecated_member_use
-  List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
+  List<DwDecisionGuard<AppRouterState>> get zoneGuards => [
     (state, target) => state.isSignedIn
-        ? _returnTo(target) ?? AppNavigationZone.home.fullPath
-        : null,
+        ? DwGuardDecision.redirect(
+            _returnTo(target) ?? AppNavigationZone.home.fullPath,
+          )
+        : DwGuardDecision.allow,
   ];
 
   /// Sign-in, remembering [target] — what a gate says to someone signed out,
