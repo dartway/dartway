@@ -2,10 +2,6 @@
 
 ## 0.22.0-dev.0
 
-- **BREAKING:** `DwAppVersion.build` is `int?`: a platform version without a build
-  number round-trips as its semantic version alone. Existing numeric-build header
-  encodings and compatibility decisions are unchanged (#521).
-
 - The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).
 
 ## 0.21.0

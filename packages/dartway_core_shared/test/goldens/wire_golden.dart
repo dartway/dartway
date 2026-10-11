@@ -45,7 +45,6 @@ const String wireGolden = r'''
       "kathmandu": "345"
     },
     "http.appVersion": "1.4.2+87",
-    "http.appVersionWithoutBuild": "1.4.2",
     "http.closeCodes": {
       "serverStopping": 1001,
       "unsupportedData": 1003,
