@@ -26,8 +26,7 @@ abstract class DwMediaController {
   /// seek. Cleared by the next seek.
   bool get endedByPlayback;
 
-  /// State/command gate only, never proof of continuous playback.
-  bool get canObservePlayback;
+  bool get hasReallyPlayed;
 
   Future<void> play();
 

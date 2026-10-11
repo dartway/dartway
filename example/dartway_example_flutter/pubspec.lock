@@ -208,7 +208,7 @@ packages:
       path: "../../packages/dartway_media_flutter"
       relative: true
     source: path
-    version: "0.2.0"
+    version: "0.3.0-dev.0"
   dartway_push_firebase:
     dependency: "direct main"
     description:

@@ -15,6 +15,19 @@ void main() {
   setUp(() => rig = MediaRig());
   tearDown(() => debugDwMediaIsWebOverride = null);
 
+  testWidgets('buffering does not turn play intent into a pause', (
+    tester,
+  ) async {
+    final controller = controllerFor(videoItem('flaps'));
+    await rig.loadVideo(tester);
+    await controller.play();
+    await rig.playVideoTo(tester, const Duration(seconds: 1));
+    rig.video.latest.startBuffering();
+    await tester.pump();
+    expect(controller.state.value.isPlaying, isTrue);
+    await release(tester, controller);
+  });
+
   group('states', () {
     testWidgets('video: loading, ready, playing, paused', (tester) async {
       final controller = controllerFor(videoItem('v'));
@@ -337,7 +350,11 @@ void main() {
       expect(asked, [1, 2]);
       expect(rig.audio.latest.uri, 'https://example.com/signed-2');
       expect(controller.state.value.isError, isFalse);
-      expect(controller.state.value.position, const Duration(seconds: 40));
+      expect(controller.state.value.intent, DwMediaPlayIntent.play);
+      expect(
+        controller.state.value.position.inMilliseconds,
+        closeTo(40000, 100),
+      );
       await release(tester, controller);
     });
 

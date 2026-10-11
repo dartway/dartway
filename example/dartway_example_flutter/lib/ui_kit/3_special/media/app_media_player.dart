@@ -60,10 +60,18 @@ class _AppMediaStage extends StatelessWidget {
               child: queue.current.kind == DwMediaKind.video
                   ? DwVideoSurface(
                       session: session,
-                      placeholder: const CircularProgressIndicator(),
+                      placeholder: const SizedBox.shrink(),
                     )
                   : const Icon(Icons.graphic_eq, size: 64, color: Colors.white),
             ),
+          ),
+          ValueListenableBuilder<DwMediaPlaybackStatus>(
+            valueListenable: session.status,
+            builder: (context, status, _) => status.waiting
+                ? const IgnorePointer(
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : const SizedBox.shrink(),
           ),
           ValueListenableBuilder<bool>(
             valueListenable: session.controlsVisible,

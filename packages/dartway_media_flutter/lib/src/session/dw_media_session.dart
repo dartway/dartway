@@ -7,8 +7,8 @@ part of 'dw_media_session_manager.dart';
 /// returns it. It ends with [dispose] — or with the mini-player's close,
 /// under `DwMediaConfig.miniPlayerCloseStopsPlayback`.
 ///
-/// A controls widget reads [playback] (the current item's state, following
-/// the queue), [queue], [isFullscreen], [minimized] and [controlsVisible],
+/// Controls read [status], timelines read [position], and [playback] merges
+/// them for the current item. Other views are [queue], [isFullscreen], [minimized] and [controlsVisible],
 /// and calls the commands below; [options] carries the settings it shows.
 final class DwMediaSession {
   DwMediaSession._({
@@ -37,38 +37,9 @@ final class DwMediaSession {
   final DwMediaSessionManager _manager;
   final int _sessionId;
   int _sourceGeneration = 0;
-  int _observationEpoch = 0;
   Object? _observationVisit;
   String? _observationItemId;
   final DwMediaIntervalAccumulator _confirmed = DwMediaIntervalAccumulator();
-
-  /// A token for this item's current source/continuity generation. Acquire a
-  /// new one after play/pause/buffer/seek/speed/load boundaries. State only
-  /// gates recording: the caller must independently confirm the played span,
-  /// including platform discontinuities the default players cannot identify.
-  DwMediaObservationHandle get playbackObservation {
-    final source = _sourceGeneration;
-    final epoch = _observationEpoch;
-    final itemId = _observationItemId ?? currentItem.id;
-    return DwMediaObservationHandle._(
-      sessionId: _sessionId,
-      itemId: itemId,
-      sourceGeneration: source,
-      record: (interval) {
-        if (_disposed ||
-            source != _sourceGeneration ||
-            epoch != _observationEpoch) {
-          return DwMediaObservationResult.stale;
-        }
-        if (_options.playbackDelivery == null)
-          return DwMediaObservationResult.disabled;
-        if (!_controller.canObservePlayback)
-          return DwMediaObservationResult.notPlaying;
-        _confirmed.add(interval);
-        return DwMediaObservationResult.recorded;
-      },
-    );
-  }
 
   /// Seals the current confirmed window, starts one handled delivery attempt,
   /// and returns its pending identity; null for an empty window. New
@@ -89,19 +60,14 @@ final class DwMediaSession {
     return report;
   }
 
-  void _breakObservation() => _observationEpoch++;
+  void _recordPlayback(DwMediaPlayedInterval interval) {
+    if (_options.playbackDelivery != null) _confirmed.add(interval);
+  }
 
   void _sourceChanged(String itemId) {
     if (_disposed) return;
-    flushPlayback();
     _sourceGeneration++;
     _observationItemId = itemId;
-    _breakObservation();
-  }
-
-  void _observationEnded() {
-    _breakObservation();
-    flushPlayback();
   }
 
   final ValueNotifier<DwMediaQueueState> _queue;
@@ -110,6 +76,12 @@ final class DwMediaSession {
   final ValueNotifier<bool> _controlsVisible = ValueNotifier(true);
   final ValueNotifier<DwMediaPlaybackState> _playback = ValueNotifier(
     const DwMediaPlaybackState(),
+  );
+  final ValueNotifier<DwMediaPlaybackStatus> _status = ValueNotifier(
+    const DwMediaPlaybackStatus(),
+  );
+  final ValueNotifier<DwMediaPositionState> _position = ValueNotifier(
+    const DwMediaPositionState(),
   );
   final ValueNotifier<VideoPlayerController?> _videoView = ValueNotifier(null);
 
@@ -137,6 +109,15 @@ final class DwMediaSession {
   /// The current item's playback state, following the queue from item to
   /// item.
   ValueListenable<DwMediaPlaybackState> get playback => _playback;
+
+  /// Intent, waiting, errors and settings, without position ticks.
+  ValueListenable<DwMediaPlaybackStatus> get status => _status;
+
+  /// Displayed position, duration, buffered position and any seek target.
+  ValueListenable<DwMediaPositionState> get position => _position;
+
+  /// Whether the current item has advanced through real playback.
+  bool get hasReallyPlayed => _controller.hasReallyPlayed;
 
   /// Whether the session is fullscreen — `DwMediaFullscreenHost` pushes and
   /// pops the route by it.
@@ -183,9 +164,12 @@ final class DwMediaSession {
       initialSpeed: _speed,
       initialMuted: _initialMuted(item),
       onPlaybackEnd: _maybeAutoplay,
-      onObservationBreak: () => currentOnly(_breakObservation),
+      onObservationBreak: () => currentOnly(() {
+        flushPlayback();
+      }),
       onSourceChange: () => currentOnly(() => _sourceChanged(item.id)),
-      onObservationEnd: () => currentOnly(_observationEnded),
+      onPlayedInterval: (interval) =>
+          currentOnly(() => _recordPlayback(interval)),
     );
     _controller = controller;
     controller.state.addListener(_onPlayback);
@@ -224,11 +208,14 @@ final class DwMediaSession {
 
   void _onPlayback() {
     final next = _controller.state.value;
+    _status.value = next.status;
+    _position.value = next.positionState;
     _playback.value = next;
     if (!next.isEnded) _autoplayHandled = false;
-    if (next.isPlaying != _wasPlaying) {
-      _wasPlaying = next.isPlaying;
-      next.isPlaying ? showControls() : _holdControls();
+    final playing = next.intent == DwMediaPlayIntent.play;
+    if (playing != _wasPlaying) {
+      _wasPlaying = playing;
+      playing ? showControls() : _holdControls();
     }
     _maybeAutoplay();
     _updatePreview(next);
@@ -257,9 +244,12 @@ final class DwMediaSession {
     _controlsVisible.value = true;
     _hideControls?.cancel();
     final delay = options.controlsAutoHideDelay;
-    if (!_playback.value.isPlaying || delay <= Duration.zero) return;
+    if (_playback.value.intent != DwMediaPlayIntent.play ||
+        delay <= Duration.zero) {
+      return;
+    }
     _hideControls = Timer(delay, () {
-      if (!_disposed && _playback.value.isPlaying) {
+      if (!_disposed && _playback.value.intent == DwMediaPlayIntent.play) {
         _controlsVisible.value = false;
       }
     });
@@ -345,7 +335,11 @@ final class DwMediaSession {
   /// `autoEnterFullscreenOnPlay`. Refused while the app is in the background
   /// and the background rules would pause this item.
   Future<void> play() async {
-    if (_disposed) return;
+    if (_disposed ||
+        (_playback.value.intent == DwMediaPlayIntent.play &&
+            !_playback.value.isEnded)) {
+      return;
+    }
     if (_manager._inBackground && _pausesInBackground) return;
     cancelAutoplay();
     _hidden = false;
@@ -356,6 +350,10 @@ final class DwMediaSession {
     }
     await _controller.play();
   }
+
+  /// Toggles the person's intent, including while the engine is waiting.
+  Future<void> togglePlay() =>
+      _playback.value.intent == DwMediaPlayIntent.play ? pause() : play();
 
   Future<void> pause() async {
     if (_disposed) return;
@@ -432,7 +430,6 @@ final class DwMediaSession {
 
   Future<void> _moveTo(int index, {required bool autoplay}) async {
     cancelAutoplay();
-    _breakObservation();
     flushPlayback();
     final old = _controller;
     _detach(old);
@@ -560,7 +557,6 @@ final class DwMediaSession {
   /// counting down to the next item.
   void _toBackground() {
     if (_disposed) return;
-    _breakObservation();
     if (options.resume?.saveOnBackground ?? false) {
       unawaited(_controller.savePosition());
     }
@@ -568,10 +564,7 @@ final class DwMediaSession {
     final countingDown = _countdownEnd != null;
     cancelAutoplay();
     final state = _playback.value;
-    if (state.isPlaying ||
-        state.isBuffering ||
-        _controller.wantsToPlay ||
-        countingDown) {
+    if (state.intent == DwMediaPlayIntent.play || countingDown) {
       unawaited(pause());
     }
   }
@@ -587,7 +580,6 @@ final class DwMediaSession {
   Future<void> dispose() async {
     if (_disposed) return;
     _disposed = true;
-    _breakObservation();
     flushPlayback();
     _fullscreenRequested = false;
     _stopCountdown();
@@ -622,7 +614,6 @@ final class DwMediaSession {
   }) {
     if (!identical(_options.playbackDelivery, options.playbackDelivery)) {
       flushPlayback();
-      _breakObservation();
     }
     _callbacks = callbacks;
     _options = options;
@@ -648,25 +639,4 @@ final class DwMediaSession {
       }
     });
   }
-}
-
-/// A recording decision, not a playback or delivery acknowledgement.
-enum DwMediaObservationResult { recorded, disabled, stale, notPlaying }
-
-/// An explicit confirmation capability bound to a session/item/source and
-/// continuity generation. Invalid spans fail in DwMediaPlayedInterval's
-/// constructor even when this handle would reject recording.
-final class DwMediaObservationHandle {
-  DwMediaObservationHandle._({
-    required this.sessionId,
-    required this.itemId,
-    required this.sourceGeneration,
-    required DwMediaObservationResult Function(DwMediaPlayedInterval) record,
-  }) : _record = record;
-  final int sessionId;
-  final String itemId;
-  final int sourceGeneration;
-  final DwMediaObservationResult Function(DwMediaPlayedInterval) _record;
-  DwMediaObservationResult record(DwMediaPlayedInterval confirmed) =>
-      _record(confirmed);
 }

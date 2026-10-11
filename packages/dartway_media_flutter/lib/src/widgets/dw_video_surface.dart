@@ -24,20 +24,58 @@ final class DwVideoSurface extends StatelessWidget {
           if (controller == null) {
             return placeholder ?? const SizedBox.shrink();
           }
-          return ListenableBuilder(
-            listenable: controller,
-            builder: (context, _) {
-              // video_player answers 1.0 for a video with no size yet.
-              final value = controller.value;
-              final ratio = value.size.isEmpty
-                  ? session.options.fallbackAspectRatio
-                  : value.aspectRatio;
-              return AspectRatio(
-                aspectRatio: ratio,
-                child: VideoPlayer(controller),
-              );
-            },
+          return _SizedVideoView(
+            key: ObjectKey(controller),
+            controller: controller,
+            fallbackAspectRatio: session.options.fallbackAspectRatio,
           );
         },
       );
+}
+
+/// Selects size only. The texture widget stays mounted during position ticks.
+final class _SizedVideoView extends StatefulWidget {
+  const _SizedVideoView({
+    super.key,
+    required this.controller,
+    required this.fallbackAspectRatio,
+  });
+  final VideoPlayerController controller;
+  final double fallbackAspectRatio;
+
+  @override
+  State<_SizedVideoView> createState() => _SizedVideoViewState();
+}
+
+final class _SizedVideoViewState extends State<_SizedVideoView> {
+  late Size _size;
+  late Widget _video;
+
+  @override
+  void initState() {
+    super.initState();
+    _size = widget.controller.value.size;
+    _video = VideoPlayer(widget.controller);
+    widget.controller.addListener(_onValue);
+  }
+
+  void _onValue() {
+    final size = widget.controller.value.size;
+    if (_size == size) return;
+    setState(() => _size = size);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onValue);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AspectRatio(
+    aspectRatio: _size.isEmpty
+        ? widget.fallbackAspectRatio
+        : _size.width / _size.height,
+    child: _video,
+  );
 }

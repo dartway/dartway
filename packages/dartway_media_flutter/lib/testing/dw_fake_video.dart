@@ -68,6 +68,7 @@ base class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
   @override
   Future<void> play(int playerId) async {
     final video = _video(playerId);
+    video.playCalls++;
     if (video.refusePlayWith case final error?) throw error;
     video._playing = true;
   }
@@ -78,7 +79,9 @@ base class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
   @override
   Future<void> seekTo(int playerId, Duration position) async {
     final video = _video(playerId);
+    video.seekCalls.add(position);
     if (video.refuseSeekWith case final error?) throw error;
+    await video.seekBarrier;
     video.position = position;
   }
 
@@ -126,6 +129,11 @@ final class DwFakeVideo {
   /// to play, a seek aborted.
   Object? refusePlayWith;
   Object? refuseSeekWith;
+
+  /// Holds seek completion while the test drives stale engine facts.
+  Future<void>? seekBarrier;
+  final List<Duration> seekCalls = [];
+  int playCalls = 0;
 
   bool _playing = false;
   bool _ready = false;

@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:just_audio/just_audio.dart';
 
-import '../model/dw_media_playback_state.dart';
+import 'dw_media_reducer.dart';
 import '../platform/dw_media_platform.dart';
 import 'dw_media_engine_controller.dart';
 
@@ -22,7 +22,7 @@ final class DwAudioMediaController extends DwMediaEngineController {
     super.onPlaybackEnd,
     super.onObservationBreak,
     super.onSourceChange,
-    super.onObservationEnd,
+    super.onPlayedInterval,
   });
 
   AudioPlayer? _player;
@@ -51,18 +51,14 @@ final class DwAudioMediaController extends DwMediaEngineController {
   void _onUpdate(AudioPlayer player) {
     if (!identical(_player, player)) return;
     final playerState = player.playerState;
-    updateState(
-      (current) => current.copyWith(
-        playState: switch (playerState.processingState) {
-          ProcessingState.idle ||
-          ProcessingState.loading => DwMediaPlayState.loading,
-          ProcessingState.buffering => DwMediaPlayState.buffering,
-          ProcessingState.ready =>
-            playerState.playing
-                ? DwMediaPlayState.playing
-                : DwMediaPlayState.paused,
-          ProcessingState.completed => DwMediaPlayState.ended,
-        },
+    reportEngine(
+      EngineFact(
+        loading:
+            playerState.processingState == ProcessingState.idle ||
+            playerState.processingState == ProcessingState.loading,
+        buffering: playerState.processingState == ProcessingState.buffering,
+        ended: playerState.processingState == ProcessingState.completed,
+        playing: playerState.playing,
         position: player.position,
         duration: player.duration ?? Duration.zero,
         buffered: player.bufferedPosition,
@@ -81,6 +77,8 @@ final class DwAudioMediaController extends DwMediaEngineController {
     unawaited(
       player.play().catchError((Object error, StackTrace stackTrace) {
         if (dwMediaIsPlayRefusal(error)) {
+          if (!identical(_player, player)) return;
+          reportPlayRefused();
           unawaited(player.pause());
         } else {
           reportFailure(error, stackTrace);

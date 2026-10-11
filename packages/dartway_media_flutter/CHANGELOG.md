@@ -1,3 +1,21 @@
+## 0.3.0-dev.0
+
+- **Breaking** (#555): playback intent owns play/pause; buffering and unconfirmed
+  play use `waiting` instead of `DwMediaPlayState.buffering`/`isBuffering`.
+  `togglePlay()` uses intent and redundant play commands do nothing. Playing an
+  ended item restarts at zero. Intent survives source retries.
+- Seeks publish their target immediately, ignore stale ticks and coalesce to one
+  active seek plus the latest queued target. Skips use the displayed position.
+- **Breaking**: remove the manual observation handle and result. The package
+  confirms spans from real playback and seals them through `playbackDelivery` on
+  pause, seek, speed, source, error or end. Waiting does not break continuity;
+  pending delivery and explicit retry keep their existing lifecycle.
+- Add `session.status`, `session.position` and `session.hasReallyPlayed`;
+  `playback` remains their merge. Video surfaces rebuild only for size changes.
+  Example controls follow intent, waiting and pending seek positions.
+- Test fakes can hold seek completion and expose play/seek calls.
+- Migration: `docs/migrations/2026-10-11-media-player-state.md`.
+
 ## 0.2.0
 
 - Optional explicit confirmed-playback intervals: sorted union and unique covered

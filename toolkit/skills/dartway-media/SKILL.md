@@ -41,7 +41,7 @@ final session = dw.plugins.media.open(
 - **Anything that expires is a resolver**, re-called on every load and retry.
 - **The plugin owns the session** (`dw.plugins.media.sessionManager.active`): a page never keeps or
   disposes it; opening an item a live session stands on returns that session. Everything goes through
-  the session — `play`, `seek`, `setSpeed` (only from `options.speeds`), `retry`, the queue.
+  the session — `play`, `togglePlay`, `seek`, `setSpeed` (only from `options.speeds`), `retry`, the queue.
 - Per-session settings: `DwMediaOpenOptions` (`withoutResume: true` for a clip feed).
 - `onCompleted` — position threshold (a seek counts), not played coverage; `onReachedEnd` — played to the end by real playback
   only, never a scrub; `onStarted` — the first real playback.
@@ -55,6 +55,14 @@ into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle 
 `AppMediaErrorView` (`retry()` inside the player), `AppMiniPlayerChrome`. Strings through `context.l10n`
 (the example's `media*` keys).
 
+- Play/pause calls `session.togglePlay()` and draws from `session.status.value.intent`.
+  `waiting` shows a spinner only: it does not change the button, controls timer or
+  observation. `play()` with play intent is a no-op; at the end it restarts at zero.
+- Controls listen to `session.status`; timelines listen to `session.position`.
+  `playback` remains their merge. A seek publishes `seekTarget` immediately and
+  ignores stale ticks; one seek runs and the latest queued target wins. Skips count
+  from the displayed position. Hold a released drag until that position equals its
+  target. `session.hasReallyPlayed` reports real playback of the current item.
 - **Fullscreen**: `DwMediaFullscreenHost(session:, builder:, child:)` around the inline player — the one
   way in; `enterFullscreen()`/`exitFullscreen()` and back gestures.
 - **Mini-player**: `DwMiniPlayerHost(sessionManager:, onExpand:, builder:)` once, in
@@ -83,15 +91,12 @@ proved with those, not with a position alone; after an audio command
 
 ## Confirmed intervals and delivery (optional)
 
-Default players do not prove played coverage from `onProgress`/position snapshots.
-Never subtract consecutive positions to record time: a seek can bridge the gap.
-Only an observer with independent confirmation may capture
-`session.playbackObservation` before a span and call
-`handle.record(DwMediaPlayedInterval(start, end))` afterwards. A stale
-handle or known non-playing state rejects the observation; these guards do not
-prove the interval. Pause, buffering, seek, speed, background and source reload
-break continuity. Fullscreen/mini-player reuse the session. Missing samples earn
-nothing; neither end nor a seek fills coverage to the duration.
+The package confirms spans when the engine's position advances beyond the playback
+or seek anchor with play intent, outside its seeks and buffering. Pause, seek, speed,
+source change, error and end seal the current window. Waiting holds continuity;
+fullscreen and mini-player share one session. End adds no unobserved tail.
+Do not re-derive spans from `onProgress` or position gaps, and do not add a manual
+confirmation adapter: the package sees its own seeks and excludes those gaps.
 
 Opt in with `DwMediaConfig(playbackDelivery: acceptReport)` or the session override;
 without an adapter recording is disabled (`withoutPlaybackDelivery` disables an
@@ -110,5 +115,5 @@ rewatch: project consumers union them using `DwMediaIntervalAccumulator`, rather
 than summing report durations. Batch/session/generation identities are manager-local,
 not backend idempotency keys. Thresholds such as 70%, content identity, DTOs, durable
 storage and backend deduplication belong to the project. The framework example's
-`workout_playback_coverage.dart` illustrates explicit input and in-memory acceptance;
-it never wires position callbacks as confirmed input.
+`workout_playback_coverage.dart` illustrates in-memory acceptance of package reports;
+it unions rewatches instead of counting a span twice.

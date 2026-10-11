@@ -63,8 +63,9 @@ final class DwMediaSessionManager {
   /// Unknown or already acknowledged reports fail with ArgumentError.
   Future<void> retryPlaybackReport(DwMediaPlaybackReport report) {
     final pending = _pendingPlayback[report];
-    if (pending == null)
+    if (pending == null) {
       throw ArgumentError('report is not pending in this manager');
+    }
     final running = pending.attempt;
     if (running != null) return running;
     final completion = Completer<void>();

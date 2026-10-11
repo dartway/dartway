@@ -1,83 +1,143 @@
 import 'package:flutter/foundation.dart';
 
-/// Where an item is in its playback.
-enum DwMediaPlayState {
-  /// The source is being resolved and the engine is preparing it, or a
-  /// failed load waits for its automatic retry.
-  loading,
+/// The person's command, independent of the engine's buffering and optimism.
+enum DwMediaPlayIntent { play, pause }
 
-  /// Loaded, and nothing has really played yet.
-  ready,
+/// Where an item is in its playback. Waiting is a separate flag.
+enum DwMediaPlayState { loading, ready, playing, paused, ended, error }
 
-  /// Playing but waiting on data.
-  buffering,
+/// The part of playback that controls read; position ticks do not change it.
+@immutable
+final class DwMediaPlaybackStatus {
+  const DwMediaPlaybackStatus({
+    this.intent = DwMediaPlayIntent.pause,
+    this.waiting = false,
+    this.playState = DwMediaPlayState.loading,
+    this.errorMessage,
+    this.speed = 1,
+    this.volume = 1,
+    this.muted = false,
+  });
 
-  playing,
-  paused,
+  final DwMediaPlayIntent intent;
+  final bool waiting;
+  final DwMediaPlayState playState;
+  final String? errorMessage;
+  final double speed;
+  final double volume;
+  final bool muted;
 
-  /// The engine stands at the end — by playback or by a seek. Whether it
-  /// was real playback is `DwMediaCallbacks.onReachedEnd`'s question.
-  ended,
+  bool get isPlaying => playState == DwMediaPlayState.playing;
+  bool get isError => playState == DwMediaPlayState.error;
+  bool get isEnded => playState == DwMediaPlayState.ended;
 
-  /// Failed; the controller waits for `retry()`.
-  error,
+  Object get _key =>
+      (intent, waiting, playState, errorMessage, speed, volume, muted);
+  @override
+  bool operator ==(Object other) =>
+      other is DwMediaPlaybackStatus && _key == other._key;
+  @override
+  int get hashCode => _key.hashCode;
 }
 
-/// A snapshot of one item's playback — what a controls widget reads to draw
-/// itself (`DwMediaSession.playback`).
+/// The ticking part of playback, including a seek's displayed target.
+@immutable
+final class DwMediaPositionState {
+  const DwMediaPositionState({
+    this.position = Duration.zero,
+    this.duration = Duration.zero,
+    this.buffered = Duration.zero,
+    this.seekTarget,
+  });
+
+  final Duration position;
+  final Duration duration;
+  final Duration buffered;
+  final Duration? seekTarget;
+
+  double get progress => duration <= Duration.zero
+      ? 0
+      : (position.inMicroseconds / duration.inMicroseconds).clamp(0, 1);
+
+  Object get _key => (position, duration, buffered, seekTarget);
+  @override
+  bool operator ==(Object other) =>
+      other is DwMediaPositionState && _key == other._key;
+  @override
+  int get hashCode => _key.hashCode;
+}
+
+/// The merge of `session.status` and `session.position`.
 @immutable
 final class DwMediaPlaybackState {
   const DwMediaPlaybackState({
+    this.intent = DwMediaPlayIntent.pause,
+    this.waiting = false,
     this.playState = DwMediaPlayState.loading,
     this.position = Duration.zero,
     this.duration = Duration.zero,
     this.buffered = Duration.zero,
+    this.seekTarget,
     this.speed = 1.0,
     this.volume = 1.0,
     this.muted = false,
     this.errorMessage,
   });
 
+  final DwMediaPlayIntent intent;
+  final bool waiting;
   final DwMediaPlayState playState;
   final Duration position;
   final Duration duration;
-
-  /// How far the engine has buffered, as an absolute position — `0` until an
-  /// engine reports one.
   final Duration buffered;
-
+  final Duration? seekTarget;
   final double speed;
   final double volume;
   final bool muted;
-
-  /// The failure, while [playState] is [DwMediaPlayState.error] — for a log;
-  /// what the person sees is the app's own text.
   final String? errorMessage;
 
+  DwMediaPlaybackStatus get status => DwMediaPlaybackStatus(
+    intent: intent,
+    waiting: waiting,
+    playState: playState,
+    errorMessage: errorMessage,
+    speed: speed,
+    volume: volume,
+    muted: muted,
+  );
+  DwMediaPositionState get positionState => DwMediaPositionState(
+    position: position,
+    duration: duration,
+    buffered: buffered,
+    seekTarget: seekTarget,
+  );
   bool get isPlaying => playState == DwMediaPlayState.playing;
-  bool get isBuffering => playState == DwMediaPlayState.buffering;
   bool get isError => playState == DwMediaPlayState.error;
   bool get isEnded => playState == DwMediaPlayState.ended;
-
-  /// `position / duration`, or `0` while the duration is unknown.
-  double get progress => duration <= Duration.zero
-      ? 0
-      : (position.inMicroseconds / duration.inMicroseconds).clamp(0, 1);
+  double get progress => positionState.progress;
 
   DwMediaPlaybackState copyWith({
+    DwMediaPlayIntent? intent,
+    bool? waiting,
     DwMediaPlayState? playState,
     Duration? position,
     Duration? duration,
     Duration? buffered,
+    Object? seekTarget = _unset,
     double? speed,
     double? volume,
     bool? muted,
     Object? errorMessage = _unset,
   }) => DwMediaPlaybackState(
+    intent: intent ?? this.intent,
+    waiting: waiting ?? this.waiting,
     playState: playState ?? this.playState,
     position: position ?? this.position,
     duration: duration ?? this.duration,
     buffered: buffered ?? this.buffered,
+    seekTarget: identical(seekTarget, _unset)
+        ? this.seekTarget
+        : seekTarget as Duration?,
     speed: speed ?? this.speed,
     volume: volume ?? this.volume,
     muted: muted ?? this.muted,
@@ -87,7 +147,15 @@ final class DwMediaPlaybackState {
   );
 
   @override
-  String toString() => 'DwMediaPlaybackState($playState, $position/$duration)';
+  bool operator ==(Object other) =>
+      other is DwMediaPlaybackState &&
+      status == other.status &&
+      positionState == other.positionState;
+  @override
+  int get hashCode => Object.hash(status, positionState);
+  @override
+  String toString() =>
+      'DwMediaPlaybackState($intent, $playState, $position/$duration)';
 }
 
 const Object _unset = Object();

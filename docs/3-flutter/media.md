@@ -70,21 +70,33 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
   opened for any other item ends it, so no engine outlives the moment it could still be reached.
   With `miniPlayer: false`, the page leaving (`minimize()`) does what `onLeaveWithoutMiniPlayer`
   says — pause, stop, or keep playing.
-- A controls widget reads `session.playback` (the current item's `DwMediaPlaybackState`, following
-  the queue), `session.queue` (`DwMediaQueueState`: the items, the current index, the next-item
-  preview and the autoplay countdown), `session.isFullscreen`, `session.minimized` and
+- A controls widget reads `session.status` (`DwMediaPlaybackStatus`: intent, waiting,
+  play state, error, speed and sound) and a timeline reads `session.position`
+  (`DwMediaPositionState`: position, duration, buffered and seek target).
+  `session.playback` remains their merge (`DwMediaPlaybackState`), following the queue.
+  Other views are `session.queue` (`DwMediaQueueState`: items, current index, next-item
+  preview and autoplay countdown), `session.isFullscreen`, `session.minimized` and
   `session.controlsVisible`, all `ValueListenable`s — a session is created at `open()`, so there is
   no provider to declare for it ahead of time. `session.options` carries the resolved settings a
   control reads (`speeds`, `fullscreen`).
-- **Controls visibility is the session's.** `controlsVisible` is true while the item is not
-  playing, and for `controlsAutoHideDelay` after playback starts or after `showControls()`;
+- **Controls visibility is the session's.** `controlsVisible` is true with pause intent,
+  and for `controlsAutoHideDelay` after play intent starts or after `showControls()`;
   `toggleControls()` is what a tap on the picture calls. The controls themselves are the app's.
-- Commands: `play`, `pause`, `seek`, `skipBack`, `skipForward`, `setSpeed` (only a speed from
+- Commands: `play`, `pause`, `togglePlay`, `seek`, `skipBack`, `skipForward`, `setSpeed` (only a speed from
   `speeds`; with the list empty it throws — the control is off), `setMuted`, `setVolume`, `retry`,
   `next`, `previous`, `jumpTo`, `cancelAutoplay`, `enterFullscreen`, `exitFullscreen`, `minimize`,
   `restore`, `showControls`, `hideControls`, `toggleControls`.
-- The playback state is `loading`, `ready`, `buffering`, `playing`, `paused`, `ended` or `error`,
-  with the position, duration, buffered position, speed, volume and mute. **An error stays inside
+- The playback state is `loading`, `ready`, `playing`, `paused`, `ended` or `error`,
+  with the position, duration, buffered position, speed, volume and mute.
+  **Intent owns play/pause:** `intent` is `DwMediaPlayIntent.play` or `pause`, changed
+  by commands and end. `waiting` means buffering or unconfirmed play and drives only
+  a spinner. Buttons draw from intent and call `togglePlay()`; controls timers and
+  observation do not react to waiting. Redundant `play()` does nothing; at an end it
+  seeks to zero and plays. `hasReallyPlayed` reports real playback of the current item.
+  A seek sets `seekTarget` and the displayed position immediately; stale ticks are
+  ignored until arrival within 200 ms or completion. One seek runs and only the latest
+  queued target follows it. Skips count from the displayed target. Timelines hold the
+  released drag until the session position equals it. **An error stays inside
   the player**: the state turns `error`, `onError` fires, and `retry()` re-resolves the source and
   returns to where playback failed. A retry shows `loading` at once, and a tap while any load runs —
   the first one included — joins it rather than loading twice. A load that does not settle within `loadTimeout` fails the
@@ -112,63 +124,35 @@ flight, and the position has moved past where playback started or the last seek 
   when the member drags to the end listens to this one.
 - `onProgress` and the periodic resume save run on real playback only.
 
-## Confirmed played intervals (explicit input)
+## Confirmed played intervals
 
-The existing progress/end guards serve callbacks, not an interval proof. A progress
-position after a seek can be far from the last callback. Default video/audio players
-remain unverified for automatic accounting: **position movement records no coverage**.
-Only a caller capable of independently confirming a span may use this opt-in API.
-It must account for platform discontinuities the framework cannot observe.
+Opt in with `DwMediaConfig(playbackDelivery: savePlayedReport)`, or the session
+option. The package confirms half-open spans when real playback advances beyond
+its playback or seek anchor. Its own seeks cannot bridge a gap. Pause, seek, speed,
+source change, error and end seal the current window; waiting preserves continuity.
+End adds no unobserved tail. Without an adapter, no intervals are retained;
+`withoutPlaybackDelivery: true` disables an inherited adapter. Do not re-derive
+spans with position-gap heuristics or manual confirmation hooks.
 
-```dart
-// Configure a project adapter. Success means it durably accepted this exact batch.
-final config = DwMediaConfig(playbackDelivery: saveConfirmedReport);
-// A capable observer captures this before the span, not after a seek/pause.
-final handle = session.playbackObservation;
-// After independently confirming [start, end), forward the same handle:
-final result = handle.record(DwMediaPlayedInterval(start, end));
-final report = session.flushPlayback(); // null if no confirmed intervals
-```
-
-`DwMediaPlayedInterval` requires nonnegative start and end greater than start.
-`DwMediaIntervalAccumulator` merges overlap and adjacency into sorted half-open
-intervals; `coveredDuration` is unique media coverage, not elapsed/repeated listening
-or wall-clock time. Reports copy this immutable union. Rewatch spans may recur in
-later windows; project consumers union reports rather than summing their durations.
-
-A handle is bound to one session, item and actual source-load generation. Reload,
-queue movement, replacement and disposal reject old handles. Pause, buffering,
-seek, speed and background boundaries also invalidate previously captured handles;
-known loading/error/non-playing states reject recording. Results are `recorded`,
-`disabled`, `stale` or `notPlaying`. State guards cannot prove a span. Acquire a new
-handle only for a newly confirmed span; never interpolate missed samples or fill
-an end tolerance. Fullscreen and mini-player share the session. Item identity must
-mean stable content in the project; reopening that same item preserves its engine,
-while retry reloads the source (an expiring URL is not content identity).
-
-`playbackDelivery` is optional on config and open options; without it, recording is
-disabled. `withoutPlaybackDelivery: true` disables an inherited adapter. A nonempty
-explicit flush seals a report into manager-owned pending state before opening a new
-window and starts one delivery attempt. Source/item replacement, end and disposal
-seal remaining confirmed data once. End adds no unobserved tail. Empty windows do
-not create reports. Sealing captures both attribution and adapter, so reopening a
-page cannot redirect an old report.
+`session.flushPlayback()` also seals a nonempty window, capturing item/source
+attribution and the adapter, and starts a handled delivery attempt. Empty windows
+produce no report. Source/item replacement and disposal seal remaining data once.
+`DwMediaIntervalAccumulator` unions overlap and adjacency. `coveredDuration` is
+unique media coverage; projects union reports across rewatches rather than sum them.
 
 The manager exposes immutable `pendingPlaybackReports` snapshots and
 `playbackDeliveryError(report)`. Automatic delivery errors are handled and retained;
-`await manager.retryPlaybackReport(report)` explicitly retries and surfaces failure.
+`await manager.retryPlaybackReport(report)` retries explicitly and surfaces failure.
 Concurrent retry joins the same attempt. Only successful acceptance of that exact
 batch removes it; late acknowledgement cannot remove newer windows. There are no
-implicit retries. Engine/session disposal finishes without awaiting an unresolved
-adapter. Pending reports survive engine teardown only in this manager's memory,
-not process/plugin teardown. A project needing durability must take ownership before
-acknowledging; hung adapters and retained failures remain inspectable pending work.
+implicit retries. Engine/session disposal never awaits an unresolved adapter.
+Pending reports remain in this manager's memory for its lifetime. A project needing
+durability takes ownership before acknowledging; batch/session/source-generation
+identities are manager-local, not backend idempotency keys.
 
-Batch/session/source-generation identities are stable only within a manager; project
-adapters define backend idempotency and durable identity. Lesson thresholds (for
-example 70%), storage, request DTOs and completion decisions belong to projects.
-The example's `workout_playback_coverage.dart` forwards explicit confirmed input and
-acknowledges an in-memory union only. Its default player never supplies such input.
+Thresholds, content identity, storage and completion policy belong to projects.
+The framework example's `workout_playback_coverage.dart` accepts package reports
+into an in-memory union, including rewatches, without a position observer.
 
 ## Queue, fullscreen, mini-player
 

@@ -14,9 +14,24 @@ class AppMediaTimeline extends HookWidget {
 
   @override
   Widget build(BuildContext context) {
-    final playback = useValueListenable(session.playback);
+    final playback = useValueListenable(session.position);
     // Where the thumb is while it is dragged; `null` follows playback.
     final dragging = useState<double?>(null);
+    final released = useState<double?>(null);
+    useEffect(() {
+      dragging.value = null;
+      released.value = null;
+      return null;
+    }, [session, session.currentItem]);
+    useEffect(() {
+      final target = released.value;
+      if (target != null &&
+          playback.position.inMilliseconds == target.round()) {
+        dragging.value = null;
+        released.value = null;
+      }
+      return null;
+    }, [playback, released.value]);
     final total = playback.duration.inMilliseconds.toDouble();
     final known = total > 0;
     final position =
@@ -34,10 +49,16 @@ class AppMediaTimeline extends HookWidget {
               secondaryTrackValue: known
                   ? playback.buffered.inMilliseconds.clamp(0, total).toDouble()
                   : null,
-              onChanged: known ? (value) => dragging.value = value : null,
+              onChanged: known
+                  ? (value) {
+                      released.value = null;
+                      dragging.value = value;
+                    }
+                  : null,
               onChangeEnd: known
                   ? (value) {
-                      dragging.value = null;
+                      dragging.value = value;
+                      released.value = value;
                       session.seek(Duration(milliseconds: value.round()));
                     }
                   : null,

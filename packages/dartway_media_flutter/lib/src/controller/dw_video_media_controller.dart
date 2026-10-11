@@ -5,7 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:video_player/video_player.dart';
 
 import '../lifecycle/dw_media_wakelock.dart';
-import '../model/dw_media_playback_state.dart';
+import 'dw_media_reducer.dart';
 import 'dw_media_engine_controller.dart';
 
 /// [DwMediaController] over `video_player`.
@@ -28,7 +28,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
     super.onPlaybackEnd,
     super.onObservationBreak,
     super.onSourceChange,
-    super.onObservationEnd,
+    super.onPlayedInterval,
   });
 
   VideoPlayerController? _controller;
@@ -99,17 +99,12 @@ final class DwVideoMediaController extends DwMediaEngineController {
       this,
       value.isPlaying && options.wakelockWhilePlaying,
     );
-    updateState(
-      (current) => current.copyWith(
-        playState: !value.isInitialized
-            ? DwMediaPlayState.loading
-            : value.isCompleted
-            ? DwMediaPlayState.ended
-            : value.isBuffering
-            ? DwMediaPlayState.buffering
-            : value.isPlaying
-            ? DwMediaPlayState.playing
-            : DwMediaPlayState.paused,
+    reportEngine(
+      EngineFact(
+        loading: !value.isInitialized,
+        ended: value.isCompleted,
+        buffering: value.isBuffering,
+        playing: value.isPlaying,
         position: value.position,
         duration: value.duration,
         buffered: value.buffered.isEmpty

@@ -55,6 +55,14 @@ class AppMiniPlayerChrome extends StatelessWidget {
                       : const Icon(Icons.graphic_eq),
                 ),
               ),
+              ValueListenableBuilder<DwMediaPlaybackStatus>(
+                valueListenable: session.status,
+                builder: (context, status, _) => status.waiting
+                    ? const IgnorePointer(
+                        child: Center(child: CircularProgressIndicator()),
+                      )
+                    : const SizedBox.shrink(),
+              ),
               // The scrims: a white icon on a light frame is not there.
               const Positioned.fill(
                 child: IgnorePointer(
@@ -77,20 +85,20 @@ class AppMiniPlayerChrome extends StatelessWidget {
               ),
               Align(
                 alignment: play,
-                child: ValueListenableBuilder<DwMediaPlaybackState>(
-                  valueListenable: session.playback,
+                child: ValueListenableBuilder<DwMediaPlaybackStatus>(
+                  valueListenable: session.status,
                   builder: (context, playback, _) => Semantics(
-                    label: playback.isPlaying
+                    label: (playback.intent == DwMediaPlayIntent.play)
                         ? context.l10n.mediaPause
                         : context.l10n.mediaPlay,
                     child: IconButton(
                       iconSize: 22,
                       icon: Icon(
-                        playback.isPlaying ? Icons.pause : Icons.play_arrow,
+                        (playback.intent == DwMediaPlayIntent.play)
+                            ? Icons.pause
+                            : Icons.play_arrow,
                       ),
-                      onPressed: playback.isPlaying
-                          ? session.pause
-                          : session.play,
+                      onPressed: session.togglePlay,
                     ),
                   ),
                 ),
