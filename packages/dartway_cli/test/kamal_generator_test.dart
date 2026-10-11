@@ -161,6 +161,24 @@ final routes = [
             .cast<YamlMap>()
             .singleWhere((step) => step['id'] == 'image');
         expect(imageStep['env']['PUBLISH'], contains(configuredBranches));
+        for (final entry
+            in imageJob['strategy']['matrix']['include'] as YamlList) {
+          final service = entry['service'] as String;
+          expect(
+            entry['kamal_service'],
+            yaml(files, 'deploy/kamal/$service.yml')['service'],
+          );
+        }
+        final buildStep = (imageJob['steps'] as YamlList)
+            .cast<YamlMap>()
+            .singleWhere(
+              (step) =>
+                  '${step['uses']}'.startsWith('docker/build-push-action'),
+            );
+        expect(
+          buildStep['with']['labels'],
+          contains(r'service=${{ matrix.kamal_service }}'),
+        );
         expect(studio['check']['args'], [
           '--project',
           '/project',

@@ -16,8 +16,19 @@ browser: `../README.md`.
 - `lib/l10n/` — the texts (English and Russian); `flutter gen-l10n` writes
   `lib/l10n/gen/`
 
-`lib/app_version.dart` repeats the `version:` of `pubspec.yaml` (a test holds
-them equal). Which builds the server still serves is decided by the contract:
+The app reads this build's version from the platform with `PackageInfo.fromPlatform()`
+in `lib/main.dart`. On web, that reads the `version.json` written by `flutter build web`.
+An empty version or a failed platform read is reported with its stack trace via
+`debugPrint` before using `0.0.0+0`, so the app still starts. This read precedes
+the app's uncaught-error pipeline.
+`pubspec.yaml` keeps the marketing version; its `+1` is only a local-build fallback.
+Release builds pass `--build-number=N` and use `--build-name` only to override the
+marketing version. N will come from Studio's per-project counter. Release build
+numbers are not committed. Until that release flow is wired, the web image
+uses pubspec's fallback build number.
+
+This label is sent as `Dw-App-Version` and decides nothing. Which builds the server
+still serves is decided by the contract:
 the `version:` of `dartway_starter_shared`, raised in a breaking line whenever a
 change removes or renames anything an installed app sends or reads.
 
