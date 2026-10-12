@@ -47,6 +47,7 @@ fi
         ['tool/checks.sh', 'analyze'],
         workingDirectory: repository.path,
         environment: environment,
+        includeParentEnvironment: false,
       );
     }
 
@@ -56,19 +57,15 @@ fi
       (line) => line.contains('dartway check'),
     );
     expect(checkCalls, hasLength(2));
-    expect(
-      checkCalls,
-      everyElement(isNot(contains('--contract-base'))),
-    );
+    expect(checkCalls, everyElement(isNot(contains('--contract-base'))));
 
     calls.writeAsStringSync('');
     result = await run(contractBase: 'HEAD');
     expect(result.exitCode, 0, reason: result.stderr as String);
-    final contractSha = (await Process.run(
-      'git',
-      ['rev-parse', 'HEAD'],
-      workingDirectory: repository.path,
-    )).stdout.toString().trim();
+    final contractSha = (await Process.run('git', [
+      'rev-parse',
+      'HEAD',
+    ], workingDirectory: repository.path)).stdout.toString().trim();
     checkCalls = calls.readAsLinesSync().where(
       (line) => line.contains('dartway check'),
     );
