@@ -251,7 +251,8 @@ project_checks() {
   fi
   for project in $CHECKED_PROJECTS; do
     run "dartway check: $project" \
-      bash -c 'cd "$1" && dart run dartway_cli:dartway check "${@:2}"' _ "$project" "${contract_args[@]}"
+      bash -c 'cd "$1" && dart run dartway_cli:dartway check "${@:2}"' _ "$project" \
+        ${contract_args[@]+"${contract_args[@]}"}
   done
 }
 
