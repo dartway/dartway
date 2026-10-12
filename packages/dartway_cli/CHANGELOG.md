@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- `deploy kamal` now gives the API TLS root service only its API host and
+  configures each web destination to proxy same-origin server paths to that
+  public API origin. The template web image renders the validated proxy routes
+  at container start, including WebSocket forwarding for `/dw/` (#564).
 - Fix: deploy disk guards measure a Docker data root that is not visible on the
   host from a throwaway container, allowing the local stack proof to run with
   Docker Desktop on macOS (#549).
