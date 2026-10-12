@@ -145,6 +145,7 @@ Future<DwDeployVerdict> _checkBuildDiskSpace(DwDeployContext context) async {
     deployUser: context.target.deployUser,
     minimum: context.target.minFreeDisk,
     minimumBytes: context.target.minFreeDiskBytes,
+    dockerImage: context.stack.resolvedImage(DwStack.postgresImage),
   );
   return result.ok
       ? DwDeployVerdict.pass(result.stdout)

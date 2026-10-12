@@ -67,8 +67,8 @@ fi
     expect(result.stdout, '$root: 10.0 GiB free of 30.0 GiB');
     expect(calls.readAsLinesSync(), [
       'docker info -f {{.DockerRootDir}}',
-      'docker run --rm --volume $root:$root:ro '
-          '${DwStack.postgresImage} df -Pk $root',
+      'docker run --pull=never --rm --volume $root:$root:ro '
+          'mirror.example/${DwStack.postgresImage} df -Pk $root',
     ]);
   });
 
@@ -99,4 +99,5 @@ Future<DwSshResult> _check(Map<String, String> environment) =>
       deployUser: 'deployer',
       minimum: '10GB',
       minimumBytes: 10 * 1024 * 1024 * 1024,
+      dockerImage: 'mirror.example/${DwStack.postgresImage}',
     );

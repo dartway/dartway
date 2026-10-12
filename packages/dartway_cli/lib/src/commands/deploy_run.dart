@@ -62,6 +62,7 @@ Future<int> runDeploy(
     ssh: ssh,
     deployUser: target.deployUser,
     directory: DwDeployRunner.remoteDirectoryOf(target),
+    dockerImage: stack.resolvedImage(DwStack.postgresImage),
     onNotice: (notice) {
       out.writeln(notice);
       report.event('notice', {'message': notice});

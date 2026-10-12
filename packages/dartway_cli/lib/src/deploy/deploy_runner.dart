@@ -285,6 +285,7 @@ rm -f "\$dw_new"''';
       deployUser: target.deployUser,
       minimum: target.minFreeDisk,
       minimumBytes: target.minFreeDiskBytes,
+      dockerImage: stack.resolvedImage(DwStack.postgresImage),
     );
     if (!space.ok) return space;
     return _as('''

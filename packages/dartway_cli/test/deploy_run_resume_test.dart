@@ -25,6 +25,7 @@ void main() {
       ssh: LocalShell(),
       deployUser: 'deployer',
       directory: p.join(temp.path, 'deploy-run'),
+      dockerImage: 'postgres:17-alpine',
       pollInterval: const Duration(milliseconds: 50),
     );
     human = _Captured();

@@ -23,6 +23,7 @@ void main() {
     ssh: ssh,
     deployUser: 'deployer',
     directory: directory,
+    dockerImage: 'postgres:17-alpine',
     pollInterval: const Duration(milliseconds: 50),
     contactTolerance: tolerance ?? const Duration(seconds: 10),
     onNotice: notices.add,
