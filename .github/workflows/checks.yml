@@ -26,28 +26,39 @@ name: Checks
 # person with the containers up. It brings the same two containers
 # `tool/checks.sh` documents, on the same ports, and the mode refuses to start
 # without them rather than skipping.
+#
+# A pull request runs the suites it can break, not all of them: the jobs ask
+# `tool/affected.dart`, which reads the change against the pubspec dependency
+# graph and the paths each suite is known to read outside its package, and
+# hands the answer to `tool/checks.sh` as DW_CHECKS_ONLY. A change to a
+# client package no longer waits for the generator's and the CLI's suites.
+# What the script cannot place, and anything that pins or picks the suites,
+# runs everything; a push to master always does. `analyze` is never narrowed:
+# it is the cheap net for exactly the #165 break above.
+#
+# The suites are split into jobs by length: the generator's and the CLI's
+# are the two longest and run alone, the rest together, so the wall clock is
+# the longest of three instead of their sum.
 
 on:
   pull_request:
     types: [opened, synchronize, ready_for_review, reopened]
   push:
     branches: [master]
+  workflow_dispatch:
 
 concurrency:
   group: checks-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  # The pull request's base; empty on a push, which runs everything.
+  DW_AFFECTED_BASE: ${{ github.event.pull_request.base.sha }}
+
 jobs:
-  checks:
+  analyze:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    strategy:
-      fail-fast: false
-      matrix:
-        # Separate jobs so a red one says which half failed without reading a
-        # log, and so the faster of the two answers first.
-        mode: [analyze, test]
-    name: ${{ matrix.mode }}
     env:
       DW_CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
     steps:
@@ -59,25 +70,59 @@ jobs:
         with:
           flutter-version: 3.47.6
           channel: stable
+          cache: true
 
-      # Only the `test` mode reaches `js_checks` in tool/checks.sh (the `js/*`
-      # npm packages, currently js/studio-bridge) — Node stays out of the
-      # `analyze` job, which never needs it. 22.18.0, not the 22.6 the
-      # package.json floor used to say: below 22.18.0 Node's `.ts` type
-      # stripping is not on by default, `node --test`'s file discovery
-      # matches nothing, and it prints `# tests 0` and exits 0 — a run that
-      # skipped every test looked exactly like one that passed them (caught in
-      # review of the PR that added this job, 36243686357).
-      - if: matrix.mode == 'test'
+      - run: tool/checks.sh analyze
+
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [generator, cli, rest]
+    name: test (${{ matrix.shard }})
+    env:
+      DW_CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.6
+          channel: stable
+          cache: true
+
+      # Only the `rest` shard holds the `js/*` npm packages (currently
+      # js/studio-bridge), the one place `tool/checks.sh test` needs Node.
+      # 22.18.0, not the 22.6 the package.json floor used to say: below
+      # 22.18.0 Node's `.ts` type stripping is not on by default, `node
+      # --test`'s file discovery matches nothing, and it prints `# tests 0`
+      # and exits 0 — a run that skipped every test looked exactly like one
+      # that passed them (caught in review of the PR that added this job,
+      # 36243686357).
+      - if: matrix.shard == 'rest'
         uses: actions/setup-node@v4
         with:
           node-version: '22.18.0'
 
-      # The `test` mode also runs the suites named in BROWSER in Chrome
+      - name: Pick the suites
+        id: affected
+        run: |
+          flutter pub get >/dev/null
+          only="$(dart run tool/affected.dart --base "$DW_AFFECTED_BASE" --shard ${{ matrix.shard }})"
+          echo "only=$only" >> "$GITHUB_OUTPUT"
+          echo "${only:-nothing in this shard is affected}"
+
+      # The `rest` shard also runs the suites named in BROWSER in Chrome
       # (`browser_suites`, D-136). No setup step: the ubuntu-latest image puts
       # `google-chrome` on PATH, and `require_chrome` stops the job by name if
       # an image ever comes without it.
-      - run: tool/checks.sh ${{ matrix.mode }}
+      - run: tool/checks.sh test
+        env:
+          DW_CHECKS_ONLY: ${{ steps.affected.outputs.only }}
 
   services:
     runs-on: ubuntu-latest
@@ -108,11 +153,22 @@ jobs:
       DW_STORAGE_SECRET_KEY: dartway-secret
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: 3.47.6
           channel: stable
+          cache: true
+
+      - name: Pick the suites
+        id: affected
+        run: |
+          flutter pub get >/dev/null
+          only="$(dart run tool/affected.dart --base "$DW_AFFECTED_BASE" --shard services)"
+          echo "only=$only" >> "$GITHUB_OUTPUT"
+          echo "${only:-nothing is affected}"
 
       - name: Start the storage
         # Not a service container: those cannot pass the image its data-path
@@ -129,3 +185,5 @@ jobs:
           exit 1
 
       - run: tool/checks.sh services
+        env:
+          DW_CHECKS_ONLY: ${{ steps.affected.outputs.only }}

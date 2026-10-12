@@ -9,6 +9,8 @@ import 'package:dartway_core_server/src/files/dw_object_store.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
+import 'support/cli_kernel.dart';
+
 void main() {
   final repo = Directory(p.normalize(p.join(Directory.current.path, '../..')));
   final config = File(p.join(repo.path, '.dart_tool/package_config.json'));
@@ -16,6 +18,8 @@ void main() {
   late Directory server;
   late File dockerCalled;
   late String compiledCli;
+  late String kernel;
+  setUpAll(() async => kernel = await cliKernel(repo.path));
   setUp(() async {
     root = await Directory.systemTemp.createTemp('dw463_');
     server = Directory(p.join(root.path, 'proof_server'))..createSync();
@@ -92,10 +96,7 @@ wait "$child"
         p.join(root.path, 'process-group'),
         compiled ? compiledCli : Platform.resolvedExecutable,
       ],
-      if (!compiled) ...[
-        '--packages=${config.path}',
-        p.join(repo.path, 'packages/dartway_cli/bin/dartway.dart'),
-      ],
+      if (!compiled) ...['--packages=${config.path}', kernel],
       command,
       ...arguments,
     ],

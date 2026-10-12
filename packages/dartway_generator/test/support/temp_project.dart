@@ -14,6 +14,46 @@ final frameworkPackages = p.normalize(p.join(generatorRoot, '..'));
 /// The `dart` running the tests, for subprocesses.
 final dartExecutable = Platform.resolvedExecutable;
 
+final _kernels = <String, Future<String>>{};
+
+/// A kernel snapshot of the program at [entryPoint] in [packageRoot],
+/// compiled once per test file against [packageConfig].
+///
+/// Run from source, every call compiled the program and the analyzer under
+/// it all over again — 4.5 s a call, and `contract_behavior_test` makes
+/// dozens of them, which made it the longest file in CI (10.8 min). The
+/// snapshot lies in the package's own `.dart_tool/test_kernels/`, so a
+/// program that finds its package by walking up from `Platform.script` still
+/// does; it is written under a unique name and renamed into place, so test
+/// files compiling it at the same time never run a half-written one.
+Future<String> kernelOf(
+  String packageRoot,
+  String entryPoint, {
+  required String packageConfig,
+}) => _kernels.putIfAbsent(p.join(packageRoot, entryPoint), () async {
+  final directory = Directory(p.join(packageRoot, '.dart_tool', 'test_kernels'))
+    ..createSync(recursive: true);
+  final target = p.join(
+    directory.path,
+    '${p.basenameWithoutExtension(entryPoint)}.dill',
+  );
+  final staging = '$target.$pid.${DateTime.now().microsecondsSinceEpoch}';
+  final result = await Process.run(dartExecutable, [
+    'compile',
+    'kernel',
+    '--packages=$packageConfig',
+    '--output=$staging',
+    p.join(packageRoot, entryPoint),
+  ]);
+  if (result.exitCode != 0) {
+    throw StateError(
+      'compiling $entryPoint failed:\n${result.stdout}${result.stderr}',
+    );
+  }
+  File(staging).renameSync(target);
+  return target;
+});
+
 /// A throwaway DartWay project on disk: real packages with a real package
 /// config, resolved against this tree's `dartway_core_shared` and `dartway_orm`, so
 /// the generator and `dart analyze` see exactly what a project would.

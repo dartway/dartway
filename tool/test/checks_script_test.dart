@@ -75,4 +75,50 @@ fi
       everyElement(endsWith('check --contract-base $contractSha')),
     );
   });
+
+  test('DW_CHECKS_ONLY runs the suites of the packages it names', () async {
+    final fixture = await Directory.systemTemp.createTemp('checks-only-');
+    addTearDown(() => fixture.delete(recursive: true));
+    final calls = File('${fixture.path}/test-calls');
+    final bin = Directory('${fixture.path}/bin')..createSync();
+    for (final tool in ['flutter', 'dart']) {
+      final path = '${bin.path}/$tool';
+      File(path).writeAsStringSync('''#!/bin/sh
+if [ "\${1:-}" = --version ]; then
+  echo 'Flutter 3.47.6'
+elif [ "\${1:-}" = test ]; then
+  printf '%s\\n' "\$PWD" >> '${calls.path}'
+fi
+''');
+      expect(Process.runSync('chmod', ['+x', path]).exitCode, 0);
+    }
+
+    Future<ProcessResult> run(String only) => Process.run(
+      '/bin/bash',
+      ['tool/checks.sh', 'test'],
+      workingDirectory: repository.path,
+      environment: {
+        ...Platform.environment,
+        'PATH': '${bin.path}:${Platform.environment['PATH']}',
+        'DW_CHECKS_ONLY': only,
+      },
+      includeParentEnvironment: false,
+    );
+
+    var result = await run('packages/dartway_core_shared tool');
+    expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+    expect(calls.readAsLinesSync(), [
+      '${repository.path}/packages/dartway_core_shared',
+      '${repository.path}/tool',
+    ]);
+
+    calls.writeAsStringSync('');
+    result = await run('');
+    expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+    expect(calls.readAsLinesSync(), isEmpty);
+
+    result = await run('packages/dartway_core_shard');
+    expect(result.exitCode, 64);
+    expect(result.stderr, contains('packages/dartway_core_shard'));
+  });
 }
