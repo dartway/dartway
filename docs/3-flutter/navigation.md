@@ -28,6 +28,10 @@ changes, guards run again and the allowed page or redirect replaces loading. A
 pending answer without a loading builder fails with an error naming the missing
 option.
 
+Each retained page checks its own route and target, even when a public page is
+pushed above it. A pushed pending destination executes its redirect when the
+guard resolves.
+
 A test can import `package:dartway_router/testing.dart` and call
 `dwCheckPendingGuards` with all zones, representative known states and a setter for
 every nullable field. Each setter returns the state with that field null; Dart

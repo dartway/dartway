@@ -50,7 +50,7 @@ class DwGoRouterOptions {
 
   /// The app's one loading page, used while a zone guard is undecided.
   /// Required when a guard returns pending. The URL and history stay unchanged;
-  /// no target or zone shell is built until the guards decide.
+  /// the target is not built until the guards decide; its zone shell stays.
   final Widget Function(BuildContext, GoRouterState)? pendingBuilder;
 
   /// Optional global redirect; can override the current location.

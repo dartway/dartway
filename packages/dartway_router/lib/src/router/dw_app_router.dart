@@ -107,9 +107,7 @@ class DwAppRouter<RouterState> {
   /// The subscription to [routerState]; `null` when the router has none.
   ProviderSubscription<RouterState>? _state;
 
-  /// What go_router listens to (`refreshListenable`), notified whenever
-  /// [routerState] changes. go_router asks for a [Listenable]; the router
-  /// keeps it to itself so the app does not have to hold one.
+  /// Notifies retained pages whenever [routerState] changes.
   _RouterRefresh? _refresh;
 
   void _followRouterState(Ref ref) {
@@ -118,12 +116,21 @@ class DwAppRouter<RouterState> {
 
     final refresh = _refresh = _RouterRefresh();
     _state = ref.listen<RouterState>(source, (_, _) {
-      // A state change can flip the guards' answer for the location already
-      // shown — pending to allowed or back — without moving the URL. `refresh`
-      // makes go_router re-run the redirect, which handles the answers that
-      // move the location; the answers that keep it are re-decided by the
-      // pending switch inside each page, which follows the same notifier.
       _decisions.clear();
+      final matches = router.routerDelegate.currentConfiguration;
+      // go_router refreshes the base URI and can preserve an imperative stack
+      // unchanged. Decide its active pushed destination before refreshing so
+      // a resolved redirect navigates instead of leaving that page loading.
+      final redirect =
+          matches.isNotEmpty && matches.last is ImperativeRouteMatch
+          ? _guardDecision(router.state).redirectPath
+          : null;
+      if (redirect != null) {
+        router.go(redirect);
+      } else {
+        router.refresh();
+      }
+      // Pending/allow changes also reach pages retained at the same location.
       refresh.notify();
     });
   }
@@ -201,7 +208,6 @@ class DwAppRouter<RouterState> {
       navigatorKey: options.navigatorKey,
       initialLocation: options.initialLocation,
       initialExtra: options.initialExtra,
-      refreshListenable: _refresh,
       redirectLimit: options.redirectLimit,
       routerNeglect: options.routerNeglect,
       debugLogDiagnostics: options.debugLogDiagnostics,
@@ -225,13 +231,20 @@ class DwAppRouter<RouterState> {
 
   final Map<DwNavigationTarget, DwGuardDecision> _decisions = {};
 
-  DwGuardDecision _guardDecision(GoRouterState state) {
-    final route = topRouteFromState(state);
+  DwGuardDecision _guardDecision(
+    GoRouterState state, {
+    DwNavigationRoute<RouterState>? pageRoute,
+  }) {
+    final route = pageRoute ?? topRouteFromState(state);
     final subscription = _state;
     if (route == null || subscription == null) return DwGuardDecision.allow;
+    // Ordinary page states can name the stack's top route. A retained page
+    // decides about its own matched path, keeping its query and fragment.
     final target = DwNavigationTarget(
-      uri: state.uri,
-      routeName: state.topRoute?.name,
+      uri: pageRoute == null
+          ? state.uri
+          : state.uri.replace(path: state.matchedLocation),
+      routeName: route.name,
       pathParameters: state.pathParameters,
     );
     // Retain only the location being decided, rather than every URL visited.
@@ -347,7 +360,7 @@ class DwAppRouter<RouterState> {
         } else {
           child = _PendingSwitch(
             listenable: _refresh,
-            showsPending: _showsPending,
+            showsPending: (state) => _showsPending(route, state),
             pendingBuilder: options.pendingBuilder,
             state: state,
             allowedBuilder: (_) => route.descriptor.pageWidget,
@@ -366,9 +379,12 @@ class DwAppRouter<RouterState> {
     );
   }
 
-  bool _showsPending(GoRouterState state) {
+  bool _showsPending(
+    DwNavigationRoute<RouterState> route,
+    GoRouterState state,
+  ) {
     if (options.pendingBuilder == null) return false;
-    final decision = _guardDecision(state);
+    final decision = _guardDecision(state, pageRoute: route);
     return decision.isPending || decision.redirectPath != null;
   }
 
@@ -514,8 +530,8 @@ class DwAppRouter<RouterState> {
   }
 }
 
-/// The `refreshListenable` handed to go_router, notified when the router
-/// state changes. Internal: an app never holds a `Listenable` for the router.
+/// Notified when the router state changes so retained pages re-run their guards.
+/// Internal: an app never holds a `Listenable` for the router.
 class _RouterRefresh extends ChangeNotifier {
   void notify() => notifyListeners();
 }

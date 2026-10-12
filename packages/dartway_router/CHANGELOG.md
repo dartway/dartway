@@ -9,6 +9,11 @@ the loading page with the allowed page or redirect.
 The builder is required when a guard returns pending; a missing builder fails
 with a diagnostic. All guards use the decision contract.
 
+Retained pages evaluate their own route's guards and target after a push, so an
+unguarded page above them cannot release pending content. When the active pushed
+destination resolves to a redirect, the router executes it instead of leaving
+that destination on the loading page.
+
 `package:dartway_router/testing.dart` provides `dwCheckPendingGuards`: every zone's
 guards are checked against representative states with each nullable field set to
 null, detecting unknown values that allow a target a known value would redirect.

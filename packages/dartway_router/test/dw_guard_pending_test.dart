@@ -25,6 +25,7 @@ int detailsBuilds = 0;
 int shellBuilds = 0;
 int pendingBuilds = 0;
 int signInBuilds = 0;
+final guardedTargets = <DwNavigationTarget>[];
 
 class CountedPage extends StatelessWidget {
   const CountedPage(this.label, {super.key});
@@ -58,10 +59,13 @@ enum PendingRoutes implements DwNavigationRoute<SessionState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
   @override
   List<DwDecisionGuard<SessionState>> get zoneGuards => [
-    (state, _) => switch (state.signedIn) {
-      null => DwGuardDecision.pending,
-      false => const DwGuardDecision.redirect('/signIn'),
-      true => DwGuardDecision.allow,
+    (state, target) {
+      guardedTargets.add(target);
+      return switch (state.signedIn) {
+        null => DwGuardDecision.pending,
+        false => const DwGuardDecision.redirect('/signIn'),
+        true => DwGuardDecision.allow,
+      };
     },
     (state, _) => switch (state.surveyDone) {
       null => DwGuardDecision.pending,
@@ -103,7 +107,10 @@ bool useCupertinoShell = false;
 Widget shellChrome(Widget child) => Directionality(
   textDirection: TextDirection.ltr,
   child: Column(
-    children: [const Text('Shell chrome'), Expanded(child: child)],
+    children: [
+      const Text('Shell chrome'),
+      Expanded(child: child),
+    ],
   ),
 );
 
@@ -172,6 +179,7 @@ void main() {
     shellBuilds = 0;
     pendingBuilds = 0;
     signInBuilds = 0;
+    guardedTargets.clear();
     useCupertinoShell = false;
   });
 
@@ -249,6 +257,56 @@ void main() {
     expect(find.text('Pending'), findsNothing);
     expect(pendingBuilds, 0);
     expect(homeBuilds, greaterThan(0));
+  });
+
+  testWidgets('a retained pending home stays guarded after a public push', (
+    tester,
+  ) async {
+    final container = scope((signedIn: true, surveyDone: null));
+    final app = await mount(tester, container, location: '/?tab=notes');
+    expect(find.text('Pending'), findsOneWidget);
+    expect(homeBuilds, 0);
+
+    guardedTargets.clear();
+    unawaited(app.router.push('/survey?tab=public'));
+    await tester.pumpAndSettle();
+    expect(find.text('Survey'), findsOneWidget);
+    expect(app.router.canPop(), isTrue);
+    expect(homeBuilds, 0);
+    expect(guardedTargets, isNotEmpty);
+    for (final target in guardedTargets) {
+      expect(target.routeName, 'home');
+      expect(target.location, '/?tab=notes');
+    }
+
+    app.router.pop();
+    await tester.pumpAndSettle();
+    expect(find.text('Pending'), findsOneWidget);
+    expect(homeBuilds, 0);
+  });
+
+  testWidgets('a pushed pending destination executes its resolved redirect', (
+    tester,
+  ) async {
+    final container = scope((signedIn: true, surveyDone: null));
+    final app = await mount(tester, container, location: '/survey');
+    expect(find.text('Survey'), findsOneWidget);
+
+    unawaited(app.router.push('/details?tab=notes'));
+    await tester.pumpAndSettle();
+    expect(find.text('Pending'), findsOneWidget);
+    expect(detailsBuilds, 0);
+    expect(app.router.canPop(), isTrue);
+
+    container.read(session.notifier).update((
+      signedIn: false,
+      surveyDone: null,
+    ));
+    await tester.pumpAndSettle();
+    expect(find.text('Sign in'), findsOneWidget);
+    expect(find.text('Pending'), findsNothing);
+    expect(app.router.state.uri.toString(), '/signIn');
+    expect(detailsBuilds, 0);
   });
 
   testWidgets('session restoration keeps a deep link pending, then opens it', (
@@ -372,9 +430,7 @@ void main() {
             ),
             container: container,
           );
-          await tester.pumpWidget(
-            MaterialApp.router(routerConfig: app.router),
-          );
+          await tester.pumpWidget(MaterialApp.router(routerConfig: app.router));
           await tester.pumpAndSettle();
 
           expect(find.text('Shell chrome'), findsOneWidget);
