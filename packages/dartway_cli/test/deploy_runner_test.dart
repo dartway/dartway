@@ -1002,6 +1002,7 @@ esac
             // Only the unshared record counts against the budget; the shared
             // one belongs to a kept image and is reported, not warned about.
             ..writeAsStringSync(stuckCache ? 'false 11GB\ntrue 2GB\n' : '');
+          final dfCalls = File(p.join(temp.path, 'df-calls'));
           final docker = File(p.join(bin.path, 'docker'))
             ..writeAsStringSync('''
 #!/bin/sh
@@ -1012,7 +1013,18 @@ case "\$*" in
     if [ -f '${fail.path}' ]; then echo 'prune refused' >&2; exit 1; fi ;;
 esac
 ''');
-          Process.runSync('chmod', ['+x', docker.path]);
+          final df = File(p.join(bin.path, 'df'))
+            // Cleanup measures twice. Keep both readings on the test disk so
+            // unrelated runner activity cannot become reported freed bytes.
+            ..writeAsStringSync('''
+#!/bin/sh
+echo "\$*" >> '${dfCalls.path}'
+cat <<'EOF'
+Filesystem 1024-blocks Used Available Capacity Mounted on
+test-disk 100000 50000 50000 50% ${temp.path}
+EOF
+''');
+          Process.runSync('chmod', ['+x', docker.path, df.path]);
           Future<DwSshResult> cleanup(String input) =>
               LocalShell(
                 environment: {
@@ -1062,6 +1074,10 @@ esac
           expect(warning['images_removed'], 0);
           expect(warning['cache_records_removed'], 0);
           expect(warning['freed_bytes'], 0);
+          expect(dfCalls.readAsLinesSync(), [
+            '-Pk ${temp.path}',
+            '-Pk ${temp.path}',
+          ]);
           expect(warning['cache_shared_bytes'], stuckCache ? 2000000000 : 0);
           expect(
             warning['message'],
@@ -1112,6 +1128,12 @@ esac
           );
           expect(resumedCleanup['warning'], isFalse);
           expect(resumedCleanup['cache_shared_bytes'], 11000000000);
+          expect(dfCalls.readAsLinesSync(), [
+            '-Pk ${temp.path}',
+            '-Pk ${temp.path}',
+            '-Pk ${temp.path}',
+            '-Pk ${temp.path}',
+          ]);
         },
       );
     }
