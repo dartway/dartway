@@ -80,11 +80,8 @@ class DwAppRouter<RouterState> {
   /// ```dart
   /// pageBuilder: DwPageBuilder.fade
   /// ```
-  final Page<dynamic> Function(
-    BuildContext context,
-    LocalKey key,
-    Widget child,
-  ) pageBuilder;
+  final Page<dynamic> Function(BuildContext context, LocalKey key, Widget child)
+  pageBuilder;
 
   /// Runtime configuration options for GoRouter.
   ///
@@ -110,9 +107,7 @@ class DwAppRouter<RouterState> {
   /// The subscription to [routerState]; `null` when the router has none.
   ProviderSubscription<RouterState>? _state;
 
-  /// What go_router listens to (`refreshListenable`), notified whenever
-  /// [routerState] changes. go_router asks for a [Listenable]; the router
-  /// keeps it to itself so the app does not have to hold one.
+  /// Notifies retained pages whenever [routerState] changes.
   _RouterRefresh? _refresh;
 
   void _followRouterState(Ref ref) {
@@ -120,7 +115,24 @@ class DwAppRouter<RouterState> {
     if (source == null) return;
 
     final refresh = _refresh = _RouterRefresh();
-    _state = ref.listen<RouterState>(source, (_, _) => refresh.notify());
+    _state = ref.listen<RouterState>(source, (_, _) {
+      _decisions.clear();
+      final matches = router.routerDelegate.currentConfiguration;
+      // go_router refreshes the base URI and can preserve an imperative stack
+      // unchanged. Decide its active pushed destination before refreshing so
+      // a resolved redirect navigates instead of leaving that page loading.
+      final redirect =
+          matches.isNotEmpty && matches.last is ImperativeRouteMatch
+          ? _guardDecision(router.state).redirectPath
+          : null;
+      if (redirect != null) {
+        router.go(redirect);
+      } else {
+        router.refresh();
+      }
+      // Pending/allow changes also reach pages retained at the same location.
+      refresh.notify();
+    });
   }
 
   void _dispose() {
@@ -147,9 +159,7 @@ class DwAppRouter<RouterState> {
   ///   // Handle profile route
   /// }
   /// ```
-  DwNavigationRoute<RouterState>? topRouteFromState(
-    GoRouterState state,
-  ) {
+  DwNavigationRoute<RouterState>? topRouteFromState(GoRouterState state) {
     final name = state.topRoute?.name;
     return name == null ? null : _routeRegistry[name];
   }
@@ -170,9 +180,7 @@ class DwAppRouter<RouterState> {
   ///   // Show authenticated shell
   /// }
   /// ```
-  DwNavigationRoute<RouterState>? rootRouteFromState(
-    GoRouterState state,
-  ) {
+  DwNavigationRoute<RouterState>? rootRouteFromState(GoRouterState state) {
     final top = topRouteFromState(state);
     if (top == null) return null;
 
@@ -200,7 +208,6 @@ class DwAppRouter<RouterState> {
       navigatorKey: options.navigatorKey,
       initialLocation: options.initialLocation,
       initialExtra: options.initialExtra,
-      refreshListenable: _refresh,
       redirectLimit: options.redirectLimit,
       routerNeglect: options.routerNeglect,
       debugLogDiagnostics: options.debugLogDiagnostics,
@@ -212,33 +219,53 @@ class DwAppRouter<RouterState> {
       extraCodec: options.extraCodec,
       onEnter: options.onEnter,
       redirect: (context, state) {
-        // First, check zone guards
-        final targetRoute = topRouteFromState(state);
-
-        final subscription = _state;
-        if (targetRoute != null &&
-            targetRoute.zoneGuards.isNotEmpty &&
-            subscription != null) {
-          final target = DwNavigationTarget(
-            uri: state.uri,
-            routeName: state.topRoute?.name,
-            pathParameters: state.pathParameters,
-          );
-          // Read once: every guard of this redirect decides by one value.
-          final current = subscription.read();
-          // Execute guards in order until one returns a redirect path
-          for (final guard in targetRoute.zoneGuards) {
-            final redirectPath = guard(current, target);
-            if (redirectPath != null) {
-              return redirectPath;
-            }
-          }
-        }
+        final decision = _guardDecision(state);
+        if (decision.isPending) return null;
+        if (decision.redirectPath != null) return decision.redirectPath;
 
         // Then check custom redirect from options
         return options.redirect?.call(context, state);
       },
     );
+  }
+
+  final Map<DwNavigationTarget, DwGuardDecision> _decisions = {};
+
+  DwGuardDecision _guardDecision(
+    GoRouterState state, {
+    DwNavigationRoute<RouterState>? pageRoute,
+  }) {
+    final route = pageRoute ?? topRouteFromState(state);
+    final subscription = _state;
+    if (route == null || subscription == null) return DwGuardDecision.allow;
+    // Ordinary page states can name the stack's top route. A retained page
+    // decides about its own matched path, keeping its query and fragment.
+    final target = DwNavigationTarget(
+      uri: pageRoute == null
+          ? state.uri
+          : state.uri.replace(path: state.matchedLocation),
+      routeName: route.name,
+      pathParameters: state.pathParameters,
+    );
+    // Retain only the location being decided, rather than every URL visited.
+    if (!_decisions.containsKey(target)) _decisions.clear();
+    return _decisions.putIfAbsent(target, () {
+      final current = subscription.read();
+      for (final guard in route.zoneGuards) {
+        final decision = guard(current, target);
+        if (decision.isPending) {
+          if (options.pendingBuilder == null) {
+            throw StateError(
+              'DwGoRouterOptions.pendingBuilder is required when a guard '
+              'returns DwGuardDecision.pending for ${target.location}.',
+            );
+          }
+          return decision;
+        }
+        if (decision.redirectPath != null) return decision;
+      }
+      return DwGuardDecision.allow;
+    });
   }
 
   // ------------------------------------------------------------
@@ -257,20 +284,16 @@ class DwAppRouter<RouterState> {
           // Find all root routes in this zone (routes without a parent)
           final rootRoutes = zone
               .where((e) => e.descriptor.parent == null)
-              .map(
-                (route) => _buildRoute(
-                  route,
-                  navigationZones,
-                ),
-              )
+              .map((route) => _buildRoute(route, navigationZones))
               .toList();
 
           // StatefulShellRoute: each root route becomes an independent branch,
           // preserving its navigation stack across tab switches.
           if (zone.first.statefulShellRouteBuilder != null) {
+            final shellBuilder = zone.first.statefulShellRouteBuilder!;
             return <RouteBase>[
               StatefulShellRoute.indexedStack(
-                pageBuilder: zone.first.statefulShellRouteBuilder!,
+                pageBuilder: shellBuilder,
                 notifyRootObserver: options.shellNotifyRootObserver,
                 branches: rootRoutes
                     .map((r) => StatefulShellBranch(routes: <RouteBase>[r]))
@@ -281,9 +304,10 @@ class DwAppRouter<RouterState> {
 
           // ShellRoute: simple shell wrapper (state not preserved across tabs).
           if (zone.first.shellRouteBuilder != null) {
+            final shellBuilder = zone.first.shellRouteBuilder!;
             return <RouteBase>[
               ShellRoute(
-                pageBuilder: zone.first.shellRouteBuilder!,
+                pageBuilder: shellBuilder,
                 notifyRootObserver: options.shellNotifyRootObserver,
                 routes: rootRoutes,
               ),
@@ -317,37 +341,51 @@ class DwAppRouter<RouterState> {
       onExit: exit == null
           ? null
           : (context, state) => exit(
-                context,
-                DwNavigationTarget(
-                  uri: state.uri,
-                  routeName: route.name,
-                  pathParameters: state.pathParameters,
-                ),
+              context,
+              DwNavigationTarget(
+                uri: state.uri,
+                routeName: route.name,
+                pathParameters: state.pathParameters,
               ),
+            ),
       pageBuilder: (context, state) {
         // Use go_router's own per-page key, which is unique for every entry on
         // the stack (a random key for imperative pushes, preserved across
         // rebuilds). Deriving the key from name + path instead would collide
         // whenever the same location appears twice on the stack and trip the
         // Navigator's _debugCheckDuplicatedPageKeys assertion.
-        return pageBuilder(
-          context,
-          state.pageKey,
-          route.descriptor.pageWidget,
-        );
+        final Widget child;
+        if (options.pendingBuilder == null) {
+          child = route.descriptor.pageWidget;
+        } else {
+          child = _PendingSwitch(
+            listenable: _refresh,
+            showsPending: (state) => _showsPending(route, state),
+            pendingBuilder: options.pendingBuilder,
+            state: state,
+            allowedBuilder: (_) => route.descriptor.pageWidget,
+          );
+        }
+        return pageBuilder(context, state.pageKey, child);
       },
       // Recursively build child routes
       routes: zones
           .expand(
-            (zone) => zone.where((e) => e.descriptor.parent == route).map(
-                  (e) => _buildRoute(
-                    e,
-                    zones,
-                  ),
-                ),
+            (zone) => zone
+                .where((e) => e.descriptor.parent == route)
+                .map((e) => _buildRoute(e, zones)),
           )
           .toList(),
     );
+  }
+
+  bool _showsPending(
+    DwNavigationRoute<RouterState> route,
+    GoRouterState state,
+  ) {
+    if (options.pendingBuilder == null) return false;
+    final decision = _guardDecision(state, pageRoute: route);
+    return decision.isPending || decision.redirectPath != null;
   }
 
   // ------------------------------------------------------------
@@ -434,8 +472,9 @@ class DwAppRouter<RouterState> {
     // Validate that all paths start with '/'
     for (final zoned in allRoutes) {
       final route = zoned.route;
-      final path =
-          route.descriptor.parent == null ? route.routePath : route.fullPath;
+      final path = route.descriptor.parent == null
+          ? route.routePath
+          : route.fullPath;
 
       if (!path.startsWith('/')) {
         throw ArgumentError(
@@ -445,8 +484,9 @@ class DwAppRouter<RouterState> {
     }
 
     // Check that routerState is provided when guards are used
-    final hasGuards =
-        navigationZones.expand((z) => z).any((r) => r.zoneGuards.isNotEmpty);
+    final hasGuards = navigationZones
+        .expand((z) => z)
+        .any((r) => r.zoneGuards.isNotEmpty);
 
     if (hasGuards && routerState == null) {
       throw ArgumentError(
@@ -471,14 +511,16 @@ class DwAppRouter<RouterState> {
       grouped.putIfAbsent(key(zoned), () => []).add(zoned);
     }
 
-    final duplicates =
-        grouped.entries.where((e) => e.value.length > 1).toList();
+    final duplicates = grouped.entries
+        .where((e) => e.value.length > 1)
+        .toList();
     if (duplicates.isEmpty) return;
 
     throw ArgumentError(
       duplicates
           .map(
-            (entry) => '${summary(entry.key)}\n'
+            (entry) =>
+                '${summary(entry.key)}\n'
                 'Declared by:\n'
                 '${entry.value.map((z) => '  - ${z.describe()}').join('\n')}\n'
                 '\n$explanation',
@@ -488,10 +530,91 @@ class DwAppRouter<RouterState> {
   }
 }
 
-/// The `refreshListenable` handed to go_router, notified when the router
-/// state changes. Internal: an app never holds a `Listenable` for the router.
+/// Notified when the router state changes so retained pages re-run their guards.
+/// Internal: an app never holds a `Listenable` for the router.
 class _RouterRefresh extends ChangeNotifier {
   void notify() => notifyListeners();
+}
+
+/// The pending-or-allowed half of a page, re-decided when the router state
+/// changes without moving the location.
+///
+/// go_router asks a page builder for its [Page] only when the location
+/// changes; a decision that flips at the URL already shown would leave the
+/// page showing the answer it was built with. The router therefore builds one
+/// page whose child is this switch, and the switch follows the router's
+/// refresh notifier: while the guards are undecided — or have decided on a
+/// redirect that has not moved the location yet — it shows the app's one
+/// pending page; once they allow, it builds [allowedBuilder]. The location,
+/// the history and the page key never change.
+class _PendingSwitch extends StatefulWidget {
+  const _PendingSwitch({
+    required this.listenable,
+    required this.showsPending,
+    required this.pendingBuilder,
+    required this.state,
+    required this.allowedBuilder,
+  });
+
+  /// Notified whenever the router state changes; the decisions are re-run
+  /// before it fires. `null` when the router follows no state.
+  final Listenable? listenable;
+
+  /// Asks the guards about [state]; the router's own `_showsPending`.
+  final bool Function(GoRouterState state) showsPending;
+
+  /// The app's one loading page.
+  final Widget Function(BuildContext context, GoRouterState state)?
+  pendingBuilder;
+
+  /// The location this page was built for.
+  final GoRouterState state;
+
+  /// Builds the page's allowed target content.
+  final Widget Function(BuildContext context) allowedBuilder;
+
+  @override
+  State<_PendingSwitch> createState() => _PendingSwitchState();
+}
+
+class _PendingSwitchState extends State<_PendingSwitch> {
+  late bool _pending = widget.showsPending(widget.state);
+
+  @override
+  void initState() {
+    super.initState();
+    widget.listenable?.addListener(_decisionChanged);
+  }
+
+  @override
+  void didUpdateWidget(_PendingSwitch oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.listenable != widget.listenable) {
+      oldWidget.listenable?.removeListener(_decisionChanged);
+      widget.listenable?.addListener(_decisionChanged);
+    }
+    _syncDecision();
+  }
+
+  @override
+  void dispose() {
+    widget.listenable?.removeListener(_decisionChanged);
+    super.dispose();
+  }
+
+  void _decisionChanged() => _syncDecision();
+
+  void _syncDecision() {
+    final pending = widget.showsPending(widget.state);
+    if (pending == _pending) return;
+    setState(() => _pending = pending);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!_pending) return widget.allowedBuilder(context);
+    return widget.pendingBuilder!(context, widget.state);
+  }
 }
 
 /// A route paired with the index of the zone that declares it.

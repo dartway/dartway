@@ -78,7 +78,7 @@ enum _Routes implements DwNavigationRoute<_RouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<_RouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<_RouterState>> get zoneGuards => [];
 }
 
 const _manifest = StudioProjectManifest(projectName: 'Binding test', zones: []);

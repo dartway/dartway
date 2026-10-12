@@ -57,8 +57,9 @@ enum AppNavigationZone implements DwNavigationRoute<AppRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-    (state, target) =>
-        state.isSignedIn ? null : AuthNavigationZone.signInFrom(target),
+  List<DwDecisionGuard<AppRouterState>> get zoneGuards => [
+    (state, target) => state.isSignedIn
+        ? DwGuardDecision.allow
+        : DwGuardDecision.redirect(AuthNavigationZone.signInFrom(target)),
   ];
 }

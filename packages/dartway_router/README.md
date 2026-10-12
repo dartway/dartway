@@ -86,7 +86,7 @@ enum AuthRoutes implements DwNavigationRoute<AppSession> {
   DwShellRoutePageBuilder? get shellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<AppSession>> get zoneGuards => [];
+  List<DwDecisionGuard<AppSession>> get zoneGuards => [];
 }
 ```
 
@@ -121,12 +121,12 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
   DwShellRoutePageBuilder? get shellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<AppSession>> get zoneGuards => [
+  List<DwDecisionGuard<AppSession>> get zoneGuards => [
     (session, target) {
       if (!session.isAuthenticated) {
-        return AuthRoutes.login.fullPath;
+        return DwGuardDecision.redirect(AuthRoutes.login.fullPath);
       }
-      return null; // Allow navigation
+      return DwGuardDecision.allow;
     },
   ];
 }
@@ -309,23 +309,45 @@ Accessible at `/users/:userId`.
 
 ### Route Guards
 
-Guards allow you to protect routes with authentication or authorization checks. Guards are executed in order, and if any guard returns a redirect path, navigation is redirected.
+Decision guards answer `DwGuardDecision.allow`, `.redirect(path)` or `.pending`.
+They run in order until a redirect or pending answer. A nullable fact is unknown:
+handle `null` explicitly with pending, so the target never builds before the decision.
+
+Provide `DwGoRouterOptions.pendingBuilder` whenever a guard can be pending. This
+one app loading page replaces the target inside the zone's unchanged shell at the
+same URL without another history entry. The router refreshes its guards when
+the state provider changes. A pending answer without a builder fails with a diagnostic.
 
 ```dart
 enum AppRoutes implements DwNavigationRoute<AppSession> {
   // ... routes ...
 
   @override
-  List<DwNavigationGuard<AppSession>> get zoneGuards => [
+  List<DwDecisionGuard<AppSession>> get zoneGuards => [
     (session, target) {
       if (!session.isAuthenticated) {
-        return AuthRoutes.login.fullPath;
+        return DwGuardDecision.redirect(AuthRoutes.login.fullPath);
       }
-      return null; // Allow navigation
+      return DwGuardDecision.allow;
     },
   ];
 }
 ```
+
+For a nullable role:
+
+```dart
+(state, _) => switch (state.role) {
+  null => DwGuardDecision.pending,
+  UserRole.admin => DwGuardDecision.allow,
+  _ => DwGuardDecision.redirect(AppRoutes.home.fullPath),
+},
+```
+
+Import `package:dartway_router/testing.dart` to use `dwCheckPendingGuards` in a
+zone guard test. Supply all zones, representative known states and a setter for
+each nullable field. It fails when an unknown field allows a target that a known
+value redirects. Pass concrete targets for guards that read parameters or queries.
 
 A guard receives the router state and the `DwNavigationTarget` being entered — `uri`, `location`,
 `routeName` and `pathParameters` — so a guard that turns someone away can say where they were going.
@@ -334,14 +356,18 @@ Back to a link after signing in:
 ```dart
 // The protected zone: remember where the person was going.
 (session, target) => session.isAuthenticated
-    ? null
-    : Uri(path: AuthRoutes.login.fullPath, queryParameters: {'from': target.location})
-        .toString(),
+    ? DwGuardDecision.allow
+    : DwGuardDecision.redirect(
+        Uri(path: AuthRoutes.login.fullPath, queryParameters: {'from': target.location})
+            .toString(),
+      ),
 
 // The sign-in zone: once signed in, go on to it — if it is one of the app's own paths.
 (session, target) => session.isAuthenticated
-    ? ownPath(target.uri.queryParameters['from']) ?? AppRoutes.home.fullPath
-    : null,
+    ? DwGuardDecision.redirect(
+        ownPath(target.uri.queryParameters['from']) ?? AppRoutes.home.fullPath,
+      )
+    : DwGuardDecision.allow,
 
 String? ownPath(String? location) =>
     location != null && location.startsWith('/') && !location.startsWith('//')
@@ -707,7 +733,7 @@ Abstract interface for navigation routes. Routes are defined as enums implementi
 - `shellRouteBuilder` - Simple shell builder (state not preserved across tabs)
 - `statefulShellRouteBuilder` - Stateful shell builder (state preserved per branch)
 - `shellRouteBuilder` - Optional shell route builder
-- `zoneGuards` - List of navigation guards, each `(routerState, DwNavigationTarget target) => String?`
+- `zoneGuards` - List of navigation guards, each `(routerState, DwNavigationTarget target) => DwGuardDecision`
 
 #### `DwNavigationRouteDescriptor<RouterState>`
 
@@ -750,6 +776,7 @@ Configuration options for GoRouter.
 - `navigatorKey` - Navigator key
 - `initialLocation` - Initial route path
 - `errorBuilder` - Custom error page builder
+- `pendingBuilder` - App loading page, required when a guard returns pending
 - `redirect` - Custom redirect function
 - `debugLogDiagnostics` - Enable debug logging
 - And more...
@@ -786,7 +813,7 @@ Extension on `DwNavigationRoute` providing:
 ### Guards not working
 
 - Ensure `routerState` is provided to `DwAppRouter`
-- Check that guards return `null` to allow navigation
+- Check that guards return `DwGuardDecision.allow` only for known facts
 - Verify guard logic is correct
 
 ### Parameters not extracted

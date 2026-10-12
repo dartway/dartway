@@ -231,12 +231,12 @@ packages:
     source: path
     version: "0.7.0-dev.0"
   dartway_router:
-    dependency: "direct overridden"
+    dependency: "direct main"
     description:
       path: "../../packages/dartway_router"
       relative: true
     source: path
-    version: "3.0.0"
+    version: "4.0.0-dev.0"
   dartway_shared_preferences:
     dependency: "direct main"
     description:

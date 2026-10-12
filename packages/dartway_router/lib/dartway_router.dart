@@ -42,8 +42,10 @@
 ///   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 ///
 ///   @override
-///   List<DwNavigationGuard<AppSession>> get zoneGuards => [
-///     (session, _) => session.isAuthenticated ? null : '/login',
+///   List<DwDecisionGuard<AppSession>> get zoneGuards => [
+///     (session, _) => session.isAuthenticated
+///         ? DwGuardDecision.allow
+///         : const DwGuardDecision.redirect('/login'),
 ///   ];
 /// }
 ///
