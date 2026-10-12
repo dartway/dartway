@@ -75,10 +75,17 @@ String git(TempProject project, List<String> arguments) {
 Future<ProcessResult> generatorCli(
   TempProject project,
   List<String> arguments,
-) => Process.run(dartExecutable, [
-  '--packages=${p.join(generatorRoot, '.dart_tool/package_config.json')}',
-  p.join(generatorRoot, 'bin/dartway_generator.dart'),
-  '--project',
-  project.root,
-  ...arguments,
-], workingDirectory: project.root);
+) async {
+  final packages = p.join(generatorRoot, '.dart_tool/package_config.json');
+  return Process.run(dartExecutable, [
+    '--packages=$packages',
+    await kernelOf(
+      generatorRoot,
+      'bin/dartway_generator.dart',
+      packageConfig: packages,
+    ),
+    '--project',
+    project.root,
+    ...arguments,
+  ], workingDirectory: project.root);
+}

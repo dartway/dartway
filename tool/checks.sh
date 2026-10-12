@@ -20,6 +20,17 @@
 #   tool/checks.sh services    the suites of the packages named in SERVICES,
 #                              against DW_DATABASE_* and DW_STORAGE_*
 #
+# DW_CHECKS_ONLY narrows `test` and `services` to the packages it names —
+# paths as `packages()` prints them, and `js/*` — space-separated. CI sets it
+# per job to what `tool/affected.dart` says a pull request can break; the
+# same works locally:
+#
+#   DW_CHECKS_ONLY="$(dart run tool/affected.dart --base origin/master)" \
+#     tool/checks.sh test
+#
+# Unset, every suite runs. `analyze` always covers everything: it is cheap,
+# and it is what catches a change breaking a package nobody named.
+#
 # `services` is not run by the default: it needs the two containers below, and
 # the default is what anyone can run on a laptop without them. It is not
 # optional either — CI runs it on every pull request beside the other two, and
@@ -123,6 +134,23 @@ packages/dartway_push_server|Postgres"
 BROWSER="\
 packages/dartway_studio_bridge|the preview frame's iframe behind a platform view"
 
+# A name in DW_CHECKS_ONLY that is not a package stops the run: a typo must
+# not read as a selection with nothing to do.
+for package in ${DW_CHECKS_ONLY:-}; do
+  if [ ! -f "$package/pubspec.yaml" ] && [ ! -f "$package/package.json" ]; then
+    echo "DW_CHECKS_ONLY names $package, which is not a package" >&2
+    exit 64
+  fi
+done
+
+# Whether this package's suites run: every one when DW_CHECKS_ONLY is unset,
+# only those it names when it is set.
+selected() {
+  [ -z "${DW_CHECKS_ONLY+set}" ] && return 0
+  case " $DW_CHECKS_ONLY " in *" $1 "*) return 0 ;; esac
+  return 1
+}
+
 # The reason this package is skipped, or nothing if it is not.
 skip_reason() {
   printf '%s\n' "$SKIP" | while IFS='|' read -r path reason; do
@@ -214,6 +242,7 @@ test_suites() {
   echo "══ test"
   for package in $(packages); do
     [ -d "$package/test" ] || continue
+    selected "$package" || continue
     reason="$(skip_reason "$package")"
     if [ -n "$reason" ]; then
       echo "── $package — skipped: $reason"
@@ -303,6 +332,7 @@ require_node_floor() {
 js_checks() {
   echo "══ js"
   for package in $(js_packages); do
+    selected "$package" || continue
     require_node_floor "$package"
     echo "── $package (npm)"
     local out status
@@ -347,6 +377,7 @@ require_chrome() {
 browser_suites() {
   echo "══ browser"
   for package in $(printf '%s\n' "$BROWSER" | cut -d'|' -f1); do
+    selected "$package" || continue
     require_chrome "$package"
     run "$package (chrome)" \
       bash -c "cd '$package' && flutter test --platform chrome"
@@ -387,12 +418,33 @@ service_suites() {
     [ -d "$package/test" ] || { echo "$package is named in SERVICES and has no test/" >&2; exit 1; }
   done || exit 1
   for package in $(printf '%s\n' "$SERVICES" | cut -d'|' -f1); do
+    selected "$package" || continue
     run "$package ($(services_of "$package"))" \
       bash -c "cd '$package' && $(runner_of "$package") test"
   done
+  selected packages/dartway_cli || return 0
   run "packages/dartway_cli (external test servers)" \
     bash -c "cd packages/dartway_cli && dart test -t services --run-skipped test/test_external_servers_test.dart test/deploy_storage_visibility_test.dart"
 }
+
+# Nothing selected for this mode: say so and stop before resolving, and before
+# asking for services nothing here would use.
+if [ -n "${DW_CHECKS_ONLY+set}" ] && { [ "$MODE" = test ] || [ "$MODE" = services ]; }; then
+  wanted=
+  if [ "$MODE" = services ]; then
+    for package in $(printf '%s\n' "$SERVICES" | cut -d'|' -f1) packages/dartway_cli; do
+      selected "$package" && wanted=1
+    done
+  else
+    for package in $DW_CHECKS_ONLY; do
+      [ -f "$package/package.json" ] || [ -d "$package/test" ] && wanted=1
+    done
+  fi
+  if [ -z "$wanted" ]; then
+    echo "✓ $MODE: nothing in DW_CHECKS_ONLY has suites to run here"
+    exit 0
+  fi
+fi
 
 [ "$MODE" = services ] && require_services
 resolve

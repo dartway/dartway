@@ -316,8 +316,10 @@ The monorepo tests itself in four tiers, split by what a run needs. The same six
 test gate apply here: public API and wire contracts are class 5; migration integrity is class 3.
 
 **`tool/checks.sh [analyze|test|services]`** — `analyze` and `test` by default, which need no
-Docker. CI (`.github/workflows/checks.yml`, on every pull request and push to `master`, one job per
-mode, all three) runs tier 1 in full. Before a PR, run `dart analyze` over touched resolution roots,
+Docker. CI (`.github/workflows/checks.yml`, on every pull request and push to `master`) runs tier 1:
+`analyze` in full, and `test` (split into generator, CLI and the rest) and `services` over the
+packages the change can break — `tool/affected.dart` reads them off the pubspec dependency graph and
+hands them to the script as `DW_CHECKS_ONLY`; a push to `master` runs everything. Before a PR, run `dart analyze` over touched resolution roots,
 `dart run dartway_cli:dartway check` when `template/` or `example/` changed, and the touched packages'
 suites (`dart test`
 or `flutter test` in each package, or `tool/checks.sh services` for a services package). A completed

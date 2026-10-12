@@ -10,6 +10,8 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
+import 'support/cli_kernel.dart';
+
 /// Real CLI over the real template: existing parser/wiring suites do not cover
 /// update's note selection or its ordering of resolution and project writes.
 void main() {
@@ -17,7 +19,9 @@ void main() {
   while (!Directory(p.join(repository.path, 'toolkit')).existsSync()) {
     repository = repository.parent;
   }
-  final cli = p.join(repository.path, 'packages/dartway_cli/bin/dartway.dart');
+  final packages = p.join(repository.path, '.dart_tool/package_config.json');
+  late String cli;
+  setUpAll(() async => cli = await cliKernel(repository.path));
   late Directory sandbox, project;
   late String target;
   File file(String path) => File(p.join(project.path, path));
@@ -30,7 +34,7 @@ void main() {
     Map<String, String>? environment,
   }) => Process.run(
     Platform.resolvedExecutable,
-    [cli, ...args],
+    ['--packages=$packages', cli, ...args],
     workingDirectory: cwd.path,
     environment: environment,
   );

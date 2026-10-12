@@ -1450,11 +1450,19 @@ void generatorResolution(TempProject project) {
   }
 }
 
-Future<ProcessResult> cli(
-  TempProject project,
-  List<String> arguments,
-) => Process.run(dartExecutable, [
-  '--packages=${p.join(frameworkPackages, '..', '.dart_tool/package_config.json')}',
-  p.join(frameworkPackages, 'dartway_cli/bin/dartway.dart'),
-  ...arguments,
-], workingDirectory: project.path('app_flutter'));
+Future<ProcessResult> cli(TempProject project, List<String> arguments) async {
+  final packages = p.join(
+    frameworkPackages,
+    '..',
+    '.dart_tool/package_config.json',
+  );
+  return Process.run(dartExecutable, [
+    '--packages=$packages',
+    await kernelOf(
+      p.join(frameworkPackages, 'dartway_cli'),
+      'bin/dartway.dart',
+      packageConfig: packages,
+    ),
+    ...arguments,
+  ], workingDirectory: project.path('app_flutter'));
+}

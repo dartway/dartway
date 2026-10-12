@@ -3,6 +3,7 @@
 /// code in it nothing judged.
 library;
 
+export 'src/affected_suites.dart';
 export 'src/changelog_check.dart';
 export 'src/plain_version.dart';
 export 'src/project_ci.dart';
