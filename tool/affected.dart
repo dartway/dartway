@@ -1,17 +1,23 @@
-// Which packages' suites a change can break, for one CI job (shard).
+// What a change can break, for one CI job (shard).
 //
 // Usage, from the repository root:
 //   dart run tool/affected.dart [--base <rev>] [--head <rev>] [--shard <name>]
 //
-// Prints the package paths on one line, space-separated — the value
+// Prints the selection on one line, space-separated — the value
 // `tool/checks.sh` takes as DW_CHECKS_ONLY — and an empty line when the
-// change touches nothing in the shard. Without --base, every package: a push
-// to master and the nightly run test everything.
+// change touches nothing in the shard. A package path runs its whole suite,
+// a `_test.dart` path that file alone. Without --base, every package: a
+// push to master and the nightly run test everything.
 //
-// Shards are the jobs of `.github/workflows/checks.yml`: the generator and
-// the CLI hold the two longest suites and run alone, `rest` is everything
-// else, and `services` is the whole set for `tool/checks.sh services`, which
-// keeps the packages it runs.
+// Shards are the jobs of `.github/workflows/checks.yml`, cut so that none
+// is long — many short jobs queue better than one long one holds the run.
+// The generator and the CLI run alone, and the longest file of each runs
+// apart from its package (`contract`, `update`); `rest` is everything else.
+// `services` is the set for `tool/checks.sh services`, which keeps what it
+// runs, without the CLI's external test servers, which are `services-cli`.
+// `analyze` is the packages whose code the change reaches. A job that is
+// one part of a shard takes its part in `tool/checks.sh` (DW_TEST_PART),
+// which knows which suites run.
 //
 // What counts as affected is `lib/src/affected_suites.dart`.
 
@@ -23,7 +29,18 @@ const _alone = {
   'generator': 'packages/dartway_generator',
   'cli': 'packages/dartway_cli',
 };
-const _shards = ['generator', 'cli', 'rest', 'services'];
+const _aloneFiles = {
+  'contract': 'packages/dartway_generator/test/contract_behavior_test.dart',
+  'update': 'packages/dartway_cli/test/update_command_test.dart',
+};
+final _shards = [
+  ..._alone.keys,
+  ..._aloneFiles.keys,
+  'rest',
+  'services',
+  'services-cli',
+  'analyze',
+];
 
 void main(List<String> arguments) {
   String? base, shard;
@@ -59,7 +76,9 @@ void main(List<String> arguments) {
       ),
   ];
 
-  var affected = {for (final package in packages) package.path};
+  final all = {for (final package in packages) package.path};
+  final tests = _tracked(['*_test.dart']);
+  var affected = Affected(all, all);
   if (base != null && base.isNotEmpty) {
     final diff = Process.runSync('git', [
       'diff',
@@ -75,22 +94,60 @@ void main(List<String> arguments) {
       );
     } else {
       final changed = '${diff.stdout}'.split('\n').where((l) => l.isNotEmpty);
-      affected = affectedSuites(packages, changed);
+      String? read(String path) {
+        final file = File(path);
+        return file.existsSync() ? file.readAsStringSync() : null;
+      }
+
+      affected = affectedChecks(
+        packages,
+        changed,
+        closures: {
+          for (final MapEntry(key: test, value: narrow) in narrowTests.entries)
+            test: importClosure([test, ...narrow.closureOf], packages, read),
+        },
+        testFiles: tests,
+      );
       stderr.writeln(
         '${changed.length} files changed since $base; '
-        '${affected.length} of ${packages.length} packages affected',
+        '${affected.code.length} of ${packages.length} packages reached',
       );
     }
   }
 
-  final selected = switch (shard) {
-    final name? when _alone.containsKey(name) => affected.where(
-      (path) => path == _alone[name],
-    ),
-    'rest' => affected.where((path) => !_alone.containsValue(path)),
-    _ => affected,
+  bool inPackage(String entry, String package) =>
+      entry == package || entry.startsWith('$package/');
+  String? owner(String file) => all
+      .where((package) => inPackage(file, package))
+      .fold<String?>(null, (a, b) => a == null || b.length > a.length ? b : a);
+  bool inCli(String entry) => inPackage(entry, _alone['cli']!);
+  // A whole package one of whose files runs in a job of its own is listed
+  // by its files, so that its job can leave that one out.
+  final suites = {
+    for (final entry in affected.suites)
+      if (_aloneFiles.values.any((file) => owner(file) == entry))
+        ...tests.where((file) => owner(file) == entry)
+      else
+        entry,
   };
-  stdout.writeln((selected.toList()..sort()).join(' '));
+  final selected = switch (shard) {
+    'analyze' => affected.code,
+    final name? when _aloneFiles.containsKey(name) => suites.where(
+      (entry) => entry == _aloneFiles[name],
+    ),
+    final name? when _alone.containsKey(name) => suites.where(
+      (entry) =>
+          inPackage(entry, _alone[name]!) &&
+          !_aloneFiles.values.contains(entry),
+    ),
+    'rest' => suites.where(
+      (entry) => !_alone.values.any((package) => inPackage(entry, package)),
+    ),
+    'services' => affected.suites.where((entry) => !inCli(entry)),
+    'services-cli' => affected.suites.where(inCli),
+    _ => affected.suites,
+  }.toList()..sort();
+  stdout.writeln(selected.join(' '));
 }
 
 /// Tracked files matching [patterns], as `git ls-files` names them.
