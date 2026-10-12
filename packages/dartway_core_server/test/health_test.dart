@@ -3,7 +3,7 @@ import 'package:test/test.dart';
 
 import 'support/test_app.dart';
 
-/// `GET /health` answers for the database the server depends on. The server
+/// Both health paths answer for the database the server depends on. The server
 /// here connects as an ordinary role, so taking its login away makes the
 /// database unreachable for it while the test keeps its own connection.
 void main() {
@@ -51,6 +51,8 @@ void main() {
     addTearDown(caller.close);
     final ok = await caller.raw('GET', '/health');
     expect((ok.status, ok.text), (200, 'ok'));
+    final appOk = await caller.raw('GET', '/dw/health');
+    expect((appOk.status, appOk.text), (ok.status, ok.text));
 
     await admin.db.execute('ALTER ROLE $role NOLOGIN');
     try {
@@ -63,11 +65,14 @@ void main() {
       );
       final down = await caller.raw('GET', '/health');
       expect(down.text, 'database unavailable');
+      final appDown = await caller.raw('GET', '/dw/health');
+      expect((appDown.status, appDown.text), (down.status, down.text));
     } finally {
       await admin.db.execute('ALTER ROLE $role LOGIN');
     }
     await eventually(
       () async => (await caller.raw('GET', '/health')).status == 200,
     );
+    expect((await caller.raw('GET', '/dw/health')).status, 200);
   });
 }

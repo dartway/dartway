@@ -96,14 +96,14 @@ void main() {
         );
       });
 
-      test('calls and /health reach the server', () async {
+      test('calls and /dw/health reach the server', () async {
         final caller = DwTestCaller(
           Uri.parse('http://localhost:${proxy.port}'),
           server.protocol,
         );
         addTearDown(caller.close);
 
-        final health = await caller.raw('GET', '/health');
+        final health = await caller.raw('GET', '/dw/health');
         expect((health.status, health.text), (200, 'ok'));
 
         final ticket = await caller.call(

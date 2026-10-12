@@ -120,6 +120,9 @@ final class DwHttpFront {
     try {
       final (status, headers, bytes) = switch (path) {
         DwHttpContract.healthPath => await _health(request),
+        DwHttpContract.appHealthPath
+            when request.method == 'GET' || request.method == 'HEAD' =>
+          await _health(request),
         _ when path.startsWith(DwHttpContract.pathPrefix) => await _call(
           request,
           body,

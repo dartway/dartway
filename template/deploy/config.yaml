@@ -87,7 +87,7 @@ local:
 #   # api_domain — the server itself, for mobile apps and webhooks: everything
 #   #   on it is proxied to the server, the live socket (/dw/live) included.
 #   # app_domain — the Flutter web app. The front proxy serves the web image
-#   #   and sends /dw/ and /health on this host to the server, so the app talks
+#   #   and sends only /dw/ on this host to the server, so the app talks
 #   #   to its own origin: no CORS, no preflight. Web releases use Uri.base.origin
 #   #   and the same image serves every destination.
 #   api_domain: api.example.com

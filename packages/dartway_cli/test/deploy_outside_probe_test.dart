@@ -52,10 +52,25 @@ void main() {
 
   group('health', () {
     test('passes on 200 ok, reached under the public host name', () async {
-      site.handler = (r) => text(r, 200, 'ok');
+      site.handler = (r) {
+        expect(r.uri.path, '/health');
+        return text(r, 200, 'ok');
+      };
       final result = await site.probe.health('http://api.example.com');
       expect(result.passed, isTrue, reason: result.detail);
       expect(site.hosts.single, 'api.example.com');
+    });
+
+    test('app origin probes /dw/health', () async {
+      site.handler = (r) {
+        expect(r.uri.path, '/dw/health');
+        return text(r, 200, 'ok');
+      };
+      final result = await site.probe.health(
+        'http://app.example.com',
+        path: '/dw/health',
+      );
+      expect(result.passed, isTrue, reason: result.detail);
     });
 
     test(

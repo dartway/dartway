@@ -50,13 +50,10 @@ void main() {
     expect(run.output.readAsStringSync(), isEmpty);
   });
 
-  test('entrypoint renders API, health, route and live socket proxies', () {
+  test('entrypoint forwards only /dw/ to the API', () {
     final run = _runScript(
       templateScript,
-      environment: {
-        'DW_API_ORIGIN': 'https://api.example.com:8443',
-        'DW_API_PATHS': '/dw /health /orders/events',
-      },
+      environment: {'DW_API_ORIGIN': 'https://api.example.com:8443'},
     );
     expect(run.result.exitCode, 0, reason: '${run.result.stderr}');
     final rendered = run.output.readAsStringSync();
@@ -65,84 +62,32 @@ void main() {
     expect(rendered, contains(r'proxy_set_header Upgrade $http_upgrade'));
     expect(rendered, contains('proxy_buffering off'));
     expect(rendered, contains('proxy_read_timeout 1h'));
-    expect(rendered, contains('location ^~ /health'));
-    expect(rendered, contains('location ^~ /orders/events'));
+    expect(rendered, isNot(contains('location ^~ /health')));
+    expect(rendered, isNot(contains('location ^~ /orders/events')));
     expect(rendered, contains('proxy_pass https://api.example.com:8443'));
     expect(rendered, contains('proxy_set_header Host api.example.com:8443'));
     expect(rendered, contains(r'X-Forwarded-For $proxy_add_x_forwarded_for'));
     expect(rendered, contains(r'X-Forwarded-Proto $http_x_forwarded_proto'));
     expect(
       RegExp('client_max_body_size 0;').allMatches(rendered),
-      hasLength(3),
+      hasLength(1),
     );
     expect(
       RegExp('proxy_request_buffering off;').allMatches(rendered),
-      hasLength(3),
+      hasLength(1),
     );
-    expect(RegExp('proxy_ssl_verify on;').allMatches(rendered), hasLength(3));
+    expect(RegExp('proxy_ssl_verify on;').allMatches(rendered), hasLength(1));
     expect(
       RegExp(
         'proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;',
       ).allMatches(rendered),
-      hasLength(3),
+      hasLength(1),
     );
   });
-
-  test('entrypoint accepts a route with a trailing slash', () {
-    final run = _runScript(
-      templateScript,
-      environment: {
-        'DW_API_ORIGIN': 'https://api.example.com',
-        'DW_API_PATHS': '/hooks/',
-      },
-    );
-    expect(run.result.exitCode, 0, reason: '${run.result.stderr}');
-    final rendered = run.output.readAsStringSync();
-    expect(rendered, contains('location ^~ /hooks/'));
-    expect(rendered, contains('location = /hooks'));
-    expect(rendered, contains(r'try_files $uri $uri/ /index.html'));
-  });
-
-  for (final paths in [
-    '/hooks /hooks/',
-    '/dw /health /health/',
-    '/api /api/v1/',
-    '/api/v1/ /api',
-  ]) {
-    test('entrypoint keeps covered slashless paths on the API: $paths', () {
-      final run = _runScript(
-        templateScript,
-        environment: {
-          'DW_API_ORIGIN': 'https://api.example.com',
-          'DW_API_PATHS': paths,
-        },
-      );
-      expect(run.result.exitCode, 0, reason: '${run.result.stderr}');
-      final rendered = run.output.readAsStringSync();
-      for (final path in paths.split(' ')) {
-        expect(
-          rendered,
-          contains('location ^~ ${path == '/dw' ? '/dw/' : path} {'),
-        );
-        if (path.endsWith('/')) {
-          expect(
-            rendered,
-            isNot(
-              contains('location = ${path.substring(0, path.length - 1)} {'),
-            ),
-          );
-        }
-      }
-    });
-  }
 
   for (final environment in [
-    {'DW_API_ORIGIN': 'http://api.example.com', 'DW_API_PATHS': '/dw'},
-    {'DW_API_ORIGIN': 'https://api.example.com/path', 'DW_API_PATHS': '/dw'},
-    {
-      'DW_API_ORIGIN': 'https://api.example.com',
-      'DW_API_PATHS': '/dw relative',
-    },
+    {'DW_API_ORIGIN': 'http://api.example.com'},
+    {'DW_API_ORIGIN': 'https://api.example.com/path'},
   ]) {
     test('entrypoint rejects invalid proxy environment $environment', () {
       final run = _runScript(templateScript, environment: environment);

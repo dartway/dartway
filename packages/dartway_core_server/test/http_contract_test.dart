@@ -399,11 +399,24 @@ void main() {
   });
 
   group('health', () {
-    test('GET /health answers 200 while the database answers', () async {
-      final answer = await anonymous.raw('GET', '/health');
-      expect(answer.status, 200);
-      expect(answer.text, 'ok');
-      expect((await anonymous.raw('POST', '/health')).status, 405);
-    });
+    test(
+      'both health paths answer alike; POST /dw/health remains a call',
+      () async {
+        final answer = await anonymous.raw('GET', '/health');
+        expect(answer.status, 200);
+        expect(answer.text, 'ok');
+        final appAnswer = await anonymous.raw('GET', '/dw/health');
+        expect(
+          (appAnswer.status, appAnswer.text),
+          (answer.status, answer.text),
+        );
+        expect((await anonymous.raw('POST', '/health')).status, 405);
+        expectFailure(
+          await anonymous.call(const ListNotes(), path: '/dw/health'),
+          DwFailureKind.unknownCall,
+          404,
+        );
+      },
+    );
   });
 }

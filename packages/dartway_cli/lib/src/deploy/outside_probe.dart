@@ -99,10 +99,10 @@ class DwOutsideProbe {
     }
   }
 
-  /// `GET <origin>/health` answers 200 `ok`: the server is up, migrated and
+  /// `GET <origin><path>` answers 200 `ok`: the server is up, migrated and
   /// reaches its database — through this host's proxy.
-  Future<DwProbeResult> health(String origin) async {
-    final url = Uri.parse('$origin/health');
+  Future<DwProbeResult> health(String origin, {String path = '/health'}) async {
+    final url = Uri.parse('$origin$path');
     final title = 'GET $url';
     try {
       final answer = await _send('GET', url);
@@ -511,7 +511,7 @@ List<Future<DwProbeResult> Function()> dwOutsideProbes(
   bool includeCanvasKitOrigin = true,
 }) => [
   () => probe.health(stack.apiOrigin),
-  () => probe.health(stack.appOrigin),
+  () => probe.health(stack.appOrigin, path: '/dw/health'),
   () => probe.appIndex(stack.appOrigin),
   () => probe.webCache(stack.appOrigin),
   () => probe.webCompression(stack.appOrigin),

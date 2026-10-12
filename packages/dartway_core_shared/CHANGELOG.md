@@ -2,6 +2,8 @@
 
 ## 0.22.0-dev.0
 
+- `DwHttpContract.appHealthPath` names the health endpoint on the app host
+  (`/dw/health`); `/health` remains available on the API host (#576).
 - The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).
 
 ## 0.21.0

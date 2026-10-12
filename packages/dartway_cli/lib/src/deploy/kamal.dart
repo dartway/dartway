@@ -4,7 +4,6 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
-import '../checker/dw_dart_source.dart';
 import '../project_layout.dart';
 import 'deploy_target.dart';
 import 'kamal_images.dart';
@@ -79,7 +78,6 @@ class DwKamalGenerator {
       'api',
       'web',
     ];
-    final prefixes = routePrefixes(layout.serverPackageDir);
     final files = <String, String>{};
     void yaml(String path, Map<String, Object?> data) {
       files[path] = '$kamalGeneratedHeader${_yaml(data)}';
@@ -176,10 +174,7 @@ class DwKamalGenerator {
           },
           if (service == 'web')
             'env': {
-              'clear': {
-                'DW_API_ORIGIN': stack.apiOrigin,
-                'DW_API_PATHS': prefixes.join(' '),
-              },
+              'clear': {'DW_API_ORIGIN': stack.apiOrigin},
             },
           if (service == 'storage')
             'env': {
@@ -256,59 +251,6 @@ class DwKamalGenerator {
       );
     }
     return match[1]!.toLowerCase();
-  }
-
-  static List<String> routePrefixes(Directory serverPackage) {
-    final prefixes = <String>{'/dw', '/health'};
-    final lib = Directory(p.join(serverPackage.path, 'lib'));
-    final files = lib.existsSync()
-        ? lib
-              .listSync(recursive: true)
-              .whereType<File>()
-              .where((f) => f.path.endsWith('.dart'))
-              .toList()
-        : <File>[];
-    files.sort((a, b) => a.path.compareTo(b.path));
-    final calls = RegExp(r'\bDwHttpRoute\s*\.\s*(?:get|post|any)\s*\(\s*');
-    for (final file in files) {
-      final source = DwDartSource(file.readAsStringSync());
-      for (final call in calls.allMatches(source.code)) {
-        final literal = source.literals
-            .where((s) => s.start == call.end)
-            .firstOrNull;
-        final tail = literal == null
-            ? ''
-            : source.code.substring(literal.end).trimLeft();
-        final path = literal == null ? null : _literalValue(literal);
-        if (literal == null ||
-            !literal.closed ||
-            literal.interpolations.isNotEmpty ||
-            (!tail.startsWith(',') && !tail.startsWith(')')) ||
-            !path!.startsWith('/')) {
-          throw StateError(
-            '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
-            'DwHttpRoute path must be a literal absolute path for Kamal generation.',
-          );
-        }
-        if (path == '/') {
-          throw StateError(
-            '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
-            'DwHttpRoute "$path" has proxy prefix "/", which would capture '
-            'every web route. Declare an exact non-root route path.',
-          );
-        }
-        if (!RegExp(
-          r'^/[A-Za-z0-9._~:@%+\-]+(?:/[A-Za-z0-9._~:@%+\-]+)*/?$',
-        ).hasMatch(path)) {
-          throw StateError(
-            '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
-            'DwHttpRoute "$path" cannot be represented as an nginx proxy prefix.',
-          );
-        }
-        prefixes.add(path);
-      }
-    }
-    return prefixes.toList();
   }
 
   static String checkImageTag(ProjectLayout layout) {
@@ -397,30 +339,4 @@ String _yaml(Map<String, Object?> map, [int depth = 0]) {
     }
   }
   return out.toString();
-}
-
-String _literalValue(DwStringLiteral literal) {
-  if (literal.raw) return literal.text;
-  return literal.text.replaceAllMapped(
-    RegExp(
-      r'\\(?:x([0-9a-fA-F]{2})|u\{([0-9a-fA-F]+)\}|u([0-9a-fA-F]{4})|(.))',
-    ),
-    (match) {
-      for (final group in [1, 2, 3]) {
-        if (match[group] case final hex?) {
-          return String.fromCharCode(int.parse(hex, radix: 16));
-        }
-      }
-      return switch (match[4]) {
-        'n' => '\n',
-        'r' => '\r',
-        't' => '\t',
-        'b' => '\b',
-        'f' => '\f',
-        'v' => '\x0b',
-        final char? => char,
-        _ => throw const FormatException('Invalid literal escape'),
-      };
-    },
-  );
 }

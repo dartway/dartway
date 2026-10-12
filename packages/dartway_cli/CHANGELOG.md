@@ -2,6 +2,11 @@
 
 ## 0.25.0-dev.0
 
+- **BREAKING (deploy):** the app host forwards only `/dw/`. Kamal web
+  destinations no longer carry route prefixes or depend on server routes;
+  compose and `dartway dev` leave `/health` and project routes to the app.
+  Outside checks use `/dw/health` on the app host (#576). See the
+  [migration note](../../docs/migrations/2026-10-12-app-host-dw-only.md).
 - Fix: the web API proxy emits a Flutter fallback for a trailing-slash route
   only when no API prefix covers its slashless path, keeping overlapping routes
   and `/health` on the API (#571).

@@ -9,6 +9,8 @@ void main() {
       expect(dwProtocolVersion, 3);
       expect(DwHttpContract.livePath, '/dw/live');
       expect(DwHttpContract.healthPath, '/health');
+      expect(DwHttpContract.appHealthPath, '/dw/health');
+      expect(DwHttpContract.wireNameOf(DwHttpContract.appHealthPath), 'health');
       expect(DwHttpContract.callPath('BookSession'), '/dw/BookSession');
       expect(DwHttpContract.wireNameOf('/dw/BookSession'), 'BookSession');
       for (final path in [

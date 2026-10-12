@@ -58,6 +58,7 @@ final class DwStartupException implements Exception {
 /// POST /dw/<WireName>   requests and commands
 /// GET  /dw/live         the live update socket
 /// GET  /health          liveness and database reachability
+/// GET  /dw/health       the same health check through an app host
 /// *                     the project's routes
 /// ```
 ///

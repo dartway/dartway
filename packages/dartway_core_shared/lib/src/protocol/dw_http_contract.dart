@@ -11,6 +11,7 @@ const int dwProtocolVersion = 3;
 /// POST /dw/<DtoWireName>   a request or a command; the body is the DTO's JSON
 /// GET  /dw/live            the WebSocket of live updates
 /// GET  /health             liveness and database reachability
+/// GET  /dw/health          same health answer on the app origin
 /// ```
 ///
 /// `/dw/` and `/health` are reserved: a project route under them fails the
@@ -27,6 +28,10 @@ abstract final class DwHttpContract {
   static const String livePath = '$pathPrefix$liveSegment';
 
   static const String healthPath = '/health';
+
+  /// Health through an app host, whose only server prefix is `/dw/`.
+  /// Calls remain POST only, so a DTO named `health` keeps its call path.
+  static const String appHealthPath = '${pathPrefix}health';
 
   /// Calls are POST only: a request is a read, but its parameters are a DTO
   /// body, and one method keeps one code path.

@@ -233,8 +233,9 @@ its state when it runs, may publish, and is due by the server's clock. Worked ex
 
 **A `DwHttpRoute` is for callers that cannot speak the contract** — a webhook, a download link. In
 `<feature>_routes.dart`, registered in `DwServerFeature(routes: [...])`, exact paths (`/dw/…` and
-`/health` are the framework's). A route's path is a string literal; identifiers go in the query or body.
-After adding a route, run `deploy kamal` and commit its output, or CI's `--check` fails.
+`/health` are the framework's). Identifiers go in the query or body. Routes are
+reached on the API host; the app host forwards only `/dw/`, so a Flutter page
+may use the same path as a server route.
 `auth:` defaults to `DwRouteAuth.none` — the route verifies its sender
 itself (a signature); `optional`/`required` read an `Authorization: Bearer` key like a call. A door acting for a signed-in
 person runs the call in process — `server.callAs(call, token:, idempotencyKey:)` — never over its own

@@ -56,7 +56,10 @@ void main() {
             reason: output,
           );
           expect(output, contains('https://api.$destination.invalid/health'));
-          expect(output, contains('https://app.$destination.invalid/health'));
+          expect(
+            output,
+            contains('https://app.$destination.invalid/dw/health'),
+          );
           expect(output, contains('wss://api.$destination.invalid/dw/live'));
           expect(output, contains('wss://app.$destination.invalid/dw/live'));
           expect(output, contains('GET https://app.$destination.invalid/'));

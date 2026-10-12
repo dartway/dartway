@@ -10,8 +10,8 @@ Future<void> main() async {
   // Concrete development parameters live here; the app itself stays
   // environment agnostic.
   //
-  // Without a define, a web release calls its own origin. Kamal routes /dw, /health and
-  // project HTTP routes to the API; the same web image serves every environment.
+  // Without a define, a web release calls its own origin. Kamal routes only
+  // /dw/ to the API; the same web image serves every environment.
   // Native releases keep the address supplied by --dart-define.
   const deployedBackendUrl = String.fromEnvironment('DW_BACKEND_URL');
 

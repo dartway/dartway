@@ -1867,6 +1867,7 @@ class _VerifiedSite {
         await socket.close(4000, 'dw.protocolUnsupported');
         return;
       case '/health':
+      case '/dw/health':
         response.write('ok');
       case '/':
         response

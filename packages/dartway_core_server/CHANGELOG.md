@@ -2,6 +2,9 @@
 
 ## 0.22.0-dev.0
 
+- `GET /dw/health` and `HEAD /dw/health` use the same database health check
+  as `/health`, so the app host can forward only `/dw/`; `POST /dw/health`
+  remains a DTO call (#576).
 - Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
 
 - `DwFileStorageSetup.provision` sets bucket policies, GET/PUT CORS for explicit

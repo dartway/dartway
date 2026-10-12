@@ -95,7 +95,7 @@ class DwDeployTarget {
   /// The server for mobile apps and webhooks: everything is proxied to it.
   final String apiDomain;
 
-  /// The Flutter web app. `/dw/` and `/health` on this host reach the server,
+  /// The Flutter web app. Only `/dw/` on this host reaches the server,
   /// so the app talks to its own origin and needs no CORS.
   final String appDomain;
 

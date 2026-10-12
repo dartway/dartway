@@ -37,12 +37,15 @@ void main() {
 
   group('routing', () {
     test('the framework paths go to the API, everything else to the web', () {
-      for (final path in ['/dw', '/dw/', '/dw/live', '/dw/SignIn', '/health']) {
+      for (final path in ['/dw/', '/dw/live', '/dw/SignIn', '/dw/health']) {
         expect(DwDevProxy.isApiPath(path), isTrue, reason: path);
       }
       for (final path in [
         '/',
         '/dwarf',
+        '/dw',
+        '/health',
+        '/orders/42',
         '/health/x',
         '/healthz',
         '/main.dart.js',
@@ -91,13 +94,18 @@ void main() {
         socket.destroy();
       }
       await Future<void>.delayed(const Duration(milliseconds: 100));
-      final health = await _get(client, at('/health'));
+      final health = await _get(client, at('/dw/health'));
       expect(health.status, 200);
     });
 
     test('a call reaches the API and a page reaches the web server', () async {
-      final health = await _get(client, at('/health'));
+      final health = await _get(client, at('/dw/health'));
       expect((health.status, health.body), (200, 'api ok'));
+
+      final appHealth = await _get(client, at('/health'));
+      expect(appHealth.body, 'web /health');
+      final orders = await _get(client, at('/orders/42'));
+      expect(orders.body, 'web /orders/42');
 
       final page = await _get(client, at('/some/route?tab=2&q=a%20b'));
       expect(page.status, 200);
@@ -180,7 +188,7 @@ void main() {
     test('HEAD answers the headers of GET without a body', () async {
       final response = await (await client.openUrl(
         'HEAD',
-        at('/health'),
+        at('/dw/health'),
       )).close();
       final bytes = await response.fold<List<int>>([], (a, b) => a..addAll(b));
 
@@ -315,7 +323,7 @@ void main() {
         final base = api.base;
         await api.close();
 
-        final first = await _get(client, at('/health'));
+        final first = await _get(client, at('/dw/health'));
         final second = await _get(client, at('/dw/Echo'));
         expect(first.status, 502);
         expect(first.body, contains('nothing answers at $base'));
@@ -326,7 +334,7 @@ void main() {
         );
 
         api = await _FakeApi.start(port: port);
-        final back = await _get(client, at('/health'));
+        final back = await _get(client, at('/dw/health'));
         expect(back.status, 200);
         expect(logged.last, contains('answers again'));
       },
@@ -428,7 +436,7 @@ final class _FakeApi {
   Future<void> _handle(HttpRequest request) async {
     final response = request.response;
     switch (request.uri.path) {
-      case '/health':
+      case '/dw/health':
         response.headers
           ..contentType = ContentType.text
           ..contentLength = 'api ok'.length;

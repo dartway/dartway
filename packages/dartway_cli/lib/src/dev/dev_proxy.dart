@@ -6,7 +6,7 @@ import 'web_directory.dart';
 
 /// One origin on the developer's machine in the shape production has
 /// (`docs/5-tooling/deploy.md`):
-/// `/dw/*` — the `/dw/live` socket included — and `/health` go to the API,
+/// `/dw/*` — the `/dw/live` socket included — goes to the API,
 /// everything else to the Flutter web app.
 ///
 /// The server answers no CORS by design, so a web app has to reach it on its
@@ -43,7 +43,7 @@ final class DwDevProxy {
          'exactly one of webServer and webDirectory',
        );
 
-  /// Where `/dw/*` and `/health` go: `http://localhost:8080`.
+  /// Where `/dw/*` goes: `http://localhost:8080`.
   final Uri api;
 
   /// The Flutter web dev server everything else goes to.
@@ -83,8 +83,7 @@ final class DwDevProxy {
   }
 
   /// Whether [path] belongs to the framework's reserved API paths.
-  static bool isApiPath(String path) =>
-      path == '/dw' || path.startsWith('/dw/') || path == '/health';
+  static bool isApiPath(String path) => path.startsWith('/dw/');
 
   /// Whether [path] goes to the API: a reserved path or one of [apiPaths]
   /// (the prefix itself or anything below it).
@@ -151,7 +150,7 @@ final class DwDevProxy {
 
   /// What goes where, for the startup banner.
   List<String> describe() => [
-    '/dw/*, /health  →  $api  (API, live socket included)',
+    '/dw/*  →  $api  (API, live socket included)',
     for (final prefix in apiPaths) '$prefix  →  $api  (external door)',
     if (webServer case final web?)
       'everything else →  $web  (Flutter web dev server)'
