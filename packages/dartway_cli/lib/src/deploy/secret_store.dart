@@ -501,6 +501,8 @@ echo "rendered \$(grep -cE "$linePattern" "\$out") key(s) into \$out"
   }
 
   /// Uploads a secret file (service account JSON and similar) into the store.
+  /// The upload is private even when the source file is world-readable, and
+  /// replacement is atomic so a concurrent boot never reads a partial file.
   Future<DwSshResult> putFile(File local, {required String name}) async {
     if (!dwIsSecretFileName(name)) {
       throw DwSecretFormatException(
@@ -509,16 +511,23 @@ echo "rendered \$(grep -cE "$linePattern" "\$out") key(s) into \$out"
       );
     }
     final staging = '/tmp/dw-secret-${DateTime.now().microsecondsSinceEpoch}';
-    final uploaded = await ssh.upload(local.path, staging);
+    final prepared = await ssh.run("mkdir -m 0700 '$staging'");
+    if (!prepared.ok) return prepared;
+    final uploaded = await ssh.upload(local.path, '$staging/input');
     if (!uploaded.ok) {
+      await ssh.run("rm -rf '$staging'");
       return uploaded;
     }
     return ssh.run(
       DwSshRunner.privilegedCommand(
+        "dw_staged='' ; "
+        "trap 'rm -f \"\$dw_staged\"; rm -rf \"$staging\"' EXIT && "
         "install -d -m 0700 -o '${target.deployUser}' -g '${target.deployUser}' "
         "'$directory' && "
+        "dw_staged=\$(mktemp '$directory/.dw-file.XXXXXXXX') && "
         "install -m 0600 -o '${target.deployUser}' -g '${target.deployUser}' "
-        "'$staging' '$directory/$name' && rm -f '$staging'",
+        "'$staging/input' \"\$dw_staged\" && "
+        "mv -fT \"\$dw_staged\" '$directory/$name'",
       ),
     );
   }

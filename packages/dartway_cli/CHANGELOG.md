@@ -2,6 +2,13 @@
 
 ## 0.25.0-dev.0
 
+- Kamal destinations support `requires.files`: individual read-only API mounts
+  and an executable pre-app-boot hook that checks file metadata over Kamal's
+  configured SSH transport, without reading contents. Existing `secret put-file`
+  delivery uses a private upload directory and atomically replaces the file;
+  rotation reaches the next container boot. Delivery remains a prerequisite,
+  including for Studio runners.
+
 - **BREAKING (deploy):** the app host forwards only `/dw/`. Kamal web
   destinations no longer carry route prefixes or depend on server routes;
   compose and `dartway dev` leave `/health` and project routes to the app.
@@ -37,7 +44,7 @@
   literal server route prefixes, the Studio deployment manifest and cached GHCR
   image builds from the project's deployment configuration. Image publication
   follows each destination's `branch:` after successful CI. `--check` reports
-  stale output. Postgres stays private to the stack. Unsupported `requires: files:`,
+  stale output. Postgres stays private to the stack. Unsupported
   deployed `site:`, root API proxy prefixes, invalid project names and a CLI path
   dependency inside the project's own checkout are refused with a diagnostic (#530).
 - The check image runs outside probes from a read-only project checkout with its

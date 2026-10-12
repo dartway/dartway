@@ -7,6 +7,7 @@ import 'package:yaml/yaml.dart';
 import '../project_layout.dart';
 import 'deploy_target.dart';
 import 'kamal_images.dart';
+import 'kamal_secret_files.dart';
 import 'stack.dart';
 
 const kamalGeneratedHeader =
@@ -42,13 +43,6 @@ class DwKamalGenerator {
     final first = targets.first;
     final owner = githubOwner(first.repo);
     for (final target in targets) {
-      if (target.requiredSecretFiles.isNotEmpty) {
-        throw StateError(
-          "deploy/config.yaml > ${target.environment}: requires: files: "
-          "Kamal topology doesn't support this yet. Use deploy run to deliver "
-          "secret files.",
-        );
-      }
       if (target.site?.deployed == true) {
         throw StateError(
           "deploy/config.yaml > ${target.environment}: site: "
@@ -117,6 +111,9 @@ class DwKamalGenerator {
         'deploy_timeout': 30,
         'drain_timeout': 30,
         'retain_containers': 5,
+        if (service == 'api' &&
+            targets.any((target) => target.requiredSecretFiles.isNotEmpty))
+          'hooks_path': kamalApiHooksDirectory,
       });
       for (final target in targets) {
         final destination = destinations[target.environment]!;
@@ -144,6 +141,12 @@ class DwKamalGenerator {
             },
           },
           if (service == 'api') ...{
+            if (target.requiredSecretFiles.isNotEmpty)
+              'volumes': [
+                for (final name in target.requiredSecretFiles)
+                  '${target.runtimeConfigDir}/$name:'
+                      '${DwStack.secretFilesDir}/$name:ro',
+              ],
             'env': {
               'clear': {
                 ...stack.serverEnvironment,
@@ -187,6 +190,11 @@ class DwKamalGenerator {
         });
       }
     }
+    if (targets.any((target) => target.requiredSecretFiles.isNotEmpty)) {
+      files[kamalSecretFilesHookPath] = kamalSecretFilesHook(
+        kamalGeneratedHeader,
+      );
+    }
     if (services.contains('storage')) {
       files['deploy/kamal/storage/Dockerfile'] =
           '${kamalGeneratedHeader}FROM rustfs/rustfs:1.0.0\n';
@@ -216,7 +224,7 @@ class DwKamalGenerator {
           in directory.listSync(recursive: true).whereType<File>()) {
         final relative = p.relative(file.path, from: projectRoot.path);
         if (!files.containsKey(relative) &&
-            file.readAsStringSync().startsWith(kamalGeneratedHeader)) {
+            _isGenerated(file.readAsStringSync())) {
           obsolete.add(relative);
         }
       }
@@ -224,11 +232,26 @@ class DwKamalGenerator {
     final stale = <String>[...obsolete];
     for (final entry in files.entries) {
       final file = File(p.join(projectRoot.path, entry.key));
-      if (file.existsSync() && file.readAsStringSync() == entry.value) continue;
+      final executable = entry.key == kamalSecretFilesHookPath;
+      final current =
+          file.existsSync() &&
+          file.readAsStringSync() == entry.value &&
+          (!executable ||
+              Platform.isWindows ||
+              file.statSync().mode & 0x49 != 0);
+      if (current) continue;
       stale.add(entry.key);
       if (!check) {
         file.parent.createSync(recursive: true);
         file.writeAsStringSync(entry.value);
+        if (executable && !Platform.isWindows) {
+          final result = Process.runSync('chmod', ['755', file.path]);
+          if (result.exitCode != 0) {
+            throw StateError(
+              'Cannot make ${entry.key} executable: ${result.stderr}',
+            );
+          }
+        }
       }
     }
     if (!check) {
@@ -238,6 +261,10 @@ class DwKamalGenerator {
     }
     return stale..sort();
   }
+
+  static bool _isGenerated(String text) =>
+      text.startsWith(kamalGeneratedHeader) ||
+      text.startsWith('#!/usr/bin/env ruby\n$kamalGeneratedHeader');
 
   static const destinations = {'staging': 'stage', 'production': 'prod'};
 

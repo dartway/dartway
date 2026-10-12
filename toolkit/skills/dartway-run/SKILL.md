@@ -98,8 +98,17 @@ pre-generated deployment files or Images workflow.
 Project HTTP routes are reached on the API host. The app host forwards only
 `/dw/`, so route changes do not affect generated Kamal web configuration or
 reserve Flutter page paths. Routes match exact paths, with no `:id` parameters.
-`requires: files:` and a deployed `site:` are refused because the Kamal topology
-does not support them yet; use `deploy run`. Invalid project names are refused
+`requires.files` mounts individually delivered files read-only into the API at
+`/run/secrets/<name>`. Use `dartway secret put-file <path> --name <name> --env
+<environment>` before the first boot and for rotation. Commit the generated
+executable `deploy/kamal/hooks/api/pre-app-boot`; its check uses Kamal's SSH
+settings and refuses missing, empty, symlinked or insecurely permissioned files
+before every boot group. Do not pass `--skip_hooks`. The store directory is mode
+700, files 400 or 600 with the same owner. A serving container keeps its old file;
+the next boot, including image rollback, reads the currently delivered file.
+Generation and CI never deliver secret contents; Studio must deliver files and
+preserve these hooks. A deployed `site:` is still refused; use `deploy run`.
+Invalid project names are refused
 with the value and the `project:` key to configure. Web release builds without a define call
 `Uri.base.origin`; they need no backend build argument. The Studio binding uses
 `STUDIO_APP_ORIGIN` when defined and otherwise the app's own origin in a web
