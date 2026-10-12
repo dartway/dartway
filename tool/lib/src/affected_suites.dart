@@ -28,18 +28,21 @@ const runsEverything = [
   'tool/checks.sh',
   'tool/affected.dart',
   'tool/lib/src/affected_suites.dart',
+  'tool/lib/src/pubspec_scan.dart',
 ];
 
 /// Paths outside its own package a suite reads, by package. A trailing `/`
-/// names a directory and everything under it; `*` matches one path segment.
+/// names a directory and everything under it.
 ///
 /// `dartway_cli` copies `template/` (`create`, `update`), checks `example/`,
 /// reads the toolkit, the docs and the root README/CLAUDE.md for the names
-/// they cite, and every package's pubspec for the framework's versions.
-/// `dartway_generator` generates over the example's shared and server
-/// packages. The
-/// lints test runs the analyzer over its own `example/`, which is a package
-/// of its own. `tool`'s suites read `template/`.
+/// they cite, every package's sources for what the docs may name, every
+/// `test/` under `packages/` and `tool/` for protocol literals, and every
+/// package's pubspec for the framework's versions. `dartway_generator`
+/// generates over the example's shared and server packages and runs the
+/// CLI's `bin/dartway.dart` for `generate`, `check` and `--contract-base`.
+/// The lints test runs the analyzer over its own `example/`, which is a
+/// package of its own. `tool`'s suites read `template/`.
 const readsOutside = {
   'packages/dartway_cli': [
     'template/',
@@ -47,8 +50,8 @@ const readsOutside = {
     'toolkit/',
     'docs/',
     'deploy/',
-    'packages/*/pubspec.yaml',
-    'packages/dartway_lints/',
+    'packages/',
+    'tool/',
     'README.md',
     'CLAUDE.md',
     'AGENTS.md',
@@ -58,6 +61,7 @@ const readsOutside = {
   'packages/dartway_generator': [
     'example/dartway_example_shared/',
     'example/dartway_example_server/',
+    'packages/dartway_cli/',
   ],
   'packages/dartway_lints': ['packages/dartway_lints/example/'],
   'tool': ['template/'],
@@ -167,7 +171,7 @@ bool _matches(String glob, String file) {
     return false;
   }
   for (var i = 0; i < globParts.length; i++) {
-    if (globParts[i] != '*' && globParts[i] != fileParts[i]) return false;
+    if (globParts[i] != fileParts[i]) return false;
   }
   return true;
 }

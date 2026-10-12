@@ -56,10 +56,12 @@ void main() {
     });
   });
 
-  test('a client package leaves the generator and the CLI alone', () {
+  test('a client package leaves the generator alone', () {
     expect(affected(['packages/dartway_core_flutter/lib/a.dart']), {
       'packages/dartway_core_flutter',
       'example/dartway_example_flutter',
+      'packages/dartway_cli', // reads every package's sources
+      'tool',
     });
   });
 
@@ -95,14 +97,15 @@ void main() {
       affected(['example/dartway_example_flutter/lib/a.dart']),
       isNot(contains('packages/dartway_generator')),
     );
-    // One segment for `*`, not a prefix.
+    // The CLI scans every test/ for protocol literals; the generator runs
+    // the CLI.
     expect(
-      affected(['packages/dartway_core_flutter/pubspec.yaml']),
+      affected(['tool/test/a_test.dart']),
       contains('packages/dartway_cli'),
     );
     expect(
-      affected(['packages/dartway_core_flutter/lib/pubspec.yaml']),
-      isNot(contains('packages/dartway_cli')),
+      affected(['packages/dartway_cli/lib/a.dart']),
+      contains('packages/dartway_generator'),
     );
   });
 
