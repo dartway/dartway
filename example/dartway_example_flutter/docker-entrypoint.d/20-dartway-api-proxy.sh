@@ -48,6 +48,16 @@ location ^~ /dw/ {
 }
 EOF
   else
+    if [ "${path%/}" != "$path" ]; then
+      app_path=${path%/}
+      cat >> "$output" <<EOF
+location = $app_path {
+  try_files \$uri \$uri/ /index.html;
+  add_header Cache-Control "no-cache";
+}
+EOF
+    fi
+
     cat >> "$output" <<EOF
 location ^~ $path {
   client_max_body_size 0;

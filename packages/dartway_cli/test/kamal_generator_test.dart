@@ -193,7 +193,6 @@ final routes = [
           studio['check']['image'],
           'ghcr.io/dartway/dartway-check:0.24.0',
         );
-        final web = yaml(files, 'deploy/kamal/web.yml');
         expect(web['proxy']['healthcheck']['path'], '/');
         for (final path in files.keys.where(
           (path) => RegExp(r'deploy/kamal/.*\.yml$').hasMatch(path),

@@ -93,7 +93,10 @@ void main() {
       },
     );
     expect(run.result.exitCode, 0, reason: '${run.result.stderr}');
-    expect(run.output.readAsStringSync(), contains('location ^~ /hooks/'));
+    final rendered = run.output.readAsStringSync();
+    expect(rendered, contains('location ^~ /hooks/'));
+    expect(rendered, contains('location = /hooks'));
+    expect(rendered, contains(r'try_files $uri $uri/ /index.html'));
   });
 
   for (final environment in [

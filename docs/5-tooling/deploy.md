@@ -36,7 +36,8 @@ dart run dartway_cli:dartway deploy kamal --check
 
 Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
 Generated files carry their source instructions. `--check` writes nothing and
-names every stale file, including the API config when a project route changes.
+names every stale file, including the web destination configs when a project
+route changes.
 `DwHttpRoute.get`, `.post` and `.any` must use string literal paths. Server routes
 match exact paths, with no `:id` parameters; put identifiers in the query or body.
 Each proxy prefix is the route's path itself: `/github` remains `/github`.
