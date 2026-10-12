@@ -103,6 +103,39 @@ void main() {
     expect(rendered, contains(r'try_files $uri $uri/ /index.html'));
   });
 
+  for (final paths in [
+    '/hooks /hooks/',
+    '/dw /health /health/',
+    '/api /api/v1/',
+    '/api/v1/ /api',
+  ]) {
+    test('entrypoint keeps covered slashless paths on the API: $paths', () {
+      final run = _runScript(
+        templateScript,
+        environment: {
+          'DW_API_ORIGIN': 'https://api.example.com',
+          'DW_API_PATHS': paths,
+        },
+      );
+      expect(run.result.exitCode, 0, reason: '${run.result.stderr}');
+      final rendered = run.output.readAsStringSync();
+      for (final path in paths.split(' ')) {
+        expect(
+          rendered,
+          contains('location ^~ ${path == '/dw' ? '/dw/' : path} {'),
+        );
+        if (path.endsWith('/')) {
+          expect(
+            rendered,
+            isNot(
+              contains('location = ${path.substring(0, path.length - 1)} {'),
+            ),
+          );
+        }
+      }
+    });
+  }
+
   for (final environment in [
     {'DW_API_ORIGIN': 'http://api.example.com', 'DW_API_PATHS': '/dw'},
     {'DW_API_ORIGIN': 'https://api.example.com/path', 'DW_API_PATHS': '/dw'},
