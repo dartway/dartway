@@ -305,7 +305,9 @@ if [ -f "\$d/\$id.exit.tmp" ]; then echo "$prefix exit-tmp 1"
 else echo "$prefix exit-tmp 0"; fi
 for dw_path in "\$d" "\$dw_docker_root"; do
   printf '%s disk\\t' "$prefix"
-  dw_disk_space "\$dw_path" || printf '%s\\tunavailable\\tunavailable\\n' "\$dw_path"
+  if [ "\$dw_path" = "\$dw_docker_root" ]; then dw_disk_image=docker
+  else dw_disk_image=; fi
+  dw_disk_space "\$dw_path" "\$dw_disk_image" || printf '%s\\tunavailable\\tunavailable\\n' "\$dw_path"
 done
 echo "$prefix end"
 ''';

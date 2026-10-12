@@ -2,6 +2,9 @@
 
 ## 0.25.0-dev.0
 
+- Fix: deploy disk guards measure a Docker data root that is not visible on the
+  host from a throwaway container, allowing the local stack proof to run with
+  Docker Desktop on macOS (#549).
 - Fix: `deploy run --without-rollback-image` unblocks a stand whose running image cannot be
   resolved after an older CLI moved its tag without leaving a rollback pin. The refusal names the
   rerun command; opting in warns that a failure leaves the service down until the next deploy.

@@ -1,10 +1,17 @@
 import 'ssh_runner.dart';
+import 'stack.dart';
 
 /// Reads size and available space in KiB on the filesystem containing a path.
 /// The path is carried separately from df's filesystem and mount names.
 const dwDiskSpaceFunction = r'''
 dw_disk_space() {
-  df -Pk "$1" | awk -v path="$1" 'NR == 2 { printf "%s\t%s\t%s\n", path, $2, $4; found=1 } END { if (!found) exit 1 }'
+  if [ -d "$1" ] || [ -z "$2" ]; then
+    df -Pk "$1"
+  else
+    docker run --rm --volume "$1:$1:ro" ''' +
+    "'${DwStack.postgresImage}'" +
+    r''' df -Pk "$1"
+  fi | awk -v path="$1" 'NR == 2 { printf "%s\t%s\t%s\n", path, $2, $4; found=1 } END { if (!found) exit 1 }'
 }
 ''';
 
@@ -54,7 +61,7 @@ Future<DwSshResult> dwCheckBuildDiskSpace({
   final result = await ssh.runAs(deployUser, '''
 $dwDiskSpaceFunction
 $dwDockerRootScript
-dw_disk_space "\$dw_docker_root"
+dw_disk_space "\$dw_docker_root" docker
 ''');
   if (!result.ok) return result;
   final space = DwDiskSpace.parse(result.stdout);
