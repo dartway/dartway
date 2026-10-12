@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:dartway_cli/src/deploy/kamal.dart';
+import 'package:dartway_cli/src/deploy/kamal_secret_files.dart';
 import 'package:dartway_cli/src/project_layout.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -213,7 +214,6 @@ final routes = [
   }
 
   for (final (extra, key) in [
-    ('  requires:\n    files: [fcm.json]\n', 'requires: files:'),
     ('  site:\n    domain: example.com\n    source: app_site/build\n', 'site:'),
   ]) {
     test('refuses unsupported $key instead of silently omitting it', () {
@@ -235,6 +235,84 @@ final routes = [
       expect(Directory(p.join(root.path, 'deploy/kamal')).existsSync(), false);
     });
   }
+
+  test('secret files belong only to their API destination, never to images', () {
+    write(
+      'deploy/config.yaml',
+      'requires:\n  files: [db-ca.pem]\n' +
+          configYaml(
+            extra:
+                '  storage: external\n  requires:\n    files: [fcm-stage.json]\n',
+          ) +
+          File('test/fixtures/kamal/production.yaml')
+              .readAsStringSync()
+              .replaceFirst('storage: bundled', 'storage: external')
+              .replaceFirst(
+                '  storage_domain: files.production.example.com\n',
+                '',
+              ) +
+          '  requires:\n    files: [fcm-prod.json]\n',
+    );
+    final files = DwKamalGenerator(root).render();
+    for (final (destination, user) in [
+      ('stage', 'deployer'),
+      ('prod', 'production_deployer'),
+    ]) {
+      final api = yaml(files, 'deploy/kamal/api.$destination.yml');
+      expect(api['volumes'], [
+        '/home/$user/.config/shop/db-ca.pem:/run/secrets/db-ca.pem:ro',
+        '/home/$user/.config/shop/fcm-$destination.json:/run/secrets/fcm-$destination.json:ro',
+      ]);
+      expect(
+        yaml(files, 'deploy/kamal/web.$destination.yml').containsKey('volumes'),
+        false,
+      );
+      expect(api['env']['secret'], isNot(contains('fcm-$destination.json')));
+    }
+    expect(
+      yaml(files, 'deploy/kamal/api.yml')['hooks_path'],
+      'deploy/kamal/hooks/api',
+    );
+    expect(files.containsKey(kamalSecretFilesHookPath), true);
+    expect(files['.github/workflows/images.yml'], isNot(contains('fcm-')));
+    expect(
+      yaml(files, 'deploy/kamal/web.yml').containsKey('hooks_path'),
+      false,
+    );
+  });
+
+  test(
+    'secret hook is executable, checked without writes and removed when obsolete',
+    () {
+      write(
+        'deploy/config.yaml',
+        configYaml(extra: '  requires:\n    files: [fcm.json]\n'),
+      );
+      final generator = DwKamalGenerator(root)..generate();
+      final hook = File(p.join(root.path, kamalSecretFilesHookPath));
+      expect(generator.generate(check: true), isEmpty);
+      if (!Platform.isWindows) {
+        expect(hook.statSync().mode & 0x49, isNot(0));
+        expect(Process.runSync('chmod', ['644', hook.path]).exitCode, 0);
+        expect(
+          generator.generate(check: true),
+          contains(kamalSecretFilesHookPath),
+        );
+        expect(hook.statSync().mode & 0x49, 0);
+        generator.generate();
+        expect(hook.statSync().mode & 0x49, isNot(0));
+      }
+      configure();
+      expect(
+        generator.generate(check: true),
+        contains(kamalSecretFilesHookPath),
+      );
+      expect(hook.existsSync(), true);
+      generator.generate();
+      expect(hook.existsSync(), false);
+      expect(generator.generate(check: true), isEmpty);
+    },
+  );
 
   test('an external site requires no Kamal service', () {
     write(

@@ -42,8 +42,8 @@ the app host, the web container's nginx proxies only `/dw/` to
 `DW_API_ORIGIN`; it serves every other app path itself. Project routes are
 available on the API host. Proxy buffering is off for API and storage.
 
-Kamal generation refuses `requires: files:` and a deployed `site:` because this
-topology does not support them yet; use `deploy run` for those projects.
+Kamal generation refuses a deployed `site:` because this topology does not
+support it yet; use `deploy run` for those projects.
 Kamal 2.12 uses kamal-proxy v0.10.2, with 30-second deployment
 and drain timeouts and five retained containers.
 
@@ -71,6 +71,44 @@ their value and the `project:` key to set explicitly. Kamal and
 Images use the same project identity without lowercasing it. Configs list secret
 names only, including required project secrets; Studio supplies their values,
 SSH credentials and `KAMAL_REGISTRY_PASSWORD`. `ssh_user` comes from the target.
+
+### File secrets
+
+Declare file names under the project's or destination's `requires.files`.
+The API destination mounts each file from
+`/home/<deploy_user>/.config/<project>/<name>` to `/run/secrets/<name>`,
+read-only. Web and storage receive no such mounts; the secret store's
+`secrets.env` is never mounted. Files are not copied into images or converted
+to environment variables.
+
+Deliver them before the first boot, and again when rotating a credential:
+
+```bash
+dartway secret put-file /private/path/fcm.json --name fcm.json --env staging
+```
+
+This uses the existing server-side file store. An upload stays in a private
+temporary directory and atomically replaces the stored file only when complete.
+A running container keeps its previous mounted file; its replacement receives
+the updated file. Image rollback uses the currently delivered secret, not a
+historical credential snapshot. Secret rotation and image rollback are separate
+operations.
+
+The generator writes an executable `deploy/kamal/hooks/api/pre-app-boot` and
+sets the API's `hooks_path`. Commit the hook with its executable bit. Kamal
+runs it before each boot group, including `kamal app boot` and rollback. It
+uses the installed Kamal gem and the API's resolved SSH settings, including
+keys, agent and proxy. It checks each selected host without reading secret
+contents: a real directory with owner-only permissions (700; an inherited
+setgid bit is allowed), nonempty regular files with mode
+400 or 600, no symlinks, and matching file/directory ownership. A failure
+stops the boot. Do not use `--skip_hooks` for deployments requiring files.
+`deploy kamal --check` also reports a missing executable bit on Unix.
+
+Delivery to a new host remains a prerequisite: generating config does not
+upload files, and the generated Images workflow handles no secret contents.
+Studio's deploy runner must preserve the generated hooks and deliver files
+before invoking Kamal. No Studio file-upload interface is supplied by this CLI.
 
 The Studio check image reads a checkout mounted read-only at `/project`, with
 `--project /project --env stage` (or `prod`). It verifies TLS by making HTTPS
