@@ -90,7 +90,9 @@ void main() {
             final caller = harness().caller();
             final incompatible = await caller.call(
               const ListNotes(ownerId: -1),
-              headers: {'dw-protocol': '${dwProtocolVersion + 1}'},
+              headers: {
+                DwHttpContract.protocolHeader: '${dwProtocolVersion + 1}',
+              },
             );
             expect(incompatible.status, 426);
             expect((await caller.call(const GetNote(-1))).status, 404);

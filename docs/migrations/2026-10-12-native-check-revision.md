@@ -2,6 +2,7 @@
 title: Verify the selected native deployment revision
 affects:
   dartway_cli: "0.25.0-dev.0"
+  dartway_core_server: "0.22.0-dev.0"
 ---
 
 ## Who is affected
@@ -30,6 +31,9 @@ The check runner must substitute `{version}` with the selected full commit SHA.
 When invoking the check image directly, pass `--version <full SHA>` alongside
 `--project` and `--env`. The worker remains outside-only and needs no SSH or Git.
 Native Kamal supplies `KAMAL_VERSION` to the running API.
+This must be a full commit SHA; tag-style versions are refused at startup.
+On a local server without a native deployment revision, leave `KAMAL_VERSION`
+unset rather than assigning a development label.
 
 ## How to check
 
