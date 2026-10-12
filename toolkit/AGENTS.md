@@ -56,6 +56,7 @@ The law list is therefore derived from `DwCheckType.severity`, not from how firm
 | The framework's lint plugin is on | `lintsPluginMissing` | `dartway-update` |
 
 Not held by any check: naming beyond DTO class names, "done", and a `DwHttpRoute` the app calls. `migrationsDrift` needs a database — `DW_DATABASE_*`, or `deploy/config.yaml > local` — and says when it did not run.
+The expand/contract rule across production releases is also held by review alone (`dartway-migrations`).
 
 ## Commands and generators
 

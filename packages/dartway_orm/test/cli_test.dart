@@ -476,8 +476,35 @@ dev_dependencies:
         source,
         contains("//   await m.renameColumn('note', 'title', 'heading');"),
       );
+      final renameOptions = RegExp(
+        r"//   await m\.renameColumn\('note', 'title', 'heading'\);\n"
+        r'    // On a released table: add the new name and copy, stop reading the old one, drop it one release later\.',
+      ).allMatches(source);
+      expect(renameOptions, hasLength(2));
       expect(source, contains('// 2 decisions required'));
       expect(out.toString(), contains('2 decisions required'));
+    });
+
+    test('table rename advice protects released readers', () async {
+      final applied = TestMigration(
+        '20260101_000000_note',
+        onUp: (m) => m.createTable(noteTable()),
+      );
+      expect(
+        await cli(migrations: [applied]).run(['create', 'remove_note']),
+        DwMigrationCli.exitOk,
+      );
+      final source = File(
+        p.join(migrationsDir(), 'm20260914_083005_remove_note.dart'),
+      ).readAsStringSync();
+      expect(
+        source,
+        contains(
+          '// If no released code reads it, rename it with\n'
+          "    // m.sql('ALTER TABLE ... RENAME TO ...') instead.\n"
+          '    // On a released table: add the new name and copy, stop reading the old one, drop it one release later.',
+        ),
+      );
     });
 
     test(

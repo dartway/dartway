@@ -103,16 +103,21 @@ object's default (below). Only logging stays after `start()`.
 3. A typed single-row table of its own (`SignInSettingRow`, read as `findFirst()` with `??`
    defaults, saved under an advisory lock) moves the same way: its fields become the object's, its
    `findFirst` a `read`, its lock and insert-or-update an `update`.
-4. Carry the stored values over, in the migration that drops the old table — a project never writes
+4. Release N carries the stored values over and stops reading the old table, keeping it so a
+   rollback to the previous image can still pass its declared-table check. A project never writes
    `dw_setting` itself:
 
        await m.carrySettings('AppSettings', fromSql: '''
          SELECT jsonb_strip_nulls(jsonb_build_object(
            'paywallBypass',
              (SELECT lower(value) = 'true' FROM app_setting WHERE key = 'paywallBypass')))''');
-       await m.dropTable('app_setting');
 
    The area is the class's wire name; what is carried is merged over anything already stored.
+   Release N+1 drops the old table, once no running code relies on it, following the same
+   expand/contract rule as a rename:
+
+       await m.dropTable('app_setting');
+
 5. In the app: a `ref.watch(dw.request(const GetAppSettings()))` answers the object; a catalogue of
    keys with parsers (`AppSettingKey`) goes.
 
