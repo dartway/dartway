@@ -81,7 +81,7 @@ Four of these are held by checks rather than by memory, and they are the reason 
 |---|---|
 | generated code | `dartway generate --check` in `example/` and `template/`, and `generatedCodeStale` in `dartway check` |
 | the wire | `packages/dartway_core_shared/test/wire_golden_test.dart` |
-| names in docs, skills and these files | `packages/dartway_cli/test/docs_identifiers_test.dart` — every `Dw…` type and `dw.` member named in the prose exists in a public library; every relative link in `docs/` resolves |
+| names in docs, skills and these files | `tool/test/docs_identifiers_test.dart` — every `Dw…` type and `dw.` member named in the prose exists in a public library; every relative link in `docs/` resolves |
 | the toolkit's lists | `toolkit_skill_list_test.dart` (the skills named are the skills shipped) and `toolkit_law_list_test.dart` (the law table is the checker's error set) |
 
 **A migration note, once releases exist** (`docs/migrations/`): the test is whether a project doing nothing wrong has to touch its own code — a renamed symbol, a required parameter, a changed default, a new wiring step, a schema change it inherits. A change that asks for nothing writes nothing. Keyed by package version rather than by commit, because the CLI reads this repository from a shallow clone with no history to diff; the form is `docs/migrations/README.md`, `migration_notes_test.dart` fails on a note naming a package that does not exist or a version that never arrives, and `dartway update` in a project reads them out.

@@ -4,7 +4,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 void main() {
-  final script = p.absolute('../../tool/tag_check_image.sh');
+  final script = p.absolute('tag_check_image.sh');
   late Directory root;
 
   void write(String name, String text, {bool executable = false}) {

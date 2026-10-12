@@ -111,7 +111,7 @@ extension DwNavigationRouteExtension on DwNavigationRoute {
       // The same spelling the manifest index reads
       // (`StudioPathTemplate.isPlaceholder`). The router cannot depend on the
       // bridge, so the two are kept in step by a test that reads both files:
-      // `dartway_cli/test/shared_spelling_test.dart`. It was a comment, and a
+      // `tool/test/shared_spelling_test.dart`. It was a comment, and a
       // comment is a rule with nothing to break.
       final expected = segment.startsWith(':')
           ? state.pathParameters[segment.substring(1)]

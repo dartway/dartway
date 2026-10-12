@@ -14,7 +14,7 @@ import 'studio_zone_spec.dart';
 ///
 /// The router's copy cannot import this one — the wire must not depend on the
 /// UI — so the two are compared by a test that reads both files
-/// (`dartway_cli/test/shared_spelling_test.dart`).
+/// (`tool/test/shared_spelling_test.dart`).
 abstract final class StudioPathTemplate {
   /// Whether [segment] stands for a value rather than for itself — the
   /// `:id` of `/orders/:id`.

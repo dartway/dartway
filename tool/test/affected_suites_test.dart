@@ -28,6 +28,10 @@ void main() {
       'packages/dartway_cli',
       'dev_dependencies:\n  dartway_core_server: ^0.1.0\n',
     ),
+    package(
+      'packages/dartway_telegram',
+      'dependencies:\n  dartway_core_shared: ^0.1.0\n',
+    ),
     package('packages/dartway_lints'),
     package('packages/dartway_lints/example'),
     package(
@@ -37,6 +41,10 @@ void main() {
           '    path: ../../packages/dartway_cli\n',
     ),
     package('example/dartway_example_shared'),
+    package(
+      'example/dartway_example_server',
+      'dependencies:\n  dartway_core_server: ^0.1.0\n',
+    ),
     package('tool', 'dependencies:\n  dartway_cli: ^0.1.0\n'),
     const RepoPackage('js/studio-bridge', 'js/studio-bridge/package.json', {}),
   ];
@@ -52,6 +60,7 @@ void main() {
       'packages/dartway_generator', // dev_dependencies
       'packages/dartway_cli', // dev_dependencies
       'example/dartway_example_flutter', // dependency_overrides
+      'example/dartway_example_server',
       'tool',
     });
   });
@@ -60,7 +69,33 @@ void main() {
     expect(affected(['packages/dartway_core_flutter/lib/a.dart']), {
       'packages/dartway_core_flutter',
       'example/dartway_example_flutter',
-      'packages/dartway_cli', // reads every package's sources
+      'packages/dartway_cli', // runs the example
+      'tool', // reads every package
+    });
+  });
+
+  test('a package the example and the generator do not use leaves the CLI '
+      'alone', () {
+    expect(affected(['packages/dartway_telegram/lib/a.dart']), {
+      'packages/dartway_telegram',
+      'tool',
+    });
+  });
+
+  test('a runner follows the code of what it runs, one hop', () {
+    expect(affected(['packages/dartway_cli/lib/a.dart']), {
+      'packages/dartway_cli',
+      'packages/dartway_generator', // runs the CLI
+      'example/dartway_example_flutter',
+      'tool',
+    });
+    // The CLI's suites read the docs; the generator runs the CLI's code.
+    expect(affected(['docs/a.md']), {'packages/dartway_cli', 'tool'});
+    // The CLI runs the example; the generator does not run the example
+    // through the CLI.
+    expect(affected(['example/dartway_example_flutter/lib/a.dart']), {
+      'example/dartway_example_flutter',
+      'packages/dartway_cli',
       'tool',
     });
   });
@@ -70,7 +105,6 @@ void main() {
       'packages/dartway_lints/example',
       'packages/dartway_lints', // reads its example
       'packages/dartway_cli', // reads packages/dartway_lints/
-      'example/dartway_example_flutter',
       'tool',
     });
     expect(
@@ -86,7 +120,6 @@ void main() {
   test('paths a suite reads outside its package reach it', () {
     expect(affected(['docs/3-flutter/media.md']), {
       'packages/dartway_cli',
-      'example/dartway_example_flutter',
       'tool',
     });
     expect(
@@ -97,15 +130,14 @@ void main() {
       affected(['example/dartway_example_flutter/lib/a.dart']),
       isNot(contains('packages/dartway_generator')),
     );
-    // The CLI scans every test/ for protocol literals; the generator runs
-    // the CLI.
+    // One segment for `*`, not a prefix.
     expect(
-      affected(['tool/test/a_test.dart']),
+      affected(['packages/dartway_telegram/pubspec.yaml']),
       contains('packages/dartway_cli'),
     );
     expect(
-      affected(['packages/dartway_cli/lib/a.dart']),
-      contains('packages/dartway_generator'),
+      affected(['packages/dartway_telegram/lib/pubspec.yaml']),
+      isNot(contains('packages/dartway_cli')),
     );
   });
 

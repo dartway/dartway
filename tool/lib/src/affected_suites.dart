@@ -4,7 +4,8 @@
 /// package, of a package it depends on (`dependencies`, `dev_dependencies`
 /// or `dependency_overrides` — every one of them reaches its tests), or one
 /// of the paths outside its package the suite is known to read
-/// ([readsOutside]). The graph comes from the pubspecs rather than a list of
+/// ([readsOutside]), or the code of a package it runs as a program
+/// ([runs]). The graph comes from the pubspecs rather than a list of
 /// paths per workflow job, because a hand-written list is exactly what #165
 /// slipped past: the suite that broke belonged to a package the author had
 /// no reason to open, and it would have been missing from their list too.
@@ -32,17 +33,17 @@ const runsEverything = [
 ];
 
 /// Paths outside its own package a suite reads, by package. A trailing `/`
-/// names a directory and everything under it.
+/// names a directory and everything under it; `*` matches one path segment.
 ///
 /// `dartway_cli` copies `template/` (`create`, `update`), checks `example/`,
-/// reads the toolkit, the docs and the root README/CLAUDE.md for the names
-/// they cite, every package's sources for what the docs may name, every
-/// `test/` under `packages/` and `tool/` for protocol literals, and every
+/// reads the toolkit, the docs and the root README/CLAUDE.md, and every
 /// package's pubspec for the framework's versions. `dartway_generator`
-/// generates over the example's shared and server packages and runs the
-/// CLI's `bin/dartway.dart` for `generate`, `check` and `--contract-base`.
-/// The lints test runs the analyzer over its own `example/`, which is a
-/// package of its own. `tool`'s suites read `template/`.
+/// generates over the example's shared and server packages. The lints test
+/// runs the analyzer over its own `example/`, which is a package of its own.
+/// `tool`'s suites copy `template/` and hold the repository to itself: the
+/// names the docs, the toolkit and the README cite against every package's
+/// sources, protocol literals in every `test/` under `packages/`,
+/// `template/` and `example/`, and spellings two packages share.
 const readsOutside = {
   'packages/dartway_cli': [
     'template/',
@@ -50,8 +51,8 @@ const readsOutside = {
     'toolkit/',
     'docs/',
     'deploy/',
-    'packages/',
-    'tool/',
+    'packages/*/pubspec.yaml',
+    'packages/dartway_lints/',
     'README.md',
     'CLAUDE.md',
     'AGENTS.md',
@@ -61,10 +62,35 @@ const readsOutside = {
   'packages/dartway_generator': [
     'example/dartway_example_shared/',
     'example/dartway_example_server/',
-    'packages/dartway_cli/',
   ],
   'packages/dartway_lints': ['packages/dartway_lints/example/'],
-  'tool': ['template/'],
+  'tool': [
+    'template/',
+    'example/',
+    'packages/',
+    'docs/',
+    'toolkit/',
+    'README.md',
+    'CLAUDE.md',
+  ],
+};
+
+/// Packages a suite runs as a program, by package: the suite is affected
+/// when the code of one of them changes — its own files or a package it
+/// depends on — and not when only what that package's suite reads does.
+///
+/// `dartway_cli` runs the real generator (`server_contract_test`) and runs
+/// the example's suites through `dartway test` (`test_external_servers_test`).
+/// `dartway_generator` runs the CLI's `bin/dartway.dart` for `generate`,
+/// `check` and `--contract-base`.
+const runs = {
+  'packages/dartway_cli': [
+    'packages/dartway_generator',
+    'example/dartway_example_server',
+    'example/dartway_example_shared',
+    'example/dartway_example_flutter',
+  ],
+  'packages/dartway_generator': ['packages/dartway_cli'],
 };
 
 /// Paths no suite reads: a change here runs nothing.
@@ -109,7 +135,8 @@ Set<String> affectedSuites(
 ) {
   final all = {for (final package in packages) package.path};
   final byName = {for (final package in packages) package.name: package};
-  final hit = <String>{};
+  final owners = <String>{};
+  final readersHit = <String>{};
   for (final file in changed) {
     if (runsEverything.contains(file)) return all;
     final owner = _owner(all, file);
@@ -123,12 +150,9 @@ Set<String> affectedSuites(
         !readByNoSuite.any((glob) => _matches(glob, file))) {
       return all;
     }
-    hit
-      ..addAll(readers)
-      ..addAll([?owner]);
+    readersHit.addAll(readers);
+    owners.addAll([?owner]);
   }
-  // Dependents, to the fixed point: a package is affected once anything it
-  // depends on is.
   final dependents = <String, Set<String>>{};
   for (final package in packages) {
     for (final dependency in package.dependencies) {
@@ -137,14 +161,26 @@ Set<String> affectedSuites(
       (dependents[local.path] ??= {}).add(package.path);
     }
   }
-  final queue = [...hit];
+  // Dependents, to the fixed point: a package is affected once the code of
+  // anything it depends on is.
+  final code = {...owners};
+  final queue = [...code];
   while (queue.isNotEmpty) {
     for (final dependent
         in dependents[queue.removeLast()] ?? const <String>{}) {
-      if (hit.add(dependent)) queue.add(dependent);
+      if (code.add(dependent)) queue.add(dependent);
     }
   }
-  return hit;
+  // What a suite reads outside its package is the suite's alone: a package
+  // depending on the CLI depends on its code, not on the docs its tests
+  // read. A runner follows the code of what it runs, one hop: the generator
+  // runs the CLI's program, not the CLI's suites.
+  return {
+    ...code,
+    ...readersHit,
+    for (final MapEntry(key: runner, value: programs) in runs.entries)
+      if (all.contains(runner) && programs.any(code.contains)) runner,
+  };
 }
 
 /// The innermost package holding [file]: `packages/dartway_lints/example/…`
@@ -171,7 +207,7 @@ bool _matches(String glob, String file) {
     return false;
   }
   for (var i = 0; i < globParts.length; i++) {
-    if (globParts[i] != fileParts[i]) return false;
+    if (globParts[i] != '*' && globParts[i] != fileParts[i]) return false;
   }
   return true;
 }

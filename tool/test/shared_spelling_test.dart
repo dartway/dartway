@@ -15,9 +15,10 @@ import 'package:test/test.dart';
 /// starts meaning something else.
 ///
 /// This does: it reads both files and compares what they actually say. It
-/// lives here because this package is the one that sees the whole monorepo.
+/// lives with the scripts this repository runs on itself, which see the
+/// whole monorepo.
 void main() {
-  final packages = Directory(p.join(Directory.current.parent.path));
+  final packages = Directory(p.join(Directory.current.parent.path, 'packages'));
 
   String sourceOf(String relative) {
     final file = File(p.join(packages.path, relative));
@@ -66,8 +67,10 @@ void main() {
           'studio_manifest_index.dart',
         ),
       ),
-      RegExp(r"static bool isPlaceholder\(String segment\) =>\s*"
-          r"segment\.startsWith\('(.+?)'\)"),
+      RegExp(
+        r"static bool isPlaceholder\(String segment\) =>\s*"
+        r"segment\.startsWith\('(.+?)'\)",
+      ),
     );
     expect(
       router,
