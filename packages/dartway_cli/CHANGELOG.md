@@ -7,8 +7,9 @@
   public API origin. The template web image renders the validated proxy routes
   at container start, including WebSocket forwarding for `/dw/` (#564).
 - Fix: deploy disk guards measure a Docker data root that is not visible on the
-  host from a throwaway container, allowing the local stack proof to run with
-  Docker Desktop on macOS (#549).
+  host from a throwaway container using the stack's resolved Postgres image
+  with Docker's default pull policy, including both cleanup measurements,
+  allowing the local stack proof to run with Docker Desktop on macOS (#549).
 - Toolkit: settings carry keeps the old table through release N and drops it in N+1; the
   constitution lists expand/contract across production releases as a rule held by review (#542).
 - Fix: `deploy run --without-rollback-image` unblocks a stand whose running image cannot be

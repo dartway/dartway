@@ -7,7 +7,7 @@ dw_disk_space() {
   if [ -d "$1" ] || [ -z "$2" ]; then
     df -Pk "$1"
   else
-    docker run --pull=never --rm --volume "$1:$1:ro" "$2" df -Pk "$1"
+    docker run --rm --volume "$1:$1:ro" "$2" df -Pk "$1"
   fi | awk -v path="$1" 'NR == 2 { printf "%s\t%s\t%s\n", path, $2, $4; found=1 } END { if (!found) exit 1 }'
 }
 ''';
