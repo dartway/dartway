@@ -42,6 +42,7 @@ void main() {
         ssh: _ContainerShell(name),
         deployUser: 'root',
         directory: '/disk/steps',
+        dockerImage: 'postgres:17-alpine',
         contactTolerance: const Duration(seconds: 5),
         pollInterval: const Duration(milliseconds: 50),
       );

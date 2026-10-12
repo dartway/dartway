@@ -30,6 +30,7 @@ void main() {
         ssh: ssh,
         deployUser: 'deployer',
         directory: DwDeployRunner.remoteDirectoryOf(targetFrom()),
+        dockerImage: 'postgres:17-alpine',
       ),
     );
     expect(runner.beginLocalDeployment, throwsStateError);

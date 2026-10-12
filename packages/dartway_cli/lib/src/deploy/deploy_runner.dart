@@ -285,6 +285,7 @@ rm -f "\$dw_new"''';
       deployUser: target.deployUser,
       minimum: target.minFreeDisk,
       minimumBytes: target.minFreeDiskBytes,
+      dockerImage: stack.resolvedImage(DwStack.postgresImage),
     );
     if (!space.ok) return space;
     return _as('''
@@ -912,7 +913,7 @@ set -e
 cd '$appDir'
 $dwDiskSpaceFunction
 $dwDockerRootScript
-space=\$(dw_disk_space "\$dw_docker_root")
+space=\$(dw_disk_space "\$dw_docker_root" '${stack.resolvedImage(DwStack.postgresImage)}')
 before=\$(printf '%s\\n' "\$space" | awk '{print \$3}')
 # One line per cache record: whether it is shared with an image, and its size.
 dw_cache_stats() {
@@ -976,7 +977,7 @@ if [ "\$cache_private" -gt ${target.buildCacheKeepBytes} ]; then
 fi
 cache_removed=\$((cache_before - cache_after))
 [ "\$cache_removed" -ge 0 ] || cache_removed=0
-space=\$(dw_disk_space "\$dw_docker_root")
+space=\$(dw_disk_space "\$dw_docker_root" '${stack.resolvedImage(DwStack.postgresImage)}')
 after=\$(printf '%s\\n' "\$space" | awk '{print \$3}')
 bytes=\$(((after - before) * 1024))
 [ "\$bytes" -ge 0 ] || bytes=0
