@@ -32,7 +32,7 @@ happened here, and code was written against an API that had been deleted.
   sentence, why the framework ships no design.
 - **Every code sample compiles against `example/`.** Prefer lifting the sample straight out of it,
   with its path, so that a change to the API breaks the example first and the page is fixed in the
-  same PR. What a test can hold, a test holds: `packages/dartway_cli/test/docs_identifiers_test.dart`
+  same PR. What a test can hold, a test holds: `tool/test/docs_identifiers_test.dart`
   fails when a `Dw…` name on a page is declared in no public library of the framework, and when a
   relative link between pages does not resolve.
 - **Name the failure, not just the rule.** What breaks if you do it the other way is the part
