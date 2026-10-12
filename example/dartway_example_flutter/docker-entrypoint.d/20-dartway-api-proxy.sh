@@ -50,12 +50,27 @@ EOF
   else
     if [ "${path%/}" != "$path" ]; then
       app_path=${path%/}
-      cat >> "$output" <<EOF
+      api_covered=false
+      for api_path in $DW_API_PATHS; do
+        # /dw is rendered as /dw/, so it does not cover the slashless /dw.
+        if [ "$api_path" = /dw ]; then
+          api_path=/dw/
+        fi
+        case "$app_path" in
+          "$api_path"*)
+            api_covered=true
+            break
+            ;;
+        esac
+      done
+      if [ "$api_covered" = false ]; then
+        cat >> "$output" <<EOF
 location = $app_path {
   try_files \$uri \$uri/ /index.html;
   add_header Cache-Control "no-cache";
 }
 EOF
+      fi
     fi
 
     cat >> "$output" <<EOF

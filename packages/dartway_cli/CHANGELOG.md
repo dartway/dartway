@@ -2,6 +2,9 @@
 
 ## 0.25.0-dev.0
 
+- Fix: the web API proxy emits a Flutter fallback for a trailing-slash route
+  only when no API prefix covers its slashless path, keeping overlapping routes
+  and `/health` on the API (#571).
 - `deploy kamal` now gives the API TLS root service only its API host and
   configures each web destination to proxy same-origin server paths to that
   public API origin. The template web image renders the validated proxy routes
