@@ -72,13 +72,24 @@ fi
     ]);
   });
 
-  test('a missing root with no Docker still refuses the check', () async {
-    File('${temp.path}/docker').writeAsStringSync('#!/bin/sh\nexit 1\n');
+  test('a Docker-only root refuses when container df fails', () async {
+    final root = '${temp.path}/missing-docker-root';
+    File('${temp.path}/docker').writeAsStringSync('''#!/bin/sh
+if [ "\$1" = info ]; then
+  printf '%s\\n' "\$DW_TEST_DOCKER_ROOT"
+else
+  exit 1
+fi
+''');
 
-    final result = await _check(environment);
+    final result = await _check({
+      ...environment,
+      'DW_TEST_DOCKER_ROOT': root,
+    });
 
     expect(result.ok, isFalse);
-    expect(result.stderr, "Cannot read free space on Docker's data root.");
+    expect(result.stdout, isEmpty);
+    expect(result.stderr, isEmpty);
   });
 }
 
