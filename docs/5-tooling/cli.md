@@ -321,12 +321,12 @@ dart run dartway_cli:dartway dev proxy --web http://localhost:5000    # `flutter
 dart run dartway_cli:dartway dev proxy --web-dir build/web            # a built app instead
 ```
 
-**The server answers no CORS, in development too** (D-039). A deployed web app reaches `/dw/*` and
-`/health` on its own origin, because the front proxy serves the app and proxies those paths beside
-it — see [Deploying the server](deploy.md). `flutter run -d chrome` breaks that on a laptop: the app
+**The server answers no CORS, in development too** (D-039). A deployed web app reaches `/dw/*`
+(including `/dw/health`) on its own origin, because the front proxy serves the app and proxies
+`/dw/` beside it — see [Deploying the server](deploy.md). `flutter run -d chrome` breaks that on a laptop: the app
 is served from a port of its own and every call is cross-origin. `dart run dartway_cli:dartway dev` restores the deployed
 shape: **one origin, `http://localhost:8000` by default**, where `/dw/*` (the `/dw/live` socket
-included) and `/health` go to the server and everything else to the web app.
+included) go to the server and everything else to the web app.
 
 Both subcommands take:
 

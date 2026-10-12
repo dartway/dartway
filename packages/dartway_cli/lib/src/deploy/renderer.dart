@@ -563,12 +563,6 @@ class DwStackRenderer {
     buffer
       ..writeln('    }')
       ..writeln()
-      ..writeln('    location = /health {');
-    buffer.writeln('        gzip off;');
-    _proxy(buffer);
-    buffer
-      ..writeln('    }')
-      ..writeln()
       ..writeln('    location / {')
       ..writeln('        proxy_pass http://${DwStack.webService}:80;')
       ..writeln(r'        proxy_set_header Host $http_host;')

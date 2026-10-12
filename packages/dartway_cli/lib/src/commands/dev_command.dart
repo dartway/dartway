@@ -40,9 +40,7 @@ void _addProxyOptions(ArgParser parser) {
     ..addOption(
       'api',
       defaultsTo: _defaultApi,
-      help:
-          'The running server: /dw/* (the live socket included) and /health '
-          'go here.',
+      help: 'The running server: /dw/* (the live socket included) goes here.',
     )
     ..addMultiOption(
       'api-path',
@@ -171,7 +169,7 @@ class DevProxyCommand extends Command<int> {
 
   @override
   String get description =>
-      'Serve one origin: /dw/* and /health to the API, everything else to the '
+      'Serve one origin: /dw/* to the API, everything else to the '
       'Flutter web dev server or a built app.';
 
   @override

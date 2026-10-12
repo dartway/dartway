@@ -6,7 +6,7 @@ construction, because both sides use the declarations in `dartway_core_shared`
 server — a tool, a test, a proxy — and when the framework or the app changes under a build already
 installed on someone's phone.
 
-## Three paths
+## HTTP paths
 
 `DwHttpContract` declares them once for both sides:
 
@@ -14,7 +14,11 @@ installed on someone's phone.
 POST /dw/<WireName>   a request or a command; the body is the DTO's JSON
 GET  /dw/live         the WebSocket of live updates
 GET  /health          liveness and database reachability
+GET  /dw/health       the same check through an app host
 ```
+
+Health uses GET or HEAD; POST `/dw/health` remains a DTO call if a project
+registers the wire name `health`.
 
 `/dw/` and `/health` are reserved: a project route under them fails the server's startup
 ([../4-server/routes.md](../4-server/routes.md)).
@@ -133,7 +137,7 @@ closed, and `DwFlutterConfig.updateRequiredScreen` replaces the app — see
 ## Origins
 
 **Calls are same-origin by deployment, and the server sends no CORS headers — also in development
-(D-039).** In production the web app's host proxies `/dw/` and `/health` to the server
+(D-039).** In production the web app's host proxies only `/dw/` to the server
 ([../5-tooling/deploy.md](../5-tooling/deploy.md)); locally `dart run dartway_cli:dartway dev` does the same
 ([../5-tooling/cli.md](../5-tooling/cli.md)). A cross-origin browser call cannot get through anyway:
 a JSON body needs a preflight, and the server never answers one. Native apps send no `Origin` and are

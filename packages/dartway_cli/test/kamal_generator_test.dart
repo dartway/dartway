@@ -117,7 +117,6 @@ final routes = [
           expect(webTarget['ssh'], target['ssh']);
           expect(webTarget['env']['clear'], {
             'DW_API_ORIGIN': 'https://$apiHost',
-            'DW_API_PATHS': '/dw /health /github /orders/events',
           });
           final clear = target['env']['clear'];
           expect(clear['DW_DATABASE_HOST'], 'shop-api-postgres-$dest');
@@ -441,96 +440,7 @@ final routes = [
     );
   });
 
-  for (final path in ['/']) {
-    test('root route prefix $path is refused with the route and location', () {
-      write(
-        'shop_server/lib/routes.dart',
-        "\nDwHttpRoute.get('$path', handler);\n",
-      );
-      expect(
-        () => DwKamalGenerator(root).render(),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            allOf(contains(path), contains('shop_server/lib/routes.dart:2')),
-          ),
-        ),
-      );
-    });
-  }
-
-  for (final expression in [
-    'path',
-    "'/foo/\$id'",
-    "'/foo' + '/bar'",
-    "'/foo' '/bar'",
-  ]) {
-    test('non-literal route $expression names file and line', () {
-      write(
-        'shop_server/lib/routes.dart',
-        '\nDwHttpRoute.post($expression, handler);\n',
-      );
-      expect(
-        () => DwKamalGenerator(root).render(),
-        throwsA(
-          isA<StateError>().having(
-            (e) => e.message,
-            'message',
-            contains('shop_server/lib/routes.dart:2'),
-          ),
-        ),
-      );
-    });
-  }
-
-  test('an exact route path containing a colon is preserved as its prefix', () {
-    write(
-      'shop_server/lib/routes.dart',
-      "DwHttpRoute.get('/orders/:literal/events', handler);",
-    );
-    expect(
-      DwKamalGenerator.routePrefixes(
-        ProjectLayout.detect(root).serverPackageDir,
-      ),
-      ['/dw', '/health', '/orders/:literal/events'],
-    );
-  });
-
-  test('a trailing slash route is preserved as its prefix', () {
-    write(
-      'shop_server/lib/routes.dart',
-      "DwHttpRoute.post('/hooks/', handler);",
-    );
-    expect(
-      DwKamalGenerator.routePrefixes(
-        ProjectLayout.detect(root).serverPackageDir,
-      ),
-      ['/dw', '/health', '/hooks/'],
-    );
-  });
-
-  test('an unsupported proxy path is refused with the route location', () {
-    write(
-      'shop_server/lib/routes.dart',
-      "\nDwHttpRoute.post('/hooks?source=one', handler);\n",
-    );
-    expect(
-      () => DwKamalGenerator(root).render(),
-      throwsA(
-        isA<StateError>().having(
-          (e) => e.message,
-          'message',
-          allOf(
-            contains('/hooks?source=one'),
-            contains('shop_server/lib/routes.dart:2'),
-          ),
-        ),
-      ),
-    );
-  });
-
-  test('--check catches an added route without changing files', () {
+  test('--check ignores server route changes', () {
     final generator = DwKamalGenerator(root);
     generator.generate();
     expect(generator.generate(check: true), isEmpty);
@@ -538,15 +448,14 @@ final routes = [
     final before = api.readAsStringSync();
     write(
       'shop_server/lib/new_route.dart',
-      "DwHttpRoute.post('/new-webhook', handler);",
+      "DwHttpRoute.post('/new-webhook', handler);\n"
+          "DwHttpRoute.get('/', handler);",
     );
-    expect(generator.generate(check: true), ['deploy/kamal/web.stage.yml']);
-    expect(api.readAsStringSync(), before);
-    generator.generate();
     expect(generator.generate(check: true), isEmpty);
+    expect(api.readAsStringSync(), before);
   });
 
-  test('CLI --check returns failure for the same stale route config', () async {
+  test('CLI --check ignores server route changes', () async {
     final generator = DwKamalGenerator(root)..generate();
     Future<ProcessResult> check() => Process.run(Platform.resolvedExecutable, [
       '--packages=${p.absolute('../../.dart_tool/package_config.json')}',
@@ -560,25 +469,8 @@ final routes = [
       'shop_server/lib/new_route.dart',
       "DwHttpRoute.post('/new', handler);",
     );
-    final stale = await check();
-    expect(stale.exitCode, 1);
-    expect(stale.stderr, contains('deploy/kamal/web.stage.yml'));
-    expect(generator.generate(check: true), ['deploy/kamal/web.stage.yml']);
-  });
-
-  test('decodes literal escapes and ignores route-looking strings', () {
-    write('shop_server/lib/routes.dart', r'''
-final ignored = "DwHttpRoute.post('/ignored', handler)";
-DwHttpRoute.get('/\x67ithub', handler);
-DwHttpRoute.get(r'/orders/events', handler);
-DwHttpRoute.get(/* comment */ '/\u{0066}iles', handler);
-''');
-    expect(
-      DwKamalGenerator.routePrefixes(
-        ProjectLayout.detect(root).serverPackageDir,
-      ),
-      ['/dw', '/health', '/github', '/orders/events', '/files'],
-    );
+    expect((await check()).exitCode, 0);
+    expect(generator.generate(check: true), isEmpty);
   });
 
   test('removing bundled storage removes obsolete generated files', () {

@@ -24,9 +24,9 @@ environments `deploy/config.yaml` declares. Every one that connects takes `--as 
 ## Kamal and GHCR
 
 `dart run dartway_cli:dartway deploy kamal` generates the Studio deployment contract from
-`deploy/config.yaml`, the server package's HTTP routes and the Flutter package's
-resolved CLI lock. Configure `staging` (destination `stage`) and/or `production`
-(destination `prod`); `local` is never a destination. Resolve the packages first.
+`deploy/config.yaml` and the Flutter package's resolved CLI lock. Configure
+`staging` (destination `stage`) and/or `production` (destination `prod`);
+`local` is never a destination. Resolve the packages first.
 
 ```bash
 cd <project>_flutter
@@ -36,18 +36,11 @@ dart run dartway_cli:dartway deploy kamal --check
 
 Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
 Generated files carry their source instructions. `--check` writes nothing and
-names every stale file, including the web destination configs when a project
-route changes.
-`DwHttpRoute.get`, `.post` and `.any` must use string literal paths. Server routes
-match exact paths, with no `:id` parameters; put identifiers in the query or body.
-Each proxy prefix is the route's path itself: `/github` remains `/github`.
-A `/` route is refused because its proxy prefix would capture every web route.
-After adding a route, run `deploy kamal` and commit the regenerated web config;
-otherwise CI's `deploy kamal --check` fails. The API service is the root service
-on its own host only. On the app host, the web container's nginx proxies the
-paths in `DW_API_PATHS` — the route prefixes, `/dw` and `/health` — to
-`DW_API_ORIGIN`; it serves all other app paths itself. Proxy buffering is off
-for API and storage.
+names every stale file. Server route changes do not affect the generated web
+configuration. The API service is the root service on its own host only. On
+the app host, the web container's nginx proxies only `/dw/` to
+`DW_API_ORIGIN`; it serves every other app path itself. Project routes are
+available on the API host. Proxy buffering is off for API and storage.
 
 Kamal generation refuses `requires: files:` and a deployed `site:` because this
 topology does not support them yet; use `deploy run` for those projects.
@@ -195,14 +188,14 @@ after that its own secret store names it.
 ## Three hosts, one server process
 
 ```
-app.example.com   →  the web image;  /dw/ (the live socket included) and /health → the server
+app.example.com   →  the web image;  only /dw/ (the live socket included) → the server
 api.example.com   →  everything → the server
 example.com       →  the site directory, static            (optional)
 files.example.com →  the bundled storage                    (with storage: bundled)
 ```
 
 **The app calls its own origin.** On the app host the front Nginx serves the web image and
-sends `/dw/`, `/dw/live` and `/health` to the server, so a browser makes same-origin calls: no CORS,
+sends `/dw/` (including `/dw/live` and `/dw/health`) to the server, so a browser makes same-origin calls: no CORS,
 no preflight, and the server answers none. Web release builds use `Uri.base.origin`. The api host proxies everything to the server — calls, the live socket, and the
 project's own doors (`DwHttpRoute`) such as a webhook. The server serves no static files. Local
 development has the same shape through `dart run dartway_cli:dartway dev` ([The CLI](cli.md)).
@@ -614,7 +607,7 @@ deployment at exit 0.
 **Then it verifies from outside**, as a browser and an app would, retrying failed probes up to twelve
 times five seconds apart:
 
-- `GET /health` answers `200` `ok` through the api host and through the app host;
+- `GET /health` on the api host and `GET /dw/health` on the app host answer `200` `ok`;
 - `GET /` on the app host is the Flutter `index.html`, served with a revalidating cache policy, and
   the build's entry points are not served for reuse without revalidation;
 - `main.dart.js` (or a Wasm build's `main.dart.wasm`) answers a request accepting gzip with

@@ -38,15 +38,14 @@ builds each image once for `linux/amd64` and pushes its commit SHA to GHCR;
 existing tags are skipped, and GHA caches keep unchanged Flutter SDK layers.
 
 Destinations are `stage` and `prod`. Kamal 2.12 runs kamal-proxy v0.10.2; the API
-owns the root of its API host. The web destination receives the API origin and
-literal server route prefixes as environment, then its nginx entrypoint proxies
-`/dw/`, `/health` and those routes so they remain available on the app host.
-Web release builds use `Uri.base.origin`, so the same image serves both
-destinations without build arguments. The Studio binding validates tokens for
-the same app origin. A non-literal route or the root path (`/`)
-refuses generation with its file and line. A project name that cannot be used
+owns the root of its API host. The web destination receives the API origin,
+then its nginx entrypoint proxies only `/dw/` to it. Server routes remain on
+the API host, so they never shadow Flutter pages. Web release builds use
+`Uri.base.origin`, so the same image serves both destinations without build
+arguments. The Studio binding validates tokens for the same app origin.
+A project name that cannot be used
 as a service name is refused with its value and the `project:` key to configure.
-Regenerate after changing routes or deployment config;
+Regenerate after changing deployment config;
 `--check` names any stale generated file.
 
 Bundled RustFS is a service with its own TLS host; Postgres is an API accessory
@@ -83,7 +82,7 @@ One server process behind one front proxy:
 | `server` | the project's server image, configured by environment only; healthcheck on `/health` |
 | `web` | the Flutter web build served by nginx, files only |
 | `storage` + `storage-init` | with `storage: bundled`: RustFS and its two buckets — `<project>-public`, whose objects anyone reads (never its listing), and `<project>-private`, which reads nothing unsigned; `storage-init` sets both on every deploy |
-| `nginx` | TLS for every host: **app** → the web image, with `/dw/` (the live socket upgrade included) and `/health` sent to the server; **api** → the server; **site** → the static directory |
+| `nginx` | TLS for every host: **app** → the web image, with `/dw/` (the live socket upgrade included) sent to the server; **api** → the server; **site** → the static directory |
 | `certbot` | renews the one certificate every host shares |
 
 The server receives `DW_DATABASE_*` (and, with the bundled storage, `DW_STORAGE_*`) and `PORT`
@@ -118,8 +117,7 @@ a private bucket anyone can read or a public one nobody can.
    runs `nginx -t` inside the running proxy, issues the certificate if no proxy
    was running to ask through before (a first deploy), and restarts the proxy —
    and checks that it is still running afterwards;
-8. verifies from outside, as a browser and an app would: `/health` answers 200
-   through both hosts, the app host serves the Flutter `index.html` with a
+8. verifies from outside, as a browser and an app would: `/health` on the api host and `/dw/health` on the app host answer 200, the app host serves the Flutter `index.html` with a
    revalidating cache policy, `/dw/live` upgrades through both hosts and the
    server answers on the socket, and — where declared — the site answers and
    the storage preflight admits a PUT from the app's origin, the public

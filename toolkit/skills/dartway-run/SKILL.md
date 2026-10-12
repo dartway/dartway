@@ -95,10 +95,9 @@ Enable CI pushes on those branches. Install the workflow on the default branch
 before its `workflow_run` trigger can run. CI checks `deploy kamal --check` next
 to generation whenever a Studio manifest is present. The template ships no
 pre-generated deployment files or Images workflow.
-After adding a project HTTP route, run `deploy kamal` and commit its output;
-otherwise CI's `deploy kamal --check` fails. Route paths are string literals read
-from `__SERVER_PKG__/lib/` and match exactly, with no `:id` parameters. Each proxy
-prefix is the path itself. Non-literal paths and a `/` route refuse generation.
+Project HTTP routes are reached on the API host. The app host forwards only
+`/dw/`, so route changes do not affect generated Kamal web configuration or
+reserve Flutter page paths. Routes match exact paths, with no `:id` parameters.
 `requires: files:` and a deployed `site:` are refused because the Kamal topology
 does not support them yet; use `deploy run`. Invalid project names are refused
 with the value and the `project:` key to configure. Web release builds without a define call

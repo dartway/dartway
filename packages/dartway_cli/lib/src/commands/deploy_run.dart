@@ -565,7 +565,7 @@ int reportOutsideVerification(
 }
 
 List<String> _describeProbes(DwStack stack) => [
-  'GET ${stack.apiOrigin}/health and ${stack.appOrigin}/health — 200 "ok"',
+  'GET ${stack.apiOrigin}/health and ${stack.appOrigin}/dw/health — 200 "ok"',
   'GET ${stack.appOrigin}/ — the Flutter index.html, revalidated',
   'cache policy of the web build entry points',
   'gzip compression of ${stack.appOrigin}/main.dart.js or main.dart.wasm',

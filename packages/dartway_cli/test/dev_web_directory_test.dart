@@ -192,8 +192,10 @@ void main() {
   test('the framework paths still go to the API', () async {
     final (status, body, _) = await get('/dw/Anything');
     expect((status, body), (200, 'api /dw/Anything'));
-    final (_, health, _) = await get('/health');
-    expect(health, 'api /health');
+    final (_, health, _) = await get('/dw/health');
+    expect(health, 'api /dw/health');
+    final (_, appHealth, _) = await get('/health');
+    expect(appHealth, '<html>app</html>');
   });
 
   test('a build that is not there says so', () async {

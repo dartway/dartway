@@ -606,20 +606,17 @@ void main() {
       );
       final app = _serverBlock(nginx, 'app.example.com');
       expect(_location(app, '/dw/'), contains('gzip off;'));
-      expect(_location(app, '= /health'), contains('gzip off;'));
+      expect(app, isNot(contains('location = /health')));
     });
 
-    test('app: files from the web image, calls and health to the server', () {
+    test('app: files from the web image, only /dw/ to the server', () {
       final app = _serverBlock(nginx, 'app.example.com');
       expect(_location(app, '/'), contains('proxy_pass http://web:80;'));
       expect(
         _location(app, '/dw/'),
         contains('proxy_pass http://server:8080;'),
       );
-      expect(
-        _location(app, '= /health'),
-        contains('proxy_pass http://server:8080;'),
-      );
+      expect(app, isNot(contains('location = /health')));
     });
 
     test('app and api: /dw/live upgrades and stays open', () {

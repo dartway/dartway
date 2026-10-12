@@ -35,8 +35,7 @@ typedef DwRouteHandler =
 ```
 
 **Paths match exactly** — a map lookup, no patterns and no path parameters; an id goes in the query
-or the body. Use a string literal for the route's path.
-After adding a route, run `deploy kamal` and commit its output, or CI's `--check` fails.
+or the body. A route change does not affect generated Kamal web configuration.
 An unknown path is `404`; a known path with another method is `405` with `Allow`.
 
 The server refuses to start on a route at `/dw`, under `/dw/` or at `/health` (the framework's), on
@@ -122,13 +121,13 @@ the project's, with a unique constraint on the event id.
 
 ## Where routes are reachable
 
-With `deploy kamal`, the API service is the root service on its own host only. On the app host,
-the web container's nginx proxies `DW_API_PATHS` — every literal route path, `/dw` and `/health` —
-to `DW_API_ORIGIN`; a `/` route is refused. With `deploy run`, the API domain proxies every path
-to the server and the app domain proxies `/dw/` and `/health`.
-A webhook URL on the API domain works in either topology
-([deploy](../5-tooling/deploy.md)). In development, `dart run dartway_cli:dartway dev` forwards `/dw/*` and `/health`,
-and a project door only when named with `--api-path /webhooks/payments`
+With `deploy kamal`, the API service is the root service on its own host. With
+`deploy run`, the API domain also proxies every path to the server. In either
+topology, the app host proxies only `/dw/` to the server; its Flutter router may
+use any other path, including one that matches a server route. External callers
+reach project routes on the API domain ([deploy](../5-tooling/deploy.md)).
+In development, `dart run dartway_cli:dartway dev` forwards `/dw/*` by default;
+use `--api-path /webhooks/payments` to opt in to forwarding a project door
 ([CLI](../5-tooling/cli.md)).
 
 ## Related
