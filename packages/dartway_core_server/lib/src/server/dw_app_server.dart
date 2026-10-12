@@ -34,6 +34,7 @@ import 'dw_runtime.dart';
 import 'dw_server_module.dart';
 import 'dw_startup_step.dart';
 import 'dw_server_settings.dart';
+import '../http/dw_peer_rate_limits.dart';
 
 /// The server refused to start: its declaration is inconsistent. Every
 /// problem is listed at once.
@@ -554,7 +555,23 @@ final class DwAppServer {
   /// Problems with the declaration, empty when it is consistent.
   @internal
   List<String> validate() {
-    final problems = <String>[];
+    final problems = DwPeerRateLimits.problems(settings);
+    if (settings.deploymentVersion case final version?
+        when !RegExp(r'^[0-9a-f]{40}$').hasMatch(version)) {
+      problems.add('deploymentVersion must be an immutable full commit SHA');
+    }
+    for (final type in settings.callRateLimits.keys) {
+      if (!protocol.entries.any(
+        (entry) =>
+            entry.type == type &&
+            (entry.kind == DwWireObjectKind.request ||
+                entry.kind == DwWireObjectKind.command),
+      )) {
+        problems.add(
+          'call rate limit for $type does not name a registered call',
+        );
+      }
+    }
     for (final step in _startupSteps) {
       problems.addAll(step.problems(auth));
     }

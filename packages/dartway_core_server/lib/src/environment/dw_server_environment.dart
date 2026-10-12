@@ -16,6 +16,9 @@ import 'dw_environment_reader.dart';
 /// | `DW_ALLOWED_ORIGINS` | [allowedOrigins], comma-separated |
 /// | `DW_ADMIN_IDENTIFIER` | [adminIdentifier], for `DwFirstAdministrator` |
 /// | `DW_MIGRATE_ONLY` | [migrateOnly], for `DwAppServer.start` |
+/// | `DW_TRUSTED_PROXY_NETWORKS` | [trustedProxyNetworks], comma-separated CIDRs |
+/// | `DW_HTTP_BEHIND_PROXY` | [httpBehindProxy], false by default |
+/// | `KAMAL_VERSION` | [deploymentVersion], the immutable native revision |
 ///
 /// Read as a part of the project's own environment, so one start reports
 /// every missing variable of both:
@@ -35,6 +38,9 @@ final class DwServerEnvironment {
     this.allowedOrigins = const {},
     this.adminIdentifier,
     this.migrateOnly = false,
+    this.trustedProxyNetworks = const [],
+    this.httpBehindProxy = false,
+    this.deploymentVersion,
   });
 
   /// The framework's variables out of [read], problems recorded there.
@@ -76,6 +82,9 @@ final class DwServerEnvironment {
       allowedOrigins: read.list('DW_ALLOWED_ORIGINS').toSet(),
       adminIdentifier: read.optional('DW_ADMIN_IDENTIFIER')?.trim(),
       migrateOnly: read.flag(migrateOnlyVariable),
+      trustedProxyNetworks: read.list('DW_TRUSTED_PROXY_NETWORKS'),
+      httpBehindProxy: read.flag('DW_HTTP_BEHIND_PROXY'),
+      deploymentVersion: read.optional('KAMAL_VERSION'),
     );
   }
 
@@ -118,6 +127,17 @@ final class DwServerEnvironment {
   /// `DW_MIGRATE_ONLY=true`: apply the migrations and exit without serving
   /// (`DwAppServer.start(migrateOnly:)`).
   final bool migrateOnly;
+
+  /// `DW_TRUSTED_PROXY_NETWORKS`, explicit ingress CIDRs for
+  /// `DwServerSettings.trustedProxyNetworks`. Validated by the server.
+  final List<String> trustedProxyNetworks;
+
+  /// `DW_HTTP_BEHIND_PROXY`: a deployment enabling peer quotas must name its
+  /// trusted proxy networks. Forwarding headers are ignored otherwise.
+  final bool httpBehindProxy;
+
+  /// KAMAL_VERSION, provided by native Kamal to every application container.
+  final String? deploymentVersion;
 
   static DwDatabaseConfig _database(DwEnvironmentReader read) {
     try {

@@ -10,6 +10,7 @@ import '../auth/dw_auth_service.dart';
 import '../context/dw_call_context.dart';
 import '../handlers/dw_call_handler.dart';
 import '../http/dw_request_body.dart';
+import '../http/dw_peer_rate_limits.dart';
 import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
 import 'dw_idempotency_ledger.dart';
@@ -47,7 +48,7 @@ final class DwCallEndpoint {
     required this.authService,
     required this.settings,
     required this.handlers,
-  });
+  }) : _rateLimits = DwPeerRateLimits(settings);
 
   final DwRuntime runtime;
   final DwAuthService authService;
@@ -55,6 +56,8 @@ final class DwCallEndpoint {
 
   /// By call class; one per request and command class of the protocol.
   final Map<Type, DwCallHandler> handlers;
+
+  final DwPeerRateLimits _rateLimits;
 
   static const int maxIdempotencyKeyLength = 128;
 
@@ -237,6 +240,14 @@ final class DwCallEndpoint {
       final incident = DwServerIncident.newId();
       _log.warning('unknown call $path (incident $incident)');
       return DwApiResponse.failed(incident, failure: DwFailureKind.unknownCall);
+    }
+    final retryAfter = _rateLimits.check(
+      handler.callType,
+      http,
+      runtime.clock.now(),
+    );
+    if (retryAfter != null) {
+      return DwApiResponse.refused(DwCallRefusal.tooManyRequests(retryAfter));
     }
     _checkContentType(http, path);
     final isCommand = handler is DwCommandHandler;

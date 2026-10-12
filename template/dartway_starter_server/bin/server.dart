@@ -53,7 +53,15 @@ Future<void> main() async {
     database: env.server.database,
     storage: storage,
     port: env.server.port,
-    settings: DwServerSettings(allowedOrigins: env.server.allowedOrigins),
+    settings: DwServerSettings(
+      allowedOrigins: env.server.allowedOrigins,
+      trustedProxyNetworks: env.server.trustedProxyNetworks,
+      behindProxy: env.server.httpBehindProxy,
+      deploymentVersion: env.server.deploymentVersion,
+      // The project chooses which calls need peer quotas. With an ingress,
+      // declare its actual network before adding entries here.
+      callRateLimits: const <Type, DwCallRateLimit>{},
+    ),
     adminIdentifier: env.server.adminIdentifier,
   );
   await server.start(migrateOnly: env.server.migrateOnly);

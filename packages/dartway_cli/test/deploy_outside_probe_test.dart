@@ -61,6 +61,26 @@ void main() {
       expect(site.hosts.single, 'api.example.com');
     });
 
+    test(
+      'a healthy endpoint must report the selected revision when required',
+      () async {
+        const version = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+        for (final etag in [null, '"${'b' * 40}"', '"$version"']) {
+          site.handler = (r) => text(
+            r,
+            200,
+            'ok',
+            headers: {if (etag != null) HttpHeaders.etagHeader: etag},
+          );
+          final result = await site.probe.health(
+            'http://api.example.com',
+            version: version,
+          );
+          expect(result.passed, etag == '"$version"');
+        }
+      },
+    );
+
     test('app origin probes /dw/health', () async {
       site.handler = (r) {
         expect(r.uri.path, '/dw/health');

@@ -158,6 +158,50 @@ app on one server process.
 | `outboundTimeout` | 30 s | How long one outbound request (`ctx.http`) may take, connecting to last byte, unless the call names its own ([handlers](handlers-and-context.md#outbound-http)). |
 | `outboundMaxResponseBytes` | 10 MiB | The largest response body one outbound request reads, unless the call names its own; past it the exchange fails with `DwOutboundException`. |
 
+### Per-peer call quotas
+
+`DwServerSettings.callRateLimits` maps a registered request or command type to a
+`DwCallRateLimit`. For example, a public catalog can admit 30 requests per minute
+with 29 additional burst requests:
+
+```dart
+DwServerSettings(
+  callRateLimits: const {GetCatalog: DwCallRateLimit(requests: 30, burst: 29)},
+  trustedProxyNetworks: env.server.trustedProxyNetworks,
+  behindProxy: env.server.httpBehindProxy,
+  deploymentVersion: env.server.deploymentVersion,
+)
+```
+
+`GetCatalog` stands for the project's own registered call. A quota runs after
+compatibility and call lookup, before reading the body or querying the database.
+A refusal uses the existing `tooManyRequests` code, HTTP 429 and `Retry-After`;
+accepted requests are never delayed. Even an incomplete request body is refused
+immediately and its connection closed. Health, live sockets and in-process calls
+are unaffected. Each process keeps independent state, bounded by `maxPeers`
+(default 10,000 per call). At capacity, new peers are refused until idle entries
+expire; active peers are never evicted to make room. Restarting resets quotas;
+replicas do not share them.
+
+By default the peer is the TCP address and forwarding headers are ignored.
+Declare only actual ingress CIDRs in `trustedProxyNetworks`: the server walks
+`X-Forwarded-For` right to left from the transport peer and stops at the first
+untrusted address. A client-supplied prefix cannot select its quota key. Invalid
+or entirely trusted chains fall back to the transport address. IPv4-mapped IPv6
+and equivalent IPv6 spellings share a key. Broad trust such as `0.0.0.0/0` or
+`::/0` is refused. An ingress must append the actual peer to the header and the
+API must not expose a public port that bypasses it. Enabling quotas with
+`behindProxy: true` and no trusted networks fails before migrations or listening.
+
+The entry point wires the three environment fields shown above. Native Kamal
+sets `DW_HTTP_BEHIND_PROXY=true`; `trusted_proxy_networks` in public deployment
+configuration becomes `DW_TRUSTED_PROXY_NETWORKS`. Use the actual Docker network
+subnets, never guesses. Kamal supplies `KAMAL_VERSION`, a full commit SHA.
+With `deploymentVersion` wired, GET/HEAD `/health` and `/dw/health` report that
+revision as a quoted `ETag` and use `Cache-Control: no-store`. Local servers may
+omit the revision. No runtime protocol bump is required: refusals retain their
+existing wire shape and health metadata is outside the app protocol.
+
 ## Configuration comes from the environment
 
 There is no configuration file. The server is configured by its environment, read **once, at start,

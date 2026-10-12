@@ -101,12 +101,23 @@ class DwOutsideProbe {
 
   /// `GET <origin><path>` answers 200 `ok`: the server is up, migrated and
   /// reaches its database — through this host's proxy.
-  Future<DwProbeResult> health(String origin, {String path = '/health'}) async {
+  Future<DwProbeResult> health(
+    String origin, {
+    String path = '/health',
+    String? version,
+  }) async {
     final url = Uri.parse('$origin$path');
     final title = 'GET $url';
     try {
       final answer = await _send('GET', url);
       if (answer.status == 200 && answer.body.trim() == 'ok') {
+        if (version != null &&
+            answer.headers.value(HttpHeaders.etagHeader) != '"$version"') {
+          return DwProbeResult.fail(
+            title,
+            'healthy server is not the selected deployment SHA',
+          );
+        }
         return DwProbeResult.pass(title, '200 ok');
       }
       return DwProbeResult.fail(
@@ -509,9 +520,10 @@ List<Future<DwProbeResult> Function()> dwOutsideProbes(
   DwStack stack,
   DwOutsideProbe probe, {
   bool includeCanvasKitOrigin = true,
+  String? version,
 }) => [
-  () => probe.health(stack.apiOrigin),
-  () => probe.health(stack.appOrigin, path: '/dw/health'),
+  () => probe.health(stack.apiOrigin, version: version),
+  () => probe.health(stack.appOrigin, path: '/dw/health', version: version),
   () => probe.appIndex(stack.appOrigin),
   () => probe.webCache(stack.appOrigin),
   () => probe.webCompression(stack.appOrigin),

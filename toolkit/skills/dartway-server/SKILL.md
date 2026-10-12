@@ -347,3 +347,22 @@ and read `ctx.deliveryHint` inside `generateCode` or `deliverCode`; null means t
 Unknown hints refuse `dw.invalid` on `deliveryHint`. Every accepted choice requests a new ticket and
 shares the same identifier cooldown, request window and idempotency rules. Never implement a separate
 anonymous dispatcher or write framework ticket tables to route delivery.
+
+## HTTP ingress quotas
+
+For a public call needing a peer quota, declare its registered type in
+`DwServerSettings.callRateLimits` with a `DwCallRateLimit`. The default period is
+one minute; `burst` is the number of additional immediate requests. This runs
+before body reading and SQL and uses the existing `tooManyRequests` refusal.
+State is bounded by `maxPeers` per call and belongs to one process; do not describe
+it as a shared quota across replicas. Health, live and in-process calls are exempt.
+
+Wire `trustedProxyNetworks: env.server.trustedProxyNetworks`,
+`behindProxy: env.server.httpBehindProxy` and
+`deploymentVersion: env.server.deploymentVersion` in the server entry point.
+Forwarding headers are trusted only from declared actual CIDRs; the chain is
+walked right to left, so a forged client prefix cannot choose the quota key.
+A proxy deployment with quotas and no trust declaration fails before migrations.
+Native config's `trusted_proxy_networks` supplies `DW_TRUSTED_PROXY_NETWORKS`;
+Kamal supplies the full SHA in `KAMAL_VERSION`. Health reports the configured SHA
+as a quoted ETag for deployment checks. Never trust every address.

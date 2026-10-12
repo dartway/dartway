@@ -47,6 +47,48 @@ final routes = [
   });
   tearDown(() => root.deleteSync(recursive: true));
 
+  test(
+    'native generation refuses ingress snippets instead of silently discarding them',
+    () {
+      write('deploy/nginx.d/http/quota.conf', 'limit_req_zone fixture;\n');
+      expect(
+        () => DwKamalGenerator(root).render(),
+        throwsA(
+          isA<StateError>().having(
+            (error) => error.message.toString(),
+            'message',
+            contains('callRateLimits'),
+          ),
+        ),
+      );
+    },
+  );
+
+  test(
+    'native ingress trust and BBR are carried into generated configuration',
+    () {
+      write(
+        'deploy/config.yaml',
+        configYaml(extra: '  trusted_proxy_networks: [172.18.0.0/16]\n'),
+      );
+      final files = DwKamalGenerator(root).render();
+      final base = loadYaml(files['deploy/kamal/api.yml']!) as Map;
+      final stage = loadYaml(files['deploy/kamal/api.stage.yml']!) as Map;
+      expect((base['proxy'] as Map)['forward_headers'], true);
+      final web = loadYaml(files['deploy/kamal/web.yml']!) as Map;
+      expect((web['proxy'] as Map).containsKey('forward_headers'), false);
+      expect(
+        (base['proxy'] as Map)['run']['options']['sysctl'],
+        'net.ipv4.tcp_congestion_control=bbr',
+      );
+      expect(
+        (stage['env'] as Map)['clear']['DW_TRUSTED_PROXY_NETWORKS'],
+        '172.18.0.0/16',
+      );
+      expect((stage['env'] as Map)['clear']['DW_HTTP_BEHIND_PROXY'], 'true');
+    },
+  );
+
   YamlMap yaml(Map<String, String> files, String path) =>
       loadYaml(files[path]!) as YamlMap;
 
@@ -188,6 +230,8 @@ final routes = [
           '/project',
           '--env',
           '{env}',
+          '--version',
+          '{version}',
         ]);
         expect(
           studio['check']['image'],

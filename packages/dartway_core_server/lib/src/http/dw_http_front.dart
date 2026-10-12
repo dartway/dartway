@@ -131,7 +131,13 @@ final class DwHttpFront {
       };
       // Whatever a handler left unread is consumed before the answer, so the
       // peer can read it (see DwRequestBody).
-      await body.discard();
+      if (_ingressRefusal(request, status)) {
+        // An ingress quota may reject before a body has arrived. Answer now
+        // and close the connection rather than waiting for a slow sender.
+        request.response.persistentConnection = false;
+      } else {
+        await body.discard();
+      }
       await _write(request, status, headers, bytes);
     } catch (error, stackTrace) {
       // Writing failed (the peer went away) or a bug above: nothing to
@@ -165,10 +171,31 @@ final class DwHttpFront {
     dwSetStatus(response, status);
     headers.forEach(response.headers.set);
     response.contentLength = bytes.length;
+    if (_ingressRefusal(request, status)) {
+      // HttpResponse normally drains the incoming body before writing headers,
+      // even with persistentConnection=false. Detach to answer an ingress
+      // refusal immediately, then release the socket instead of retaining a
+      // slow sender for bodyReadTimeout.
+      response.persistentConnection = false;
+      final socket = await response.detachSocket();
+      try {
+        socket.add(bytes);
+        await socket.flush();
+        await socket.close();
+      } finally {
+        socket.destroy();
+      }
+      return;
+    }
     if (_stopping) response.persistentConnection = false;
     response.add(bytes);
     await response.close();
   }
+
+  static bool _ingressRefusal(HttpRequest request, int status) =>
+      status == 429 &&
+      request.method == DwHttpContract.callMethod &&
+      request.uri.path.startsWith(DwHttpContract.pathPrefix);
 
   Future<(int, Map<String, String>, List<int>)> _call(
     HttpRequest request,
@@ -207,7 +234,11 @@ final class DwHttpFront {
     if (_stopping) return _text(503, 'stopping');
     try {
       await runtime.db.query('SELECT 1');
-      return _text(200, 'ok');
+      return _text(200, 'ok', {
+        HttpHeaders.cacheControlHeader: 'no-store',
+        if (settings.deploymentVersion case final version?)
+          HttpHeaders.etagHeader: '"$version"',
+      });
     } catch (error) {
       _log.warning('health check: database unavailable', error: error);
       return _text(503, 'database unavailable');

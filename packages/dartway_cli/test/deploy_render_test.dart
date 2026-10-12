@@ -214,6 +214,7 @@ void main() {
       expect(server['env_file'], ['.env']);
       expect(Map.of(server['environment'] as YamlMap), {
         'PORT': '8080',
+        'DW_HTTP_BEHIND_PROXY': 'true',
         'DW_DATABASE_HOST': 'postgres',
         'DW_DATABASE_PORT': '5432',
         'DW_DATABASE_NAME': 'shop',

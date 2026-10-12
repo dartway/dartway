@@ -7,6 +7,7 @@ import '../checker/dw_check_type.dart';
 import '../deploy/deploy_check.dart';
 import '../deploy/deploy_target.dart';
 import '../deploy/remote_checks.dart';
+import '../deploy/kamal_runtime_checks.dart';
 import '../deploy/ssh_runner.dart';
 import '../deploy/stack.dart';
 import '../project_layout.dart';
@@ -208,6 +209,16 @@ class DeployCheckCommand extends Command<int> {
   DeployCheckCommand() {
     argParser
       ..addOption('env', help: 'Environment declared in deploy/config.yaml.')
+      ..addOption(
+        'engine',
+        allowed: ['compose', 'kamal'],
+        help:
+            'Deployment engine; defaults to Kamal when deploy/studio.yml exists.',
+      )
+      ..addOption(
+        'version',
+        help: 'Full deployed image SHA (Kamal); defaults to Git HEAD.',
+      )
       ..addFlag(
         'local',
         negatable: false,
@@ -247,6 +258,10 @@ class DeployCheckCommand extends Command<int> {
     final context = DwDeployContext(
       projectRoot: projectRoot,
       stack: stack,
+      engine: results.option('engine') == null
+          ? null
+          : DwDeployEngine.values.byName(results.option('engine')!),
+      version: results.option('version'),
       ssh: offline
           ? null
           : DwSshRunner(
@@ -256,6 +271,11 @@ class DeployCheckCommand extends Command<int> {
             ),
     );
 
+    if (context.engine == DwDeployEngine.compose && context.version != null) {
+      usageException(
+        '--version verifies native Kamal image identity, not Compose images.',
+      );
+    }
     stdout
       ..writeln('Deploy check [${target.environment}]')
       ..writeln('  server:    $sshUser@${target.host}')
@@ -280,7 +300,10 @@ class DeployCheckCommand extends Command<int> {
     final tally = _Tally();
 
     stdout.writeln('\nWorking copy');
-    for (final check in dwLocalDeployChecks) {
+    for (final check
+        in context.engine == DwDeployEngine.kamal
+            ? dwKamalLocalDeployChecks
+            : dwLocalDeployChecks) {
       _report(check, await check.evaluate(context), tally);
     }
 
@@ -289,7 +312,10 @@ class DeployCheckCommand extends Command<int> {
     } else {
       stdout.writeln('\nDNS, server and site');
       var sshUsable = true;
-      for (final check in dwRemoteDeployChecks) {
+      for (final check
+          in context.engine == DwDeployEngine.kamal
+              ? dwKamalRemoteDeployChecks
+              : dwRemoteDeployChecks) {
         if (check.requiresSsh && !sshUsable) {
           _report(
             check,

@@ -44,6 +44,9 @@ class DwSshResult {
 /// crypto dependency and reuses the user's existing keys, agent and
 /// `~/.ssh/config`. The OpenSSH client ships with macOS, Linux and Windows 10+.
 class DwSshRunner {
+  /// One literal shell argument; never command substitution or interpolation.
+  static String quote(String value) => "'${value.replaceAll("'", "'\"'\"'")}'";
+
   DwSshRunner({
     required this.host,
     required this.user,

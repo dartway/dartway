@@ -20,6 +20,18 @@ class DwKamalGenerator {
   final Directory projectRoot;
 
   Map<String, String> render() {
+    final snippets = Directory(p.join(projectRoot.path, 'deploy/nginx.d'));
+    if (snippets.existsSync() &&
+        snippets
+            .listSync(recursive: true)
+            .whereType<File>()
+            .any((file) => file.path.endsWith('.conf'))) {
+      throw StateError(
+        'Native Kamal cannot apply deploy/nginx.d snippets. '
+        'Move call quotas to DwServerSettings.callRateLimits and migrate '
+        'other ingress policies before generating Kamal destinations.',
+      );
+    }
     final layout = ProjectLayout.detect(projectRoot);
     final environments = DwDeployTarget.environmentsIn(projectRoot);
     for (final environment in environments) {
@@ -85,7 +97,14 @@ class DwKamalGenerator {
         'minimum_version': '2.12.0',
         'proxy': {
           'ssl': true,
-          'run': {'version': 'v0.10.2'},
+          // The app host reaches this ingress through its nginx. Preserve that
+          // chain and let the server stop at the first untrusted peer. The
+          // proxy still appends the actual TCP peer to direct API requests.
+          if (service == 'api') 'forward_headers': true,
+          'run': {
+            'version': 'v0.10.2',
+            'options': {'sysctl': 'net.ipv4.tcp_congestion_control=bbr'},
+          },
           'app_port': switch (service) {
             'api' => 8080,
             'storage' => 9000,
@@ -205,7 +224,14 @@ class DwKamalGenerator {
       'health': '/health',
       'check': {
         'image': 'ghcr.io/dartway/dartway-check:${checkImageTag(layout)}',
-        'args': ['--project', '/project', '--env', '{env}'],
+        'args': [
+          '--project',
+          '/project',
+          '--env',
+          '{env}',
+          '--version',
+          '{version}',
+        ],
       },
     });
     files['.github/workflows/images.yml'] =

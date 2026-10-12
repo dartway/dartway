@@ -2,6 +2,15 @@
 
 ## 0.22.0-dev.0
 
+- Add optional `DwCallRateLimit` per registered HTTP call type, bounded peer
+  state, explicit trusted proxy CIDRs and pre-body 429/Retry-After refusals.
+  Invalid declarations fail before migrations, including quotas behind an
+  ingress without trusted networks. Forwarded client prefixes cannot select
+  the peer; quotas are independent per process.
+- `DwServerEnvironment` reads native ingress declarations and `KAMAL_VERSION`;
+  wiring `DwServerSettings.deploymentVersion` adds no-store revision ETags to
+  GET/HEAD health endpoints, without changing the app wire protocol.
+
 - `GET /dw/health` and `HEAD /dw/health` use the same database health check
   as `/health`, so the app host can forward only `/dw/`; `POST /dw/health`
   remains a DTO call (#576).
