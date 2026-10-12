@@ -1,8 +1,12 @@
-import 'package:dartway_starter_flutter/core/app_version.dart';
 import 'package:dartway_starter_flutter/dartway_starter_app.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final appVersion = await readAppVersion();
+
   // Concrete development parameters live here; the app itself stays
   // environment agnostic.
   //
@@ -27,6 +31,28 @@ void main() {
 
   DartwayStarterApp(
     baseUrl: Uri.parse(backendUrl),
-    appVersion: appBuildVersion,
+    appVersion: appVersion,
   ).run();
+}
+
+Future<String> readAppVersion() async {
+  final PackageInfo info;
+  try {
+    info = await PackageInfo.fromPlatform();
+  } catch (error, stackTrace) {
+    // The app's uncaught-error pipeline is installed after this read.
+    debugPrint('Could not read app version: $error\n$stackTrace');
+    return '0.0.0+0';
+  }
+  return appVersionOf(info);
+}
+
+String appVersionOf(PackageInfo info) {
+  if (info.version.isEmpty) {
+    debugPrint('Platform app version is empty.\n${StackTrace.current}');
+    return '0.0.0+0';
+  }
+  return info.buildNumber.isEmpty
+      ? '${info.version}+0'
+      : '${info.version}+${info.buildNumber}';
 }

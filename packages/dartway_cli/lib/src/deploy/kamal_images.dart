@@ -13,6 +13,9 @@ String kamalImagesWorkflow(
     for (final service in services)
       {
         'service': service,
+        // Kamal refuses an image whose `service` label isn't the service it
+        // deploys; its own builder adds the label, a CI-built image must too.
+        'kamal_service': '${imageRepository.split('/').last}-$service',
         'dockerfile': switch (service) {
           'api' => '${layout.serverPackage}/Dockerfile',
           'web' => '${layout.flutterPackage}/Dockerfile',
@@ -116,7 +119,9 @@ jobs:
           platforms: linux/amd64
           push: ${{ steps.image.outputs.publish == 'true' }}
           tags: ${{ steps.image.outputs.tag }}
-          labels: org.opencontainers.image.source=https://github.com/${{ github.repository }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            service=${{ matrix.kamal_service }}
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: ${{ steps.image.outputs.publish == 'true' && format('type=gha,mode=max,scope={0}', matrix.service) || '' }}
 ''';

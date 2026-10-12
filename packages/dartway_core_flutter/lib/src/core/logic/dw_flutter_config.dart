@@ -70,9 +70,7 @@ class DwFlutterConfig {
   /// `debugPrint` and nothing else happens — set this to alert on it.
   final void Function(DwErrorReport report)? onErrorReport;
 
-  /// The app build, `<semver>+<build>` (`1.4.2+57`): shown in error reports
-  /// and, with the data layer, sent to the server on every call so it can
-  /// refuse a build below its minimum. Required by `DwFlutterCore`.
+  /// This build as the platform reports it, `<semver>+<build>`.
   final String? appVersion;
 
   /// Custom confirmation UI for `dw.action(confirmation: ...)`. Defaults to

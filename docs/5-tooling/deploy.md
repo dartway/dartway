@@ -36,16 +36,18 @@ dart run dartway_cli:dartway deploy kamal --check
 
 Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
 Generated files carry their source instructions. `--check` writes nothing and
-names every stale file, including the API config when a project route changes.
+names every stale file, including the web destination configs when a project
+route changes.
 `DwHttpRoute.get`, `.post` and `.any` must use string literal paths. Server routes
 match exact paths, with no `:id` parameters; put identifiers in the query or body.
 Each proxy prefix is the route's path itself: `/github` remains `/github`.
 A `/` route is refused because its proxy prefix would capture every web route.
-After adding a route, run `deploy kamal` and commit the regenerated API config;
-otherwise CI's `deploy kamal --check` fails. The API serves
-these prefixes plus `/dw` and `/health` on both API and app hosts, preserving the
-path; the web service catches all other app paths. Proxy buffering is off for
-API and storage.
+After adding a route, run `deploy kamal` and commit the regenerated web config;
+otherwise CI's `deploy kamal --check` fails. The API service is the root service
+on its own host only. On the app host, the web container's nginx proxies the
+paths in `DW_API_PATHS` — the route prefixes, `/dw` and `/health` — to
+`DW_API_ORIGIN`; it serves all other app paths itself. Proxy buffering is off
+for API and storage.
 
 Kamal generation refuses `requires: files:` and a deployed `site:` because this
 topology does not support them yet; use `deploy run` for those projects.
@@ -558,6 +560,12 @@ after the prune: cleanup warns only when the cache no kept image shares stays ab
 reports the shared bytes as information. The reported byte count is the
 observed increase in free space on Docker's data filesystem (negative changes are reported as zero;
 containerd may reclaim additional bytes asynchronously). The cache limit applies to the Docker daemon's builder across the machine, not only this stack.
+
+If an older CLI moved the image tag before it failed and left no usable rollback pin, rerun with
+`dart run dartway_cli:dartway deploy run --env <env> --without-rollback-image` to consciously allow this one deployment
+when the running image cannot be resolved. The flag is not stored in config. The CLI records an
+empty previous-image entry and warns that a failure leaves the service down until the next deploy.
+When the image can be resolved, it is still pinned for rollback even with the flag.
 
 That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
 steps after the interruption still need someone to run them: **`dart run dartway_cli:dartway deploy run --env <env>

@@ -363,6 +363,7 @@ void main() {
         bool digestResolvable = true,
         bool tagMatchesContainer = true,
         bool pinned = false,
+        bool withoutRollbackImage = false,
         String image = 'sha256:previous',
         bool fresh = true,
       }) async {
@@ -398,6 +399,7 @@ exit 0
           stack: stackFrom(),
           appDir: p.join(temp.path, 'shop'),
           storeDir: p.join(temp.path, 'state'),
+          withoutRollbackImage: withoutRollbackImage,
         );
         if (fresh) {
           final begun = await runner.beginLocalDeployment();
@@ -477,6 +479,12 @@ exit 0
             result.stderr,
             contains('Cannot resolve the running server image'),
           );
+          expect(
+            result.stderr.trim(),
+            endsWith(
+              'dartway deploy run --env staging --without-rollback-image',
+            ),
+          );
           expect(at(calls, 'stop -t 45'), -1);
           expect(at(calls, 'image tag sha256:unserved'), -1);
           expect(
@@ -487,6 +495,65 @@ exit 0
           );
         },
       );
+
+      test(
+        'an unresolved image can be explicitly waived, leaving no rollback after a failed migration',
+        () async {
+          final (result, calls) = await replace(
+            digestResolvable: false,
+            tagMatchesContainer: false,
+            withoutRollbackImage: true,
+            migrationFails: true,
+          );
+          expect(result.exitCode, 1);
+          expect(
+            File(
+              p.join(temp.path, 'state/deploy-run/server.previous'),
+            ).readAsStringSync(),
+            isEmpty,
+          );
+          expect(
+            result.stderr
+                .split('\n')
+                .where((line) => line.startsWith('WARNING:')),
+            [
+              'WARNING: this deploy has no rollback image for server; '
+                  'a failure leaves the service down until the next deploy.',
+            ],
+          );
+          expect(
+            result.stderr,
+            contains('there is no previous server to start again'),
+          );
+          expect(at(calls, 'stop -t 45 server'), isNot(-1));
+          expect(at(calls, 'image tag'), -1);
+          expect(at(calls, 'up -d --no-deps server'), -1);
+        },
+      );
+
+      for (final digestResolvable in [true, false]) {
+        test(
+          'the waiver still pins a resolvable ${digestResolvable ? 'digest' : 'tag'}',
+          () async {
+            final (result, calls) = await replace(
+              digestResolvable: digestResolvable,
+              withoutRollbackImage: true,
+            );
+            expect(result.ok, isTrue, reason: result.stderr);
+            expect(result.stderr, isNot(contains('WARNING:')));
+            expect(
+              File(
+                p.join(temp.path, 'state/deploy-run/server.previous'),
+              ).readAsStringSync().trim(),
+              'sha256:previous',
+            );
+            expect(
+              at(calls, 'image tag sha256:previous shop-server:dw-previous'),
+              isNot(-1),
+            );
+          },
+        );
+      }
 
       test(
         'an unresolvable manifest uses a tag only when the container holds its image',
@@ -820,6 +887,70 @@ esac
     }
 
     test(
+      'deploy run forwards the waiver and prints the successful build warning once',
+      () async {
+        final temp = Directory.systemTemp.createTempSync('dw_rollback_waiver_');
+        addTearDown(() => temp.deleteSync(recursive: true));
+        final bin = Directory(p.join(temp.path, 'bin'))..createSync();
+        final journal = Directory(p.join(temp.path, 'journal'))..createSync();
+        final calls = File(p.join(temp.path, 'calls'));
+        final docker = File(p.join(bin.path, 'docker'))
+          ..writeAsStringSync('''
+#!/bin/sh
+echo "\$*" >> '${calls.path}'
+case "\$*" in
+  *" ps -aq server"*) echo old-container ;;
+  "inspect -f {{.Config.Image}}"*) echo shop-server:latest ;;
+  "inspect -f {{.Image}}"*) echo sha256:manifest ;;
+  "inspect -f {{.Id}}"*) echo old-container ;;
+  "image inspect -f {{.Id}} shop-server:latest") echo sha256:unserved ;;
+  "image inspect"*) exit 1 ;;
+  "ps -aq --no-trunc --filter ancestor="*) echo other-container ;;
+esac
+''');
+        Process.runSync('chmod', ['+x', docker.path]);
+        final site = await _VerifiedSite.start();
+        addTearDown(site.close);
+        final server = _IdentityServer(
+          listing: 'shop_postgres_data\n',
+          buildRun: (input) =>
+              LocalShell(
+                environment: {
+                  'PATH': '${bin.path}:${Platform.environment['PATH']}',
+                },
+              ).run(
+                input
+                    .replaceAll('/home/deployer/shop', temp.path)
+                    .replaceAll(
+                      '/home/deployer/.config/shop/deploy-run',
+                      journal.path,
+                    ),
+              ),
+        );
+        final result = await HttpOverrides.runWithHttpOverrides(
+          () => deploy(server, stackFrom(), const ['--without-rollback-image']),
+          site.overrides,
+        );
+        expect(result.code, 0, reason: result.human);
+        expect(
+          File(p.join(journal.path, 'server.previous')).readAsStringSync(),
+          isEmpty,
+        );
+        expect(calls.readAsStringSync(), isNot(contains('image tag')));
+        const warning =
+            'WARNING: this deploy has no rollback image for server; '
+            'a failure leaves the service down until the next deploy.';
+        expect(
+          result.human.split('\n').where((line) => line.contains(warning)),
+          ['  $warning'],
+        );
+        expect(result.events.where((event) => event['event'] == 'notice'), [
+          containsPair('message', warning),
+        ]);
+      },
+    );
+
+    test(
       'resume retries failed outside probes without replacing services',
       () async {
         final site = await _VerifiedSite.start();
@@ -871,6 +1002,7 @@ esac
             // Only the unshared record counts against the budget; the shared
             // one belongs to a kept image and is reported, not warned about.
             ..writeAsStringSync(stuckCache ? 'false 11GB\ntrue 2GB\n' : '');
+          final dfCalls = File(p.join(temp.path, 'df-calls'));
           final docker = File(p.join(bin.path, 'docker'))
             ..writeAsStringSync('''
 #!/bin/sh
@@ -881,7 +1013,18 @@ case "\$*" in
     if [ -f '${fail.path}' ]; then echo 'prune refused' >&2; exit 1; fi ;;
 esac
 ''');
-          Process.runSync('chmod', ['+x', docker.path]);
+          final df = File(p.join(bin.path, 'df'))
+            // Cleanup measures twice. Keep both readings on the test disk so
+            // unrelated runner activity cannot become reported freed bytes.
+            ..writeAsStringSync('''
+#!/bin/sh
+echo "\$*" >> '${dfCalls.path}'
+cat <<'EOF'
+Filesystem 1024-blocks Used Available Capacity Mounted on
+test-disk 100000 50000 50000 50% ${temp.path}
+EOF
+''');
+          Process.runSync('chmod', ['+x', docker.path, df.path]);
           Future<DwSshResult> cleanup(String input) =>
               LocalShell(
                 environment: {
@@ -931,6 +1074,10 @@ esac
           expect(warning['images_removed'], 0);
           expect(warning['cache_records_removed'], 0);
           expect(warning['freed_bytes'], 0);
+          expect(dfCalls.readAsLinesSync(), [
+            '-Pk ${temp.path}',
+            '-Pk ${temp.path}',
+          ]);
           expect(warning['cache_shared_bytes'], stuckCache ? 2000000000 : 0);
           expect(
             warning['message'],
@@ -981,6 +1128,12 @@ esac
           );
           expect(resumedCleanup['warning'], isFalse);
           expect(resumedCleanup['cache_shared_bytes'], 11000000000);
+          expect(dfCalls.readAsLinesSync(), [
+            '-Pk ${temp.path}',
+            '-Pk ${temp.path}',
+            '-Pk ${temp.path}',
+            '-Pk ${temp.path}',
+          ]);
         },
       );
     }
@@ -1612,9 +1765,11 @@ class _IdentityServer extends RecordingSsh {
     this.record,
     this.exitCode = 0,
     this.cleanupRun,
+    this.buildRun,
   });
 
   final Future<DwSshResult> Function(String)? cleanupRun;
+  final Future<DwSshResult> Function(String)? buildRun;
 
   final String listing;
   final String? record;
@@ -1666,8 +1821,13 @@ class _IdentityServer extends RecordingSsh {
     String input,
   ) async {
     started.add((command: command, script: input));
-    if (input.contains('docker builder prune') && cleanupRun != null) {
-      final result = await cleanupRun!(input);
+    final execute = input.contains('docker builder prune')
+        ? cleanupRun
+        : input.contains(' build\n')
+        ? buildRun
+        : null;
+    if (execute != null) {
+      final result = await execute(input);
       final nonce = _nonce.firstMatch(command)!.group(0)!;
       return DwSshResult(
         exitCode: 0,

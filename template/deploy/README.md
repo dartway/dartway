@@ -38,7 +38,9 @@ builds each image once for `linux/amd64` and pushes its commit SHA to GHCR;
 existing tags are skipped, and GHA caches keep unchanged Flutter SDK layers.
 
 Destinations are `stage` and `prod`. Kamal 2.12 runs kamal-proxy v0.10.2; the API
-routes `/dw`, `/health` and literal project HTTP-route prefixes on both hosts.
+owns the root of its API host. The web destination receives the API origin and
+literal server route prefixes as environment, then its nginx entrypoint proxies
+`/dw/`, `/health` and those routes so they remain available on the app host.
 Web release builds use `Uri.base.origin`, so the same image serves both
 destinations without build arguments. The Studio binding validates tokens for
 the same app origin. A non-literal route or the root path (`/`)
@@ -63,7 +65,7 @@ below remains available until this project moves.
 | `config.yaml` | every environment of this project: `local` — what your own machine starts a server with — and each deployment's machine, repository, `api` / `app` / optional `site` hosts and optional storage. Plus `requires`, what the project needs wherever it runs |
 | `../dartway_starter_server/Dockerfile` | the server image: `dart compile exe`, the binary as PID 1 |
 | `../dartway_starter_flutter/Dockerfile` | the web image; a release calls `Uri.base.origin` |
-| `../dartway_starter_flutter/nginx.conf` | how that image serves the build — files only — and above all **what a browser may keep** |
+| `../dartway_starter_flutter/nginx.conf` | how that image serves the build and includes the container-start API proxy routes — and above all **what a browser may keep** |
 | `compose.override.yml` | anything this project adds to a standard deployment — create it when that happens. Read from the checkout on every deploy |
 | `nginx.d/{http,api,app}/*.conf` | extra directives for the front proxy, if ever needed. A `proxy_pass` here must name a service the stack declares — `deploy check` and the deploy both refuse otherwise |
 | `secrets.yaml` | **git-ignored**: the half of every environment that cannot be committed — your own `local` keys, and the maintainer's copy of each server's, moved with `secret push` / `secret pull` |
