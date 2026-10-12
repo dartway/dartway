@@ -59,8 +59,10 @@ into the project's `lib/ui_kit/3_special/media/`, add the `part` lines, restyle 
   `waiting` shows a spinner only: it does not change the button, controls timer or
   observation. `play()` with play intent is a no-op; at the end it restarts at zero.
 - Controls listen to `session.status`; timelines listen to `session.position`.
-  `playback` remains their merge. A seek publishes `seekTarget` immediately and
-  ignores stale ticks; one seek runs and the latest queued target wins. Skips count
+  `playback` remains their merge. Seeking away from the end clears `ended` at
+  once, paused; play during that seek keeps its target and starts the engine after
+  the seek settles. A seek publishes `seekTarget` immediately and ignores stale
+  ticks; one seek runs and the latest queued target wins. Skips count
   from the displayed position. A timeline thumb reads its drag, then `seekTarget`,
   then the playback position. `session.hasReallyPlayed` reports real playback of
   the current item.

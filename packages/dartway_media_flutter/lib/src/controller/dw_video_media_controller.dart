@@ -154,12 +154,8 @@ final class DwVideoMediaController extends DwMediaEngineController {
 }
 
 final class _DwVideoPlayerController extends VideoPlayerController {
-  _DwVideoPlayerController.networkUrl(
-    super.url, {
-    super.closedCaptionFile,
-    super.videoPlayerOptions,
-    super.httpHeaders,
-  }) : super.networkUrl();
+  _DwVideoPlayerController.networkUrl(super.url, {super.videoPlayerOptions})
+    : super.networkUrl();
 
   int _seekEpoch = 0;
   int _seeking = 0;

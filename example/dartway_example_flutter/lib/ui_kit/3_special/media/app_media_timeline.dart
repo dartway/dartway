@@ -40,9 +40,7 @@ class AppMediaTimeline extends HookWidget {
               secondaryTrackValue: known
                   ? playback.buffered.inMilliseconds.clamp(0, total).toDouble()
                   : null,
-              onChanged: known
-                  ? (value) => dragging.value = value
-                  : null,
+              onChanged: known ? (value) => dragging.value = value : null,
               onChangeEnd: known
                   ? (value) {
                       session.seek(Duration(milliseconds: value.round()));

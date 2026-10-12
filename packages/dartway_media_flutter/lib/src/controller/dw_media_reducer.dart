@@ -159,9 +159,7 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
       next = next.copyWith(
         intent: DwMediaPlayIntent.pause,
         waiting: false,
-        playState: next.isEnded || next.isError
-            ? next.playState
-            : resting(),
+        playState: next.isEnded || next.isError ? next.playState : resting(),
       );
     case SeekCommand(:final target):
       if (next.isError) break;
@@ -174,7 +172,13 @@ MediaPlayerState reduceMedia(MediaPlayerState state, MediaEvent event) {
       played = false;
       seekEpoch++;
       needsEngineAnchor = false;
-      next = next.copyWith(position: clamped, seekTarget: clamped);
+      next = next.copyWith(
+        position: clamped,
+        seekTarget: clamped,
+        playState: next.isEnded && clamped < next.duration
+            ? DwMediaPlayState.paused
+            : next.playState,
+      );
     case SeekSettled(:final target):
       if (next.seekTarget == target && !next.isError) {
         anchor = target;

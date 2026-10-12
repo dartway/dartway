@@ -93,8 +93,11 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
   a spinner. Buttons draw from intent and call `togglePlay()`; controls timers and
   observation do not react to waiting. Redundant `play()` does nothing; at an end it
   seeks to zero and plays. `hasReallyPlayed` reports real playback of the current item.
-  A seek sets `seekTarget` and the displayed position immediately; stale ticks are
-  ignored until arrival within 200 ms or completion. One seek runs and only the latest
+  A seek sets `seekTarget` and the displayed position immediately. A video position
+  read is accepted only if no seek overlapped it. Seeking away from the end clears
+  `ended` immediately, paused; play during that seek keeps its target and waits for
+  the seek to settle before starting the engine. Stale engine ticks are ignored
+  until arrival within 200 ms or completion. One seek runs and only the latest
   queued target follows it. Skips count from the displayed target. A timeline thumb
   reads its active drag, then `seekTarget`, then the playback position. **An error stays inside
   the player**: the state turns `error`, `onError` fires, and `retry()` re-resolves the source and

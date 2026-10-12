@@ -46,9 +46,9 @@ final class DwAudioMediaController extends DwMediaEngineController {
       player.playbackEventStream.listen((event) {
         if (!identical(_player, player)) return;
         _playbackEvent = event;
-        final beforeSeek = _seekStartedAt case final started?
-            ? event.updateTime.isBefore(started)
-            : false;
+        final started = _seekStartedAt;
+        final beforeSeek =
+            started != null && event.updateTime.isBefore(started);
         _onUpdate(
           player,
           event.updatePosition,
@@ -64,17 +64,12 @@ final class DwAudioMediaController extends DwMediaEngineController {
     _onUpdate(player, player.position);
   }
 
-  void _onUpdate(
-    AudioPlayer player,
-    Duration position, {
-    int? seekEpoch,
-  }) {
+  void _onUpdate(AudioPlayer player, Duration position, {int? seekEpoch}) {
     if (!identical(_player, player)) return;
     final event = _playbackEvent ?? player.playbackEvent;
     final processingState = event.processingState;
-    final beforeSeek = _seekStartedAt case final started?
-        ? event.updateTime.isBefore(started)
-        : false;
+    final started = _seekStartedAt;
+    final beforeSeek = started != null && event.updateTime.isBefore(started);
     final factSeekEpoch =
         seekEpoch ??
         (beforeSeek ? _preSeekEpoch : null) ??
@@ -87,8 +82,7 @@ final class DwAudioMediaController extends DwMediaEngineController {
             processingState == ProcessingState.loading,
         buffering: processingState == ProcessingState.buffering,
         ended: processingState == ProcessingState.completed,
-        playing:
-            player.playing && processingState == ProcessingState.ready,
+        playing: player.playing && processingState == ProcessingState.ready,
         position: position,
         duration: event.duration ?? Duration.zero,
         buffered: event.bufferedPosition,

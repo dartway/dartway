@@ -375,6 +375,8 @@ abstract class DwMediaEngineController extends DwMediaController {
     _dispatch(const PlayCommand());
     if (!_loaded) return;
     if (restart) await seek(Duration.zero);
+    final seeking = _seekRunning;
+    if (seeking != null) await seeking;
     if (_state.value.intent == DwMediaPlayIntent.play) await _playEngine();
   }
 

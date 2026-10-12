@@ -64,9 +64,12 @@ void main() {
     expect(session.hasReallyPlayed, isTrue);
     track.startBuffering(at: beforeBuffering.position);
     await dwSettleMedia(tester);
+    final buffering = session.position.value;
     await tester.pump(const Duration(seconds: 2));
-    expect(session.position.value, beforeBuffering);
-    await session.pause();
+    expect(session.position.value, buffering);
+    final pausing = session.pause();
+    await dwSettleMedia(tester);
+    await pausing;
     expect(
       manager.pendingPlaybackReports.single.intervals.single.end,
       beforeBuffering.position,
@@ -336,6 +339,7 @@ void main() {
       await session.play();
       await dwSettleMedia(tester);
       track.advanceTo(const Duration(seconds: 1));
+      track.stopBuffering();
       await tester.pump(const Duration(seconds: 1));
       expect(session.hasReallyPlayed, isTrue);
       session.minimize();

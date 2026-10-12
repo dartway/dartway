@@ -167,6 +167,51 @@ void main() {
     await endSession(tester, session);
   });
 
+  for (final endedBySeek in [false, true]) {
+    testWidgets('play during a backward seek from end resumes at its target '
+        '(${endedBySeek ? 'seek' : 'playback'})', (tester) async {
+      final manager = DwMediaSessionManager(
+        config: const DwMediaConfig(resume: null),
+      );
+      final session = manager.open(items: [videoItem('backward-from-end')]);
+      final video = await rig.loadVideo(tester);
+      if (endedBySeek) {
+        await session.seek(const Duration(seconds: 100));
+      } else {
+        await session.play();
+        await rig.playVideoTo(tester, const Duration(seconds: 1));
+        video.finish();
+        await tester.pump();
+      }
+      expect(session.status.value.isEnded, isTrue);
+      final previousSeeks = video.seekCalls.length;
+
+      final gate = Completer<void>();
+      video.seekBarrier = gate.future;
+      final seeking = session.seek(const Duration(seconds: 30));
+      expect(session.status.value.isEnded, isFalse);
+      expect(session.status.value.playState, DwMediaPlayState.paused);
+      expect(session.status.value.intent, DwMediaPlayIntent.pause);
+      expect(session.position.value.position, const Duration(seconds: 30));
+      expect(session.position.value.seekTarget, const Duration(seconds: 30));
+
+      final playing = session.play();
+      expect(session.position.value.position, const Duration(seconds: 30));
+      expect(video.seekCalls.skip(previousSeeks), [
+        const Duration(seconds: 30),
+      ]);
+      gate.complete();
+      await seeking;
+      await playing;
+      expect(video.seekCalls.skip(previousSeeks), [
+        const Duration(seconds: 30),
+      ]);
+      expect(video.position, const Duration(seconds: 30));
+      expect(video.isPlaying, isTrue);
+      await endSession(tester, session);
+    });
+  }
+
   testWidgets('error during a seek survives its late completion', (
     tester,
   ) async {

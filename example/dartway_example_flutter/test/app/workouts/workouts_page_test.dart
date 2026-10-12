@@ -152,6 +152,10 @@ void main() {
     expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
 
     slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(15000);
+    await tester.pump();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 15000);
+    slider = tester.widget<Slider>(find.byType(Slider));
     slider.onChanged!(20000);
     await tester.pump();
     slider = tester.widget<Slider>(find.byType(Slider));
@@ -162,6 +166,8 @@ void main() {
 
     gate.complete();
     await tester.pump();
+    await playTo(tester, const Duration(seconds: 21));
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 21000);
     await stop(tester, app);
   });
 
