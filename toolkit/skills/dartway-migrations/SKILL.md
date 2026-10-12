@@ -110,7 +110,9 @@ diff `check` compares against.
 - **A migration changes the schema; it writes rows only to carry them across that change**, through
   `m.backfill('UPDATE …', params: {…})`, reading with `m.query` (`migrationChangesData` holds this).
   Content is a `DwSeedRows` step (`dartway-server`); `dw_*` tables are never written, a settings table is
-  carried with `m.carrySettings(…)`.
+  carried with `m.carrySettings(…)` in release N, which stops reading the old table but keeps it for
+  rollback to the previous image. Release N+1 drops that table, once no running code relies on it,
+  following the same [expand/contract rule](#expand-then-contract) as a rename.
 - Transactional by default; `bool get transactional => false` only for what Postgres refuses inside one
   (`CREATE INDEX CONCURRENTLY`) — a crash leaves it `dirty`, repaired by hand.
 - One concern per migration, named after the change; `dependsOn` only across namespaces.

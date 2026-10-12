@@ -2,6 +2,9 @@
 
 ## 0.25.0-dev.0
 
+- Toolkit: settings carry keeps the old table through release N and drops it in N+1; the
+  constitution lists expand/contract across production releases as a rule held by review (#542).
+
 - Fix: `deploy run --without-rollback-image` unblocks a stand whose running image cannot be
   resolved after an older CLI moved its tag without leaving a rollback pin. The refusal names the
   rerun command; opting in warns that a failure leaves the service down until the next deploy.
