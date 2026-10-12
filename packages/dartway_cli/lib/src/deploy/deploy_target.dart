@@ -71,10 +71,15 @@ class DwDeployTarget {
     this.firewallPorts = const [],
     this.requiredSecrets = const [],
     this.requiredSecretFiles = const [],
+    this.trustedProxyNetworks = const [],
   });
 
   /// Environment name — the top-level key in `deploy/config.yaml`.
   final String environment;
+
+  /// Explicit CIDRs of the deployment's ingress network, forwarded to the
+  /// server as DW_TRUSTED_PROXY_NETWORKS. Empty until peer quotas are adopted.
+  final List<String> trustedProxyNetworks;
 
   final String host;
   final String sshUser;
@@ -403,6 +408,10 @@ class DwDeployTarget {
         '10GB';
     guarded(() => _diskBytes(buildCacheKeep, 'build_cache_keep'));
 
+    final trustedProxyNetworks =
+        guarded(() => reader.optionalStringList('trusted_proxy_networks')) ??
+        const <String>[];
+
     if (problems.isEmpty) {
       final target = DwDeployTarget(
         environment: environment,
@@ -426,6 +435,7 @@ class DwDeployTarget {
         firewallPorts: firewallPorts,
         requiredSecrets: requiredSecrets,
         requiredSecretFiles: requiredSecretFiles,
+        trustedProxyNetworks: trustedProxyNetworks,
       );
       problems.addAll(target._domainProblems(source));
       if (problems.isEmpty) return target;
@@ -536,6 +546,7 @@ class DwDeployTarget {
     'build_cache_keep',
     'firewall_ports',
     'requires',
+    'trusted_proxy_networks',
   };
 
   static void _unknownKeys(

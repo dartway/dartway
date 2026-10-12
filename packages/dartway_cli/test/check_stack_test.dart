@@ -42,6 +42,8 @@ void main() {
             image!,
             '--env',
             destination,
+            '--version',
+            'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
           ]);
           // .invalid hosts intentionally have no deployment. Each selected probe
           // must run and report its own failure; none can silently skip.

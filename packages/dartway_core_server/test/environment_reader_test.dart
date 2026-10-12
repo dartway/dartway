@@ -156,6 +156,23 @@ void main() {
       expect(environment.provisionStorage, isFalse);
     });
 
+    test('reads native ingress declarations without project parsing', () {
+      const revision = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+      final environment = read({
+        ...database,
+        'DW_TRUSTED_PROXY_NETWORKS': '172.18.0.0/16, fd00::/64',
+        'DW_HTTP_BEHIND_PROXY': 'true',
+        'KAMAL_VERSION': revision,
+      });
+      expect(environment.trustedProxyNetworks, ['172.18.0.0/16', 'fd00::/64']);
+      expect(environment.httpBehindProxy, true);
+      expect(environment.deploymentVersion, revision);
+      final local = read(database);
+      expect(local.trustedProxyNetworks, isEmpty);
+      expect(local.httpBehindProxy, false);
+      expect(local.deploymentVersion, isNull);
+    });
+
     test('defaults the port to 8080 and has no origins', () {
       final environment = read(database);
       expect(environment.port, 8080);

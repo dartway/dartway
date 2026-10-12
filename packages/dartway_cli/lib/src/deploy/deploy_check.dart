@@ -14,6 +14,7 @@ import 'secret_store.dart';
 import 'ssh_runner.dart';
 import 'stack.dart';
 import 'web_cache.dart';
+import 'kamal_runtime_checks.dart';
 
 /// Where a check can run.
 ///
@@ -22,13 +23,24 @@ import 'web_cache.dart';
 /// deployed site over HTTPS.
 enum DwDeployCheckStage { local, remote }
 
+/// Two explicit deployment contracts; native checks never infer success from
+/// Compose resources remaining on the same host.
+enum DwDeployEngine { compose, kamal }
+
 /// Everything a check is allowed to look at.
 class DwDeployContext {
   DwDeployContext({
     required this.projectRoot,
     required this.stack,
     DwSshRunner? ssh,
-  }) : ssh = ssh == null
+    DwDeployEngine? engine,
+    this.version,
+  }) : engine =
+           engine ??
+           (File(p.join(projectRoot.path, 'deploy/studio.yml')).existsSync()
+               ? DwDeployEngine.kamal
+               : DwDeployEngine.compose),
+       ssh = ssh == null
            ? null
            : DwMaskedSshRunner(
                ssh,
@@ -39,6 +51,12 @@ class DwDeployContext {
 
   final Directory projectRoot;
   final DwStack stack;
+  final DwDeployEngine engine;
+
+  /// Full image SHA for native checks. Otherwise the checkout's HEAD is used.
+  final String? version;
+
+  late final DwKamalRuntime kamal = DwKamalRuntime(this);
 
   /// Absent when the run is offline; checks that need it declare
   /// [DwDeployCheck.requiresSsh] and are skipped instead of failing.

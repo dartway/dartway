@@ -888,12 +888,21 @@ Future<DwDeployVerdict> _checkSecretsMatchLocal(DwDeployContext context) async {
 /// socket through both hosts, and — where they exist — the site and the
 /// storage CORS rule.
 Future<DwDeployVerdict> _checkOutside(DwDeployContext context) async {
+  String? version;
+  if (context.engine == DwDeployEngine.kamal) {
+    try {
+      version = await context.kamal.version;
+    } on StateError catch (error) {
+      return DwDeployVerdict.fail(error.message.toString());
+    }
+  }
   final results = [
     // CanvasKit is reported separately by the warning-severity check.
     for (final probe in dwOutsideProbes(
       context.stack,
       DwOutsideProbe(),
       includeCanvasKitOrigin: false,
+      version: version,
     ))
       await probe(),
   ];

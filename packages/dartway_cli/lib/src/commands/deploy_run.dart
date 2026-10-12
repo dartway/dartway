@@ -108,6 +108,7 @@ Future<int> runDeploy(
   // The working-copy checks are cheap and catch the mismatches that otherwise
   // surface as a half-deployed server.
   final context = DwDeployContext(
+    engine: DwDeployEngine.compose,
     projectRoot: projectRoot,
     stack: stack,
     ssh: ssh,

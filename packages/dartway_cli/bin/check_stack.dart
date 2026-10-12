@@ -16,6 +16,7 @@ Future<void> main(List<String> arguments) async {
       help: 'Read-only project checkout.',
     )
     ..addOption('env', help: 'Kamal destination: stage or prod.')
+    ..addOption('version', help: 'Required immutable deployment SHA.')
     ..addFlag('help', abbr: 'h', negatable: false);
   try {
     final args = parser.parse(arguments);
@@ -29,6 +30,10 @@ Future<void> main(List<String> arguments) async {
       _ => throw ArgumentError('Specify --env stage or --env prod.'),
     };
     final root = Directory(args.option('project')!);
+    final version = args.option('version');
+    if (version == null || !RegExp(r'^[0-9a-f]{40}$').hasMatch(version)) {
+      throw ArgumentError('Specify --version <full deployment SHA>.');
+    }
     final layout = ProjectLayout.detect(root);
     final target = DwDeployTarget.load(
       projectRoot: root,
@@ -42,8 +47,8 @@ Future<void> main(List<String> arguments) async {
     );
     final probe = DwOutsideProbe();
     final checks = [
-      () => probe.health(stack.apiOrigin),
-      () => probe.health(stack.appOrigin),
+      () => probe.health(stack.apiOrigin, version: version),
+      () => probe.health(stack.appOrigin, path: '/dw/health', version: version),
       () => probe.liveUpgrade(stack.apiOrigin),
       () => probe.liveUpgrade(stack.appOrigin, browserOrigin: stack.appOrigin),
       () => probe.appIndex(stack.appOrigin),

@@ -2,6 +2,16 @@
 
 ## 0.25.0-dev.0
 
+- Native `deploy check` selects Kamal from the Studio manifest and verifies the
+  selected SHA, actual TLS routing, native data/secret mounts, BBR and explicit
+  ingress trust, without inspecting secret environments. Compose `deploy run`
+  retains its own checks. Native generation refuses nginx snippets rather than
+  silently dropping policies.
+- **BREAKING (native check contract):** the outside-only check image requires
+  `--version <full SHA>` and verifies it on API `/health` and app `/dw/health`.
+  Generated manifests now include `{version}`. Regenerate and wire server health
+  metadata; see the native-check migration note.
+
 - Kamal destinations support `requires.files`: individual read-only API mounts
   and an executable pre-app-boot hook that checks file metadata over Kamal's
   configured SSH transport, without reading contents. Existing `secret put-file`

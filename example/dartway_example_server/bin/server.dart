@@ -60,7 +60,15 @@ Future<void> main() async {
       providers: AppPush.providers(env.push),
       eligibility: ProfileAccess.pushEligibility,
     ),
-    settings: DwServerSettings(allowedOrigins: env.server.allowedOrigins),
+    settings: DwServerSettings(
+      allowedOrigins: env.server.allowedOrigins,
+      trustedProxyNetworks: env.server.trustedProxyNetworks,
+      behindProxy: env.server.httpBehindProxy,
+      deploymentVersion: env.server.deploymentVersion,
+      // The project chooses which calls need peer quotas. With an ingress,
+      // declare its actual network before adding entries here.
+      callRateLimits: const <Type, DwCallRateLimit>{},
+    ),
     adminIdentifier: env.server.adminIdentifier,
   );
   await server.start(migrateOnly: env.server.migrateOnly);

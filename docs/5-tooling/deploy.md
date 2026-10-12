@@ -45,7 +45,9 @@ available on the API host. Proxy buffering is off for API and storage.
 Kamal generation refuses a deployed `site:` because this topology does not
 support it yet; use `deploy run` for those projects.
 Kamal 2.12 uses kamal-proxy v0.10.2, with 30-second deployment
-and drain timeouts and five retained containers.
+and drain timeouts and five retained containers. The native proxy is configured
+with `net.ipv4.tcp_congestion_control=bbr`; provision BBR on the Linux host before
+booting it.
 
 The generated Images workflow runs after the project's `CI` workflow completes
 successfully. Image publication follows the `branch:` values of the configured
@@ -71,6 +73,45 @@ their value and the `project:` key to set explicitly. Kamal and
 Images use the same project identity without lowercasing it. Configs list secret
 names only, including required project secrets; Studio supplies their values,
 SSH credentials and `KAMAL_REGISTRY_PASSWORD`. `ssh_user` comes from the target.
+
+### Native checks and ingress policy
+
+`deploy check` selects its engine from `deploy/studio.yml`: a native manifest
+selects Kamal; projects without one retain Compose. `--engine kamal` or
+`--engine compose` selects it explicitly. `deploy run` remains the Compose
+operator and always checks Compose. Generating a manifest does not deploy it.
+
+```bash
+dart run dartway_cli:dartway deploy check --env staging --local
+dart run dartway_cli:dartway deploy check --env staging --version <full-commit-sha>
+```
+
+Without `--version`, native operator checks use the checkout's HEAD. A branch
+name or abbreviated SHA is refused. Native checks verify generated files, the
+running service/role/destination and selected image SHA, health, actual TLS
+routes and active targets, BBR in the proxy namespace, per-file read-only secret
+mounts, and the native Postgres/storage mounts. A healthy replacement container
+with the old route still active fails. An overlapping host claim, rollout or
+read target fails. Docker inspection projects only identities, health status,
+mount metadata and network addresses; it never reads container environments or
+health logs. These checks do not prove stored data: prove a backup restore before
+changing engines.
+
+Declare the actual `kamal` network subnets under `trusted_proxy_networks` for each
+destination, then wire `DwServerEnvironment.trustedProxyNetworks`,
+`httpBehindProxy` and `deploymentVersion` into `DwServerSettings` as described in
+[server configuration](../4-server/app-server.md#per-peer-call-quotas). Native
+checks require this explicit trust and compare it with the actual Docker network.
+The Docker network must exist before that check can pass. The generated API
+proxy sets `forward_headers: true` to preserve the chain from the app host;
+kamal-proxy still appends its actual TCP peer. Web ingress keeps Kamal's TLS
+default, replacing incoming forwarding headers. Do not set `client_ip_header`
+to an untrusted public header.
+
+Generation refuses `deploy/nginx.d/*.conf`: native Kamal does not run the Compose
+front nginx and cannot silently preserve its policies. Move per-call peer quotas
+to `DwServerSettings.callRateLimits`; review all other snippets before removing
+them. Compose remains available for a deployment that needs those policies.
 
 ### File secrets
 
@@ -111,7 +152,12 @@ Studio's deploy runner must preserve the generated hooks and deliver files
 before invoking Kamal. No Studio file-upload interface is supplied by this CLI.
 
 The Studio check image reads a checkout mounted read-only at `/project`, with
-`--project /project --env stage` (or `prod`). It verifies TLS by making HTTPS
+`--project /project --env stage --version <full-commit-sha>` (or `prod`).
+The generated manifest supplies `{version}` as an argument placeholder: the
+runner must substitute the selected deployment SHA, not the framework image tag.
+This image is an outside-only checker and requires no SSH, Docker socket or Git.
+Both API `/health` and app `/dw/health` must return the selected SHA in `ETag`; a
+healthy old deployment fails. It verifies TLS by making HTTPS
 requests, health on both hosts, the live socket hello, web caching and bundled
 storage visibility and CORS preflights on both buckets, and exits nonzero on a failure.
 With bundled storage, the API's

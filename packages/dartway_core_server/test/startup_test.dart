@@ -56,6 +56,78 @@ void main() {
       fail('the server started');
     }
 
+    for (final (settings, message) in <(DwServerSettings, String)>[
+      (
+        const DwServerSettings(
+          callRateLimits: {ListNotes: DwCallRateLimit(requests: 0)},
+        ),
+        'requests must be positive',
+      ),
+      (
+        const DwServerSettings(
+          callRateLimits: {
+            ListNotes: DwCallRateLimit(requests: 1, period: Duration.zero),
+          },
+        ),
+        'period must be positive',
+      ),
+      (
+        const DwServerSettings(
+          callRateLimits: {ListNotes: DwCallRateLimit(requests: 1, burst: -1)},
+        ),
+        'burst must be nonnegative',
+      ),
+      (
+        const DwServerSettings(
+          callRateLimits: {
+            ListNotes: DwCallRateLimit(requests: 1, maxPeers: 0),
+          },
+        ),
+        'maxPeers must be positive',
+      ),
+      (
+        const DwServerSettings(
+          callRateLimits: {String: DwCallRateLimit(requests: 1)},
+        ),
+        'does not name a registered call',
+      ),
+      (
+        const DwServerSettings(
+          behindProxy: true,
+          callRateLimits: {ListNotes: DwCallRateLimit(requests: 1)},
+        ),
+        'require trustedProxyNetworks',
+      ),
+      (
+        const DwServerSettings(trustedProxyNetworks: ['0.0.0.0/0']),
+        'must be an IPv4/IPv6 CIDR',
+      ),
+      (
+        const DwServerSettings(trustedProxyNetworks: ['::/0']),
+        'must be an IPv4/IPv6 CIDR',
+      ),
+      (
+        const DwServerSettings(trustedProxyNetworks: ['localhost/32']),
+        'must be an IPv4/IPv6 CIDR',
+      ),
+      (
+        const DwServerSettings(deploymentVersion: 'master'),
+        'immutable full commit SHA',
+      ),
+    ]) {
+      test(
+        'invalid ingress declaration fails before database opening: $message',
+        () async {
+          final found = await problems(app.server(unused, settings: settings));
+          expect(
+            found.any((problem) => problem.contains(message)),
+            true,
+            reason: '$found',
+          );
+        },
+      );
+    }
+
     test('a feature is named as its folder, once', () async {
       final found = await problems(
         DwAppServer(

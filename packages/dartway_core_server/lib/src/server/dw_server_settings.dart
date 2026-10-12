@@ -1,3 +1,5 @@
+import '../http/dw_call_rate_limit.dart';
+
 /// Limits and timings of a server. The defaults suit a mobile app on one
 /// server process; every value exists because something unbounded would
 /// otherwise grow.
@@ -22,6 +24,10 @@ final class DwServerSettings {
     this.alertsPerMinute = 10,
     this.outboundTimeout = const Duration(seconds: 30),
     this.outboundMaxResponseBytes = 10 << 20,
+    this.callRateLimits = const {},
+    this.trustedProxyNetworks = const [],
+    this.behindProxy = false,
+    this.deploymentVersion,
   }) : assert(maxBodyBytes > 0),
        assert(outboundLimitBytes > 0),
        assert(maxLiveMessageBytes > 0),
@@ -32,6 +38,26 @@ final class DwServerSettings {
   /// (`DwCallHandler`'s `maxBodyBytes`); project routes pass theirs to
   /// `DwHttpRequest.bytes`.
   final int maxBodyBytes;
+
+  /// Per-peer quotas, keyed by registered request or command class. Checked
+  /// after compatibility and call lookup, before body reading or database work.
+  /// Health, live sockets and in-process calls are not charged.
+  final Map<Type, DwCallRateLimit> callRateLimits;
+
+  /// Explicit IPv4/IPv6 CIDRs whose forwarding headers may be trusted. With
+  /// no trusted networks, X-Forwarded-For is ignored. Never trust 0.0.0.0/0
+  /// or ::/0. Walk the header from the transport peer right to left, stopping
+  /// at the first untrusted address; client-supplied prefixes cannot choose it.
+  final List<String> trustedProxyNetworks;
+
+  /// A deployment behind an ingress must declare trusted networks before
+  /// enabling peer quotas, rather than accidentally limiting every user as
+  /// one proxy. This declaration is validated before migrations or listening.
+  final bool behindProxy;
+
+  /// Immutable revision reported by health probes. Native Kamal provides
+  /// KAMAL_VERSION; local servers may omit it. It grants no access.
+  final String? deploymentVersion;
 
   /// How long a whole body may take to arrive. A client dripping a body a
   /// byte at a time holds a connection and a buffer; this bounds both.
