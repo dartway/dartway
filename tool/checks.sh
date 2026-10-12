@@ -20,16 +20,25 @@
 #   tool/checks.sh services    the suites of the packages named in SERVICES,
 #                              against DW_DATABASE_* and DW_STORAGE_*
 #
-# DW_CHECKS_ONLY narrows `test` and `services` to the packages it names —
-# paths as `packages()` prints them, and `js/*` — space-separated. CI sets it
-# per job to what `tool/affected.dart` says a pull request can break; the
-# same works locally:
+# DW_CHECKS_ONLY narrows a mode to what it names, space-separated: a package
+# path, as `packages()` prints it, or `js/*`, runs the package's whole suite;
+# the path of a `_test.dart` file runs that file alone. CI sets it per job to
+# what `tool/affected.dart` says a pull request can break — for `analyze`, the
+# packages whose code it reaches, and the projects `dartway check` covers when
+# one of their packages is among them. The same works locally:
 #
 #   DW_CHECKS_ONLY="$(dart run tool/affected.dart --base origin/master)" \
 #     tool/checks.sh test
+#   DW_CHECKS_ONLY="$(dart run tool/affected.dart --base origin/master \
+#     --shard analyze)" tool/checks.sh analyze
 #
-# Unset, every suite runs. `analyze` always covers everything: it is cheap,
-# and it is what catches a change breaking a package nobody named.
+# Unset, everything runs.
+#
+# Suites, analyzer roots and project checks run side by side, DW_CHECKS_JOBS
+# at a time (the machine's processors by default); each one's output is
+# printed whole when it ends, in the order they started. DW_TEST_SHARDS splits
+# each `dart test` run into that many processes (`--total-shards`), for the
+# jobs that hold one long package.
 #
 # `services` is not run by the default: it needs the two containers below, and
 # the default is what anyone can run on a laptop without them. It is not
@@ -134,21 +143,122 @@ packages/dartway_push_server|Postgres"
 BROWSER="\
 packages/dartway_studio_bridge|the preview frame's iframe behind a platform view"
 
-# A name in DW_CHECKS_ONLY that is not a package stops the run: a typo must
-# not read as a selection with nothing to do.
-for package in ${DW_CHECKS_ONLY:-}; do
-  if [ ! -f "$package/pubspec.yaml" ] && [ ! -f "$package/package.json" ]; then
-    echo "DW_CHECKS_ONLY names $package, which is not a package" >&2
-    exit 64
-  fi
+# A name in DW_CHECKS_ONLY that is neither a package nor a test file stops
+# the run: a typo must not read as a selection with nothing to do.
+for entry in ${DW_CHECKS_ONLY:-}; do
+  case "$entry" in
+    *_test.dart) [ -f "$entry" ] && continue ;;
+    *) { [ -f "$entry/pubspec.yaml" ] || [ -f "$entry/package.json" ]; } && continue ;;
+  esac
+  echo "DW_CHECKS_ONLY names $entry, which is not a package or a test file" >&2
+  exit 64
 done
 
-# Whether this package's suites run: every one when DW_CHECKS_ONLY is unset,
-# only those it names when it is set.
+# Whether this package's whole suite runs: always when DW_CHECKS_ONLY is
+# unset, when it names the package when it is set.
 selected() {
   [ -z "${DW_CHECKS_ONLY+set}" ] && return 0
   case " $DW_CHECKS_ONLY " in *" $1 "*) return 0 ;; esac
   return 1
+}
+
+# The test files of this package DW_CHECKS_ONLY names, relative to the
+# package, one per line.
+selected_files() {
+  local entry
+  for entry in ${DW_CHECKS_ONLY:-}; do
+    case "$entry" in "$1"/test/*_test.dart) printf '%s\n' "${entry#"$1"/}" ;; esac
+  done
+}
+
+# Whether anything of this package runs: its whole suite or a file of it.
+touched() { selected "$1" || [ -n "$(selected_files "$1")" ]; }
+
+# Checks run side by side, DW_CHECKS_JOBS at a time. Each writes to a log of
+# its own, printed whole when the check ends; `drain` waits for all of them in
+# the order they started and records the failures, so the output reads as the
+# sequential run did. Plain arrays and a `jobs` count rather than `wait -n`:
+# bash 3.2 has neither associative arrays nor `wait -n`.
+JOBS="${DW_CHECKS_JOBS:-$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 2)}"
+POOL_PIDS=()
+POOL_LABELS=()
+POOL_LOGS=()
+POOL_KINDS=()
+POOL_COUNT="$(mktemp)"
+trap 'rm -f "$POOL_COUNT"' EXIT
+
+# spawn <kind> <label> <command...>: runs the command in the background, once
+# fewer than DW_CHECKS_JOBS are running. <kind> says how `drain` reads a
+# failure: `analyze` tells a dead analysis server from errors, `shard` takes
+# "no tests ran" (exit 79) as a shard that got none of a short file's tests,
+# `js` wants a non-zero test count, anything else fails on a non-zero exit.
+spawn() {
+  local kind="$1" label="$2"; shift 2
+  while jobs -rp >"$POOL_COUNT" && [ "$(wc -l <"$POOL_COUNT")" -ge "$JOBS" ]; do
+    sleep 1
+  done
+  local log
+  log="$(mktemp)"
+  (
+    started=$SECONDS
+    "$@"
+    status=$?
+    echo "($((SECONDS - started)) s)"
+    exit $status
+  ) >"$log" 2>&1 &
+  POOL_PIDS+=($!)
+  POOL_LABELS+=("$label")
+  POOL_LOGS+=("$log")
+  POOL_KINDS+=("$kind")
+  echo "   started: $label"
+}
+
+drain() {
+  local i=0 status log label
+  while [ $i -lt ${#POOL_PIDS[@]} ]; do
+    wait "${POOL_PIDS[$i]}"
+    status=$?
+    log="${POOL_LOGS[$i]}"
+    label="${POOL_LABELS[$i]}"
+    echo "── $label"
+    cat "$log"
+    case "${POOL_KINDS[$i]}:$status" in
+      *:0)
+        if [ "${POOL_KINDS[$i]}" = js ] && ! grep -qE '^# tests [1-9][0-9]*$' "$log"; then
+          # A version below the floor is refused before the run; this is the
+          # second net — a glob that stopped matching (a renamed test/
+          # directory, say) must not read as green either. Same reasoning as
+          # the analyzer's UNRUN: a suite nobody ran is not a suite that
+          # passed.
+          echo "$label: npm run check exited 0 but ran no tests" >&2
+          FAILED+=("$label — ran 0 tests")
+        fi
+        ;;
+      shard:79) ;;
+      analyze:*)
+        # The analyzer has two ways of exiting non-zero: it found errors, or
+        # it never finished. A killed analysis server — jetsam under memory
+        # pressure, or macOS refusing a page of its snapshot — prints its own
+        # line and says nothing about the code, so it goes to UNRUN, not
+        # FAILED. Reporting the two the same way sends one reader hunting for
+        # a defect that is not in the diff and teaches the next that some
+        # roots "are always red here", which is how a real error gets waved
+        # through.
+        if grep -qE 'analysis server crashed|analysis server exited with code' "$log"; then
+          UNRUN+=("$label")
+        else
+          FAILED+=("$label")
+        fi
+        ;;
+      *) FAILED+=("$label") ;;
+    esac
+    rm -f "$log"
+    i=$((i + 1))
+  done
+  POOL_PIDS=()
+  POOL_LABELS=()
+  POOL_LOGS=()
+  POOL_KINDS=()
 }
 
 # The reason this package is skipped, or nothing if it is not.
@@ -180,38 +290,6 @@ is_member() { grep -q '^resolution: workspace' "$1/pubspec.yaml"; }
 # says which it is.
 runner_of() { grep -q 'flutter_test:' "$1/pubspec.yaml" && echo flutter || echo dart; }
 
-run() {
-  local label="$1"; shift
-  echo "── $label"
-  if ! "$@"; then
-    FAILED+=("$label")
-  fi
-}
-
-# `run` for the analyzer, which has two ways of exiting non-zero: it found
-# errors, or it never finished. A killed analysis server — jetsam under memory
-# pressure, or macOS refusing a page of its snapshot — prints its own line and
-# says nothing about the code, so it goes to UNRUN, not FAILED. Reporting the
-# two the same way sends one reader hunting for a defect that is not in the
-# diff and teaches the next that some roots "are always red here", which is
-# how a real error gets waved through.
-analyze_root() {
-  local label="$1"; shift
-  echo "── $label"
-  local out status
-  out="$(mktemp)"
-  "$@" 2>&1 | tee "$out"
-  status=${PIPESTATUS[0]}
-  if [ "$status" -ne 0 ]; then
-    if grep -qE 'analysis server crashed|analysis server exited with code' "$out"; then
-      UNRUN+=("$label")
-    else
-      FAILED+=("$label")
-    fi
-  fi
-  rm -f "$out"
-}
-
 resolve() {
   echo "══ resolving"
   flutter pub get >/dev/null || { echo "root pub get failed"; exit 1; }
@@ -229,20 +307,34 @@ analyze() {
   # whose warnings its own test counts.
   # `tool` is in here so the scripts this repository runs on itself are held
   # to the same analyzer as the code they check.
-  analyze_root "packages + tool (workspace)" \
-    dart analyze --no-fatal-warnings packages tool
+  # One analyzer for the workspace members DW_CHECKS_ONLY names — one
+  # resolution, so one process — and one for each other root.
+  local members=() package
+  if [ -z "${DW_CHECKS_ONLY+set}" ]; then
+    members=(packages tool)
+  else
+    for package in $(packages); do
+      is_member "$package" && selected "$package" && members+=("$package")
+    done
+  fi
+  if [ ${#members[@]} -gt 0 ]; then
+    spawn analyze "workspace: ${members[*]}" \
+      dart analyze --no-fatal-warnings "${members[@]}"
+  fi
   for package in $(packages); do
     is_member "$package" && continue
-    analyze_root "$package" \
+    selected "$package" || continue
+    spawn analyze "$package" \
       bash -c "cd '$package' && dart analyze --no-fatal-warnings"
   done
 }
 
 test_suites() {
   echo "══ test"
+  local shards="${DW_TEST_SHARDS:-1}" runner files shard
   for package in $(packages); do
     [ -d "$package/test" ] || continue
-    selected "$package" || continue
+    touched "$package" || continue
     reason="$(skip_reason "$package")"
     if [ -n "$reason" ]; then
       echo "── $package — skipped: $reason"
@@ -253,7 +345,24 @@ test_suites() {
       echo "── $package — in services: needs $needs"
       continue
     fi
-    run "$package" bash -c "cd '$package' && $(runner_of "$package") test"
+    runner="$(runner_of "$package")"
+    files=
+    selected "$package" || files="$(selected_files "$package" | tr '\n' ' ')"
+    # Split, each process runs one file at a time: the processes are the
+    # concurrency. Several files each at once oversubscribe the machine, and
+    # the generator's suites, which compile and analyze a project per test,
+    # run into their timeouts.
+    if [ "$runner" = dart ] && [ "$shards" -gt 1 ]; then
+      shard=0
+      while [ $shard -lt "$shards" ]; do
+        spawn shard "$package [$((shard + 1))/$shards]" \
+          bash -c "cd '$package' && dart test --concurrency 1 --total-shards $shards --shard-index $shard $files"
+        shard=$((shard + 1))
+      done
+    else
+      spawn suite "$package${files:+ ($files)}" \
+        bash -c "cd '$package' && $runner test $files"
+    fi
   done
 }
 
@@ -279,10 +388,21 @@ project_checks() {
     echo "Project contract baseline: $contract_sha (explicit trusted revision)"
   fi
   for project in $CHECKED_PROJECTS; do
-    run "dartway check: $project" \
+    project_selected "$project" || continue
+    spawn suite "dartway check: $project" \
       bash -c 'cd "$1" && dart run dartway_cli:dartway check "${@:2}"' _ "$project" \
         ${contract_args[@]+"${contract_args[@]}"}
   done
+}
+
+# Whether a project is checked: always when DW_CHECKS_ONLY is unset, when it
+# names one of the project's packages — `template/dartway_starter_server` for
+# `template/dartway_starter_flutter` — when it is set. The check reads the
+# whole project.
+project_selected() {
+  [ -z "${DW_CHECKS_ONLY+set}" ] && return 0
+  case " $DW_CHECKS_ONLY " in *" ${1%/*}/"*) return 0 ;; esac
+  return 1
 }
 
 # The JavaScript half of the monorepo: each `js/*` package is its own npm
@@ -334,22 +454,7 @@ js_checks() {
   for package in $(js_packages); do
     selected "$package" || continue
     require_node_floor "$package"
-    echo "── $package (npm)"
-    local out status
-    out="$(mktemp)"
-    (cd "$package" && npm ci && npm run check) 2>&1 | tee "$out"
-    status=${PIPESTATUS[0]}
-    if [ "$status" -ne 0 ]; then
-      FAILED+=("$package (npm)")
-    elif ! grep -qE '^# tests [1-9][0-9]*$' "$out"; then
-      # A version below the floor is refused above; this is the second net —
-      # a glob that stopped matching (a renamed test/ directory, say) must
-      # not read as green either. Same reasoning as `analyze_root`'s UNRUN:
-      # a suite nobody ran is not a suite that passed.
-      echo "$package: npm run check exited 0 but ran no tests" >&2
-      FAILED+=("$package (npm) — ran 0 tests")
-    fi
-    rm -f "$out"
+    spawn js "$package (npm)" bash -c "cd '$package' && npm ci && npm run check"
   done
 }
 
@@ -379,7 +484,7 @@ browser_suites() {
   for package in $(printf '%s\n' "$BROWSER" | cut -d'|' -f1); do
     selected "$package" || continue
     require_chrome "$package"
-    run "$package (chrome)" \
+    spawn suite "$package (chrome)" \
       bash -c "cd '$package' && flutter test --platform chrome"
   done
 }
@@ -417,42 +522,75 @@ service_suites() {
   printf '%s\n' "$SERVICES" | while IFS='|' read -r package needs; do
     [ -d "$package/test" ] || { echo "$package is named in SERVICES and has no test/" >&2; exit 1; }
   done || exit 1
+  local files
   for package in $(printf '%s\n' "$SERVICES" | cut -d'|' -f1); do
-    selected "$package" || continue
-    run "$package ($(services_of "$package"))" \
-      bash -c "cd '$package' && $(runner_of "$package") test"
+    touched "$package" || continue
+    files=
+    selected "$package" || files="$(selected_files "$package" | tr '\n' ' ')"
+    spawn suite "$package ($(services_of "$package"))${files:+ ($files)}" \
+      bash -c "cd '$package' && $(runner_of "$package") test $files"
   done
-  selected packages/dartway_cli || return 0
-  run "packages/dartway_cli (external test servers)" \
-    bash -c "cd packages/dartway_cli && dart test -t services --run-skipped test/test_external_servers_test.dart test/deploy_storage_visibility_test.dart"
+  # Side by side like the others: every suite here already shares the one
+  # Postgres and storage with its own concurrent files, each under names of
+  # its own.
+  files="$(cli_service_files)"
+  if [ -n "$files" ]; then
+    spawn suite "packages/dartway_cli (external test servers)" \
+      bash -c "cd packages/dartway_cli && dart test -t services --run-skipped $files"
+  fi
+  drain
+}
+
+# The CLI's files with suites against the services, those of them selected.
+cli_service_files() {
+  local file
+  for file in test/test_external_servers_test.dart test/deploy_storage_visibility_test.dart; do
+    if selected packages/dartway_cli || selected "packages/dartway_cli/$file"; then
+      printf '%s ' "$file"
+    fi
+  done
 }
 
 # Nothing selected for this mode: say so and stop before resolving, and before
 # asking for services nothing here would use.
-if [ -n "${DW_CHECKS_ONLY+set}" ] && { [ "$MODE" = test ] || [ "$MODE" = services ]; }; then
+if [ -n "${DW_CHECKS_ONLY+set}" ] && [ "$MODE" != all ]; then
   wanted=
-  if [ "$MODE" = services ]; then
-    for package in $(printf '%s\n' "$SERVICES" | cut -d'|' -f1) packages/dartway_cli; do
-      selected "$package" && wanted=1
-    done
-  else
-    for package in $DW_CHECKS_ONLY; do
-      [ -f "$package/package.json" ] || [ -d "$package/test" ] && wanted=1
-    done
-  fi
+  case "$MODE" in
+    services)
+      for package in $(printf '%s\n' "$SERVICES" | cut -d'|' -f1); do
+        touched "$package" && wanted=1
+      done
+      [ -n "$(cli_service_files)" ] && wanted=1
+      ;;
+    test)
+      for entry in $DW_CHECKS_ONLY; do
+        { [ -f "$entry" ] || [ -f "$entry/package.json" ] || [ -d "$entry/test" ]; } && wanted=1
+      done
+      ;;
+    analyze) [ -n "$DW_CHECKS_ONLY" ] && wanted=1 ;;
+  esac
   if [ -z "$wanted" ]; then
-    echo "✓ $MODE: nothing in DW_CHECKS_ONLY has suites to run here"
+    echo "✓ $MODE: nothing in DW_CHECKS_ONLY has anything to run here"
     exit 0
   fi
 fi
 
 [ "$MODE" = services ] && require_services
 resolve
-[ "$MODE" = all ] || [ "$MODE" = analyze ] && analyze
-[ "$MODE" = all ] || [ "$MODE" = analyze ] && project_checks
-[ "$MODE" = all ] || [ "$MODE" = test ] && test_suites
-[ "$MODE" = all ] || [ "$MODE" = test ] && browser_suites
-[ "$MODE" = all ] || [ "$MODE" = test ] && js_checks
+if [ "$MODE" = all ] || [ "$MODE" = analyze ]; then
+  analyze
+  project_checks
+  drain
+fi
+if [ "$MODE" = all ] || [ "$MODE" = test ]; then
+  test_suites
+  js_checks
+  drain
+  # After the VM suites rather than beside them: a package's browser run and
+  # its VM run would build in the same directory at once.
+  browser_suites
+  drain
+fi
 [ "$MODE" = services ] && service_suites
 
 echo

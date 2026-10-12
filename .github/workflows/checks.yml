@@ -27,18 +27,24 @@ name: Checks
 # `tool/checks.sh` documents, on the same ports, and the mode refuses to start
 # without them rather than skipping.
 #
-# A pull request runs the suites it can break, not all of them: the jobs ask
+# A pull request runs the checks it can break, not all of them: the jobs ask
 # `tool/affected.dart`, which reads the change against the pubspec dependency
 # graph and the paths each suite is known to read outside its package, and
 # hands the answer to `tool/checks.sh` as DW_CHECKS_ONLY. A change to a
-# client package no longer waits for the generator's and the CLI's suites.
-# What the script cannot place, and anything that pins or picks the suites,
-# runs everything; a push to master always does. `analyze` is never narrowed:
-# it is the cheap net for exactly the #165 break above.
+# client package no longer waits for the generator's and the CLI's suites,
+# and the few test files that take minutes run on the code they execute,
+# not on every change to their package. `analyze` covers every package the
+# change's code reaches — each one depending on a changed one, through any
+# pubspec section, which is the net for exactly the #165 break above. What
+# the script cannot place, and anything that pins or picks the checks, runs
+# everything; a push to master always does.
 #
 # The suites are split into jobs by length: the generator's and the CLI's
 # are the two longest and run alone, the rest together, so the wall clock is
-# the longest of three instead of their sum.
+# the longest of three instead of their sum. Inside a job, `tool/checks.sh`
+# runs its checks side by side, and the generator's and the CLI's `dart test`
+# runs as several processes (DW_TEST_SHARDS), each with a share of every
+# file's tests: one file holds most of the generator's time.
 
 on:
   pull_request:
@@ -72,7 +78,17 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Pick the roots
+        id: affected
+        run: |
+          flutter pub get >/dev/null
+          only="$(dart run tool/affected.dart --base "$DW_AFFECTED_BASE" --shard analyze)"
+          echo "only=$only" >> "$GITHUB_OUTPUT"
+          echo "${only:-nothing is affected}"
+
       - run: tool/checks.sh analyze
+        env:
+          DW_CHECKS_ONLY: ${{ steps.affected.outputs.only }}
 
   test:
     runs-on: ubuntu-latest
@@ -81,6 +97,11 @@ jobs:
       fail-fast: false
       matrix:
         shard: [generator, cli, rest]
+        include:
+          - shard: generator
+            processes: 4
+          - shard: cli
+            processes: 2
     name: test (${{ matrix.shard }})
     env:
       DW_CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -123,6 +144,7 @@ jobs:
       - run: tool/checks.sh test
         env:
           DW_CHECKS_ONLY: ${{ steps.affected.outputs.only }}
+          DW_TEST_SHARDS: ${{ matrix.processes || 1 }}
 
   services:
     runs-on: ubuntu-latest
