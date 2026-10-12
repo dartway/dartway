@@ -71,15 +71,19 @@ void main() {
     expect(rendered, contains('proxy_set_header Host api.example.com:8443'));
     expect(rendered, contains(r'X-Forwarded-For $proxy_add_x_forwarded_for'));
     expect(rendered, contains(r'X-Forwarded-Proto $http_x_forwarded_proto'));
-    expect(RegExp('client_max_body_size 0;').allMatches(rendered), hasLength(3));
+    expect(
+      RegExp('client_max_body_size 0;').allMatches(rendered),
+      hasLength(3),
+    );
     expect(
       RegExp('proxy_request_buffering off;').allMatches(rendered),
       hasLength(3),
     );
     expect(RegExp('proxy_ssl_verify on;').allMatches(rendered), hasLength(3));
     expect(
-      RegExp('proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;')
-          .allMatches(rendered),
+      RegExp(
+        'proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;',
+      ).allMatches(rendered),
       hasLength(3),
     );
   });

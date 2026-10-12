@@ -2,6 +2,8 @@
 
 ## 0.22.0-dev.0
 
+- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
+
 - `DwFileStorageSetup.provision` sets bucket policies, GET/PUT CORS for explicit
   `allowedOrigins`, and the visibility probe object in both buckets, so outside
   checks work with `verifyBuckets: false`. CORS writes carry `Content-MD5`;
