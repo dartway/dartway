@@ -44,7 +44,7 @@ The law list is therefore derived from `DwCheckType.severity`, not from how firm
 | A screen shows a read through `DwReadBuilder` / `DwPagedListView` / `DwWindowListView` | `forbiddenRequestRead` | `dartway-data-layer` |
 | The one spinner is the kit's | `forbiddenProgressIndicator` | `dartway-ui-kit` |
 | `dw.command` runs in the feature's `logic/`, inside `dw.action` | `forbiddenCommandCall` | `dartway-data-layer` |
-| A screen is a route; dialogs through the kit; "new" is a route, never id 0; route names are global; the router disposes itself | `forbiddenNavigationCall`, `sentinelId`, `routeNameDuplicated`, `routerDisposedByApp` | `dartway-navigation` |
+| A screen is a route; dialogs through the kit; "new" is a route, never id 0; route names are global; the router disposes itself; unknown guard facts return pending (review blocker if allowed) | `forbiddenNavigationCall`, `sentinelId`, `routeNameDuplicated`, `routerDisposedByApp` | `dartway-navigation` |
 | A server feature is a closed file set; features form a graph without cycles, import each other's surface only, write only their own rows; `core/` imports no feature | `invalidServerFeatureFile`, `misplacedServerCode`, `featureImportCycle`, `featureImportOutsideSurface`, `foreignRowWrite`, `coreImportsFeature` | `dartway-server` |
 | Time is `ctx.now`; the environment is read in `core/environment.dart`; other services through `ctx.http` | `forbiddenDateTimeNow`, `forbiddenEnvironmentRead`, `forbiddenHttpClient` | `dartway-server` |
 | Startup work is a step before the port opens; settings are a typed object; a `!` on a row id is an error | `workAfterServerStart`, `settingsKeyValueTable`, `redundantBangAllowed` | `dartway-server` |

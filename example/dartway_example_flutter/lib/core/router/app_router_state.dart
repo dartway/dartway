@@ -7,9 +7,10 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 /// only when one of these actually changes.
 ///
 /// `isSignedIn` is known from the stored session at start, before the server
-/// has answered: a signed-in user opens straight into the app. `role` is the
+/// has answered. `role` is the
 /// signed-in user's role — `null` while signed out and while the profile has
-/// not loaded yet; a role an admin changes arrives live.
+/// not loaded yet; a role an admin changes arrives live. Guards reading it
+/// return pending while it is unknown.
 typedef AppRouterState = ({bool isSignedIn, UserRole? role});
 
 /// The router follows this provider (`DwAppRouter.routerState`).

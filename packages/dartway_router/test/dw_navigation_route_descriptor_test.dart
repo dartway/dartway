@@ -42,7 +42,7 @@ enum TestRoutes implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 // Test params

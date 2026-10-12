@@ -98,7 +98,7 @@ enum ExitRoutes implements DwNavigationRoute<ExitRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<ExitRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<ExitRouterState>> get zoneGuards => [];
 }
 
 /// Opens the app at [location] and returns its router.

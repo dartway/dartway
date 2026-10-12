@@ -66,13 +66,15 @@ enum AuthRoutes implements DwNavigationRoute<AppSession> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<AppSession>> get zoneGuards => [
+  List<DwDecisionGuard<AppSession>> get zoneGuards => [
     // Signed in: on to where the app zone turned them away from — one of
     // the app's own paths, whatever else the link says.
     (session, target) => session.isLoggedIn
-        ? _ownPath(target.uri.queryParameters['from']) ??
-              AppRoutes.catalog.fullPath
-        : null,
+        ? DwGuardDecision.redirect(
+            _ownPath(target.uri.queryParameters['from']) ??
+                AppRoutes.catalog.fullPath,
+          )
+        : DwGuardDecision.allow,
   ];
 }
 
@@ -144,14 +146,16 @@ enum AppRoutes implements DwNavigationRoute<AppSession> {
       };
 
   @override
-  List<DwNavigationGuard<AppSession>> get zoneGuards => [
+  List<DwDecisionGuard<AppSession>> get zoneGuards => [
     // Signed out: to sign-in, remembering where they were going.
     (session, target) => session.isLoggedIn
-        ? null
-        : Uri(
-            path: AuthRoutes.auth.fullPath,
-            queryParameters: {'from': target.location},
-          ).toString(),
+        ? DwGuardDecision.allow
+        : DwGuardDecision.redirect(
+            Uri(
+              path: AuthRoutes.auth.fullPath,
+              queryParameters: {'from': target.location},
+            ).toString(),
+          ),
   ];
 }
 

@@ -43,14 +43,14 @@ enum AdminNavigationZone implements DwNavigationRoute<AppRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
-    (state, target) =>
-        state.isSignedIn ? null : AuthNavigationZone.signInFrom(target),
-    // Only once the role is known: while the profile loads the gate shows
-    // nothing of the app, and an admin opening /admin must not be sent away
-    // for not having loaded yet.
-    (state, _) => state.role != null && state.role != UserRole.admin
-        ? AppNavigationZone.home.fullPath
-        : null,
+  List<DwDecisionGuard<AppRouterState>> get zoneGuards => [
+    (state, target) => state.isSignedIn
+        ? DwGuardDecision.allow
+        : DwGuardDecision.redirect(AuthNavigationZone.signInFrom(target)),
+    (state, _) => switch (state.role) {
+      null => DwGuardDecision.pending,
+      UserRole.admin => DwGuardDecision.allow,
+      _ => DwGuardDecision.redirect(AppNavigationZone.home.fullPath),
+    },
   ];
 }

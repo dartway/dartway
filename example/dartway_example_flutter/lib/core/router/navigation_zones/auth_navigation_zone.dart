@@ -20,10 +20,12 @@ enum AuthNavigationZone implements DwNavigationRoute<AppRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<AppRouterState>> get zoneGuards => [
+  List<DwDecisionGuard<AppRouterState>> get zoneGuards => [
     (state, target) => state.isSignedIn
-        ? _returnTo(target) ?? AppNavigationZone.schedule.fullPath
-        : null,
+        ? DwGuardDecision.redirect(
+            _returnTo(target) ?? AppNavigationZone.schedule.fullPath,
+          )
+        : DwGuardDecision.allow,
   ];
 
   /// Sign-in, remembering [target] — what a gate says to someone signed out,

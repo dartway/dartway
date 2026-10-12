@@ -45,7 +45,7 @@ enum TestRoutes implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 // Test pages
@@ -136,7 +136,7 @@ enum ParameterizedRoutes implements DwNavigationRoute<TestRouterState> {
   DwStatefulShellRouteBuilder? get statefulShellRouteBuilder => null;
 
   @override
-  List<DwNavigationGuard<TestRouterState>> get zoneGuards => [];
+  List<DwDecisionGuard<TestRouterState>> get zoneGuards => [];
 }
 
 /// A page that renders its own name, so a test can reach its [BuildContext].
