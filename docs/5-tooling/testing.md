@@ -318,8 +318,8 @@ test gate apply here: public API and wire contracts are class 5; migration integ
 **`tool/checks.sh [analyze|test|services]`** — `analyze` and `test` by default, which need no
 Docker. CI (`.github/workflows/checks.yml`, on every pull request and push to `master`) runs tier 1
 over what the change can break: `analyze` over the packages whose code it reaches (and the checker
-over a project one of whose packages is among them), `test` (split into generator, CLI and the rest)
-and `services` over the suites that can fail — `tool/affected.dart` reads them off the pubspec
+over a project one of whose packages is among them), `test` (cut into many short jobs: the generator, `contract_behavior_test` in three, the CLI in two, `update_command_test`, the rest in two)
+and `services` (the CLI's external test servers apart) over the suites that can fail — `tool/affected.dart` reads them off the pubspec
 dependency graph, and the few test files that take minutes (`narrowTests` in
 `tool/lib/src/affected_suites.dart`) off the code they run, and hands them to the script as
 `DW_CHECKS_ONLY`; a push to `master` runs everything. Inside a job the checks run side by side. Before a PR, run `dart analyze` over touched resolution roots,

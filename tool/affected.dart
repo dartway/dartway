@@ -9,11 +9,15 @@
 // a `_test.dart` path that file alone. Without --base, every package: a
 // push to master and the nightly run test everything.
 //
-// Shards are the jobs of `.github/workflows/checks.yml`: the generator and
-// the CLI hold the two longest suites and run alone, `rest` is everything
-// else, `services` is the whole set for `tool/checks.sh services`, which
-// keeps what it runs, and `analyze` is the packages whose code the change
-// reaches, for `tool/checks.sh analyze`.
+// Shards are the jobs of `.github/workflows/checks.yml`, cut so that none
+// is long — many short jobs queue better than one long one holds the run.
+// The generator and the CLI run alone, and the longest file of each runs
+// apart from its package (`contract`, `update`); `rest` is everything else.
+// `services` is the set for `tool/checks.sh services`, which keeps what it
+// runs, without the CLI's external test servers, which are `services-cli`.
+// `analyze` is the packages whose code the change reaches. A job that is
+// one part of a shard takes its part in `tool/checks.sh` (DW_TEST_PART),
+// which knows which suites run.
 //
 // What counts as affected is `lib/src/affected_suites.dart`.
 
@@ -25,7 +29,18 @@ const _alone = {
   'generator': 'packages/dartway_generator',
   'cli': 'packages/dartway_cli',
 };
-const _shards = ['generator', 'cli', 'rest', 'services', 'analyze'];
+const _aloneFiles = {
+  'contract': 'packages/dartway_generator/test/contract_behavior_test.dart',
+  'update': 'packages/dartway_cli/test/update_command_test.dart',
+};
+final _shards = [
+  ..._alone.keys,
+  ..._aloneFiles.keys,
+  'rest',
+  'services',
+  'services-cli',
+  'analyze',
+];
 
 void main(List<String> arguments) {
   String? base, shard;
@@ -62,6 +77,7 @@ void main(List<String> arguments) {
   ];
 
   final all = {for (final package in packages) package.path};
+  final tests = _tracked(['*_test.dart']);
   var affected = Affected(all, all);
   if (base != null && base.isNotEmpty) {
     final diff = Process.runSync('git', [
@@ -90,7 +106,7 @@ void main(List<String> arguments) {
           for (final MapEntry(key: test, value: narrow) in narrowTests.entries)
             test: importClosure([test, ...narrow.closureOf], packages, read),
         },
-        testFiles: _tracked(['*_test.dart']),
+        testFiles: tests,
       );
       stderr.writeln(
         '${changed.length} files changed since $base; '
@@ -101,17 +117,37 @@ void main(List<String> arguments) {
 
   bool inPackage(String entry, String package) =>
       entry == package || entry.startsWith('$package/');
+  String? owner(String file) => all
+      .where((package) => inPackage(file, package))
+      .fold<String?>(null, (a, b) => a == null || b.length > a.length ? b : a);
+  bool inCli(String entry) => inPackage(entry, _alone['cli']!);
+  // A whole package one of whose files runs in a job of its own is listed
+  // by its files, so that its job can leave that one out.
+  final suites = {
+    for (final entry in affected.suites)
+      if (_aloneFiles.values.any((file) => owner(file) == entry))
+        ...tests.where((file) => owner(file) == entry)
+      else
+        entry,
+  };
   final selected = switch (shard) {
     'analyze' => affected.code,
-    final name? when _alone.containsKey(name) => affected.suites.where(
-      (entry) => inPackage(entry, _alone[name]!),
+    final name? when _aloneFiles.containsKey(name) => suites.where(
+      (entry) => entry == _aloneFiles[name],
     ),
-    'rest' => affected.suites.where(
+    final name? when _alone.containsKey(name) => suites.where(
+      (entry) =>
+          inPackage(entry, _alone[name]!) &&
+          !_aloneFiles.values.contains(entry),
+    ),
+    'rest' => suites.where(
       (entry) => !_alone.values.any((package) => inPackage(entry, package)),
     ),
+    'services' => affected.suites.where((entry) => !inCli(entry)),
+    'services-cli' => affected.suites.where(inCli),
     _ => affected.suites,
-  };
-  stdout.writeln((selected.toList()..sort()).join(' '));
+  }.toList()..sort();
+  stdout.writeln(selected.join(' '));
 }
 
 /// Tracked files matching [patterns], as `git ls-files` names them.

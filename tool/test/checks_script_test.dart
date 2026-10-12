@@ -93,17 +93,19 @@ fi
       expect(Process.runSync('chmod', ['+x', path]).exitCode, 0);
     }
 
-    Future<ProcessResult> run(String only) => Process.run(
-      '/bin/bash',
-      ['tool/checks.sh', 'test'],
-      workingDirectory: repository.path,
-      environment: {
-        ...Platform.environment,
-        'PATH': '${bin.path}:${Platform.environment['PATH']}',
-        'DW_CHECKS_ONLY': only,
-      },
-      includeParentEnvironment: false,
-    );
+    Future<ProcessResult> run(String only, {String part = '1/1'}) =>
+        Process.run(
+          '/bin/bash',
+          ['tool/checks.sh', 'test'],
+          workingDirectory: repository.path,
+          environment: {
+            ...Platform.environment,
+            'PATH': '${bin.path}:${Platform.environment['PATH']}',
+            'DW_CHECKS_ONLY': only,
+            'DW_TEST_PART': part,
+          },
+          includeParentEnvironment: false,
+        );
 
     var result = await run('packages/dartway_core_shared tool');
     expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
@@ -123,6 +125,34 @@ fi
     expect(calls.readAsLinesSync(), [
       '${repository.path}/packages/dartway_cli|test test/pinned_cli_test.dart',
     ]);
+
+    // A part takes every n-th suite that runs; one suite, its n-th of tests.
+    calls.writeAsStringSync('');
+    const files =
+        'packages/dartway_cli/test/pinned_cli_test.dart '
+        'packages/dartway_cli/test/build_context_test.dart '
+        'packages/dartway_core_shared tool';
+    result = await run(files, part: '2/2');
+    expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+    expect(
+      calls.readAsLinesSync(),
+      unorderedEquals([
+        '${repository.path}/packages/dartway_cli|test test/build_context_test.dart',
+        '${repository.path}/tool|test',
+      ]),
+    );
+    calls.writeAsStringSync('');
+    result = await run(
+      'packages/dartway_cli/test/pinned_cli_test.dart',
+      part: '2/3',
+    );
+    expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+    expect(calls.readAsLinesSync(), [
+      '${repository.path}/packages/dartway_cli|'
+          'test --total-shards 3 --shard-index 1 test/pinned_cli_test.dart',
+    ]);
+    result = await run('tool', part: '3/2');
+    expect(result.exitCode, 64);
 
     calls.writeAsStringSync('');
     result = await run('');

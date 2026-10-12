@@ -36,7 +36,8 @@
 #
 # Suites, analyzer roots and project checks run side by side, DW_CHECKS_JOBS
 # at a time (the machine's processors by default); each one's output is
-# printed whole when it ends, in the order they started.
+# printed whole when it ends, in the order they started. DW_TEST_PART cuts a
+# `test` run across several jobs (below).
 #
 # `services` is not run by the default: it needs the two containers below, and
 # the default is what anyone can run on a laptop without them. It is not
@@ -152,6 +153,19 @@ for entry in ${DW_CHECKS_ONLY:-}; do
   exit 64
 done
 
+# DW_TEST_PART=i/n: this run is the i-th of n jobs over one selection, and
+# `test` runs every n-th of the suites that run, from the i-th — or, when
+# there is one, the i-th n-th of its tests. Split here, not by whoever picks
+# the selection: only this script knows which of the suites it names run
+# here, are skipped or need the services.
+PART="${DW_TEST_PART:-1/1}"
+PART_INDEX="${PART%/*}"
+PART_COUNT="${PART#*/}"
+case "$PART_INDEX/$PART_COUNT" in
+  [1-9]*/[1-9]*) [ "$PART_INDEX" -le "$PART_COUNT" ] 2>/dev/null ;;
+  *) false ;;
+esac || { echo "DW_TEST_PART takes i/n, 1 <= i <= n: $PART" >&2; exit 64; }
+
 # Whether this package's whole suite runs: always when DW_CHECKS_ONLY is
 # unset, when it names the package when it is set.
 selected() {
@@ -187,7 +201,8 @@ trap 'rm -f "$POOL_COUNT"' EXIT
 
 # spawn <kind> <label> <command...>: runs the command in the background, once
 # fewer than DW_CHECKS_JOBS are running. <kind> says how `drain` reads a
-# failure: `analyze` tells a dead analysis server from errors, `js` wants a non-zero test count, anything else fails on a non-zero exit.
+# failure: `analyze` tells a dead analysis server from errors, `part` takes
+# "no tests ran" (exit 79) as a part that got none of the suite's tests, `js` wants a non-zero test count, anything else fails on a non-zero exit.
 spawn() {
   local kind="$1" label="$2"; shift 2
   while jobs -rp >"$POOL_COUNT" && [ "$(wc -l <"$POOL_COUNT")" -ge "$JOBS" ]; do
@@ -219,6 +234,7 @@ drain() {
     echo "── $label"
     cat "$log"
     case "${POOL_KINDS[$i]}:$status" in
+      part:79) ;;
       *:0)
         if [ "${POOL_KINDS[$i]}" = js ] && ! grep -qE '^# tests [1-9][0-9]*$' "$log"; then
           # A version below the floor is refused before the run; this is the
@@ -326,7 +342,8 @@ analyze() {
 
 test_suites() {
   echo "══ test"
-  local runner files
+  # package|file, file empty for the whole suite.
+  local items=() item package file files runner k=0 split= kind=suite
   for package in $(packages); do
     [ -d "$package/test" ] || continue
     touched "$package" || continue
@@ -340,11 +357,40 @@ test_suites() {
       echo "── $package — in services: needs $needs"
       continue
     fi
-    runner="$(runner_of "$package")"
-    files=
-    selected "$package" || files="$(selected_files "$package" | tr '\n' ' ')"
-    spawn suite "$package${files:+ ($files)}" \
-      bash -c "cd '$package' && $runner test $files"
+    if selected "$package"; then
+      items+=("$package|")
+    else
+      for file in $(selected_files "$package"); do items+=("$package|$file"); done
+    fi
+  done
+  # One suite for several parts: they split its tests, and a part that gets
+  # none exits 79.
+  if [ "$PART_COUNT" -gt 1 ] && [ ${#items[@]} -eq 1 ]; then
+    split="--total-shards $PART_COUNT --shard-index $((PART_INDEX - 1))"
+    kind=part
+  fi
+  local kept=()
+  for item in ${items[@]+"${items[@]}"}; do
+    if [ -n "$split" ] || [ $((k % PART_COUNT)) -eq $((PART_INDEX - 1)) ]; then
+      kept+=("$item")
+    fi
+    k=$((k + 1))
+  done
+  # Items of a package are consecutive: each package's share runs as one.
+  package=
+  files=
+  for item in ${kept[@]+"${kept[@]}"} "|"; do
+    if [ "${item%%|*}" != "$package" ]; then
+      if [ -n "$package" ]; then
+        runner="$(runner_of "$package")"
+        spawn "$kind" "$package${files:+ (${files# })}${split:+ — part $PART}" \
+          bash -c "cd '$package' && $runner test $split$files"
+      fi
+      package="${item%%|*}"
+      files=
+    fi
+    file="${item#*|}"
+    [ -n "$file" ] && files="$files $file"
   done
 }
 
@@ -433,6 +479,8 @@ require_node_floor() {
 
 js_checks() {
   echo "══ js"
+  # Few and short: the first part of a split run takes them.
+  [ "$PART_INDEX" -eq 1 ] || return 0
   for package in $(js_packages); do
     selected "$package" || continue
     require_node_floor "$package"
@@ -463,6 +511,7 @@ require_chrome() {
 
 browser_suites() {
   echo "══ browser"
+  [ "$PART_INDEX" -eq 1 ] || return 0
   for package in $(printf '%s\n' "$BROWSER" | cut -d'|' -f1); do
     selected "$package" || continue
     require_chrome "$package"

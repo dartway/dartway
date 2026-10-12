@@ -226,7 +226,7 @@ Nine workflows in `.github/workflows/`:
 
 | File | When | What it does |
 |---|---|---|
-| `checks.yml` | A PR is opened, updated or taken out of draft; push to `master` | `tool/checks.sh analyze`, `tool/checks.sh test` (jobs: generator, CLI, the rest) and `tool/checks.sh services` with a Postgres service container and a storage, over what `tool/affected.dart` says the PR can break — everything on `master` |
+| `checks.yml` | A PR is opened, updated or taken out of draft; push to `master` | `tool/checks.sh analyze`, `tool/checks.sh test` (many short jobs: generator, contract ×3, CLI ×2, update, the rest ×2) and `tool/checks.sh services` (two jobs) with a Postgres service container and a storage, over what `tool/affected.dart` says the PR can break — everything on `master` |
 | `database.yml` | Nightly, by hand, when this workflow's file changes, and on a PR touching `packages/`, `template/`, `example/` or the project CI runner | `dartway test` in `example/`; in `template`, a project created from this commit with its packages vendored in, committed, and run through its own `ci.yml` by `tool/run_project_ci.dart` |
 | `images.yml` | `template/` or the CLI changes, nightly, by hand | Builds the two images of a project **as `dartway create` produces it**, with this tree's packages vendored in (`tool/vendor_framework.dart`) |
 | `kamal.yml` | PR or master push touching the deploy generator, template or workflow | Validates generated destinations with pinned Kamal 2.12 |
