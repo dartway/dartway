@@ -1,5 +1,5 @@
-/// An explicitly confirmed, half-open span of media positions [start, end).
-/// This value proves nothing about a player: the caller confirms playback.
+/// A half-open span of media positions [start, end). Playback reports contain
+/// spans confirmed by the package from real playback, excluding its seeks.
 final class DwMediaPlayedInterval {
   DwMediaPlayedInterval(this.start, this.end) {
     if (start < Duration.zero || end <= start) {
@@ -89,7 +89,8 @@ List<DwMediaPlayedInterval> _reportIntervals(
   for (final interval in intervals) {
     union.add(interval);
   }
-  if (union.isEmpty)
+  if (union.isEmpty) {
     throw ArgumentError('a playback report needs confirmed intervals');
+  }
   return union.intervals;
 }

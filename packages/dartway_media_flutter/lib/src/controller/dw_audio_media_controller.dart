@@ -2,7 +2,7 @@ import 'dart:async';
 
 import 'package:just_audio/just_audio.dart';
 
-import '../model/dw_media_playback_state.dart';
+import 'dw_media_reducer.dart';
 import '../platform/dw_media_platform.dart';
 import 'dw_media_engine_controller.dart';
 
@@ -22,10 +22,14 @@ final class DwAudioMediaController extends DwMediaEngineController {
     super.onPlaybackEnd,
     super.onObservationBreak,
     super.onSourceChange,
-    super.onObservationEnd,
+    super.onPlayedInterval,
   });
 
   AudioPlayer? _player;
+  PlaybackEvent? _playbackEvent;
+  int? _seekInFlightEpoch;
+  DateTime? _seekStartedAt;
+  int? _preSeekEpoch;
   final List<StreamSubscription<Object?>> _subscriptions = [];
 
   @override
@@ -35,37 +39,54 @@ final class DwAudioMediaController extends DwMediaEngineController {
     unawaited(_release().catchError((Object _) {}));
     final player = AudioPlayer();
     _player = player;
-    void onChange(Object? _) => _onUpdate(player);
+    _playbackEvent = null;
+    void onState(Object? _) => _onUpdate(player, player.position);
     _subscriptions.addAll([
-      player.playerStateStream.listen(onChange),
-      player.positionStream.listen(onChange),
-      player.bufferedPositionStream.listen(onChange),
+      player.playerStateStream.listen(onState),
+      player.playbackEventStream.listen((event) {
+        if (!identical(_player, player)) return;
+        _playbackEvent = event;
+        final started = _seekStartedAt;
+        final beforeSeek =
+            started != null && event.updateTime.isBefore(started);
+        _onUpdate(
+          player,
+          event.updatePosition,
+          seekEpoch: beforeSeek ? _preSeekEpoch : null,
+        );
+      }),
+      player.positionStream.listen((position) => _onUpdate(player, position)),
       player.errorStream.listen((error) {
         if (identical(_player, player)) reportFailure(error);
       }),
     ]);
     await player.setUrl(uri.toString());
-    _onUpdate(player);
+    _onUpdate(player, player.position);
   }
 
-  void _onUpdate(AudioPlayer player) {
+  void _onUpdate(AudioPlayer player, Duration position, {int? seekEpoch}) {
     if (!identical(_player, player)) return;
-    final playerState = player.playerState;
-    updateState(
-      (current) => current.copyWith(
-        playState: switch (playerState.processingState) {
-          ProcessingState.idle ||
-          ProcessingState.loading => DwMediaPlayState.loading,
-          ProcessingState.buffering => DwMediaPlayState.buffering,
-          ProcessingState.ready =>
-            playerState.playing
-                ? DwMediaPlayState.playing
-                : DwMediaPlayState.paused,
-          ProcessingState.completed => DwMediaPlayState.ended,
-        },
-        position: player.position,
-        duration: player.duration ?? Duration.zero,
-        buffered: player.bufferedPosition,
+    final event = _playbackEvent ?? player.playbackEvent;
+    final processingState = event.processingState;
+    final started = _seekStartedAt;
+    final beforeSeek = started != null && event.updateTime.isBefore(started);
+    final factSeekEpoch =
+        seekEpoch ??
+        (beforeSeek ? _preSeekEpoch : null) ??
+        _seekInFlightEpoch ??
+        engineSeekEpoch;
+    reportEngine(
+      EngineFact(
+        loading:
+            processingState == ProcessingState.idle ||
+            processingState == ProcessingState.loading,
+        buffering: processingState == ProcessingState.buffering,
+        ended: processingState == ProcessingState.completed,
+        playing: player.playing && processingState == ProcessingState.ready,
+        position: position,
+        duration: event.duration ?? Duration.zero,
+        buffered: event.bufferedPosition,
+        seekEpoch: factSeekEpoch,
       ),
     );
   }
@@ -79,13 +100,18 @@ final class DwAudioMediaController extends DwMediaEngineController {
     final player = _player;
     if (player == null) return;
     unawaited(
-      player.play().catchError((Object error, StackTrace stackTrace) {
-        if (dwMediaIsPlayRefusal(error)) {
-          unawaited(player.pause());
-        } else {
-          reportFailure(error, stackTrace);
-        }
-      }),
+      player.play().then(
+        (_) {},
+        onError: (Object error, StackTrace stackTrace) {
+          if (!identical(_player, player)) return;
+          if (dwMediaIsPlayRefusal(error)) {
+            reportPlayRefused();
+            unawaited(player.pause());
+          } else if (!dwMediaIsBenignError(error)) {
+            reportFailure(error, stackTrace);
+          }
+        },
+      ),
     );
   }
 
@@ -93,7 +119,19 @@ final class DwAudioMediaController extends DwMediaEngineController {
   Future<void> enginePause() async => _player?.pause();
 
   @override
-  Future<void> engineSeek(Duration position) async => _player?.seek(position);
+  Future<void> engineSeek(Duration position) async {
+    final player = _player;
+    if (player == null) return;
+    final epoch = engineSeekEpoch;
+    _seekInFlightEpoch = epoch;
+    _preSeekEpoch = epoch;
+    _seekStartedAt = DateTime.now();
+    try {
+      await player.seek(position);
+    } finally {
+      if (_seekInFlightEpoch == epoch) _seekInFlightEpoch = null;
+    }
+  }
 
   @override
   Future<void> engineSetSpeed(double speed) async => _player?.setSpeed(speed);
@@ -108,6 +146,10 @@ final class DwAudioMediaController extends DwMediaEngineController {
   Future<void> _release() async {
     final player = _player;
     _player = null;
+    _playbackEvent = null;
+    _seekInFlightEpoch = null;
+    _seekStartedAt = null;
+    _preSeekEpoch = null;
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }

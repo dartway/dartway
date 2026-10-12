@@ -1,5 +1,30 @@
 ## 0.3.0-dev.0
 
+- **Breaking** (#555): playback intent owns play/pause; buffering and unconfirmed
+  play use `waiting` instead of `DwMediaPlayState.buffering`/`isBuffering`.
+  `togglePlay()` uses intent and redundant play commands do nothing. Playing an
+  ended item restarts at zero. Intent survives source retries.
+- Seeks publish their target immediately, ignore stale ticks and coalesce to one
+  active seek plus the latest queued target. Skips use the displayed position.
+  Video position reads overlapping a seek are dropped, including reads started
+  during a held seek and completed after it settles.
+  Seeking away from an ended item clears the ended state immediately; play while
+  that seek is pending resumes at its target instead of restarting at zero.
+- **Breaking**: remove the manual observation handle and result. The package
+  confirms spans from real playback and seals them through `playbackDelivery` on
+  pause, seek, speed, source, error or end. Waiting does not break continuity;
+  pending delivery and explicit retry keep their existing lifecycle.
+- Audio coverage follows ready, playing position ticks on every platform. A
+  refused web play can therefore credit the short interval before the browser's
+  refusal arrives; `just_audio_web` exposes no separate positive start signal.
+  Refusal stops playback but does not retract delivered coverage. Audio seeks
+  settle only when the platform seek completes.
+- Add `session.status`, `session.position` and `session.hasReallyPlayed`;
+  `playback` remains their merge. Video surfaces rebuild only for size changes.
+  Example controls follow intent, waiting and pending seek positions.
+- Test fakes can hold seek completion or a position read and expose play/seek
+  calls.
+- Migration: `docs/migrations/2026-10-11-media-player-state.md`.
 - Dependency carets follow DartWay 0.22 and its satellites on their next
   development lines; public dependency types follow those releases (#530).
 

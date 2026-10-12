@@ -13,8 +13,8 @@ class AppMediaErrorView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) =>
-      ValueListenableBuilder<DwMediaPlaybackState>(
-        valueListenable: session.playback,
+      ValueListenableBuilder<DwMediaPlaybackStatus>(
+        valueListenable: session.status,
         builder: (context, playback, _) {
           if (!playback.isError) return const SizedBox.shrink();
           return ColoredBox(

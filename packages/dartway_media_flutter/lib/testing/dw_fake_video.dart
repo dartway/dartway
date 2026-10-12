@@ -68,6 +68,7 @@ base class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
   @override
   Future<void> play(int playerId) async {
     final video = _video(playerId);
+    video.playCalls++;
     if (video.refusePlayWith case final error?) throw error;
     video._playing = true;
   }
@@ -78,12 +79,21 @@ base class DwFakeVideoPlayerPlatform extends VideoPlayerPlatform {
   @override
   Future<void> seekTo(int playerId, Duration position) async {
     final video = _video(playerId);
+    video.seekCalls.add(position);
     if (video.refuseSeekWith case final error?) throw error;
+    await video.seekBarrier;
     video.position = position;
   }
 
   @override
-  Future<Duration> getPosition(int playerId) async => _video(playerId).position;
+  Future<Duration> getPosition(int playerId) async {
+    final video = _video(playerId);
+    final position = video.position;
+    video._positionReadStarted?.complete();
+    video._positionReadStarted = null;
+    await video._positionReadBarrier?.future;
+    return position;
+  }
 
   @override
   Future<void> setVolume(int playerId, double volume) async =>
@@ -127,6 +137,14 @@ final class DwFakeVideo {
   Object? refusePlayWith;
   Object? refuseSeekWith;
 
+  /// Holds seek completion while the test drives stale engine facts.
+  Future<void>? seekBarrier;
+  final List<Duration> seekCalls = [];
+  int playCalls = 0;
+
+  Completer<void>? _positionReadStarted;
+  Completer<void>? _positionReadBarrier;
+
   bool _playing = false;
   bool _ready = false;
   bool _released = false;
@@ -160,6 +178,19 @@ final class DwFakeVideo {
 
   /// Playback has reached [to] — seen by the app on its next 100 ms poll.
   void advanceTo(Duration to) => position = to;
+
+  /// Holds the next platform position read after it has captured its result.
+  Future<void> holdNextPositionRead() {
+    _positionReadStarted = Completer<void>();
+    _positionReadBarrier = Completer<void>();
+    return _positionReadStarted!.future;
+  }
+
+  /// Lets a position read held by [holdNextPositionRead] return.
+  void releasePositionRead() {
+    _positionReadBarrier?.complete();
+    _positionReadBarrier = null;
+  }
 
   /// The platform's own end of playback.
   void finish() {

@@ -377,7 +377,7 @@ void main() {
       );
       video.startBuffering();
       await tester.pump();
-      expect(session.playback.value.isBuffering, isTrue);
+      expect(session.status.value.waiting, isTrue);
       goTo(tester, AppLifecycleState.hidden);
       await tester.pump();
       expect(video.isPlaying, isFalse);

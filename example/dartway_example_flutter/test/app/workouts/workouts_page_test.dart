@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartway_example_flutter/app/workouts/logic/workout_playback_coverage.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
 import 'package:dartway_example_flutter/core/dw_core.dart';
@@ -57,12 +59,13 @@ void main() {
     await stop(tester, app);
   });
 
-  testWidgets('explicit workout input accepts coverage; default progress and '
-      'seek do not, and later overlapping reports are unioned', (tester) async {
+  testWidgets('package spans exclude seeks and coverage unions rewatches', (
+    tester,
+  ) async {
     final app = await TestApp.start(tester, FakeApp());
     final coverage = WorkoutPlaybackCoverage();
     final session = dw.plugins.media.open(
-      items: [workoutVideo('confirmed')],
+      items: [workoutVideo('coverage')],
       options: DwMediaOpenOptions(
         autoplayOnOpen: true,
         playbackDelivery: coverage.accept,
@@ -70,42 +73,101 @@ void main() {
     );
     await app.settle(tester);
     await playTo(tester, const Duration(seconds: 1));
-    expect(session.flushPlayback(), isNull);
-    // Simulate a capable observer with an explicitly confirmed span. The
-    // application's default platform callbacks do not make this assertion.
-    final observer = session.playbackObservation;
-    final interval = DwMediaPlayedInterval(
-      Duration.zero,
-      const Duration(seconds: 1),
-    );
-    expect(
-      coverage.confirm(observer, interval),
-      DwMediaObservationResult.recorded,
-    );
-    final first = session.flushPlayback()!;
-    await app.run(
-      tester,
-      dw.plugins.media.sessionManager.retryPlaybackReport(first),
-    );
-    expect(coverage.coveredDuration('confirmed'), const Duration(seconds: 1));
     await app.run(tester, session.seek(const Duration(seconds: 50)));
     await playTo(tester, const Duration(seconds: 51));
-    expect(
-      coverage.confirm(observer, interval),
-      DwMediaObservationResult.stale,
-    );
-    expect(session.flushPlayback(), isNull);
-    expect(
-      coverage.confirm(session.playbackObservation, interval),
-      DwMediaObservationResult.recorded,
-    );
-    final repeated = session.flushPlayback()!;
-    await app.run(
-      tester,
-      dw.plugins.media.sessionManager.retryPlaybackReport(repeated),
-    );
-    expect(coverage.coveredDuration('confirmed'), const Duration(seconds: 1));
+    await app.run(tester, session.pause());
+    expect(coverage.coveredDuration('coverage'), const Duration(seconds: 2));
+    await app.run(tester, session.seek(Duration.zero));
+    await app.run(tester, session.play());
+    await playTo(tester, const Duration(seconds: 1));
+    await app.run(tester, session.pause());
+    expect(coverage.coveredDuration('coverage'), const Duration(seconds: 2));
     expect(dw.plugins.media.sessionManager.pendingPlaybackReports, isEmpty);
+    await stop(tester, app);
+  });
+
+  testWidgets(
+    'buffering keeps the pause button, spinner and controls deadline',
+    (tester) async {
+      final app = await TestApp.start(tester, FakeApp());
+      await app.tap(tester, find.text('Workouts').last);
+      await app.tap(tester, find.text('Morning mobility'));
+      await playTo(tester, const Duration(seconds: 1));
+      video.latest.startBuffering();
+      await tester.pump();
+      expect(find.byTooltip('Pause'), findsOneWidget);
+      expect(find.byType(CircularProgressIndicator), findsOneWidget);
+      video.latest.stopBuffering();
+      await tester.pump();
+      expect(find.byTooltip('Pause'), findsOneWidget);
+      await tester.pump(dw.plugins.media.config.controlsAutoHideDelay);
+      expect(controls, findsNothing);
+      await stop(tester, app);
+    },
+  );
+
+  testWidgets('scrub release never draws the old position', (tester) async {
+    final app = await TestApp.start(tester, FakeApp());
+    await app.tap(tester, find.text('Workouts').last);
+    await app.tap(tester, find.text('Morning mobility'));
+    await playTo(tester, const Duration(seconds: 1));
+    final gate = Completer<void>();
+    video.latest.seekBarrier = gate.future;
+    final slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(20000);
+    await tester.pump();
+    tester.widget<Slider>(find.byType(Slider)).onChangeEnd!(20000);
+    await tester.pump();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
+    await playTo(tester, const Duration(seconds: 2));
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
+    gate.complete();
+    // The barriered seek lands first — its acknowledgement and position both
+    // notify the session before this frame is drawn.
+    await tester.pump();
+    video.latest.advanceTo(const Duration(seconds: 21));
+    await tester.pump(const Duration(milliseconds: 100));
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 21000);
+    await stop(tester, app);
+  });
+
+  testWidgets('a repeated scrub stays on its pending seek target', (
+    tester,
+  ) async {
+    final app = await TestApp.start(tester, FakeApp());
+    await app.tap(tester, find.text('Workouts').last);
+    await app.tap(tester, find.text('Morning mobility'));
+    await playTo(tester, const Duration(seconds: 1));
+    final gate = Completer<void>();
+    video.latest.seekBarrier = gate.future;
+
+    var slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(20000);
+    await tester.pump();
+    slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.value, 20000);
+    slider.onChangeEnd!(20000);
+    expect(active().position.value.seekTarget, const Duration(seconds: 20));
+    await tester.pump();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
+
+    slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(15000);
+    await tester.pump();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 15000);
+    slider = tester.widget<Slider>(find.byType(Slider));
+    slider.onChanged!(20000);
+    await tester.pump();
+    slider = tester.widget<Slider>(find.byType(Slider));
+    expect(slider.value, 20000);
+    slider.onChangeEnd!(20000);
+    await tester.pump();
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 20000);
+
+    gate.complete();
+    await tester.pump();
+    await playTo(tester, const Duration(seconds: 21));
+    expect(tester.widget<Slider>(find.byType(Slider)).value, 21000);
     await stop(tester, app);
   });
 

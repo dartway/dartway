@@ -21,9 +21,9 @@ class AppMediaControlBar extends StatelessWidget {
     return IconTheme(
       data: const IconThemeData(color: Colors.white),
       child: ListenableBuilder(
-        listenable: Listenable.merge([session.playback, session.isFullscreen]),
+        listenable: Listenable.merge([session.status, session.isFullscreen]),
         builder: (context, _) {
-          final playback = session.playback.value;
+          final playback = session.status.value;
           final fullscreen = session.isFullscreen.value;
           return Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -34,14 +34,16 @@ class AppMediaControlBar extends StatelessWidget {
                 onPressed: session.skipBack,
               ),
               IconButton(
-                tooltip: playback.isPlaying
+                tooltip: (playback.intent == DwMediaPlayIntent.play)
                     ? context.l10n.mediaPause
                     : context.l10n.mediaPlay,
                 iconSize: 40,
                 icon: Icon(
-                  playback.isPlaying ? Icons.pause_circle : Icons.play_circle,
+                  (playback.intent == DwMediaPlayIntent.play)
+                      ? Icons.pause_circle
+                      : Icons.play_circle,
                 ),
-                onPressed: playback.isPlaying ? session.pause : session.play,
+                onPressed: session.togglePlay,
               ),
               IconButton(
                 tooltip: context.l10n.mediaSkipForward,

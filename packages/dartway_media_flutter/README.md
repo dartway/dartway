@@ -14,11 +14,15 @@ own `ui_kit/` and restyled — the `dartway-media` toolkit skill walks through i
 
 Documentation, with the table of every setting: `docs/3-flutter/media.md`.
 
-Optional confirmed-playback accounting exports `DwMediaPlayedInterval`,
-`DwMediaIntervalAccumulator` and immutable `DwMediaPlaybackReport`. Configure
-`playbackDelivery`, capture `session.playbackObservation` before a span, and record
-only an interval your caller can independently confirm. Position/progress callbacks
-never record coverage automatically. `flushPlayback()` seals a window; the manager
-retains failed/in-flight reports for inspection and explicit retry, independently of
-engine disposal. Successful delivery acknowledges only that report. Retention is
-in memory for the manager's lifetime; project adapters own persistence and policy.
+Play/pause follows `session.status.value.intent`; use `session.togglePlay()`.
+`waiting` drives a spinner without changing intent. Timeline widgets listen to
+`session.position`; pending seeks display `seekTarget` immediately and skips count
+from it. `playback` merges both notifiers, and `hasReallyPlayed` exposes real playback.
+
+Configure `playbackDelivery` to receive spans confirmed by the package. Pause, seek,
+speed change, source change, error and end seal reports; waiting keeps continuity.
+`flushPlayback()` also seals a window. The manager retains failed/in-flight reports
+for inspection and explicit retry, independently of engine disposal. Successful
+delivery acknowledges only that report. Retention is in memory for the manager's
+lifetime; project adapters own persistence and policy, and union reports across
+rewatches using `DwMediaIntervalAccumulator`.

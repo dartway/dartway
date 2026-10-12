@@ -1,6 +1,7 @@
 import '../config/dw_media_config.dart';
 import '../model/dw_media_callbacks.dart';
 import '../model/dw_media_item.dart';
+import '../observation/dw_media_played_interval.dart';
 import 'dw_audio_media_controller.dart';
 import 'dw_media_controller.dart';
 import 'dw_video_media_controller.dart';
@@ -17,7 +18,7 @@ DwMediaController createDwMediaController({
   void Function()? onPlaybackEnd,
   void Function()? onObservationBreak,
   void Function()? onSourceChange,
-  void Function()? onObservationEnd,
+  void Function(DwMediaPlayedInterval)? onPlayedInterval,
 }) => switch (item.kind) {
   DwMediaKind.video => DwVideoMediaController(
     item: item,
@@ -28,7 +29,7 @@ DwMediaController createDwMediaController({
     onPlaybackEnd: onPlaybackEnd,
     onObservationBreak: onObservationBreak,
     onSourceChange: onSourceChange,
-    onObservationEnd: onObservationEnd,
+    onPlayedInterval: onPlayedInterval,
   ),
   DwMediaKind.audio => DwAudioMediaController(
     item: item,
@@ -39,6 +40,6 @@ DwMediaController createDwMediaController({
     onPlaybackEnd: onPlaybackEnd,
     onObservationBreak: onObservationBreak,
     onSourceChange: onSourceChange,
-    onObservationEnd: onObservationEnd,
+    onPlayedInterval: onPlayedInterval,
   ),
 };

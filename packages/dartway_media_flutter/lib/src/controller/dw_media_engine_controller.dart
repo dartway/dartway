@@ -8,8 +8,10 @@ import '../model/dw_media_callbacks.dart';
 import '../model/dw_media_item.dart';
 import '../model/dw_media_playback_state.dart';
 import '../platform/dw_media_platform.dart';
+import '../observation/dw_media_played_interval.dart';
 import '../resume/dw_media_position_store.dart';
 import 'dw_media_controller.dart';
+import 'dw_media_reducer.dart';
 
 /// Where resume positions live when `DwMediaConfig.positionStore` is `null`:
 /// one store for the life of the app, so an item reopened by another session
@@ -19,7 +21,7 @@ final DwMediaPositionStore _inMemoryPositionStore =
 
 /// What both engines share: the state, the callbacks and their guards, the
 /// resume policy, retries. A subclass implements only the `engine*` calls and
-/// reports what its engine says through [updateState] and [reportFailure].
+/// reports what its engine says through [reportEngine] and [reportFailure].
 ///
 /// **Real playback, not a position.** Both engines report a seek to the end
 /// as "completed": `video_player` sets `isCompleted` on any `seekTo` landing
@@ -27,7 +29,10 @@ final DwMediaPositionStore _inMemoryPositionStore =
 /// `ProcessingState.completed` after a seek made while paused. And
 /// `video_player` reports `isPlaying` the moment `play()` is called, before
 /// the platform answers — a web `play()` the browser refuses still reads as
-/// playing. So a tick counts as **real playback** only when the engine plays,
+/// playing. A ready position tick before that refusal therefore earns its
+/// short interval; the web audio engine exposes no separate start proof and
+/// delivered evidence is not retracted. A tick counts as **real playback**
+/// only when the engine plays,
 /// no seek of this controller is in flight, and the position has moved past
 /// where playback started or the last seek landed. `onStarted`, `onProgress`,
 /// the periodic resume save and `reachedEndTolerance` read only such ticks,
@@ -45,12 +50,12 @@ abstract class DwMediaEngineController extends DwMediaController {
     VoidCallback? onPlaybackEnd,
     VoidCallback? onObservationBreak,
     VoidCallback? onSourceChange,
-    VoidCallback? onObservationEnd,
+    void Function(DwMediaPlayedInterval)? onPlayedInterval,
   }) : _callbacks = callbacks,
        _onPlaybackEnd = onPlaybackEnd,
        _onObservationBreak = onObservationBreak,
        _onSourceChange = onSourceChange,
-       _onObservationEnd = onObservationEnd,
+       _onPlayedInterval = onPlayedInterval,
        _speed = initialSpeed ?? options.defaultSpeed,
        _muted = initialMuted,
        _autoRetriesLeft = options.autoRetryCount {
@@ -70,17 +75,11 @@ abstract class DwMediaEngineController extends DwMediaController {
   final VoidCallback? _onPlaybackEnd;
   final VoidCallback? _onObservationBreak;
   final VoidCallback? _onSourceChange;
-  final VoidCallback? _onObservationEnd;
-  int _observationCommands = 0;
+  final void Function(DwMediaPlayedInterval)? _onPlayedInterval;
+  MediaPlayerState _playerState = const MediaPlayerState();
 
   @override
-  bool get canObservePlayback =>
-      !_disposed &&
-      _loaded &&
-      !_failed &&
-      _state.value.isPlaying &&
-      _seeksInFlight == 0 &&
-      _observationCommands == 0;
+  bool get hasReallyPlayed => _playerState.hasReallyPlayed;
 
   final ValueNotifier<DwMediaPlaybackState> _state = ValueNotifier(
     const DwMediaPlaybackState(),
@@ -93,10 +92,9 @@ abstract class DwMediaEngineController extends DwMediaController {
   bool? _muted;
   double _volumeBeforeMute = 1;
 
-  int _seeksInFlight = 0;
-  Duration? _anchor;
-  bool _playedSinceSeek = false;
-  bool _everPlayed = false;
+  Future<void>? _seekRunning;
+  _SeekRequest? _queuedSeek;
+  int? _activeSeekEpoch;
   bool _startedFired = false;
   bool _completedFired = false;
   bool _reachedEndFired = false;
@@ -105,7 +103,6 @@ abstract class DwMediaEngineController extends DwMediaController {
   DateTime? _lastSaveAt;
 
   bool _loaded = false;
-  bool _playWhenLoaded = false;
   bool _failed = false;
 
   /// The load in flight — the first one or a reload — which a retry joins.
@@ -129,7 +126,8 @@ abstract class DwMediaEngineController extends DwMediaController {
   bool get isDisposed => _disposed;
 
   @override
-  bool get wantsToPlay => _playWhenLoaded;
+  bool get wantsToPlay =>
+      !_loaded && _state.value.intent == DwMediaPlayIntent.play;
 
   @override
   bool get endedByPlayback => _endedByPlayback;
@@ -140,7 +138,7 @@ abstract class DwMediaEngineController extends DwMediaController {
   // --- Engine seam ---------------------------------------------------------
 
   /// Loads [uri], replacing whatever was loaded before, and reports the first
-  /// state through [updateState]. Throws when the source cannot be opened.
+  /// state through [reportEngine]. Throws when the source cannot be opened.
   @protected
   Future<void> engineLoad(Uri uri);
 
@@ -163,8 +161,11 @@ abstract class DwMediaEngineController extends DwMediaController {
     final generation = ++_loadGeneration;
     bool stale() => _disposed || generation != _loadGeneration;
     _loaded = false;
-    _onSourceChange?.call();
+    _seekRunning = null;
+    _queuedSeek = null;
     _failed = false;
+    _dispatch(const LoadCommand());
+    _onSourceChange?.call();
     var overran = false;
     try {
       final policy = options.resume;
@@ -199,15 +200,16 @@ abstract class DwMediaEngineController extends DwMediaController {
       await engineSetSpeed(_speed);
       final muted = _muted;
       if (muted != null) await _applyVolume(muted ? 0 : _volumeBeforeMute);
-      updateState((current) => current.copyWith(speed: _speed));
-      if (startAt != null && startAt > Duration.zero) await seek(startAt);
-      _anchor ??= _state.value.position;
-      _autoRetriesLeft = options.autoRetryCount;
+      _dispatch(SettingsCommand(speed: _speed));
       _loaded = true;
-      if (_playWhenLoaded) {
-        _playWhenLoaded = false;
-        await play();
+      if (_queuedSeek != null) {
+        await _startSeeks();
+      } else if (startAt != null && startAt > Duration.zero) {
+        await seek(startAt);
       }
+      if (stale() || _failed) return;
+      _autoRetriesLeft = options.autoRetryCount;
+      if (_state.value.intent == DwMediaPlayIntent.play) await _playEngine();
     } catch (error, stackTrace) {
       if (overran || !stale()) reportFailure(error, stackTrace);
     }
@@ -225,17 +227,10 @@ abstract class DwMediaEngineController extends DwMediaController {
       _autoRetryTimer = Timer(options.autoRetryDelay, () {
         if (!_disposed) unawaited(_reload());
       });
-      updateState(
-        (current) => current.copyWith(playState: DwMediaPlayState.loading),
-      );
+      _dispatch(const LoadCommand());
       return;
     }
-    updateState(
-      (current) => current.copyWith(
-        playState: DwMediaPlayState.error,
-        errorMessage: error.toString(),
-      ),
-    );
+    _dispatch(FailureFact(error.toString()));
     _failed = true;
     _callbacks.onError?.call(item, error);
   }
@@ -249,12 +244,6 @@ abstract class DwMediaEngineController extends DwMediaController {
     if (running != null) return running;
     final position = _state.value.position;
     _failed = false;
-    updateState(
-      (current) => current.copyWith(
-        playState: DwMediaPlayState.loading,
-        errorMessage: null,
-      ),
-    );
     return _track(_load(restoreTo: position > Duration.zero ? position : null));
   }
 
@@ -269,41 +258,42 @@ abstract class DwMediaEngineController extends DwMediaController {
 
   // --- State and callbacks -------------------------------------------------
 
-  /// Merges what the engine reports into the state and fires the callbacks
-  /// the change earns. An engine reports [DwMediaPlayState.paused] for "not
-  /// playing"; before any real playback it reads as
-  /// [DwMediaPlayState.ready].
+  /// Engine adapters translate their values into facts; only the reducer
+  /// chooses intent, waiting, displayed position and playback evidence.
   @protected
-  void updateState(
-    DwMediaPlaybackState Function(DwMediaPlaybackState current) update,
-  ) {
+  void reportEngine(EngineFact fact) => _dispatch(fact);
+
+  /// The seek generation an engine observation belongs to. Polling adapters
+  /// capture this before starting a poll and put it on the resulting fact.
+  @protected
+  int get engineSeekEpoch => _activeSeekEpoch ?? _playerState.seekEpoch;
+
+  @protected
+  void reportPlayRefused() => _dispatch(const PlayRefused());
+
+  void _dispatch(MediaEvent event) {
     if (_disposed) return;
     final previous = _state.value;
-    var next = update(previous);
-    // A failed engine keeps talking — an idle player, a reset value — and
-    // none of it may cover the error until a retry loads again.
-    if (_failed) next = next.copyWith(playState: DwMediaPlayState.error);
-    if (next.playState == DwMediaPlayState.paused && !_everPlayed) {
-      next = next.copyWith(playState: DwMediaPlayState.ready);
-    }
-    if (next.playState != previous.playState || next.speed != previous.speed) {
-      _onObservationBreak?.call();
-    }
-    if (next.isEnded && !previous.isEnded) _onObservationEnd?.call();
+    _playerState = reduceMedia(_playerState, event);
+    final next = _playerState.playback;
+    final interval = _playerState.interval;
+    if (interval != null) _onPlayedInterval?.call(interval);
+    // Seal before listeners can move the queue and detach this controller.
+    if (_playerState.sealPlayback) _onObservationBreak?.call();
     _state.value = next;
-    _afterUpdate(previous, next);
-  }
-
-  void _afterUpdate(DwMediaPlaybackState previous, DwMediaPlaybackState next) {
-    final seeking = _seeksInFlight > 0;
-    if (next.isPlaying && !previous.isPlaying && !seeking) {
-      _anchor = next.position;
+    if (next.isEnded && !previous.isEnded) {
+      // Off the synchronous dispatch: an engine reports its end from inside
+      // its own event delivery, and `just_audio`'s `pause()` would reenter
+      // that delivery ("Cannot fire new event. Controller is already firing
+      // an event") — its subject is synchronous.
+      scheduleMicrotask(() {
+        if (!_disposed) unawaited(_quietly(enginePause));
+      });
     }
-    final anchor = _anchor;
-    final realTick =
-        next.isPlaying && !seeking && anchor != null && next.position > anchor;
-    if (realTick) _onRealPlayback(next);
-    if (next.isEnded && !previous.isEnded && !seeking && _playedSinceSeek) {
+    if (interval != null) {
+      _onRealPlayback(next);
+    }
+    if (next.isEnded && !previous.isEnded && _playerState.playedSinceSeek) {
       _reachEnd();
     }
     if (!next.isEnded && previous.isEnded) _endedByPlayback = false;
@@ -317,8 +307,6 @@ abstract class DwMediaEngineController extends DwMediaController {
   }
 
   void _onRealPlayback(DwMediaPlaybackState next) {
-    _playedSinceSeek = true;
-    _everPlayed = true;
     if (!_startedFired) {
       _startedFired = true;
       _callbacks.onStarted?.call(item);
@@ -376,19 +364,28 @@ abstract class DwMediaEngineController extends DwMediaController {
 
   // --- Commands --------------------------------------------------------------
 
-  /// Before the item has loaded, remembers the intent and plays once it
-  /// has — what `DwMediaConfig.autoplayOnOpen` relies on.
   @override
   Future<void> play() async {
-    if (_disposed) return;
-    if (!_loaded) {
-      _playWhenLoaded = true;
+    if (_disposed ||
+        (_state.value.intent == DwMediaPlayIntent.play &&
+            !_state.value.isEnded)) {
       return;
     }
+    final restart = _state.value.isEnded;
+    _dispatch(const PlayCommand());
+    if (!_loaded) return;
+    if (restart) await seek(Duration.zero);
+    final seeking = _seekRunning;
+    if (seeking != null) await seeking;
+    if (_state.value.intent == DwMediaPlayIntent.play) await _playEngine();
+  }
+
+  Future<void> _playEngine() async {
     try {
       await enginePlay();
     } catch (error, stackTrace) {
       if (dwMediaIsPlayRefusal(error)) {
+        reportPlayRefused();
         await _quietly(enginePause);
         return;
       }
@@ -399,33 +396,63 @@ abstract class DwMediaEngineController extends DwMediaController {
   @override
   Future<void> pause() async {
     if (_disposed) return;
-    _playWhenLoaded = false;
-    _observationCommands++;
-    _onObservationBreak?.call();
-    try {
-      await _quietly(enginePause);
-      if (options.resume?.saveOnPause ?? false) await savePosition();
-    } finally {
-      _observationCommands--;
-    }
+    _dispatch(const PauseCommand());
+    await _quietly(enginePause);
+    if (options.resume?.saveOnPause ?? false) await savePosition();
   }
 
   @override
-  Future<void> seek(Duration position) async {
-    if (_disposed) return;
-    final duration = _state.value.duration;
-    var target = position < Duration.zero ? Duration.zero : position;
-    if (duration > Duration.zero && target > duration) target = duration;
-    _seeksInFlight++;
-    _onObservationBreak?.call();
-    _playedSinceSeek = false;
+  Future<void> seek(Duration position) {
+    if (_disposed) return Future.value();
+    _dispatch(SeekCommand(position));
     _endedByPlayback = false;
-    try {
-      await _quietly(() => engineSeek(target));
-    } finally {
-      _seeksInFlight--;
+    final target = _state.value.seekTarget;
+    if (target != null) {
+      _queuedSeek = _SeekRequest(target, _playerState.seekEpoch);
     }
-    _anchor = target;
+    if (!_loaded) return _reloading ?? Future.value();
+    return _startSeeks();
+  }
+
+  Future<void> _startSeeks() {
+    final running = _seekRunning;
+    if (running != null) return running;
+    final completion = Completer<void>();
+    _seekRunning = completion.future;
+    unawaited(_drainSeeks(completion, _loadGeneration));
+    return completion.future;
+  }
+
+  Future<void> _drainSeeks(Completer<void> completion, int generation) async {
+    bool stale() => _disposed || generation != _loadGeneration;
+    try {
+      while (_queuedSeek != null && !stale() && !_failed) {
+        final request = _queuedSeek!;
+        final target = request.target;
+        _queuedSeek = null;
+        _activeSeekEpoch = request.epoch - 1;
+        try {
+          await engineSeek(target);
+        } catch (error, stackTrace) {
+          if (stale()) return;
+          if (dwMediaIsBenignError(error)) {
+            if (_queuedSeek == null) _dispatch(SeekAborted(target));
+            continue;
+          }
+          reportFailure(error, stackTrace);
+          return;
+        }
+        _activeSeekEpoch = null;
+        if (stale() || _failed) return;
+        _dispatch(SeekSettled(target));
+      }
+    } finally {
+      // Release ownership before completing the callers' future: a seek from
+      // their continuation or a state listener must start its own drain.
+      _activeSeekEpoch = null;
+      if (identical(_seekRunning, completion.future)) _seekRunning = null;
+      completion.complete();
+    }
   }
 
   @override
@@ -434,15 +461,10 @@ abstract class DwMediaEngineController extends DwMediaController {
   @override
   Future<void> setSpeed(double speed) async {
     if (_disposed) return;
-    _observationCommands++;
-    _onObservationBreak?.call();
-    try {
-      _speed = speed;
-      await _quietly(() => engineSetSpeed(speed));
-      updateState((current) => current.copyWith(speed: speed));
-    } finally {
-      _observationCommands--;
-    }
+    if (speed == _state.value.speed) return;
+    _speed = speed;
+    _dispatch(SettingsCommand(speed: speed));
+    await _quietly(() => engineSetSpeed(speed));
   }
 
   @override
@@ -463,9 +485,7 @@ abstract class DwMediaEngineController extends DwMediaController {
 
   Future<void> _applyVolume(double volume) async {
     await _quietly(() => engineSetVolume(volume));
-    updateState(
-      (current) => current.copyWith(volume: volume, muted: volume == 0),
-    );
+    _dispatch(SettingsCommand(volume: volume, muted: volume == 0));
   }
 
   /// Runs an engine command, reporting a real failure and swallowing a
@@ -492,4 +512,11 @@ abstract class DwMediaEngineController extends DwMediaController {
     }
     _state.dispose();
   }
+}
+
+final class _SeekRequest {
+  const _SeekRequest(this.target, this.epoch);
+
+  final Duration target;
+  final int epoch;
 }

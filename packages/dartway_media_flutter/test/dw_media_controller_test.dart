@@ -15,7 +15,114 @@ void main() {
   setUp(() => rig = MediaRig());
   tearDown(() => debugDwMediaIsWebOverride = null);
 
+  testWidgets('buffering does not turn play intent into a pause', (
+    tester,
+  ) async {
+    final controller = controllerFor(videoItem('flaps'));
+    await rig.loadVideo(tester);
+    await controller.play();
+    await rig.playVideoTo(tester, const Duration(seconds: 1));
+    rig.video.latest.startBuffering();
+    await tester.pump();
+    expect(controller.state.value.isPlaying, isTrue);
+    await release(tester, controller);
+  });
+
   group('states', () {
+    testWidgets('video ignores a position poll started during a seek', (
+      tester,
+    ) async {
+      final controller = controllerFor(videoItem('seek-poll-during'));
+      final video = await rig.loadVideo(tester);
+      await controller.play();
+      await rig.playVideoTo(tester, const Duration(seconds: 4));
+      final seekGate = Completer<void>();
+      video.seekBarrier = seekGate.future;
+      final seek = controller.seek(const Duration(seconds: 30));
+      await tester.pump();
+      expect(video.seekCalls, [const Duration(seconds: 30)]);
+      final positionReadStarted = video.holdNextPositionRead();
+      await tester.pump(const Duration(milliseconds: 100));
+      await positionReadStarted;
+      seekGate.complete();
+      await seek;
+      expect(controller.state.value.position, const Duration(seconds: 30));
+      video.releasePositionRead();
+      await tester.pump();
+      expect(controller.state.value.position, const Duration(seconds: 30));
+      await release(tester, controller);
+    });
+
+    testWidgets(
+      'video facts from an active seek cannot settle its queued seek',
+      (tester) async {
+        final intervals = <DwMediaPlayedInterval>[];
+        final controller = controllerFor(
+          videoItem('queued-seek-facts'),
+          onPlayedInterval: intervals.add,
+        );
+        final video = await rig.loadVideo(tester);
+        await controller.play();
+        await rig.playVideoTo(tester, const Duration(seconds: 10));
+        intervals.clear();
+
+        final gate = Completer<void>();
+        video.seekBarrier = gate.future;
+        final first = controller.seek(const Duration(seconds: 20));
+        await tester.pump();
+        final second = controller.seek(const Duration(seconds: 10));
+        video.startBuffering();
+        video.stopBuffering();
+        await tester.pump();
+
+        expect(controller.state.value.seekTarget, const Duration(seconds: 10));
+        expect(intervals, isEmpty);
+        gate.complete();
+        await first;
+        await second;
+        expect(video.seekCalls, [
+          const Duration(seconds: 20),
+          const Duration(seconds: 10),
+        ]);
+        expect(controller.state.value.position, const Duration(seconds: 10));
+        expect(controller.state.value.seekTarget, isNull);
+        expect(intervals, isEmpty);
+        await release(tester, controller);
+      },
+    );
+
+    testWidgets('video ignores a pre-seek position poll that resolves later', (
+      tester,
+    ) async {
+      final controller = controllerFor(videoItem('seek-poll'));
+      final video = await rig.loadVideo(tester);
+      await controller.play();
+      video.advanceTo(const Duration(seconds: 4));
+      final positionReadStarted = video.holdNextPositionRead();
+      await tester.pump(const Duration(milliseconds: 100));
+      await positionReadStarted;
+      await controller.seek(const Duration(seconds: 30));
+      expect(controller.state.value.position, const Duration(seconds: 30));
+      video.releasePositionRead();
+      await tester.pump();
+      expect(controller.state.value.position, const Duration(seconds: 30));
+      await release(tester, controller);
+    });
+
+    testWidgets('video accepts a position poll with no seek', (tester) async {
+      final controller = controllerFor(videoItem('clean-poll'));
+      final video = await rig.loadVideo(tester);
+      await controller.play();
+      final positionReadStarted = video.holdNextPositionRead();
+      video.advanceTo(const Duration(seconds: 4));
+      await tester.pump(const Duration(milliseconds: 100));
+      await positionReadStarted;
+      video.releasePositionRead();
+      await tester.pump();
+      expect(controller.state.value.position, const Duration(seconds: 4));
+      await release(tester, controller);
+    });
+
     testWidgets('video: loading, ready, playing, paused', (tester) async {
       final controller = controllerFor(videoItem('v'));
       expect(controller.state.value.playState, DwMediaPlayState.loading);
@@ -74,6 +181,174 @@ void main() {
       await controller.play();
       await rig.playVideoTo(tester, const Duration(seconds: 2));
       expect(started, 1);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: native playback counts from the play call', (
+      tester,
+    ) async {
+      var started = 0;
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('extrapolated'),
+        callbacks: DwMediaCallbacks(onStarted: (_) => started++),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      await controller.play();
+      await dwSettleMedia(tester);
+      final acknowledgedEvents = track.playbackEventCount;
+      // just_audio extrapolates with DateTime.now(), outside the widget clock.
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 200)),
+      );
+      await tester.pump(const Duration(milliseconds: 200));
+      expect(track.playbackEventCount, acknowledgedEvents);
+      expect(started, 1);
+      final credited = DwMediaIntervalAccumulator();
+      intervals.forEach(credited.add);
+      expect(credited.intervals.single.start, Duration.zero);
+      expect(
+        credited.coveredDuration.inMilliseconds,
+        greaterThanOrEqualTo(100),
+      );
+      expect(controller.hasReallyPlayed, isTrue);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: refusal before a ready tick earns no coverage', (
+      tester,
+    ) async {
+      debugDwMediaIsWebOverride = true;
+      var started = 0;
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('immediate-refusal'),
+        callbacks: DwMediaCallbacks(onStarted: (_) => started++),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      track.startBuffering();
+      await dwSettleMedia(tester);
+      track.refusePlayWith = PlatformException(code: 'NotAllowedError');
+      await controller.play();
+      await dwSettleMedia(tester);
+      expect(intervals, isEmpty);
+      expect(started, 0);
+      expect(controller.hasReallyPlayed, isFalse);
+      await release(tester, controller);
+    });
+
+    testWidgets(
+      'audio: delayed refusal retains only the ready ticks before it',
+      (tester) async {
+        debugDwMediaIsWebOverride = true;
+        final intervals = <DwMediaPlayedInterval>[];
+        var lastReadyTick = Duration.zero;
+        final controller = controllerFor(
+          audioItem('delayed-refusal'),
+          options: const DwMediaConfig(progressInterval: Duration.zero),
+          callbacks: DwMediaCallbacks(
+            onProgress: (_, position, _) {
+              lastReadyTick = position;
+            },
+          ),
+          onPlayedInterval: intervals.add,
+        );
+        final track = await rig.loadAudio(tester);
+        final gate = Completer<void>();
+        track.playBarrier = gate.future;
+        track.refusePlayWith = PlatformException(code: 'NotAllowedError');
+        await controller.play();
+        await dwSettleMedia(tester);
+        track.stopBuffering(at: const Duration(seconds: 2));
+        await tester.pump();
+        expect(lastReadyTick, greaterThanOrEqualTo(const Duration(seconds: 2)));
+        gate.complete();
+        await dwSettleMedia(tester);
+        expect(controller.state.value.isPlaying, isFalse);
+        expect(controller.state.value.intent, DwMediaPlayIntent.pause);
+        expect(track.playing, isFalse);
+        final credited = DwMediaIntervalAccumulator();
+        intervals.forEach(credited.add);
+        expect(credited.intervals, [
+          DwMediaPlayedInterval(Duration.zero, lastReadyTick),
+        ]);
+        final before = List.of(intervals);
+        await tester.pump(const Duration(seconds: 2));
+        expect(intervals, before);
+        await release(tester, controller);
+      },
+    );
+
+    testWidgets('audio: the first ready tick confirms normal web play', (
+      tester,
+    ) async {
+      debugDwMediaIsWebOverride = true;
+      var started = 0;
+      final controller = controllerFor(
+        audioItem('web-ready'),
+        callbacks: DwMediaCallbacks(onStarted: (_) => started++),
+      );
+      final track = await rig.loadAudio(tester);
+      await controller.play();
+      track.advanceTo(const Duration(seconds: 1));
+      await tester.pump();
+      expect(controller.state.value.waiting, isFalse);
+      expect(controller.hasReallyPlayed, isTrue);
+      expect(started, 1);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: optimistic seek position cannot settle its target', (
+      tester,
+    ) async {
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('held-seek'),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      await controller.play();
+      track.advanceTo(const Duration(seconds: 4));
+      track.stopBuffering();
+      await tester.pump();
+      intervals.clear();
+      final gate = Completer<void>();
+      track.seekBarrier = gate.future;
+      final seeking = controller.seek(const Duration(seconds: 30));
+      await tester.pump(const Duration(seconds: 1));
+      expect(controller.state.value.seekTarget, const Duration(seconds: 30));
+      expect(intervals, isEmpty);
+      gate.complete();
+      await seeking;
+      expect(controller.state.value.seekTarget, isNull);
+      expect(intervals, isEmpty);
+      await release(tester, controller);
+    });
+
+    testWidgets('audio: an observation created before a seek stays stale', (
+      tester,
+    ) async {
+      final intervals = <DwMediaPlayedInterval>[];
+      final controller = controllerFor(
+        audioItem('delayed-before-seek'),
+        onPlayedInterval: intervals.add,
+      );
+      final track = await rig.loadAudio(tester);
+      await controller.play();
+      final pausing = controller.pause();
+      await dwSettleMedia(tester);
+      await pausing;
+      track.advanceTo(const Duration(seconds: 20));
+      final eventGate = Completer<void>();
+      unawaited(track.reportReadyAfter(eventGate.future));
+      await controller.seek(Duration.zero);
+      intervals.clear();
+      eventGate.complete();
+      await tester.pump();
+      expect(controller.state.value.position, Duration.zero);
+      expect(intervals, isEmpty);
       await release(tester, controller);
     });
 
@@ -240,7 +515,7 @@ void main() {
           await controller.play();
           await dwSettleMedia(tester);
           track.advanceTo(const Duration(seconds: 30));
-          await dwSettleMedia(tester);
+          await tester.pump(const Duration(seconds: 30));
           // just_audio's pause completes outside the fake clock.
           unawaited(controller.pause());
           await dwSettleMedia(tester);
@@ -257,13 +532,33 @@ void main() {
           await controller.play();
           await dwSettleMedia(tester);
           track.advanceTo(const Duration(seconds: 50));
-          await dwSettleMedia(tester);
+          await tester.pump(const Duration(seconds: 50));
           track.finish();
           await dwSettleMedia(tester);
         }),
         1,
       );
     });
+
+    testWidgets(
+      'audio: ending pauses the engine and a scrub back stays paused',
+      (tester) async {
+        final controller = controllerFor(audioItem('ended-paused'));
+        final track = await rig.loadAudio(tester);
+        await controller.play();
+        track.advanceTo(const Duration(seconds: 50));
+        await tester.pump(const Duration(seconds: 50));
+        track.finish();
+        await dwSettleMedia(tester);
+        expect(track.playing, isFalse);
+        expect(track.pauseCalls, greaterThan(0));
+        await controller.seek(const Duration(seconds: 40));
+        await dwSettleMedia(tester);
+        expect(track.playing, isFalse);
+        expect(controller.state.value.intent, DwMediaPlayIntent.pause);
+        await release(tester, controller);
+      },
+    );
   });
 
   testWidgets('onCompleted counts a seek past the threshold', (tester) async {
@@ -327,7 +622,7 @@ void main() {
       await controller.play();
       await dwSettleMedia(tester);
       track.advanceTo(const Duration(seconds: 40));
-      await dwSettleMedia(tester);
+      await tester.pump(const Duration(seconds: 40));
       track.fail('link expired');
       await dwSettleMedia(tester);
       expect(controller.state.value.isError, isTrue);
@@ -337,7 +632,11 @@ void main() {
       expect(asked, [1, 2]);
       expect(rig.audio.latest.uri, 'https://example.com/signed-2');
       expect(controller.state.value.isError, isFalse);
-      expect(controller.state.value.position, const Duration(seconds: 40));
+      expect(controller.state.value.intent, DwMediaPlayIntent.play);
+      expect(
+        controller.state.value.position.inMilliseconds,
+        closeTo(40000, 100),
+      );
       await release(tester, controller);
     });
 

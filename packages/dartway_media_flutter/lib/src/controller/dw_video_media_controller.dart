@@ -5,7 +5,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:video_player/video_player.dart';
 
 import '../lifecycle/dw_media_wakelock.dart';
-import '../model/dw_media_playback_state.dart';
+import 'dw_media_reducer.dart';
 import 'dw_media_engine_controller.dart';
 
 /// [DwMediaController] over `video_player`.
@@ -28,7 +28,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
     super.onPlaybackEnd,
     super.onObservationBreak,
     super.onSourceChange,
-    super.onObservationEnd,
+    super.onPlayedInterval,
   });
 
   VideoPlayerController? _controller;
@@ -50,7 +50,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
       previous.removeListener(_onValue);
       unawaited(_disposeAfterFrame(previous));
     }
-    final controller = VideoPlayerController.networkUrl(
+    final controller = _DwVideoPlayerController.networkUrl(
       uri,
       videoPlayerOptions: VideoPlayerOptions(
         allowBackgroundPlayback: true,
@@ -83,6 +83,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
   }
 
   void _onValue() {
+    final seekEpoch = engineSeekEpoch;
     final controller = _controller;
     if (controller == null) return;
     final value = controller.value;
@@ -99,22 +100,18 @@ final class DwVideoMediaController extends DwMediaEngineController {
       this,
       value.isPlaying && options.wakelockWhilePlaying,
     );
-    updateState(
-      (current) => current.copyWith(
-        playState: !value.isInitialized
-            ? DwMediaPlayState.loading
-            : value.isCompleted
-            ? DwMediaPlayState.ended
-            : value.isBuffering
-            ? DwMediaPlayState.buffering
-            : value.isPlaying
-            ? DwMediaPlayState.playing
-            : DwMediaPlayState.paused,
+    reportEngine(
+      EngineFact(
+        loading: !value.isInitialized,
+        ended: value.isCompleted,
+        buffering: value.isBuffering,
+        playing: value.isPlaying,
         position: value.position,
         duration: value.duration,
         buffered: value.buffered.isEmpty
             ? Duration.zero
             : value.buffered.last.end,
+        seekEpoch: seekEpoch,
       ),
     );
   }
@@ -153,5 +150,33 @@ final class DwVideoMediaController extends DwMediaEngineController {
     controller?.removeListener(_onValue);
     DwWakelockCoordinator.instance.setWants(this, false);
     await controller?.dispose();
+  }
+}
+
+final class _DwVideoPlayerController extends VideoPlayerController {
+  _DwVideoPlayerController.networkUrl(super.url, {super.videoPlayerOptions})
+    : super.networkUrl();
+
+  int _seekEpoch = 0;
+  int _seeking = 0;
+
+  @override
+  Future<Duration?> get position async {
+    final epoch = _seekEpoch;
+    final clean = _seeking == 0;
+    final position = await super.position;
+    return clean && epoch == _seekEpoch ? position : value.position;
+  }
+
+  @override
+  Future<void> seekTo(Duration position) async {
+    _seekEpoch++;
+    _seeking++;
+    try {
+      await super.seekTo(position);
+    } finally {
+      _seeking--;
+      _seekEpoch++;
+    }
   }
 }

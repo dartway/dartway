@@ -75,6 +75,12 @@ final class DwFakeAudio extends AudioPlayerPlatform {
 
   Duration position = Duration.zero;
   bool _released = false;
+  bool playing = false;
+  int pauseCalls = 0;
+  int playbackEventCount = 0;
+  Object? refusePlayWith;
+  Future<void>? playBarrier;
+  Future<void>? seekBarrier;
   final List<StreamController<PlaybackEventMessage>> _listeners = [];
 
   bool get isReleased => _released;
@@ -82,7 +88,28 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   /// Playback has reached [to].
   void advanceTo(Duration to) {
     position = to;
+  }
+
+  /// The platform has stopped producing audio while it refills its buffer.
+  void startBuffering({Duration? at}) {
+    position = at ?? position;
+    _report(ProcessingStateMessage.buffering);
+  }
+
+  /// The platform is ready to produce audio again.
+  void stopBuffering({Duration? at}) {
+    position = at ?? position;
     _report(ProcessingStateMessage.ready);
+  }
+
+  /// Creates a ready event now and delivers it after [barrier] completes.
+  ///
+  /// This reproduces an engine event waiting in an asynchronous stream while
+  /// `just_audio`'s presentation clock keeps extrapolating from its timestamp.
+  Future<void> reportReadyAfter(Future<void> barrier) async {
+    final event = _event(ProcessingStateMessage.ready);
+    await barrier;
+    _send(event);
   }
 
   /// The platform's own end of playback.
@@ -122,6 +149,7 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   @override
   Future<SeekResponse> seek(SeekRequest request) async {
     position = request.position ?? position;
+    await seekBarrier;
     _report(
       position >= length
           ? ProcessingStateMessage.completed
@@ -131,10 +159,21 @@ final class DwFakeAudio extends AudioPlayerPlatform {
   }
 
   @override
-  Future<PlayResponse> play(PlayRequest request) async => PlayResponse();
+  Future<PlayResponse> play(PlayRequest request) async {
+    playing = true;
+    await playBarrier;
+    if (refusePlayWith case final error?) throw error;
+    _report(ProcessingStateMessage.ready);
+    return PlayResponse();
+  }
 
   @override
-  Future<PauseResponse> pause(PauseRequest request) async => PauseResponse();
+  Future<PauseResponse> pause(PauseRequest request) async {
+    pauseCalls++;
+    playing = false;
+    _report(ProcessingStateMessage.ready);
+    return PauseResponse();
+  }
 
   @override
   Future<SetVolumeResponse> setVolume(SetVolumeRequest request) async =>
@@ -214,18 +253,34 @@ final class DwFakeAudio extends AudioPlayerPlatform {
     int? errorCode,
     String? errorMessage,
   }) {
-    final event = PlaybackEventMessage(
-      processingState: processing,
-      updateTime: DateTime.now(),
-      updatePosition: position,
-      bufferedPosition: position,
-      duration: length,
-      icyMetadata: null,
-      currentIndex: 0,
-      androidAudioSessionId: null,
-      errorCode: errorCode,
-      errorMessage: errorMessage,
+    _send(
+      _event(
+        processing,
+        errorCode: errorCode,
+        errorMessage: errorMessage,
+      ),
     );
+  }
+
+  PlaybackEventMessage _event(
+    ProcessingStateMessage processing, {
+    int? errorCode,
+    String? errorMessage,
+  }) => PlaybackEventMessage(
+    processingState: processing,
+    updateTime: DateTime.now(),
+    updatePosition: position,
+    bufferedPosition: position,
+    duration: length,
+    icyMetadata: null,
+    currentIndex: 0,
+    androidAudioSessionId: null,
+    errorCode: errorCode,
+    errorMessage: errorMessage,
+  );
+
+  void _send(PlaybackEventMessage event) {
+    playbackEventCount++;
     for (final listener in List.of(_listeners)) {
       listener.add(event);
     }

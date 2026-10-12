@@ -332,8 +332,8 @@ final class DwMediaConfig {
   /// storage to resume across launches.
   final DwMediaPositionStore? positionStore;
 
-  /// Opts into explicit confirmed intervals. No automatic accounting from
-  /// positions/progress. Pending batches survive engine disposal while this
+  /// Receives spans confirmed by the package's real playback and seek rules.
+  /// Pending batches survive engine disposal while this
   /// manager exists; delivery success acknowledges only the sealed batch.
   final DwMediaPlaybackDelivery? playbackDelivery;
 
