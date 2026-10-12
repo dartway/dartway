@@ -317,7 +317,7 @@ test gate apply here: public API and wire contracts are class 5; migration integ
 
 **`tool/checks.sh [analyze|test|services]`** — `analyze` and `test` by default, which need no
 Docker. CI (`.github/workflows/checks.yml`, on every pull request and push to `master`) runs tier 1
-over what the change can break: `analyze` over the packages whose code it reaches (and `dartway check`
+over what the change can break: `analyze` over the packages whose code it reaches (and the checker
 over a project one of whose packages is among them), `test` (split into generator, CLI and the rest)
 and `services` over the suites that can fail — `tool/affected.dart` reads them off the pubspec
 dependency graph, and the few test files that take minutes (`narrowTests` in

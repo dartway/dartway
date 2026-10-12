@@ -42,9 +42,10 @@ name: Checks
 # The suites are split into jobs by length: the generator's and the CLI's
 # are the two longest and run alone, the rest together, so the wall clock is
 # the longest of three instead of their sum. Inside a job, `tool/checks.sh`
-# runs its checks side by side, and the generator's and the CLI's `dart test`
-# runs as several processes (DW_TEST_SHARDS), each with a share of every
-# file's tests: one file holds most of the generator's time.
+# runs its checks side by side. A package's own files are not split into
+# processes: `dart test` already keeps the runner's four CPUs busy, and four
+# processes each compiling every file were slower and ran the generator's
+# tests into their timeouts (#575).
 
 on:
   pull_request:
@@ -97,11 +98,6 @@ jobs:
       fail-fast: false
       matrix:
         shard: [generator, cli, rest]
-        include:
-          - shard: generator
-            processes: 4
-          - shard: cli
-            processes: 2
     name: test (${{ matrix.shard }})
     env:
       DW_CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -144,7 +140,6 @@ jobs:
       - run: tool/checks.sh test
         env:
           DW_CHECKS_ONLY: ${{ steps.affected.outputs.only }}
-          DW_TEST_SHARDS: ${{ matrix.processes || 1 }}
 
   services:
     runs-on: ubuntu-latest

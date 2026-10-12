@@ -36,9 +36,7 @@
 #
 # Suites, analyzer roots and project checks run side by side, DW_CHECKS_JOBS
 # at a time (the machine's processors by default); each one's output is
-# printed whole when it ends, in the order they started. DW_TEST_SHARDS splits
-# each `dart test` run into that many processes (`--total-shards`), for the
-# jobs that hold one long package.
+# printed whole when it ends, in the order they started.
 #
 # `services` is not run by the default: it needs the two containers below, and
 # the default is what anyone can run on a laptop without them. It is not
@@ -189,9 +187,7 @@ trap 'rm -f "$POOL_COUNT"' EXIT
 
 # spawn <kind> <label> <command...>: runs the command in the background, once
 # fewer than DW_CHECKS_JOBS are running. <kind> says how `drain` reads a
-# failure: `analyze` tells a dead analysis server from errors, `shard` takes
-# "no tests ran" (exit 79) as a shard that got none of a short file's tests,
-# `js` wants a non-zero test count, anything else fails on a non-zero exit.
+# failure: `analyze` tells a dead analysis server from errors, `js` wants a non-zero test count, anything else fails on a non-zero exit.
 spawn() {
   local kind="$1" label="$2"; shift 2
   while jobs -rp >"$POOL_COUNT" && [ "$(wc -l <"$POOL_COUNT")" -ge "$JOBS" ]; do
@@ -234,7 +230,6 @@ drain() {
           FAILED+=("$label — ran 0 tests")
         fi
         ;;
-      shard:79) ;;
       analyze:*)
         # The analyzer has two ways of exiting non-zero: it found errors, or
         # it never finished. A killed analysis server — jetsam under memory
@@ -331,7 +326,7 @@ analyze() {
 
 test_suites() {
   echo "══ test"
-  local shards="${DW_TEST_SHARDS:-1}" runner files shard
+  local runner files
   for package in $(packages); do
     [ -d "$package/test" ] || continue
     touched "$package" || continue
@@ -348,21 +343,8 @@ test_suites() {
     runner="$(runner_of "$package")"
     files=
     selected "$package" || files="$(selected_files "$package" | tr '\n' ' ')"
-    # Split, each process runs one file at a time: the processes are the
-    # concurrency. Several files each at once oversubscribe the machine, and
-    # the generator's suites, which compile and analyze a project per test,
-    # run into their timeouts.
-    if [ "$runner" = dart ] && [ "$shards" -gt 1 ]; then
-      shard=0
-      while [ $shard -lt "$shards" ]; do
-        spawn shard "$package [$((shard + 1))/$shards]" \
-          bash -c "cd '$package' && dart test --concurrency 1 --total-shards $shards --shard-index $shard $files"
-        shard=$((shard + 1))
-      done
-    else
-      spawn suite "$package${files:+ ($files)}" \
-        bash -c "cd '$package' && $runner test $files"
-    fi
+    spawn suite "$package${files:+ ($files)}" \
+      bash -c "cd '$package' && $runner test $files"
   done
 }
 

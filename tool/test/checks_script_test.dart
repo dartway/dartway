@@ -93,7 +93,7 @@ fi
       expect(Process.runSync('chmod', ['+x', path]).exitCode, 0);
     }
 
-    Future<ProcessResult> run(String only, {int shards = 1}) => Process.run(
+    Future<ProcessResult> run(String only) => Process.run(
       '/bin/bash',
       ['tool/checks.sh', 'test'],
       workingDirectory: repository.path,
@@ -101,7 +101,6 @@ fi
         ...Platform.environment,
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
         'DW_CHECKS_ONLY': only,
-        'DW_TEST_SHARDS': '$shards',
       },
       includeParentEnvironment: false,
     );
@@ -117,24 +116,13 @@ fi
       ]),
     );
 
-    // A test file runs alone; DW_TEST_SHARDS splits a `dart test` run.
+    // A test file runs alone.
     calls.writeAsStringSync('');
     result = await run('packages/dartway_cli/test/pinned_cli_test.dart');
     expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
     expect(calls.readAsLinesSync(), [
       '${repository.path}/packages/dartway_cli|test test/pinned_cli_test.dart',
     ]);
-    calls.writeAsStringSync('');
-    result = await run('packages/dartway_core_shared', shards: 2);
-    expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
-    expect(
-      calls.readAsLinesSync(),
-      unorderedEquals([
-        for (final index in [0, 1])
-          '${repository.path}/packages/dartway_core_shared|'
-              'test --concurrency 1 --total-shards 2 --shard-index $index',
-      ]),
-    );
 
     calls.writeAsStringSync('');
     result = await run('');
@@ -169,12 +157,13 @@ fi
       '/bin/bash',
       ['tool/checks.sh', 'analyze'],
       workingDirectory: repository.path,
+      // CI sets a contract baseline; this test is about the roots.
       environment: {
         ...Platform.environment,
         'PATH': '${bin.path}:${Platform.environment['PATH']}',
         'DW_CHECKS_ONLY':
             'packages/dartway_core_shared template/dartway_starter_server',
-      },
+      }..remove('DW_CONTRACT_BASE'),
       includeParentEnvironment: false,
     );
     expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
