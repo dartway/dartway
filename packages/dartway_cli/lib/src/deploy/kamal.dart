@@ -100,12 +100,7 @@ class DwKamalGenerator {
             _ => 80,
           },
           'healthcheck': {'path': service == 'web' ? '/' : '/health'},
-          if (service == 'api') ...{
-            'path_prefixes': prefixes,
-            'strip_path_prefix': false,
-          },
-          if (service != 'web')
-            'buffering': {'requests': false, 'responses': false},
+          'buffering': {'requests': false, 'responses': false},
         },
         'registry': {
           'server': 'ghcr.io',
@@ -145,7 +140,7 @@ class DwKamalGenerator {
             'volumes': ['$identity-data-$destination:/data'],
           'proxy': {
             'hosts': switch (service) {
-              'api' => [target.apiDomain, target.appDomain],
+              'api' => [target.apiDomain],
               'web' => [target.appDomain],
               _ => [target.storageDomain!],
             },
@@ -179,6 +174,13 @@ class DwKamalGenerator {
                 },
               },
           },
+          if (service == 'web')
+            'env': {
+              'clear': {
+                'DW_API_ORIGIN': stack.apiOrigin,
+                'DW_API_PATHS': prefixes.join(' '),
+              },
+            },
           if (service == 'storage')
             'env': {
               'clear': {'RUSTFS_CONSOLE_ENABLE': 'false'},
@@ -293,6 +295,14 @@ class DwKamalGenerator {
             '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
             'DwHttpRoute "$path" has proxy prefix "/", which would capture '
             'every web route. Declare an exact non-root route path.',
+          );
+        }
+        if (!RegExp(
+          r'^/[A-Za-z0-9._~:@%+\-]+(?:/[A-Za-z0-9._~:@%+\-]+)*/?$',
+        ).hasMatch(path)) {
+          throw StateError(
+            '${p.relative(file.path, from: serverPackage.parent.path)}:${source.lineOf(call.start)}: '
+            'DwHttpRoute "$path" cannot be represented as an nginx proxy prefix.',
           );
         }
         prefixes.add(path);
