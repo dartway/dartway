@@ -14,6 +14,7 @@ final class _NativePausePlatform extends DwFakeVideoPlayerPlatform {
   StreamController<VideoEvent>? _native;
   Completer<void>? playBarrier;
   bool attached = true;
+  PlatformException? streamPlayError;
   @override
   Future<void> play(int playerId) async {
     await super.play(playerId);
@@ -27,6 +28,10 @@ final class _NativePausePlatform extends DwFakeVideoPlayerPlatform {
       );
     }
     await playBarrier?.future;
+    if (streamPlayError case final error?) {
+      await super.pause(playerId);
+      _native!.addError(error);
+    }
   }
 
   @override
@@ -124,6 +129,10 @@ void main() {
     'second native pause',
     'pause during restoration',
     'background during restoration',
+    'stream refusal',
+    'stream cancellation pause during restoration',
+    'stream cancellation background during restoration',
+    'stream failure',
   ]) {
     testWidgets('surface restoration respects $guard', (tester) async {
       debugDwMediaIsWebOverride = guard != 'native platform';
@@ -175,6 +184,16 @@ void main() {
       if (guard == 'play failure') {
         video.refusePlayWith = PlatformException(code: 'VideoError');
       }
+      if (guard.startsWith('stream')) {
+        platform.streamPlayError = PlatformException(
+          code: guard == 'stream refusal'
+              ? 'NotAllowedError'
+              : guard == 'stream failure'
+              ? 'VideoError'
+              : 'AbortError',
+          message: 'Browser rejected the operation',
+        );
+      }
       if (guard == 'expired handoff') {
         await tester.pump(const Duration(seconds: 1));
       }
@@ -191,10 +210,14 @@ void main() {
         'second native pause',
         'pause during restoration',
         'background during restoration',
+        'stream refusal',
+        'stream cancellation pause during restoration',
+        'stream cancellation background during restoration',
+        'stream failure',
       ].contains(guard);
       expect(video.playCalls, plays + (attempted ? 1 : 0));
       if (guard.contains('during restoration')) {
-        if (guard == 'pause during restoration') {
+        if (guard.contains('pause during restoration')) {
           await session.pause();
         } else {
           manager.handleAppLifecycle(AppLifecycleState.paused);
@@ -204,12 +227,14 @@ void main() {
         await tester.pump();
         expect(video.isPlaying, isFalse);
         expect(session.status.value.intent, DwMediaPlayIntent.pause);
+        expect(session.status.value.isError, isFalse);
       }
-      if (guard == 'refusal') {
+      if (guard == 'refusal' || guard == 'stream refusal') {
         expect(session.status.value.intent, DwMediaPlayIntent.pause);
         expect(session.status.value.isError, isFalse);
       }
-      if (guard == 'play failure') expect(session.status.value.isError, isTrue);
+      if (guard == 'play failure' || guard == 'stream failure')
+        expect(session.status.value.isError, isTrue);
       if (guard == 'second native pause') {
         await platform.detachPausesVideo();
         await tester.pump();
