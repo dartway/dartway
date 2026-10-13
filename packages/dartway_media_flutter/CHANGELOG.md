@@ -1,5 +1,9 @@
 ## 0.3.0-dev.0
 
+- Preserve typed browser refusal/cancellation during owned surface restoration,
+  serialize a newer user play behind its pending promise, and detach ownership
+  before native cleanup without resetting foreign video controllers.
+
 - Web video surfaces restore one browser pause caused by handing an already
   started video to another surface, including a mini-player or fullscreen view.
   The same controller and source stay live. User/background pauses, playback

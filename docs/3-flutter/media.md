@@ -85,10 +85,25 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
   one restoration after its replacement frame and two further rendered frames,
   within 500 ms of that surface mounting. This scheduler barrier lets the browser place the platform
   view; it is a bounded presentation allowance, not a DOM-connected API. It keeps the same
-  controller and source and uses the normal browser-refusal/error path.
+  controller and source. A web-only platform-event bridge retains typed browser
+  refusal/cancellation for that owned restoration before `video_player` discards
+  its error code; genuine failures and unowned streams still pass through.
   Explicit pause, background pause, seek or session disposal cancels that
   restoration; initial autoplay refusals are not retried. Position ticks do
   not arm it, and unrelated later engine pauses do not start a retry loop.
+  If a user resumes while that one native play promise is pending, the newer
+  command waits for settlement and queued errors before issuing its own play;
+  refusal of the newer ordinary play is not swallowed. Pause, seek, source change,
+  disposal or an explicit platform restart invalidates a waiting command.
+  This pending-command wait is capped at 30 seconds, independently of the 500 ms
+  permission to begin restoration. At the cap the session stays paused; no
+  overlapping play or automatic reload is issued. Manual retry can replace the
+  source, or play can resume after the old promise settles.
+  Presentation and ownership detach immediately on close. Native disposal pauses
+  first, waits for its owned pending play and drains events, pauses again to cancel
+  the SDK's timer, then disposes. This relies on HTML pause aborting a pending play,
+  as `video_player_web` does. A broken delegate that never settles cannot be
+  force-disposed safely through the SDK's public API and can delay native cleanup.
 - **Controls visibility is the session's.** `controlsVisible` is true with pause intent,
   and for `controlsAutoHideDelay` after play intent starts or after `showControls()`;
   `toggleControls()` is what a tap on the picture calls. The controls themselves are the app's.

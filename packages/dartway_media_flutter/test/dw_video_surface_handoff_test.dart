@@ -6,32 +6,72 @@ import 'package:dartway_media_flutter/testing.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
 import 'support/media_test_kit.dart';
 
 final class _NativePausePlatform extends DwFakeVideoPlayerPlatform {
-  StreamController<VideoEvent>? _native;
+  final Map<int, StreamController<VideoEvent>> nativeStreams = {};
+  int initCalls = 0;
+  final List<int> disposals = [];
+
+  @override
+  Future<void> init() async {
+    initCalls++;
+    for (final video in videos) {
+      await super.dispose(video.id);
+    }
+  }
+
+  @override
+  Future<void> dispose(int playerId) {
+    disposals.add(playerId);
+    return super.dispose(playerId);
+  }
+
   Completer<void>? playBarrier;
   bool attached = true;
   PlatformException? streamPlayError;
   @override
   Future<void> play(int playerId) async {
+    final operationError = streamPlayError;
+    final barrier = playBarrier;
     await super.play(playerId);
+    if (operationError != null && operationError.code != 'AbortError') {
+      await super.pause(playerId);
+    } else {
+      nativeStreams[playerId]!.add(
+        VideoEvent(
+          eventType: VideoEventType.isPlayingStateUpdate,
+          isPlaying: true,
+        ),
+      );
+    }
     if (!attached) {
       await super.pause(playerId);
-      _native!.add(
+      nativeStreams[playerId]!.add(
         VideoEvent(
           eventType: VideoEventType.isPlayingStateUpdate,
           isPlaying: false,
         ),
       );
     }
-    await playBarrier?.future;
-    if (streamPlayError case final error?) {
-      await super.pause(playerId);
-      _native!.addError(error);
+    await barrier?.future;
+    if (operationError != null) {
+      nativeStreams[playerId]!.addError(operationError);
     }
+  }
+
+  @override
+  Future<void> pause(int playerId) async {
+    await super.pause(playerId);
+    nativeStreams[playerId]?.add(
+      VideoEvent(
+        eventType: VideoEventType.isPlayingStateUpdate,
+        isPlaying: false,
+      ),
+    );
   }
 
   @override
@@ -44,13 +84,14 @@ final class _NativePausePlatform extends DwFakeVideoPlayerPlatform {
           .listen(events.add, onError: events.addError),
       onCancel: () => subscription.cancel(),
     );
-    _native = events;
+    nativeStreams[playerId] = events;
     return events.stream;
   }
 
-  Future<void> detachPausesVideo() async {
-    await super.pause(latest.id);
-    _native!.add(
+  Future<void> detachPausesVideo({int? playerId}) async {
+    final target = playerId ?? latest.id;
+    await super.pause(target);
+    nativeStreams[target]!.add(
       VideoEvent(
         eventType: VideoEventType.isPlayingStateUpdate,
         isPlaying: false,
@@ -139,7 +180,13 @@ void main() {
       final platform = _NativePausePlatform();
       VideoPlayerPlatform.instance = platform;
       final manager = DwMediaSessionManager(
-        config: const DwMediaConfig(resume: null, wakelockWhilePlaying: false),
+        config: DwMediaConfig(
+          resume: null,
+          wakelockWhilePlaying: false,
+          autoRetryCount:
+              guard.startsWith('stream') && guard != 'stream failure' ? 2 : 0,
+          autoRetryDelay: const Duration(milliseconds: 100),
+        ),
       );
       final session = manager.open(items: [videoItem('guard')]);
       Widget surface(String key) => Directionality(
@@ -228,13 +275,16 @@ void main() {
         expect(video.isPlaying, isFalse);
         expect(session.status.value.intent, DwMediaPlayIntent.pause);
         expect(session.status.value.isError, isFalse);
+        expect(session.videoView.value!.value.isInitialized, isTrue);
+        expect(session.videoView.value!.value.isPlaying, isFalse);
       }
       if (guard == 'refusal' || guard == 'stream refusal') {
         expect(session.status.value.intent, DwMediaPlayIntent.pause);
         expect(session.status.value.isError, isFalse);
       }
-      if (guard == 'play failure' || guard == 'stream failure')
+      if (guard == 'play failure' || guard == 'stream failure') {
         expect(session.status.value.isError, isTrue);
+      }
       if (guard == 'second native pause') {
         await platform.detachPausesVideo();
         await tester.pump();
@@ -298,6 +348,368 @@ void main() {
       expect(platform.opened, hasLength(1));
       await endSession(tester, session);
       await tester.pumpWidget(const SizedBox.shrink());
+    },
+  );
+  testWidgets(
+    'typed bridge preserves foreign playback and isolates two owned streams',
+    (tester) async {
+      debugDwMediaIsWebOverride = true;
+      final platform = _NativePausePlatform();
+      VideoPlayerPlatform.instance = platform;
+      final foreign = VideoPlayerController.networkUrl(
+        Uri.parse('https://example.test/foreign.mp4'),
+      );
+      await foreign.initialize();
+      await foreign.play();
+      final foreignVideo = platform.latest;
+      expect(platform.initCalls, 1);
+      final firstManager = DwMediaSessionManager(
+        config: const DwMediaConfig(resume: null, wakelockWhilePlaying: false),
+      );
+      final secondManager = DwMediaSessionManager(
+        config: const DwMediaConfig(resume: null, wakelockWhilePlaying: false),
+      );
+      final first = firstManager.open(items: [videoItem('first-owned')]);
+      final second = secondManager.open(items: [videoItem('second-owned')]);
+      Widget surfaces(String firstKey) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: Row(
+          children: [
+            Expanded(
+              child: DwVideoSurface(key: ValueKey(firstKey), session: first),
+            ),
+            Expanded(
+              child: DwVideoSurface(
+                key: const ValueKey('second'),
+                session: second,
+              ),
+            ),
+          ],
+        ),
+      );
+      await tester.pumpWidget(surfaces('main'));
+      await dwSettleMedia(tester);
+      await first.play();
+      await second.play();
+      final firstVideo = platform.opened[1];
+      final secondVideo = platform.opened[2];
+      expect(
+        platform.initCalls,
+        1,
+        reason: 'adapter installation cannot reset an existing platform',
+      );
+      expect(platform.disposals, isEmpty);
+      expect(foreignVideo.isPlaying, isTrue);
+      platform.streamPlayError = PlatformException(
+        code: 'NotAllowedError',
+        message: 'gesture required',
+      );
+      await tester.pumpWidget(surfaces('mini'));
+      await platform.detachPausesVideo(playerId: firstVideo.id);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(first.status.value.intent, DwMediaPlayIntent.pause);
+      expect(first.status.value.isError, isFalse);
+      expect(first.videoView.value!.value.isInitialized, isTrue);
+      expect(first.videoView.value!.value.isPlaying, isFalse);
+      expect(second.status.value.isError, isFalse);
+      expect(secondVideo.isPlaying, isTrue);
+      expect(secondVideo.playCalls, 1);
+      expect(foreignVideo.isPlaying, isTrue);
+      expect(foreignVideo.playCalls, 1);
+      platform.nativeStreams[foreignVideo.id]!.addError(
+        PlatformException(code: 'NotAllowedError', message: 'foreign refusal'),
+      );
+      await tester.pump();
+      expect(
+        foreign.value.hasError,
+        isTrue,
+        reason: 'unowned streams are forwarded unchanged',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await endSession(tester, first);
+      await endSession(tester, second);
+      await foreign.dispose();
+    },
+  );
+
+  testWidgets('explicit bridge init delegates restart and releases bindings', (
+    tester,
+  ) async {
+    debugDwMediaIsWebOverride = true;
+    final platform = _NativePausePlatform();
+    VideoPlayerPlatform.instance = platform;
+    final manager = DwMediaSessionManager(
+      config: const DwMediaConfig(resume: null, wakelockWhilePlaying: false),
+    );
+    final session = manager.open(items: [videoItem('restart')]);
+    await tester.pumpWidget(
+      Directionality(
+        textDirection: TextDirection.ltr,
+        child: DwVideoSurface(session: session),
+      ),
+    );
+    await dwSettleMedia(tester);
+    await session.play();
+    final before = platform.initCalls;
+    await VideoPlayerPlatform.instance.init();
+    expect(platform.initCalls, before + 1);
+    expect(platform.latest.isReleased, isTrue);
+    await tester.pumpWidget(const SizedBox.shrink());
+    await endSession(tester, session);
+  });
+
+  testWidgets('native play acknowledgement ends restoration error capture', (
+    tester,
+  ) async {
+    debugDwMediaIsWebOverride = true;
+    final platform = _NativePausePlatform();
+    VideoPlayerPlatform.instance = platform;
+    final manager = DwMediaSessionManager(
+      config: const DwMediaConfig(resume: null, wakelockWhilePlaying: false),
+    );
+    final session = manager.open(items: [videoItem('terminal-play')]);
+    Widget surface(String key) => Directionality(
+      textDirection: TextDirection.ltr,
+      child: DwVideoSurface(key: ValueKey(key), session: session),
+    );
+    await tester.pumpWidget(surface('main'));
+    await dwSettleMedia(tester);
+    await session.play();
+    await tester.pumpWidget(surface('mini'));
+    await platform.detachPausesVideo();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    expect(platform.latest.isPlaying, isTrue);
+    platform.nativeStreams[platform.latest.id]!.addError(
+      PlatformException(
+        code: 'NotAllowedError',
+        message: 'later unrelated failure',
+      ),
+    );
+    await tester.pump();
+    expect(
+      session.status.value.isError,
+      isTrue,
+      reason: 'terminal native play ends the allowance',
+    );
+    await tester.pumpWidget(const SizedBox.shrink());
+    await endSession(tester, session);
+  });
+  for (final code in ['AbortError', 'NotAllowedError']) {
+    testWidgets('pause then resume retires delayed restoration $code', (
+      tester,
+    ) async {
+      debugDwMediaIsWebOverride = true;
+      final platform = _NativePausePlatform();
+      VideoPlayerPlatform.instance = platform;
+      final manager = DwMediaSessionManager(
+        config: const DwMediaConfig(
+          resume: null,
+          wakelockWhilePlaying: false,
+          autoRetryCount: 2,
+          autoRetryDelay: Duration(milliseconds: 100),
+        ),
+      );
+      final session = manager.open(items: [videoItem('user-resume-race')]);
+      Widget surface(String key) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: DwVideoSurface(key: ValueKey(key), session: session),
+      );
+      await tester.pumpWidget(surface('main'));
+      await dwSettleMedia(tester);
+      await session.play();
+      final pending = Completer<void>();
+      platform.playBarrier = pending;
+      platform.streamPlayError = PlatformException(
+        code: code,
+        message: 'old operation rejected',
+      );
+      await tester.pumpWidget(surface('mini'));
+      await platform.detachPausesVideo();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      await session.pause();
+      platform.playBarrier = null;
+      platform.streamPlayError = null;
+      final resumed = session.play();
+      await tester.pump();
+      pending.complete();
+      await tester.pump();
+      await resumed;
+      await tester.pump(const Duration(seconds: 1));
+      expect(session.status.value.intent, DwMediaPlayIntent.play);
+      expect(session.status.value.isError, isFalse);
+      expect(session.videoView.value!.value.isInitialized, isTrue);
+      expect(platform.latest.isPlaying, isTrue);
+      expect(
+        platform.opened,
+        hasLength(1),
+        reason: 'old rejection cannot reload the newer user play',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await endSession(tester, session);
+    });
+  }
+  for (final cancellation in [
+    'pause',
+    'seek',
+    'source',
+    'dispose',
+    'stop',
+    'restart',
+    'timeout',
+    'new refusal',
+  ]) {
+    testWidgets(
+      'waiting resume respects $cancellation without stale native play',
+      (tester) async {
+        debugDwMediaIsWebOverride = true;
+        final platform = _NativePausePlatform();
+        VideoPlayerPlatform.instance = platform;
+        final manager = DwMediaSessionManager(
+          config: const DwMediaConfig(
+            resume: null,
+            wakelockWhilePlaying: false,
+          ),
+        );
+        final session = manager.open(
+          items: [videoItem('pending-resume'), videoItem('next-source')],
+        );
+        Widget surface(String key) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: DwVideoSurface(key: ValueKey(key), session: session),
+        );
+        await tester.pumpWidget(surface('main'));
+        await dwSettleMedia(tester);
+        await session.play();
+        final video = platform.latest;
+        final pending = Completer<void>();
+        platform.playBarrier = pending;
+        platform.streamPlayError = PlatformException(
+          code: 'AbortError',
+          message: 'retired restoration',
+        );
+        await tester.pumpWidget(surface('mini'));
+        await platform.detachPausesVideo();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        await session.pause();
+        platform.playBarrier = null;
+        platform.streamPlayError = cancellation == 'new refusal'
+            ? PlatformException(
+                code: 'NotAllowedError',
+                message: 'new user operation refused',
+              )
+            : null;
+        final resumed = session.play();
+        await tester.pump();
+        expect(
+          video.playCalls,
+          2,
+          reason: 'new native play waits for the old promise',
+        );
+        Future<void>? cancelled;
+        if (cancellation == 'pause') await session.pause();
+        if (cancellation == 'seek') {
+          cancelled = session.seek(const Duration(seconds: 5));
+        }
+        if (cancellation == 'source') cancelled = session.next(autoplay: false);
+        if (cancellation == 'dispose') await session.dispose();
+        if (cancellation == 'stop') await session.closeFromMiniPlayer();
+        if (cancellation == 'restart') {
+          await VideoPlayerPlatform.instance.init();
+        }
+        if (cancellation == 'timeout') {
+          await tester.pump(const Duration(seconds: 31));
+          await resumed;
+          expect(session.status.value.intent, DwMediaPlayIntent.pause);
+          expect(session.status.value.isError, isFalse);
+          await session.play();
+          expect(
+            video.playCalls,
+            2,
+            reason: 'timeout cannot issue overlapping native play',
+          );
+        }
+        await tester.pump();
+        pending.complete();
+        await tester.pump();
+        await resumed;
+        if (cancelled != null) {
+          await tester.pump();
+          await cancelled;
+        }
+        await tester.pump(const Duration(milliseconds: 500));
+        if (cancellation == 'new refusal') {
+          expect(video.playCalls, 3);
+          expect(
+            session.status.value.isError,
+            isTrue,
+            reason:
+                'new ordinary refusal is not swallowed with the retired one',
+          );
+        } else if (cancellation == 'seek') {
+          expect(
+            video.playCalls,
+            3,
+            reason: 'only the new seek may resume, not the stale play',
+          );
+          expect(session.position.value.position, const Duration(seconds: 5));
+          expect(session.status.value.isError, isFalse);
+        } else {
+          expect(
+            video.playCalls,
+            2,
+            reason: 'retired resume cannot issue stale native play',
+          );
+          expect(session.status.value.isError, isFalse);
+        }
+        if (cancellation == 'timeout') {
+          await session.play();
+          expect(
+            video.playCalls,
+            3,
+            reason: 'manual retry after old settlement is safe',
+          );
+        }
+        await tester.pumpWidget(const SizedBox.shrink());
+        await endSession(tester, session);
+      },
+    );
+  }
+
+  testWidgets(
+    'ordinary initial native stream refusal remains outside handoff capture',
+    (tester) async {
+      debugDwMediaIsWebOverride = true;
+      final platform = _NativePausePlatform();
+      VideoPlayerPlatform.instance = platform;
+      final manager = DwMediaSessionManager(
+        config: const DwMediaConfig(resume: null, wakelockWhilePlaying: false),
+      );
+      final session = manager.open(items: [videoItem('ordinary-refusal')]);
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: DwVideoSurface(session: session),
+        ),
+      );
+      await dwSettleMedia(tester);
+      platform.streamPlayError = PlatformException(
+        code: 'NotAllowedError',
+        message: 'ordinary stream refusal',
+      );
+      await session.play();
+      await tester.pump();
+      expect(
+        session.status.value.isError,
+        isTrue,
+        reason: 'the adapter does not change ordinary stream error handling',
+      );
+      expect(platform.opened, hasLength(1));
+      await tester.pumpWidget(const SizedBox.shrink());
+      await endSession(tester, session);
     },
   );
 }
