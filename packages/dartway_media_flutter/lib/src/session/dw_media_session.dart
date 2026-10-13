@@ -195,6 +195,7 @@ final class DwMediaSession {
   void _detach(DwMediaController controller) {
     controller.state.removeListener(_onPlayback);
     if (controller is DwVideoMediaController) {
+      controller.revokeVideoSurfaceHandoff();
       controller.videoController.removeListener(_onVideoView);
     }
   }

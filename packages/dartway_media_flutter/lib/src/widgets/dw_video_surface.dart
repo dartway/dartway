@@ -2,6 +2,7 @@ import 'package:flutter/widgets.dart';
 import 'package:video_player/video_player.dart';
 
 import '../session/dw_media_session_manager.dart';
+import '../controller/dw_video_surface_binding.dart';
 
 /// The video of [session]'s current item at its own aspect ratio — no
 /// chrome, no controls. Follows the queue, and draws [placeholder] while
@@ -56,6 +57,9 @@ final class _SizedVideoViewState extends State<_SizedVideoView> {
     super.initState();
     _size = widget.controller.value.size;
     _video = VideoPlayer(widget.controller);
+    if (widget.controller case DwVideoSurfaceBinding binding) {
+      binding.attachVideoSurface();
+    }
     widget.controller.addListener(_onValue);
   }
 
@@ -67,6 +71,9 @@ final class _SizedVideoViewState extends State<_SizedVideoView> {
 
   @override
   void dispose() {
+    if (widget.controller case DwVideoSurfaceBinding binding) {
+      binding.detachVideoSurface();
+    }
     widget.controller.removeListener(_onValue);
     super.dispose();
   }

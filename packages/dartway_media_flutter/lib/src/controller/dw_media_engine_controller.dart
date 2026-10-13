@@ -393,6 +393,21 @@ abstract class DwMediaEngineController extends DwMediaController {
     }
   }
 
+  /// Restores a presentation-induced pause without changing user intent.
+  /// The engine's ordinary refusal/error path still owns a failed play.
+  @protected
+  Future<void> restoreEnginePlayback() async {
+    if (_disposed ||
+        !_loaded ||
+        _failed ||
+        _state.value.intent != DwMediaPlayIntent.play ||
+        _state.value.isEnded ||
+        _state.value.seekTarget != null) {
+      return;
+    }
+    await _playEngine();
+  }
+
   @override
   Future<void> pause() async {
     if (_disposed) return;

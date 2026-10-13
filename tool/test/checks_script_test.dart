@@ -40,7 +40,9 @@ fi
     Future<ProcessResult> run({String? contractBase}) {
       final environment = Map<String, String>.of(Platform.environment)
         ..['PATH'] = '${bin.path}:${Platform.environment['PATH']}'
-        ..remove('DW_CONTRACT_BASE');
+        ..remove('DW_CONTRACT_BASE')
+        ..remove('DW_CHECKS_ONLY')
+        ..remove('DW_TEST_PART');
       if (contractBase != null) environment['DW_CONTRACT_BASE'] = contractBase;
       return Process.run(
         '/bin/bash',

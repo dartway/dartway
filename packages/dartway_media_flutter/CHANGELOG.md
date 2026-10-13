@@ -1,5 +1,18 @@
 ## 0.3.0-dev.0
 
+- Claim owned web initialization once, keep unresolved restoration ownership
+  across later surface moves, and silence retired owner callbacks immediately
+  while native disposal safely waits for its pending play.
+
+- Preserve typed browser refusal/cancellation during owned surface restoration,
+  serialize a newer user play behind its pending promise, and detach ownership
+  before native cleanup without resetting foreign video controllers.
+
+- Web video surfaces restore one browser pause caused by handing an already
+  started video to another surface, including a mini-player or fullscreen view.
+  The same controller and source stay live. User/background pauses, playback
+  errors and autoplay refusals are respected; position ticks never replay.
+
 - **Breaking** (#555): playback intent owns play/pause; buffering and unconfirmed
   play use `waiting` instead of `DwMediaPlayState.buffering`/`isBuffering`.
   `togglePlay()` uses intent and redundant play commands do nothing. Playing an
