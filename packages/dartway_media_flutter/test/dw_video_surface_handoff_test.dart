@@ -100,6 +100,21 @@ final class _NativePausePlatform extends DwFakeVideoPlayerPlatform {
   }
 }
 
+final class _BlockedPositionStore implements DwMediaPositionStore {
+  final saved = Completer<void>();
+  int writes = 0;
+  @override
+  Future<Duration?> read(String itemId) async => null;
+  @override
+  Future<void> write(String itemId, Duration position) {
+    writes++;
+    return saved.future;
+  }
+
+  @override
+  Future<void> clear(String itemId) async {}
+}
+
 void main() {
   tearDown(() => debugDwMediaIsWebOverride = null);
   for (final detachFirst in [true, false]) {
@@ -712,4 +727,214 @@ void main() {
       await endSession(tester, session);
     },
   );
+  testWidgets(
+    'foreign initialized from an owned native callback cannot inherit its binding',
+    (tester) async {
+      debugDwMediaIsWebOverride = true;
+      final platform = _NativePausePlatform();
+      VideoPlayerPlatform.instance = platform;
+      final manager = DwMediaSessionManager(
+        config: const DwMediaConfig(resume: null, wakelockWhilePlaying: false),
+      );
+      final session = manager.open(items: [videoItem('callback-owner')]);
+      Widget surface(String key) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: DwVideoSurface(key: ValueKey(key), session: session),
+      );
+      await tester.pumpWidget(surface('main'));
+      await dwSettleMedia(tester);
+      await session.play();
+      await tester.pump();
+      final owned = platform.latest;
+      owned.advanceTo(const Duration(seconds: 1));
+      await tester.pump(const Duration(milliseconds: 100));
+      VideoPlayerController? foreign;
+      Future<void>? initialized;
+      void onStatus() {
+        if (session.status.value.waiting && foreign == null) {
+          foreign = VideoPlayerController.networkUrl(
+            Uri.parse('https://example.test/from-callback.mp4'),
+          );
+          initialized = foreign!.initialize();
+        }
+      }
+
+      session.status.addListener(onStatus);
+      platform.nativeStreams[owned.id]!.add(
+        VideoEvent(eventType: VideoEventType.bufferingStart),
+      );
+      await tester.pump();
+      expect(foreign, isNotNull);
+      await initialized;
+      await foreign!.dispose();
+      session.status.removeListener(onStatus);
+      platform.nativeStreams[owned.id]!.add(
+        VideoEvent(eventType: VideoEventType.bufferingEnd),
+      );
+      await tester.pump();
+      await tester.pumpWidget(surface('mini'));
+      await platform.detachPausesVideo(playerId: owned.id);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      expect(
+        owned.isPlaying,
+        isTrue,
+        reason: 'foreign disposal cannot release the original owner',
+      );
+      expect(owned.playCalls, 2);
+      expect(session.status.value.isError, isFalse);
+      await tester.pumpWidget(const SizedBox.shrink());
+      await endSession(tester, session);
+    },
+  );
+
+  for (final check in ['overlap', 'original deadline']) {
+    testWidgets(
+      'unresolved restoration keeps ownership across a second handoff: $check',
+      (tester) async {
+        debugDwMediaIsWebOverride = true;
+        final platform = _NativePausePlatform();
+        VideoPlayerPlatform.instance = platform;
+        final manager = DwMediaSessionManager(
+          config: const DwMediaConfig(
+            resume: null,
+            wakelockWhilePlaying: false,
+          ),
+        );
+        final session = manager.open(
+          items: [videoItem('pending-second-handoff')],
+        );
+        Widget surface(String key) => Directionality(
+          textDirection: TextDirection.ltr,
+          child: DwVideoSurface(key: ValueKey(key), session: session),
+        );
+        await tester.pumpWidget(surface('main'));
+        await dwSettleMedia(tester);
+        await session.play();
+        final pending = Completer<void>();
+        platform.playBarrier = pending;
+        platform.streamPlayError = PlatformException(
+          code: 'AbortError',
+          message: 'pending restore interrupted',
+        );
+        await tester.pumpWidget(surface('mini'));
+        await platform.detachPausesVideo();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        if (check == 'original deadline')
+          await tester.pump(const Duration(seconds: 29));
+        await tester.pumpWidget(surface('main-again'));
+        await platform.detachPausesVideo();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        if (check == 'overlap') {
+          expect(
+            platform.latest.playCalls,
+            2,
+            reason: 'a second surface cannot overlap the pending native play',
+          );
+        } else {
+          await tester.pump(const Duration(seconds: 2));
+          expect(
+            session.status.value.intent,
+            DwMediaPlayIntent.pause,
+            reason: 'replacement must not extend the first 30-second deadline',
+          );
+        }
+        platform.playBarrier = null;
+        platform.streamPlayError = null;
+        pending.complete();
+        await tester.pump();
+        await tester.pump(const Duration(milliseconds: 50));
+        expect(session.status.value.isError, isFalse);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await endSession(tester, session);
+      },
+    );
+  }
+
+  for (final detachment in [
+    'close before frame',
+    'source before frame',
+    'blocked storage error',
+    'blocked storage reload',
+  ]) {
+    testWidgets('retired video emits no failure after $detachment', (
+      tester,
+    ) async {
+      debugDwMediaIsWebOverride = true;
+      final platform = _NativePausePlatform();
+      VideoPlayerPlatform.instance = platform;
+      final store = _BlockedPositionStore();
+      final failures = <Object>[];
+      final blocked = detachment.startsWith('blocked');
+      final manager = DwMediaSessionManager(
+        config: DwMediaConfig(
+          resume: blocked
+              ? const DwMediaResumePolicy(saveOnPause: false)
+              : null,
+          positionStore: store,
+          wakelockWhilePlaying: false,
+          autoRetryCount: detachment.endsWith('reload') ? 2 : 0,
+          autoRetryDelay: const Duration(milliseconds: 100),
+        ),
+      );
+      final session = manager.open(
+        items: [videoItem('retired-source'), videoItem('replacement')],
+        callbacks: DwMediaCallbacks(onError: (_, error) => failures.add(error)),
+      );
+      Widget surface(String key) => Directionality(
+        textDirection: TextDirection.ltr,
+        child: DwVideoSurface(key: ValueKey(key), session: session),
+      );
+      await tester.pumpWidget(surface('main'));
+      await dwSettleMedia(tester);
+      await session.play();
+      final video = platform.latest;
+      video.advanceTo(const Duration(seconds: 7));
+      await tester.pump(const Duration(milliseconds: 100));
+      final pending = Completer<void>();
+      platform.playBarrier = pending;
+      await tester.pumpWidget(surface('mini'));
+      await platform.detachPausesVideo();
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+      platform.playBarrier = null;
+      if (detachment.startsWith('source')) {
+        await session.next(autoplay: false);
+      } else {
+        await session.closeFromMiniPlayer();
+      }
+      if (blocked) {
+        await tester.pump();
+        await tester.pump();
+        expect(
+          store.writes,
+          greaterThan(0),
+          reason:
+              'deferred owner disposal is actually waiting on resume storage',
+        );
+      }
+      platform.nativeStreams[video.id]!.addError(
+        PlatformException(
+          code: 'AbortError',
+          message: 'retired browser play rejected',
+        ),
+      );
+      // Drain the asynchronous native stream without drawing the disposal frame.
+      await Future<void>.value();
+      await Future<void>.value();
+      expect(failures, isEmpty, reason: 'a detached owner cannot call onError');
+      pending.complete();
+      await tester.pump(const Duration(seconds: 1));
+      expect(
+        platform.opened,
+        hasLength(detachment.startsWith('source') ? 2 : 1),
+        reason: 'retired errors cannot trigger a reload',
+      );
+      store.saved.complete();
+      await tester.pumpWidget(const SizedBox.shrink());
+      await endSession(tester, session);
+    });
+  }
 }
