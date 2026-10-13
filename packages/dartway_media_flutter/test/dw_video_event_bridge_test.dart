@@ -8,6 +8,10 @@ import 'package:video_player_platform_interface/video_player_platform_interface.
 final class _EventPlatform extends VideoPlayerPlatform {
   final source = StreamController<VideoEvent>();
   int restarts = 0;
+  int createdPlayerId = 7;
+  @override
+  Future<int?> createWithOptions(VideoCreationOptions options) async =>
+      createdPlayerId;
   final disposed = <int>[];
 
   @override
@@ -36,6 +40,15 @@ void main() {
       late StreamSubscription<VideoEvent> subscription;
       await binding.initialize(() async {
         await VideoPlayerPlatform.instance.init();
+        await VideoPlayerPlatform.instance.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(
+              sourceType: DataSourceType.network,
+              uri: 'https://example.test/owned.mp4',
+            ),
+            viewType: VideoViewType.textureView,
+          ),
+        );
         subscription = VideoPlayerPlatform.instance
             .videoEventsFor(7)
             .listen((_) {}, onError: forwarded.add);
@@ -81,7 +94,7 @@ void main() {
   test(
     'explicit restart releases old bindings and forwards later errors',
     () async {
-      final platform = _EventPlatform();
+      final platform = _EventPlatform()..createdPlayerId = 3;
       VideoPlayerPlatform.instance = platform;
       var calls = 0;
       final binding = DwVideoEventBinding(
@@ -95,6 +108,15 @@ void main() {
       late StreamSubscription<VideoEvent> subscription;
       await binding.initialize(() async {
         await VideoPlayerPlatform.instance.init();
+        await VideoPlayerPlatform.instance.createWithOptions(
+          VideoCreationOptions(
+            dataSource: DataSource(
+              sourceType: DataSourceType.network,
+              uri: 'https://example.test/owned.mp4',
+            ),
+            viewType: VideoViewType.textureView,
+          ),
+        );
         subscription = VideoPlayerPlatform.instance
             .videoEventsFor(3)
             .listen((_) {}, onError: forwarded.add);

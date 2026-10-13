@@ -1,5 +1,9 @@
 ## 0.3.0-dev.0
 
+- Claim owned web initialization once, keep unresolved restoration ownership
+  across later surface moves, and silence retired owner callbacks immediately
+  while native disposal safely waits for its pending play.
+
 - Preserve typed browser refusal/cancellation during owned surface restoration,
   serialize a newer user play behind its pending promise, and detach ownership
   before native cleanup without resetting foreign video controllers.

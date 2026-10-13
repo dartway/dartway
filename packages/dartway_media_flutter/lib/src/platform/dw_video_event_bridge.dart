@@ -18,6 +18,7 @@ final class DwVideoEventBinding {
   final bool Function(Object, StackTrace) onError;
   final void Function()? onRelease;
   bool _active = true;
+  bool _claimed = false;
   bool get active => _active;
 
   Future<void> initialize(Future<void> Function() initialize) {
@@ -28,6 +29,12 @@ final class DwVideoEventBinding {
     // The SDK's first platform getter runs synchronously inside initialize,
     // before its first await. No foreign controller can interleave it.
     return runZoned(initialize, zoneValues: {_bindingKey: this});
+  }
+
+  DwVideoEventBinding? claim() {
+    if (!_active || _claimed) return null;
+    _claimed = true;
+    return this;
   }
 
   void release() {
@@ -63,9 +70,8 @@ final class _VideoEventBridge extends VideoPlayerPlatform {
   @override
   Stream<VideoEvent> videoEventsFor(int playerId) {
     final source = delegate.videoEventsFor(playerId);
-    final binding = Zone.current[_bindingKey] as DwVideoEventBinding?;
+    final binding = _bindings[playerId];
     if (binding == null) return source;
-    _bindings[playerId] = binding;
     return source.transform(
       StreamTransformer.fromHandlers(
         handleData: (event, sink) {
@@ -87,15 +93,28 @@ final class _VideoEventBridge extends VideoPlayerPlatform {
     return delegate.dispose(playerId);
   }
 
+  Future<int?> _create(Future<int?> Function() create) async {
+    // Claim before invoking the delegate: even synchronous callbacks from
+    // create cannot pass this owned token to another controller.
+    final binding = (Zone.current[_bindingKey] as DwVideoEventBinding?)
+        ?.claim();
+    final playerId = await create();
+    if (playerId != null && binding != null && binding.active) {
+      _bindings[playerId] = binding;
+    }
+    return playerId;
+  }
+
   @override
   Future<int?> createWithOptions(VideoCreationOptions options) =>
-      delegate.createWithOptions(options);
+      _create(() => delegate.createWithOptions(options));
   @override
-  Future<int?> create(DataSource source) =>
-      // The adapter forwards the platform interface unchanged, including callers
-      // of its deprecated methods; converting them could change the delegate.
-      // ignore: deprecated_member_use
-      delegate.create(source);
+  Future<int?> create(DataSource source) => _create(
+    () =>
+        // Preserve the platform's existing legacy entry point unchanged.
+        // ignore: deprecated_member_use
+        delegate.create(source),
+  );
   @override
   Future<void> setLooping(int playerId, bool looping) =>
       delegate.setLooping(playerId, looping);

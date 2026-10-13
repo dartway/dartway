@@ -88,6 +88,8 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
   controller and source. A web-only platform-event bridge retains typed browser
   refusal/cancellation for that owned restoration before `video_player` discards
   its error code; genuine failures and unowned streams still pass through.
+  The initialization token is claimed once before native creation awaits, so
+  a foreign player created from an owned event callback cannot inherit it.
   Explicit pause, background pause, seek or session disposal cancels that
   restoration; initial autoplay refusals are not retried. Position ticks do
   not arm it, and unrelated later engine pauses do not start a retry loop.
@@ -97,9 +99,13 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
   disposal or an explicit platform restart invalidates a waiting command.
   This pending-command wait is capped at 30 seconds, independently of the 500 ms
   permission to begin restoration. At the cap the session stays paused; no
-  overlapping play or automatic reload is issued. Manual retry can replace the
+  overlapping play or automatic reload is issued. A second surface handoff
+  while that promise is unresolved is rejected without changing its original
+  deadline; if the old play aborts, it stays paused for a manual retry.
+  Manual retry can replace the
   source, or play can resume after the old promise settles.
-  Presentation and ownership detach immediately on close. Native disposal pauses
+  Presentation, observation and failure-reporting ownership detach immediately
+  on close or source change, including while resume storage waits. Native disposal pauses
   first, waits for its owned pending play and drains events, pauses again to cancel
   the SDK's timer, then disposes. This relies on HTML pause aborting a pending play,
   as `video_player_web` does. A broken delegate that never settles cannot be

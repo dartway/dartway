@@ -821,8 +821,9 @@ void main() {
         await platform.detachPausesVideo();
         await tester.pump();
         await tester.pump(const Duration(milliseconds: 50));
-        if (check == 'original deadline')
+        if (check == 'original deadline') {
           await tester.pump(const Duration(seconds: 29));
+        }
         await tester.pumpWidget(surface('main-again'));
         await platform.detachPausesVideo();
         await tester.pump();

@@ -109,6 +109,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
   }
 
   void _onValue() {
+    if (_surfaceReleased) return;
     final seekEpoch = engineSeekEpoch;
     final controller = _controller;
     if (controller == null) return;
@@ -153,6 +154,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
     final replacement = _surfaceWasMounted;
     _surfaceWasMounted = true;
     if (!replacement ||
+        (_restoration != null && !_restoration!.completed) ||
         !_playSucceeded ||
         state.value.intent != DwMediaPlayIntent.play) {
       return;
@@ -219,6 +221,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
   }
 
   Future<void> _restorePlayback(VideoPlayerController controller) async {
+    if (_restoration != null && !_restoration!.completed) return;
     final attempt = _RestorationAttempt(controller);
     _restoration?.timer?.cancel();
     _restoration = attempt;
@@ -326,6 +329,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
   /// screen may sleep again.
   @override
   void reportFailure(Object error, [StackTrace? stackTrace]) {
+    if (_surfaceReleased) return;
     DwWakelockCoordinator.instance.setWants(this, false);
     super.reportFailure(error, stackTrace);
   }
@@ -368,6 +372,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
     if (controller != null &&
         identical(controller, _controller) &&
         !isDisposed &&
+        !_surfaceReleased &&
         !controller.value.hasError &&
         !state.value.isError &&
         state.value.intent == DwMediaPlayIntent.play &&
@@ -416,12 +421,24 @@ final class DwVideoMediaController extends DwMediaEngineController {
     await super.dispose();
   }
 
+  @override
+  void reportPlayRefused() {
+    if (_surfaceReleased) return;
+    super.reportPlayRefused();
+  }
+
   /// The session releases presentation before deferred engine disposal.
   @internal
   void revokeVideoSurfaceHandoff() {
+    _surfaceReleased = true;
+    _initialized = false;
+    final controller = _controller;
+    controller?.removeListener(_onValue);
+    if (controller is _DwVideoPlayerController) {
+      controller.releaseEventBinding();
+    }
     _invalidateWaitingPlay();
     _clearRestoration();
-    _surfaceReleased = true;
     _playSucceeded = false;
     _handoffPending = false;
     _handoffTimer?.cancel();
