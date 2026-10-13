@@ -5,8 +5,11 @@ import 'package:flutter/scheduler.dart';
 import 'package:video_player/video_player.dart';
 
 import '../lifecycle/dw_media_wakelock.dart';
+import '../platform/dw_media_platform.dart';
+import '../model/dw_media_playback_state.dart';
 import 'dw_media_reducer.dart';
 import 'dw_media_engine_controller.dart';
+import 'dw_video_surface_binding.dart';
 
 /// [DwMediaController] over `video_player`.
 ///
@@ -35,6 +38,14 @@ final class DwVideoMediaController extends DwMediaEngineController {
   final ValueNotifier<VideoPlayerController?> _view = ValueNotifier(null);
   bool _initialized = false;
   bool _failureReported = false;
+  bool _playSucceeded = false;
+  bool _surfaceReleased = false;
+  int _surfaceCount = 0;
+  bool _surfaceWasMounted = false;
+  bool _handoffPending = false;
+  bool _handoffPainted = false;
+  int _handoffEpoch = 0;
+  Timer? _handoffTimer;
 
   /// The `video_player` controller to draw, once it has initialized — what
   /// `DwVideoSurface` renders. `null` while loading, and between a retry
@@ -43,6 +54,8 @@ final class DwVideoMediaController extends DwMediaEngineController {
 
   @override
   Future<void> engineLoad(Uri uri) async {
+    _clearSurfaceHandoff();
+    _playSucceeded = false;
     final previous = _controller;
     _controller = null;
     _view.value = null;
@@ -56,6 +69,8 @@ final class DwVideoMediaController extends DwMediaEngineController {
         allowBackgroundPlayback: true,
         preventsDisplaySleepDuringVideoPlayback: options.wakelockWhilePlaying,
       ),
+      onSurfaceAttached: _surfaceAttached,
+      onSurfaceDetached: _surfaceDetached,
     );
     _controller = controller;
     _initialized = false;
@@ -114,6 +129,92 @@ final class DwVideoMediaController extends DwMediaEngineController {
         seekEpoch: seekEpoch,
       ),
     );
+    _restoreSurfaceHandoff();
+  }
+
+  void _surfaceAttached(VideoPlayerController controller) {
+    if (!dwMediaIsWeb ||
+        _surfaceReleased ||
+        !identical(controller, _controller)) {
+      return;
+    }
+    _surfaceCount++;
+    final replacement = _surfaceWasMounted;
+    _surfaceWasMounted = true;
+    if (!replacement ||
+        !_playSucceeded ||
+        state.value.intent != DwMediaPlayIntent.play) {
+      return;
+    }
+    _handoffTimer?.cancel();
+    _handoffPending = true;
+    _handoffPainted = false;
+    final epoch = ++_handoffEpoch;
+    _handoffTimer = Timer(const Duration(milliseconds: 500), () {
+      if (epoch == _handoffEpoch) _handoffPending = false;
+    });
+    unawaited(_afterSurfaceFrame(controller, epoch));
+  }
+
+  void _surfaceDetached(VideoPlayerController controller) {
+    if (!dwMediaIsWeb || !identical(controller, _controller)) return;
+    if (_surfaceCount > 0) _surfaceCount--;
+    if (_surfaceCount == 0) _handoffPainted = false;
+  }
+
+  Future<void> _afterSurfaceFrame(
+    VideoPlayerController controller,
+    int epoch,
+  ) async {
+    // A web platform view can still be detached at the replacement frame's
+    // end. Give its DOM placement two further rendered frames before play;
+    // playing the detached element is itself immediately paused by Chrome.
+    for (var frame = 0; frame < 3; frame++) {
+      await SchedulerBinding.instance.endOfFrame;
+      if (!identical(controller, _controller) ||
+          epoch != _handoffEpoch ||
+          !_handoffPending ||
+          _surfaceCount == 0 ||
+          _surfaceReleased ||
+          isDisposed) {
+        return;
+      }
+    }
+    _handoffPainted = true;
+    // One attempt within the mount's lease, never a position-poll retry loop.
+    _restoreSurfaceHandoff();
+  }
+
+  void _restoreSurfaceHandoff() {
+    final controller = _controller;
+    if (!_handoffPending ||
+        !_handoffPainted ||
+        _surfaceCount == 0 ||
+        controller == null ||
+        !_initialized ||
+        _surfaceReleased ||
+        isDisposed ||
+        controller.value.isPlaying ||
+        controller.value.hasError ||
+        controller.value.isCompleted ||
+        state.value.isError ||
+        state.value.intent != DwMediaPlayIntent.play ||
+        state.value.seekTarget != null) {
+      return;
+    }
+    _handoffPending = false;
+    _handoffTimer?.cancel();
+    unawaited(restoreEnginePlayback());
+  }
+
+  void _clearSurfaceHandoff() {
+    _handoffTimer?.cancel();
+    _handoffTimer = null;
+    _handoffEpoch++;
+    _surfaceCount = 0;
+    _surfaceWasMounted = false;
+    _handoffPending = false;
+    _handoffPainted = false;
   }
 
   /// A failed video is not playing, whatever its last value said: the
@@ -125,14 +226,31 @@ final class DwVideoMediaController extends DwMediaEngineController {
   }
 
   @override
-  Future<void> enginePlay() async => _controller?.play();
+  Future<void> enginePlay() async {
+    final controller = _controller;
+    await controller?.play();
+    if (controller != null &&
+        identical(controller, _controller) &&
+        !isDisposed &&
+        state.value.intent == DwMediaPlayIntent.play) {
+      _playSucceeded = true;
+    }
+  }
 
   @override
-  Future<void> enginePause() async => _controller?.pause();
+  Future<void> enginePause() async {
+    _playSucceeded = false;
+    _handoffPending = false;
+    _handoffTimer?.cancel();
+    await _controller?.pause();
+  }
 
   @override
-  Future<void> engineSeek(Duration position) async =>
-      _controller?.seekTo(position);
+  Future<void> engineSeek(Duration position) async {
+    _handoffPending = false;
+    _handoffTimer?.cancel();
+    await _controller?.seekTo(position);
+  }
 
   @override
   Future<void> engineSetSpeed(double speed) async =>
@@ -143,7 +261,24 @@ final class DwVideoMediaController extends DwMediaEngineController {
       _controller?.setVolume(volume);
 
   @override
+  Future<void> dispose() async {
+    // Revoke the lease before the base awaits observation/resume storage.
+    revokeVideoSurfaceHandoff();
+    await super.dispose();
+  }
+
+  /// The session releases presentation before deferred engine disposal.
+  @internal
+  void revokeVideoSurfaceHandoff() {
+    _surfaceReleased = true;
+    _playSucceeded = false;
+    _handoffPending = false;
+    _handoffTimer?.cancel();
+  }
+
+  @override
   Future<void> engineDispose() async {
+    _clearSurfaceHandoff();
     final controller = _controller;
     _controller = null;
     _view.value = null;
@@ -153,9 +288,25 @@ final class DwVideoMediaController extends DwMediaEngineController {
   }
 }
 
-final class _DwVideoPlayerController extends VideoPlayerController {
-  _DwVideoPlayerController.networkUrl(super.url, {super.videoPlayerOptions})
-    : super.networkUrl();
+final class _DwVideoPlayerController extends VideoPlayerController
+    implements DwVideoSurfaceBinding {
+  _DwVideoPlayerController.networkUrl(
+    super.url, {
+    super.videoPlayerOptions,
+    required void Function(VideoPlayerController) onSurfaceAttached,
+    required void Function(VideoPlayerController) onSurfaceDetached,
+  }) : _onSurfaceAttached = onSurfaceAttached,
+       _onSurfaceDetached = onSurfaceDetached,
+       super.networkUrl();
+
+  final void Function(VideoPlayerController) _onSurfaceAttached;
+  final void Function(VideoPlayerController) _onSurfaceDetached;
+
+  @override
+  void attachVideoSurface() => _onSurfaceAttached(this);
+
+  @override
+  void detachVideoSurface() => _onSurfaceDetached(this);
 
   int _seekEpoch = 0;
   int _seeking = 0;

@@ -79,6 +79,16 @@ session. It ends with `session.dispose()`, or with the mini-player's close.
   `session.controlsVisible`, all `ValueListenable`s — a session is created at `open()`, so there is
   no provider to declare for it ahead of time. `session.options` carries the resolved settings a
   control reads (`speeds`, `fullscreen`).
+- **Web surface handoff preserves play intent.** A browser can pause an HTML
+  video when its platform view is detached and reattached to another surface.
+  For a video whose play has succeeded, a replacement `DwVideoSurface` arms
+  one restoration after its replacement frame and two further rendered frames,
+  within 500 ms of that surface mounting. This scheduler barrier lets the browser place the platform
+  view; it is a bounded presentation allowance, not a DOM-connected API. It keeps the same
+  controller and source and uses the normal browser-refusal/error path.
+  Explicit pause, background pause, seek or session disposal cancels that
+  restoration; initial autoplay refusals are not retried. Position ticks do
+  not arm it, and unrelated later engine pauses do not start a retry loop.
 - **Controls visibility is the session's.** `controlsVisible` is true with pause intent,
   and for `controlsAutoHideDelay` after play intent starts or after `showControls()`;
   `toggleControls()` is what a tap on the picture calls. The controls themselves are the app's.
