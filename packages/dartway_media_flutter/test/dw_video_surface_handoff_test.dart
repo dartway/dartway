@@ -8,8 +8,10 @@ import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_player_platform_interface/video_player_platform_interface.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 import 'support/media_test_kit.dart';
+import 'support/fake_wakelock_platform.dart';
 
 final class _NativePausePlatform extends DwFakeVideoPlayerPlatform {
   final Map<int, StreamController<VideoEvent>> nativeStreams = {};
@@ -859,6 +861,7 @@ void main() {
     'source before frame',
     'blocked storage error',
     'blocked storage reload',
+    'blocked storage wakelock',
   ]) {
     testWidgets('retired video emits no failure after $detachment', (
       tester,
@@ -869,13 +872,20 @@ void main() {
       final store = _BlockedPositionStore();
       final failures = <Object>[];
       final blocked = detachment.startsWith('blocked');
+      final checkWakelock = detachment.endsWith('wakelock');
+      final previousWakelock = wakelockPlusPlatformInstance;
+      final wakelock = FakeWakelockPlatform();
+      if (checkWakelock) {
+        wakelockPlusPlatformInstance = wakelock;
+        addTearDown(() => wakelockPlusPlatformInstance = previousWakelock);
+      }
       final manager = DwMediaSessionManager(
         config: DwMediaConfig(
           resume: blocked
               ? const DwMediaResumePolicy(saveOnPause: false)
               : null,
           positionStore: store,
-          wakelockWhilePlaying: false,
+          wakelockWhilePlaying: checkWakelock,
           autoRetryCount: detachment.endsWith('reload') ? 2 : 0,
           autoRetryDelay: const Duration(milliseconds: 100),
         ),
@@ -901,6 +911,7 @@ void main() {
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 50));
       platform.playBarrier = null;
+      if (checkWakelock) expect(wakelock.isEnabled, isTrue);
       if (detachment.startsWith('source')) {
         await session.next(autoplay: false);
       } else {
@@ -915,6 +926,14 @@ void main() {
           reason:
               'deferred owner disposal is actually waiting on resume storage',
         );
+        if (checkWakelock) {
+          expect(
+            wakelock.isEnabled,
+            isFalse,
+            reason:
+                'detached ownership releases its lock before storage settles',
+          );
+        }
       }
       platform.nativeStreams[video.id]!.addError(
         PlatformException(
