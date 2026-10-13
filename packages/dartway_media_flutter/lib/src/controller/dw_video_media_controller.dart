@@ -431,6 +431,7 @@ final class DwVideoMediaController extends DwMediaEngineController {
   @internal
   void revokeVideoSurfaceHandoff() {
     _surfaceReleased = true;
+    DwWakelockCoordinator.instance.setWants(this, false);
     _initialized = false;
     final controller = _controller;
     controller?.removeListener(_onValue);
