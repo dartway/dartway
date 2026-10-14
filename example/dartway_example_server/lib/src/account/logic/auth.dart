@@ -89,12 +89,24 @@ abstract final class AccountAuth {
     // it: a member who changes it by code (`DwConfirmIdentifier` with
     // `replace`) changes it here too, in the same transaction.
     onIdentifierChanged: (ctx, change) async {
-      final phone = change.current;
-      if (change.kind != DwIdentifierKind.phone || phone == null) return;
+      if (change.kind != DwIdentifierKind.phone) return;
       final current = await ctx.db.userProfiles.findFirst(
         where: (t) => t.accountId.equals(change.accountId),
       );
-      if (current == null || current.phone == phone) return;
+      if (current == null) return;
+      // A batch removal can retain another unchanged phone, so the event's
+      // current value alone is not the account's final phone selection.
+      final phones = (await ctx.accounts.listIdentities(change.accountId))
+          .where((identity) => identity.kind == DwIdentifierKind.phone)
+          .map((identity) => identity.value)
+          .toList();
+      final changedPhone = change.current;
+      final phone = changedPhone != null && phones.contains(changedPhone)
+          ? changedPhone
+          : phones.contains(current.phone)
+          ? current.phone
+          : phones.firstOrNull ?? '';
+      if (current.phone == phone) return;
       await ProfileChanges.changePhone(ctx, current, phone);
     },
   );

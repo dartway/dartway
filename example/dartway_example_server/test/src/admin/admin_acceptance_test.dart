@@ -16,6 +16,49 @@ void main() {
   tearDownAll(() => club.stop());
 
   test(
+    'retaining an owned phone removes the stale preferred phone mirror',
+    () async {
+      const first = '79990186211';
+      const second = '79990186212';
+      final member = await club.signUp(first, firstName: 'Retained phone');
+      final profile = member.client.watch(const GetMyProfile());
+      addTearDown(profile.close);
+      await dwWaitUntil(() => profile.isLive);
+      final original = await club.server.server.accounts.listIdentities(
+        member.accountId,
+      );
+      final ticket = await member.client.command(
+        const DwRequestIdentifierCode(
+          kind: DwIdentifierKind.phone,
+          identifier: second,
+        ),
+      );
+      await member.client.command(
+        DwConfirmIdentifier(
+          ticketId: ticket.valueOrThrow.id,
+          code: club.delivered[second]!,
+        ),
+      );
+      await dwWaitUntil(() => dataOf(profile.state)?.phone == second);
+      final finalIdentities = await club.server.runInContext(
+        (ctx) => ctx.accounts.updateIdentifiers(
+          member.accountId,
+          phone: const DwFieldPatch.set(first),
+        ),
+      );
+      expect(finalIdentities.single.id, original.single.id);
+      expect(finalIdentities.single.value, first);
+      final stored = await member.client.fetch(const GetMyProfile());
+      expect(stored.valueOrThrow.phone, first);
+      await dwWaitUntil(() => dataOf(profile.state)?.phone == first);
+      expect(
+        await club.server.server.accounts.find(DwIdentifierKind.phone, second),
+        isNull,
+      );
+    },
+  );
+
+  test(
     'trusted phone edit composes profile writes before the real mirror hook',
     () async {
       final member = await club.signUp(
