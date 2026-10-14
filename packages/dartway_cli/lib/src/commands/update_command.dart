@@ -255,10 +255,13 @@ class UpdateCommand extends Command<int> {
         version,
         path: pluginPath,
         gitRef: frameworkPath == null ? target.commit : null,
-        frameworkGitUrl:
+        frameworkGitUrls:
             frameworkPath == null
-                ? (source.localDir ?? MonorepoSource.defaultRepoUrl)
-                : null,
+                ? {
+                    source.repoUrl,
+                    if (source.localDir case final localDir?) localDir,
+                  }
+                : const {},
       );
       stdout.writeln(
         'Analyzer plugin: resolvable; ${lintPlan.change ?? 'existing source retained'}.',

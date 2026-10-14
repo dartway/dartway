@@ -676,6 +676,79 @@ plugins:
     );
   }, timeout: const Timeout(Duration(minutes: 5)));
 
+  test(
+    'git-installed CLI moves the canonical framework plugin URL',
+    () async {
+      final mirror = Directory(p.join(sandbox.path, 'framework-mirror.git'));
+      succeeds(
+        await Process.run('git', [
+          'clone',
+          '--bare',
+          repository.path,
+          mirror.path,
+        ]),
+      );
+      final home = Directory(p.join(sandbox.path, 'home'))..createSync();
+      succeeds(
+        await Process.run('git', [
+          'config',
+          '--file',
+          p.join(home.path, '.gitconfig'),
+          'url.file://${mirror.path}.insteadOf',
+          'https://github.com/dartway/dartway.git',
+        ]),
+      );
+      file('shop_flutter/analysis_options.yaml').writeAsStringSync(
+        'plugins:\n  dartway_lints:\n    git:\n'
+        '      url: https://github.com/dartway/dartway.git\n'
+        '      ref: stable\n'
+        '      path: packages/dartway_lints\n',
+      );
+
+      final result = await invoke(
+        ['update', '--target', target],
+        project,
+        environment: {'HOME': home.path},
+      );
+
+      succeeds(result);
+      expect(
+        file('shop_flutter/analysis_options.yaml').readAsStringSync(),
+        contains('ref: $target'),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
+
+  test('DARTWAY_REPO_URL moves the matching fork plugin ref', () async {
+    final fork = Directory(p.join(sandbox.path, 'framework-fork.git'));
+    succeeds(
+      await Process.run('git', [
+        'clone',
+        '--bare',
+        repository.path,
+        fork.path,
+      ]),
+    );
+    file('shop_flutter/analysis_options.yaml').writeAsStringSync(
+      'plugins:\n  dartway_lints:\n    git:\n'
+      '      url: ${fork.path}\n'
+      '      ref: stable\n'
+      '      path: packages/dartway_lints\n',
+    );
+
+    final result = await update(
+      [],
+      environment: {'DARTWAY_REPO_URL': '${fork.path}/'},
+    );
+
+    succeeds(result);
+    expect(
+      file('shop_flutter/analysis_options.yaml').readAsStringSync(),
+      contains('ref: $target'),
+    );
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
   test('native YAML git ref coercion is replaced by the exact target', () async {
     final plugin = repository;
     // This branch exists and JSON pub preflight resolves it. The native

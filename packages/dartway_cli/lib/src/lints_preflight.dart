@@ -20,7 +20,7 @@ class DwLintsPlan {
     String version, {
     String? path,
     String? gitRef,
-    String? frameworkGitUrl,
+    Iterable<String> frameworkGitUrls = const [],
   }) async {
     final scratch = Directory.systemTemp.createTempSync('dw-plugin-preflight-');
     try {
@@ -39,7 +39,7 @@ class DwLintsPlan {
             );
             movesFrameworkGitSource = _usesGitUrl(
               dependency,
-              frameworkGitUrl,
+              frameworkGitUrls,
             );
           }
         }
@@ -124,16 +124,33 @@ class DwLintsPlan {
   }
 }
 
-bool _usesGitUrl(Object dependency, String? expectedUrl) {
-  if (expectedUrl == null || dependency is! Map) return false;
+bool _usesGitUrl(Object dependency, Iterable<String> expectedUrls) {
+  if (dependency is! Map) return false;
   final git = dependency['git'];
   if (git is! Map || git['url'] is! String) return false;
   final actualUrl = git['url'] as String;
-  if (actualUrl == expectedUrl) return true;
-  if (p.isAbsolute(actualUrl) && p.isAbsolute(expectedUrl)) {
-    return p.equals(p.normalize(actualUrl), p.normalize(expectedUrl));
+  for (final expectedUrl in expectedUrls) {
+    if (_sameRepository(actualUrl, expectedUrl)) return true;
   }
   return false;
+}
+
+bool _sameRepository(String left, String right) {
+  if (p.isAbsolute(left) && p.isAbsolute(right)) {
+    return p.equals(p.normalize(left), p.normalize(right));
+  }
+  return _canonicalGitUrl(left) == _canonicalGitUrl(right);
+}
+
+String _canonicalGitUrl(String value) {
+  var url = value.trim();
+  final scp = RegExp(r'^git@([^:]+):(.+)$').firstMatch(url);
+  if (scp != null) url = 'https://${scp[1]}/${scp[2]}';
+  final parsed = Uri.tryParse(url);
+  if (parsed == null || parsed.host.isEmpty) return url;
+  var path = parsed.path.replaceFirst(RegExp(r'/+$'), '');
+  if (path.endsWith('.git')) path = path.substring(0, path.length - 4);
+  return '${parsed.host.toLowerCase()}${path.toLowerCase()}';
 }
 
 /// Native plugin options are not pub dependency options: diagnostics stay in
