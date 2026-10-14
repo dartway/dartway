@@ -153,7 +153,8 @@ List<String> withFrameworkGitOverrides(
   ];
 }
 
-/// Moves only full-SHA `ref:` fields in framework git overrides.
+/// Moves `ref:` fields in framework git overrides, whatever they currently
+/// name (a branch, a tag, or a quoted or unquoted commit).
 String moveFrameworkGitOverrideRefs(String source, String commit) {
   final lines = source.split('\n');
   final start = lines.indexWhere((line) => line == 'dependency_overrides:');
@@ -168,9 +169,19 @@ String moveFrameworkGitOverrideRefs(String source, String commit) {
       continue;
     }
     if (RegExp(r'^  [a-z_]+:').hasMatch(line)) inFrameworkEntry = false;
-    if (inFrameworkEntry &&
-        RegExp(r'^      ref: [0-9a-fA-F]{40}$').hasMatch(line)) {
-      lines[index] = '      ref: $commit';
+    if (inFrameworkEntry) {
+      final ref = RegExp(
+        r'^(\s+ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?)$',
+      ).firstMatch(line);
+      if (ref != null) {
+        final openingQuote = ref.group(2)!;
+        final closingQuote = ref.group(4)!;
+        final matchingQuotes =
+            openingQuote.isNotEmpty && openingQuote == closingQuote;
+        lines[index] =
+            '${ref.group(1)}${matchingQuotes ? openingQuote : ''}$commit'
+            '${matchingQuotes ? closingQuote : ''}${ref.group(5)}';
+      }
     }
   }
   return lines.join('\n');

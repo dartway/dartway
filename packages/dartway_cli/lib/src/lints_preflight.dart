@@ -27,12 +27,19 @@ class DwLintsPlan {
       if (options.existsSync()) options.copySync(staged.path);
       if (gitRef != null && staged.existsSync()) {
         final before = staged.readAsStringSync();
-        final after = before.replaceFirst(
+        final after = before.replaceFirstMapped(
           RegExp(
-            r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref: )[0-9a-fA-F]{40}',
+            r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?$)',
             multiLine: true,
           ),
-          '\$1$gitRef',
+          (match) {
+            final openingQuote = match[2]!;
+            final closingQuote = match[4]!;
+            final matchingQuotes =
+                openingQuote.isNotEmpty && openingQuote == closingQuote;
+            return '${match[1]}${matchingQuotes ? openingQuote : ''}$gitRef'
+                '${matchingQuotes ? closingQuote : ''}${match[5]}';
+          },
         );
         if (after != before) staged.writeAsStringSync(after);
       }

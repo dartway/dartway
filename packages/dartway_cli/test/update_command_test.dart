@@ -217,6 +217,41 @@ void main() {
     expect(options.readAsStringSync(), contains('ref: $target'));
   });
 
+  test('target moves branch, tag, and quoted framework git refs', () async {
+    final pubspec = file('shop_shared/pubspec.yaml');
+    final clean = withoutDependencyOverrides(
+      pubspec.readAsStringSync().split('\n'),
+    );
+    final pinned = withFrameworkGitOverrides(
+      clean,
+      ['dartway_core_shared'],
+      url: repository.path,
+      commit: 'stable',
+    ).join('\n');
+    pubspec.writeAsStringSync(
+      '${pinned.replaceFirst('ref: stable', "ref: 'stable-2026-10-11' # pin")}\n',
+    );
+    final options = file('shop_flutter/analysis_options.yaml');
+    options.writeAsStringSync(
+      options.readAsStringSync().replaceFirst(
+        RegExp(r'  dartway_lints:\n    path: [^\n]+'),
+        '  dartway_lints:\n    git:\n'
+            '      url: ${repository.path}\n'
+            '      ref: "stable"\n'
+            '      path: packages/dartway_lints',
+      ),
+    );
+    final beforePlan = files();
+
+    succeeds(await update(['--plan']));
+    expect(files(), beforePlan);
+
+    succeeds(await update([]));
+
+    expect(pubspec.readAsStringSync(), contains("ref: '$target' # pin"));
+    expect(options.readAsStringSync(), contains('ref: "$target"'));
+  });
+
   test('partial dispositions survive repeated plans and installs', () async {
     succeeds(
       await update([
