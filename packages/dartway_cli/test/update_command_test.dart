@@ -307,9 +307,9 @@ dependency_overrides:
     expect(files(), before);
   });
 
-  test('commented override headers fail without edits', () async {
+  test('commented override headers are edited in place', () async {
     final rootPubspec = file('pubspec.yaml');
-    rootPubspec.writeAsStringSync('''
+    final original = '''
 name: shop_workspace
 dependency_overrides: # framework pins
   dartway_core_shared:
@@ -317,15 +317,16 @@ dependency_overrides: # framework pins
       url: ${repository.path}
       path: packages/dartway_core_shared
       ref: stable
-''');
-    final before = files();
+''';
+    rootPubspec.writeAsStringSync(original);
 
     final result = await update([]);
 
-    expect(result.exitCode, 1, reason: output(result));
-    expect(output(result), contains(rootPubspec.path));
-    expect(output(result), contains('dartway_core_shared'));
-    expect(files(), before);
+    succeeds(result);
+    expect(
+      rootPubspec.readAsStringSync(),
+      original.replaceFirst('ref: stable', 'ref: $target'),
+    );
   });
 
   test('unsupported plugin flow-map refs fail without edits', () async {
