@@ -27,6 +27,13 @@ class DwLintsPlan {
       if (options.existsSync()) options.copySync(staged.path);
       if (gitRef != null && staged.existsSync()) {
         final before = staged.readAsStringSync();
+        final originalDocument = loadYaml(before);
+        if (originalDocument is YamlMap) {
+          final plugins = originalDocument['plugins'];
+          if (plugins is YamlMap && plugins.containsKey('dartway_lints')) {
+            _pluginDependency(plugins['dartway_lints'], options);
+          }
+        }
         final after = before.replaceFirstMapped(
           RegExp(
             r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?$)',

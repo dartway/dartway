@@ -163,12 +163,14 @@ String moveFrameworkGitOverrideRefs(String source, String commit) {
   for (var index = start + 1; index < lines.length; index++) {
     final line = lines[index];
     if (line.isNotEmpty && !line.startsWith(' ')) break;
-    final entry = RegExp(r'^  (dartway_[a-z_]+):$').firstMatch(line);
+    final entry = RegExp(r'^  (dartway_[a-z0-9_]+):$').firstMatch(line);
     if (entry != null) {
       inFrameworkEntry = true;
       continue;
     }
-    if (RegExp(r'^  [a-z_]+:').hasMatch(line)) inFrameworkEntry = false;
+    if (RegExp(r'^  [A-Za-z_][A-Za-z0-9_]*:').hasMatch(line)) {
+      inFrameworkEntry = false;
+    }
     if (inFrameworkEntry) {
       final ref = RegExp(
         r'^(\s+ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?)$',

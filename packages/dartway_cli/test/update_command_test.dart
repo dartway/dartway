@@ -252,6 +252,33 @@ void main() {
     expect(options.readAsStringSync(), contains('ref: "$target"'));
   });
 
+  test(
+    'target leaves a following third-party git override byte-identical',
+    () async {
+      final pubspec = file('shop_shared/pubspec.yaml');
+      final clean = withoutDependencyOverrides(
+        pubspec.readAsStringSync().split('\n'),
+      );
+      final framework = withFrameworkGitOverrides(
+        clean,
+        ['dartway_core_shared'],
+        url: repository.path,
+        commit: 'stable',
+      ).join('\n');
+      const thirdParty =
+          '  win32:\n'
+          '    git:\n'
+          '      url: https://example.invalid/win32.git\n'
+          '      ref: keep-this-ref # untouched\n';
+      pubspec.writeAsStringSync('$framework\n$thirdParty');
+
+      succeeds(await update([]));
+
+      expect(pubspec.readAsStringSync(), contains('ref: $target'));
+      expect(pubspec.readAsStringSync(), endsWith(thirdParty));
+    },
+  );
+
   test('partial dispositions survive repeated plans and installs', () async {
     succeeds(
       await update([

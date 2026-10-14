@@ -51,8 +51,8 @@ class CreateCommand extends Command<int> {
         help:
             'Build the project against the framework packages of a local '
             'monorepo checkout, by path: its pubspecs get dependency_overrides '
-            'onto <monorepo>/packages instead of resolving from pub.dev. For '
-            'developing the framework, and for versions not published yet. '
+            'onto <monorepo>/packages instead of the default immutable Git '
+            'pin. For developing the framework. '
             'The template and the toolkit come from the same checkout unless '
             '--local-repo names another.',
       )
