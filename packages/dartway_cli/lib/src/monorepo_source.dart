@@ -56,7 +56,7 @@ class MonorepoSource {
            ? namedDir
            : (channelChosen ? null : cliCheckout()?.path);
 
-  static const defaultRepoUrl = 'https://github.com/dartway/dartway.git';
+  static const defaultRepoUrl = 'https://github.com/dartway/dartway';
   static const defaultBranch = 'stable';
 
   final String branch;

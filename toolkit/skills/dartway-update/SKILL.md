@@ -13,7 +13,7 @@ The update is: what moved, what the project owes because of it, and proof the re
 caret is the last step, not the task; the update is its own branch and PR, never folded into a feature.
 
 1. **A branch from a clean tree**: `git status`, then `git switch -c chore/dartway-update __BASE_BRANCH__`.
-2. **Update the CLI**: `dart pub global activate dartway_cli` — an old CLI installs an old toolkit.
+2. **Update the CLI**: `dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable` — an old CLI installs an old toolkit.
 3. **Plan first:** `dartway update --plan` takes the recorded channel (or explicit `--channel` /
    `--local-repo`) and prints its exact commit, package gaps and unconfirmed migration notes,
    oldest first, with their instructions. It writes **no project files**, including migration state.

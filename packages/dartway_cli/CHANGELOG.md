@@ -2,6 +2,12 @@
 
 ## 0.25.0-dev.0
 
+- **BREAKING (`dartway create` dependency source):** new projects pin every
+  reached `dartway_*` package and the analyzer plugin to the full git commit
+  that supplied the template. `dartway update --target <sha>` moves those refs;
+  `--framework-path` continues to write local path overrides. Creation no
+  longer depends on unpublished pub.dev versions.
+
 - Native `deploy check` selects Kamal from the Studio manifest and verifies the
   selected SHA, actual TLS routing, native data/secret mounts, BBR and explicit
   ingress trust, without inspecting secret environments. Compose `deploy run`

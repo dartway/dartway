@@ -19,11 +19,23 @@ class DwLintsPlan {
     File options,
     String version, {
     String? path,
+    String? gitRef,
   }) async {
     final scratch = Directory.systemTemp.createTempSync('dw-plugin-preflight-');
     try {
       final staged = File(p.join(scratch.path, 'analysis_options.yaml'));
       if (options.existsSync()) options.copySync(staged.path);
+      if (gitRef != null && staged.existsSync()) {
+        final before = staged.readAsStringSync();
+        final after = before.replaceFirst(
+          RegExp(
+            r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref: )[0-9a-fA-F]{40}',
+            multiLine: true,
+          ),
+          '\$1$gitRef',
+        );
+        if (after != before) staged.writeAsStringSync(after);
+      }
       final wiring = wireLintsPlugin(staged, version, path: path);
       if (wiring.manual != null) {
         throw StateError(wiring.manual!.replaceAll(staged.path, options.path));
@@ -60,7 +72,10 @@ class DwLintsPlan {
           (lock['packages'] as YamlMap)['dartway_lints'] as YamlMap;
       return DwLintsPlan._(
         contents,
-        wiring.change?.replaceAll(staged.path, options.path),
+        wiring.change?.replaceAll(staged.path, options.path) ??
+            (options.existsSync() && contents != options.readAsStringSync()
+                ? 'moved the dartway_lints git ref to $gitRef'
+                : null),
         '${jsonEncode(dependency)} → ${resolved['version']} (${resolved['source']})',
       );
     } finally {

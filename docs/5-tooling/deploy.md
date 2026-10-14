@@ -176,8 +176,7 @@ available after that framework commit reaches master and its image build passes;
 uncommitted checkout changes do not get an image of their own. Framework CI builds SHA tags on
 `master`. A push to `stable` copies that image to the published CLI version,
 skipping prereleases and existing version tags with a notice. A version tag
-belongs to the commit at which that CLI version was published. A missing
-pub.dev publication fails promotion. The PR runs this promotion in dry-run mode.
+belongs to the commit at which that CLI version was published. When pub.dev has no such version, promotion ends successfully with a notice and pushes nothing. After a later publish, run **Check image version** on `stable` by hand. The PR runs this promotion in dry-run mode.
 Hosted projects get this capability with the first CLI release after #530.
 
 Studio owns server preparation and deploy execution. A live project's move and

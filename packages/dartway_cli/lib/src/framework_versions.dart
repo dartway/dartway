@@ -49,8 +49,8 @@ class DwPackageGap {
 ///
 /// The checkout is the authority rather than pub.dev on purpose: this is the
 /// answer to "what would I get by moving to this channel", and a channel is a
-/// tree. What is published is a separate question, and a separate check
-/// (`tool/caret_check.dart`) already asks it.
+/// tree. What is published is a separate question; update planning is deliberately
+/// independent of hosted publication.
 Map<String, String> readFrameworkVersions(Directory monorepoDir) {
   final versions = <String, String>{};
   final packagesDir = Directory(p.join(monorepoDir.path, 'packages'));

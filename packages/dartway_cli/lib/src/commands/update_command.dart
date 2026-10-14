@@ -233,10 +233,23 @@ class UpdateCommand extends Command<int> {
       final options = File(
         p.join(layout.flutterPackageDir.path, 'analysis_options.yaml'),
       );
+      final pubspecs = projectRoot
+          .listSync()
+          .whereType<Directory>()
+          .map((directory) => File(p.join(directory.path, 'pubspec.yaml')))
+          .where((file) => file.existsSync())
+          .toList();
+      final movedPubspecs = <File, String>{};
+      for (final pubspec in pubspecs) {
+        final before = pubspec.readAsStringSync();
+        final after = moveFrameworkGitOverrideRefs(before, target.commit);
+        if (after != before) movedPubspecs[pubspec] = after;
+      }
       final lintPlan = await DwLintsPlan.preflight(
         options,
         version,
         path: pluginPath,
+        gitRef: frameworkPath == null ? target.commit : null,
       );
       stdout.writeln(
         'Analyzer plugin: resolvable; ${lintPlan.change ?? 'existing source retained'}.',
@@ -267,6 +280,10 @@ class UpdateCommand extends Command<int> {
           settings: choice.settings,
         ),
       );
+      for (final MapEntry(key: file, value: contents)
+          in movedPubspecs.entries) {
+        file.writeAsStringSync(contents);
+      }
       lintPlan.apply(options);
       stdout.writeln(
         'Commit toolkit and instruction blocks with the update. '
@@ -290,7 +307,8 @@ class UpdateCommand extends Command<int> {
       '\n⚠️  This CLI is $dartwayCliVersion, the target has $channelVersion.\n'
       '   Update it first and run this again — an older CLI installs an older '
       'idea of what a project needs:\n'
-      '   dart pub global activate dartway_cli',
+      '   dart pub global activate --source git https://github.com/dartway/dartway '
+          '--git-path packages/dartway_cli --git-ref stable',
     );
   }
 

@@ -3,7 +3,7 @@
 Command-line tool for the [DartWay](https://dartway.dev) framework.
 
 ```bash
-dart pub global activate dartway_cli
+dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
 ```
 
 Or straight from the monorepo (the `stable` channel):

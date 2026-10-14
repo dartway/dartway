@@ -9,7 +9,7 @@ Working with an AI assistant instead? It runs this same path for you — see
 ## 1. Install the CLI and check the machine
 
 ```bash
-dart pub global activate dartway_cli
+dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
 dartway doctor
 ```
 
@@ -45,11 +45,6 @@ counters, analytics dashboards, a members table, a card per member, settings), t
 recorded by the [analytics module](../4-server/analytics.md), navigation with zone guards, a UI kit as
 source you own, and tests on both sides. No domain models. What each folder is for:
 [project layout](project-layout.md).
-
-Until the framework family is published on pub.dev, build the project against a local DartWay
-checkout: `dartway create my_app --framework-path <path to the checkout>`. Its pubspecs then get
-`dependency_overrides` onto the checkout's packages, and the template and the toolkit come from the
-same checkout.
 
 ## 3. Bring the server up
 

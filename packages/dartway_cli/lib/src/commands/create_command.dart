@@ -131,7 +131,7 @@ class CreateCommand extends Command<int> {
       final path? when path.isNotEmpty => p.normalize(p.absolute(path)),
       _ => null,
     };
-    final frameworkPackages = frameworkPath == null
+    final pathFrameworkPackages = frameworkPath == null
         ? null
         : frameworkPackageDirectories(Directory(frameworkPath));
 
@@ -143,6 +143,15 @@ class CreateCommand extends Command<int> {
           Platform.environment.containsKey('DARTWAY_BRANCH'),
     );
     final monorepoDir = await source.resolve();
+    final frameworkPackages = frameworkPackageDirectories(monorepoDir);
+    final frameworkCommit = await monorepoCommit(monorepoDir);
+    if (frameworkCommit == null ||
+        !RegExp(r'^[0-9a-fA-F]{40}$').hasMatch(frameworkCommit)) {
+      throw StateError(
+        'Cannot pin framework packages: the template source has no full git '
+        'commit.',
+      );
+    }
     final templateDir = Directory(p.join(monorepoDir.path, _sourceDirectory));
     if (!templateDir.existsSync()) {
       throw StateError(
@@ -159,11 +168,18 @@ class CreateCommand extends Command<int> {
       stderr.writeln('Note: $notice');
     }
     _formatRenamedCode(targetDir);
-    _rewritePubspecs(targetDir, frameworkPackages);
+    _rewritePubspecs(
+      targetDir,
+      frameworkPackages,
+      pathFrameworkPackages: pathFrameworkPackages,
+      gitUrl: source.repoUrl,
+      gitCommit: frameworkCommit,
+    );
     _pinLintsPlugin(
       targetDir,
-      monorepoDir: monorepoDir,
-      frameworkPackages: frameworkPackages,
+      frameworkPackages: pathFrameworkPackages,
+      gitUrl: source.repoUrl,
+      gitCommit: frameworkCommit,
     );
     if (frameworkPath != null) {
       stdout.writeln(
@@ -408,45 +424,55 @@ class CreateCommand extends Command<int> {
   /// Drops the monorepo-only `dependency_overrides` block (with its leading
   /// comments) from every package pubspec: inside the monorepo those overrides
   /// point at sibling folders, and in a standalone project the same paths lead
-  /// nowhere. What is left resolves from pub.dev, like any other dependency.
+  /// nowhere. The replacement pins the reached packages to the template commit.
   ///
   /// With [frameworkPackages] (`--framework-path`) each pubspec gets overrides
   /// onto those packages instead — for exactly the framework packages it
   /// reaches.
   void _rewritePubspecs(
     Directory projectRoot,
-    Map<String, String>? frameworkPackages,
-  ) {
+    Map<String, String> frameworkPackages, {
+    required Map<String, String>? pathFrameworkPackages,
+    required String gitUrl,
+    required String gitCommit,
+  }) {
     for (final packageDir in projectRoot.listSync().whereType<Directory>()) {
       final pubspecFile = File(p.join(packageDir.path, 'pubspec.yaml'));
       if (!pubspecFile.existsSync()) {
         continue;
       }
       final lines = pubspecFile.readAsLinesSync();
-      final rewritten = frameworkPackages == null
-          ? withoutDependencyOverrides(lines)
-          : withFrameworkOverrides(
+      final clean = withoutDependencyOverrides(lines);
+      final reached = frameworkOverridesFor(clean.join('\n'), frameworkPackages);
+      final rewritten = pathFrameworkPackages != null
+          ? withFrameworkOverrides(
               lines,
               frameworkOverridesFor(
-                withoutDependencyOverrides(lines).join('\n'),
-                frameworkPackages,
+                clean.join('\n'),
+                pathFrameworkPackages,
               ),
+            )
+          : withFrameworkGitOverrides(
+              lines,
+              reached.keys,
+              url: gitUrl,
+              commit: gitCommit,
             );
       pubspecFile.writeAsStringSync('${rewritten.join('\n')}\n');
     }
   }
 
-  /// Points the Flutter package's `plugins: dartway_lints:` at the published
-  /// plugin, or at the checkout's with `--framework-path`.
+  /// Points the Flutter package's `plugins: dartway_lints:` at the template
+  /// commit, or at the checkout's with `--framework-path`.
   ///
   /// The template names it by a path into this repository, which leads
   /// nowhere in a project; an analyzer plugin is not a pub dependency, so
-  /// `dependency_overrides` never reached it. The version is the one the
-  /// template was taken from.
+  /// `dependency_overrides` never reaches it.
   void _pinLintsPlugin(
     Directory projectRoot, {
-    required Directory monorepoDir,
     required Map<String, String>? frameworkPackages,
+    required String gitUrl,
+    required String gitCommit,
   }) {
     final options = File(
       p.join(
@@ -465,20 +491,10 @@ class CreateCommand extends Command<int> {
     if (frameworkPackages?['dartway_lints'] case final path?) {
       pin = "\n    path: '$path'";
     } else {
-      final version = RegExp(r'^version:\s*(\S+)', multiLine: true)
-          .firstMatch(
-            File(
-              p.join(
-                monorepoDir.path,
-                'packages',
-                'dartway_lints',
-                'pubspec.yaml',
-              ),
-            ).readAsStringSync(),
-          )
-          ?.group(1);
-      if (version == null) return;
-      pin = ' ^$version';
+      pin = '\n    git:\n'
+          '      url: $gitUrl\n'
+          '      path: packages/dartway_lints\n'
+          '      ref: $gitCommit';
     }
     options.writeAsStringSync(
       source.replaceFirstMapped(pattern, (match) => '${match[1]}$pin'),

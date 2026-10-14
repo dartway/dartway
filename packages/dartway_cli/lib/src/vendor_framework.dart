@@ -1,19 +1,13 @@
 // Puts a monorepo checkout's framework packages inside a created project, so
 // that images and builds can be made from code that is not published yet.
 //
-// `dartway create` strips the monorepo's `dependency_overrides` on purpose:
-// the paths lead nowhere in a standalone project, and what is left resolves
-// from pub.dev the way a stranger's project does. That is right for a stranger
-// and wrong for a check that is asking about *this tree* — and the difference
-// stayed invisible while only patch versions were released. A minor bump under
-// a zero major puts the skeleton's carets past anything published (`^0.13.0`
-// against `0.12.1`), and the build then fails inside `pub get` for a reason
-// that says nothing about what was being checked.
+// `dartway create` replaces the monorepo's path overrides with immutable git
+// overrides. Docker build contexts cannot fetch a private or local source, so
+// repository CI vendors the same packages into the project instead.
 //
 // Two questions were sharing one answer. "Does this tree still produce a
-// project that builds" is one; "is what a stranger receives installable" is a
-// release question, and `tool/caret_check.dart` asks pub.dev directly. This
-// library serves the first.
+// project that builds" is one; "can its Docker context reach the source" is
+// another. This library answers both for repository CI.
 
 import 'dart:io';
 

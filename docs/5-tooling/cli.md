@@ -6,7 +6,7 @@ the generator, one checks the conventions, one serves the web app and the server
 runs the server tests on a database of their own, one deploys, and one counts lines.
 
 ```bash
-dart pub global activate dartway_cli
+dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
 ```
 
 **Inside a project, run the CLI the project pins.** Every DartWay project carries `dartway_cli` as a
@@ -65,7 +65,7 @@ pub.dev — takes the channel. The install prints which source it used and recor
 |---|---|
 | `DARTWAY_BRANCH` | The channel for `create`, `setup-ai` and `update` when `--channel` is not given; chosen, so it wins over the checkout the CLI runs from |
 | `DARTWAY_MONOREPO_DIR` | A local monorepo checkout to use instead of cloning |
-| `DARTWAY_REPO_URL` | Another monorepo git URL (default `https://github.com/dartway/dartway.git`) |
+| `DARTWAY_REPO_URL` | Another monorepo git URL (default `https://github.com/dartway/dartway`) |
 
 ## `dartway quickstart` — the instruction, printed
 
@@ -74,7 +74,7 @@ of the bring-up steps and why, how to verify the server answers, how to hand ove
 the checks to run before calling a change done. It writes nothing and asks nothing.
 
 It is a printed text rather than an extension for one assistant on purpose: **whatever agent you
-use, its way in is two commands** — `dart pub global activate dartway_cli` and `dartway
+use, its way in is two commands** — `dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable` and `dartway
 quickstart` — after which the instruction is in that agent's context. A plugin for one vendor would
 make the front door of an open framework depend on a format nobody here controls. A human reads the
 same text; there is no second, friendlier version to drift from it. The source is
@@ -122,9 +122,8 @@ What the copy does beyond copying:
 - runs `dart format` over `bin/`, `lib/` and `test/` of every package — a rename changes the length
   of names, and without this the first commit would not be formatted and `dart run dartway_cli:dartway generate
   --check` would depend on where lines happened to break;
-- strips the monorepo-only `dependency_overrides` block (with the comments above it) from every
-  package pubspec. Those overrides point at sibling folders of the monorepo; in a project they lead
-  nowhere, and what is left resolves from pub.dev;
+- replaces the monorepo-only `dependency_overrides` block with git overrides for exactly the
+  `dartway_*` packages each pubspec reaches, pinned to the full commit that supplied the template;
 - installs the toolkit with base branch `master` and the given `--language` and `--notes-tracker`
   (see `setup-ai` below);
 - unless `--no-git`: `git init` (skipped when the folder is already a repository), `git add -A`,
@@ -148,11 +147,7 @@ lands in that repository.
 | `--notes-tracker` | `dartway/dartway` | GitHub repository where findings about the framework are filed; `none` files nothing outside the project |
 | `--[no-]git` | on | Initialize a repository with an initial commit |
 
-**`--framework-path` is how a project is built against a framework checkout that is not published** —
-this tree's own unreleased changes, or a fork. The rewrite's package family (`^0.21.0`) is on
-pub.dev, so a project created normally resolves on its own; `--framework-path` instead resolves the
-same pubspecs against the local checkout the template was written against. The block it writes says
-to remove it once the versions it points at are published.
+**`--framework-path` is how a project is built against a local framework checkout** — this tree's own uncommitted changes, or a fork. Normally `create` writes immutable git overrides at the template commit; `dartway update --target <sha>` moves them. `--framework-path` writes path overrides instead.
 
 The last thing `create` prints points at `dartway doctor` and `dartway quickstart` and says to ask
 whatever assistant you use to bring the project up. The manual sequence is in the project's

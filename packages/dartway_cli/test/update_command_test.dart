@@ -6,6 +6,7 @@ import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dartway_cli/src/checker/dw_uniformity_rules.dart';
+import 'package:dartway_cli/src/framework_overrides.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
@@ -185,6 +186,36 @@ void main() {
       expect(output(again), contains(second));
     },
   );
+
+  test('target moves framework git refs and changes no other pubspec text', () async {
+    const old = '1111111111111111111111111111111111111111';
+    final pubspec = file('shop_shared/pubspec.yaml');
+    final original = pubspec.readAsStringSync();
+    final clean = withoutDependencyOverrides(original.split('\n'));
+    final pinned = withFrameworkGitOverrides(
+      clean,
+      ['dartway_core_shared'],
+      url: repository.path,
+      commit: old,
+    ).join('\n');
+    pubspec.writeAsStringSync('$pinned\n');
+    final options = file('shop_flutter/analysis_options.yaml');
+    options.writeAsStringSync(
+      options.readAsStringSync().replaceFirst(
+        RegExp(r'  dartway_lints:\n    path: [^\n]+'),
+        '  dartway_lints:\n    git:\n'
+            '      url: ${repository.path}\n'
+            '      path: packages/dartway_lints\n'
+            '      ref: $old',
+      ),
+    );
+    succeeds(await update([]));
+    expect(
+      pubspec.readAsStringSync(),
+      pinned.replaceAll(old, target) + '\n',
+    );
+    expect(options.readAsStringSync(), contains('ref: $target'));
+  });
 
   test('partial dispositions survive repeated plans and installs', () async {
     succeeds(

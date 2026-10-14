@@ -1,8 +1,7 @@
 import 'package:dartway_repo_tools/dartway_repo_tools.dart';
 import 'package:test/test.dart';
 
-/// The caret rule `caret_check.dart` judges the skeleton by. Pub's rule, not
-/// npm's: under a zero major the next breaking version is the next minor.
+/// Pub's caret rule, used by release dependency ordering.
 void main() {
   PlainVersion v(String text) => PlainVersion.tryParse(text)!;
 

@@ -141,55 +141,62 @@ void main() {
   });
 
   test(
-    'without --framework-path the pubspecs resolve from pub.dev: no '
-    'overrides, the framework family and the tools as dev dependencies',
+    'without --framework-path every reached package and the lints plugin are '
+    'git-pinned to the full template commit',
     () async {
       final project = await create(['shop', '--local-repo', repository.path]);
-      for (final package in ['shop_shared', 'shop_server', 'shop_flutter']) {
-        expect(
-          read(project, '$package/pubspec.yaml'),
-          isNot(contains('dependency_overrides')),
-          reason: package,
-        );
+      final revision = (await Process.run('git', [
+        'rev-parse',
+        'HEAD',
+      ], workingDirectory: repository.path)).stdout.toString().trim();
+      expect(revision, hasLength(40));
+      Set<String> overridden(String package) {
+        final yaml = loadYaml(read(project, '$package/pubspec.yaml')) as YamlMap;
+        return (yaml['dependency_overrides'] as YamlMap)
+            .keys
+            .cast<String>()
+            .toSet();
       }
-      // Read rather than written down: the family's version moves whenever a
-      // change owes the projects a migration note (D-080), and an expectation
-      // spelled out here would have to be edited every time — which is how it
-      // ends up asserting last month's number.
-      final family = _familyVersion(repository);
-      expect(
-        read(project, 'shop_server/pubspec.yaml'),
-        allOf(
-          contains('dartway_core_server: ^$family'),
-          contains('dartway_generator: ^$family'),
-        ),
-      );
-      expect(
-        read(project, 'shop_flutter/pubspec.yaml'),
-        allOf(
-          contains('dartway_core_flutter: ^$family'),
-          contains('dartway_cli:'),
-        ),
-      );
-      // The analyzer plugin is not a pub dependency: the template's path into
-      // this repository becomes the version the template was taken from.
-      final lints = RegExp(r'^version:\s*(\S+)', multiLine: true)
-          .firstMatch(
-            File(
-              p.join(
-                repository.path,
-                'packages',
-                'dartway_lints',
-                'pubspec.yaml',
-              ),
-            ).readAsStringSync(),
-          )!
-          .group(1);
+      expect(overridden('shop_shared'), {
+        'dartway_analytics_shared',
+        'dartway_core_shared',
+      });
+      expect(overridden('shop_server'), {
+        'dartway_analytics_server',
+        'dartway_analytics_shared',
+        'dartway_client',
+        'dartway_core_server',
+        'dartway_core_shared',
+        'dartway_generator',
+        'dartway_orm',
+      });
+      expect(overridden('shop_flutter'), {
+        'dartway_analytics_flutter',
+        'dartway_analytics_shared',
+        'dartway_cli',
+        'dartway_client',
+        'dartway_core_flutter',
+        'dartway_core_shared',
+        'dartway_router',
+        'dartway_shared_preferences',
+      });
+      for (final package in ['shop_shared', 'shop_server', 'shop_flutter']) {
+        final text = read(project, '$package/pubspec.yaml');
+        expect(
+          RegExp(
+            r'      ref: [0-9a-f]{40}$',
+            multiLine: true,
+          ).allMatches(text),
+          isNotEmpty,
+        );
+        expect(text, isNot(contains('dartway_lints:')));
+        expect(text, contains('ref: $revision'));
+      }
       expect(
         read(project, 'shop_flutter/analysis_options.yaml'),
         allOf(
-          contains('  dartway_lints: ^$lints'),
-          isNot(contains('packages/dartway_lints')),
+          contains('path: packages/dartway_lints'),
+          contains('ref: $revision'),
         ),
       );
     },
@@ -522,18 +529,3 @@ bool _isText(File file) {
   const binary = {'.png', '.jpg', '.ico', '.jar', '.webp', '.ttf'};
   return !binary.contains(p.extension(file.path));
 }
-
-/// The one version the core family carries, read from the checkout under test.
-String _familyVersion(Directory repository) =>
-    RegExp(r'^version:\s*(\S+)', multiLine: true)
-        .firstMatch(
-          File(
-            p.join(
-              repository.path,
-              'packages',
-              'dartway_core_server',
-              'pubspec.yaml',
-            ),
-          ).readAsStringSync(),
-        )!
-        .group(1)!;

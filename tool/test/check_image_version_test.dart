@@ -19,8 +19,13 @@ void main() {
     write('packages/dartway_cli/pubspec.yaml', 'version: 0.24.0\n');
     write('bin/git', '#!/bin/sh\necho framework-sha\n', executable: true);
     write('bin/curl', r'''#!/bin/sh
-if [ "$MISSING_VERSION" = true ]; then exit 22; fi
-echo '{"version":"0.24.0"}'
+while [ "$1" != "" ]; do
+  if [ "$1" = --output ]; then shift; output="$1"; fi
+  shift
+done
+if [ "$CURL_FAILURE" = true ]; then exit 7; fi
+echo '{"version":"0.24.0"}' > "$output"
+echo "${HTTP_STATUS:-200}"
 ''', executable: true);
     write(
       'bin/jq',
@@ -46,7 +51,8 @@ esac
   ProcessResult run({
     String mode = 'publish',
     String existing = 'absent',
-    bool missingVersion = false,
+    String httpStatus = '200',
+    bool curlFailure = false,
   }) => Process.runSync(
     '/bin/bash',
     [script, mode],
@@ -54,7 +60,8 @@ esac
     environment: {
       'PATH': '${p.join(root.path, 'bin')}:${Platform.environment['PATH']}',
       'EXISTING': existing,
-      'MISSING_VERSION': '$missingVersion',
+      'HTTP_STATUS': httpStatus,
+      'CURL_FAILURE': '$curlFailure',
     },
   );
 
@@ -92,10 +99,18 @@ esac
     expect(File(p.join(root.path, 'created')).existsSync(), false);
   });
 
-  test('stable without a publication fails before accessing registry', () {
-    final result = run(missingVersion: true);
+  test('missing publication skips with a notice before accessing registry', () {
+    final result = run(httpStatus: '404');
+    expect(result.exitCode, 0);
+    expect(result.stdout, contains('version tag not created'));
+    expect(result.stdout, contains('Run this workflow on stable after publishing'));
+    expect(File(p.join(root.path, 'docker-calls')).existsSync(), false);
+  });
+
+  test('pub.dev server failure fails before accessing registry', () {
+    final result = run(httpStatus: '503');
     expect(result.exitCode, 1);
-    expect(result.stderr, contains('after publishing'));
+    expect(result.stderr, contains('HTTP 503'));
     expect(File(p.join(root.path, 'docker-calls')).existsSync(), false);
   });
 

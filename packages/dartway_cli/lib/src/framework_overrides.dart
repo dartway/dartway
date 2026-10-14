@@ -1,8 +1,8 @@
-// Points a created project at a local monorepo's framework packages by path.
+// Points a created project at the framework packages from one immutable tree.
 //
-// A project `dartway create` makes normally resolves the DartWay family from
-// pub.dev (`^0.20.0`). `create --framework-path` is for building against a
-// local checkout instead — this tree's own unreleased changes, or a fork —
+// A project `dartway create` makes normally pins the DartWay family to the
+// template commit. `create --framework-path` uses a local checkout instead —
+// this tree's own unreleased changes, or a fork —
 // answering the question "does what this tree hands a stranger build, test
 // and run?" by resolving the same pubspecs against the same tree the
 // template was written against — the way the template itself resolves
@@ -113,12 +113,65 @@ List<String> withFrameworkOverrides(
     ...kept,
     '',
     '# Written by `dartway create --framework-path`: the framework comes from a',
-    '# local checkout rather than pub.dev. Remove this block once the versions',
-    '# above are published.',
+    '# local checkout rather than the immutable git commit.',
     'dependency_overrides:',
     for (final MapEntry(key: name, value: directory) in overrides.entries) ...[
       '  $name:',
       "    path: '${directory.replaceAll("'", "''")}'",
     ],
   ];
+}
+
+/// [lines] with overrides for the reached package [names], all pinned to the
+/// same immutable DartWay repository [commit].
+List<String> withFrameworkGitOverrides(
+  List<String> lines,
+  Iterable<String> names, {
+  required String url,
+  required String commit,
+}) {
+  final kept = withoutDependencyOverrides(lines);
+  while (kept.isNotEmpty && kept.last.trim().isEmpty) {
+    kept.removeLast();
+  }
+  final sorted = names.toList()..sort();
+  if (sorted.isEmpty) return kept;
+  return [
+    ...kept,
+    '',
+    '# Written by `dartway create`: the framework is pinned to the template',
+    '# commit.',
+    '# `dartway update --target <sha>` moves this pin.',
+    'dependency_overrides:',
+    for (final name in sorted) ...[
+      '  $name:',
+      '    git:',
+      '      url: $url',
+      '      path: packages/$name',
+      '      ref: $commit',
+    ],
+  ];
+}
+
+/// Moves only full-SHA `ref:` fields in framework git overrides.
+String moveFrameworkGitOverrideRefs(String source, String commit) {
+  final lines = source.split('\n');
+  final start = lines.indexWhere((line) => line == 'dependency_overrides:');
+  if (start < 0) return source;
+  var inFrameworkEntry = false;
+  for (var index = start + 1; index < lines.length; index++) {
+    final line = lines[index];
+    if (line.isNotEmpty && !line.startsWith(' ')) break;
+    final entry = RegExp(r'^  (dartway_[a-z_]+):$').firstMatch(line);
+    if (entry != null) {
+      inFrameworkEntry = true;
+      continue;
+    }
+    if (RegExp(r'^  [a-z_]+:').hasMatch(line)) inFrameworkEntry = false;
+    if (inFrameworkEntry &&
+        RegExp(r'^      ref: [0-9a-fA-F]{40}$').hasMatch(line)) {
+      lines[index] = '      ref: $commit';
+    }
+  }
+  return lines.join('\n');
 }
