@@ -20,35 +20,43 @@ class DwLintsPlan {
     String version, {
     String? path,
     String? gitRef,
+    String? frameworkGitUrl,
   }) async {
     final scratch = Directory.systemTemp.createTempSync('dw-plugin-preflight-');
     try {
       final staged = File(p.join(scratch.path, 'analysis_options.yaml'));
       if (options.existsSync()) options.copySync(staged.path);
+      var movesFrameworkGitSource = false;
       if (gitRef != null && staged.existsSync()) {
         final before = staged.readAsStringSync();
         final originalDocument = loadYaml(before);
         if (originalDocument is YamlMap) {
           final plugins = originalDocument['plugins'];
           if (plugins is YamlMap && plugins.containsKey('dartway_lints')) {
-            _pluginDependency(plugins['dartway_lints'], options);
+            final dependency = _pluginDependency(
+              plugins['dartway_lints'],
+              options,
+            );
+            movesFrameworkGitSource = _usesGitUrl(
+              dependency,
+              frameworkGitUrl,
+            );
           }
         }
         final editableRef = RegExp(
           r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?$)',
           multiLine: true,
         );
-        final after = before.replaceFirstMapped(
-          editableRef,
-          (match) {
-            final openingQuote = match[2]!;
-            final closingQuote = match[4]!;
-            final matchingQuotes =
-                openingQuote.isNotEmpty && openingQuote == closingQuote;
-            return '${match[1]}${matchingQuotes ? openingQuote : ''}$gitRef'
-                '${matchingQuotes ? closingQuote : ''}${match[5]}';
-          },
-        );
+        final after = movesFrameworkGitSource
+            ? before.replaceFirstMapped(editableRef, (match) {
+                final openingQuote = match[2]!;
+                final closingQuote = match[4]!;
+                final matchingQuotes =
+                    openingQuote.isNotEmpty && openingQuote == closingQuote;
+                return '${match[1]}${matchingQuotes ? openingQuote : ''}$gitRef'
+                    '${matchingQuotes ? closingQuote : ''}${match[5]}';
+              })
+            : before;
         if (after != before) staged.writeAsStringSync(after);
       }
       final wiring = wireLintsPlugin(staged, version, path: path);
@@ -61,9 +69,10 @@ class DwLintsPlan {
         (document['plugins'] as YamlMap)['dartway_lints'],
         options,
       );
-      if (gitRef != null && dependency is Map && dependency['git'] != null) {
-        final git = dependency['git'];
-        final ref = git is Map ? git['ref'] : null;
+      if (gitRef != null && movesFrameworkGitSource) {
+        final source = dependency as Map<Object?, Object?>;
+        final git = source['git'] as Map<Object?, Object?>;
+        final ref = git['ref'];
         if (ref is! String || ref != gitRef) {
           throw StateError(
             'Cannot move dartway_lints git ref in ${options.path}: the edited '
@@ -113,6 +122,18 @@ class DwLintsPlan {
   void apply(File options) {
     if (change != null) options.writeAsStringSync(contents);
   }
+}
+
+bool _usesGitUrl(Object dependency, String? expectedUrl) {
+  if (expectedUrl == null || dependency is! Map) return false;
+  final git = dependency['git'];
+  if (git is! Map || git['url'] is! String) return false;
+  final actualUrl = git['url'] as String;
+  if (actualUrl == expectedUrl) return true;
+  if (p.isAbsolute(actualUrl) && p.isAbsolute(expectedUrl)) {
+    return p.equals(p.normalize(actualUrl), p.normalize(expectedUrl));
+  }
+  return false;
 }
 
 /// Native plugin options are not pub dependency options: diagnostics stay in
