@@ -162,24 +162,33 @@ String moveFrameworkGitOverrideRefs(
   String? filePath,
 }) {
   final lines = source.split('\n');
-  final start = lines.indexWhere((line) => line == 'dependency_overrides:');
-  if (start < 0) {
+  final document = loadYaml(source);
+  final overrides = document is YamlMap
+      ? document.nodes.entries
+            .where((entry) => entry.key.value == 'dependency_overrides')
+            .map((entry) => entry.value)
+            .firstOrNull
+      : null;
+  if (overrides is! YamlMap) {
     _validateFrameworkGitRefs(source, commit, filePath: filePath);
     return source;
   }
-  var inFrameworkEntry = false;
-  for (var index = start + 1; index < lines.length; index++) {
-    final line = lines[index];
-    if (line.isNotEmpty && !line.startsWith(' ')) break;
-    final entry = RegExp(r'^  (dartway_[a-z0-9_]+):$').firstMatch(line);
-    if (entry != null) {
-      inFrameworkEntry = true;
-      continue;
+  final frameworkEntryLines = <int>{};
+  for (final entry in overrides.nodes.entries) {
+    if (entry.key.value case final String package
+        when package.startsWith('dartway_')) {
+      for (
+        var line = entry.value.span.start.line;
+        line <= entry.value.span.end.line;
+        line++
+      ) {
+        frameworkEntryLines.add(line);
+      }
     }
-    if (RegExp(r'^  [A-Za-z_][A-Za-z0-9_]*:').hasMatch(line)) {
-      inFrameworkEntry = false;
-    }
-    if (inFrameworkEntry) {
+  }
+  for (var index = 0; index < lines.length; index++) {
+    if (frameworkEntryLines.contains(index)) {
+      final line = lines[index];
       final ref = RegExp(
         r'^(\s+ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?)$',
       ).firstMatch(line);

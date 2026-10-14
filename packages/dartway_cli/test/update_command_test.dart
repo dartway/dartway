@@ -346,7 +346,7 @@ plugins:
   });
 
   test(
-    'target leaves a following third-party git override byte-identical',
+    'target leaves a following quoted third-party git override byte-identical',
     () async {
       final pubspec = file('shop_shared/pubspec.yaml');
       final clean = withoutDependencyOverrides(
@@ -359,7 +359,7 @@ plugins:
         commit: 'stable',
       ).join('\n');
       const thirdParty =
-          '  win32:\n'
+          '  "win32":\n'
           '    git:\n'
           '      url: https://example.invalid/win32.git\n'
           '      ref: keep-this-ref # untouched\n';
