@@ -2,6 +2,22 @@
 
 ## 0.22.0-dev.0
 
+- **BREAKING (source):** `DwIdentifierChangeCause` adds `updated` for trusted
+  edits; exhaustive identifier hooks must handle the new cause.
+
+- Add trusted `DwAccountService.updateIdentifiers` batch phone/e-mail edits with
+  keep/set/clear, stable identities, unchanged sessions and a transactional
+  `beforeChange` project callback. All identity writes precede `updated` hooks;
+  conflicts and removal of the final login method refuse atomically (the
+  latter as `dw.invalid` on the composite `identifiers` field).
+- Fix account-deletion races: queued identifier-code requests refuse a deleted
+  caller instead of inserting an orphan ticket, and queued key issuance reports
+  a missing account instead of an FK incident (#591).
+- Serialize identity membership per account before identifier/ticket/project
+  locks across edits, confirmations, sign-in, moves, removals and deletion.
+  Optimistic owner changes use the existing bounded serialization retry policy;
+  bare-database services also retry top-level conflicts at most three times.
+
 - Add optional `DwCallRateLimit` per registered HTTP call type, bounded peer
   state, explicit trusted proxy CIDRs and pre-body 429/Retry-After refusals.
   Invalid declarations fail before migrations, including quotas behind an

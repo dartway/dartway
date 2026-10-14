@@ -165,6 +165,156 @@ final class DwAccountService {
     return {for (final row in rows) row.get<int>('account_id')};
   }
 
+  /// Atomically edits an existing account's phone and e-mail identifiers.
+  ///
+  /// Trusted backend code only: the caller enforces its own authorization.
+  /// A set patch replaces that kind (retaining its own matching identity, or
+  /// the oldest identity's id); clear removes that kind; keep leaves it alone.
+  /// Values use the sign-in normalizer. No account is created or merged, and
+  /// session keys are unchanged. Provider identities count as ways to sign in.
+  /// Answers all final identities, oldest first. New/changed values are not
+  /// verified; unchanged values retain their proof. Only actual changes run
+  /// hooks, including duplicate removals. A valid all-keep call still runs
+  /// [beforeChange], for a profile-only edit.
+  ///
+  /// Refuses notFound for a missing account, invalid on phone/email for an
+  /// invalid value, identifierTaken on the conflicting field, and
+  /// invalid on the composite `identifiers` field when the final account
+  /// would have no login identity.
+  ///
+  /// [beforeChange] runs after locks and validation, before identity writes.
+  /// Use it to lock and update the project's profile in the SAME transaction,
+  /// never before this call. All identity writes precede identifier hooks, so
+  /// every hook reads one coherent project/identity snapshot. The context's
+  /// caller is unchanged: [accountId] is the target, not an impersonation.
+  /// A callback or hook failure rolls everything back, including publications.
+  /// Like any transaction callback it may be retried: no outbound calls or
+  /// other nontransactional effects. Joins ctx.transaction through a savepoint.
+  Future<List<DwIdentityInfo>> updateIdentifiers(
+    int accountId, {
+    DwFieldPatch<String> phone = const DwFieldPatch.keep(),
+    DwFieldPatch<String> email = const DwFieldPatch.keep(),
+    Future<void> Function(DwCallContext ctx)? beforeChange,
+  }) => _scope.transaction((ctx) async {
+    final db = ctx.db;
+    await dwLockAccountIdentities(ctx, [accountId]);
+    final patches = {
+      DwIdentifierKind.phone: phone,
+      DwIdentifierKind.email: email,
+    };
+    final values = <DwIdentifierKind, String>{};
+    for (final entry in patches.entries) {
+      if (!entry.value.isSet) continue;
+      final value = _auth.normalize(entry.key, entry.value.newValue!);
+      if (value == null) {
+        ctx.refuse(DwCoreRefusal.invalid, field: entry.key.name);
+      }
+      values[entry.key] = value;
+    }
+    final current = await _readAccountIdentities(db, accountId);
+    final keys = {
+      for (final identity in current)
+        dwLockKey('${identity.kindName}:${identity.value}'),
+      for (final entry in values.entries)
+        dwLockKey('${entry.key.name}:${entry.value}'),
+    }.toList()..sort();
+    for (final key in keys) {
+      await db.advisoryLock(DwLockSpace.identifier, key);
+    }
+    if ((await db.query(
+      'SELECT id FROM dw_account WHERE id = @id FOR SHARE',
+      params: {'id': accountId},
+    )).isEmpty) {
+      ctx.refuse(DwCoreRefusal.notFound);
+    }
+    for (final entry in values.entries) {
+      final owner = await dwAccountOf(db, entry.key, entry.value);
+      if (owner != null && owner != accountId) {
+        ctx.refuse(DwAuthRefusal.identifierTaken, field: entry.key.name);
+      }
+    }
+    final keepsLogin =
+        current.any(
+          (identity) => identity.kind == null || patches[identity.kind]!.isKept,
+        ) ||
+        values.isNotEmpty;
+    if (!keepsLogin) {
+      ctx.refuse(DwCoreRefusal.invalid, field: 'identifiers');
+    }
+    await beforeChange?.call(ctx);
+    final changes = <DwIdentifierChange>[];
+    for (final entry in patches.entries) {
+      if (entry.value.isKept) continue;
+      final own = current
+          .where((identity) => identity.kind == entry.key)
+          .toList();
+      final value = values[entry.key];
+      DwIdentityInfo? retained;
+      if (value != null) {
+        retained =
+            own.where((identity) => identity.value == value).firstOrNull ??
+            own.firstOrNull;
+        if (retained == null) {
+          await db.execute(
+            'INSERT INTO dw_identity (account_id, kind, value) VALUES (@account, @kind, @value)',
+            params: {
+              'account': accountId,
+              'kind': entry.key.name,
+              'value': value,
+            },
+          );
+          changes.add(
+            DwIdentifierChange(
+              accountId: accountId,
+              kind: entry.key,
+              cause: DwIdentifierChangeCause.updated,
+              current: value,
+            ),
+          );
+        } else if (retained.value != value) {
+          await db.execute(
+            'UPDATE dw_identity SET value = @value, verified_at = NULL WHERE id = @id',
+            params: {'id': retained.id, 'value': value},
+          );
+          changes.add(
+            DwIdentifierChange(
+              accountId: accountId,
+              kind: entry.key,
+              cause: DwIdentifierChangeCause.updated,
+              previous: retained.value,
+              current: value,
+            ),
+          );
+        }
+      }
+      final dropped = own
+          .where((identity) => value == null || identity.id != retained?.id)
+          .toList();
+      if (dropped.isNotEmpty) {
+        await db.execute(
+          'DELETE FROM dw_identity WHERE id = ANY(@ids::int8[])',
+          params: {
+            'ids': [for (final identity in dropped) identity.id],
+          },
+        );
+        for (final identity in dropped) {
+          changes.add(
+            DwIdentifierChange(
+              accountId: accountId,
+              kind: entry.key,
+              cause: DwIdentifierChangeCause.updated,
+              previous: identity.value,
+            ),
+          );
+        }
+      }
+    }
+    for (final change in changes) {
+      await _changed(ctx, change);
+    }
+    return _readAccountIdentities(db, accountId);
+  });
+
   /// Moves the identifiers of [fromAccountId] — those of [kinds], or all —
   /// to [toAccountId], for a merge of two accounts. Answers the identities as
   /// moved (their ids unchanged).
@@ -194,6 +344,7 @@ final class DwAccountService {
     }
     return _scope.transaction((ctx) async {
       final db = ctx.db;
+      await dwLockAccountIdentities(ctx, [fromAccountId, toAccountId]);
       final target = await db.query(
         'SELECT id FROM dw_account WHERE id = @id FOR SHARE',
         params: {'id': toAccountId},
@@ -259,6 +410,7 @@ final class DwAccountService {
     Set<DwIdentifierKind>? kinds,
   }) => _scope.transaction((ctx) async {
     final db = ctx.db;
+    await dwLockAccountIdentities(ctx, [accountId]);
     final removing = await _lockedIdentities(db, accountId, kinds);
     if (removing.isEmpty) return const <DwIdentityInfo>[];
     await db.execute(
@@ -340,14 +492,15 @@ final class DwAccountService {
     DwSessionKeyKind kind = DwSessionKeyKind.personal,
   }) async {
     final checked = DwAuthStore.personalLabel(label);
-    final issued = await _scope.direct(
-      (db, _) => DwAuthStore.insertKey(
-        db,
+    final issued = await _scope.transaction((ctx) async {
+      await dwLockAccountIdentities(ctx, [accountId]);
+      return DwAuthStore.insertKey(
+        ctx.db,
         accountId: accountId,
         kind: kind,
         label: checked,
-      ),
-    );
+      );
+    });
     if (issued == null) {
       throw ArgumentError.value(accountId, 'accountId', 'no such account');
     }
@@ -490,6 +643,8 @@ final class DwAccountService {
     _scope.checkRevocation();
     return _scope.transaction((ctx) async {
       final db = ctx.db;
+      await dwLockAccountIdentities(ctx, [accountId]);
+      await _lockedIdentities(db, accountId, null);
       final found = await db.query(
         'SELECT id FROM dw_account WHERE id = @id FOR UPDATE',
         params: {'id': accountId},
@@ -566,6 +721,74 @@ final class DwAccountService {
       ));
 }
 
+Future<List<DwIdentityInfo>> _readAccountIdentities(
+  DwDatabaseHandle db,
+  int accountId,
+) async => [
+  for (final row in await db.query(
+    'SELECT ${DwAuthStore.identityColumns} FROM dw_identity WHERE account_id = @account ORDER BY id',
+    params: {'account': accountId},
+  ))
+    DwAuthStore.identityOf(row),
+];
+
+/// Membership locks precede identifier locks, identity rows and project hooks.
+/// Sorting the actual advisory keys also makes hash collisions harmless.
+@internal
+Future<void> dwLockAccountIdentities(
+  DwCallContext ctx,
+  Iterable<int> accounts,
+) async {
+  final keys = {for (final id in accounts) dwLockKey('$id')}.toList()..sort();
+  for (final key in keys) {
+    await ctx.db.advisoryLock(DwLockSpace.accountIdentities, key);
+  }
+}
+
+/// Resolve before locking, then verify under both locks. An ownership change
+/// aborts the transaction before writes or hooks; the context's bounded
+/// serialization retry resolves it again without retaining the old locks.
+@internal
+Future<void> dwLockCodeIdentity(
+  DwCallContext ctx,
+  DwAuthConfig auth,
+  DwIdentifierKind kind,
+  String identifier, {
+  int? attachingAccount,
+}) async {
+  Future<Set<int>> resolve() async => {
+    ?attachingAccount,
+    ?await dwAccountOf(ctx.db, kind, identifier),
+    if (kind == DwIdentifierKind.email && auth.linkByVerifiedEmail)
+      for (final row in await ctx.db.query(
+        'SELECT DISTINCT account_id FROM dw_identity WHERE provider_email = @email',
+        params: {'email': identifier},
+      ))
+        row.get<int>('account_id'),
+  };
+  final accounts = await resolve();
+  await dwLockAccountIdentities(ctx, accounts);
+  if (attachingAccount != null &&
+      (await ctx.db.query(
+        'SELECT id FROM dw_account WHERE id = @id',
+        params: {'id': attachingAccount},
+      )).isEmpty) {
+    // The request authenticated before deletion committed, then waited here.
+    // Never deliver a code or insert a ticket for that now-deleted caller.
+    throw const DwNotAuthenticatedException();
+  }
+  await ctx.db.advisoryLock(
+    DwLockSpace.identifier,
+    dwLockKey('${kind.name}:$identifier'),
+  );
+  final actual = await resolve();
+  if (accounts.length != actual.length || !accounts.containsAll(actual)) {
+    throw DwSerializationFailure(
+      'Identifier ownership changed while acquiring account locks',
+    );
+  }
+}
+
 @internal
 Future<int?> dwAccountOf(
   DwDatabaseHandle db,
@@ -632,10 +855,7 @@ Future<DwEnsuredAccount> dwEnsureAccount(
   }
   final verified = origin is DwSignInOrigin;
   // Two first sign-ins of one identifier at once must create one account.
-  await db.advisoryLock(
-    DwLockSpace.identifier,
-    dwLockKey('${kind.name}:$identifier'),
-  );
+  await dwLockCodeIdentity(ctx, auth, kind, identifier);
   if (verified) {
     final existing = await db.query(
       'UPDATE dw_identity SET verified_at = now() '
@@ -752,6 +972,17 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
   final normalizedEmail = auth.linkByVerifiedEmail && verifiedEmail != null
       ? auth.normalize(DwIdentifierKind.email, verifiedEmail)
       : null;
+  Future<Set<int>> resolve() async => {
+    for (final row in await db.query(
+      'SELECT account_id FROM dw_identity WHERE kind = @provider AND value = @subject',
+      params: {'provider': provider, 'subject': subject},
+    ))
+      row.get<int>('account_id'),
+    if (normalizedEmail != null)
+      ?await dwAccountOf(db, DwIdentifierKind.email, normalizedEmail),
+  };
+  final accounts = await resolve();
+  await dwLockAccountIdentities(ctx, accounts);
   // Two first sign-ins of one provider identity at once make one account; a
   // link additionally touches the matching e-mail identity, in the same
   // fixed (sorted) order `_lockedIdentities` locks several identities in, so
@@ -762,6 +993,12 @@ Future<DwEnsuredAccount> dwEnsureExternalAccount(
   }.toList()..sort();
   for (final key in keys) {
     await db.advisoryLock(DwLockSpace.identifier, key);
+  }
+  final actual = await resolve();
+  if (accounts.length != actual.length || !accounts.containsAll(actual)) {
+    throw DwSerializationFailure(
+      'External identity ownership changed while acquiring account locks',
+    );
   }
   final existing = await db.query(
     'UPDATE dw_identity SET verified_at = now(), provider_email = @email '
@@ -852,9 +1089,12 @@ Future<DwIdentityInfo?> dwAttachIdentity(
   if (!db.inTransaction) {
     throw StateError('dwAttachIdentity needs a transaction');
   }
-  await db.advisoryLock(
-    DwLockSpace.identifier,
-    dwLockKey('${kind.name}:$identifier'),
+  await dwLockCodeIdentity(
+    ctx,
+    auth,
+    kind,
+    identifier,
+    attachingAccount: accountId,
   );
   final owner = await dwAccountOf(db, kind, identifier);
   if (owner != null && owner != accountId) return null;
@@ -1034,8 +1274,22 @@ final class _DetachedScope extends _Scope {
   final DwAuthConfig auth;
 
   @override
-  Future<T> transaction<T>(Future<T> Function(DwCallContext ctx) body) =>
-      db.transaction((tx) => body(_DetachedContext(tx, auth)));
+  Future<T> transaction<T>(Future<T> Function(DwCallContext ctx) body) async {
+    // Same bounded conflict policy as server contexts. A savepoint must let
+    // the conflict reach its enclosing transaction, not retry with old locks.
+    for (var attempt = 1; ; attempt++) {
+      try {
+        return await db.transaction((tx) => body(_DetachedContext(tx, auth)));
+      } catch (error) {
+        if (!db.inTransaction &&
+            attempt < dwMaxTransactionAttempts &&
+            dwIsRetryableTransactionError(error)) {
+          continue;
+        }
+        rethrow;
+      }
+    }
+  }
 
   @override
   Future<T> direct<T>(

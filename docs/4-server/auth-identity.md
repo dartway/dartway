@@ -484,12 +484,60 @@ Three ways to get one, by where the code runs:
 | `listIdentities(accountId)` | `List<DwIdentityInfo>` | oldest first |
 | `listIdentitiesOf(accountIds)` | `Map<int, List<DwIdentityInfo>>` | one query for a list of profiles; every account asked for is a key |
 | `accountsMatching(fragment, {kinds})` | `Set<int>` | case-insensitive substring of stored (normalized) identifiers; `%`, `_` and `\` match themselves; an empty fragment throws |
+| `updateIdentifiers(accountId, {phone, email, beforeChange})` | `List<DwIdentityInfo>` | trusted backend edit of an existing account; keep/set/clear patches, both identifiers and project callback atomic; never creates or merges an account, preserves sessions |
 | `moveIdentities(fromAccountId, toAccountId, {kinds})` | `List<DwIdentityInfo>` | a merge, in one transaction under the per-identifier locks; `onIdentifierChanged` runs for both accounts. Revokes nothing |
 | `removeIdentities(accountId, {kinds})` | `List<DwIdentityInfo>` | a removed identifier is free: a later sign-in with it makes a new account. Revokes nothing |
 | `issueKey(accountId, {label, kind})` | `DwIssuedKey` (`key`, `token`) | a personal key unless `kind` says otherwise. The token exists only in this answer |
 | `listKeys(accountId)` | `List<DwSessionKeyInfo>` | newest first, revoked ones included until cleanup |
 | `revokeKey(keyId, {accountId})` | `bool` | whether a live key was revoked. Pass the caller's account when the key id came from a client, so nobody revokes a key that is not theirs |
 | `revokeKeys(accountId)` | — | every key of the account, app and personal |
+
+### Trusted administrative identifier edits
+
+`updateIdentifiers` does not authorize or impersonate the target. Its caller must enforce the
+project's admin/backend policy; `ctx.accountId` remains the caller. Values use `DwAuthConfig.normalize`.
+A set patch replaces every identifier of that kind, keeping a matching own identity or the oldest
+identity's id; clear removes the kind, and keep does nothing. New/changed values are unverified:
+trusted administrative entry is not proof of a mailbox or phone. An unchanged matching value keeps
+its existing proof. Provider identities also count as login methods.
+
+The operation refuses `dw.notFound` for a missing account, `dw.invalid` on `phone`/`email` for invalid
+input, `dw.identifierTaken` on the occupied field, and `dw.invalid` on the composite `identifiers` field when the final account
+would have no login identity. This field names the pair, not an individually malformed value. All conflicts are checked before callbacks or writes. It returns
+**all final identities**, oldest first, including provider identities. Hooks run only for actual
+additions, removals or value changes (including removed duplicate identities), with
+`DwIdentifierChangeCause.updated`; a no-op emits no hooks. A valid all-keep call still runs
+`beforeChange`, for a profile-only edit.
+
+For a combined project profile and identifier edit, read the target profile without a row lock to
+find its account, then call the API. Lock/revalidate that profile and write its fields only inside
+`beforeChange`. Never take the profile lock first: authentication hooks lock the account and
+identifiers before reaching project rows. The callback runs after account/identifier locks and
+conflict/final-login checks, before all identity writes; every identifier hook then reads the same
+final profile and both final identifiers. A failure rolls back the callback, identities and
+publications together, including inside an outer `ctx.transaction` savepoint.
+
+```dart
+await ctx.accounts.updateIdentifiers(
+  accountId,
+  phone: command.phone,
+  email: command.email,
+  beforeChange: (batchCtx) async {
+    // Lock/revalidate the project's target row here, then update its fields
+    // through batchCtx.db. Do not change its account id.
+    await writeProfile(batchCtx, accountId, command);
+  },
+);
+```
+
+Callbacks and hooks must use the passed transaction context and perform no outbound requests or
+nontransactional effects. The server retries deadlock/serialization conflicts at the enclosing
+transaction boundary, at most three attempts. A bare-database service uses the same bounded retry
+policy for top-level transactions; inside a caller-owned transaction a conflict propagates, so the
+caller retries the whole transaction. Ownership is resolved before account locks and checked again
+under identifier locks; a changed owner aborts before any callback/hook runs. There is no global
+sign-in mutex. `removeIdentities` still permits removing all identities for an explicit merge; the
+last-login safeguard belongs to trusted edits, not to that separate operation.
 
 **A command that issues a key never stores its successful outcome** (D-043). The outcome table
 would otherwise hold the bearer token for a week. A retried send runs again and makes a second key;

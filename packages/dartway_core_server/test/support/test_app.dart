@@ -154,6 +154,12 @@ final class TestApp {
   /// Every `onIdentifierChanged`, in order.
   final List<DwIdentifierChange> identifierChanges = [];
 
+  /// The complete transactional snapshot each identifier hook observed.
+  final List<
+    ({int accountId, int? callerId, String name, List<String> identities})
+  >
+  identifierSnapshots = [];
+
   /// Identifier values whose change makes `onIdentifierChanged` throw, after
   /// it has written the profile.
   final Set<String> failingIdentifierChanges = {};
@@ -163,6 +169,9 @@ final class TestApp {
 
   /// Accounts whose deletion `onAccountDeleting` refuses.
   final Set<int> undeletable = {};
+  final Set<int> gatedAccountDeletion = {};
+  Completer<void> accountDeletingEntered = Completer();
+  Completer<void> accountDeletingGate = Completer();
 
   /// Accounts that may read anyone's notes (`NotesOfOwner`).
   final Set<int> staff = {};
@@ -312,6 +321,10 @@ final class TestApp {
           );
         },
     onAccountDeleting: (ctx, accountId) async {
+      if (gatedAccountDeletion.contains(accountId)) {
+        accountDeletingEntered.complete();
+        await accountDeletingGate.future;
+      }
       if (undeletable.contains(accountId)) {
         ctx.refuse(DwCoreRefusal.forbidden);
       }
@@ -324,6 +337,21 @@ final class TestApp {
     // on its own rows would.
     onIdentifierChanged: (ctx, change) async {
       identifierChanges.add(change);
+      final profile = await ctx.db.query(
+        'SELECT name FROM profile WHERE account_id = @id',
+        params: {'id': change.accountId},
+      );
+      identifierSnapshots.add((
+        accountId: change.accountId,
+        callerId: ctx.accountId,
+        name: profile.firstOrNull?.get<String>('name') ?? '',
+        identities: [
+          for (final identity in await ctx.accounts.listIdentities(
+            change.accountId,
+          ))
+            '${identity.kindName}:${identity.value}',
+        ],
+      ));
       if (change.current case final current?) {
         await ctx.db.execute(
           'UPDATE profile SET identifier = @identifier WHERE account_id = @id',

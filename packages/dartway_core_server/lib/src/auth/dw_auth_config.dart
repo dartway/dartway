@@ -144,10 +144,11 @@ final class DwAuthConfig {
 
   /// Runs in the transaction that changes an existing account's identifiers
   /// through the framework — `DwConfirmIdentifier`, and
-  /// `DwAccountService.moveIdentities` / `removeIdentities` — once per account
+  /// `DwAccountService.updateIdentifiers` / `moveIdentities` /
+  /// `removeIdentities` — once per account
   /// and identifier affected, after the change: the place to mirror an
   /// identifier into the project's own rows. Throwing (or refusing) undoes the
-  /// change.
+  /// change. A batch edit finishes every identity write before its hook loop.
   ///
   /// Not called for the identity an account is created with
   /// ([onAccountCreated] sees it), nor when a sign-in merely confirms an
@@ -301,6 +302,9 @@ final class DwToolOrigin extends DwAccountOrigin {
 
 /// Why an account's identifiers changed.
 enum DwIdentifierChangeCause {
+  /// Trusted backend code edited identifiers through updateIdentifiers.
+  updated,
+
   /// The account's owner confirmed a code (`DwConfirmIdentifier`).
   confirmed,
 

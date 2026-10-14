@@ -267,6 +267,7 @@ abstract final class DwLockSpace {
   static const int identifier = 0x44570001;
   static const int idempotencyKey = 0x44570002;
   static const int pendingUploads = 0x44570003;
+  static const int accountIdentities = 0x44570004;
 }
 
 /// Whether [error] means "run the transaction again".

@@ -288,7 +288,22 @@ provider again. Details:
 **Everything else about accounts is `DwAccountService`** — `ctx.accounts` in a handler, job, route or
 startup step (joins its transaction), `server.accounts` beside a started server,
 `DwAccountService(db, auth)` in a script — never SQL on `dw_*` tables: `ensure`, `find`,
-`listIdentities(Of)`, `accountsMatching`, `moveIdentities`, `removeIdentities`, keys (`dartway-access`).
+`listIdentities(Of)`, `accountsMatching`, `updateIdentifiers`, `moveIdentities`, `removeIdentities`, keys (`dartway-access`).
+
+Trusted admin/backend edits use `ctx.accounts.updateIdentifiers(accountId, {phone, email,
+beforeChange})`: phone/e-mail are `DwFieldPatch<String>` keep/set/clear, both changes atomic,
+returning all final identities. Enforce the caller's project access rule yourself; this neither
+creates/merges an account nor changes the caller or session keys. Read the project profile without
+locking first; lock/revalidate and write it **only inside beforeChange**, through its passed
+transaction context. Do not take the profile lock before account/identifier locks. The callback
+runs after conflict/last-login validation, then all identifier SQL runs before any identifier hook.
+No outbound/nontransactional effects in callbacks/hooks: the enclosing transaction may retry.
+Invalid input refuses `dw.invalid` on phone/email; occupied values `dw.identifierTaken` on that
+field; clearing the final login method `dw.invalid` on the composite `identifiers` field. Provider identities count as logins.
+New/changed values have no code proof; a no-op preserves proof and emits no hook. Hooks use
+`DwIdentifierChangeCause.updated` only for actual changes (including duplicate removals); a valid
+all-keep call still runs the profile callback. Publish profile-only changes explicitly when no hook
+ran. A failure rolls back callback writes and both identifiers; never SQL on framework tables.
 
 ## 9. Startup, seeds, settings
 

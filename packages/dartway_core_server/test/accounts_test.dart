@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:test/test.dart';
 
@@ -841,5 +843,78 @@ void main() {
         isNull,
       );
     });
+  });
+  group('account deletion and in-flight changes', () {
+    Future<void> waitForBlockedCall() => eventually(
+      () async =>
+          (await harness().db.query(
+            "SELECT count(*) AS n FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND pid <> pg_backend_pid()",
+          )).single.get<int>('n') >
+          0,
+    );
+    void gateDeletion(int id) {
+      harness().app.gatedAccountDeletion.add(id);
+      harness().app.accountDeletingEntered = Completer<void>();
+      harness().app.accountDeletingGate = Completer<void>();
+    }
+
+    test(
+      'a caller deleted while its attach request waits is refused without ticket or delivery',
+      () async {
+        final (caller, target) = await harness().signedIn(
+          'delete-pending-attach@example.com',
+        );
+        gateDeletion(target.id);
+        final deletion = accounts().deleteAccount(target.id);
+        await harness().app.accountDeletingEntered.future;
+        final pending = caller.call(
+          const DwRequestIdentifierCode(
+            kind: DwIdentifierKind.email,
+            identifier: 'deleted-attach-new@example.com',
+          ),
+        );
+        try {
+          await waitForBlockedCall();
+        } finally {
+          harness().app.accountDeletingGate.complete();
+        }
+        expect(await deletion, isTrue);
+        expect((await pending).status, 401);
+        expect(
+          harness().app.delivered.containsKey('deleted-attach-new@example.com'),
+          isFalse,
+        );
+        expect(
+          (await harness().db.query(
+            'SELECT count(*) AS n FROM dw_code_ticket WHERE identifier = @value',
+            params: {'value': 'deleted-attach-new@example.com'},
+          )).single.get<int>('n'),
+          0,
+        );
+      },
+    );
+    test(
+      'issuing a key queued behind deletion reports missing account, not an FK incident',
+      () async {
+        final (_, target) = await harness().signedIn(
+          'delete-pending-key@example.com',
+        );
+        gateDeletion(target.id);
+        final deletion = accounts().deleteAccount(target.id);
+        await harness().app.accountDeletingEntered.future;
+        final pending = expectLater(
+          accounts().issueKey(target.id, label: 'queued key'),
+          throwsArgumentError,
+        );
+        try {
+          await waitForBlockedCall();
+        } finally {
+          harness().app.accountDeletingGate.complete();
+        }
+        expect(await deletion, isTrue);
+        await pending;
+        expect(await accounts().listKeys(target.id), isEmpty);
+      },
+    );
   });
 }

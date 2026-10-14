@@ -1,6 +1,9 @@
 import 'dart:convert';
 
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
+import 'package:dartway_starter_server/generated/dw_schema.dart';
+import 'package:dartway_starter_server/src/profile/profile_rows.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 
@@ -16,6 +19,67 @@ void main() {
   tearDownAll(() => app.stop());
 
   const adminChannel = DwLiveChannel(DartwayStarterChannel.admin);
+
+  test(
+    'trusted batch profile and identifiers arrive live as one coherent snapshot',
+    () async {
+      final admin = await app.admin('79990186010', 'Batch admin');
+      final member = await app.signUp('79990186011', firstName: 'Before batch');
+      final profileId = await member.profileId;
+      final profile = await member.watch(const GetMyProfile());
+      final before = dataOf(profile.state)!;
+      final observed = <UserProfile>[];
+      final subscription = profile.states.listen((state) {
+        final value = dataOf(state);
+        if (value != null) observed.add(value);
+      });
+      addTearDown(subscription.cancel);
+      await app.server.runInContext(
+        (ctx) => ctx.accounts.updateIdentifiers(
+          member.accountId,
+          phone: const DwFieldPatch.set('79990186012'),
+          email: const DwFieldPatch.set(' Batch-Consumer@EXAMPLE.COM '),
+          beforeChange: (batchCtx) async {
+            final row = await batchCtx.db.userProfiles.findById(
+              profileId,
+              lock: DwRowLock.forUpdate,
+            );
+            if (row == null || row.accountId != member.accountId) {
+              batchCtx.refuse(DwCoreRefusal.notFound);
+            }
+            await batchCtx.db.userProfiles.update(
+              row.copyWith(firstName: 'After batch'),
+            );
+          },
+        ),
+      );
+      await dwWaitUntil(() => dataOf(profile.state)?.phone == '79990186012');
+      final after = dataOf(profile.state)!;
+      expect(after.id, before.id);
+      expect(after.accountId, before.accountId);
+      expect(after.firstName, 'After batch');
+      expect(after.email, 'batch-consumer@example.com');
+      for (final value in observed.where((value) => value != before)) {
+        expect(value.firstName, 'After batch');
+        expect(value.phone, '79990186012');
+        expect(value.email, 'batch-consumer@example.com');
+      }
+      final card = (await admin.client.fetch(
+        GetUserCard(profileId: profileId),
+      )).valueOrThrow;
+      expect(card.profile, after);
+      expect(card.identifiers.map((i) => i.value), [
+        '79990186012',
+        'batch-consumer@example.com',
+      ]);
+      expect(
+        (await member.client.fetch(
+          const GetMyProfile(),
+        )).valueOrThrow.accountId,
+        member.accountId,
+      );
+    },
+  );
 
   test(
     'a role change is live: the member hears their own new role and gains '
