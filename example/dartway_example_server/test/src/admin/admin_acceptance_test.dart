@@ -1,4 +1,7 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
+import 'package:dartway_example_server/generated/dw_schema.dart';
+import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
@@ -11,6 +14,49 @@ void main() {
 
   setUpAll(() async => club = await AppHarness.start());
   tearDownAll(() => club.stop());
+
+  test(
+    'trusted phone edit composes profile writes before the real mirror hook',
+    () async {
+      final member = await club.signUp(
+        '79990186111',
+        firstName: 'Before batch',
+      );
+      final profile = member.client.watch(const GetMyProfile());
+      addTearDown(profile.close);
+      await dwWaitUntil(() => profile.isLive);
+      final before = dataOf(profile.state)!;
+      await club.server.runInContext(
+        (ctx) => ctx.accounts.updateIdentifiers(
+          member.accountId,
+          phone: const DwFieldPatch.set('79990186112'),
+          beforeChange: (batchCtx) async {
+            final row = await batchCtx.db.userProfiles.findById(
+              before.id,
+              lock: DwRowLock.forUpdate,
+            );
+            if (row == null || row.accountId != member.accountId) {
+              batchCtx.refuse(DwCoreRefusal.notFound);
+            }
+            await batchCtx.db.userProfiles.update(
+              row.copyWith(firstName: 'After batch'),
+            );
+          },
+        ),
+      );
+      await dwWaitUntil(() => dataOf(profile.state)?.phone == '79990186112');
+      final after = dataOf(profile.state)!;
+      expect(after.id, before.id);
+      expect(after.accountId, before.accountId);
+      expect(after.firstName, 'After batch');
+      expect(
+        (await member.client.fetch(
+          const GetMyProfile(),
+        )).valueOrThrow.accountId,
+        member.accountId,
+      );
+    },
+  );
 
   test("an admin changing a member's role: the member's own profile follows "
       "live, and the admin's own profile is not touched by it", () async {

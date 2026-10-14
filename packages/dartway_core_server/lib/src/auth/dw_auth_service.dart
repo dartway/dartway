@@ -233,9 +233,12 @@ final class DwAuthService {
     final (ticket, code, accountId) = await ctx.transaction((tx) async {
       // The limit is read and extended under one lock per identifier, or two
       // parallel requests would both see room for one more.
-      await ctx.db.advisoryLock(
-        DwLockSpace.identifier,
-        dwLockKey('${kind.name}:$identifier'),
+      await dwLockCodeIdentity(
+        ctx,
+        auth,
+        kind,
+        identifier,
+        attachingAccount: attachingAccount,
       );
       final stats = (await ctx.db.query(
         'SELECT now() AS now, count(*) AS n, min(created_at) AS first, '
@@ -372,11 +375,36 @@ final class DwAuthService {
         _ => ctx.refuse(DwCoreRefusal.codeExpired, field: 'code'),
       };
 
+  Future<void> _lockTicketIdentity(
+    DwCallContext ctx,
+    String ticketId,
+    _CodePurpose purpose, {
+    int? accountId,
+  }) async {
+    final rows = await ctx.db.query(
+      'SELECT kind, identifier FROM dw_code_ticket WHERE id = @id AND purpose = @purpose AND account_id IS NOT DISTINCT FROM @account::int8',
+      params: {'id': ticketId, 'purpose': purpose.name, 'account': accountId},
+    );
+    if (rows.isEmpty) {
+      if (accountId != null) await dwLockAccountIdentities(ctx, [accountId]);
+      return;
+    }
+    final row = rows.single;
+    await dwLockCodeIdentity(
+      ctx,
+      auth,
+      DwIdentifierKind.values.byName(row.get<String>('kind')),
+      row.get<String>('identifier'),
+      attachingAccount: accountId,
+    );
+  }
+
   Future<DwAuthSession> _verifyCode(
     DwCallContext ctx,
     DwVerifyCode command,
   ) async {
     final (check, session) = await ctx.transaction((tx) async {
+      await _lockTicketIdentity(ctx, command.ticketId, _CodePurpose.signIn);
       final check = await _checkCode(
         ctx,
         command.ticketId,
@@ -412,6 +440,12 @@ final class DwAuthService {
   ) async {
     final caller = ctx.requireAccountId;
     final (check, identity) = await ctx.transaction((tx) async {
+      await _lockTicketIdentity(
+        ctx,
+        command.ticketId,
+        _CodePurpose.attach,
+        accountId: caller,
+      );
       final check = await _checkCode(
         ctx,
         command.ticketId,
