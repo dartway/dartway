@@ -764,7 +764,6 @@ final class DwAppServer {
   DwRecurringJob _cleanupJob() {
     final ticketRetention = [
       auth.requestWindow,
-      auth.codeLifetime,
       auth.resendDelay,
     ].reduce((a, b) => a > b ? a : b);
     return DwRecurringJob(
@@ -778,8 +777,9 @@ final class DwAppServer {
         );
         await ctx.db.execute(
           'DELETE FROM dw_code_ticket '
-          'WHERE created_at < now() - @age::int8 * interval \'1 microsecond\'',
-          params: {'age': ticketRetention.inMicroseconds},
+          'WHERE expires_at <= @now::timestamptz AND '
+          'created_at < @now::timestamptz - @age::int8 * interval \'1 microsecond\'',
+          params: {'age': ticketRetention.inMicroseconds, 'now': ctx.now},
         );
         // `failed_at` is stamped by the server's clock, so it is aged by it.
         await ctx.db.execute(

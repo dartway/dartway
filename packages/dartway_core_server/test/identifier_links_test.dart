@@ -52,6 +52,7 @@ void main() {
   final links = <String, Uri>{};
   var deliveries = 0;
   var failDelivery = false;
+  String? echoedProviderFailure;
   Completer<void>? entered;
   Completer<void>? release;
   final harness = useHarness(
@@ -79,7 +80,16 @@ void main() {
               links[identifier] = link;
               entered?.complete();
               if (release != null) await release!.future;
-              if (failDelivery) throw StateError('provider unavailable');
+              if (failDelivery) {
+                // Representative provider exception retaining the outbound URI.
+                // The project hook sanitizes it before the framework's alert sink.
+                try {
+                  throw StateError('provider echoed outbound request $link');
+                } catch (error) {
+                  echoedProviderFailure = '$error';
+                  throw StateError('provider unavailable');
+                }
+              }
             },
           ),
         },
@@ -137,6 +147,15 @@ void main() {
       expect(after.single.verifiedAt, isNotNull);
       invalid(await confirm('new@example.com', key: 'confirm-once'));
       expect(owner.token, account.token);
+      const authenticatedOwner = DwRequestIdentifierCode(
+        kind: DwIdentifierKind.phone,
+        identifier: '+79990000901',
+      );
+      expect((await owner.call(authenticatedOwner)).status, 200);
+      expect(
+        harness().app.codeCallers[authenticatedOwner.identifier],
+        account.id,
+      );
       final secret = token('new@example.com');
       expect(secret.length, 22);
       final dump = await harness().db.query(
@@ -167,6 +186,24 @@ void main() {
         200,
       );
       expect(foreign.token, other.token);
+      const authenticatedForeign = DwRequestIdentifierCode(
+        kind: DwIdentifierKind.phone,
+        identifier: '+79990000902',
+      );
+      expect((await foreign.call(authenticatedForeign)).status, 200);
+      expect(
+        harness().app.codeCallers[authenticatedForeign.identifier],
+        other.id,
+      );
+      const authenticatedOwner = DwRequestIdentifierCode(
+        kind: DwIdentifierKind.phone,
+        identifier: '+79990000903',
+      );
+      expect((await owner.call(authenticatedOwner)).status, 200);
+      expect(
+        harness().app.codeCallers[authenticatedOwner.identifier],
+        account.id,
+      );
       expect(
         (await harness().server.server.accounts.listIdentities(
           other.id,
@@ -246,6 +283,15 @@ void main() {
       );
       final failed = await owner.call(command);
       expect(failed.status, 500);
+      final secret = token('failed@example.com');
+      expect(echoedProviderFailure, contains(secret));
+      expect(RecordingLogger.lines.join(), isNot(contains(secret)));
+      expect(
+        harness().app.alerts.incidents
+            .map((i) => '${i.where} ${i.error} ${i.stackTrace}')
+            .join(),
+        isNot(contains(secret)),
+      );
       failDelivery = false;
       expect((await confirm('failed@example.com')).status, 200);
     },
@@ -371,18 +417,32 @@ void main() {
       await request('cleanup@example.com');
       clock.value = actualNow;
       await harness().db.execute(
+        "INSERT INTO dw_code_ticket (id, kind, identifier, code_hash, created_at, expires_at, purpose) VALUES "
+        "('history', 'email', 'history@example.com', decode('00', 'hex'), @recent, @expired, 'signIn'), "
+        "('stale', 'email', 'stale@example.com', decode('00', 'hex'), @old, @expired, 'signIn')",
+        params: {
+          'recent': actualNow.subtract(const Duration(minutes: 5)),
+          'old': actualNow.subtract(const Duration(hours: 2)),
+          'expired': actualNow.subtract(const Duration(minutes: 1)),
+        },
+      );
+      await harness().db.execute(
         "UPDATE dw_recurring_job SET next_run_at = @now WHERE name = 'dw.cleanup'",
         params: {'now': clock.value},
       );
       harness().server.wakeJobs();
+      // The stale row is removed by the same atomic DELETE as link cleanup.
+      // Waiting for it proves this run finished even if an earlier job ran.
       await eventually(
-        () async =>
-            (await harness().db.query(
-              "SELECT last_run_at FROM dw_recurring_job WHERE name = 'dw.cleanup'",
-            )).single['last_run_at'] !=
-            null,
+        () async => (await harness().db.query(
+          "SELECT id FROM dw_code_ticket WHERE id = 'stale'",
+        )).isEmpty,
       );
       expect((await confirm('cleanup@example.com')).status, 200);
+      final retained = await harness().db.query(
+        "SELECT id FROM dw_code_ticket WHERE id IN ('history', 'stale')",
+      );
+      expect(retained.map((row) => row.get<String>('id')), ['history']);
     },
   );
   for (final resend in [Duration.zero, const Duration(seconds: 60)]) {
@@ -445,6 +505,10 @@ void main() {
         final answers = await Future.wait([first, second]);
         expect(answers.map((a) => a.status), everyElement(200));
         expect(answers.first.value(command), answers.last.value(command));
+        expect(
+          answers.where((answer) => (answer.response as DwApiOk).replayed),
+          hasLength(1),
+        );
         expect(deliveredLinks, hasLength(1));
         final rows = await h.db.query(
           "SELECT id, consumed_at FROM dw_code_ticket WHERE account_id = @id AND delivery = 'link'",

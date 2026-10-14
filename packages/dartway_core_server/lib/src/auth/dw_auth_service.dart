@@ -241,6 +241,14 @@ final class DwAuthService {
         ? auth.attachDelivery[kind]
         : null;
     final (ticket, code, accountId) = await ctx.transaction((tx) async {
+      final stored = await runtimeContext.claimProvisionalOutcome();
+      if (stored != null) {
+        return (
+          ctx.protocol.decodeValue<DwCodeTicket>(stored.result),
+          null,
+          null,
+        );
+      }
       // The limit is read and extended under one lock per identifier, or two
       // parallel requests would both see room for one more.
       await dwLockCodeIdentity(
@@ -337,6 +345,11 @@ final class DwAuthService {
       await runtimeContext.recordProvisionalOutcome(ticket);
       return (ticket, code, accountId);
     });
+    if (code == null) {
+      // Mark only after the read transaction committed, never on a failed retry.
+      runtimeContext.markProvisionalOutcomeReplayed();
+      return ticket;
+    }
     if (linkPolicy == null) {
       await auth.deliverCode(ctx, kind, identifier, code, accountId);
     } else {

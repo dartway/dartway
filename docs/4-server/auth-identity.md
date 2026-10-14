@@ -605,3 +605,16 @@ For web landing URLs prefer a fragment route: fragments never enter HTTP access 
 token in memory and replace the browser URL with a clean route **before** confirmation or error
 reporting. Do not retain it in preferences, route/error context, provider diagnostics or logs. A
 native deep link is also supported; its host application must apply the same secret discipline.
+
+Ticket cleanup keeps each row until its stored expiry and the required request-history window
+have both elapsed. Request transactions claim the canonical actor/idempotency key before account
+and identifier guards, then recheck the outcome before rate limits or ticket mutation. This also
+covers a duplicate arriving before the first ticket commits; delivery still runs once after locks
+are released.
+
+The delivery callback owns provider-error sanitization. A provider exception may retain the whole
+outbound URI or echo message content; catch it inside the hook and raise a safe refusal or sanitized
+exception without embedding the original error. The framework forwards arbitrary hook exceptions
+to alert sinks; it cannot make a provider's arbitrary object safe. Captured-delivery tests should
+exercise an echoing provider error and assert both recorded logs and structured incidents exclude
+the link token. Never wrap the original exception into the supposedly sanitized message.

@@ -547,10 +547,11 @@ final class DwCallEndpoint {
     }
     if (handler.recordsSuccess &&
         !ctx.madeSecret &&
-        !ctx.recordedProvisionalOutcome) {
+        !ctx.recordedProvisionalOutcome &&
+        !ctx.replayedProvisionalOutcome) {
       await dwRecordOutcome(runtime.db, key, accountId, typeName, 'ok', value);
     }
-    return DwApiResponse.ok(value);
+    return DwApiResponse.ok(value, replayed: ctx.replayedProvisionalOutcome);
   }
 
   void _requireSignIn(DwAccessRule access, DwCallContext ctx) {
