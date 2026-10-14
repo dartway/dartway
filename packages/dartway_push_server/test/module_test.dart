@@ -168,11 +168,18 @@ void main() {
     addTearDown(database.drop);
     final opened = await DwPostgresDatabase.open(database.config);
     addTearDown(opened.close);
-    final migrations = {
+    await DwMigrationRunner(opened.db, migrations: {
+      'dw': DwAppServer.frameworkMigrations,
+      dwPushNamespace: dwPushMigrations.take(1).toList(),
+    }).apply();
+    await opened.db.execute(
+      "INSERT INTO dw_push_message (category, title, data, expires_at) "
+      "VALUES ('news', 'Before upgrade', '{}'::jsonb, now())",
+    );
+    await DwMigrationRunner(opened.db, migrations: {
       'dw': DwAppServer.frameworkMigrations,
       dwPushNamespace: dwPushMigrations,
-    };
-    await DwMigrationRunner(opened.db, migrations: migrations).apply();
+    }).apply();
     final ledger = await opened.db.query(
       "SELECT id FROM dw_migrations WHERE namespace = 'push'",
     );
@@ -184,8 +191,7 @@ void main() {
       ],
     );
     final oldRow = await opened.db.query(
-      "INSERT INTO dw_push_message (category, title, data, expires_at) "
-      "VALUES ('news', 'Before upgrade', '{}'::jsonb, now()) RETURNING sound",
+      "SELECT sound FROM dw_push_message WHERE title = 'Before upgrade'",
     );
     expect(oldRow.single['sound'], 'standard');
     await DwMigrationRunner(
