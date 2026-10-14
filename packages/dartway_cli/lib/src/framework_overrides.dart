@@ -161,30 +161,13 @@ String moveFrameworkGitOverrideRefs(
   String commit, {
   String? filePath,
 }) {
-  final document = loadYaml(source);
-  final overrides = document is YamlMap
-      ? document['dependency_overrides']
-      : null;
-  var expectedRefs = 0;
-  if (overrides is YamlMap) {
-    for (final entry in overrides.entries) {
-      if (entry.key is! String ||
-          !(entry.key as String).startsWith('dartway_')) {
-        continue;
-      }
-      final dependency = entry.value;
-      if (dependency is YamlMap &&
-          dependency['git'] is YamlMap &&
-          (dependency['git'] as YamlMap).containsKey('ref')) {
-        expectedRefs++;
-      }
-    }
-  }
   final lines = source.split('\n');
   final start = lines.indexWhere((line) => line == 'dependency_overrides:');
-  if (start < 0) return source;
+  if (start < 0) {
+    _validateFrameworkGitRefs(source, commit, filePath: filePath);
+    return source;
+  }
   var inFrameworkEntry = false;
-  var movedRefs = 0;
   for (var index = start + 1; index < lines.length; index++) {
     final line = lines[index];
     if (line.isNotEmpty && !line.startsWith(' ')) break;
@@ -208,17 +191,36 @@ String moveFrameworkGitOverrideRefs(
         lines[index] =
             '${ref.group(1)}${matchingQuotes ? openingQuote : ''}$commit'
             '${matchingQuotes ? closingQuote : ''}${ref.group(5)}';
-        movedRefs++;
       }
     }
   }
-  if (movedRefs != expectedRefs) {
+  final edited = lines.join('\n');
+  _validateFrameworkGitRefs(edited, commit, filePath: filePath);
+  return edited;
+}
+
+void _validateFrameworkGitRefs(
+  String source,
+  String commit, {
+  String? filePath,
+}) {
+  final document = loadYaml(source);
+  final overrides = document is YamlMap
+      ? document['dependency_overrides']
+      : null;
+  if (overrides is! YamlMap) return;
+  for (final entry in overrides.entries) {
+    final package = entry.key;
+    if (package is! String || !package.startsWith('dartway_')) continue;
+    final dependency = entry.value;
+    if (dependency is! YamlMap || dependency['git'] is! YamlMap) continue;
+    final ref = (dependency['git'] as YamlMap)['ref'];
+    if (ref is String && ref == commit) continue;
     throw StateError(
-      'Cannot move framework git ref in ${filePath ?? 'pubspec.yaml'}: '
-      'a dartway_* override uses an unsupported ref form. Use a block map '
-      'with two-space dependency indentation and a separate `ref:` line. '
-      'Project files were not changed.',
+      'Cannot move framework git ref in ${filePath ?? 'pubspec.yaml'} for '
+      '$package: the edited source does not contain the target SHA as a '
+      'string. Use a block map with two-space dependency indentation and a '
+      'separate `ref:` line. Project files were not changed.',
     );
   }
-  return lines.join('\n');
 }

@@ -38,20 +38,6 @@ class DwLintsPlan {
           r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?$)',
           multiLine: true,
         );
-        final plugin = originalDocument is YamlMap
-            ? originalDocument['plugins']
-            : null;
-        final lintSource = plugin is YamlMap ? plugin['dartway_lints'] : null;
-        if (lintSource is YamlMap &&
-            lintSource['git'] is YamlMap &&
-            (lintSource['git'] as YamlMap).containsKey('ref') &&
-            !editableRef.hasMatch(before)) {
-          throw StateError(
-            'Cannot move dartway_lints git ref in ${options.path}: the plugin '
-            'uses an unsupported ref form. Use a block map with a separate '
-            '`ref:` line. Project configuration left untouched.',
-          );
-        }
         final after = before.replaceFirstMapped(
           editableRef,
           (match) {
@@ -75,6 +61,18 @@ class DwLintsPlan {
         (document['plugins'] as YamlMap)['dartway_lints'],
         options,
       );
+      if (gitRef != null && dependency is Map && dependency['git'] != null) {
+        final git = dependency['git'];
+        final ref = git is Map ? git['ref'] : null;
+        if (ref is! String || ref != gitRef) {
+          throw StateError(
+            'Cannot move dartway_lints git ref in ${options.path}: the edited '
+            'source does not contain the target SHA as a string. Use a block '
+            'map with a separate `ref:` line. Project configuration left '
+            'untouched.',
+          );
+        }
+      }
       File(p.join(scratch.path, 'pubspec.yaml')).writeAsStringSync(
         'name: dartway_plugin_preflight\n'
         'environment:\n  sdk: ">=3.11.0 <4.0.0"\n'

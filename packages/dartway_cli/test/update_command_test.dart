@@ -214,7 +214,7 @@ void main() {
       pubspec.readAsStringSync(),
       pinned.replaceAll(old, target) + '\n',
     );
-    expect(options.readAsStringSync(), contains('ref: $target'));
+    expect(options.readAsStringSync(), contains("ref: '$target'"));
   });
 
   test('target moves branch, tag, and quoted framework git refs', () async {
@@ -283,7 +283,48 @@ dependency_overrides:
 
     expect(result.exitCode, 1, reason: output(result));
     expect(output(result), contains(rootPubspec.path));
-    expect(output(result), contains('unsupported ref form'));
+    expect(output(result), contains('does not contain the target SHA'));
+    expect(files(), before);
+  });
+
+  test('implicit framework git refs fail without edits', () async {
+    final rootPubspec = file('pubspec.yaml');
+    rootPubspec.writeAsStringSync('''
+name: shop_workspace
+dependency_overrides:
+  dartway_core_shared:
+    git:
+      url: ${repository.path}
+      path: packages/dartway_core_shared
+''');
+    final before = files();
+
+    final result = await update([]);
+
+    expect(result.exitCode, 1, reason: output(result));
+    expect(output(result), contains(rootPubspec.path));
+    expect(output(result), contains('dartway_core_shared'));
+    expect(files(), before);
+  });
+
+  test('commented override headers fail without edits', () async {
+    final rootPubspec = file('pubspec.yaml');
+    rootPubspec.writeAsStringSync('''
+name: shop_workspace
+dependency_overrides: # framework pins
+  dartway_core_shared:
+    git:
+      url: ${repository.path}
+      path: packages/dartway_core_shared
+      ref: stable
+''');
+    final before = files();
+
+    final result = await update([]);
+
+    expect(result.exitCode, 1, reason: output(result));
+    expect(output(result), contains(rootPubspec.path));
+    expect(output(result), contains('dartway_core_shared'));
     expect(files(), before);
   });
 
@@ -300,7 +341,7 @@ plugins:
 
     expect(result.exitCode, 1, reason: output(result));
     expect(output(result), contains(options.path));
-    expect(output(result), contains('unsupported ref form'));
+    expect(output(result), contains('does not contain the target SHA'));
     expect(files(), before);
   });
 
@@ -635,12 +676,14 @@ plugins:
   }, timeout: const Timeout(Duration(minutes: 5)));
 
   test('native YAML git ref coercion is replaced by the exact target', () async {
-    final plugin = await rootPluginRepository();
+    final plugin = repository;
     // This branch exists and JSON pub preflight resolves it. The native
     // analyzer emits ref: true into YAML, which pub rejects as a boolean.
     final options =
         'plugins:\n  dartway_lints:\n    git:\n'
-        '      url: ${plugin.path}\n      ref: "true"\n';
+        '      url: ${plugin.path}\n'
+        '      path: packages/dartway_lints\n'
+        '      ref: "true"\n';
     file('shop_flutter/analysis_options.yaml').writeAsStringSync(options);
     final native = await nativeAnalyze(options);
     expect(native.exitCode, isNot(0), reason: output(native));
