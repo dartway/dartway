@@ -23,8 +23,8 @@ analyzer:
 # in a document is a convention that drifts. They show in the IDE and in
 # `dart analyze` — `flutter analyze` does not run analyzer plugins.
 #
-# In the framework's repository this names the local package by path; a
-# project names the published version.
+# In the framework's repository this names the local package by path; a created
+# project pins the plugin to the immutable framework Git commit.
 plugins:
   dartway_lints:
     path: ../../packages/dartway_lints

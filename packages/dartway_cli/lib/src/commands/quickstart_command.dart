@@ -7,7 +7,7 @@ import '../quickstart_brief.dart';
 /// Prints the agent-facing setup brief.
 ///
 /// The entry point to DartWay is two commands a human pastes anywhere —
-/// `dart pub global activate dartway_cli` and `dartway quickstart` — after
+/// Install the CLI from the DartWay git repository, then run `dartway quickstart` — after
 /// which whatever assistant is at hand has the full instruction in its context.
 /// Deliberately not a plugin for one particular assistant: the framework's
 /// front door must not depend on a vendor's extension format.

@@ -1,8 +1,8 @@
-// Points a created project at a local monorepo's framework packages by path.
+// Points a created project at the framework packages from one immutable tree.
 //
-// A project `dartway create` makes normally resolves the DartWay family from
-// pub.dev (`^0.20.0`). `create --framework-path` is for building against a
-// local checkout instead — this tree's own unreleased changes, or a fork —
+// A project `dartway create` makes normally pins the DartWay family to the
+// template commit. `create --framework-path` uses a local checkout instead —
+// this tree's own unreleased changes, or a fork —
 // answering the question "does what this tree hands a stranger build, test
 // and run?" by resolving the same pubspecs against the same tree the
 // template was written against — the way the template itself resolves
@@ -15,6 +15,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'vendor_framework.dart';
 
@@ -113,12 +114,166 @@ List<String> withFrameworkOverrides(
     ...kept,
     '',
     '# Written by `dartway create --framework-path`: the framework comes from a',
-    '# local checkout rather than pub.dev. Remove this block once the versions',
-    '# above are published.',
+    '# local checkout rather than the immutable git commit.',
     'dependency_overrides:',
     for (final MapEntry(key: name, value: directory) in overrides.entries) ...[
       '  $name:',
       "    path: '${directory.replaceAll("'", "''")}'",
     ],
   ];
+}
+
+/// [lines] with overrides for the reached package [names], all pinned to the
+/// same immutable DartWay repository [commit].
+List<String> withFrameworkGitOverrides(
+  List<String> lines,
+  Iterable<String> names, {
+  required String url,
+  required String commit,
+}) {
+  final kept = withoutDependencyOverrides(lines);
+  while (kept.isNotEmpty && kept.last.trim().isEmpty) {
+    kept.removeLast();
+  }
+  final sorted = names.toList()..sort();
+  if (sorted.isEmpty) return kept;
+  return [
+    ...kept,
+    '',
+    '# Written by `dartway create`: the framework is pinned to the template',
+    '# commit.',
+    '# `dartway update --target <sha>` moves this pin.',
+    'dependency_overrides:',
+    for (final name in sorted) ...[
+      '  $name:',
+      '    git:',
+      '      url: $url',
+      '      path: packages/$name',
+      '      ref: $commit',
+    ],
+  ];
+}
+
+/// Moves `ref:` fields in framework git overrides, whatever they currently
+/// name (a branch, a tag, or a quoted or unquoted commit).
+String moveFrameworkGitOverrideRefs(
+  String source,
+  String commit, {
+  String? filePath,
+  required Iterable<String> frameworkGitUrls,
+}) {
+  final lines = source.split('\n');
+  final document = loadYaml(source);
+  final overrides = document is YamlMap
+      ? document.nodes.entries
+            .where((entry) => entry.key.value == 'dependency_overrides')
+            .map((entry) => entry.value)
+            .firstOrNull
+      : null;
+  if (overrides is! YamlMap) {
+    _validateFrameworkGitRefs(
+      source,
+      commit,
+      frameworkGitUrls: frameworkGitUrls,
+      filePath: filePath,
+    );
+    return source;
+  }
+  final frameworkEntryLines = <int>{};
+  for (final entry in overrides.nodes.entries) {
+    if (entry.key.value case final String package
+        when package.startsWith('dartway_') &&
+            usesGitRepository(entry.value.value, frameworkGitUrls)) {
+      for (
+        var line = entry.value.span.start.line;
+        line <= entry.value.span.end.line;
+        line++
+      ) {
+        frameworkEntryLines.add(line);
+      }
+    }
+  }
+  for (var index = 0; index < lines.length; index++) {
+    if (frameworkEntryLines.contains(index)) {
+      final line = lines[index];
+      final ref = RegExp(
+        r'^(\s+ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?)$',
+      ).firstMatch(line);
+      if (ref != null) {
+        final openingQuote = ref.group(2)!;
+        final closingQuote = ref.group(4)!;
+        final matchingQuotes =
+            openingQuote.isNotEmpty && openingQuote == closingQuote;
+        lines[index] =
+            '${ref.group(1)}${matchingQuotes ? openingQuote : ''}$commit'
+            '${matchingQuotes ? closingQuote : ''}${ref.group(5)}';
+      }
+    }
+  }
+  final edited = lines.join('\n');
+  _validateFrameworkGitRefs(
+    edited,
+    commit,
+    frameworkGitUrls: frameworkGitUrls,
+    filePath: filePath,
+  );
+  return edited;
+}
+
+void _validateFrameworkGitRefs(
+  String source,
+  String commit, {
+  String? filePath,
+  required Iterable<String> frameworkGitUrls,
+}) {
+  final document = loadYaml(source);
+  final overrides = document is YamlMap
+      ? document['dependency_overrides']
+      : null;
+  if (overrides is! YamlMap) return;
+  for (final entry in overrides.entries) {
+    final package = entry.key;
+    if (package is! String || !package.startsWith('dartway_')) continue;
+    final dependency = entry.value;
+    if (dependency is! YamlMap || dependency['git'] is! YamlMap) continue;
+    if (!usesGitRepository(dependency, frameworkGitUrls)) continue;
+    final ref = (dependency['git'] as YamlMap)['ref'];
+    if (ref is String && ref == commit) continue;
+    throw StateError(
+      'Cannot move framework git ref in ${filePath ?? 'pubspec.yaml'} for '
+      '$package: the edited source does not contain the target SHA as a '
+      'string. Use a block map with two-space dependency indentation and a '
+      'separate `ref:` line. Project files were not changed.',
+    );
+  }
+}
+
+/// Whether [dependency] is a git dependency on one of [repositoryUrls].
+bool usesGitRepository(Object? dependency, Iterable<String> repositoryUrls) {
+  if (dependency is! Map) return false;
+  final git = dependency['git'];
+  if (git is! Map || git['url'] is! String) return false;
+  final actualUrl = git['url'] as String;
+  return repositoryUrls.any(
+    (expectedUrl) => sameGitRepository(actualUrl, expectedUrl),
+  );
+}
+
+/// Compares local paths and the common URL spellings of a git repository.
+bool sameGitRepository(String left, String right) {
+  if (p.isAbsolute(left) && p.isAbsolute(right)) {
+    return p.equals(p.normalize(left), p.normalize(right));
+  }
+  return _canonicalGitUrl(left) == _canonicalGitUrl(right);
+}
+
+String _canonicalGitUrl(String value) {
+  var url = value.trim();
+  final scp = RegExp(r'^git@([^:]+):(.+)$').firstMatch(url);
+  if (scp != null) url = 'https://${scp[1]}/${scp[2]}';
+  final parsed = Uri.tryParse(url);
+  if (parsed == null || parsed.host.isEmpty) return url;
+  var path = parsed.path.replaceFirst(RegExp(r'/+$'), '');
+  if (path.endsWith('.git')) path = path.substring(0, path.length - 4);
+  return '${parsed.host.toLowerCase()}${path.toLowerCase()}';
 }

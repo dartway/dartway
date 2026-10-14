@@ -125,8 +125,7 @@ jobs:
           dartway create cicheck --local-repo "$GITHUB_WORKSPACE" --no-git
 
       - name: Build the project against this commit, not against pub.dev
-        # As in `images.yml`: between a version bump and its release the
-        # carets of a created project name versions pub.dev does not have.
+        # As in `images.yml`, vendoring keeps the Docker context self-contained.
         run: |
           dart run tool/vendor_framework.dart \
             "$RUNNER_TEMP/create/cicheck" "$GITHUB_WORKSPACE"

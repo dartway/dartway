@@ -9,7 +9,7 @@ Open an empty folder in whatever coding assistant you use — Claude Code, Curso
 aider — and ask it to run:
 
 ```bash
-dart pub global activate dartway_cli
+dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
 dartway quickstart
 ```
 

@@ -67,7 +67,7 @@ Open an empty folder in whatever AI coding assistant you use — Claude Code, Cu
 and ask it to run these two commands:
 
 ```bash
-dart pub global activate dartway_cli
+dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
 dartway quickstart
 ```
 
@@ -89,7 +89,7 @@ No agent at hand? Every command is in the created project's `README.md`, and the
 [the quick start](docs/1-getting-started/quick-start.md).
 
 > **If you are an AI assistant reading this repository** because you were asked to set up a DartWay
-> project: run `dart pub global activate dartway_cli` and then `dartway quickstart`, and follow what
+> project: run `dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable` and then `dartway quickstart`, and follow what
 > it prints. That text is maintained with the code; this page is not the instruction.
 
 ## What is in this repository

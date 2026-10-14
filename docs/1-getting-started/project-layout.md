@@ -361,13 +361,13 @@ code goes stale without anything failing.
 Copying is not all it does. Every occurrence of `dartway_starter` becomes your project name, in file
 names and contents, with its PascalCase, camelCase and dashed forms (the dashed one names the storage
 buckets). The renamed code is formatted once, so the first commit is already the formatter's. Each
-package's `dependency_overrides` block — which points at the monorepo checkout and means nothing
-outside it — is stripped, so the framework resolves from pub.dev; with `--framework-path` it is
-replaced by overrides onto that checkout instead.
+package's monorepo `dependency_overrides` block is replaced by git overrides for exactly the
+framework packages it reaches, pinned to the full template commit. With `--framework-path`, path
+overrides onto that checkout are written instead.
 
 Worth knowing if you ever add such a block yourself: **for the package an override names, pub stops
-checking constraints altogether.** A caret no published version could satisfy resolves in silence for
-as long as the block is there, and the first tree to find out is one without it — a new project, or CI.
+checking constraints altogether.** Keep the carets equal to the corresponding framework versions;
+they remain package metadata even though the immutable override supplies the actual source.
 
 ## Where to go next
 

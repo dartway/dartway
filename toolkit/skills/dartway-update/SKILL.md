@@ -13,7 +13,7 @@ The update is: what moved, what the project owes because of it, and proof the re
 caret is the last step, not the task; the update is its own branch and PR, never folded into a feature.
 
 1. **A branch from a clean tree**: `git status`, then `git switch -c chore/dartway-update __BASE_BRANCH__`.
-2. **Update the CLI**: `dart pub global activate dartway_cli` — an old CLI installs an old toolkit.
+2. **Update the CLI**: `dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable` — an old CLI installs an old toolkit.
 3. **Plan first:** `dartway update --plan` takes the recorded channel (or explicit `--channel` /
    `--local-repo`) and prints its exact commit, package gaps and unconfirmed migration notes,
    oldest first, with their instructions. It writes **no project files**, including migration state.
@@ -32,7 +32,8 @@ caret is the last step, not the task; the update is its own branch and PR, never
    supplies a path for a missing plugin. Do not write an unresolvable hosted pin to get past this step.
 5. **Install the target:** `dartway update --target <sha>` with the same source and installer options.
    It rechecks resolution, installs the selected Codex/Claude integrations, preserves owner rules
-   and recorded installer choices, and applies only the planned plugin edit. It completes **no notes**.
+   and recorded installer choices, moves every framework Git override and the plugin Git ref to the
+   exact target, and applies only the planned plugin edit. It completes **no notes**.
 6. **Read and make each note's edits**, in order and in the project's conventions. Search for what
    changed before deciding applicability. An absent `.dartway/migrations.json` means **unknown
    baseline**, even if locks already resolve the target or the toolkit was installed today. Review

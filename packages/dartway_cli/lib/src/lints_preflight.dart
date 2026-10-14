@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
+import 'framework_overrides.dart';
 import 'lints_plugin.dart';
 
 /// Stages the exact YAML edit and asks pub to resolve its plugin dependency in
@@ -19,11 +20,46 @@ class DwLintsPlan {
     File options,
     String version, {
     String? path,
+    String? gitRef,
+    Iterable<String> frameworkGitUrls = const [],
   }) async {
     final scratch = Directory.systemTemp.createTempSync('dw-plugin-preflight-');
     try {
       final staged = File(p.join(scratch.path, 'analysis_options.yaml'));
       if (options.existsSync()) options.copySync(staged.path);
+      var movesFrameworkGitSource = false;
+      if (gitRef != null && staged.existsSync()) {
+        final before = staged.readAsStringSync();
+        final originalDocument = loadYaml(before);
+        if (originalDocument is YamlMap) {
+          final plugins = originalDocument['plugins'];
+          if (plugins is YamlMap && plugins.containsKey('dartway_lints')) {
+            final dependency = _pluginDependency(
+              plugins['dartway_lints'],
+              options,
+            );
+            movesFrameworkGitSource = usesGitRepository(
+              dependency,
+              frameworkGitUrls,
+            );
+          }
+        }
+        final editableRef = RegExp(
+          r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?$)',
+          multiLine: true,
+        );
+        final after = movesFrameworkGitSource
+            ? before.replaceFirstMapped(editableRef, (match) {
+                final openingQuote = match[2]!;
+                final closingQuote = match[4]!;
+                final matchingQuotes =
+                    openingQuote.isNotEmpty && openingQuote == closingQuote;
+                return '${match[1]}${matchingQuotes ? openingQuote : ''}$gitRef'
+                    '${matchingQuotes ? closingQuote : ''}${match[5]}';
+              })
+            : before;
+        if (after != before) staged.writeAsStringSync(after);
+      }
       final wiring = wireLintsPlugin(staged, version, path: path);
       if (wiring.manual != null) {
         throw StateError(wiring.manual!.replaceAll(staged.path, options.path));
@@ -34,6 +70,19 @@ class DwLintsPlan {
         (document['plugins'] as YamlMap)['dartway_lints'],
         options,
       );
+      if (gitRef != null && movesFrameworkGitSource) {
+        final source = dependency as Map<Object?, Object?>;
+        final git = source['git'] as Map<Object?, Object?>;
+        final ref = git['ref'];
+        if (ref is! String || ref != gitRef) {
+          throw StateError(
+            'Cannot move dartway_lints git ref in ${options.path}: the edited '
+            'source does not contain the target SHA as a string. Use a block '
+            'map with a separate `ref:` line. Project configuration left '
+            'untouched.',
+          );
+        }
+      }
       File(p.join(scratch.path, 'pubspec.yaml')).writeAsStringSync(
         'name: dartway_plugin_preflight\n'
         'environment:\n  sdk: ">=3.11.0 <4.0.0"\n'
@@ -60,7 +109,10 @@ class DwLintsPlan {
           (lock['packages'] as YamlMap)['dartway_lints'] as YamlMap;
       return DwLintsPlan._(
         contents,
-        wiring.change?.replaceAll(staged.path, options.path),
+        wiring.change?.replaceAll(staged.path, options.path) ??
+            (options.existsSync() && contents != options.readAsStringSync()
+                ? 'moved the dartway_lints git ref to $gitRef'
+                : null),
         '${jsonEncode(dependency)} → ${resolved['version']} (${resolved['source']})',
       );
     } finally {

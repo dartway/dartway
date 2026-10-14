@@ -69,7 +69,7 @@ Quick additional checks:
 
 **First check whether the bump was warranted at all** (root `AGENTS.md`, "Versioning"): a version is the number of the next release, not a count of pull requests, and it moves once per release cycle. `git show origin/stable:packages/<pkg>/pubspec.yaml | grep -m1 '^version:'` — equal to master and this PR moves it; master already ahead and the pending release carries a bump, so a second one is a finding rather than the norm. The one exception is escalation: a breaking change in front of a pending patch raises the minor.
 
-Why this is not caught on its own: both trees hold a `dependency_overrides` block pointing at the local packages, and **for an overridden package pub does not check the constraint at all**. An unsatisfiable line resolves in silence for exactly as long as the block is there. `dartway create` strips it — and the constraint is read for the first time, for real, in a stranger's tree.
+Why this is not caught on its own: the trees and created projects hold `dependency_overrides`, and **for an overridden package pub does not check the constraint at all**. The carets remain a statement of the matching package versions and must move with them even though resolution cannot enforce them.
 
 The check is mechanical and takes a minute:
 
@@ -93,15 +93,15 @@ Three of the facts this repository states about itself are copies of something e
 One command asks all three:
 
 ```bash
-dart run tool/self_check.dart            # everything
-dart run tool/self_check.dart --offline  # skip the check that needs pub.dev
+dart run tool/self_check.dart            # everything; no network access
+dart run tool/self_check.dart --offline  # equivalent explicit offline spelling
 ```
 
-**Its exit code has three values, and the third is the point:** `0` clean, `1` something is not what we say it is, `2` a check could not be carried out — pub.dev unreachable, most likely. A check that could not run is not a check that failed; reporting the two the same way is how people learn to skim a gate.
+**Its exit codes are:** `0` clean, `1` something is not what we say it is, `2` a local check could not be carried out.
 
-**What a finding means differs by check, so read the summary rather than the count.** A stale lockfile is fixed by `flutter pub get` and a commit. A missing git setting is fixed by the `git config` line it prints, and it is yours alone — setting it here sets it for nobody else. **A caret finding is not fixed by editing the caret:** it means the packages are not published yet, which is a release decision. Report it and name the packages that lag.
+**What a finding means differs by check, so read the summary rather than the count.** A stale lockfile is fixed by `flutter pub get` and a commit. A missing git setting is fixed by the `git config` line it prints, and it is yours alone — setting it here sets it for nobody else.
 
-This is deliberately not in `tool/checks.sh`, and therefore not in CI: two of the three would be red on every runner by construction — a fresh clone has none of the git settings, and the carets are unsatisfied for as long as a release is pending. A gate that is red by design is a gate people stop reading.
+This is deliberately not in `tool/checks.sh`, and therefore not in CI: a fresh clone has none of the local git settings. A gate that is red by design is a gate people stop reading.
 
 ## Step 5. Does a project on the framework have to change?
 
@@ -114,8 +114,7 @@ the change, keyed to the package version that delivers it. A target at or above 
 the note until the project records a verified applied/not-applicable disposition; dependency locks
 and toolkit installations never complete it (D-126). Follow the root version policy: use a
 satellite's pending release version if it is already ahead of `stable`; otherwise raise it. The
-family's prereleases move in lockstep (`0.21.0-dev.1`, then `dev.2`, … after `0.20.0`; pub.dev receives
-the plain version when the release is cut, D-086), with the carets in `template/` and `example/`. The one
+family's prereleases move in lockstep (`0.21.0-dev.1`, then `dev.2`, … after `0.20.0`; the plain version is written at the cut and is published only on a separate owner decision, D-086, D-157), with the carets in `template/` and `example/`. The one
 journey without a note is a project coming from 0.x, which is recreated on the rewrite rather than
 migrated (D-031).
 
