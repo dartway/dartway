@@ -353,20 +353,22 @@ final class DwOutboundResponse {
 /// Names the request by its method and origin only — the path and the query
 /// may carry a credential.
 final class DwOutboundException implements Exception {
+  /// [cause] is untrusted transport input: only its presence selects the
+  /// network-failure category. Its text is never retained, logged or exposed.
   DwOutboundException(this.request, {this.timedOutAfter, String? cause})
     : reason = timedOutAfter != null
           ? 'timed out after ${timedOutAfter.inMilliseconds} ms'
-          : cause ?? 'no response';
+          : cause == null
+          ? 'no response'
+          : 'network failure';
 
   /// The response body was larger than [maxBytes]: it was not read further.
-  DwOutboundException.tooLarge(DwOutboundRequest request, int maxBytes)
-    : this(
-        request,
-        cause:
-            'the response is larger than $maxBytes bytes '
-            '(DwServerSettings.outboundMaxResponseBytes, or the call\'s '
-            'maxResponseBytes)',
-      );
+  DwOutboundException.tooLarge(this.request, int maxBytes)
+    : timedOutAfter = null,
+      reason =
+          'the response is larger than $maxBytes bytes '
+          '(DwServerSettings.outboundMaxResponseBytes, or the call\'s '
+          'maxResponseBytes)';
 
   final DwOutboundRequest request;
 
@@ -375,7 +377,8 @@ final class DwOutboundException implements Exception {
 
   bool get timedOut => timedOutAfter != null;
 
-  /// What went wrong, for the log.
+  /// Framework-owned diagnostic category or numeric timeout/size limit.
+  /// Never contains arbitrary transport messages, which may echo secrets.
   final String reason;
 
   @override
@@ -447,10 +450,11 @@ final class DwNetworkTransport implements DwOutboundTransport {
       );
     } on http.RequestAbortedException {
       throw DwOutboundException(request, timedOutAfter: timeout);
-    } on http.ClientException catch (error) {
-      throw DwOutboundException(request, cause: error.message);
-    } on IOException catch (error) {
-      throw DwOutboundException(request, cause: '$error');
+    } on http.ClientException {
+      // Provider/client messages may echo the URL, headers or outbound body.
+      throw DwOutboundException(request, cause: 'network');
+    } on IOException {
+      throw DwOutboundException(request, cause: 'network');
     } finally {
       timer.cancel();
     }

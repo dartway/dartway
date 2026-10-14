@@ -2,6 +2,10 @@
 
 ## 0.22.0-dev.0
 
+- Outbound transport failure diagnostics discard arbitrary provider/client causes, which may
+  contain credentials or bearer links. Logs, exception strings and incident errors retain safe
+  categories; framework-owned timeout and response-size limits remain informative.
+
 - Auth request transactions recheck canonical idempotency before ticket writes, including
   duplicates arriving before commit. Cleanup retains tickets through stored expiry and rate history.
 

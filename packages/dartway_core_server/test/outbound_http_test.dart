@@ -210,14 +210,32 @@ void main() {
       final port = remote.port;
       await remote.close(force: true);
       await expectLater(
-        http.get(Uri.parse('http://127.0.0.1:$port/')),
-        throwsA(
-          isA<DwOutboundException>().having(
-            (e) => e.timedOut,
-            'timedOut',
-            isFalse,
+        http.get(
+          Uri.parse(
+            'http://127.0.0.1:$port/synthetic-network-token?key=synthetic-network-key',
           ),
         ),
+        throwsA(
+          isA<DwOutboundException>()
+              .having((e) => e.timedOut, 'timedOut', isFalse)
+              .having((e) => e.reason, 'category', 'network failure')
+              .having(
+                (e) => '$e',
+                'safe diagnostic',
+                allOf(
+                  isNot(contains('synthetic-network-token')),
+                  isNot(contains('synthetic-network-key')),
+                ),
+              ),
+        ),
+      );
+      expect(
+        RecordingLogger.lines.join(),
+        isNot(contains('synthetic-network-token')),
+      );
+      expect(
+        RecordingLogger.lines.join(),
+        isNot(contains('synthetic-network-key')),
       );
     });
 
@@ -322,6 +340,41 @@ void main() {
       expect(fake.requests, hasLength(1));
     });
 
+    test(
+      'echoed transport cause never appears in logger or exception diagnostics',
+      () async {
+        const token = 'synthetic-bearer-outbound';
+        const email = 'synthetic-private@example.com';
+        const key = 'synthetic-api-outbound';
+        final start = RecordingLogger.lines.length;
+        fake.when(
+          (_) => true,
+          (request) => throw DwOutboundException(
+            request,
+            cause: 'provider echoed ${request.url} ${request.body} $email $key',
+          ),
+        );
+        DwOutboundException? failure;
+        try {
+          await http.post(
+            Uri.parse('https://api.example.com/$token?key=$key'),
+            json: {
+              'email': email,
+              'link': 'https://example.com/#/confirm?token=$token',
+            },
+          );
+        } on DwOutboundException catch (error) {
+          failure = error;
+        }
+        expect(failure, isNotNull);
+        final diagnostics =
+            '${RecordingLogger.lines.skip(start).join()} ${failure!.reason} $failure';
+        for (final secret in [token, email, key]) {
+          expect(diagnostics, isNot(contains(secret)));
+        }
+      },
+    );
+
     test('lets a rule fail the exchange, or run into the timeout', () async {
       fake
         ..when(
@@ -421,6 +474,41 @@ void main() {
       expect(answer.status, 500);
       expect(server.http.requests, hasLength(1));
     });
+
+    test(
+      'echoed transport cause is absent from actual structured incidents and logs',
+      () async {
+        const token = 'synthetic-alert-bearer';
+        const email = 'synthetic-alert-private@example.com';
+        const key = 'synthetic-alert-api-key';
+        final logStart = RecordingLogger.lines.length;
+        final incidentsStart = harness().app.alerts.incidents.length;
+        harness().server.http.when(
+          (_) => true,
+          (request) => throw DwOutboundException(
+            request,
+            cause:
+                'provider echoed ${request.url} ${request.body} $token $email $key',
+          ),
+        );
+        final answer = await harness().caller().raw(
+          'POST',
+          '/notify',
+          body: utf8.encode('$token $email $key'),
+        );
+        expect(answer.status, 500);
+        final incidents = harness().app.alerts.incidents
+            .skip(incidentsStart)
+            .toList();
+        expect(incidents, hasLength(1));
+        expect(incidents.single.error, isA<DwOutboundException>());
+        final diagnostics =
+            '${RecordingLogger.lines.skip(logStart).join()} ${incidents.single.error} ${incidents.single.stackTrace} ${answer.text}';
+        for (final secret in [token, email, key]) {
+          expect(diagnostics, isNot(contains(secret)));
+        }
+      },
+    );
 
     test("the server's outboundTimeout bounds ctx.http", () async {
       harness().server.http.when(
