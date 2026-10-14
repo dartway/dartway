@@ -23,11 +23,15 @@ import java.util.concurrent.Executors
 
 private const val CHANNEL_ID_META = "dev.dartway.push.rustore.channel_id"
 private const val CHANNEL_NAME_META = "dev.dartway.push.rustore.channel_name"
+private const val SILENT_CHANNEL_ID_META = "dev.dartway.push.rustore.silent_channel_id"
+private const val SILENT_CHANNEL_NAME_META = "dev.dartway.push.rustore.silent_channel_name"
 private const val ICON_META = "ru.rustore.sdk.pushclient.default_notification_icon"
 private const val COLOR_META = "ru.rustore.sdk.pushclient.default_notification_color"
 
 private const val DEFAULT_CHANNEL_ID = "dw_push"
 private const val DEFAULT_CHANNEL_NAME = "Notifications"
+private const val DEFAULT_SILENT_CHANNEL_ID = "dw_push_silent"
+private const val DEFAULT_SILENT_CHANNEL_NAME = "Quiet notifications"
 
 private const val MAX_IMAGE_BYTES = 1024 * 1024
 private const val MAX_BITMAP_SIDE = 1600
@@ -48,6 +52,11 @@ internal object DwRuStoreNotificationRenderer {
         Thread(runnable, "dw-rustore-push-image").apply { isDaemon = true }
     }
 
+    fun attach(context: Context) {
+        val appContext = context.applicationContext
+        ensureNotificationChannels(appContext, readSettings(appContext))
+    }
+
     fun show(
         context: Context,
         message: RemoteMessage,
@@ -55,7 +64,7 @@ internal object DwRuStoreNotificationRenderer {
     ) {
         val appContext = context.applicationContext
         val settings = readSettings(appContext)
-        ensureNotificationChannel(appContext, settings)
+        ensureNotificationChannels(appContext, settings)
 
         val notificationId = message.messageId?.hashCode()
             ?: System.currentTimeMillis().toInt()
@@ -119,12 +128,15 @@ internal object DwRuStoreNotificationRenderer {
         settings: NotificationSettings,
         content: DwRuStoreNotificationContent,
         contentIntent: PendingIntent,
-    ) = NotificationCompat.Builder(context, settings.channelId)
+    ) = NotificationCompat.Builder(
+        context,
+        if (content.isSilent) settings.silentChannelId else settings.channelId,
+    )
         .setSmallIcon(settings.iconResourceId)
         .setContentTitle(content.title)
         .setContentText(content.body)
         .setAutoCancel(true)
-        .setPriority(NotificationCompat.PRIORITY_HIGH)
+        .setPriority(if (content.isSilent) NotificationCompat.PRIORITY_LOW else NotificationCompat.PRIORITY_HIGH)
         .setContentIntent(contentIntent)
         .also { builder -> settings.color?.let(builder::setColor) }
 
@@ -154,24 +166,34 @@ internal object DwRuStoreNotificationRenderer {
         )
         .build()
 
-    private fun ensureNotificationChannel(context: Context, settings: NotificationSettings) {
+    private fun ensureNotificationChannels(context: Context, settings: NotificationSettings) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
-        if (notificationManager.getNotificationChannel(settings.channelId) != null) return
-
-        notificationManager.createNotificationChannel(
-            NotificationChannel(
+        if (notificationManager.getNotificationChannel(settings.channelId) == null) {
+            notificationManager.createNotificationChannel(NotificationChannel(
                 settings.channelId,
                 settings.channelName,
                 NotificationManager.IMPORTANCE_HIGH,
-            ),
-        )
+            ))
+        }
+        if (notificationManager.getNotificationChannel(settings.silentChannelId) == null) {
+            notificationManager.createNotificationChannel(NotificationChannel(
+                settings.silentChannelId,
+                settings.silentChannelName,
+                NotificationManager.IMPORTANCE_LOW,
+            ).apply {
+                setSound(null, null)
+                enableVibration(false)
+            })
+        }
     }
 
     private data class NotificationSettings(
         val channelId: String,
         val channelName: String,
+        val silentChannelId: String,
+        val silentChannelName: String,
         val iconResourceId: Int,
         val color: Int?,
     )
@@ -192,6 +214,8 @@ internal object DwRuStoreNotificationRenderer {
         return NotificationSettings(
             channelId = metaData?.getString(CHANNEL_ID_META) ?: DEFAULT_CHANNEL_ID,
             channelName = metaData?.getString(CHANNEL_NAME_META) ?: DEFAULT_CHANNEL_NAME,
+            silentChannelId = metaData?.getString(SILENT_CHANNEL_ID_META) ?: DEFAULT_SILENT_CHANNEL_ID,
+            silentChannelName = metaData?.getString(SILENT_CHANNEL_NAME_META) ?: DEFAULT_SILENT_CHANNEL_NAME,
             iconResourceId = iconResourceId,
             color = colorResourceId?.let { resourceId ->
                 runCatching { context.getColor(resourceId) }.getOrNull()

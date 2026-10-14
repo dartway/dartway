@@ -40,6 +40,7 @@ final class DwPushData {
   static const String titleKey = 'dw_title';
   static const String bodyKey = 'dw_body';
   static const String imageKey = 'dw_image';
+  static const String soundKey = 'dw_sound';
 
   bool get isEmpty => payload == null && link == null;
 

@@ -17,6 +17,11 @@ final List<DwDatabaseMigration> dwPushMigrations = List.unmodifiable([
     _initialUp,
     _initialDown,
   ),
+  const _PushSqlMigration(
+    '20261014_000000_push_message_sound',
+    _messageSoundUp,
+    _messageSoundDown,
+  ),
 ]);
 
 final class _PushSqlMigration extends DwDatabaseMigration {
@@ -123,4 +128,12 @@ const List<String> _initialDown = [
   'DROP TABLE dw_push_delivery',
   'DROP TABLE dw_push_message',
   'DROP TABLE dw_push_device',
+];
+
+const List<String> _messageSoundUp = [
+  "ALTER TABLE dw_push_message ADD COLUMN sound text NOT NULL DEFAULT 'standard' CHECK (sound IN ('standard','silent'))",
+];
+
+const List<String> _messageSoundDown = [
+  'ALTER TABLE dw_push_message DROP COLUMN sound',
 ];

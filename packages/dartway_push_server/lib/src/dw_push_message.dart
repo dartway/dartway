@@ -1,6 +1,9 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_push_shared/dartway_push_shared.dart';
 
+/// Whether a notification uses the device's standard alert or stays quiet.
+enum DwPushSound { standard, silent }
+
 /// What a notification says: the same for every recipient of one send.
 final class DwPushMessage {
   const DwPushMessage({
@@ -9,6 +12,7 @@ final class DwPushMessage {
     this.data,
     this.link,
     this.imageUrl,
+    this.sound = DwPushSound.standard,
   });
 
   /// Shown as the notification's title. Required: a notification without
@@ -32,6 +36,9 @@ final class DwPushMessage {
   /// message must not fail over it. `DwPushService.send` logs a warning
   /// naming the URL.
   final String? imageUrl;
+
+  /// The alert behaviour for this message.
+  final DwPushSound sound;
 
   /// Whether a provider can show [imageUrl].
   bool get imageIsShowable => showsImage(imageUrl);

@@ -23,12 +23,14 @@ class DwRuStoreNotificationContentTest {
                 "dw_title" to "  Title  ",
                 "dw_body" to "Body",
                 "dw_image" to "https://cdn.example.com/banner.png",
+                "dw_sound" to "silent",
             ),
         )
 
         assertEquals("Title", content?.title)
         assertEquals("Body", content?.body)
         assertEquals("https://cdn.example.com/banner.png", content?.imageUrl)
+        assertEquals(true, content?.isSilent)
     }
 
     @Test

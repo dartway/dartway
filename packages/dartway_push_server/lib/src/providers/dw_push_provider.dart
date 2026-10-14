@@ -1,4 +1,5 @@
 import 'package:dartway_push_shared/dartway_push_shared.dart';
+import '../dw_push_message.dart';
 
 /// Sends one notification to one device token of its [transport].
 ///
@@ -26,6 +27,7 @@ final class DwPushRequest {
     this.data = const {},
     this.link,
     this.ttl,
+    this.sound = DwPushSound.standard,
   });
 
   final String token;
@@ -41,6 +43,7 @@ final class DwPushRequest {
 
   /// How long the service may hold the message for an offline device.
   final Duration? ttl;
+  final DwPushSound sound;
 }
 
 /// How a provider answered one send. Every failure carries the service's own

@@ -42,6 +42,7 @@ class DwRuStorePushPlugin :
         get() = activityBinding?.activity
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        DwRuStoreNotificationRenderer.attach(binding.applicationContext)
         payloadStore = DwRuStorePushPayloadStore(binding.applicationContext)
         channel = MethodChannel(binding.binaryMessenger, CHANNEL_NAME).also {
             it.setMethodCallHandler(this)

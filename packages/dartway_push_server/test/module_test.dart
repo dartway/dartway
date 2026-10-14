@@ -168,17 +168,40 @@ void main() {
     addTearDown(database.drop);
     final opened = await DwPostgresDatabase.open(database.config);
     addTearDown(opened.close);
-    final migrations = {
+    await DwMigrationRunner(opened.db, migrations: {
+      'dw': DwAppServer.frameworkMigrations,
+      dwPushNamespace: dwPushMigrations.take(1).toList(),
+    }).apply();
+    await opened.db.execute(
+      "INSERT INTO dw_push_message (category, title, data, expires_at) "
+      "VALUES ('news', 'Before upgrade', '{}'::jsonb, now())",
+    );
+    await DwMigrationRunner(opened.db, migrations: {
       'dw': DwAppServer.frameworkMigrations,
       dwPushNamespace: dwPushMigrations,
-    };
-    await DwMigrationRunner(opened.db, migrations: migrations).apply();
+    }).apply();
     final ledger = await opened.db.query(
       "SELECT id FROM dw_migrations WHERE namespace = 'push'",
     );
     expect(
       [for (final row in ledger) row['id']],
-      ['20260915_000000_push_initial'],
+      [
+        '20260915_000000_push_initial',
+        '20261014_000000_push_message_sound',
+      ],
+    );
+    final oldRow = await opened.db.query(
+      "SELECT sound FROM dw_push_message WHERE title = 'Before upgrade'",
+    );
+    expect(oldRow.single['sound'], 'standard');
+    await DwMigrationRunner(
+      opened.db,
+      migrations: {dwPushNamespace: dwPushMigrations},
+    ).rollback(
+      id: const DwMigrationRef(
+        dwPushNamespace,
+        '20261014_000000_push_message_sound',
+      ),
     );
     await DwMigrationRunner(
       opened.db,

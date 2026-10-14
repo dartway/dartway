@@ -1,5 +1,7 @@
 ## 0.7.0-dev.0
 
+- Adds the `DwPushData.soundKey` used by native renderers for data-only silent notifications (#595).
+
 - Dependency carets follow DartWay 0.22 and its satellites on their next
   development lines; public dependency types follow those releases (#530).
 

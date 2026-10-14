@@ -5,6 +5,7 @@ package dev.dartway.push.rustore
 internal const val DW_TITLE_DATA_KEY = "dw_title"
 internal const val DW_BODY_DATA_KEY = "dw_body"
 internal const val DW_IMAGE_DATA_KEY = "dw_image"
+internal const val DW_SOUND_DATA_KEY = "dw_sound"
 
 /**
  * What to draw for a message the RuStore SDK will not draw itself.
@@ -13,6 +14,7 @@ data class DwRuStoreNotificationContent(
     val title: String,
     val body: String,
     val imageUrl: String?,
+    val isSilent: Boolean,
 )
 
 /**
@@ -41,6 +43,7 @@ fun resolveDwRuStoreNotificationContent(
         title = title,
         body = body,
         imageUrl = messageData[DW_IMAGE_DATA_KEY]?.trim()?.takeIf(String::isNotEmpty),
+        isSilent = messageData[DW_SOUND_DATA_KEY] == "silent",
     )
 }
 
