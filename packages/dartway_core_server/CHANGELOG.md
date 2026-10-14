@@ -2,6 +2,13 @@
 
 ## 0.22.0-dev.0
 
+- Auth request transactions recheck canonical idempotency before ticket writes, including
+  duplicates arriving before commit. Cleanup retains tickets through stored expiry and rate history.
+
+- Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,
+  latest-request-only across destinations, and anonymous confirmation without changing sessions.
+  Invalid/expired/used/occupied links share `dw.invalid` on `token`; success is not replayed.
+
 - **BREAKING (source):** `DwIdentifierChangeCause` adds `updated` for trusted
   edits; exhaustive identifier hooks must handle the new cause.
 

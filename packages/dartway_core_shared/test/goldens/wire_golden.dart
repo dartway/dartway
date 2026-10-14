@@ -546,6 +546,9 @@ const String wireGolden = r'''
       "kind": "email",
       "identifier": "ada@example.com"
     },
+    "dto.confirmIdentifierLink": {
+      "token": "opaque-link-token"
+    },
     "dto.confirmIdentifier": {
       "ticketId": "t-2",
       "code": "654321",

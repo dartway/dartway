@@ -95,9 +95,12 @@ for any caller — the rule and why: `dartway-realtime` §1–2.
   client; `revokeKeys(accountId)` signs out everywhere; `listKeys` for a sessions screen. A key's
   `lastUsedAt` is `null` until its first use (`isUsed`) — never compare it with `createdAt` to ask
   "used yet".
-- A second phone or e-mail is `DwRequestIdentifierCode` then `DwConfirmIdentifier`; a taken identifier
-  is refused only after the right code (`DwAuthRefusal.identifierTaken`). **Never check "taken"
-  earlier** — that is an account-existence oracle.
+- A second phone or e-mail starts with `DwRequestIdentifierCode`; project-selected code delivery
+  confirms through `DwConfirmIdentifier` and refuses a taken identifier only after the right code
+  (`DwAuthRefusal.identifierTaken`). A configured `DwIdentifierLinkPolicy` confirms anonymously
+  through `DwConfirmIdentifierLink`, updating the ticket's account without changing the browser's
+  session. Invalid, expired, used, superseded and occupied links all refuse `DwCoreRefusal.invalid`
+  on `token`. **Never check "taken" earlier** — that is an account-existence oracle.
 - All of it through `DwAccountService` (`dartway-server` §8), which holds the locks sign-in takes and
   closes live sessions.
 

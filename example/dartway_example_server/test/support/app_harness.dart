@@ -33,6 +33,7 @@ final class AppHarness {
     DwFileStorageConfig? storage,
     DwPushModule? push,
     DateTime? now,
+    Map<DwIdentifierKind, DwIdentifierLinkPolicy> attachDelivery = const {},
   }) async {
     final database = await DwTestDatabase.create(prefix: 'dw_example_test');
     final clock = DwTestClock(now ?? DateTime.now());
@@ -48,6 +49,7 @@ final class AppHarness {
         clock: clock,
         auth: DwAuthConfig(
           accountDeletion: DwAccountDeletion.byMember,
+          attachDelivery: attachDelivery,
           normalize: AccountAuth.config.normalize,
           onAccountCreated: AccountAuth.config.onAccountCreated,
           onIdentifierChanged: AccountAuth.config.onIdentifierChanged,

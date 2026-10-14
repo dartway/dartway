@@ -645,6 +645,10 @@ List<_WireShape> _wireShapes() {
       ),
     ),
     dto(
+      'dto.confirmIdentifierLink',
+      const DwConfirmIdentifierLink(token: 'opaque-link-token'),
+    ),
+    dto(
       'dto.confirmIdentifier',
       const DwConfirmIdentifier(ticketId: 't-2', code: '654321', replace: true),
     ),

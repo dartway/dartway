@@ -356,6 +356,37 @@ final class DwRuntimeContext extends DwCallContext {
   }) =>
       _idempotencyTarget = (key: key, accountId: accountId, typeName: typeName);
 
+  /// Internal request-specific claim, inside the handler's own transaction.
+  /// Lock before account/identifier guards, matching transactional endpoints.
+  /// Recheck the canonical actor/key/type outcome after a preflight miss so
+  /// a duplicate waiting for the first commit never repeats ticket writes.
+  /// Delivery still happens after this transaction releases all locks.
+  Future<DwStoredOutcome?> claimProvisionalOutcome() async {
+    final target = _idempotencyTarget;
+    if (target == null || _madeSecret) return null;
+    if (!db.inTransaction) {
+      throw StateError('claimProvisionalOutcome needs a transaction');
+    }
+    await db.advisoryLock(
+      DwLockSpace.idempotencyKey,
+      dwLockKey('${target.accountId}/${target.key}'),
+    );
+    final stored = await dwStoredOutcome(db, target.key, target.accountId);
+    if (stored == null) return null;
+    if (stored.type != target.typeName) {
+      refuse(DwCoreRefusal.conflict, params: {'idempotencyKey': 'reused'});
+    }
+    if (stored.status != 'ok') {
+      throw DwRefusalException(DwCallRefusal.fromJson(stored.result));
+    }
+    return stored;
+  }
+
+  /// A late canonical replay, not a provisional write owned by this call.
+  bool get replayedProvisionalOutcome => _replayedProvisionalOutcome;
+  void markProvisionalOutcomeReplayed() => _replayedProvisionalOutcome = true;
+  bool _replayedProvisionalOutcome = false;
+
   /// Whether [recordProvisionalOutcome] wrote a row during this call —
   /// `DwCallEndpoint` reads this once the handler returns or throws, to
   /// decide whether a refusal or an exception must correct an

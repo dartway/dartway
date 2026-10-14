@@ -433,15 +433,8 @@ final class DwIdentityInfo extends DwDataObject {
       other.verifiedAt == verifiedAt;
 
   @override
-  int get hashCode => Object.hash(
-    id,
-    accountId,
-    kind,
-    provider,
-    value,
-    createdAt,
-    verifiedAt,
-  );
+  int get hashCode =>
+      Object.hash(id, accountId, kind, provider, value, createdAt, verifiedAt);
 
   /// Without the value for a provider identity: unlike a phone or an e-mail,
   /// which this already showed, a subject id is only ever meant for the
@@ -454,11 +447,13 @@ final class DwIdentityInfo extends DwDataObject {
 
 /// Asks the server to send a one-time code to an identifier the signed-in
 /// caller wants to attach to their account, or to change theirs to — without
-/// signing in again. Confirmed with [DwConfirmIdentifier].
+/// signing in again. Project config chooses code (the default, confirmed with
+/// [DwConfirmIdentifier]) or link (confirmed with [DwConfirmIdentifierLink]).
+/// The returned ticket is metadata only; a link ticket cannot confirm by code.
 ///
 /// Everything sign-in does applies: the same normalization, the same limits
-/// per identifier (the two commands share them), the same delivery and fixed
-/// code. As with [DwRequestCode], the answer does not reveal whether the
+/// per identifier (the two commands share them). Code delivery uses the same
+/// delivery and fixed-code configuration. As with [DwRequestCode], the answer does not reveal whether the
 /// identifier belongs to an account; only a confirmed code learns that.
 final class DwRequestIdentifierCode extends DwActionCommand<DwCodeTicket> {
   const DwRequestIdentifierCode({required this.kind, required this.identifier});
@@ -542,6 +537,27 @@ final class DwConfirmIdentifier extends DwActionCommand<DwIdentityInfo> {
   int get hashCode => Object.hash(ticketId, code, replace);
 }
 
+/// Confirms a bearer link for the account bound when it was requested.
+/// Ignores the caller's session and never signs them in. Unknown, expired,
+/// used, superseded and occupied links all refuse `dw.invalid` on `token`.
+final class DwConfirmIdentifierLink extends DwActionCommand<void> {
+  const DwConfirmIdentifierLink({required this.token});
+  final String token;
+  @override
+  String get dwTypeName => 'DwConfirmIdentifierLink';
+  @override
+  Map<String, Object?> toJson() => {'token': token};
+  static DwConfirmIdentifierLink fromJson(Map<String, Object?> json) =>
+      DwConfirmIdentifierLink(token: json['token']! as String);
+  @override
+  bool operator ==(Object other) =>
+      other is DwConfirmIdentifierLink && other.token == token;
+  @override
+  int get hashCode => Object.hash(DwConfirmIdentifierLink, token);
+  @override
+  String toString() => 'DwConfirmIdentifierLink([redacted])';
+}
+
 /// The framework's refusals of identifier changes, beside `DwCoreRefusal`
 /// (a separate enum, so a project switching exhaustively over the core codes
 /// keeps compiling); the codes share the `dw.` namespace.
@@ -571,6 +587,10 @@ const List<DwProtocolEntry> dwAuthProtocolEntries = [
   DwProtocolEntry<DwRequestIdentifierCode>(
     'DwRequestIdentifierCode',
     DwRequestIdentifierCode.fromJson,
+  ),
+  DwProtocolEntry<DwConfirmIdentifierLink>(
+    'DwConfirmIdentifierLink',
+    DwConfirmIdentifierLink.fromJson,
   ),
   DwProtocolEntry<DwConfirmIdentifier>(
     'DwConfirmIdentifier',
