@@ -363,4 +363,103 @@ void main() {
       harness().app.gatedAccountDeletion.remove(account.id);
     },
   );
+  test(
+    'hourly cleanup retains an unexpired 24-hour link and its confirmation succeeds',
+    () async {
+      final actualNow = DateTime.now().toUtc();
+      clock.value = actualNow.subtract(const Duration(hours: 2));
+      await request('cleanup@example.com');
+      clock.value = actualNow;
+      await harness().db.execute(
+        "UPDATE dw_recurring_job SET next_run_at = @now WHERE name = 'dw.cleanup'",
+        params: {'now': clock.value},
+      );
+      harness().server.wakeJobs();
+      await eventually(
+        () async =>
+            (await harness().db.query(
+              "SELECT last_run_at FROM dw_recurring_job WHERE name = 'dw.cleanup'",
+            )).single['last_run_at'] !=
+            null,
+      );
+      expect((await confirm('cleanup@example.com')).status, 200);
+    },
+  );
+  for (final resend in [Duration.zero, const Duration(seconds: 60)]) {
+    test(
+      'precommit duplicate request delivers once and returns canonical ticket with resend $resend',
+      () async {
+        final deliveredLinks = <Uri>[];
+        final app = TestApp();
+        final h = await Harness.start(
+          app: app,
+          build: (app, config) => app.server(
+            config,
+            auth: app.auth(
+              resendDelay: resend,
+              attachDelivery: {
+                DwIdentifierKind.email: DwIdentifierLinkPolicy(
+                  urlTemplate: 'https://example.com/#/confirm?token={token}',
+                  replace: true,
+                  deliverLink: (ctx, kind, identifier, link) async =>
+                      deliveredLinks.add(link),
+                ),
+              },
+            ),
+          ),
+        );
+        addTearDown(h.stop);
+        final caller = h.caller();
+        final session = await app.signIn(caller, 'duplicate-owner@example.com');
+        caller.token = session.token;
+        final entered = Completer<void>();
+        final release = Completer<void>();
+        final guard = h.server.server.accounts.updateIdentifiers(
+          session.id,
+          beforeChange: (_) async {
+            entered.complete();
+            await release.future;
+          },
+        );
+        await entered.future;
+        const command = DwRequestIdentifierCode(
+          kind: DwIdentifierKind.email,
+          identifier: 'duplicate-new@example.com',
+        );
+        final first = caller.call(command, key: 'precommit-same-key');
+        final second = h
+            .caller(token: session.token)
+            .call(command, key: 'precommit-same-key');
+        try {
+          await eventually(
+            () async =>
+                (await h.db.query(
+                  "SELECT count(*) AS n FROM pg_locks WHERE locktype = 'advisory' AND NOT granted AND database = (SELECT oid FROM pg_database WHERE datname = current_database())",
+                )).single.get<int>('n') >=
+                2,
+          );
+        } finally {
+          release.complete();
+        }
+        await guard;
+        final answers = await Future.wait([first, second]);
+        expect(answers.map((a) => a.status), everyElement(200));
+        expect(answers.first.value(command), answers.last.value(command));
+        expect(deliveredLinks, hasLength(1));
+        final rows = await h.db.query(
+          "SELECT id, consumed_at FROM dw_code_ticket WHERE account_id = @id AND delivery = 'link'",
+          params: {'id': session.id},
+        );
+        expect(rows, hasLength(1));
+        expect(rows.single['consumed_at'], isNull);
+        final token = Uri.parse(
+          deliveredLinks.single.fragment,
+        ).queryParameters['token']!;
+        expect(
+          (await h.caller().call(DwConfirmIdentifierLink(token: token))).status,
+          200,
+        );
+      },
+    );
+  }
 }
