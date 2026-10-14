@@ -206,7 +206,7 @@ void main() {
         '  dartway_lints:\n    git:\n'
             '      url: ${repository.path}\n'
             '      path: packages/dartway_lints\n'
-            '      ref: $old',
+            "      ref: '$old'",
       ),
     );
     succeeds(await update([]));
@@ -250,6 +250,58 @@ void main() {
 
     expect(pubspec.readAsStringSync(), contains("ref: '$target' # pin"));
     expect(options.readAsStringSync(), contains('ref: "$target"'));
+  });
+
+  test('target moves framework git refs in the workspace root', () async {
+    final rootPubspec = file('pubspec.yaml');
+    rootPubspec.writeAsStringSync('''
+name: shop_workspace
+dependency_overrides:
+  dartway_core_shared:
+    git:
+      url: ${repository.path}
+      path: packages/dartway_core_shared
+      ref: stable
+''');
+
+    succeeds(await update([]));
+
+    expect(rootPubspec.readAsStringSync(), contains('ref: $target'));
+  });
+
+  test('unsupported framework flow-map refs fail without edits', () async {
+    final rootPubspec = file('pubspec.yaml');
+    rootPubspec.writeAsStringSync('''
+name: shop_workspace
+dependency_overrides:
+  dartway_core_shared:
+    git: {url: ${repository.path}, path: packages/dartway_core_shared, ref: stable}
+''');
+    final before = files();
+
+    final result = await update([]);
+
+    expect(result.exitCode, 1, reason: output(result));
+    expect(output(result), contains(rootPubspec.path));
+    expect(output(result), contains('unsupported ref form'));
+    expect(files(), before);
+  });
+
+  test('unsupported plugin flow-map refs fail without edits', () async {
+    final options = file('shop_flutter/analysis_options.yaml');
+    options.writeAsStringSync('''
+plugins:
+  dartway_lints:
+    git: {url: ${repository.path}, path: packages/dartway_lints, ref: stable}
+''');
+    final before = files();
+
+    final result = await update([]);
+
+    expect(result.exitCode, 1, reason: output(result));
+    expect(output(result), contains(options.path));
+    expect(output(result), contains('unsupported ref form'));
+    expect(files(), before);
   });
 
   test(
@@ -582,7 +634,7 @@ void main() {
     );
   }, timeout: const Timeout(Duration(minutes: 5)));
 
-  test('native YAML git ref coercion is refused without edits', () async {
+  test('native YAML git ref coercion is replaced by the exact target', () async {
     final plugin = await rootPluginRepository();
     // This branch exists and JSON pub preflight resolves it. The native
     // analyzer emits ref: true into YAML, which pub rejects as a boolean.
@@ -595,39 +647,24 @@ void main() {
     expect(output(native), contains("The 'ref' field"));
     expect(output(native), contains('must be a string'));
     final before = files();
-    for (final flags in [
-      <String>['--plan'],
-      <String>[],
-    ]) {
-      final result = await update(flags);
-      expect(result.exitCode, 1, reason: output(result));
-      expect(
-        output(result),
-        contains('Analyzer plugin source is not resolvable'),
-      );
-      expect(output(result), contains("The 'ref' field"));
-      expect(output(result), isNot(contains('Analyzer plugin: resolvable')));
-      expect(files(), before);
-    }
+    succeeds(await update(['--plan']));
+    expect(files(), before);
+    succeeds(await update([]));
+    expect(
+      file('shop_flutter/analysis_options.yaml').readAsStringSync(),
+      contains('ref: "$target"'),
+    );
   }, timeout: const Timeout(Duration(minutes: 5)));
 
-  test('missing path and git ref explicitly fail without edits', () async {
-    for (final source in [
-      '    path: ../missing-plugin\n',
-      '    git:\n      url: ${repository.path}\n      ref: missing-update-ref\n      path: packages/dartway_lints\n',
-    ]) {
-      file(
-        'shop_flutter/analysis_options.yaml',
-      ).writeAsStringSync('plugins:\n  dartway_lints:\n$source');
-      final before = files();
-      final result = await update([]);
-      expect(result.exitCode, 1, reason: output(result));
-      expect(
-        output(result),
-        contains('Analyzer plugin source is not resolvable'),
-      );
-      expect(files(), before);
-    }
+  test('missing path explicitly fails without edits', () async {
+    file('shop_flutter/analysis_options.yaml').writeAsStringSync(
+      'plugins:\n  dartway_lints:\n    path: ../missing-plugin\n',
+    );
+    final before = files();
+    final result = await update([]);
+    expect(result.exitCode, 1, reason: output(result));
+    expect(output(result), contains('Analyzer plugin source is not resolvable'));
+    expect(files(), before);
   });
 
   test('a published hosted source resolves before its pin is raised', () async {

@@ -34,11 +34,26 @@ class DwLintsPlan {
             _pluginDependency(plugins['dartway_lints'], options);
           }
         }
+        final editableRef = RegExp(
+          r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?$)',
+          multiLine: true,
+        );
+        final plugin = originalDocument is YamlMap
+            ? originalDocument['plugins']
+            : null;
+        final lintSource = plugin is YamlMap ? plugin['dartway_lints'] : null;
+        if (lintSource is YamlMap &&
+            lintSource['git'] is YamlMap &&
+            (lintSource['git'] as YamlMap).containsKey('ref') &&
+            !editableRef.hasMatch(before)) {
+          throw StateError(
+            'Cannot move dartway_lints git ref in ${options.path}: the plugin '
+            'uses an unsupported ref form. Use a block map with a separate '
+            '`ref:` line. Project configuration left untouched.',
+          );
+        }
         final after = before.replaceFirstMapped(
-          RegExp(
-            r'(^  dartway_lints:\s*\n    git:\s*\n(?:      [^\n]+\n)*?      ref:\s*)(["\x27]?)([^#\r\n]*?)(["\x27]?)(\s*(?:#.*)?$)',
-            multiLine: true,
-          ),
+          editableRef,
           (match) {
             final openingQuote = match[2]!;
             final closingQuote = match[4]!;

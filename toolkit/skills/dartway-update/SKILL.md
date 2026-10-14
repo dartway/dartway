@@ -32,7 +32,8 @@ caret is the last step, not the task; the update is its own branch and PR, never
    supplies a path for a missing plugin. Do not write an unresolvable hosted pin to get past this step.
 5. **Install the target:** `dartway update --target <sha>` with the same source and installer options.
    It rechecks resolution, installs the selected Codex/Claude integrations, preserves owner rules
-   and recorded installer choices, and applies only the planned plugin edit. It completes **no notes**.
+   and recorded installer choices, moves every framework Git override and the plugin Git ref to the
+   exact target, and applies only the planned plugin edit. It completes **no notes**.
 6. **Read and make each note's edits**, in order and in the project's conventions. Search for what
    changed before deciding applicability. An absent `.dartway/migrations.json` means **unknown
    baseline**, even if locks already resolve the target or the toolkit was installed today. Review

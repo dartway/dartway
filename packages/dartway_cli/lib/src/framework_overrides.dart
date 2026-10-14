@@ -15,6 +15,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'vendor_framework.dart';
 
@@ -155,11 +156,35 @@ List<String> withFrameworkGitOverrides(
 
 /// Moves `ref:` fields in framework git overrides, whatever they currently
 /// name (a branch, a tag, or a quoted or unquoted commit).
-String moveFrameworkGitOverrideRefs(String source, String commit) {
+String moveFrameworkGitOverrideRefs(
+  String source,
+  String commit, {
+  String? filePath,
+}) {
+  final document = loadYaml(source);
+  final overrides = document is YamlMap
+      ? document['dependency_overrides']
+      : null;
+  var expectedRefs = 0;
+  if (overrides is YamlMap) {
+    for (final entry in overrides.entries) {
+      if (entry.key is! String ||
+          !(entry.key as String).startsWith('dartway_')) {
+        continue;
+      }
+      final dependency = entry.value;
+      if (dependency is YamlMap &&
+          dependency['git'] is YamlMap &&
+          (dependency['git'] as YamlMap).containsKey('ref')) {
+        expectedRefs++;
+      }
+    }
+  }
   final lines = source.split('\n');
   final start = lines.indexWhere((line) => line == 'dependency_overrides:');
   if (start < 0) return source;
   var inFrameworkEntry = false;
+  var movedRefs = 0;
   for (var index = start + 1; index < lines.length; index++) {
     final line = lines[index];
     if (line.isNotEmpty && !line.startsWith(' ')) break;
@@ -183,8 +208,17 @@ String moveFrameworkGitOverrideRefs(String source, String commit) {
         lines[index] =
             '${ref.group(1)}${matchingQuotes ? openingQuote : ''}$commit'
             '${matchingQuotes ? closingQuote : ''}${ref.group(5)}';
+        movedRefs++;
       }
     }
+  }
+  if (movedRefs != expectedRefs) {
+    throw StateError(
+      'Cannot move framework git ref in ${filePath ?? 'pubspec.yaml'}: '
+      'a dartway_* override uses an unsupported ref form. Use a block map '
+      'with two-space dependency indentation and a separate `ref:` line. '
+      'Project files were not changed.',
+    );
   }
   return lines.join('\n');
 }

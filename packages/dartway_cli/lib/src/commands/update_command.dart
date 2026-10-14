@@ -233,16 +233,21 @@ class UpdateCommand extends Command<int> {
       final options = File(
         p.join(layout.flutterPackageDir.path, 'analysis_options.yaml'),
       );
-      final pubspecs = projectRoot
-          .listSync()
-          .whereType<Directory>()
-          .map((directory) => File(p.join(directory.path, 'pubspec.yaml')))
-          .where((file) => file.existsSync())
-          .toList();
+      final pubspecs = <File>[
+        File(p.join(projectRoot.path, 'pubspec.yaml')),
+        ...projectRoot
+            .listSync()
+            .whereType<Directory>()
+            .map((directory) => File(p.join(directory.path, 'pubspec.yaml'))),
+      ].where((file) => file.existsSync()).toList();
       final movedPubspecs = <File, String>{};
       for (final pubspec in pubspecs) {
         final before = pubspec.readAsStringSync();
-        final after = moveFrameworkGitOverrideRefs(before, target.commit);
+        final after = moveFrameworkGitOverrideRefs(
+          before,
+          target.commit,
+          filePath: pubspec.path,
+        );
         if (after != before) movedPubspecs[pubspec] = after;
       }
       final lintPlan = await DwLintsPlan.preflight(

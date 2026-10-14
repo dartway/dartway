@@ -238,9 +238,10 @@ and leaves project files untouched. Choose a resolvable hosted target or project
 configuration. `--framework-path` supplies a local plugin path when adding a missing plugin; it
 preserves an existing source choice. Pub cache activity occurs outside the project.
 
-After successful preflight, `update --target` installs the selected toolkit integrations and applies
-the planned lint configuration edit. It edits no application code, bumps no dependencies and completes
-no migration notes. The `dartway-update` skill guides the project edits, regeneration and verification.
+After successful preflight, `update --target` installs the selected toolkit integrations, moves every
+framework Git override and the lint plugin Git ref to the exact target, and applies the planned lint
+configuration edit. It edits no application code, bumps no hosted dependency and completes no migration
+notes. The `dartway-update` skill guides the project edits, regeneration and verification.
 
 Record each note only after checking its edits or applicability:
 
