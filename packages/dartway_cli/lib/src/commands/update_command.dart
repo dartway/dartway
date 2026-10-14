@@ -241,12 +241,17 @@ class UpdateCommand extends Command<int> {
             .map((directory) => File(p.join(directory.path, 'pubspec.yaml'))),
       ].where((file) => file.existsSync()).toList();
       final movedPubspecs = <File, String>{};
+      final frameworkGitUrls = {
+        source.repoUrl,
+        if (source.localDir case final localDir?) localDir,
+      };
       for (final pubspec in pubspecs) {
         final before = pubspec.readAsStringSync();
         final after = moveFrameworkGitOverrideRefs(
           before,
           target.commit,
           filePath: pubspec.path,
+          frameworkGitUrls: frameworkGitUrls,
         );
         if (after != before) movedPubspecs[pubspec] = after;
       }
@@ -255,13 +260,7 @@ class UpdateCommand extends Command<int> {
         version,
         path: pluginPath,
         gitRef: frameworkPath == null ? target.commit : null,
-        frameworkGitUrls:
-            frameworkPath == null
-                ? {
-                    source.repoUrl,
-                    if (source.localDir case final localDir?) localDir,
-                  }
-                : const {},
+        frameworkGitUrls: frameworkPath == null ? frameworkGitUrls : const {},
       );
       stdout.writeln(
         'Analyzer plugin: resolvable; ${lintPlan.change ?? 'existing source retained'}.',

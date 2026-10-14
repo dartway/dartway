@@ -160,6 +160,7 @@ String moveFrameworkGitOverrideRefs(
   String source,
   String commit, {
   String? filePath,
+  required Iterable<String> frameworkGitUrls,
 }) {
   final lines = source.split('\n');
   final document = loadYaml(source);
@@ -170,13 +171,19 @@ String moveFrameworkGitOverrideRefs(
             .firstOrNull
       : null;
   if (overrides is! YamlMap) {
-    _validateFrameworkGitRefs(source, commit, filePath: filePath);
+    _validateFrameworkGitRefs(
+      source,
+      commit,
+      frameworkGitUrls: frameworkGitUrls,
+      filePath: filePath,
+    );
     return source;
   }
   final frameworkEntryLines = <int>{};
   for (final entry in overrides.nodes.entries) {
     if (entry.key.value case final String package
-        when package.startsWith('dartway_')) {
+        when package.startsWith('dartway_') &&
+            usesGitRepository(entry.value.value, frameworkGitUrls)) {
       for (
         var line = entry.value.span.start.line;
         line <= entry.value.span.end.line;
@@ -204,7 +211,12 @@ String moveFrameworkGitOverrideRefs(
     }
   }
   final edited = lines.join('\n');
-  _validateFrameworkGitRefs(edited, commit, filePath: filePath);
+  _validateFrameworkGitRefs(
+    edited,
+    commit,
+    frameworkGitUrls: frameworkGitUrls,
+    filePath: filePath,
+  );
   return edited;
 }
 
@@ -212,6 +224,7 @@ void _validateFrameworkGitRefs(
   String source,
   String commit, {
   String? filePath,
+  required Iterable<String> frameworkGitUrls,
 }) {
   final document = loadYaml(source);
   final overrides = document is YamlMap
@@ -223,6 +236,7 @@ void _validateFrameworkGitRefs(
     if (package is! String || !package.startsWith('dartway_')) continue;
     final dependency = entry.value;
     if (dependency is! YamlMap || dependency['git'] is! YamlMap) continue;
+    if (!usesGitRepository(dependency, frameworkGitUrls)) continue;
     final ref = (dependency['git'] as YamlMap)['ref'];
     if (ref is String && ref == commit) continue;
     throw StateError(
@@ -232,4 +246,34 @@ void _validateFrameworkGitRefs(
       'separate `ref:` line. Project files were not changed.',
     );
   }
+}
+
+/// Whether [dependency] is a git dependency on one of [repositoryUrls].
+bool usesGitRepository(Object? dependency, Iterable<String> repositoryUrls) {
+  if (dependency is! Map) return false;
+  final git = dependency['git'];
+  if (git is! Map || git['url'] is! String) return false;
+  final actualUrl = git['url'] as String;
+  return repositoryUrls.any(
+    (expectedUrl) => sameGitRepository(actualUrl, expectedUrl),
+  );
+}
+
+/// Compares local paths and the common URL spellings of a git repository.
+bool sameGitRepository(String left, String right) {
+  if (p.isAbsolute(left) && p.isAbsolute(right)) {
+    return p.equals(p.normalize(left), p.normalize(right));
+  }
+  return _canonicalGitUrl(left) == _canonicalGitUrl(right);
+}
+
+String _canonicalGitUrl(String value) {
+  var url = value.trim();
+  final scp = RegExp(r'^git@([^:]+):(.+)$').firstMatch(url);
+  if (scp != null) url = 'https://${scp[1]}/${scp[2]}';
+  final parsed = Uri.tryParse(url);
+  if (parsed == null || parsed.host.isEmpty) return url;
+  var path = parsed.path.replaceFirst(RegExp(r'/+$'), '');
+  if (path.endsWith('.git')) path = path.substring(0, path.length - 4);
+  return '${parsed.host.toLowerCase()}${path.toLowerCase()}';
 }

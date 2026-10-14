@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 
+import 'framework_overrides.dart';
 import 'lints_plugin.dart';
 
 /// Stages the exact YAML edit and asks pub to resolve its plugin dependency in
@@ -37,7 +38,7 @@ class DwLintsPlan {
               plugins['dartway_lints'],
               options,
             );
-            movesFrameworkGitSource = _usesGitUrl(
+            movesFrameworkGitSource = usesGitRepository(
               dependency,
               frameworkGitUrls,
             );
@@ -122,35 +123,6 @@ class DwLintsPlan {
   void apply(File options) {
     if (change != null) options.writeAsStringSync(contents);
   }
-}
-
-bool _usesGitUrl(Object dependency, Iterable<String> expectedUrls) {
-  if (dependency is! Map) return false;
-  final git = dependency['git'];
-  if (git is! Map || git['url'] is! String) return false;
-  final actualUrl = git['url'] as String;
-  for (final expectedUrl in expectedUrls) {
-    if (_sameRepository(actualUrl, expectedUrl)) return true;
-  }
-  return false;
-}
-
-bool _sameRepository(String left, String right) {
-  if (p.isAbsolute(left) && p.isAbsolute(right)) {
-    return p.equals(p.normalize(left), p.normalize(right));
-  }
-  return _canonicalGitUrl(left) == _canonicalGitUrl(right);
-}
-
-String _canonicalGitUrl(String value) {
-  var url = value.trim();
-  final scp = RegExp(r'^git@([^:]+):(.+)$').firstMatch(url);
-  if (scp != null) url = 'https://${scp[1]}/${scp[2]}';
-  final parsed = Uri.tryParse(url);
-  if (parsed == null || parsed.host.isEmpty) return url;
-  var path = parsed.path.replaceFirst(RegExp(r'/+$'), '');
-  if (path.endsWith('.git')) path = path.substring(0, path.length - 4);
-  return '${parsed.host.toLowerCase()}${path.toLowerCase()}';
 }
 
 /// Native plugin options are not pub dependency options: diagnostics stay in

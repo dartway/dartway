@@ -373,6 +373,48 @@ plugins:
     },
   );
 
+  test(
+    'target leaves a dartway override from another repository byte-identical',
+    () async {
+      final other = Directory(p.join(sandbox.path, 'other-framework.git'));
+      succeeds(
+        await Process.run('git', [
+          'clone',
+          '--bare',
+          repository.path,
+          other.path,
+        ]),
+      );
+      final pubspec = file('shop_shared/pubspec.yaml');
+      final clean = withoutDependencyOverrides(
+        pubspec.readAsStringSync().split('\n'),
+      );
+      final framework = withFrameworkGitOverrides(
+        clean,
+        ['dartway_core_shared'],
+        url: repository.path,
+        commit: 'stable',
+      ).join('\n');
+      final otherRef = (Process.runSync(
+        'git',
+        ['rev-parse', 'HEAD~1'],
+        workingDirectory: repository.path,
+      ).stdout as String).trim();
+      final otherOverride =
+          '  dartway_router:\n'
+          '    git:\n'
+          '      url: ${other.path}\n'
+          '      path: packages/dartway_router\n'
+          '      ref: $otherRef # belongs to another repository\n';
+      pubspec.writeAsStringSync('$framework\n$otherOverride');
+
+      succeeds(await update([]));
+
+      expect(pubspec.readAsStringSync(), contains('ref: $target'));
+      expect(pubspec.readAsStringSync(), endsWith(otherOverride));
+    },
+  );
+
   test('partial dispositions survive repeated plans and installs', () async {
     succeeds(
       await update([
@@ -704,6 +746,17 @@ plugins:
         '      ref: stable\n'
         '      path: packages/dartway_lints\n',
       );
+      final sharedPubspec = file('shop_shared/pubspec.yaml');
+      sharedPubspec.writeAsStringSync(
+        withFrameworkGitOverrides(
+          withoutDependencyOverrides(
+            sharedPubspec.readAsStringSync().split('\n'),
+          ),
+          ['dartway_core_shared'],
+          url: 'https://github.com/dartway/dartway.git',
+          commit: 'stable',
+        ).join('\n'),
+      );
 
       final result = await invoke(
         ['update', '--target', target],
@@ -716,6 +769,7 @@ plugins:
         file('shop_flutter/analysis_options.yaml').readAsStringSync(),
         contains('ref: $target'),
       );
+      expect(sharedPubspec.readAsStringSync(), contains('ref: $target'));
     },
     timeout: const Timeout(Duration(minutes: 5)),
   );
