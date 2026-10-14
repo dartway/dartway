@@ -212,6 +212,37 @@ void main() {
     expect(options.readAsStringSync(), again);
   });
 
+  test('the generated git lints plugin is resolved from the copy', () {
+    final options =
+        File(p.join(project.path, 'shop_server', 'analysis_options.yaml'))
+          ..writeAsStringSync('''
+plugins:
+  dartway_lints:
+    git:
+      url: 'https://github.com/dartway/dartway'
+      path: packages/dartway_lints
+      ref: '0123456789012345678901234567890123456789'
+
+linter:
+  rules:
+    - prefer_single_quotes
+''');
+
+    vendorFramework(project: project, monorepo: monorepo);
+
+    expect(
+      options.readAsStringSync(),
+      contains(
+        'plugins:\n'
+        '  dartway_lints:\n'
+        '    path: ../$vendorDirName/dartway_lints\n'
+        '\n'
+        'linter:',
+      ),
+    );
+    expect(options.readAsStringSync(), isNot(contains('git:')));
+  });
+
   test('the build context admits the copies', () {
     vendorFramework(project: project, monorepo: monorepo);
 

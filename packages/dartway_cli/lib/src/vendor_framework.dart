@@ -225,12 +225,15 @@ List<String> _pointLintsPluginAtCopy(
   return pointed;
 }
 
-/// [options] with a `dartway_lints: <version>` plugin entry replaced by one
-/// naming [path]. A file with no such entry comes back as it was — the entry
-/// under `plugins:` is the only two-space `dartway_lints:` key an
+/// [options] with a generated `dartway_lints` plugin source replaced by one
+/// naming [path]. A file with no recognised entry comes back as it was — the
+/// entry under `plugins:` is the only two-space `dartway_lints:` key an
 /// `analysis_options.yaml` of a project has.
 String withLintsPluginPath(String options, String path) => options.replaceFirst(
-  RegExp(r'^  dartway_lints:[ \t]*[^\s#][^\n]*$', multiLine: true),
+  RegExp(
+    r'''^  dartway_lints:(?:[ \t]*[^\s#][^\n]*|\n    git:\n      url: ['"]?[^\n'"]+['"]?\n      path: ['"]?packages/dartway_lints['"]?\n      ref: ['"]?[^\s'"]+['"]?)$''',
+    multiLine: true,
+  ),
   '  dartway_lints:\n    path: $path',
 );
 
