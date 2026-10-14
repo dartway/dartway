@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:dartway_push_shared/dartway_push_shared.dart';
 
+import '../dw_push_message.dart';
 import 'dw_push_http.dart';
 import 'dw_push_provider.dart';
 
@@ -21,6 +22,7 @@ final class DwRuStoreProvider implements DwPushProvider {
     required this.projectId,
     required String serviceToken,
     this.androidChannelId,
+    this.androidSilentChannelId = 'dw_push_silent',
     this.androidIcon,
     this.androidColor,
     Uri? endpoint,
@@ -41,6 +43,7 @@ final class DwRuStoreProvider implements DwPushProvider {
   final String projectId;
   final String _serviceToken;
   final String? androidChannelId;
+  final String androidSilentChannelId;
   final String? androidIcon;
 
   /// `#rrggbb`.
@@ -74,17 +77,22 @@ final class DwRuStoreProvider implements DwPushProvider {
             DwPushData.titleKey: request.title,
             DwPushData.bodyKey: ?request.body,
             DwPushData.imageKey: image,
+            if (request.sound == DwPushSound.silent)
+              DwPushData.soundKey: request.sound.name,
           },
         if (image == null)
           'notification': {'title': request.title, 'body': ?request.body},
         'android': {
           if (request.ttl case final ttl?) 'ttl': '${ttl.inSeconds}s',
           if (image == null &&
-              (androidChannelId != null ||
+              (request.sound == DwPushSound.silent || androidChannelId != null ||
                   androidIcon != null ||
                   androidColor != null))
             'notification': {
-              'channel_id': ?androidChannelId,
+              if (request.sound == DwPushSound.silent)
+                'channel_id': androidSilentChannelId
+              else
+                'channel_id': ?androidChannelId,
               'icon': ?androidIcon,
               'color': ?androidColor,
             },

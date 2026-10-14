@@ -178,7 +178,24 @@ void main() {
     );
     expect(
       [for (final row in ledger) row['id']],
-      ['20260915_000000_push_initial'],
+      [
+        '20260915_000000_push_initial',
+        '20261014_000000_push_message_sound',
+      ],
+    );
+    final oldRow = await opened.db.query(
+      "INSERT INTO dw_push_message (category, title, data, expires_at) "
+      "VALUES ('news', 'Before upgrade', '{}'::jsonb, now()) RETURNING sound",
+    );
+    expect(oldRow.single['sound'], 'standard');
+    await DwMigrationRunner(
+      opened.db,
+      migrations: {dwPushNamespace: dwPushMigrations},
+    ).rollback(
+      id: const DwMigrationRef(
+        dwPushNamespace,
+        '20261014_000000_push_message_sound',
+      ),
     );
     await DwMigrationRunner(
       opened.db,

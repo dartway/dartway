@@ -102,7 +102,7 @@ final class DwPushWorker {
     final now = ctx.now;
     final rows = await tx.query(
       'SELECT d.id, d.account_id, d.message_id, d.attempts, d.done_devices, '
-      'd.sent, m.category, m.title, m.body, m.image_url, m.data, '
+      'd.sent, m.category, m.title, m.body, m.image_url, m.data, m.sound, '
       'm.expires_at, m.created_at AS message_created_at '
       'FROM dw_push_delivery d JOIN dw_push_message m ON m.id = d.message_id '
       'WHERE d.finished_at IS NULL AND d.run_at <= @now::timestamptz '
@@ -327,6 +327,7 @@ final class DwPushWorker {
               data: message.data,
               link: message.data[DwPushData.linkKey],
               ttl: message.expiresAt.difference(now),
+              sound: message.sound,
             ),
           )
           .timeout(timeout);
@@ -528,6 +529,7 @@ final class _Message {
     required this.body,
     required this.imageUrl,
     required this.data,
+    required this.sound,
     required this.expiresAt,
     required this.createdAt,
   });
@@ -539,6 +541,7 @@ final class _Message {
     body: row['body'] as String?,
     imageUrl: row['image_url'] as String?,
     data: (row['data']! as Map).cast<String, String>(),
+    sound: DwPushSound.values.byName(row.get<String>('sound')),
     expiresAt: row.get<DateTime>('expires_at'),
     createdAt: row.get<DateTime>('message_created_at'),
   );
@@ -549,6 +552,7 @@ final class _Message {
   final String? body;
   final String? imageUrl;
   final Map<String, String> data;
+  final DwPushSound sound;
   final DateTime expiresAt;
   final DateTime createdAt;
 

@@ -142,6 +142,24 @@ void main() {
     expect(h.fcm.sends.where((s) => s.token == 'fcm-token-rollback'), isEmpty);
   });
 
+  test('send stores sound and the worker passes it to the provider', () async {
+    final h = harness();
+    final member = await h.member('fcm-token-silent');
+    const command = QueueAlert(recipients: [], silent: true);
+    final queued = QueueAlert(recipients: [member.id], silent: command.silent);
+    expect((await h.queue(queued)).value(queued), 1);
+    await finished(member.id);
+    final row = (await h.db.query(
+      'SELECT sound FROM dw_push_message ORDER BY id DESC LIMIT 1',
+    )).single;
+    expect(row['sound'], 'silent');
+    final message = h.fcm.sends.singleWhere(
+      (send) => send.token == 'fcm-token-silent',
+    ).message;
+    expect(((message['apns']! as Map)['payload'] as Map)['aps'], isEmpty);
+    expect((message['webpush']! as Map)['notification'], {'silent': true});
+  });
+
   test('a dedup key sends once per recipient', () async {
     final h = harness();
     final member = await h.member('fcm-token-dedup');

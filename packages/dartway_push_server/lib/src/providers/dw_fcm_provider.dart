@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:dartway_push_shared/dartway_push_shared.dart';
 
+import '../dw_push_message.dart';
 import 'dw_push_http.dart';
 import 'dw_push_provider.dart';
 import 'dw_rsa_signer.dart';
@@ -123,6 +124,7 @@ final class DwFcmProvider implements DwPushProvider {
     required this.account,
     this.webLinkBase,
     this.androidChannelId,
+    this.androidSilentChannelId = 'dw_push_silent',
     this.androidIcon,
     this.androidColor,
     this.webIcon,
@@ -150,6 +152,7 @@ final class DwFcmProvider implements DwPushProvider {
   final Uri? webLinkBase;
 
   final String? androidChannelId;
+  final String androidSilentChannelId;
   final String? androidIcon;
 
   /// `#rrggbb`.
@@ -213,11 +216,14 @@ final class DwFcmProvider implements DwPushProvider {
         if (request.data.isNotEmpty) 'data': request.data,
         'android': {
           if (ttl != null) 'ttl': '${ttl.inSeconds}s',
-          if (androidChannelId != null ||
+          if (request.sound == DwPushSound.silent || androidChannelId != null ||
               androidIcon != null ||
               androidColor != null)
             'notification': {
-              'channel_id': ?androidChannelId,
+              if (request.sound == DwPushSound.silent)
+                'channel_id': androidSilentChannelId
+              else
+                'channel_id': ?androidChannelId,
               'icon': ?androidIcon,
               'color': ?androidColor,
             },
@@ -230,16 +236,23 @@ final class DwFcmProvider implements DwPushProvider {
             },
           'payload': {
             'aps': {
-              'sound': 'default',
+              if (request.sound == DwPushSound.standard) 'sound': 'default',
               if (image != null) 'mutable-content': 1,
             },
           },
           if (image != null) 'fcm_options': {'image': image},
         },
-        if (ttl != null || link != null || webIcon != null)
+        if (ttl != null ||
+            link != null ||
+            webIcon != null ||
+            request.sound == DwPushSound.silent)
           'webpush': {
             if (ttl != null) 'headers': {'TTL': '${ttl.inSeconds}'},
-            if (webIcon != null) 'notification': {'icon': webIcon},
+            if (webIcon != null || request.sound == DwPushSound.silent)
+              'notification': {
+                if (webIcon != null) 'icon': webIcon,
+                if (request.sound == DwPushSound.silent) 'silent': true,
+              },
             if (link != null) 'fcm_options': {'link': link},
           },
       },

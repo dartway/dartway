@@ -65,6 +65,7 @@ await ctx.push.send(
     body: excerpt,
     data: NewsAlert(id: post.id),       // a data object of the protocol: the app receives it typed
     link: '/news',                      // the in-app path a tap opens; the web opens it too
+    sound: DwPushSound.silent,          // optional: standard
   ),
   category: AcmePushCategory.news,
   dedupKey: 'news:${post.id}',
@@ -80,6 +81,11 @@ when there is none.
 - **The payload is a DTO**, not a map of keys. `DwPushData` writes its wire name and JSON into the
   provider's data map (`dw_type`, `dw_payload`, `dw_link`), and the app reads it back with the same
   class and its protocol: the keys exist once, in `dartway_push_shared` (#85).
+- **Sound is chosen per message.** `DwPushSound.standard` is the default and alerts as before;
+  `DwPushSound.silent` still shows the notification but requests no sound or vibration. The project
+  owns the policy: its eligibility rule can delay a message until morning, while a message that
+  must appear during quiet hours can be sent as `silent`. The framework has no quiet-hours or
+  category defaults.
 - **`dedupKey`** holds per recipient while a delivery with it is pending or finished within
   `retention` (7 days): a retried command, a job that runs twice, two events about one thing send
   once. Without it every call sends.

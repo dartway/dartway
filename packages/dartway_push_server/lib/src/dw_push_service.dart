@@ -80,8 +80,8 @@ final class DwPushService {
       final rows = await db.query(
         'WITH message AS ('
         'INSERT INTO dw_push_message '
-        '(category, title, body, image_url, data, expires_at, created_at) '
-        'VALUES (@category, @title, @body::text, @image::text, @data::jsonb, '
+        '(category, title, body, image_url, data, sound, expires_at, created_at) '
+        'VALUES (@category, @title, @body::text, @image::text, @data::jsonb, @sound, '
         '@run_at::timestamptz '
         '+ @lifetime::int8 * interval \'1 microsecond\', @now::timestamptz) '
         'RETURNING id) '
@@ -96,6 +96,7 @@ final class DwPushService {
           'body': message.body,
           'image': message.imageUrl,
           'data': jsonEncode(message.wireData),
+          'sound': message.sound.name,
           // Due by the server's clock, the one the job covering it runs by.
           'run_at': runAt,
           // When it was queued, as an eligibility rule reads it

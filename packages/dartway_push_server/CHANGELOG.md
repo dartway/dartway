@@ -1,5 +1,8 @@
 ## 0.7.0-dev.0
 
+- Adds per-message `DwPushSound.standard` and `DwPushSound.silent`; providers select the quiet
+  Android channel and suppress APNs and web sound for silent messages (#595).
+
 - Dependency carets follow DartWay 0.22 and its satellites on their next
   development lines; public dependency types follow those releases (#530).
 

@@ -14,6 +14,20 @@ separate packages, so an app downloads only what it ships:
 
 The server half — queue, eligibility, retries — is [Push delivery](../4-server/push-delivery.md).
 
+On Android 8 and newer, both transport plugins create the quiet `dw_push_silent` notification
+channel as soon as they attach. It uses low importance with sound and vibration disabled, so it
+exists before the first silent push arrives. Apps can localize or replace its identity with
+manifest meta-data:
+
+```xml
+<meta-data android:name="dev.dartway.push.firebase.silent_channel_id" android:value="app_quiet" />
+<meta-data android:name="dev.dartway.push.firebase.silent_channel_name" android:value="Quiet notifications" />
+<meta-data android:name="dev.dartway.push.rustore.silent_channel_id" android:value="app_quiet" />
+<meta-data android:name="dev.dartway.push.rustore.silent_channel_name" android:value="Quiet notifications" />
+```
+
+Use the keys for the transports the app ships. The default channel remains unchanged.
+
 ## Wiring
 
 ```dart

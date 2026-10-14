@@ -47,6 +47,9 @@ final protocol = DwWireProtocol([
 
 void main() {
   group('DwPushData', () {
+    test('publishes the native renderer sound key', () {
+      expect(DwPushData.soundKey, 'dw_sound');
+    });
     test('round-trips a typed payload and a link through a string map', () {
       const data = DwPushData(
         payload: NewsAlert(id: 12, title: 'Pool closed'),

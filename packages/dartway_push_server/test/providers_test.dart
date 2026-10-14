@@ -225,6 +225,21 @@ void main() {
       });
     });
 
+    test('builds a silent message for every platform', () {
+      final message = provider.messageOf(
+        const DwPushRequest(
+          token: 't',
+          title: 'Quiet',
+          sound: DwPushSound.silent,
+        ),
+      )['message']! as Map<String, Object?>;
+      expect((message['android']! as Map)['notification'], {
+        'channel_id': 'dw_push_silent',
+      });
+      expect(((message['apns']! as Map)['payload'] as Map)['aps'], isEmpty);
+      expect((message['webpush']! as Map)['notification'], {'silent': true});
+    });
+
     test('an https web link base is required', () {
       expect(
         () => DwFcmProvider(
@@ -383,6 +398,32 @@ void main() {
         },
         'android': <String, Object?>{},
       });
+    });
+
+    test('uses the silent channel with no picture', () {
+      final message = provider.messageOf(
+        const DwPushRequest(
+          token: 't',
+          title: 'Quiet',
+          sound: DwPushSound.silent,
+        ),
+      )['message']! as Map<String, Object?>;
+      expect((message['android']! as Map)['notification'], {
+        'channel_id': 'dw_push_silent',
+        'color': '#112233',
+      });
+    });
+
+    test('carries silent through the data-only picture path', () {
+      final message = provider.messageOf(
+        const DwPushRequest(
+          token: 't',
+          title: 'Quiet',
+          imageUrl: 'https://cdn.example.com/a.png',
+          sound: DwPushSound.silent,
+        ),
+      )['message']! as Map<String, Object?>;
+      expect((message['data']! as Map)[DwPushData.soundKey], 'silent');
     });
 
     test('classifies RuStore\'s documented errors', () async {
