@@ -80,6 +80,52 @@ void main() {
       row['line']! as String,
   ];
 
+  test(
+    'identifier link schema upgrades populated code tickets and rolls back only link tickets',
+    () async {
+      await runner(
+        framework
+            .where((m) => m.id != '20261014_000000_dw_identifier_links')
+            .toList(),
+      ).apply();
+      await opened.db.execute(
+        "INSERT INTO dw_account (id) VALUES (7); INSERT INTO dw_code_ticket (id, kind, identifier, code_hash, expires_at, purpose, account_id) VALUES ('existing', 'email', 'old@example.com', decode('1234', 'hex'), now() + interval '1 day', 'attach', 7)",
+      );
+      await runner(framework).apply();
+      final before = (await opened.db.query(
+        "SELECT delivery, code_hash, link_hash FROM dw_code_ticket WHERE id = 'existing'",
+      )).single;
+      expect(before.get<String>('delivery'), 'code');
+      expect(before['code_hash'], isNotNull);
+      expect(before['link_hash'], isNull);
+      await opened.db.execute(
+        "INSERT INTO dw_code_ticket (id, kind, identifier, link_hash, expires_at, purpose, account_id, delivery) VALUES ('link', 'email', 'new@example.com', decode('5678', 'hex'), now() + interval '1 day', 'attach', 7, 'link')",
+      );
+      await expectLater(
+        opened.db.execute(
+          "UPDATE dw_code_ticket SET code_hash = decode('1234', 'hex') WHERE id = 'link'",
+        ),
+        throwsA(isA<Exception>()),
+      );
+      await runner(framework).rollback(
+        id: const DwMigrationRef('dw', '20261014_000000_dw_identifier_links'),
+      );
+      expect(
+        (await opened.db.query(
+          'SELECT id FROM dw_code_ticket',
+        )).single.get<String>('id'),
+        'existing',
+      );
+      expect(
+        (await opened.db.query(
+          'SELECT id FROM dw_account',
+        )).single.get<int>('id'),
+        7,
+      );
+      await runner(framework).apply();
+    },
+  );
+
   test('a table holding files stops the migration and says what to '
       'record, and migrates once it is recorded', () async {
     await runner(upTo('20260914_000000_dw_stored_file')).apply();
@@ -171,6 +217,7 @@ void main() {
       '20261009_000001_dw_identity_provider_email',
       fromConfig.id,
       lastUsed.id,
+      '20261014_000000_dw_identifier_links',
     ]);
     expect(
       (await runner(framework).status()).map((status) => status.state),
@@ -303,7 +350,10 @@ void main() {
     final touched = (await lastUsedAt())[2];
 
     final run = await runner(framework).apply();
-    expect(run.migrations.map((ref) => ref.id), [lastUsed.id]);
+    expect(run.migrations.map((ref) => ref.id), [
+      lastUsed.id,
+      '20261014_000000_dw_identifier_links',
+    ]);
     expect(await lastUsedAt(), {1: null, 2: touched});
 
     await opened.db.execute(

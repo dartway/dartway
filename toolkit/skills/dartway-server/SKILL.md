@@ -381,3 +381,16 @@ A proxy deployment with quotas and no trust declaration fails before migrations.
 Native config's `trusted_proxy_networks` supplies `DW_TRUSTED_PROXY_NETWORKS`;
 Kamal supplies the full SHA in `KAMAL_VERSION`. Health reports the configured SHA
 as a quoted ETag for deployment checks. Never trust every address.
+
+### Identifier confirmation links
+
+Configure `DwAuthConfig.attachDelivery` by kind with `DwIdentifierLinkPolicy` when an identifier
+must be confirmed by a link. The policy requires a trusted absolute URL template containing one
+`{token}`, a `deliverLink` callback, and fixes replace intent; lifetime defaults to 24 hours. Do not
+derive URLs from request headers. Default code delivery and sign-in remain unchanged.
+`DwRequestIdentifierCode` returns metadata only; the token goes only to postcommit delivery.
+A public landing calls `DwConfirmIdentifierLink`, without switching the browser's session.
+All invalid/expired/used/superseded/occupied links refuse existing `DwCoreRefusal.invalid` on `token`.
+Only the latest account attach-link request works. Success is single-use, not idempotency-replayed;
+response loss can show invalid after a committed change. Publish using the change hook's account.
+Prefer web fragment URLs, clear the token before calls/diagnostics, and never log bearer links.

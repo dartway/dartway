@@ -2,6 +2,10 @@
 
 ## 0.22.0-dev.0
 
+- Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,
+  latest-request-only across destinations, and anonymous confirmation without changing sessions.
+  Invalid/expired/used/occupied links share `dw.invalid` on `token`; success is not replayed.
+
 - `DwHttpContract.appHealthPath` names the health endpoint on the app host
   (`/dw/health`); `/health` remains available on the API host (#576).
 - The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).

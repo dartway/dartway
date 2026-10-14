@@ -50,6 +50,11 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _authKeyLastUsedUp,
     _authKeyLastUsedDown,
   ),
+  const _DwSqlMigration(
+    '20261014_000000_dw_identifier_links',
+    _identifierLinksUp,
+    _identifierLinksDown,
+  ),
 ]);
 
 /// A framework migration written as SQL statements. Its checksum is the hash
@@ -389,4 +394,24 @@ const List<String> _initialDown = [
   'DROP TABLE dw_auth_key',
   'DROP TABLE dw_identity',
   'DROP TABLE dw_account',
+];
+
+const List<String> _identifierLinksUp = [
+  "ALTER TABLE dw_code_ticket ADD COLUMN delivery text NOT NULL DEFAULT 'code' CHECK (delivery IN ('code', 'link'))",
+  'ALTER TABLE dw_code_ticket ALTER COLUMN code_hash DROP NOT NULL',
+  'ALTER TABLE dw_code_ticket ADD COLUMN link_hash bytea',
+  'ALTER TABLE dw_code_ticket ADD COLUMN replace_identity boolean NOT NULL DEFAULT false',
+  "ALTER TABLE dw_code_ticket ADD CONSTRAINT dw_code_ticket_hash_shape CHECK ((delivery = 'code' AND code_hash IS NOT NULL AND link_hash IS NULL) OR (delivery = 'link' AND purpose = 'attach' AND code_hash IS NULL AND link_hash IS NOT NULL))",
+  'CREATE UNIQUE INDEX dw_code_ticket_link_hash ON dw_code_ticket (link_hash) WHERE link_hash IS NOT NULL',
+  "CREATE INDEX dw_code_ticket_pending_link ON dw_code_ticket (account_id) WHERE delivery = 'link' AND consumed_at IS NULL",
+];
+const List<String> _identifierLinksDown = [
+  "DELETE FROM dw_code_ticket WHERE delivery = 'link'",
+  'DROP INDEX dw_code_ticket_pending_link',
+  'DROP INDEX dw_code_ticket_link_hash',
+  'ALTER TABLE dw_code_ticket DROP CONSTRAINT dw_code_ticket_hash_shape',
+  'ALTER TABLE dw_code_ticket DROP COLUMN replace_identity',
+  'ALTER TABLE dw_code_ticket DROP COLUMN link_hash',
+  'ALTER TABLE dw_code_ticket ALTER COLUMN code_hash SET NOT NULL',
+  'ALTER TABLE dw_code_ticket DROP COLUMN delivery',
 ];

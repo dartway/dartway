@@ -35,6 +35,7 @@ final class DwAuthConfig {
     required this.deliverCode,
     required this.accountDeletion,
     this.generateCode,
+    this.attachDelivery = const {},
     this.allowedDeliveryHints = const {},
     this.onAccountCreated,
     this.onIdentifierChanged,
@@ -51,6 +52,9 @@ final class DwAuthConfig {
   }) : assert(codeLength >= 4 && codeLength <= 12),
        assert(maxAttempts > 0),
        assert(maxRequestsPerWindow > 0);
+
+  /// Link policies by kind; an absent kind keeps code confirmation.
+  final Map<DwIdentifierKind, DwIdentifierLinkPolicy> attachDelivery;
 
   /// The canonical form of an identifier (`+79991234567`, a lower-cased
   /// e-mail), or `null` when [raw] is not a valid identifier of [kind]
@@ -143,7 +147,7 @@ final class DwAuthConfig {
   onAccountCreated;
 
   /// Runs in the transaction that changes an existing account's identifiers
-  /// through the framework — `DwConfirmIdentifier`, and
+  /// through the framework — `DwConfirmIdentifier`, `DwConfirmIdentifierLink`, and
   /// `DwAccountService.updateIdentifiers` / `moveIdentities` /
   /// `removeIdentities` — once per account
   /// and identifier affected, after the change: the place to mirror an
@@ -305,7 +309,7 @@ enum DwIdentifierChangeCause {
   /// Trusted backend code edited identifiers through updateIdentifiers.
   updated,
 
-  /// The account's owner confirmed a code (`DwConfirmIdentifier`).
+  /// The account's owner confirmed a code or an account-bound link.
   confirmed,
 
   /// `DwAccountService.moveIdentities` moved it between accounts.
@@ -373,4 +377,45 @@ enum DwAccountDeletion {
   /// Only server code deletes accounts (`ctx.accounts.deleteAccount`);
   /// `DwDeleteMyAccount` is refused `dw.forbidden`.
   byOperator,
+}
+
+/// Project-owned link destination and delivery for attaching an identifier.
+/// No request can downgrade this policy to a code. Delivery runs after commit.
+final class DwIdentifierLinkPolicy {
+  DwIdentifierLinkPolicy({
+    required this.urlTemplate,
+    required this.deliverLink,
+    this.replace = false,
+    this.lifetime = const Duration(hours: 24),
+  }) {
+    if (lifetime <= Duration.zero ||
+        '{token}'.allMatches(urlTemplate).length != 1) {
+      throw ArgumentError(
+        'A link policy needs a positive lifetime and one token placeholder',
+      );
+    }
+    final uri = Uri.tryParse(urlTemplate.replaceAll('{token}', 'token'));
+    if (uri == null ||
+        !uri.hasScheme ||
+        uri.userInfo.isNotEmpty ||
+        {'javascript', 'data', 'file'}.contains(uri.scheme) ||
+        ((uri.scheme == 'https' || uri.scheme == 'http') && uri.host.isEmpty)) {
+      throw ArgumentError(
+        'A link policy needs an absolute trusted URL without user information',
+      );
+    }
+  }
+
+  final String urlTemplate;
+  final Duration lifetime;
+  final bool replace;
+
+  /// Never log the link or include it in provider-error diagnostics.
+  final Future<void> Function(
+    DwCallContext ctx,
+    DwIdentifierKind kind,
+    String identifier,
+    Uri link,
+  )
+  deliverLink;
 }

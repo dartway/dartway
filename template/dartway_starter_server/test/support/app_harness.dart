@@ -32,6 +32,7 @@ final class AppHarness {
   static Future<AppHarness> start({
     DwFileStorageConfig? storage,
     DateTime? now,
+    Map<DwIdentifierKind, DwIdentifierLinkPolicy> attachDelivery = const {},
   }) async {
     final database = await DwTestDatabase.create(prefix: 'app_test');
     final clock = DwTestClock(now ?? DateTime.now());
@@ -46,6 +47,7 @@ final class AppHarness {
         auth: AccountAuth.config(
           // Tests ask one identifier for several codes within a minute.
           resendDelay: Duration.zero,
+          attachDelivery: attachDelivery,
           deliverCode: (ctx, kind, identifier, code) async =>
               harness.delivered[identifier] = code,
         ),

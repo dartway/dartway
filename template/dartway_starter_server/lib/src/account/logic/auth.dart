@@ -42,10 +42,12 @@ abstract final class AccountAuth {
   /// identifier; the app counts it down from the ticket's `resendAfter`.
   static DwAuthConfig config({
     CodeDelivery? deliverCode,
+    Map<DwIdentifierKind, DwIdentifierLinkPolicy> attachDelivery = const {},
     Set<String> allowedDeliveryHints = const {},
     Duration resendDelay = const Duration(seconds: 60),
   }) => DwAuthConfig(
     accountDeletion: DwAccountDeletion.byMember,
+    attachDelivery: attachDelivery,
     allowedDeliveryHints: allowedDeliveryHints,
     // One rule on both sides: the app normalizes what it sends with the same
     // function.

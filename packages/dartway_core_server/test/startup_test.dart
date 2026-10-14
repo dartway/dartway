@@ -377,6 +377,7 @@ void main() {
         'dw/20261009_000001_dw_identity_provider_email',
         'dw/20261009_000002_dw_stored_file_bucket_from_config',
         'dw/20261009_000003_dw_auth_key_last_used',
+        'dw/20261014_000000_dw_identifier_links',
         'app/20260913_120000_test_app',
       ]);
       await server.stop();

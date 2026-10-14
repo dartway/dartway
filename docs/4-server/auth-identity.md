@@ -145,8 +145,9 @@ Registered by the framework in every server; a project may not register handlers
 | `DwVerifyCode(ticketId, code, registration)` | anonymous | `DwAuthSession` | checks the code; creates the account when the identifier has none; makes an `app` session key |
 | `DwSignOut()` | signed in | none | revokes the caller's session key |
 | `DwDeleteMyAccount()` | signed in | none | deletes the caller's account when `accountDeletion` is `byMember`, refuses `dw.forbidden` otherwise — see below |
-| `DwRequestIdentifierCode(kind, identifier)` | signed in | `DwCodeTicket` | a code to an identifier the caller wants to attach, or change theirs to |
-| `DwConfirmIdentifier(ticketId, code, replace)` | signed in | `DwIdentityInfo` | attaches the identifier or, with `replace`, puts it in place of the caller's identifiers of that kind |
+| `DwRequestIdentifierCode(kind, identifier)` | signed in | `DwCodeTicket` | requests project-configured code or link proof for attachment/replacement |
+| `DwConfirmIdentifier(ticketId, code, replace)` | signed in | `DwIdentityInfo` | attaches a code-confirmed identifier or replaces those of its kind |
+| `DwConfirmIdentifierLink(token)` | anonymous | none | confirms the account-bound link without changing the caller's session |
 
 **A code request answers the same whether the identifier belongs to an account or not.** Otherwise
 the command would tell anyone which phone numbers are registered. `DwAuthSession.isNewAccount` is
@@ -559,3 +560,48 @@ is all.
 - [Access and roles](../2-core/access-and-roles.md) — who may call what, once signed in.
 - [Channels and realtime](../2-core/channels-and-realtime.md) — every subscription requires sign-in.
 - [Testing](../5-tooling/testing.md) — signing test callers in.
+
+## Confirming an identifier by link
+
+`DwAuthConfig.attachDelivery` selects link delivery per identifier kind; an absent kind keeps
+code delivery. Sign-in codes and their delivery are unchanged. Configure a trusted project URL,
+not a caller-supplied Host header or origin:
+
+```dart
+attachDelivery: {
+  DwIdentifierKind.email: DwIdentifierLinkPolicy(
+    urlTemplate: 'https://example.com/#/email-confirm?token={token}',
+    replace: true,
+    deliverLink: (ctx, kind, identifier, link) async {
+      // Send through the project's mail provider; never log the link.
+    },
+  ),
+},
+```
+
+The policy requires exactly one `{token}` in an absolute URL, a positive lifetime (24 hours by
+default), and a delivery callback. `replace` is bound at request time; neither the requester nor
+the landing browser can downgrade the policy or change that intent. `DwRequestIdentifierCode`
+keeps its payload and returns only opaque `DwCodeTicket` metadata. Despite its historical name,
+a ticket delivered by link cannot be confirmed with a code. Delivery runs after ticket commit,
+with the same request idempotency and provider-failure semantics as code delivery.
+
+A link has 128 random bits; only its hash is stored. It is single-use. A new link request for the
+account's attach purpose consumes all older links across destinations, retaining their request
+history for rate limits. It does not consume sign-in or code-confirmation tickets.
+
+The project's public landing calls `DwConfirmIdentifierLink(token: token)`. It works anonymously
+or while signed in as somebody else, changes only the account bound to the ticket, and returns
+void without identifiers or a session. Its browser remains signed in exactly as before. The
+identifier hook receives cause `confirmed` and the bound account; publish that account's profile,
+not the landing browser's account. Unknown, expired, consumed, superseded and occupied links all
+answer the same `DwCoreRefusal.invalid` on `token`, with no parameters: the `linkInvalid` category.
+
+Success is not cached for idempotency. If the first response is lost after commit, retrying returns
+the same invalid-link category, while the account remains changed. A hook failure rolls back both
+the change and consumption; an occupied destination consumes the valid ticket before refusing.
+
+For web landing URLs prefer a fragment route: fragments never enter HTTP access logs. Capture the
+token in memory and replace the browser URL with a clean route **before** confirmation or error
+reporting. Do not retain it in preferences, route/error context, provider diagnostics or logs. A
+native deep link is also supported; its host application must apply the same secret discipline.

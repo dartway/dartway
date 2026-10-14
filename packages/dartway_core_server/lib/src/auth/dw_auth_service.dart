@@ -45,6 +45,7 @@ final class DwAuthService {
     DwDeleteMyAccount,
     DwRequestIdentifierCode,
     DwConfirmIdentifier,
+    DwConfirmIdentifierLink,
   };
 
   List<DwCallHandler> handlers() => [
@@ -100,6 +101,12 @@ final class DwAuthService {
         command.identifier,
         _CodePurpose.attach,
       ),
+    ),
+    DwCallHandler.command<DwConfirmIdentifierLink, void>(
+      access: DwAccessRule.anonymous,
+      transactional: false,
+      recordsSuccess: false,
+      handle: _confirmIdentifierLink,
     ),
     // Not transactional for the reason `DwVerifyCode` is not; its result is
     // no secret, so a retry is answered the stored identity.
@@ -230,6 +237,9 @@ final class DwAuthService {
       _CodePurpose.signIn => null,
       _CodePurpose.attach => ctx.requireAccountId,
     };
+    final linkPolicy = purpose == _CodePurpose.attach
+        ? auth.attachDelivery[kind]
+        : null;
     final (ticket, code, accountId) = await ctx.transaction((tx) async {
       // The limit is read and extended under one lock per identifier, or two
       // parallel requests would both see room for one more.
@@ -241,14 +251,15 @@ final class DwAuthService {
         attachingAccount: attachingAccount,
       );
       final stats = (await ctx.db.query(
-        'SELECT now() AS now, count(*) AS n, min(created_at) AS first, '
+        'SELECT @now::timestamptz AS now, count(*) AS n, min(created_at) AS first, '
         'max(created_at) AS last FROM dw_code_ticket '
         'WHERE kind = @kind AND identifier = @identifier '
-        'AND created_at > now() - @window::int8 * interval \'1 microsecond\'',
+        'AND created_at > @now::timestamptz - @window::int8 * interval \'1 microsecond\'',
         params: {
           'kind': kind.name,
           'identifier': identifier,
           'window': auth.requestWindow.inMicroseconds,
+          'now': ctx.now,
         },
       )).single;
       final now = stats.get<DateTime>('now');
@@ -270,23 +281,36 @@ final class DwAuthService {
       }
 
       final accountId = await dwAccountOf(ctx.db, kind, identifier);
-      final code =
-          await auth.generateCode?.call(ctx, kind, identifier, accountId) ??
-          dwRandomCode(auth.codeLength);
+      final code = linkPolicy != null
+          ? DwAuthStore.randomToken(16)
+          : await auth.generateCode?.call(ctx, kind, identifier, accountId) ??
+                dwRandomCode(auth.codeLength);
+      if (linkPolicy != null) {
+        await ctx.db.execute(
+          "UPDATE dw_code_ticket SET consumed_at = @now WHERE account_id = @account AND purpose = 'attach' AND delivery = 'link' AND consumed_at IS NULL",
+          params: {'account': attachingAccount, 'now': ctx.now},
+        );
+      }
       final ticketId = DwAuthStore.randomToken(16);
       final row = (await ctx.db.query(
         'INSERT INTO dw_code_ticket '
-        '(id, kind, identifier, code_hash, expires_at, purpose, account_id) '
+        '(id, kind, identifier, code_hash, expires_at, purpose, account_id, delivery, link_hash, replace_identity, created_at) '
         'VALUES (@id, @kind, @identifier, @hash, '
-        'now() + @lifetime::int8 * interval \'1 microsecond\', @purpose, '
-        '@account::int8) '
+        '@expires, @purpose, '
+        '@account::int8, @delivery, @linkHash, @replace, @created) '
         'RETURNING created_at, expires_at',
         params: {
           'id': ticketId,
           'kind': kind.name,
           'identifier': identifier,
-          'hash': _codeHash(ticketId, code),
-          'lifetime': auth.codeLifetime.inMicroseconds,
+          'hash': linkPolicy == null ? _codeHash(ticketId, code) : null,
+          'expires': ctx.now.add(linkPolicy?.lifetime ?? auth.codeLifetime),
+          'created': ctx.now,
+          'delivery': linkPolicy == null ? 'code' : 'link',
+          'linkHash': linkPolicy == null
+              ? null
+              : sha256.convert(utf8.encode(code)).bytes,
+          'replace': linkPolicy?.replace ?? false,
           'purpose': purpose.name,
           'account': attachingAccount,
         },
@@ -313,7 +337,21 @@ final class DwAuthService {
       await runtimeContext.recordProvisionalOutcome(ticket);
       return (ticket, code, accountId);
     });
-    await auth.deliverCode(ctx, kind, identifier, code, accountId);
+    if (linkPolicy == null) {
+      await auth.deliverCode(ctx, kind, identifier, code, accountId);
+    } else {
+      await linkPolicy.deliverLink(
+        ctx,
+        kind,
+        identifier,
+        Uri.parse(
+          linkPolicy.urlTemplate.replaceAll(
+            '{token}',
+            Uri.encodeComponent(code),
+          ),
+        ),
+      );
+    }
     return ticket;
   }
 
@@ -334,10 +372,15 @@ final class DwAuthService {
     final tx = ctx.db;
     final rows = await tx.query(
       'SELECT kind, identifier, code_hash, attempts, '
-      'expires_at <= now() OR consumed_at IS NOT NULL AS dead '
-      'FROM dw_code_ticket WHERE id = @id AND purpose = @purpose '
+      'expires_at <= @now OR consumed_at IS NOT NULL AS dead '
+      "FROM dw_code_ticket WHERE delivery = 'code' AND id = @id AND purpose = @purpose "
       'AND account_id IS NOT DISTINCT FROM @account::int8 FOR UPDATE',
-      params: {'id': ticketId, 'purpose': purpose.name, 'account': accountId},
+      params: {
+        'id': ticketId,
+        'purpose': purpose.name,
+        'account': accountId,
+        'now': ctx.now,
+      },
     );
     if (rows.isEmpty) return const _TicketCheck.expired();
     final ticket = rows.single;
@@ -472,6 +515,62 @@ final class DwAuthService {
       ctx.refuse(DwAuthRefusal.identifierTaken, field: 'code');
     }
     _refuseCode(ctx, check);
+  }
+
+  Future<void> _confirmIdentifierLink(
+    DwCallContext ctx,
+    DwConfirmIdentifierLink command,
+  ) async {
+    if (!RegExp(r'^[A-Za-z0-9_-]{22}$').hasMatch(command.token)) {
+      ctx.refuse(DwCoreRefusal.invalid, field: 'token');
+    }
+    final hash = sha256.convert(utf8.encode(command.token)).bytes;
+    final confirmed = await ctx.transaction((tx) async {
+      final hints = await ctx.db.query(
+        "SELECT account_id, kind, identifier FROM dw_code_ticket WHERE link_hash = @hash AND delivery = 'link'",
+        params: {'hash': hash},
+      );
+      if (hints.isEmpty) return false;
+      final hint = hints.single;
+      final account = hint.get<int>('account_id');
+      final kind = DwIdentifierKind.values.byName(hint.get<String>('kind'));
+      final identifier = hint.get<String>('identifier');
+      try {
+        await dwLockCodeIdentity(
+          ctx,
+          auth,
+          kind,
+          identifier,
+          attachingAccount: account,
+        );
+      } on DwNotAuthenticatedException {
+        return false;
+      }
+      final rows = await ctx.db.query(
+        "SELECT id, expires_at, consumed_at, replace_identity FROM dw_code_ticket WHERE link_hash = @hash AND delivery = 'link' AND account_id = @account FOR UPDATE",
+        params: {'hash': hash, 'account': account},
+      );
+      if (rows.isEmpty) return false;
+      final ticket = rows.single;
+      if (ticket['consumed_at'] != null ||
+          !ticket.get<DateTime>('expires_at').isAfter(ctx.now)) {
+        return false;
+      }
+      await ctx.db.execute(
+        'UPDATE dw_code_ticket SET consumed_at = @now WHERE id = @id',
+        params: {'id': ticket.get<String>('id'), 'now': ctx.now},
+      );
+      return await dwAttachIdentity(
+            ctx,
+            auth,
+            accountId: account,
+            kind: kind,
+            identifier: identifier,
+            replace: ticket.get<bool>('replace_identity'),
+          ) !=
+          null;
+    });
+    if (!confirmed) ctx.refuse(DwCoreRefusal.invalid, field: 'token');
   }
 
   Future<void> _signOut(DwCallContext ctx, DwSignOut command) async {
