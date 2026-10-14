@@ -210,14 +210,32 @@ void main() {
       final port = remote.port;
       await remote.close(force: true);
       await expectLater(
-        http.get(Uri.parse('http://127.0.0.1:$port/')),
-        throwsA(
-          isA<DwOutboundException>().having(
-            (e) => e.timedOut,
-            'timedOut',
-            isFalse,
+        http.get(
+          Uri.parse(
+            'http://127.0.0.1:$port/synthetic-network-token?key=synthetic-network-key',
           ),
         ),
+        throwsA(
+          isA<DwOutboundException>()
+              .having((e) => e.timedOut, 'timedOut', isFalse)
+              .having((e) => e.reason, 'category', 'network failure')
+              .having(
+                (e) => '$e',
+                'safe diagnostic',
+                allOf(
+                  isNot(contains('synthetic-network-token')),
+                  isNot(contains('synthetic-network-key')),
+                ),
+              ),
+        ),
+      );
+      expect(
+        RecordingLogger.lines.join(),
+        isNot(contains('synthetic-network-token')),
+      );
+      expect(
+        RecordingLogger.lines.join(),
+        isNot(contains('synthetic-network-key')),
       );
     });
 

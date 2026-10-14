@@ -276,7 +276,7 @@ final response = await ctx.http.post(
   headers: {'authorization': 'Bearer ${sms.token}'},
   json: {'phone': phone, 'text': text},
 );
-if (!response.isSuccess) throw SmsException(response.statusCode, response.body);
+if (!response.isSuccess) throw SmsException(response.statusCode);
 ```
 
 - `get`, `post`, `put`, `patch`, `delete` and `send(method, url)` to an `http` or `https` URL (anything
@@ -288,6 +288,11 @@ if (!response.isSuccess) throw SmsException(response.statusCode, response.body);
   call's `maxResponseBytes:`, is not read further: `DwOutboundException`.
 - **Logged** through `ctx.log`: method, origin, status and time. Never the user info, the path, the
   query, a header or a body — that is where credentials travel (`/bot<token>/`, `?psw=`).
+  Transport failure text is untrusted too: `DwOutboundException.reason` retains only fixed
+  no-response/network-failure categories or framework-owned numeric timeout/size diagnostics.
+  The optional constructor `cause` text is discarded; network client and I/O exception messages
+  are not retained. Exception strings and framework incidents therefore do not echo that text.
+  Provider response bodies are separate application data: do not include them in thrown errors.
 - **An answer is an answer.** Any status comes back as a `DwOutboundResponse` (`statusCode`,
   `isSuccess`, `body`, `json`, `headers`). What throws is not getting one: `DwOutboundException`,
   with `timedOut` telling a timeout from an unreachable host.
