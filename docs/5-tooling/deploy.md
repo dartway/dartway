@@ -51,7 +51,8 @@ booting it.
 
 The generated Images workflow runs after the project's `CI` workflow completes
 successfully. Image publication follows the `branch:` values of the configured
-deployments; enable CI pushes on those branches. The template enables `master`
+deployments: a CI run on one of those branches publishes when it was started by a push or
+by hand (`workflow_dispatch`, write access only); enable one of the two there. The template enables `master`
 and `release` by default. `workflow_run` loads workflows from the default branch, so the initial
 installation must be merged there before this trigger can run. PR CI successes
 build without pushing or writing shared caches. Fork PRs skip this privileged

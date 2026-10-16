@@ -459,7 +459,8 @@ final routes = [
       );
       expect(
         image['env']['PUBLISH'],
-        r"${{ github.event.workflow_run.event == 'push' && " +
+        r"${{ (github.event.workflow_run.event == 'push' || "
+                r"github.event.workflow_run.event == 'workflow_dispatch') && " +
             predicate +
             ' }}',
       );
