@@ -80,7 +80,7 @@ jobs:
         if: steps.deployment.outputs.configured == 'true'
 
       - name: Registry login
-        if: steps.deployment.outputs.configured == 'true' && github.event.workflow_run.event == 'push'
+        if: steps.deployment.outputs.configured == 'true' && (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -95,7 +95,7 @@ jobs:
           REPOSITORY: __IMAGE_REPOSITORY__
           SHA: ${{ github.event.workflow_run.head_sha }}
           PUBLISH: >-
-            ${{ github.event.workflow_run.event == 'push' && contains(fromJSON('__DEPLOYMENT_BRANCHES__'), github.event.workflow_run.head_branch) }}
+            ${{ (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') && contains(fromJSON('__DEPLOYMENT_BRANCHES__'), github.event.workflow_run.head_branch) }}
         run: |
           tag="ghcr.io/${REPOSITORY}-${SERVICE}:${SHA}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
