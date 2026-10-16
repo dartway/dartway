@@ -21,9 +21,14 @@ import 'generate_command.dart';
 /// author wrote is left to resolve.
 class SyncCommand extends Command<int> {
   /// [regenerate] remakes the derived files of a project root; tests replace
-  /// the package resolution and the generators it runs by default.
-  SyncCommand({Future<int> Function(String root)? regenerate})
-    : _regenerate = regenerate ?? _regenerateProject {
+  /// the package resolution and the generators it runs by default. [directory]
+  /// is where the project is looked for, the current directory by default:
+  /// tests name theirs, since the current directory is the whole process's.
+  SyncCommand({
+    Future<int> Function(String root)? regenerate,
+    String? directory,
+  }) : _regenerate = regenerate ?? _regenerateProject,
+       _directory = directory {
     argParser.addFlag(
       'continue',
       negatable: false,
@@ -34,6 +39,7 @@ class SyncCommand extends Command<int> {
   }
 
   final Future<int> Function(String root) _regenerate;
+  final String? _directory;
 
   static Future<int> _regenerateProject(String root) async {
     final resolved = await resolvePackages(root);
@@ -54,11 +60,10 @@ class SyncCommand extends Command<int> {
 
   @override
   Future<int> run() async {
-    final root = GenerateCommand.projectRootOf(Directory.current.path);
+    final directory = _directory ?? Directory.current.path;
+    final root = GenerateCommand.projectRootOf(directory);
     if (root == null) {
-      throw StateError(
-        'No DartWay project at or above ${Directory.current.path}.',
-      );
+      throw StateError('No DartWay project at or above $directory.');
     }
     final top = (await _git(root, ['rev-parse', '--show-toplevel'])).trim();
     if (!argResults!.flag('continue')) {
