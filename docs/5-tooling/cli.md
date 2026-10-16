@@ -307,7 +307,7 @@ Merges the base branch into the current one from a clean tree. A conflict in a d
 either side; the migrations registry (`migrations.dart` headed `Maintained by \`migrate create\``) is
 rewritten from the migration files beside it; an `.arb` merges by key, and only a key both sides
 changed differently stays a conflict. Then `pub get` (and `gen-l10n`) in every package and
-`dartway generate` remake every derived file from the merged sources, and the merge is committed.
+`dart run dartway_cli:dartway generate` remake every derived file from the merged sources, and the merge is committed.
 A conflict in a source stops it: resolve, `git add`, then `--continue`.
 
 ## `dartway check` — the conventions, enforced
