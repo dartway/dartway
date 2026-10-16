@@ -72,15 +72,10 @@ class $name extends DwDatabaseMigration {
             regenerated.add(project);
             return 0;
           },
+          directory: root.path,
         ),
       );
-    final previous = Directory.current;
-    Directory.current = root;
-    try {
-      return (await runner.run(['sync', ...args]))!;
-    } finally {
-      Directory.current = previous;
-    }
+    return (await runner.run(['sync', ...args]))!;
   }
 
   setUp(() {
