@@ -10,8 +10,13 @@ import 'descriptor.dart';
 
 /// Baseline selection is performed before analysis and never follows feature
 /// HEAD. Explicit CI revisions are resolved directly; project defaults use
-/// the configured base branch (or an unambiguous remote HEAD/main/master).
-String resolveContractBase(String projectRoot, String? revision) {
+/// [branch] when given (the release branch), else the configured base branch
+/// (or an unambiguous remote HEAD/main/master).
+String resolveContractBase(
+  String projectRoot,
+  String? revision, {
+  String? branch,
+}) {
   if (revision != null) {
     return _git(projectRoot, [
       'rev-parse',
@@ -20,23 +25,16 @@ String resolveContractBase(String projectRoot, String? revision) {
       '$revision^{commit}',
     ]).trim();
   }
-  String? branch;
-  for (final relative in [
-    '.agents/dartway-toolkit.json',
-    '.claude/dartway-toolkit.json',
-  ]) {
-    final file = File(p.join(projectRoot, relative));
-    if (!file.existsSync()) continue;
-    final json = jsonDecode(file.readAsStringSync());
-    if (json is! Map ||
-        json['settings'] is! Map ||
-        (json['settings'] as Map)['baseBranch'] is! String) {
-      throw const FormatException(
-        'toolkit settings do not identify the project base branch; supply --contract-base',
-      );
+  if (branch == null) {
+    final settings = _toolkitSettings(projectRoot);
+    if (settings != null) {
+      if (settings['baseBranch'] is! String) {
+        throw const FormatException(
+          'toolkit settings do not identify the project base branch; supply --contract-base',
+        );
+      }
+      branch = settings['baseBranch'] as String;
     }
-    branch = (json['settings'] as Map)['baseBranch'] as String;
-    break;
   }
   if (branch != null) {
     final remote = _tryGit(projectRoot, [
@@ -83,6 +81,37 @@ String resolveContractBase(String projectRoot, String? revision) {
     }
   }
   return _git(projectRoot, ['merge-base', 'HEAD', branch]).trim();
+}
+
+/// The project's release branch, when it releases from a branch of its own
+/// (D-158): tasks merge into the base branch without raising the contract
+/// version, and the release raises it once against this branch.
+String? contractReleaseBranch(String projectRoot) {
+  final settings = _toolkitSettings(projectRoot);
+  return switch (settings?['releaseBranch']) {
+    final String branch when branch.isNotEmpty => branch,
+    _ => null,
+  };
+}
+
+/// The settings of the toolkit manifest, or null when the project has none;
+/// [FormatException] for a manifest that is not an object with settings.
+Map<dynamic, dynamic>? _toolkitSettings(String projectRoot) {
+  for (final relative in [
+    '.agents/dartway-toolkit.json',
+    '.claude/dartway-toolkit.json',
+  ]) {
+    final file = File(p.join(projectRoot, relative));
+    if (!file.existsSync()) continue;
+    final json = jsonDecode(file.readAsStringSync());
+    if (json is! Map || json['settings'] is! Map) {
+      throw const FormatException(
+        'toolkit settings do not identify the project base branch; supply --contract-base',
+      );
+    }
+    return json['settings'] as Map;
+  }
+  return null;
 }
 
 String _git(String root, List<String> arguments) {

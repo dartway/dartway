@@ -43,6 +43,7 @@ final class DwGenerationReport {
     this.contractBase,
     this.contractProof,
     this.contractVerdict,
+    this.contractRaise,
   });
 
   final String root;
@@ -68,6 +69,11 @@ final class DwGenerationReport {
   final String? contractBase;
   final String? contractProof;
   final String? contractVerdict;
+
+  /// The shared package version the contract changes since the baseline ask
+  /// for, when the project releases from a branch of its own and the version
+  /// waits for the release (D-158). Null when nothing waits.
+  final String? contractRaise;
 
   bool get hasErrors => diagnostics.isNotEmpty;
 
@@ -109,13 +115,27 @@ abstract final class DwCodeGenerator {
   /// [sdkPath] overrides the Dart SDK the analyzer reads; by default it is
   /// found from the running `dart` or `PATH`. With [check] nothing is written
   /// and the report tells what would change.
+  ///
+  /// A project with a release branch in its toolkit settings (D-158) compares
+  /// against that branch by default and lets the version wait: the changes
+  /// that ask for a raise are reported in [DwGenerationReport.contractRaise],
+  /// not refused, so tasks merged into the base branch never touch the version
+  /// and never conflict on it. An explicit [contractBase] judges as before.
+  ///
+  /// [raiseVersion] is the release (D-158): the shared package version is
+  /// raised to what the changes since the baseline ask for, and the project is
+  /// generated and judged at that version.
   static Future<DwGenerationReport> run(
     String projectRoot, {
     String? sdkPath,
     bool check = false,
     String? contractBase,
     bool verifyContract = false,
+    bool raiseVersion = false,
   }) async {
+    if (raiseVersion && check) {
+      throw ArgumentError('a release raises the version; it cannot be a check');
+    }
     final stopwatch = Stopwatch()..start();
     // Resolved, because the analyzer reports resolved paths and every path
     // this run compares or prints must agree with them.
@@ -128,6 +148,7 @@ abstract final class DwCodeGenerator {
     String? baselineSha;
     String? proof;
     String? verdict;
+    String? raise;
 
     DwGenerationReport finish({OutputPlan? plan}) {
       diagnostics.sort();
@@ -143,6 +164,7 @@ abstract final class DwCodeGenerator {
         contractBase: baselineSha,
         contractProof: proof,
         contractVerdict: verdict,
+        contractRaise: raise,
       );
     }
 
@@ -157,9 +179,15 @@ abstract final class DwCodeGenerator {
     // Ordinary generation also needs trusted introduction metadata, but keeps
     // its existing non-verifying mode for new projects and unsupported codecs.
     // The check gate must still prove a baseline before accepting the output.
-    final verify = verifyContract || contractBase != null;
+    final verify = verifyContract || contractBase != null || raiseVersion;
+    String? releaseBranch;
     try {
-      baselineSha = resolveContractBase(root, contractBase);
+      releaseBranch = contractBase == null ? contractReleaseBranch(root) : null;
+      baselineSha = resolveContractBase(
+        root,
+        contractBase,
+        branch: releaseBranch,
+      );
     } on Exception catch (error) {
       if (verify) {
         diagnostics.add(
@@ -240,6 +268,27 @@ abstract final class DwCodeGenerator {
               );
             }
             if (changes.isNotEmpty &&
+                !previousVersion.isOlderLineThan(nextVersion) &&
+                (releaseBranch != null || raiseVersion)) {
+              raise = contractRaiseOf(previousVersion.text, changes);
+              if (raiseVersion) {
+                final pubspec = File(p.join(shared.root, 'pubspec.yaml'));
+                pubspec.writeAsStringSync(
+                  pubspec.readAsStringSync().replaceFirst(
+                    RegExp(r'^version:.*$', multiLine: true),
+                    'version: $raise',
+                  ),
+                );
+                return await DwCodeGenerator.run(
+                  projectRoot,
+                  sdkPath: sdkPath,
+                  contractBase: contractBase,
+                  verifyContract: true,
+                );
+              }
+              verdict =
+                  'contract changes since $releaseBranch wait for the release to raise `version:` to $raise (${changes.join('; ')})';
+            } else if (changes.isNotEmpty &&
                 !previousVersion.isOlderLineThan(nextVersion)) {
               diagnostics.add(
                 DwGenerationDiagnostic(

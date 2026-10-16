@@ -80,4 +80,6 @@ from its risk survey and the spec, with a class and expected outcome per item;
 
 **A rule that did not exist, an API the app had to work around, the urge to edit a managed file** — each is a finding for the framework: `dartway-framework-notes`, before creating any issue.
 
-**Git:** PRs and diffs go against `__BASE_BRANCH__`; the commit format is `/commit`.
+**Git:** PRs and diffs go against `__BASE_BRANCH__`; the commit format is `/commit`. Bring
+`__BASE_BRANCH__` in with `dart run dartway_cli:dartway sync`, never a hand-resolved merge of generated
+files, locks, translations or the migrations registry.

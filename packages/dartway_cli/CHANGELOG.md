@@ -2,6 +2,14 @@
 
 ## 0.25.0-dev.0
 
+- `dartway sync [<ref>]` merges the base branch in and resolves derived files
+  itself: generated code, locks and l10n outputs are regenerated, the
+  migrations registry is rebuilt from its directory, `.arb` files merge by key;
+  only source conflicts stop (`--continue` after resolving). `dartway generate
+  --release` raises the contract version once at the release and resolves the
+  packages; `--release-branch` records `releaseBranch` in the toolkit settings
+  (D-158).
+
 - **BREAKING (`dartway create` dependency source):** new projects pin every
   reached `dartway_*` package and the analyzer plugin to the full git commit
   that supplied the template. `dartway update --target <sha>` moves those refs;

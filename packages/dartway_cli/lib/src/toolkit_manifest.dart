@@ -44,6 +44,11 @@ class ToolkitProvenance {
   static const languageSetting = 'language';
   static const notesTrackerSetting = 'notesTracker';
 
+  /// The branch the project releases into, when it is not the base branch
+  /// (D-158): tasks merge into the base branch and the release raises the
+  /// contract version once against this one. Recorded only when set.
+  static const releaseBranchSetting = 'releaseBranch';
+
   /// The three settings as the manifest holds them.
   ///
   /// Every writer goes through here, so a command that records them cannot
@@ -52,10 +57,12 @@ class ToolkitProvenance {
     required String baseBranch,
     required String language,
     required String notesTracker,
+    String releaseBranch = '',
   }) => {
     baseBranchSetting: baseBranch,
     languageSetting: language,
     notesTrackerSetting: notesTracker,
+    if (releaseBranch.isNotEmpty) releaseBranchSetting: releaseBranch,
   };
 
   /// Reads the manifest a previous install left, or null when there is none —

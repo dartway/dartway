@@ -264,6 +264,7 @@ cd <project>_flutter
 dart run dartway_cli:dartway generate            # write
 dart run dartway_cli:dartway generate --check --contract-base <trusted-SHA>  # read-only freshness and compatibility
 dart run dartway_cli:dartway generate -v         # list every file written or removed
+dart run dartway_cli:dartway generate --release  # the release: raise the contract version once
 ```
 
 Runs `dartway_generator` over the project: DTO codecs (`*.dw.dart` parts) and the protocol registry
@@ -282,6 +283,32 @@ unresolved package has no package config to find the generator in.
 
 The exit code is the generator's. `--check` is what CI runs, and what `dart run dartway_cli:dartway check` reports as
 `generatedCodeStale` and `projectContractVersion`.
+
+**A project with a release branch raises the contract version at the release, not in each task**
+(D-158). Install the toolkit with `--release-branch <branch>` (recorded as `releaseBranch`): tasks merge
+into the base branch, and generation and `--check` without `--contract-base` take the merge-base
+with the release branch as the baseline, generate at the current `version:` and report the raise the
+contract changes need instead of failing. The release runs `generate --release`: it raises the shared
+package `version:` — the next major (the next minor below 1.0) for an incompatible change, the next
+minor (the next patch below 1.0) for a new data object — generates at it and runs `pub get` in every
+package. The release CI then checks with an explicit `--contract-base` against the release branch,
+strictly, as before.
+
+## `dartway sync` — the base branch in, nothing derived to resolve
+
+```bash
+dart run dartway_cli:dartway sync              # merge origin/<baseBranch>
+dart run dartway_cli:dartway sync develop      # or any ref
+dart run dartway_cli:dartway sync --continue   # after resolving a source conflict
+```
+
+Merges the base branch into the current one from a clean tree. A conflict in a derived file —
+`lib/generated/`, `*.dw.dart`, `pubspec.lock`, the `flutter gen-l10n` outputs of `l10n.yaml` — takes
+either side; the migrations registry (`migrations.dart` headed `Maintained by \`migrate create\``) is
+rewritten from the migration files beside it; an `.arb` merges by key, and only a key both sides
+changed differently stays a conflict. Then `pub get` (and `gen-l10n`) in every package and
+`dart run dartway_cli:dartway generate` remake every derived file from the merged sources, and the merge is committed.
+A conflict in a source stops it: resolve, `git add`, then `--continue`.
 
 ## `dartway check` — the conventions, enforced
 
