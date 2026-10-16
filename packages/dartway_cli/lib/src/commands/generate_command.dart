@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
 import '../generator_invocation.dart';
+import '../project_refresh.dart';
 
 /// Runs `dartway_generator` over the project: DTO codecs and the protocol
 /// registry in `*_shared`, entity tables and the schema in `*_server`.
@@ -30,6 +31,14 @@ class GenerateCommand extends Command<int> {
           'For CI.',
     );
     argParser.addFlag(
+      'release',
+      negatable: false,
+      help:
+          'Raise the shared package `version:` as far as the contract changes '
+          'since the release branch require, generate at it and resolve the '
+          'packages again. Run by the release, never by a task (D-158).',
+    );
+    argParser.addFlag(
       'verbose',
       abbr: 'v',
       negatable: false,
@@ -46,13 +55,13 @@ class GenerateCommand extends Command<int> {
       'schema of this project.';
 
   @override
-  String get invocation => 'dartway generate [--check]';
+  String get invocation => 'dartway generate [--check | --release]';
 
   static const _generator = 'dartway_generator';
 
   @override
   Future<int> run() async {
-    final root = _findProjectRoot(Directory.current.path);
+    final root = projectRootOf(Directory.current.path);
     if (root == null) {
       throw StateError(
         'No DartWay project here: expected a directory holding *_shared and '
@@ -60,18 +69,26 @@ class GenerateCommand extends Command<int> {
         '${Directory.current.path}.',
       );
     }
-
-    final forwarded = [
-      '--project',
-      root,
+    final release = argResults!.flag('release');
+    final code = await invoke(root, [
       if (argResults!.flag('check')) '--check',
+      if (release) '--release',
       if (argResults!.flag('verbose')) '--verbose',
       if (argResults!.option('contract-base') case final String base) ...[
         '--contract-base',
         base,
       ],
-    ];
+    ]);
+    // The raised version is in the shared pubspec, and every lock that path-
+    // depends on it still names the old one.
+    if (code != 0 || !release) return code;
+    return resolvePackages(root);
+  }
 
+  /// Runs the generator [root] resolved with [flags] and returns its exit
+  /// code.
+  static Future<int> invoke(String root, List<String> flags) async {
+    final forwarded = ['--project', root, ...flags];
     final host = _packagesOf(root).where(_resolvesGenerator).firstOrNull;
     final List<String> command;
     final String workingDirectory;
@@ -100,7 +117,7 @@ class GenerateCommand extends Command<int> {
 
   /// The project root: the nearest directory at or above [start] that holds a
   /// `*_shared` or `*_server` package, or is one.
-  static String? _findProjectRoot(String start) {
+  static String? projectRootOf(String start) {
     var current = p.normalize(p.absolute(start));
     while (true) {
       final name = p.basename(current);

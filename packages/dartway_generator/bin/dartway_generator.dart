@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:args/args.dart';
 import 'package:dartway_generator/dartway_generator.dart';
 
-/// `dart run dartway_generator [--project <dir>] [--check] [--sdk <dir>]`
+/// `dart run dartway_generator [--project <dir>] [--check | --release] [--sdk <dir>]`
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addOption(
@@ -23,8 +23,14 @@ Future<void> main(List<String> arguments) async {
     )
     ..addOption(
       'contract-base',
+      help: 'Trusted committed project baseline; resolved once to a SHA. Check defaults to the project base-branch merge-base.',
+    )
+    ..addFlag(
+      'release',
+      negatable: false,
       help:
-          'Trusted committed project baseline; resolved once to a SHA. Check defaults to the project base-branch merge-base.',
+          'The release: raise the shared package version to what the contract '
+          'changes since the baseline ask for, then generate at that version.',
     )
     ..addOption(
       'sdk',
@@ -57,6 +63,7 @@ Future<void> main(List<String> arguments) async {
     check: options.flag('check'),
     contractBase: options.option('contract-base'),
     verifyContract: options.flag('check'),
+    raiseVersion: options.flag('release'),
   );
 
   for (final diagnostic in report.diagnostics) {
@@ -70,6 +77,11 @@ Future<void> main(List<String> arguments) async {
   if (report.contractVerdict != null) {
     stdout.writeln(
       '${report.contractVerdict}; coverage: generated project codecs/registry, excluding handlers/domain semantics and manually composed external modules.',
+    );
+  }
+  if (report.contractRaise != null) {
+    stdout.writeln(
+      'The release raises `version:` to ${report.contractRaise}: `dartway generate --release`.',
     );
   }
   if (options.flag('verbose') || report.check) {

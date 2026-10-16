@@ -2,6 +2,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_generator/dartway_generator.dart';
+import 'package:dartway_generator/src/contract/descriptor.dart'
+    show contractRaiseOf;
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -92,6 +94,89 @@ void main() { print(appProtocol.entryNamed('ExtraRecord')!.since); }
       );
     },
     timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'under a release branch the version waits for the release, which raises it',
+    () async {
+      final project = TempProject.create(['app_shared']);
+      String version() => RegExp(
+        r'version: ([^\n]+)',
+      ).firstMatch(project.readFile('app_shared/pubspec.yaml'))![1]!;
+      project.writeFile(
+        'app_shared/pubspec.yaml',
+        project
+            .readFile('app_shared/pubspec.yaml')
+            .replaceFirst(RegExp(r'version: [^\n]+'), 'version: 13.0.0'),
+      );
+      project.writeFile('app_shared/lib/src/item.dart', itemSource());
+      project.writeFile(
+        '.agents/dartway-toolkit.json',
+        jsonEncode({
+          'settings': {'baseBranch': 'develop', 'releaseBranch': 'main'},
+        }),
+      );
+      await project.generateClean();
+      final release = baseline(project);
+      git(project, ['branch', 'develop', release]);
+      project.writeFile(
+        'app_shared/lib/src/extra.dart',
+        itemSource()
+            .replaceAll('ItemRecord', 'ExtraRecord')
+            .replaceAll('item.dw.dart', 'extra.dw.dart'),
+      );
+      // A task: generated and checked without touching the version.
+      final generated = await generatorCli(project, []);
+      expect(generated.exitCode, 0, reason: output(generated));
+      final checked = await generatorCli(project, ['--check']);
+      expect(checked.exitCode, 0, reason: output(checked));
+      expect(
+        output(checked),
+        contains('wait for the release to raise `version:` to 13.1.0'),
+      );
+      expect(version(), '13.0.0');
+      // An explicit baseline judges as before: the release CI.
+      final strict = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        release,
+      ]);
+      expect(strict.exitCode, 3, reason: output(strict));
+      // The release raises the version once and generates at it.
+      final released = await generatorCli(project, ['--release']);
+      expect(released.exitCode, 0, reason: output(released));
+      expect(version(), '13.1.0');
+      final path = 'app_shared/lib/generated/dw_contract.json';
+      final descriptor = jsonDecode(project.readFile(path)) as Map;
+      expect(descriptor['contractVersion'], '13.1.0');
+      expect(descriptor['objects']['ExtraRecord']['since'], '13.1.0');
+      final releaseChecked = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        release,
+      ]);
+      expect(releaseChecked.exitCode, 0, reason: output(releaseChecked));
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'a breaking change raises the line, a compatible one the next version',
+    () {
+      expect(
+        contractRaiseOf('13.0.0', ['raise `version:` above 13.0.0: X']),
+        '13.1.0',
+      );
+      expect(
+        contractRaiseOf('13.4.2', ['X.y: field removed/renamed']),
+        '14.0.0',
+      );
+      expect(
+        contractRaiseOf('0.7.2', ['raise `version:` above 0.7.2: X']),
+        '0.7.3',
+      );
+      expect(contractRaiseOf('0.7.2', ['X: kind/identity changed']), '0.8.0');
+    },
   );
 
   test(

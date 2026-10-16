@@ -61,6 +61,7 @@ migrations changed, otherwise `false`.
 
 ```bash
 CONTRACT_BASE="$(git merge-base HEAD origin/__BASE_BRANCH__)"  # resolve once; CI supplies its trusted SHA
+# with a releaseBranch in .agents/dartway-toolkit.json: drop both --contract-base arguments (D-158)
 (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check --contract-base "$CONTRACT_BASE")
 if "$RUN_MIGRATE_CHECK"; then
   (cd __SERVER_PKG__ && dart run bin/migrate.dart check)  # needs a database

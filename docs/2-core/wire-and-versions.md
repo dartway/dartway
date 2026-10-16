@@ -180,7 +180,9 @@ format 1 baselines are also accepted) from the same resolved models as the codec
 source-derived shape with a fixed committed Git baseline. Pass `--contract-base <revision>`; it is
 resolved once to a commit SHA and reported. Normal project check uses the configured base branch
 merge-base (including main/master); CI supplies a trusted base SHA explicitly. Working JSON edits,
-regeneration and feature commits do not replace that baseline.
+regeneration and feature commits do not replace that baseline. A project with a `releaseBranch`
+raises the version at the release instead: tasks generate at the current version against the release
+branch, and `generate --release` raises it once (D-158, [CLI](../5-tooling/cli.md#dartway-generate--the-generated-code)).
 
 Field/wire-name removals and renames, recursive type/nullability/patch/default changes, resolved
 request/result-kind changes, strict-enum additions/removals and enum openness changes are breaking.

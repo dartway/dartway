@@ -205,7 +205,9 @@ enum AcmeUpload with DwUploadPurpose {
 After any DTO (or row class) change: `dart run dartway_cli:dartway generate` from `__FLUTTER_PKG__`,
 commit the output with the change. Resolve a trusted baseline once with
 `git merge-base HEAD origin/__BASE_BRANCH__` and pass that SHA as `--contract-base <SHA>` to generation
-and checks. It writes `*.dw.dart`, `lib/generated/dw_protocol.dart` and the sorted
+and checks — unless `.agents/dartway-toolkit.json` names a `releaseBranch`: then pass no
+`--contract-base` and never edit `version:`; the release raises it (`generate --release`, D-158).
+It writes `*.dw.dart`, `lib/generated/dw_protocol.dart` and the sorted
 `lib/generated/dw_contract.json` here, row
 parts and `lib/generated/dw_schema.dart` in the server. Never edit them; a refused declaration is fixed
 in the declaration.
@@ -224,6 +226,9 @@ An installed build keeps calling with the contract it was built with, for weeks.
 | a new generated data object type | additive with a shared version above the trusted base (a patch is enough); generated `since` keeps its updates and deletions from older builds |
 | a request/command renamed or removed | `404` |
 | a refusal code renamed | its generic refusal text |
+
+With a `releaseBranch`, the next two paragraphs are the release's: a task keeps `version:` and its PR
+says which kind of change it is.
 
 Prefer the additive change. When a breaking one is unavoidable, **raise the breaking line of
 `__SHARED_PKG__/pubspec.yaml`'s `version:`** in the same change — the minor below 1.0, the major after —

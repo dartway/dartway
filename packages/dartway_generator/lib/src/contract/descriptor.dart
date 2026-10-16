@@ -661,3 +661,22 @@ Map<String, String> contractIntroductions(
           name as String: since,
   };
 }
+
+/// The shared package version that settles [changes] against a baseline at
+/// [previous] (D-158): a new breaking line for any incompatible change, else
+/// the next compatible version — a minor above 1.0, a patch on a `0.x` line,
+/// where the minor is the line.
+String contractRaiseOf(String previous, List<String> changes) {
+  final match = RegExp(r'^(\d+)\.(\d+)\.(\d+)').firstMatch(previous);
+  if (match == null) throw FormatException('not a semantic version', previous);
+  final [major, minor, patch] = [
+    for (final group in [1, 2, 3]) int.parse(match[group]!),
+  ];
+  final breaking = changes.any(
+    (change) => !change.startsWith('raise `version:`'),
+  );
+  if (major > 0) {
+    return breaking ? '${major + 1}.0.0' : '$major.${minor + 1}.0';
+  }
+  return breaking ? '0.${minor + 1}.0' : '0.$minor.${patch + 1}';
+}

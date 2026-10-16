@@ -2,7 +2,10 @@
 
 ## 0.22.0-dev.0
 
-- Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
+- With `releaseBranch` in the toolkit settings, a task's contract changes no
+  longer require raising `version:`: generation reports the raise and
+  `--release` applies it once, writing the shared pubspec and generating at the
+  new version (D-158). An explicit `--contract-base` stays strict.
 - The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).
 
 ## 0.21.0

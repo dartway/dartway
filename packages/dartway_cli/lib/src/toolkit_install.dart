@@ -30,6 +30,14 @@ void addToolkitInstallOptions(
       help: 'Base branch of THIS project (used by PR/commit skills).',
     )
     ..addOption(
+      'release-branch',
+      defaultsTo: '',
+      help:
+          'Branch THIS project releases into, when tasks merge into a base '
+          'branch of their own: the contract version is then raised by '
+          '`dartway generate --release`, not by each task.',
+    )
+    ..addOption(
       'language',
       defaultsTo: 'English',
       help:
@@ -68,6 +76,7 @@ class ToolkitInstallChoice {
   ToolkitInstallChoice({
     this.agent = 'both',
     required this.baseBranch,
+    this.releaseBranch = '',
     required this.language,
     required this.notesTracker,
     required this.channel,
@@ -104,6 +113,10 @@ class ToolkitInstallChoice {
     return ToolkitInstallChoice(
       agent: pick('agent', ToolkitProvenance.agentSetting),
       baseBranch: pick('base-branch', ToolkitProvenance.baseBranchSetting),
+      releaseBranch: pick(
+        'release-branch',
+        ToolkitProvenance.releaseBranchSetting,
+      ),
       language: pick('language', ToolkitProvenance.languageSetting),
       notesTracker: pick(
         'notes-tracker',
@@ -123,6 +136,7 @@ class ToolkitInstallChoice {
 
   final String agent;
   final String baseBranch;
+  final String releaseBranch;
   final String language;
   final String notesTracker;
   final String channel;
@@ -141,12 +155,14 @@ class ToolkitInstallChoice {
       baseBranch: baseBranch,
       language: language,
       notesTracker: notesTracker,
+      releaseBranch: releaseBranch,
     ),
   };
 
   void describe(StringSink out) {
     out.writeln('Agent integrations: $agent');
     out.writeln('Base branch: $baseBranch');
+    if (releaseBranch.isNotEmpty) out.writeln('Release branch: $releaseBranch');
     out.writeln('Project language: $language');
     out.writeln(
       notesTracker == ProjectLayout.noNotesTracker
