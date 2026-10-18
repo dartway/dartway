@@ -261,6 +261,12 @@ Two consequences that are easy to get wrong:
   (`AppEventCard.compactHeight`), not a public field on the feature. A feature may read a size; it
   may not assign one.
 
+The skeleton's `AppKeyboardInset` supplies one value for a sheet's keyboard-dependent height,
+padding and edges. On native iOS it follows the engine's animated `MediaQuery.viewInsets` directly;
+adding a second tween makes the sheet trail the keyboard. Web, including iOS browsers, and other
+platforms retain a 250 ms ease-out tween for inset steps. The native path is guarded by
+`!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS`.
+
 And the kit does not know the domain: it imports no app models and switches on no domain enums. If a
 widget picks an image from the reason a course is locked, the widget moves into the kit with two
 constructors and the domain `switch` stays in the feature as one line. The enum itself does not

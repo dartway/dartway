@@ -2,6 +2,12 @@
 
 ## 0.25.0-dev.0
 
+- Fix: `AppKeyboardInset` in the template and example follows native iOS engine
+  frames directly, avoiding a second tween and its trailing animation. Web and
+  other platforms retain step smoothing. The `dartway-on-device` skill now
+  distinguishes these paths (#578); existing copies can follow the
+  [migration note](../../docs/migrations/2026-10-18-native-ios-keyboard-insets.md).
+
 - Fix: native `deploy check` verifies secret-file mounts on the target before
   masking output, so a path stored in `FCM_SERVICE_ACCOUNT_FILE` no longer
   hides a correct per-file read-only bind from the checker (#587).
