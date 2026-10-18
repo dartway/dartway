@@ -334,3 +334,27 @@ font family is still a label that leaked into the kit, and is still reported.
 
 Finally: tempted to add a client-specific hack inside a framework widget? That is the signal an
 extension point is missing. Add it to your kit — do not fork `dartway_core_flutter`.
+
+
+## Quick-entry surface in the scaffold
+
+The template includes a reusable quick-entry pattern as source. Opt in on an app page with
+`AppScaffold.main(quickEntry: AppQuickSheetEntry(...))`: supply localized `openLabel` and
+`dismissLabel` strings and a `builder(context, inputFocus, dismiss)` that builds the feature. Attach
+`inputFocus` to its composer and call `dismiss` to close. Drafts and server reads stay in the feature;
+the template adds no domain data or server contract.
+
+The kit's `AppQuickSheetOverlay` reserves up to 70% of the screen while data loads. Keep it mounted
+and update `isOpen` so the slide-out can finish. Its `AppQuickSheetHistory` takes newest-first items,
+an `itemBuilder`, `itemCount`, a `loading` widget and `isReady`. Set `isReady` only once the initial
+items and their dependent cards are ready. A reversed list lays out the newest item at the bottom
+on its first visible frame, with no scroll correction; reopening starts at the newest item again.
+
+Native input focus is requested 150 ms into the 250 ms entrance. Native iOS keyboard insets are
+already animated, so `AppKeyboardInset` uses them directly; other platforms smooth step changes.
+On web, the scaffold focuses an invisible mounted primer synchronously in the opening gesture and
+transfers focus to the composer next frame, as required by iOS Safari.
+
+Navigation and its version footer stay mounted at the physical bottom under the keyboard and sheet.
+They start revealing as soon as dismissal begins, before the keyboard inset reaches zero. The sheet
+freezes its geometry while sliding out so keyboard dismissal cannot resize it in the opposite direction.

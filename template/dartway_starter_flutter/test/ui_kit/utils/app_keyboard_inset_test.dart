@@ -1,5 +1,6 @@
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 /// The keyboard, as a test can state it: a step change in `viewInsets`.
@@ -51,6 +52,35 @@ const _sheetPadding = 16.0;
 
 void main() {
   group('AppKeyboardInset', () {
+    testWidgets(
+      'native iOS tracks each keyboard frame without trailing motion',
+      (tester) async {
+        late double delivered;
+        Widget frame(double inset) => _withKeyboard(
+          inset,
+          AppKeyboardInset(
+            builder: (_, value) {
+              delivered = value;
+              return const SizedBox.shrink();
+            },
+          ),
+        );
+        await tester.pumpWidget(frame(0));
+        for (final inset in [40.0, 120.0, 220.0, 300.0, 180.0, 60.0, 0.0]) {
+          await tester.pumpWidget(frame(inset));
+          expect(
+            delivered,
+            inset,
+            reason: 'layout must follow the system frame',
+          );
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(delivered, inset, reason: 'no tween may trail the keyboard');
+        }
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.iOS),
+      skip: kIsWeb,
+    );
+
     testWidgets('hands a step change over gradually, not at once', (
       tester,
     ) async {
