@@ -70,7 +70,7 @@ dw = DwFlutterCore(
 
 | Field | Required by `DwFlutterCore` | What it is for |
 |---|---|---|
-| `appVersion` | yes | The build, `<semver>+<build>` (`1.4.2+57`). Sent on every call as `Dw-App-Version`; the server refuses a build below its minimum. Shown in error reports. |
+| `appVersion` | yes | The build, `<semver>+<build>` (`1.4.2+57`). Sent on every call as `Dw-App-Version`; it labels the session key created at sign-in. Shown in error reports. Compatibility is decided by `Dw-Contract-Version` and `Dw-Protocol`, as described in [wire and versions](../2-core/wire-and-versions.md#versions). |
 | `refusalText` | yes | Turns a `DwCallRefusal` — a code with parameters, never a sentence — into words. `dw.action` shows it. See [actions and refusal texts](actions-and-refusal-texts.md). |
 | `readLoadingBuilder` | yes | What a read shows while it loads with no placeholder to draw a skeleton from — in `DwReadBuilder`, `DwPagedListView`, `DwWindowListView`. The kit's, once. See [the data layer](data-layer.md#showing-a-read-dwreadbuilder). |
 | `readFailedBuilder` | yes | What a read shows when it was refused with no `onRefused` branch, failed, or could not reach the server: the kit's view, given a `retry`. |
@@ -79,8 +79,8 @@ dw = DwFlutterCore(
 | `confirmDialogBuilder` | no | Replaces the built-in `DwConfirmDialog` for `dw.action(confirmation: ...)`. |
 
 **Why four fields are required.** A server answers "no" with a code, and an app that cannot render
-the code shows the user nothing at all. A server that stops supporting old builds needs to know
-which build is calling. A read that fails into nothing reads as "there is nothing here". All of
+the code shows the user nothing at all. The app's build labels its session key and error reports.
+A read that fails into nothing reads as "there is nothing here". All of
 these failures are silent at runtime, so the constructor refuses a config
 without them — with an `ArgumentError` naming the field, before the core exists. A malformed
 `appVersion` (not `<semver>+<build>`) throws `FormatException` at the same moment.
