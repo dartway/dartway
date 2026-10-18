@@ -2,6 +2,12 @@
 
 ## 0.25.0-dev.0
 
+- Fix: Compose deployments pin both serving images as
+  `<project>-<service>:dw-previous` before building moves `:latest`. Retries
+  keep the original journal entries, restore missing or moved pins, and
+  refuse a missing rollback image before building or replacing a service
+  (#602, #589).
+
 - Fix: template and example Docker contexts exclude native app signing files
   (`key.properties`, `*.jks`, `*.keystore`, `*.p8`) at every depth (#588).
   Existing projects must update their copied `.dockerignore`; see the
