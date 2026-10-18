@@ -96,8 +96,13 @@ final class InvoiceRow extends DwTableRow with _$InvoiceRow {
   `@DwDefaultValue('sql')` for rows written without the column (existing rows when it is added) — a
   repository insert writes every column, so there the Dart default applies.
 - "Create or save" by an optional id: read the row by id and owner with a lock, then
-  `update(current.copyWith(...))`; `update(draft.withId(id))` only when the command carries every
-  column; a row keyed by a unique column is `upsert(draft, conflictOn: …)`.
+  `update(current.copyWith(...))`; build an update from the command alone with `draft.withId(id)`
+  only when it carries every column. A row keyed by a unique column uses
+  `upsert(draft, conflictOn: …)` only for a complete replacement of its non-key columns.
+  For shared draft/stored-row edits or derived values, use a
+  project-written `toDraft()` projection of every stored column and one helper on `New<Entity>Row`;
+  read under a transaction lock and restore `current.id` with `withId` for the update. See the
+  framework's [shared-edit example](https://github.com/dartway/dartway/blob/master/docs/migrations/2026-09-30-persisted-row-id.md#sharing-code-before-and-after-insert).
 - Append-only is a decision about the screen: answer which event applies an edit, how the person
   triggers it and what they see meanwhile, or do not choose it.
 

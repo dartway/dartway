@@ -16,6 +16,74 @@ void main() {
   );
   const entities = ['app_setting', 'club_service', 'club_session'];
 
+  test('the persisted-row migration shares edits and derived values through '
+      'a draft without losing stored fields', () async {
+    final note = File(
+      p.join(
+        frameworkPackages,
+        '..',
+        'docs',
+        'migrations',
+        '2026-09-30-persisted-row-id.md',
+      ),
+    ).readAsStringSync();
+    final example = RegExp(
+      r'## Sharing code before and after insert\s+[\s\S]*?```dart\n([\s\S]*?)```',
+    ).firstMatch(note);
+    expect(
+      example,
+      isNotNull,
+      reason: 'the migration needs a runnable shared-edit example',
+    );
+    final project = TempProject.create(['app_server'], serverOnCore: true);
+    project.writeFile('app_server/lib/invoice_rows.dart', example![1]!);
+    await project.generateClean();
+    expect(await project.analyze('app_server'), isNull);
+    project.writeFile('app_server/bin/shared_edit.dart', r'''
+import 'package:dartway_core_server/dartway_core_server.dart';
+import '../lib/invoice_rows.dart';
+
+void check(bool condition) {
+  if (!condition) throw StateError('shared invoice edit lost row state');
+}
+
+void main() {
+  const defaults = NewInvoiceRow(ownerProfileId: 7);
+  final created = applyInvoiceEdit(
+    defaults, amountCents: 900, note: const DwFieldPatch.set('first'),
+  );
+  check(created.ownerProfileId == 7 && created.amountCents == 900);
+  check(created.note == 'first' && created.ownerConfirmedAt == null);
+  check(!defaults.needsOwnerConfirmation && created.needsOwnerConfirmation);
+
+  final confirmedAt = DateTime.utc(2026, 9, 30);
+  final current = InvoiceRow(
+    id: 42, ownerProfileId: 19, amountCents: 700,
+    ownerConfirmedAt: confirmedAt, note: 'stored',
+  );
+  final updated = applyInvoiceEdit(
+    current.toDraft(), amountCents: 1200, note: const DwFieldPatch.set('edited'),
+  ).withId(current.id);
+  check(updated.id == 42 && updated.ownerProfileId == 19);
+  check(updated.amountCents == 700 && updated.ownerConfirmedAt == confirmedAt);
+  check(updated.note == 'edited' && !updated.toDraft().needsOwnerConfirmation);
+  check(current.note == 'stored');
+
+  final kept = applyInvoiceEdit(current.toDraft(), amountCents: 1200);
+  final cleared = applyInvoiceEdit(
+    kept, amountCents: 1200, note: const DwFieldPatch.clear(),
+  );
+  check(kept.note == 'stored' && cleared.note == null);
+  check(cleared.ownerProfileId == 19 && cleared.ownerConfirmedAt == confirmedAt);
+}
+''');
+    final result = await project.runScript(
+      'app_server',
+      'bin/shared_edit.dart',
+    );
+    expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
   group('dartway_orm reference fixtures', () {
     late TempProject project;
 
