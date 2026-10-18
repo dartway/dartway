@@ -123,6 +123,169 @@ void main() {
     });
   });
 
+  group('rollback images before building', () {
+    late Directory temp;
+    late DwDeployRunner runner;
+    late File calls;
+
+    setUp(() {
+      temp = Directory.systemTemp.createTempSync('dw_prebuild_images_');
+      final bin = Directory(p.join(temp.path, 'bin'))..createSync();
+      final images = Directory(p.join(temp.path, 'images'))..createSync();
+      calls = File(p.join(temp.path, 'calls'));
+      for (final service in ['server', 'web']) {
+        File(p.join(images.path, 'old-$service')).writeAsStringSync('');
+        File(
+          p.join(images.path, '$service:latest'),
+        ).writeAsStringSync('sha256:old-$service');
+      }
+      final docker = File(p.join(bin.path, 'docker'))
+        ..writeAsStringSync('''
+#!/bin/sh
+echo "\$*" >> '${calls.path}'
+cd '${images.path}' || exit 1
+case "\$*" in
+  info*) echo '${temp.path}' ;;
+  *" ps -aq server") echo server-container ;;
+  *" ps -aq web") echo web-container ;;
+  *" ps -q server") echo new-server-container ;;
+  "inspect -f "*"{{.State.Status}}"*) echo 'running healthy 0 0' ;;
+  "inspect -f {{.Config.Image}} "*) echo "shop-\${4%-container}:latest" ;;
+  "inspect -f {{.Image}} "*) echo "sha256:old-\${4%-container}" ;;
+  "inspect -f {{.Id}} "*) echo "\$4" ;;
+  "image inspect -f {{.Id}} "*)
+    image=\$5
+    case "\$image" in
+      shop-*) image=\$(cat "\${image#shop-}" 2>/dev/null) || exit 1 ;;
+    esac
+    [ -n "\$image" ] && [ -f "\${image#sha256:}" ] || exit 1
+    echo "\$image" ;;
+  "image tag "*)
+    [ -f "\${3#sha256:}" ] || exit 1
+    printf '%s' "\$3" > "\${4#shop-}" ;;
+  "ps -aq --no-trunc --filter ancestor="*)
+    echo "\${5#ancestor=sha256:old-}-container" ;;
+  *" build")
+    for service in server web; do
+      # Model containerd dropping the old exported image when latest moves,
+      # even though the old container remains running.
+      [ "\$(cat "\$service:dw-previous" 2>/dev/null)" = "sha256:old-\$service" ] || rm -f "old-\$service"
+      touch "new-\$service"
+      printf '%s' "sha256:new-\$service" > "\$service:latest"
+    done ;;
+esac
+''');
+      final df = File(p.join(bin.path, 'df'))
+        ..writeAsStringSync('''
+#!/bin/sh
+echo 'Filesystem 1024-blocks Used Available Capacity Mounted on'
+echo 'test-disk 31457280 0 20971520 0% ${temp.path}'
+''');
+      Process.runSync('chmod', ['+x', docker.path, df.path]);
+      runner = DwDeployRunner(
+        ssh: LocalShell(
+          environment: {'PATH': '${bin.path}:${Platform.environment['PATH']}'},
+        ),
+        stack: stackFrom(),
+        appDir: temp.path,
+        storeDir: p.join(temp.path, 'state'),
+      );
+    });
+    tearDown(() => temp.deleteSync(recursive: true));
+
+    test(
+      'both serving images survive latest moving and a resumed build',
+      () async {
+        final first = await runner.build();
+        expect(first.ok, isTrue, reason: first.stderr);
+        for (final service in ['server', 'web']) {
+          expect(
+            File(
+              p.join(temp.path, 'images', '$service:dw-previous'),
+            ).readAsStringSync(),
+            'sha256:old-$service',
+          );
+          expect(
+            File(p.join(temp.path, 'images', 'old-$service')).existsSync(),
+            isTrue,
+          );
+          expect(
+            File(
+              p.join(temp.path, 'state/deploy-run', '$service.previous'),
+            ).readAsStringSync().trim(),
+            'sha256:old-$service',
+          );
+        }
+        // A missing or moved pin must not change the original rollback target.
+        File(
+          p.join(temp.path, 'images/server:dw-previous'),
+        ).writeAsStringSync('sha256:new-server');
+        File(p.join(temp.path, 'images/web:dw-previous')).deleteSync();
+        final resumed = await runner.build();
+        expect(resumed.ok, isTrue, reason: resumed.stderr);
+        expect(File(p.join(temp.path, 'images/old-web')).existsSync(), isTrue);
+        final web = await runner.startWeb();
+        expect(web.ok, isTrue, reason: web.stderr);
+        for (final service in ['server', 'web']) {
+          expect(
+            File(
+              p.join(temp.path, 'images', '$service:dw-previous'),
+            ).readAsStringSync(),
+            'sha256:old-$service',
+          );
+          expect(
+            File(
+              p.join(temp.path, 'state/deploy-run', '$service.previous'),
+            ).readAsStringSync().trim(),
+            'sha256:old-$service',
+          );
+        }
+      },
+    );
+
+    for (final service in ['server', 'web']) {
+      for (final resumed in [false, true]) {
+        test(
+          'a missing $service rollback image refuses '
+          '${resumed ? 'a resumed' : 'a fresh'} build before changing services',
+          () async {
+            if (resumed) {
+              final first = await runner.build();
+              expect(first.ok, isTrue, reason: first.stderr);
+              calls.writeAsStringSync('');
+            }
+            File(p.join(temp.path, 'images', 'old-$service')).deleteSync();
+            final result = await runner.build();
+            expect(result.ok, isFalse, reason: result.stderr);
+            expect(result.stderr, contains('$service'));
+            expect(result.stderr, contains('rollback image'));
+            expect(calls.readAsStringSync(), isNot(contains(' build\n')));
+            expect(calls.readAsStringSync(), isNot(contains(' stop ')));
+            expect(calls.readAsStringSync(), isNot(contains(' up ')));
+          },
+        );
+      }
+
+      test(
+        'a vanished journalled $service image refuses replacement',
+        () async {
+          final built = await runner.build();
+          expect(built.ok, isTrue, reason: built.stderr);
+          calls.writeAsStringSync('');
+          File(p.join(temp.path, 'images', 'old-$service')).deleteSync();
+          final result = await (service == 'server'
+              ? runner.replaceServer()
+              : runner.startWeb());
+          expect(result.ok, isFalse, reason: result.stderr);
+          expect(result.stderr, contains('$service'));
+          expect(result.stderr, contains('rollback image'));
+          expect(calls.readAsStringSync(), isNot(contains(' stop ')));
+          expect(calls.readAsStringSync(), isNot(contains(' up ')));
+        },
+      );
+    }
+  });
+
   group('the order of a deployment', () {
     final runner = DwDeployRunner(
       ssh: RecordingSsh(),

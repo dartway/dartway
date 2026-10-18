@@ -28,3 +28,8 @@
 **/pubspec_overrides.yaml
 # The rendered server environment holds secrets; it never enters an image.
 **/.env
+# Native app signing material is never an input to a server or web image.
+**/key.properties
+**/*.jks
+**/*.keystore
+**/*.p8

@@ -372,7 +372,7 @@ dw_wait_healthy() {
     return _as("rm -rf '$_journalDirectory'\n");
   }
 
-  // Written before replacement, once per deployment: a retry or a resumed
+  // Written before building, once per deployment: a retry or a resumed
   // cleanup must retain the original rollback image, not the newly serving one.
   String _rememberImage(String service) {
     final unresolved = withoutRollbackImage
@@ -409,8 +409,8 @@ if [ ! -f '$_journalDirectory/$service.previous' ]; then
         $unresolved
       fi
     fi
-    # The containerd store can drop an untagged exported image once its
-    # container is removed. Pin it before replacement, not during cleanup.
+    # The containerd store can drop the old exported image as soon as a
+    # build moves latest, even while its container still runs. Pin it first.
     if [ -s '$_journalDirectory/$service.previous.tmp' ]; then
       docker image tag "\$(cat '$_journalDirectory/$service.previous.tmp')" '${target.projectName}-$service:dw-previous'
     fi
@@ -418,6 +418,20 @@ if [ ! -f '$_journalDirectory/$service.previous' ]; then
     : >'$_journalDirectory/$service.previous.tmp'
   fi
   mv '$_journalDirectory/$service.previous.tmp' '$_journalDirectory/$service.previous'
+else
+  # A journal entry is not proof that Docker still has the rollback image.
+  # Never replace it with the newly serving image when resuming a deployment.
+  rollback_image=\$(cat '$_journalDirectory/$service.previous')
+  if [ -n "\$rollback_image" ]; then
+    if ! docker image inspect -f '{{.Id}}' "\$rollback_image" >/dev/null 2>&1; then
+      echo "The $service rollback image (\$rollback_image) recorded for this deployment is missing; refusing to build or replace services because rollback cannot work. Restore the image or start a fresh deployment without --resume." >&2
+      exit 1
+    fi
+    pinned_image=\$(docker image inspect -f '{{.Id}}' '${target.projectName}-$service:dw-previous' 2>/dev/null) || pinned_image=
+    if [ "\$pinned_image" != "\$rollback_image" ]; then
+      docker image tag "\$rollback_image" '${target.projectName}-$service:dw-previous'
+    fi
+  fi
 fi
 """;
   }
