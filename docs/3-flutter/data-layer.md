@@ -350,6 +350,11 @@ DwReadBuilder(
 `DwReadBuilder`, `DwPagedListView` and `DwWindowListView` shows them. No screen spells its own
 spinner — `CircularProgressIndicator` outside `ui_kit/` is `forbiddenProgressIndicator`.
 
+Moving from per-screen loading/error builders to these app-wide views changes the product's
+skeletons, titles and icons. Review those states as part of migration acceptance. `placeholder`
+preserves a skeleton based on data; `onRefused` preserves a view for a particular refusal. Neither
+is a general per-screen error-builder override.
+
 **Several reads nest.** The inner builder stands in the outer one's `builder`; each loads, fails and
 retries on its own.
 

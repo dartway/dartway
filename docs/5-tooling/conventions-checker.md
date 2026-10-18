@@ -174,7 +174,7 @@ Forty-three errors, twelve warnings, one info — `DwCheckType` and its `severit
 | `forbiddenNavigationCall` | error | `showDialog`, `showModalBottomSheet`, `showCupertino…` and their siblings, `Navigator.push…` or a page route (`MaterialPageRoute`, …) outside `ui_kit/` and `core/router/`; `Navigator.pop`, `GoRouter.of(…).pop` or `context.pop` anywhere |
 | `sentinelId` | error | A route parameter set to `0` or `-1` — `…Params.<name>.set(0)` |
 | `relativeImport` | error | A relative `import`/`export` in `lib/` of the Flutter, server or shared package — `lib/` imports by `package:` only. Generated files are passed over; `--fix` rewrites the rest |
-| `testLayout` | error | A test that mirrors no `lib/` path (`test/<path>_test.dart` for `lib/<path>.dart`, `test/<path>/<folder>/<folder>[_<scenario>]_acceptance_test.dart` for `lib/<path>/<folder>/`), a helper outside `test/support/`, or a test inside it; `--fix` moves a root-level acceptance test to `test/src/<feature>/` |
+| `testLayout` | error | A test that mirrors no `lib/` path (`test/<path>_test.dart` for `lib/<path>.dart`, `test/<path>/<folder>/<folder>[_<scenario>]_{acceptance,contract}_test.dart` for `lib/<path>/<folder>/`), a helper outside `test/support/`, or a test inside it; `--fix` moves a root-level acceptance test to `test/src/<feature>/` |
 | `testHarnessBypassed` | error | Outside `test/support/`: a `ProviderScope` or a `DwFakeServer` built by a widget test, a `DwTestServer.start` or a `DwAppServer` by a server test |
 | `rawSpacing` | error | Outside `ui_kit/`: a number instead of an `AppSpace` step in a spacer `SizedBox`, a `Gap`, an `EdgeInsets.*`, or a `spacing:`/`runSpacing:`/`mainAxisSpacing:`/`crossAxisSpacing:` — conditionals included. Zero passes; a `SizedBox` with a `child:` or both dimensions, and `SizedBox.square`, are sizes, not spacing |
 | `lintsPluginMissing` | error | The Flutter package's `analysis_options.yaml` does not enable the `dartway_lints` plugin; `dartway update --target <sha>` adds it after resolution preflight; plan first with `--plan` |
@@ -407,7 +407,12 @@ state holder reached through a subclass of the project's own, nor a `Notifier` n
 `dw.files.getLink` from a widget — nor refusal text built outside the catalogue. A `<Feature>Commands`
 class holds command senders only — a pure helper on it reads as a command sent outside `dw.action`.
 Only the first argument of `dw.action(…)` counts as inside it: a command in
-`followUpIfMountedAction` runs after the action's refusal handling is over.
+`followUpIfMountedAction` runs after the action's refusal handling is over. A local final closure
+used only in that first argument is also recognized; any use outside action work keeps the finding.
+The scan cannot trace a callback through another widget's file: pass a built `DwUiAction` at that
+boundary. Shared command-owning UI goes in `common/<feature>/` with its sender in `logic/`; pure
+helpers stay in `shared/`, and non-visual framework helpers may live in `core/` (for example
+`core/storage/` for file links).
 
 ## Why `notAFeature` and `featureSpecMissing` are one rule
 
@@ -547,7 +552,11 @@ for each.
   `test/src/chat/chat_attachments_acceptance_test.dart`, the `<feature>_*` naming a feature's own
   files follow. A scenario across features names the feature that owns it. The acceptance form names
   the folder rather than its `_feature.dart`, because it drives the feature's handlers, rows and
-  publications together, which is a test of the folder, not of the file that registers it. Helpers are in
+  publications together, which is a test of the folder, not of the file that registers it. A shared
+  feature's contract across several files has the same ownership rule:
+  `test/src/chat/chat_contract_test.dart` or `chat_updates_contract_test.dart` for `lib/src/chat/`.
+  Script tests live in `tool/test/` outside this scan and need an explicit `dart test tool/test`
+  command in CI; the default runner does not discover them. Helpers are in
   `test/support/`, and the harness there is how a test starts what it needs
   (`testHarnessBypassed`).
 - **Spacing is a token** (`rawSpacing`): the kit's `AppSpace` scale, a closed set named by value, so

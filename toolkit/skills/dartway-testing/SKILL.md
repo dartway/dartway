@@ -34,7 +34,12 @@ cannot prove the button sends the right command.
 **Where the file goes** (`testLayout`, `testHarnessBypassed`): at the mirror of what it tests —
 `lib/src/core/files.dart` → `test/src/core/files_test.dart`; a server feature through its calls →
 `test/src/invoices/invoices_acceptance_test.dart` (`check --fix` moves a root-level one);
-the contract → `test/<shared package>_test.dart`. A test walking through two features is split by
+the whole contract → `test/<shared package>_test.dart`, or one shared feature's several files →
+`test/src/<feature>/<feature>_contract_test.dart` (scenario:
+`<feature>_<scenario>_contract_test.dart`). Folder-wide acceptance and contract names must start with
+the owning folder's name. Tests of `tool/` scripts live in `tool/test/`, outside the package's
+`test/` mirror rule; run `dart test tool/test` explicitly from that package and add it to CI, because
+the default runner discovers only `test/`. Their helpers may live in `tool/test/support/`. A test walking through two features is split by
 feature, what they share moved into the harness. Helpers and the
 harness live in `test/support/`, imported relatively; a test builds no server, fake server or
 `ProviderScope` of its own — a configuration it needs is a method on the harness.

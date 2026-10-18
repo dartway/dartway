@@ -37,6 +37,16 @@ class CoursePage extends HookConsumerWidget {
       expect(linesOf('app/course/course_page.dart', source, read), [3, 5, 6]);
     });
 
+    test('parentheses around a watched value keep its binding (#446)', () {
+      const source = '''
+Widget build(BuildContext context, WidgetRef ref) {
+  final course = (ref.watch(dw.request(GetCourse(id))));
+  return Text(course.value!.title);
+}
+''';
+      expect(linesOf('app/course/course_page.dart', source, read), [3]);
+    });
+
     test('a switch or a case pattern over it is refused, and so is a read '
         'bound to a name first', () {
       const source = '''

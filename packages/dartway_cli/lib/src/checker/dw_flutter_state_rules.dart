@@ -276,7 +276,7 @@ class DwFlutterStateInspector {
           'followUpIfMountedAction',
         );
       }
-      final actions = _firstArgumentSpans(code, _dwAction);
+      final actions = _actionWorkSpans(code);
       for (final match in _commandsCall.allMatches(code)) {
         if (actions.any((s) => match.start >= s.$1 && match.start < s.$2)) {
           continue;
@@ -429,6 +429,60 @@ class DwFlutterStateInspector {
   ];
 
   static final _catchClause = RegExp(r'\s*(?:catch\s*\(|on\s+[A-Za-z_])');
+
+  /// Also recognize a final closure handed to an action locally. Every use
+  /// must be in action work: passing it to another widget or invoking it
+  /// directly cannot prove that the command is guarded.
+  static List<(int, int)> _actionWorkSpans(String code) {
+    final direct = _firstArgumentSpans(code, _dwAction);
+    final result = [...direct];
+    for (final binding in RegExp(
+      r'(?<![\w$.])final\s+(\w+)\s*=\s*\(',
+    ).allMatches(code)) {
+      final parametersEnd = _closing(code, binding.end - 1);
+      final body = RegExp(
+        r'\s*(?:async\s*)?(=>|\{)',
+      ).matchAsPrefix(code, parametersEnd);
+      if (body == null) continue;
+      final end = body.group(1) == '{'
+          ? _closing(code, body.end - 1)
+          : _expressionEnd(code, body.end);
+      // Stay within the declaration's enclosing block, including nested
+      // blocks. Identically named callbacks in other methods are unrelated.
+      final blocks = <int>[];
+      for (var i = 0; i < binding.start; i++) {
+        if (code[i] == '{') blocks.add(i);
+        if (code[i] == '}' && blocks.isNotEmpty) blocks.removeLast();
+      }
+      final scopeEnd = blocks.isEmpty
+          ? code.length
+          : _closing(code, blocks.last);
+      final uses =
+          RegExp('(?<![\\w\$])${RegExp.escape(binding.group(1)!)}(?![\\w\$])')
+              .allMatches(code.substring(end, scopeEnd))
+              .map((use) => end + use.start)
+              .toList();
+      if (uses.isNotEmpty &&
+          uses.every((at) => direct.any((s) => at >= s.$1 && at < s.$2))) {
+        result.add((binding.end, end));
+      }
+    }
+    return result;
+  }
+
+  static int _expressionEnd(String code, int start) {
+    var depth = 0;
+    for (var i = start; i < code.length; i++) {
+      final char = code[i];
+      if (char == '(' || char == '[' || char == '{') depth++;
+      if (char == ')' || char == ']' || char == '}') {
+        if (depth == 0) return i;
+        depth--;
+      }
+      if ((char == ';' || char == ',') && depth == 0) return i;
+    }
+    return code.length;
+  }
 
   /// The span of the first argument of every call [opening] matches (ending
   /// in `(`) — the work `dw.action` runs, not `followUpIfMountedAction` or the

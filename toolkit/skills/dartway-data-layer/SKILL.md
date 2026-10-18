@@ -119,6 +119,27 @@ widget needs is unwrapped in the logic function (`(await dw.command(…)).valueO
 - A command two features send is one more feature, not a copy in each.
 - "Already paid" is the invoice's status in the watched list, not a local set the widget keeps.
 
+Shared command-owning UI is a feature in `common/<feature>/`, with its sender in `logic/`.
+A passive kit widget takes a `DwUiAction` built by its owner and runs it through `DwActionBuilder`.
+Keep pure helpers in `shared/`; a non-visual framework helper several features need (such as a
+private file link) belongs in `core/storage/`, where `valueOrThrow` is allowed. Do not add `logic/`
+under `shared/`.
+
+The checker recognizes a local final closure used only in `dw.action`'s first argument. It cannot
+follow a raw callback through another widget's file: pass the built action at that boundary.
+Read detection is also a source scan; zero findings does not prove no manual async-state rendering
+remains behind a helper or derived provider. Review those call sites.
+
+**A command outcome rendered as the screen** belongs to a flow controller in `logic/`. Capture it
+into state and let the operation return `Future<void>` normally for handled outcomes; a guarded
+button runs it without success notifications or success follow-ups. The view uses the same refusal
+catalogue, handles a signed-out session, and reports unexpected failures through `dw.handleError`
+with source `manual` (or lets `DwReadBuilder.derived` report them as `asyncBuild`, once). Keep the
+error policy from adding a toast to that screen-owned failure. Returning or throwing the handled
+refusal back to `dw.action` displays it twice; `onError` cannot suppress the toast. A server mutation
+stays a command. See the framework repository's
+[inline outcome guidance](https://github.com/dartway/dartway/blob/master/docs/3-flutter/actions-and-refusal-texts.md#when-the-outcome-is-the-screen).
+
 ## 5. Refusal texts
 
 `DwFlutterConfig.refusalText` turns a code into words: the skeleton's `lib/core/refusal_text.dart`, an

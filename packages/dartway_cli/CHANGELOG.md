@@ -2,6 +2,12 @@
 
 ## 0.25.0-dev.0
 
+- Fix: recognize local final command callbacks used only as `dw.action` work,
+  detect parenthesized watched-read bindings, and accept feature-wide
+  `<feature>[_<scenario>]_contract_test.dart` files. Clarify Flutter migration
+  presentation, shared helpers, hosted views, inline command outcomes, checker
+  limits and script-test CI discovery in the docs and toolkit (#446).
+
 - Fix: the template maps user cards in a batch, loading identities and avatar
   URLs once and sharing them with the nested profiles. A single card uses a
   batch of one (#418).
