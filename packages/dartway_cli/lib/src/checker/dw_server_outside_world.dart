@@ -17,8 +17,9 @@ import 'dw_dart_source.dart';
 ///   `DwLocalEnvironment.overlay(…)`, and no map read by a variable's name
 ///   (`env['PORT']`): an entry point reads through `AppEnvironment.read`;
 /// - [DwCheckType.forbiddenHttpClient] — `dart:io`'s `HttpClient(` or an
-///   import of `package:http/…` anywhere in `lib/`: an outbound request is
-///   `ctx.http`, bounded, logged and faked by the test server.
+///   import of `package:http/…`, or `DwOutboundHttp.network`, anywhere in
+///   `lib/`: an outbound request is `ctx.http`, bounded, logged and faked by
+///   the test server.
 ///
 /// Comments and strings are not code; an interpolation is. Known limits:
 /// another client package (`dio`, `package:http`'s re-exports through a
@@ -64,7 +65,10 @@ class DwServerOutsideWorldInspector {
       (filterSeverity == null || filterSeverity == type.severity);
 
   static final _environment = RegExp(r'\bPlatform\s*\.\s*environment\b');
-  static final _httpClient = RegExp(r'\bHttpClient\s*(\(|\.\s*new\b)');
+  static final _httpClient = RegExp(
+    r'\bHttpClient\s*(\(|\.\s*new\b)|'
+    r'\bDwOutboundHttp\s*\.\s*network\b',
+  );
   static final _httpImport = RegExp(
     r'''^\s*(import|export)\s+['"]package:http/''',
     multiLine: true,
@@ -97,7 +101,7 @@ class DwServerOutsideWorldInspector {
     ]..sort((a, b) => a.$1.compareTo(b.$1));
   }
 
-  /// Lines of [content] that construct `HttpClient` or import `package:http`.
+  /// Lines that construct or tear off a standalone client, or import `package:http`.
   static List<int> httpClientsIn(String content) => {
     ..._lines(_code(content), _httpClient),
     ..._lines(_code(content, keepWordsAndPaths: true), _httpImport),

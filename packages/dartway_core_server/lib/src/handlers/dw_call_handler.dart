@@ -37,6 +37,8 @@ sealed class DwAccessRule {
   /// are not theirs. For "is this mine" and "am I in this project": the rule
   /// every handler used to write inline after `signedIn`, and the one that
   /// drifted into three different answers to the same question.
+  /// Resource refusals are call-level (`field` is null): a rule may load a
+  /// parent or a record, so it does not infer an input field.
   ///
   /// [R] is whatever the handler needs from the check — a row, or a record
   /// of the row and the parent that decided (a message and the caller's

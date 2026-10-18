@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Keep standalone `DwOutboundHttp.network` construction and tear-offs out of
+  server `lib/` with `forbiddenHttpClient`; server code uses the bounded,
+  test-faked `ctx.http` (#444).
+
 - Tests: synchronize the deployment busy-refusal check with the real detached
   process's startup and release, avoiding its fixed sleep window (#613).
 

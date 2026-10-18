@@ -200,6 +200,32 @@ final port = int.parse(env['PORT'] ?? '8080');
       });
     });
 
+    test('standalone network clients stay outside server lib', () {
+      write('lib/src/sms/sms_handlers.dart', '''
+final client = DwOutboundHttp.network();
+final factory = server.DwOutboundHttp.network;
+// DwOutboundHttp.network();
+final text = 'DwOutboundHttp.network()';
+''');
+      for (final folder in ['bin', 'tool', 'test']) {
+        write('$folder/send.dart', 'final client = DwOutboundHttp.network();');
+      }
+      final inspector = DwServerOutsideWorldInspector(serverPackageDir: server);
+      expect(inspector.run(), 2);
+      expect(
+        inspector.findings.map((finding) => finding.$1),
+        everyElement(DwCheckType.forbiddenHttpClient),
+      );
+      expect(inspector.findings.map((finding) => finding.$2), [
+        contains(
+          p.join('shop_server', 'lib', 'src', 'sms', 'sms_handlers.dart:1;'),
+        ),
+        contains(
+          p.join('shop_server', 'lib', 'src', 'sms', 'sms_handlers.dart:2;'),
+        ),
+      ]);
+    });
+
     test('passes a server that reads AppEnvironment and sends through '
         'ctx.http', () {
       write('lib/src/core/environment.dart', '''

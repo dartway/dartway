@@ -235,8 +235,8 @@ enum DwCheckType {
   /// .overlay(Platform.environment))` — and parses nothing itself.
   forbiddenEnvironmentRead,
 
-  /// `dart:io`'s `HttpClient(` or an import of `package:http/…` in the
-  /// server package's `lib/` (dartway/dartway#386).
+  /// `dart:io`'s `HttpClient(`, `DwOutboundHttp.network`, or an import of
+  /// `package:http/…` in the server package's `lib/` (dartway/dartway#386).
   ///
   /// An outbound request is `ctx.http`: bounded by a timeout, logged through
   /// the server's log, and answered by the test server's fake. A client of a

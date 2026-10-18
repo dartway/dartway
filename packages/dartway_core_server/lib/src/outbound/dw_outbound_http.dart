@@ -8,6 +8,7 @@ import 'package:http/io_client.dart';
 import 'package:meta/meta.dart';
 
 import '../alerts/dw_server_logger.dart';
+import '../server/dw_server_settings.dart';
 
 /// Requests from the server to somebody else's HTTP API — an SMS gateway, a
 /// CRM, a model provider — as `ctx.http`, in handlers, jobs, routes and
@@ -41,20 +42,52 @@ import '../alerts/dw_server_logger.dart';
 /// and its connection for as long as the other side takes to answer. Commit
 /// first (`transactional: false`, a job), then call out.
 final class DwOutboundHttp {
+  /// A network client for a command-line tool with no running server.
+  ///
+  /// Reuses its connections until [close]. The caller owns its lifetime:
+  /// close it in `finally`. Handlers use `ctx.http`, whose transport and
+  /// lifetime belong to the server and whose tests use the server's fake.
+  factory DwOutboundHttp.network({
+    DwServerSettings settings = const DwServerSettings(),
+    DwServerLogger log = const DwConsoleLogger(),
+  }) => DwOutboundHttp(
+    DwNetworkTransport(connectionTimeout: settings.outboundTimeout),
+    log: log,
+    timeout: settings.outboundTimeout,
+    maxResponseBytes: settings.outboundMaxResponseBytes,
+    ownsTransport: true,
+  );
+
   @internal
   DwOutboundHttp(
     this._transport, {
     required DwServerLogger log,
     required Duration timeout,
     required int maxResponseBytes,
+    bool ownsTransport = false,
   }) : _log = log,
        _timeout = timeout,
-       _maxResponseBytes = maxResponseBytes;
+       _maxResponseBytes = maxResponseBytes,
+       _ownsTransport = ownsTransport;
 
   final DwOutboundTransport _transport;
   final DwServerLogger _log;
   final Duration _timeout;
   final int _maxResponseBytes;
+  final bool _ownsTransport;
+
+  /// Closes the connections owned by a [DwOutboundHttp.network] client.
+  ///
+  /// Throws [StateError] for a context or fake client: its transport belongs
+  /// to the server or fake, and closing it here would affect other callers.
+  void close() {
+    if (!_ownsTransport) {
+      throw StateError(
+        'Only a DwOutboundHttp.network client owns its transport',
+      );
+    }
+    _transport.close();
+  }
 
   /// `GET` [url].
   Future<DwOutboundResponse> get(
