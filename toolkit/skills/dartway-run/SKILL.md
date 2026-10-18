@@ -94,7 +94,15 @@ deployments' `branch:` values after successful `CI` (PR builds do not push).
 Enable CI pushes on those branches. Install the workflow on the default branch
 before its `workflow_run` trigger can run. CI checks `deploy kamal --check` next
 to generation whenever a Studio manifest is present. The template ships no
-pre-generated deployment files or Images workflow.
+pre-generated deployment files or Images workflow. The manifest declares
+`__SERVER_PKG__/lib/src/migrations/**` and `__SERVER_PKG__/pubspec.lock` as migration
+paths relative to the repository root. Images supplies the workflow run number
+as Docker's `BUILD_NUMBER` argument; the web Dockerfile passes it to Flutter's
+`--build-number` and defaults to `0` for local builds. Existing SHA images are
+skipped and keep their first build number. For an existing project, regenerate
+the deployment files and add the argument to its project-owned web Dockerfile
+as described in the framework repository's
+[migration note](https://github.com/dartway/dartway/blob/master/docs/migrations/2026-10-18-studio-migrations-and-build-number.md).
 Project HTTP routes are reached on the API host. The app host forwards only
 `/dw/`, so route changes do not affect generated Kamal web configuration or
 reserve Flutter page paths. Routes match exact paths, with no `:id` parameters.

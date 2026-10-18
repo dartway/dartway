@@ -1,9 +1,13 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartway_cli/src/deploy/kamal.dart';
+import 'package:glob/glob.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
+
+import 'support/deploy_fixtures.dart';
 
 /// `dartway create` over this repository's own template: what a stranger's
 /// project is named after, and what it resolves against.
@@ -15,6 +19,7 @@ import 'package:yaml/yaml.dart';
 /// The CLI runs as a process of its own, in a folder of its own: `create`
 /// works in the current directory, and the current directory of this process
 /// is shared by every suite running beside this one.
+
 void main() {
   final repository = () {
     var dir = Directory.current.absolute;
@@ -61,6 +66,45 @@ void main() {
 
   String read(Directory project, String path) =>
       File(p.join(project.path, path)).readAsStringSync();
+
+  test(
+    'created project migration globs cover its registry and server lock',
+    () async {
+      final project = await create(['shop', '--local-repo', repository.path]);
+      File(
+        p.join(project.path, 'deploy/config.yaml'),
+      ).writeAsStringSync(configYaml());
+      // Generation needs only the resolved CLI version, not a network resolution.
+      File(p.join(project.path, 'shop_flutter/pubspec.lock')).writeAsStringSync(
+        File('test/fixtures/kamal/hosted.lock').readAsStringSync(),
+      );
+      final generator = DwKamalGenerator(project)..generate();
+      final studioFile = File(p.join(project.path, 'deploy/studio.yml'));
+      final studio = loadYaml(studioFile.readAsStringSync()) as YamlMap;
+      final migrations = (studio['migrations'] as YamlList?)?.cast<String>();
+      expect(migrations, isNotNull);
+      expect(migrations, [
+        'shop_server/lib/src/migrations/**',
+        'shop_server/pubspec.lock',
+      ]);
+      final registry = 'shop_server/lib/src/migrations/migrations.dart';
+      expect(File(p.join(project.path, registry)).existsSync(), isTrue);
+      for (final path in [registry, 'shop_server/pubspec.lock']) {
+        expect(
+          migrations!.any((pattern) => Glob(pattern).matches(path)),
+          isTrue,
+          reason: path,
+        );
+      }
+      expect(generator.generate(check: true), isEmpty);
+      studioFile.writeAsStringSync(
+        studioFile.readAsStringSync().replaceFirst('migrations:', 'omitted:'),
+      );
+      final drifted = studioFile.readAsStringSync();
+      expect(generator.generate(check: true), contains('deploy/studio.yml'));
+      expect(studioFile.readAsStringSync(), drifted);
+    },
+  );
 
   group('git initialization (#599)', () {
     final environment = {
@@ -222,12 +266,13 @@ void main() {
       ], workingDirectory: repository.path)).stdout.toString().trim();
       expect(revision, hasLength(40));
       Set<String> overridden(String package) {
-        final yaml = loadYaml(read(project, '$package/pubspec.yaml')) as YamlMap;
-        return (yaml['dependency_overrides'] as YamlMap)
-            .keys
+        final yaml =
+            loadYaml(read(project, '$package/pubspec.yaml')) as YamlMap;
+        return (yaml['dependency_overrides'] as YamlMap).keys
             .cast<String>()
             .toSet();
       }
+
       expect(overridden('shop_shared'), {
         'dartway_analytics_shared',
         'dartway_core_shared',
@@ -254,10 +299,7 @@ void main() {
       for (final package in ['shop_shared', 'shop_server', 'shop_flutter']) {
         final text = read(project, '$package/pubspec.yaml');
         expect(
-          RegExp(
-            r'      ref: [0-9a-f]{40}$',
-            multiLine: true,
-          ).allMatches(text),
+          RegExp(r'      ref: [0-9a-f]{40}$', multiLine: true).allMatches(text),
           isNotEmpty,
         );
         expect(text, isNot(contains('dartway_lints:')));

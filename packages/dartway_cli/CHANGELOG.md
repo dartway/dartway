@@ -108,6 +108,12 @@
   backend address, so one image serves every destination. Deploy checks require
   the backend build argument only when the Dockerfile declares it (#530).
 
+- Fix: generated Studio manifests declare the actual server migration and lock
+  paths. Images pass the workflow run number into web builds, preserving SHA
+  image identities and build-once behavior (#566). Existing projects must
+  regenerate Kamal files and update their web Dockerfile; see the
+  [migration note](../../docs/migrations/2026-10-18-studio-migrations-and-build-number.md).
+
 ## 0.24.0
 
 - Fix: toolkit manifests no longer record machine-local pub-cache clone paths,

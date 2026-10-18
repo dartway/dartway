@@ -20,6 +20,7 @@ dependencies:
   yaml: ^3.1.2
 
 dev_dependencies:
+  glob: ^2.1.3
   # The local stack proof signs a presigned S3 upload the way the framework
   # does, to prove the rendered storage host lets one through.
   crypto: ^3.0.0

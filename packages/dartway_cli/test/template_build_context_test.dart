@@ -97,6 +97,30 @@ void main() {
     );
   }
 
+  for (final (tree, package) in [
+    ('template', 'dartway_starter_flutter'),
+    ('example', 'dartway_example_flutter'),
+  ]) {
+    test(
+      '$tree: web builds accept a build number after dependency resolution',
+      () {
+        final dockerfile = File(
+          p.join(repository.path, tree, package, 'Dockerfile'),
+        ).readAsStringSync();
+        expect(dockerfile, contains('ARG BUILD_NUMBER=0'));
+        expect(dockerfile, contains(r'--build-number=$BUILD_NUMBER'));
+        expect(
+          dockerfile.indexOf('ARG BUILD_NUMBER=0'),
+          greaterThan(dockerfile.indexOf('RUN flutter pub get')),
+        );
+        expect(
+          dockerfile.indexOf('RUN flutter build web'),
+          greaterThan(dockerfile.indexOf('ARG BUILD_NUMBER=0')),
+        );
+      },
+    );
+  }
+
   // The two projects this repository ships images for, both halves of each.
   final images = [
     (tree: 'example', package: 'dartway_example_server'),

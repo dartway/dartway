@@ -222,6 +222,10 @@ class DwKamalGenerator {
       'services': services,
       'environments': environments.map((env) => destinations[env]).toList(),
       'health': '/health',
+      'migrations': [
+        '${layout.serverPackage}/lib/src/migrations/**',
+        '${layout.serverPackage}/pubspec.lock',
+      ],
       'check': {
         'image': 'ghcr.io/dartway/dartway-check:${checkImageTag(layout)}',
         'args': [

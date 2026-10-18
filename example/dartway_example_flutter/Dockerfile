@@ -35,8 +35,10 @@ WORKDIR /workspace/dartway_example_flutter
 # honest error naming both.
 RUN flutter pub get --enforce-lockfile
 
+ARG BUILD_NUMBER=0
+
 # Web releases call their own origin, so this image serves every environment.
-RUN flutter build web --release --no-web-resources-cdn
+RUN flutter build web --release --build-number=$BUILD_NUMBER --no-web-resources-cdn
 
 # `COPY` keeps each file's mode, and the checkout's modes come from the umask
 # of whoever pulled it on the server: under `077` a newly added asset reaches
