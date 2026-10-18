@@ -2,6 +2,12 @@
 
 ## 0.25.0-dev.0
 
+- Fix: Compose deployments pin both serving images as
+  `<project>-<service>:dw-previous` before building moves `:latest`. Retries
+  keep the original journal entries, restore missing or moved pins, and
+  refuse a missing rollback image before building or replacing a service
+  (#602, #589).
+
 - `dartway sync [<ref>]` merges the base branch in and resolves derived files
   itself: generated code, locks and l10n outputs are regenerated, the
   migrations registry is rebuilt from its directory, `.arb` files merge by key;
