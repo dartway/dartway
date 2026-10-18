@@ -1,6 +1,6 @@
 {
   "name": "@dartway/studio-bridge",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "App side of the DartWay Studio bridge for JavaScript apps: declare your screens and features, let Studio preview and drive the running build.",
   "license": "Apache-2.0",
   "type": "module",
@@ -32,7 +32,8 @@
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
-    "check": "npm run typecheck && npm test && npm run build"
+    "audit": "npm audit --audit-level=high",
+    "check": "npm run audit && npm run typecheck && npm test && npm run build"
   },
   "peerDependencies": {
     "react": ">=18",
@@ -47,7 +48,7 @@
     "@types/react": "^19.0.0",
     "react": "^19.0.0",
     "typescript": "^5.7.0",
-    "vue": "^3.5.0"
+    "vue": "^3.5.42"
   },
   "engines": {
     "node": ">=22.18.0"
