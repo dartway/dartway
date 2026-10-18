@@ -1,6 +1,8 @@
 import 'dart:convert';
 
+import 'secret_store.dart';
 import 'ssh_runner.dart';
+import 'stack.dart';
 
 /// Whitelisted runtime metadata: no environment, health logs or credentials.
 final class DwKamalRuntimeState {
@@ -41,7 +43,7 @@ final class DwKamalRuntimeState {
 
 final class DwKamalContainerInfo {
   DwKamalContainerInfo(this.fields) {
-    if (fields.length != 11 ||
+    if (fields.length != 13 ||
         fields[0] is! String ||
         !RegExp(r'^[0-9a-f]{64}$').hasMatch(fields[0] as String) ||
         !const [0, 1].contains(fields[3]) ||
@@ -50,7 +52,10 @@ final class DwKamalContainerInfo {
           'starting',
           'healthy',
           'unhealthy',
-        ].contains(fields[4])) {
+        ].contains(fields[4]) ||
+        fields[11] is! List ||
+        (fields[11] as List).any((value) => value is! bool) ||
+        fields[12] is! bool) {
       throw const FormatException('invalid container metadata');
     }
   }
@@ -66,6 +71,8 @@ final class DwKamalContainerInfo {
   List<DwKamalMountInfo> get mounts => (fields[8] as List)
       .map((mount) => DwKamalMountInfo(mount as List))
       .toList();
+  List<bool> get secretFileMountsValid => (fields[11] as List).cast<bool>();
+  bool get mountsWholeSecretStore => fields[12] as bool;
   bool isTarget(String target, int port) {
     final uri = Uri.parse(target.contains('://') ? target : 'http://$target');
     return uri.port == port &&
@@ -101,13 +108,17 @@ final class DwKamalMountInfo {
 
 /// Inspects only selected services, the native proxy and its network. Mount
 /// access modes are explicit numeric flags and validated before use.
-String nativeKamalInspectionScript(List<String> services) =>
+String nativeKamalInspectionScript(
+  List<String> services, {
+  required List<String> secretFiles,
+  required String runtimeConfigDir,
+}) =>
     '''
 set -eu
 for service in ${services.map(DwSshRunner.quote).join(' ')}; do
   ids=\$(docker ps -aq --filter "label=service=\$service")
   if [ -n "\$ids" ]; then
-    docker inspect --format ${DwSshRunner.quote(_inspectionTemplate)} \$ids
+    docker inspect --format ${DwSshRunner.quote(_inspectionTemplate(secretFiles, runtimeConfigDir))} \$ids
   fi
 done
 printf '\\nDW_KAMAL_ROUTES\\n'
@@ -118,5 +129,20 @@ printf '\\nDW_KAMAL_NETWORK\\n'
 docker network inspect kamal --format '{{json .IPAM.Config}}'
 ''';
 
-const _inspectionTemplate =
-    r'''[{{json .Id}},{{json .Name}},{{json .Config.Image}},{{if .State.Running}}1{{else}}0{{end}},{{with index .State "Health"}}{{json .Status}}{{else}}"none"{{end}},{{json (index .Config.Labels "service")}},{{json (index .Config.Labels "role")}},{{json (index .Config.Labels "destination")}},[{{range $index,$mount := .Mounts}}{{if $index}},{{end}}[{{json $mount.Type}},{{json $mount.Source}},{{json $mount.Destination}},{{if index $mount "Name"}}{{json (index $mount "Name")}}{{else}}""{{end}},{{if $mount.RW}}1{{else}}0{{end}}]{{end}}],{{with index .NetworkSettings.Networks "kamal"}}{{json .IPAddress}},{{json .GlobalIPv6Address}}{{else}}"",""{{end}}]''';
+String _inspectionTemplate(List<String> secretFiles, String runtimeConfigDir) =>
+    r'''[{{json .Id}},{{json .Name}},{{json .Config.Image}},{{if .State.Running}}1{{else}}0{{end}},{{with index .State "Health"}}{{json .Status}}{{else}}"none"{{end}},{{json (index .Config.Labels "service")}},{{json (index .Config.Labels "role")}},{{json (index .Config.Labels "destination")}},[{{range $index,$mount := .Mounts}}{{if $index}},{{end}}[{{json $mount.Type}},{{json $mount.Source}},{{json $mount.Destination}},{{if index $mount "Name"}}{{json (index $mount "Name")}}{{else}}""{{end}},{{if $mount.RW}}1{{else}}0{{end}}]{{end}}],{{with index .NetworkSettings.Networks "kamal"}}{{json .IPAddress}},{{json .GlobalIPv6Address}}{{else}}"",""{{end}},['''
+    '${secretFiles.map((name) => _fileMountTemplate(name, runtimeConfigDir)).join(',')}],'
+    r'{{$whole := false}}{{range .Mounts}}{{if or '
+    '(eq .Destination ${jsonEncode(DwStack.secretFilesDir)}) '
+    '(eq .Destination ${jsonEncode('${DwStack.secretFilesDir}/${DwSecretStore.fileName}')})'
+    r'}}{{$whole = true}}{{end}}{{end}}{{json $whole}}]';
+
+// Compare on the target, before the transport masks paths that are also secret
+// values (for example FCM_SERVICE_ACCOUNT_FILE). Use only verdicts after masking.
+// Concatenating the matches makes exactly one valid bind the only passing shape.
+String _fileMountTemplate(String name, String runtimeConfigDir) =>
+    r'{{$matches := ""}}{{range .Mounts}}{{if eq .Destination '
+    '${jsonEncode('${DwStack.secretFilesDir}/$name')}}}'
+    r'{{$matches = print $matches (and (eq .Type "bind") (not .RW) '
+    '(eq .Source ${jsonEncode('$runtimeConfigDir/$name')}))}}'
+    r'{{end}}{{end}}{{json (eq $matches "true")}}';

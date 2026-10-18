@@ -6,6 +6,7 @@ import 'dart:io';
 import 'package:dartway_cli/src/deploy/deploy_check.dart';
 import 'package:dartway_cli/src/deploy/kamal.dart';
 import 'package:dartway_cli/src/deploy/kamal_runtime_checks.dart';
+import 'package:dartway_cli/src/deploy/secret_store.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -17,7 +18,7 @@ import 'support/deploy_fixtures.dart';
 /// daemon. No global kamal-proxy, network or application is changed on the host.
 void main() {
   test(
-    'native checks follow real routes and the app preserves the client peer',
+    'native checks verify masked secret-file mounts and real routes',
     () async {
       const version = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
       final root = Directory.systemTemp.createTempSync('dw-native-runtime-');
@@ -37,7 +38,7 @@ void main() {
       );
       const extra =
           '  trusted_proxy_networks: [172.28.0.0/16]\n'
-          '  requires:\n    files: [account.json]\n';
+          '  requires:\n    files: [firebase-service-account.json]\n';
       write('deploy/config.yaml', configYaml(extra: extra));
       final files = DwKamalGenerator(root).render();
       for (final entry in files.entries) write(entry.key, entry.value);
@@ -133,9 +134,10 @@ void main() {
         '-c',
         '''set -eu
 mkdir -p /home/deployer/.config/shop /root/shop-api-postgres-stage/postgres
-printf '%s' 'fixture-file' >/home/deployer/.config/shop/account.json
+printf '%s' 'fixture-file' >/home/deployer/.config/shop/firebase-service-account.json
+printf "FCM_SERVICE_ACCOUNT_FILE='/run/secrets/firebase-service-account.json'\\nTOKEN='runtime-secret-token'\\n" >/home/deployer/.config/shop/${DwSecretStore.fileName}
 chmod 700 /home/deployer/.config/shop
-chmod 600 /home/deployer/.config/shop/account.json
+chmod 600 /home/deployer/.config/shop/firebase-service-account.json
 chmod +x /fixture/proxy.sh
 chmod 444 /fixture/key.pem
 ''',
@@ -147,11 +149,15 @@ chmod 444 /fixture/key.pem
           'ghcr.io/acme/shop-$role:$version',
         ]);
       }
-      final api = (await inside([
+      const apiName = 'shop-api-web-stage-$version';
+      const fileMount =
+          '/home/deployer/.config/shop/firebase-service-account.json:'
+          '/run/secrets/firebase-service-account.json';
+      Future<String> startApi(List<String> mounts) async => (await inside([
         'run',
         '-d',
         '--name',
-        'shop-api-web-stage-$version',
+        apiName,
         '--network',
         'kamal',
         '--label',
@@ -162,10 +168,10 @@ chmod 444 /fixture/key.pem
         'destination=stage',
         '-v',
         '/fixture/api.conf:/etc/nginx/conf.d/default.conf:ro',
-        '-v',
-        '/home/deployer/.config/shop/account.json:/run/secrets/account.json:ro',
+        for (final mount in mounts) ...['-v', mount],
         'ghcr.io/acme/shop-api:$version',
       ])).trim();
+      final api = await startApi(['$fileMount:ro']);
       await inside([
         'run',
         '-d',
@@ -261,6 +267,14 @@ chmod 444 /fixture/key.pem
         ssh: ssh,
         version: version,
       );
+      final masked = await context.ssh!.runAs(
+        context.target.deployUser,
+        "printf '%s' '/run/secrets/firebase-service-account.json runtime-secret-token'; "
+        "printf '%s' '/run/secrets/firebase-service-account.json runtime-secret-token' >&2",
+      );
+      expect(masked.ok, true, reason: masked.stderr);
+      expect(masked.stdout, '*** ***');
+      expect(masked.stderr, '*** ***');
       Future<DwDeployVerdict> check(String name, DwDeployContext ctx) =>
           dwKamalRemoteDeployChecks
               .firstWhere((check) => check.id == name)
@@ -346,6 +360,50 @@ chmod 444 /fixture/key.pem
       );
       expect((await check('stack-identity', after)).passed, true);
       expect((await check('kamal-routing', after)).passed, false);
+      for (final (name, mounts) in <(String, List<String>)>[
+        ('missing file', []),
+        ('writable file', [fileMount]),
+        (
+          'wrong source',
+          ['/fixture/api.conf:/run/secrets/firebase-service-account.json:ro'],
+        ),
+        (
+          'wrong destination',
+          [
+            '/home/deployer/.config/shop/firebase-service-account.json:/other.json:ro',
+          ],
+        ),
+        (
+          'whole directory',
+          ['$fileMount:ro', '/home/deployer/.config/shop:/run/secrets:ro'],
+        ),
+        (
+          'whole store file',
+          [
+            '$fileMount:ro',
+            '/home/deployer/.config/shop/${DwSecretStore.fileName}:'
+                '/run/secrets/${DwSecretStore.fileName}:ro',
+          ],
+        ),
+      ]) {
+        await inside(['rm', '-f', apiName]);
+        await startApi(mounts);
+        final invalid = DwDeployContext(
+          projectRoot: root,
+          stack: stackFrom(projectRoot: root, extra: extra),
+          ssh: ssh,
+          version: version,
+        );
+        final verdict = await check('secret-files', invalid);
+        expect(verdict.passed, false, reason: name);
+        expect(
+          verdict.detail,
+          contains(
+            name.startsWith('whole') ? 'whole secret store' : 'per-file',
+          ),
+          reason: '$name: ${verdict.detail}',
+        );
+      }
     },
     skip: 'Needs Docker; run -t docker --run-skipped.',
     timeout: const Timeout(Duration(minutes: 6)),

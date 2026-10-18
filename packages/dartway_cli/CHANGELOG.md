@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Fix: native `deploy check` verifies secret-file mounts on the target before
+  masking output, so a path stored in `FCM_SERVICE_ACCOUNT_FILE` no longer
+  hides a correct per-file read-only bind from the checker (#587).
+
 - Fix: the installed `dartway-finish` gate block omits `CONTRACT_BASE` and
   `--contract-base` when the project has a release branch, so task checks do not
   demand contract version bumps reserved for `generate --release` (#607).

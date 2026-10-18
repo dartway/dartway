@@ -87,3 +87,6 @@ jobs:
                 config -c "deploy/kamal/$service.yml" -d "$destination"
             done
           done
+      - name: Verify native runtime checks through the masked transport
+        working-directory: packages/dartway_cli
+        run: dart test -t docker --run-skipped test/kamal_runtime_docker_test.dart
