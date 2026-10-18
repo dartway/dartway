@@ -1,3 +1,7 @@
+# Integration files launch compilers, analyzers and nested test runners. Keep
+# their concurrency bounded even when the surrounding monorepo gate is parallel.
+concurrency: 2
+
 tags:
   services:
     skip: "needs Postgres and storage; run by tool/checks.sh services"

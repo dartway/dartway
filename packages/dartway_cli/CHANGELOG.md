@@ -6,6 +6,11 @@
   URLs once and sharing them with the nested profiles. A single card uses a
   batch of one (#418).
 
+- Tests: prepare external-service workers before timed CLI assertions and own
+  fixture subprocess groups through timeout and teardown, so CLI and native
+  analyzer children stop before their temporary directories are removed. Limit
+  concurrent CLI test files to two to bound nested compiler load (#609).
+
 - Tests: synchronize the deployment busy-refusal check with the real detached
   process's startup and release, avoiding its fixed sleep window (#613).
 
