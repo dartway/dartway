@@ -251,6 +251,60 @@ void main() {
     );
   });
 
+  test('--framework-path works from an export without Git metadata', () async {
+    final exported = Directory(p.join(sandbox.path, 'framework'));
+    final tracked = await Process.run('git', [
+      'ls-files',
+      '--',
+      'template',
+      'toolkit',
+      'packages/*/pubspec.yaml',
+    ], workingDirectory: repository.path);
+    expect(tracked.exitCode, 0, reason: '${tracked.stderr}');
+    for (final path in (tracked.stdout as String).trim().split('\n')) {
+      final target = File(p.join(exported.path, path));
+      target.parent.createSync(recursive: true);
+      File(p.join(repository.path, path)).copySync(target.path);
+    }
+    final revision = await Process.run('git', [
+      'rev-parse',
+      'HEAD',
+    ], workingDirectory: exported.path);
+    expect(revision.exitCode, isNot(0));
+
+    final project = await create(['shop', '--framework-path', exported.path]);
+    for (final package in ['shop_shared', 'shop_server', 'shop_flutter']) {
+      final yaml = loadYaml(read(project, '$package/pubspec.yaml')) as YamlMap;
+      final overrides = yaml['dependency_overrides'] as YamlMap;
+      expect(overrides, isNotEmpty);
+      for (final entry in overrides.entries) {
+        expect(entry.value, {
+          'path': p.join(exported.path, 'packages', entry.key as String),
+        }, reason: '$package: ${entry.key}');
+      }
+    }
+    final options =
+        loadYaml(read(project, 'shop_flutter/analysis_options.yaml'))
+            as YamlMap;
+    expect((options['plugins'] as YamlMap)['dartway_lints'], {
+      'path': p.join(exported.path, 'packages', 'dartway_lints'),
+    });
+
+    final pinned = await dartway([
+      'create',
+      'pinned_shop',
+      '--local-repo',
+      exported.path,
+      '--no-git',
+    ]);
+    expect(pinned.exitCode, isNot(0));
+    expect('${pinned.stderr}', contains('Cannot pin framework packages'));
+    expect(
+      Directory(p.join(sandbox.path, 'pinned_shop')).existsSync(),
+      isFalse,
+    );
+  });
+
   test('without a channel or a checkout named, the project comes from the '
       'checkout the CLI runs from — its own revision, not a channel', () async {
     // A home with no clone cache and a repository URL that leads nowhere: a

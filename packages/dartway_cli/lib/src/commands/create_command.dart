@@ -145,8 +145,12 @@ class CreateCommand extends Command<int> {
     final monorepoDir = await source.resolve();
     final frameworkPackages = frameworkPackageDirectories(monorepoDir);
     final frameworkCommit = await monorepoCommit(monorepoDir);
-    if (frameworkCommit == null ||
-        !RegExp(r'^[0-9a-fA-F]{40}$').hasMatch(frameworkCommit)) {
+    final needsGitPin =
+        pathFrameworkPackages == null ||
+        !pathFrameworkPackages.containsKey('dartway_lints');
+    if (needsGitPin &&
+        (frameworkCommit == null ||
+            !RegExp(r'^[0-9a-fA-F]{40}$').hasMatch(frameworkCommit))) {
       throw StateError(
         'Cannot pin framework packages: the template source has no full git '
         'commit.',
@@ -434,7 +438,7 @@ class CreateCommand extends Command<int> {
     Map<String, String> frameworkPackages, {
     required Map<String, String>? pathFrameworkPackages,
     required String gitUrl,
-    required String gitCommit,
+    required String? gitCommit,
   }) {
     for (final packageDir in projectRoot.listSync().whereType<Directory>()) {
       final pubspecFile = File(p.join(packageDir.path, 'pubspec.yaml'));
@@ -456,7 +460,7 @@ class CreateCommand extends Command<int> {
               lines,
               reached.keys,
               url: gitUrl,
-              commit: gitCommit,
+              commit: gitCommit!,
             );
       pubspecFile.writeAsStringSync('${rewritten.join('\n')}\n');
     }
@@ -472,7 +476,7 @@ class CreateCommand extends Command<int> {
     Directory projectRoot, {
     required Map<String, String>? frameworkPackages,
     required String gitUrl,
-    required String gitCommit,
+    required String? gitCommit,
   }) {
     final options = File(
       p.join(
@@ -491,10 +495,11 @@ class CreateCommand extends Command<int> {
     if (frameworkPackages?['dartway_lints'] case final path?) {
       pin = "\n    path: '$path'";
     } else {
-      pin = '\n    git:\n'
+      pin =
+          '\n    git:\n'
           '      url: $gitUrl\n'
           '      path: packages/dartway_lints\n'
-          '      ref: $gitCommit';
+          '      ref: ${gitCommit!}';
     }
     options.writeAsStringSync(
       source.replaceFirstMapped(pattern, (match) => '${match[1]}$pin'),

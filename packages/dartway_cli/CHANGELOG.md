@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Fix: `create --framework-path` accepts a framework export without Git
+  metadata when the dependencies and lints plugin resolve by local paths
+  (#600). A full commit remains required for Git pinning.
+
 - Fix: the installed `dartway-finish` gate block omits `CONTRACT_BASE` and
   `--contract-base` when the project has a release branch, so task checks do not
   demand contract version bumps reserved for `generate --release` (#607).
