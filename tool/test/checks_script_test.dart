@@ -13,6 +13,28 @@ void main() {
     return dir;
   }();
 
+  test('contract baseline fixture ignores parent suite selection', () async {
+    // Run the fixture with the caller's filter, even in an unfiltered suite.
+    // Without isolation it skips both projects and never creates dart-calls.
+    final result = await Process.run(
+      Platform.resolvedExecutable,
+      [
+        'test',
+        'test/checks_script_test.dart',
+        '--name',
+        '^checks.sh forwards only a configured contract baseline\$',
+      ],
+      workingDirectory: '${repository.path}/tool',
+      environment: {
+        ...Platform.environment,
+        'DW_CHECKS_ONLY': 'packages/dartway_cli tool',
+        'DW_TEST_PART': '2/2',
+      },
+      includeParentEnvironment: false,
+    );
+    expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+  });
+
   test('checks.sh forwards only a configured contract baseline', () async {
     final fixture = await Directory.systemTemp.createTemp('checks-script-');
     addTearDown(() => fixture.delete(recursive: true));
@@ -38,6 +60,7 @@ fi
 ''');
 
     Future<ProcessResult> run({String? contractBase}) {
+      // Check both projects regardless of the outer CI selection.
       final environment = Map<String, String>.of(Platform.environment)
         ..['PATH'] = '${bin.path}:${Platform.environment['PATH']}'
         ..remove('DW_CONTRACT_BASE')
