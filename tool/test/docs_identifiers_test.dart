@@ -115,6 +115,48 @@ void main() {
       reason: 'links to nothing',
     );
   });
+
+  // #567: runtime tests cannot catch prose that teaches a different contract.
+  test(
+    'app version comments require a build and explain the platform fallback',
+    () {
+      for (final project in [
+        'template/dartway_starter',
+        'example/dartway_example',
+      ]) {
+        final name = p.basename(project);
+        final source = File(
+          p.join(root.path, '${project}_flutter/lib/${name}_app.dart'),
+        ).readAsStringSync();
+        final comment = RegExp(
+          r'((?:  ///[^\n]*\n)+)  final String appVersion;',
+        ).firstMatch(source)!.group(1)!;
+        expect(comment, contains('<semver>+<build>'), reason: project);
+        expect(comment, isNot(contains('optional')), reason: project);
+        expect(comment, contains('appVersionOf'), reason: project);
+        expect(comment, contains('+0'), reason: project);
+      }
+    },
+  );
+
+  test(
+    'Flutter core docs distinguish app labels from compatibility versions',
+    () {
+      final text = File(
+        p.join(docs.path, '3-flutter/flutter-core.md'),
+      ).readAsStringSync();
+      final config = text
+          .split('### `DwFlutterConfig`')
+          .last
+          .split('## Two phases:')
+          .first;
+      expect(config, isNot(contains('minimum')));
+      expect(config, isNot(contains('stops supporting old builds')));
+      expect(config, contains('labels the session'));
+      expect(config, contains('`Dw-Contract-Version`'));
+      expect(config, contains('`Dw-Protocol`'));
+    },
+  );
 }
 
 final _typeName = RegExp(r'\bDw[A-Z][A-Za-z0-9]*\b');
