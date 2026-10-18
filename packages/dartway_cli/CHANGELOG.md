@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Keep standalone `DwOutboundHttp.network` construction and tear-offs out of
+  server `lib/` with `forbiddenHttpClient`; server code uses the bounded,
+  test-faked `ctx.http` (#444).
+
 - Fix: the template maps user cards in a batch, loading identities and avatar
   URLs once and sharing them with the nested profiles. A single card uses a
   batch of one (#418).

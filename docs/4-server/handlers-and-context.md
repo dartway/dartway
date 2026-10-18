@@ -268,7 +268,7 @@ even when that transaction rolls back.
 
 A request to somebody else's API — an SMS gateway, a CRM, a model provider — is `ctx.http`, in a
 handler, a job, a route or a startup step alike. There is no second client: `dart run dartway_cli:dartway check` refuses
-`HttpClient(` and `package:http` in `lib/src/` (`forbiddenHttpClient`).
+`HttpClient(`, `package:http` and `DwOutboundHttp.network` in `lib/` (`forbiddenHttpClient`).
 
 ```dart
 final response = await ctx.http.post(
@@ -319,8 +319,25 @@ The rule added last is asked first, so a test overrides what its harness scripte
 `DwOutboundHttp` (`ctx.http`) per call, so it is unit-tested without a server over the same fake:
 `DwFakeOutboundHttp().client()`.
 
-A client used only by a command-line entry point, with no server and no context, is not the server's:
-it lives in `bin/` (or a tool package of its own), where the checker does not look for one.
+A standalone entry point in `bin/` or `tool/` can share the provider class without starting a server:
+
+```dart
+final http = DwOutboundHttp.network(
+  settings: const DwServerSettings(outboundMaxResponseBytes: 64 << 20),
+);
+try {
+  await gateway.send(http, phone, text);
+} finally {
+  http.close();
+}
+```
+
+This client owns its connections. Its defaults match the server's timeout and response cap;
+`log:` supplies the tool's logger. Borrowed context and fake clients reject `close` because their
+transport belongs to their owner. Server handlers keep using `ctx.http` so tests use the fake.
+For base64 image responses, the cap includes the encoded text and JSON overhead. Prefer a
+per-call `maxResponseBytes: 64 << 20` over raising every request's limit: each whole response is
+buffered in memory.
 
 Framework satellites keep their own clients for now — push delivery (`dartway_push_server`) and the
 sign-in providers' key fetches (`dartway_auth_providers_server`) — as does the storage client inside the
