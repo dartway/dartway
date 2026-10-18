@@ -2,6 +2,10 @@
 
 ## 0.22.0-dev.0
 
+- Add `DwOutboundHttp.network` for standalone tools using the same bounded,
+  safely logged HTTP client as server contexts. Tools close their owned client;
+  borrowed context and fake clients reject `close` (#444).
+
 - A zero auth `resendDelay` no longer refuses a repeated code request when
   the previous ticket's timestamp is ahead of the current clock reading.
   Positive resend delays and per-identifier request-window quotas still apply (#586).

@@ -329,7 +329,9 @@ the start. `bin/server.dart` does nothing after
 missing row, overwrites a changed one by its key, and leaves undeclared rows alone — so a seed owns its
 rows (rows operators edit are made in the admin panel, with defaults in code), the key is a unique
 `NOT NULL` natural key, the rows are constants, a row is retired by a column (`isPublished: false`), and
-a seed pointing at another's comes after it. A long catalogue lives in a
+a seed pointing at another's comes after it. Insert-only defaults that admins may later edit belong
+in a project `DwStartupStep` with `tryInsert(… DwOnConflict.doNothing)` on a unique natural key;
+`DwSeedRows` would overwrite those edits. A long catalogue lives in a
 `<feature>_<part>_rows.dart` of `const` drafts only, which the length check passes over.
 
 **Settings** are a data object of the contract (`dartway-contract`) read and written through
@@ -359,7 +361,10 @@ the server factory; `bin/` parses nothing itself — no `env['NAME']`.
 `DwServerSettings.outboundTimeout` and `outboundMaxResponseBytes`; logged without path, query, headers
 or body; `followRedirects: false` when a header carries a credential. Not inside a transaction (§4).
 A service class takes `ctx.http` per call — tests fake it (`dartway-testing`), nothing is threaded
-through the server factory for them.
+through the server factory for them. A standalone `bin/` or `tool/` script creates
+`DwOutboundHttp.network()` and closes it in `finally`; server code uses its context's client.
+The default response cap is 10 MiB including base64/JSON; for image APIs, raise `maxResponseBytes:`
+on that call (for example `64 << 20`), accounting for the whole body being held in memory.
 
 Sign-in delivery preferences: pass a project-defined `deliveryHint` on `DwRequestCode` only when
 requesting an explicit delivery choice. Allow accepted strings in `DwAuthConfig.allowedDeliveryHints`

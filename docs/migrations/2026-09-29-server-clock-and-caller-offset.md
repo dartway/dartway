@@ -54,6 +54,13 @@ a test that waited for one (`eventually(…)` over a failed attempt) moves the c
 time: `created_at` columns, session keys, sign-in codes and their expiry. A test comparing one of
 those with `ctx.now` compares two clocks — assert on what the server's clock stamped instead.
 
+Time-derived keys also stop changing: two calls to `ctx.now.microsecondsSinceEpoch` return the
+same value until the clock moves. If a test expects separate events with time-derived keys,
+advance `harness.clock` between them, for example
+`harness.clock.advance(const Duration(microseconds: 1))`; sleeping does not advance it. A timestamp
+is not a uniqueness guarantee in production either: use a database-generated id or a UUID when
+independent events must remain distinct at the same instant.
+
 **The caller's offset in tests is pinned to zero.** The test server's callers and clients report
 `DwTestServer.utcOffset`, `Duration.zero` unless the test sets it (`server.utcOffset = …`, or
 `connectClient(utcOffset: …)`), not the zone of the machine the suite runs on. A test that relied

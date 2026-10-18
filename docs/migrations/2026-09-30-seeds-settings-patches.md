@@ -74,10 +74,13 @@ Rows the code declares — a questionnaire, a catalogue — leave the migration 
     + // in the feature: startup: [DwSeedRows('catalogue', table: …, key: …, rows: catalogue)]
     + await server.start();
 
-An "ensure" that inserts missing rows by `tryInsert(… DwOnConflict.doNothing)` becomes `DwSeedRows`
-over the same rows; from now on an edited row reaches every database too. Work that is not rows
-(prompts kept until an admin edits them) is a `DwStartupStep` of the project's own, or a settings
-object's default (below). Only logging stays after `start()`.
+An "ensure" that inserts missing rows becomes `DwSeedRows` only when code owns those rows and
+must overwrite changes at the next start. For **seed once, never overwrite admin edits**, write a
+project `DwStartupStep` instead: implement `run(DwCallContext ctx)` with insert-only logic such as
+`tryInsert(… DwOnConflict.doNothing)` against a unique natural key. Declare it in the feature's
+`startup` list. It runs on every start in a transaction, but a row already present is left intact;
+`DwSeedRows` would write the declaration over the admin's edit. For a single app-wide settings
+object, use its defaults (below) until saved. Only logging stays after `start()`.
 
 ## A key/value settings table → a settings object
 
