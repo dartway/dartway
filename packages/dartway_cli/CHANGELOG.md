@@ -8,6 +8,11 @@
   refuse a missing rollback image before building or replacing a service
   (#602, #589).
 
+- Fix: template and example Docker contexts exclude native app signing files
+  (`key.properties`, `*.jks`, `*.keystore`, `*.p8`) at every depth (#588).
+  Existing projects must update their copied `.dockerignore`; see the
+  [migration note](../../docs/migrations/2026-10-18-docker-context-signing-files.md).
+
 - Fix: the installed `dartway-finish` gate block omits `CONTRACT_BASE` and
   `--contract-base` when the project has a release branch, so task checks do not
   demand contract version bumps reserved for `generate --release` (#607).

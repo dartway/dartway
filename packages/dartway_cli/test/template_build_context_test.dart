@@ -38,6 +38,65 @@ void main() {
     }
   }();
 
+  for (final tree in ['template', 'example']) {
+    test(
+      '$tree: Docker keeps signing material out of the build context',
+      () async {
+        // Use Docker's own ignore semantics and only synthetic files. Exporting
+        // a scratch COPY proves what can enter a layer without pulling an image.
+        final fixture = Directory.systemTemp.createTempSync(
+          'dw_signing_context_',
+        );
+        addTearDown(() => fixture.deleteSync(recursive: true));
+        final context = Directory(p.join(fixture.path, 'context'))
+          ..createSync();
+        final output = p.join(fixture.path, 'output');
+        File(
+          p.join(repository.path, tree, '.dockerignore'),
+        ).copySync(p.join(context.path, '.dockerignore'));
+        File(
+          p.join(context.path, 'Dockerfile'),
+        ).writeAsStringSync('FROM scratch\nCOPY . /\n');
+
+        final sources = <String>[];
+        for (final role in ['flutter', 'server', 'shared']) {
+          for (final directory in ['', 'android', 'ios/signing']) {
+            final prefix = p.join('fixture_$role', directory);
+            sources.add(p.join(prefix, 'source.dart'));
+            for (final name in [
+              'source.dart',
+              'key.properties',
+              'upload.jks',
+              'upload.keystore',
+              'AuthKey.p8',
+            ]) {
+              File(p.join(context.path, prefix, name))
+                ..createSync(recursive: true)
+                ..writeAsStringSync('synthetic fixture only\n');
+            }
+          }
+        }
+
+        final build = await Process.run(
+          'docker',
+          ['build', '--output', 'type=local,dest=$output', context.path],
+          environment: {'DOCKER_BUILDKIT': '1'},
+        );
+        expect(build.exitCode, 0, reason: '${build.stdout}\n${build.stderr}');
+        final copied = Directory(output)
+            .listSync(recursive: true)
+            .whereType<File>()
+            .map((file) => p.relative(file.path, from: output));
+        expect(
+          copied,
+          unorderedEquals(sources),
+          reason: 'ordinary sources must be copied, signing files must not',
+        );
+      },
+      tags: ['docker'],
+    );
+  }
+
   // The two projects this repository ships images for, both halves of each.
   final images = [
     (tree: 'example', package: 'dartway_example_server'),
