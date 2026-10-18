@@ -60,9 +60,7 @@ only for an unaffected suite CI carries. Set `RUN_MIGRATE_CHECK` to `true` when 
 migrations changed, otherwise `false`.
 
 ```bash
-CONTRACT_BASE="$(git merge-base HEAD origin/__BASE_BRANCH__)"  # resolve once; CI supplies its trusted SHA
-# with a releaseBranch in .agents/dartway-toolkit.json: drop both --contract-base arguments (D-158)
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway generate --check --contract-base "$CONTRACT_BASE")
+__FINISH_GENERATE_CHECK__
 if "$RUN_MIGRATE_CHECK"; then
   (cd __SERVER_PKG__ && dart run bin/migrate.dart check)  # needs a database
 fi
@@ -78,7 +76,7 @@ fi
 if "$RUN_FLUTTER_TESTS"; then
   (cd __FLUTTER_PKG__ && flutter test "${FLUTTER_TEST_FILES[@]}")
 fi
-(cd __FLUTTER_PKG__ && dart run dartway_cli:dartway check --contract-base "$CONTRACT_BASE")
+__FINISH_CHECK__
 ```
 
 - Analyze whole packages: `dart analyze lib` skips `test/`, where moves and API changes break.

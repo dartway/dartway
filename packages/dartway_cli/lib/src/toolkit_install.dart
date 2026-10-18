@@ -229,6 +229,7 @@ Future<ToolkitInstallResult?> installToolkitInto({
     projectRoot: projectRoot,
     tokens: layout.toolkitTokens(
       baseBranch: choice.baseBranch,
+      releaseBranch: choice.releaseBranch,
       language: choice.language,
       notesTracker: choice.notesTracker,
     ),
