@@ -629,7 +629,11 @@ journal, so a resume keeps the same targets. If a container image digest cannot 
 the tag is accepted only when Docker proves that image still holds the running container. After
 an interrupted deployment moved the tag, the next fresh deploy recovers by itself: it tries the
 `<project>-<service>:dw-previous` pin that deployment left, under the same proof. When neither
-holds the running container, it is refused before stopping the service. Images go before cache:
+holds the running container, it is refused before building either image. A retried build and each
+service replacement verify that the journalled rollback image still exists and restore a missing
+or moved `dw-previous` tag to that same image. A missing journalled image stops the deployment
+with a diagnostic before the build or replacement; a resume never records the newly serving image
+as its rollback target. Images go before cache:
 the containerd image store shares BuildKit snapshots with exported images. Every prune uses
 `--keep-storage` with `build_cache_keep`; shared cache keys for retained images survive so unchanged
 builds can reuse their layers. Docker excludes shared bytes from that budget, and so does the check
@@ -766,8 +770,9 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
   without the binding needs no such argument. A Kamal web image omits the define:
   the Studio binding takes its own `Uri.base.origin` in a web release.
 - **`.dockerignore` denies everything** and admits the packages by role suffix (`*_server/`,
-  `*_flutter/`, `*_shared/`), minus build output and `.env` — so the working copy's history, build
-  output and local secrets never reach the Docker daemon.
+  `*_flutter/`, `*_shared/`), minus build output, `.env` and native app signing material
+  (`key.properties`, `*.jks`, `*.keystore`, `*.p8`) at every depth. These excluded files
+  never reach the Docker daemon.
 
 **What the web image lets a browser keep fails silently.** A Flutter web build hashes nothing:
 `index.html`, `flutter_bootstrap.js`, `main.dart.js` and everything under `assets/` carry the same
