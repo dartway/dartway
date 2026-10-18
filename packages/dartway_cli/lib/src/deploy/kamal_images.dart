@@ -117,6 +117,7 @@ jobs:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
+          build-args: BUILD_NUMBER=${{ github.run_number }}
           push: ${{ steps.image.outputs.publish == 'true' }}
           tags: ${{ steps.image.outputs.tag }}
           labels: |

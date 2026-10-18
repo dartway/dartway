@@ -2,6 +2,12 @@
 
 ## 0.25.0-dev.0
 
+- Fix: generated Studio manifests declare the actual server migration and lock
+  paths. Images pass the workflow run number into web builds, preserving SHA
+  image identities and build-once behavior (#566). Existing projects must
+  regenerate Kamal files and update their web Dockerfile; see the
+  [migration note](../../docs/migrations/2026-10-18-studio-migrations-and-build-number.md).
+
 - Fix: `dartway create` initializes Git on the recorded base branch (`master`),
   even when Git defaults to `main`, so the new project's contract baseline is
   available. `create .` preserves an existing repository's branch (#599).

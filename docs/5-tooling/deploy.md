@@ -35,6 +35,10 @@ dart run dartway_cli:dartway deploy kamal --check
 ```
 
 Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
+The Studio manifest's `migrations` globs name the server package's
+`lib/src/migrations/**` and `pubspec.lock`, relative to the repository root.
+Studio treats changes matching either path as carrying migrations, including
+framework migrations brought in by dependency updates.
 Generated files carry their source instructions. `--check` writes nothing and
 names every stale file. Server route changes do not affect the generated web
 configuration. The API service is the root service on its own host only. On
@@ -62,8 +66,12 @@ a generated Studio manifest skip builds.
 
 It respects `DW_CI_RUNS_ON`, builds `linux/amd64`, uses a GHA layer cache and
 pushes `<commit sha>` tags to GHCR with `GITHUB_TOKEN` on those two branches.
-Existing manifests are skipped; registry failures fail the job. PR runs build
-without pushing. The OCI source label links the packages to their repository.
+Every service receives `BUILD_NUMBER=${{ github.run_number }}` as a Docker build
+argument. The web Dockerfile declares `ARG BUILD_NUMBER=0` after dependency
+resolution and passes it to `flutter build web --build-number=$BUILD_NUMBER`;
+Flutter writes it into `version.json`. Local builds default to zero.
+Existing manifests are skipped and keep their first build number; registry
+failures fail the job. PR runs build without pushing. The OCI source label links the packages to their repository.
 
 Bundled storage is a service built from `rustfs/rustfs:1.0.0` with a TLS host;
 external storage has no service and receives its environment through secrets.

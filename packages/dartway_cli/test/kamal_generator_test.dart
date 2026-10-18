@@ -92,6 +92,21 @@ final routes = [
   YamlMap yaml(Map<String, String> files, String path) =>
       loadYaml(files[path]!) as YamlMap;
 
+  test('image builds pass the workflow run number to every service', () {
+    final workflow = yaml(
+      DwKamalGenerator(root).render(),
+      '.github/workflows/images.yml',
+    );
+    final steps = workflow['jobs']['images']['steps'] as YamlList;
+    final build = steps.cast<YamlMap>().singleWhere(
+      (step) => step['uses'] == 'docker/build-push-action@v6',
+    );
+    expect(
+      build['with']['build-args'],
+      r'BUILD_NUMBER=${{ github.run_number }}',
+    );
+  });
+
   for (final bundled in [true, false]) {
     test(
       'renders stage and prod with ${bundled ? 'bundled' : 'external'} storage',
