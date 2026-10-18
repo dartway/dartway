@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:dartway_cli/src/toolkit_install.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -15,20 +16,17 @@ void main() {
     }
     repository = repository.parent;
   }
-  final skill = File(
-    p.join(repository.path, 'toolkit/skills/dartway-finish/SKILL.md'),
-  ).readAsStringSync();
-  final gates = skill.split('## A.2 ').last.split('## A.3 ').first;
-  final block = RegExp(
-    r'```bash\n([\s\S]*?)\n```',
-  ).firstMatch(gates)!.group(1)!;
-
   late Directory sandbox;
   late File log;
   setUp(() {
     sandbox = Directory.systemTemp.createTempSync('dw-finish-gates-');
     log = File(p.join(sandbox.path, 'calls'));
-    for (final name in ['shared', 'server', 'flutter', 'bin']) {
+    for (final name in [
+      'sample_shared',
+      'sample_server',
+      'sample_flutter',
+      'bin',
+    ]) {
       Directory(p.join(sandbox.path, name)).createSync();
     }
     for (final tool in ['dart', 'flutter', 'git']) {
@@ -48,12 +46,47 @@ fi
   });
   tearDown(() => sandbox.deleteSync(recursive: true));
 
-  Future<List<String>> run(String selection) async {
-    final script = '$selection\n$block'
-        .replaceAll('__SHARED_PKG__', 'shared')
-        .replaceAll('__SERVER_PKG__', 'server')
-        .replaceAll('__FLUTTER_PKG__', 'flutter')
-        .replaceAll('__BASE_BRANCH__', 'master');
+  Future<List<String>> run(
+    String selection, {
+    String releaseBranch = '',
+  }) async {
+    await installToolkitInto(
+      projectRoot: sandbox,
+      choice: ToolkitInstallChoice(
+        baseBranch: 'develop',
+        releaseBranch: releaseBranch,
+        language: 'English',
+        notesTracker: 'none',
+        channel: 'master',
+        localRepo: repository.path,
+        channelWasExplicit: false,
+        channelChosen: false,
+      ),
+      installed: null,
+    );
+    final skill = File(
+      p.join(sandbox.path, '.agents/skills/dartway-finish/SKILL.md'),
+    ).readAsStringSync();
+    expect(
+      File(
+        p.join(sandbox.path, '.claude/skills/dartway-finish/SKILL.md'),
+      ).readAsStringSync(),
+      skill,
+    );
+    final gates = skill.split('## A.2 ').last.split('## A.3 ').first;
+    final block = RegExp(
+      r'```bash\n([\s\S]*?)\n```',
+    ).firstMatch(gates)!.group(1)!;
+    if (releaseBranch.isEmpty) {
+      expect(
+        block,
+        contains('CONTRACT_BASE="\$(git merge-base HEAD origin/develop)"'),
+      );
+    } else {
+      expect(block, isNot(contains('CONTRACT_BASE')));
+      expect(block, isNot(contains('--contract-base')));
+    }
+    final script = '$selection\n$block';
     final result = await Process.run(
       'bash',
       ['-e', '-c', script],
@@ -67,21 +100,22 @@ fi
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     final calls = log.readAsLinesSync();
     // These gates cannot disappear when CI carries all three suites.
-    expect(calls, contains('shared:dart <analyze>'));
-    expect(calls, contains('server:dart <analyze>'));
-    expect(calls, contains('flutter:dart <analyze> <--fatal-infos>'));
+    expect(calls, contains('sample_shared:dart <analyze>'));
+    expect(calls, contains('sample_server:dart <analyze>'));
+    expect(calls, contains('sample_flutter:dart <analyze> <--fatal-infos>'));
+    final contractArgs = releaseBranch.isEmpty
+        ? ' <--contract-base> <trusted-base>'
+        : '';
     expect(
       calls,
       contains(
-        'flutter:dart <run> <dartway_cli:dartway> <generate> <--check> '
-        '<--contract-base> <trusted-base>',
+        'sample_flutter:dart <run> <dartway_cli:dartway> <generate> <--check>$contractArgs',
       ),
     );
     expect(
       calls,
       contains(
-        'flutter:dart <run> <dartway_cli:dartway> <check> '
-        '<--contract-base> <trusted-base>',
+        'sample_flutter:dart <run> <dartway_cli:dartway> <check>$contractArgs',
       ),
     );
     return calls;
@@ -97,6 +131,12 @@ SERVER_TEST_FILES=()
 FLUTTER_TEST_FILES=()
 ''';
 
+  for (final releaseBranch in ['', 'stage']) {
+    test('rendered gates with releaseBranch="$releaseBranch"', () async {
+      await run(runAll, releaseBranch: releaseBranch);
+    });
+  }
+
   test('CI selections are forwarded relative to the suite package', () async {
     final calls = await run('''$runAll
 RUN_MIGRATE_CHECK=false
@@ -104,18 +144,21 @@ SHARED_TEST_FILES=(test/contract_test.dart)
 SERVER_TEST_FILES=(test/src/accounts/accounts_acceptance_test.dart)
 FLUTTER_TEST_FILES=(test/admin/users 'test/app/sign in/page_test.dart')
 ''');
-    expect(calls, contains('shared:dart <test> <test/contract_test.dart>'));
+    expect(
+      calls,
+      contains('sample_shared:dart <test> <test/contract_test.dart>'),
+    );
     expect(
       calls,
       contains(
-        'flutter:dart <run> <dartway_cli:dartway> <test> <--> '
+        'sample_flutter:dart <run> <dartway_cli:dartway> <test> <--> '
         '<test/src/accounts/accounts_acceptance_test.dart>',
       ),
     );
     expect(
       calls,
       contains(
-        'flutter:flutter <test> <test/admin/users> '
+        'sample_flutter:flutter <test> <test/admin/users> '
         '<test/app/sign in/page_test.dart>',
       ),
     );
@@ -124,13 +167,16 @@ FLUTTER_TEST_FILES=(test/admin/users 'test/app/sign in/page_test.dart')
 
   test('no CI or an unmapped change can run full suites', () async {
     final calls = await run(runAll);
-    expect(calls, contains('shared:dart <test>'));
+    expect(calls, contains('sample_shared:dart <test>'));
     expect(
       calls,
-      contains('flutter:dart <run> <dartway_cli:dartway> <test> <-->'),
+      contains('sample_flutter:dart <run> <dartway_cli:dartway> <test> <-->'),
     );
-    expect(calls, contains('flutter:flutter <test>'));
-    expect(calls, contains('server:dart <run> <bin/migrate.dart> <check>'));
+    expect(calls, contains('sample_flutter:flutter <test>'));
+    expect(
+      calls,
+      contains('sample_server:dart <run> <bin/migrate.dart> <check>'),
+    );
   });
 
   test(
@@ -153,15 +199,18 @@ RUN_FLUTTER_TESTS=false
 RUN_FLUTTER_TESTS=false
 SERVER_TEST_FILES=(test/src/accounts/accounts_acceptance_test.dart)
 ''');
-      expect(calls, contains('shared:dart <test>'));
+      expect(calls, contains('sample_shared:dart <test>'));
       expect(
         calls,
         contains(
-          'flutter:dart <run> <dartway_cli:dartway> <test> <--> '
+          'sample_flutter:dart <run> <dartway_cli:dartway> <test> <--> '
           '<test/src/accounts/accounts_acceptance_test.dart>',
         ),
       );
-      expect(calls.any((call) => call.startsWith('flutter:flutter')), isFalse);
+      expect(
+        calls.any((call) => call.startsWith('sample_flutter:flutter')),
+        isFalse,
+      );
     },
   );
 }
