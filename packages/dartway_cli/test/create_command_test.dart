@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
@@ -60,6 +61,76 @@ void main() {
 
   String read(Directory project, String path) =>
       File(p.join(project.path, path)).readAsStringSync();
+
+  group('git initialization (#599)', () {
+    final environment = {
+      'GIT_CONFIG_COUNT': '2',
+      'GIT_CONFIG_KEY_0': 'init.defaultBranch',
+      'GIT_CONFIG_VALUE_0': 'main',
+      'GIT_CONFIG_KEY_1': 'commit.gpgsign',
+      'GIT_CONFIG_VALUE_1': 'false',
+      'GIT_AUTHOR_NAME': 'DartWay Test',
+      'GIT_AUTHOR_EMAIL': 'test@example.com',
+      'GIT_COMMITTER_NAME': 'DartWay Test',
+      'GIT_COMMITTER_EMAIL': 'test@example.com',
+    };
+
+    Future<String> git(Directory directory, List<String> arguments) async {
+      final result = await Process.run(
+        'git',
+        arguments,
+        workingDirectory: directory.path,
+        environment: environment,
+      );
+      expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+      return (result.stdout as String).trim();
+    }
+
+    for (final (target, existingBranch) in [
+      ('shop', null),
+      ('.', null),
+      ('.', 'existing-branch'),
+    ]) {
+      test('create $target with existing branch $existingBranch', () async {
+        final workingDirectory = target == '.'
+            ? (Directory(p.join(sandbox.path, 'shop'))..createSync())
+            : sandbox;
+        if (existingBranch != null) {
+          await git(workingDirectory, ['init', '-q', '-b', existingBranch]);
+        }
+        final result = await Process.run(
+          Platform.resolvedExecutable,
+          [cli, 'create', target, '--local-repo', repository.path],
+          workingDirectory: workingDirectory.path,
+          environment: environment,
+        );
+        expect(
+          result.exitCode,
+          0,
+          reason: '${result.stdout}\n${result.stderr}',
+        );
+        expect('${result.stderr}', isNot(contains('Warning: git')));
+        final project = Directory(p.join(sandbox.path, 'shop'));
+        expect(
+          await git(project, ['branch', '--show-current']),
+          existingBranch ?? 'master',
+        );
+        if (existingBranch == null) {
+          final manifest =
+              jsonDecode(read(project, '.agents/dartway-toolkit.json')) as Map;
+          final baseBranch = manifest['settings']['baseBranch'] as String;
+          expect(
+            await git(project, [
+              'merge-base',
+              'HEAD',
+              'refs/heads/$baseBranch',
+            ]),
+            await git(project, ['rev-parse', 'HEAD']),
+          );
+        }
+      });
+    }
+  });
 
   test('does not give the project a licence or notice', () async {
     final project = await create(['shop', '--local-repo', repository.path]);

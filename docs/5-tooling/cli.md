@@ -126,8 +126,9 @@ What the copy does beyond copying:
   `dartway_*` packages each pubspec reaches, pinned to the full commit that supplied the template;
 - installs the toolkit with base branch `master` and the given `--language` and `--notes-tracker`
   (see `setup-ai` below);
-- unless `--no-git`: `git init` (skipped when the folder is already a repository), `git add -A`,
-  and an initial commit.
+- unless `--no-git`: `git init -b master` (skipped when the folder is already a repository),
+  `git add -A`, and an initial commit. The branch matches the recorded base branch regardless of
+  Git's default; an existing repository keeps its branch.
 
 The name must be a lower_snake_case Dart identifier without leading, trailing or doubled
 underscores, at most 55 characters — it becomes package names, and `<name>-private` has to fit the

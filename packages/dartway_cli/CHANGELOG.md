@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Fix: `dartway create` initializes Git on the recorded base branch (`master`),
+  even when Git defaults to `main`, so the new project's contract baseline is
+  available. `create .` preserves an existing repository's branch (#599).
+
 - Fix: Compose deployments pin both serving images as
   `<project>-<service>:dw-previous` before building moves `:latest`. Retries
   keep the original journal entries, restore missing or moved pins, and
