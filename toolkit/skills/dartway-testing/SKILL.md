@@ -75,6 +75,9 @@ it or an extension on it.
   sets up are `harness.clock.now().add(…)`, never `DateTime.now()`. A standing clock also holds back job
   and push retries and recurring jobs until moved; what the database stamps (`created_at`, session and
   code expiry) keeps real time.
+  Time-derived keys such as `ctx.now.microsecondsSinceEpoch` repeat at the same instant: advance
+  the clock between events that expect distinct times. Sleeping does not move it; production code
+  needing unique events at the same instant uses database ids or UUIDs.
 - **The caller's UTC offset is pinned to zero**: `server.utcOffset = …` for someone else's day (callers
   made after it use it; `null` — a raw caller sends none, as an old app), `connectClient(utcOffset:)`;
   `DwAppServer.callAs` carries none.

@@ -8,6 +8,10 @@
   presentation, shared helpers, hosted views, inline command outcomes, checker
   limits and script-test CI discovery in the docs and toolkit (#446).
 
+- Keep standalone `DwOutboundHttp.network` construction and tear-offs out of
+  server `lib/` with `forbiddenHttpClient`; server code uses the bounded,
+  test-faked `ctx.http` (#444).
+
 - Fix: the template maps user cards in a batch, loading identities and avatar
   URLs once and sharing them with the nested profiles. A single card uses a
   batch of one (#418).

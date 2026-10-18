@@ -117,9 +117,30 @@ non-2xx status is still an answer (`response.statusCode`, `isSuccess`); what use
 (`timedOut`). A redirect that must not carry a token is `followRedirects: false`. A service class
 takes `ctx.http` (a `DwOutboundHttp`) per call instead of holding a client.
 
-A client used only by a command-line entry point that has no server context — Studio's
-`studio_remote_caller.dart`, used by `bin/import_github.dart` alone — is not the server's: move it to
-`bin/` (or a tool package of its own). The check judges `lib/`, not `bin/`.
+The response body cap is **10 MiB**, including JSON and base64 text, rather than the decoded
+image size. An image provider can exceed it even when the binary image is smaller. Raise the cap
+for that call, for example `ctx.http.post(url, json: body, maxResponseBytes: 64 << 20)` (64 MiB),
+or set `DwServerSettings(outboundMaxResponseBytes: 64 << 20)` on the server if every integration
+needs it. Prefer a per-call cap: the whole response is buffered in memory, and concurrent requests
+multiply that cost. A response past the cap throws `DwOutboundException`.
+
+A command-line tool without a server context can use the same provider class. From
+`dartway_core_server` **0.22.0-dev.0**, create a real client through the public library:
+
+    final http = DwOutboundHttp.network(
+      settings: const DwServerSettings(outboundMaxResponseBytes: 64 << 20),
+    );
+    try {
+      await gateway.send(http, phone, text);
+    } finally {
+      http.close();
+    }
+
+The client reuses connections; the tool owns and closes it. Its default timeout (30 s), cap
+(10 MiB), and safe logging match `ctx.http`; pass `log:` to use the tool's logger. Keep the
+entry point in `bin/` or `tool/`. Server code still takes `ctx.http`, so `DwTestServer` continues
+to answer it from its fake; `forbiddenHttpClient` rejects the standalone factory in server `lib/`.
+Do not close a borrowed `ctx.http` or `fake.client()`; their owner manages the transport.
 
 **4. Tests drop their transport seams.** A transport interface threaded through the server factory
 for tests (Molodey's SMSC and amoCRM transports) is deleted together with its parameter; the test

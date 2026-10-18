@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.4.1
+
+- Refresh the development dependency lockfile to use patched Vue and
+  `source-map-js` releases, resolving the three high-severity audit findings
+  from GHSA-g2v6-rqmx-r4w6 (Vue server-renderer XSS) and GHSA-68fv-2mgg-jv7q
+  (source-map processing denial of service). Require Vue 3.5.42 or newer for
+  development; the bridge's optional peer dependencies and wire protocol are
+  unchanged.
+- Add `npm run audit` (`npm audit --audit-level=high`). It is kept out of
+  `npm run check`: the check stays offline and does not turn red on a new
+  upstream advisory or a registry outage unrelated to the change.
+
 ## 0.4.0
 
 **The app's side of the bridge knows which window is its peer.** It used to

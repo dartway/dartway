@@ -35,6 +35,13 @@ several places, one of which forgot the block check. The recipe is below; the re
     + handle: (ctx, command) async {
     +   final task = ctx.accessed<TaskRow>();
 
+Resource access refusals are deliberately **call-level**: `dw.notFound` and `dw.forbidden`
+carry `field: null`. The rule can load a parent or a record and does not infer an input field.
+If the old inline refusal named `dailyPlanId` or `messageId`, remove that field expectation from
+tests and handle the access refusal as a general call error in the UI. Keep field-specific input
+validation in the DTO's `validate()` or the handler; it is separate from resource access. A missing
+resource and an inaccessible one must still give the same refusal.
+
 A handler under a role rule moves the role into `allows` as well: **`allows` carries the whole
 permission**, and `load` answers `null` for a caller without the role before it locks anything
 (`await ctx.isStaff ? … : null`).

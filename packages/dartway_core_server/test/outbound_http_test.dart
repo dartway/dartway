@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_core_server/src/outbound/dw_outbound_http.dart'
-    show DwNetworkTransport;
 import 'package:test/test.dart';
 
 import 'support/test_app.dart';
@@ -15,7 +13,6 @@ import 'support/test_app.dart';
 void main() {
   group('over the network', () {
     late HttpServer remote;
-    late DwNetworkTransport transport;
     late RecordingLogger log;
     late DwOutboundHttp http;
     final received =
@@ -62,25 +59,35 @@ void main() {
         }
         await response.close();
       });
-      transport = DwNetworkTransport(
-        connectionTimeout: const Duration(seconds: 5),
-      );
       log = RecordingLogger('call');
-      http = DwOutboundHttp(
-        transport,
+      http = DwOutboundHttp.network(
         log: log,
-        timeout: const Duration(seconds: 5),
-        maxResponseBytes: 1000,
+        settings: const DwServerSettings(
+          outboundTimeout: Duration(seconds: 5),
+          outboundMaxResponseBytes: 1000,
+        ),
       );
       RecordingLogger.lines.clear();
     });
 
     tearDown(() async {
-      transport.close();
+      http.close();
       await remote.close(force: true);
     });
 
     Uri at(String path) => Uri.parse('http://127.0.0.1:${remote.port}$path');
+
+    test(
+      'closing a standalone client prevents further network requests',
+      () async {
+        http.close();
+        await expectLater(
+          http.get(at('/json')),
+          throwsA(isA<DwOutboundException>()),
+        );
+        expect(received, isEmpty);
+      },
+    );
 
     test('sends JSON and reads JSON back', () async {
       final response = await http.post(at('/json'), json: {'phone': '7999'});
@@ -286,6 +293,10 @@ void main() {
         maxResponseBytes: 100,
         log: RecordingLogger(),
       );
+    });
+
+    test('a borrowed client cannot close the shared transport', () {
+      expect(http.close, throwsStateError);
     });
 
     test('records every request and answers from its rules', () async {

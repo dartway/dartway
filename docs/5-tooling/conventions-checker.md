@@ -78,7 +78,7 @@ From the project root or from inside the `*_flutter` package, in this order:
 5. **the environment and outbound HTTP** in the server package: `Platform.environment` outside
    `lib/src/core/environment.dart`, and in `bin/` anything but `DwLocalEnvironment.overlay(Platform.environment)`
    or a map read by a variable's name (`forbiddenEnvironmentRead`); an `HttpClient(` or a
-   `package:http` import in `lib/` (`forbiddenHttpClient`);
+   `package:http` import or `DwOutboundHttp.network` in `lib/` (`forbiddenHttpClient`);
 6. **the data lifecycle** of the server, shared and Flutter packages (`migrationChangesData`,
    `workAfterServerStart`, `settingsKeyValueTable`, `fieldPatchMatched`), and **migrations**:
    `dart run bin/migrate.dart check` in the server package (`migrationsDrift`);
@@ -188,7 +188,7 @@ Forty-three errors, twelve warnings, one info — `DwCheckType` and its `severit
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
 | `forbiddenEnvironmentRead` | error | `Platform.environment` in the server's `lib/` outside `lib/src/core/environment.dart`, where `AppEnvironment` reads every variable at start; in `bin/`, `Platform.environment` outside `DwLocalEnvironment.overlay(…)` or a map read by a variable's name (`env['PORT']`) |
-| `forbiddenHttpClient` | error | `HttpClient(` or an import of `package:http/…` in the server's `lib/` — an outbound request is `ctx.http` |
+| `forbiddenHttpClient` | error | `HttpClient(`, `DwOutboundHttp.network` (including a tear-off), or an import of `package:http/…` in the server's `lib/` — an outbound request is `ctx.http` |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
 | `docCommentLanguage` | warning | A doc comment in `lib/` written in a script other than the language `dartway setup-ai --language` recorded — a heuristic on Cyrillic against Latin letters, so it warns and never fails. A comment the skeleton wrote (the same text in the template the project came from) is not judged, nor a generated file |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
@@ -338,8 +338,10 @@ never reaches it. An entry point in `bin/` hands the environment in and reads no
 read by a variable's name — `bin/server.dart` reads through `AppEnvironment.read`. An outbound request is
 `ctx.http`, bounded by a timeout, logged and answered by the test server's fake; a client of a project's
 own has none of that unless it is written again, with a test seam of its own threaded through the
-server's factory; a client a command-line entry point uses with no server behind it lives in `bin/`,
-which this check does not judge. **Known limits:** another client package (`dio`, or `package:http`
+server's factory; a client a command-line entry point uses with no server behind it lives in `bin/`
+or `tool/`, which this check does not judge. The standalone `DwOutboundHttp.network` factory and
+its tear-offs are rejected in server `lib/` too: code there receives `ctx.http` so tests keep using
+the fake. **Known limits:** another client package (`dio`, or `package:http`
 reached through a package that re-exports it), `WebSocket.connect`, a conditional import naming
 `package:http`, and an environment read through a helper in `bin/` that does not subscript a literal
 name are not seen. See [The app server](../4-server/app-server.md#configuration-comes-from-the-environment)
