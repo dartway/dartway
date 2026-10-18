@@ -1,27 +1,38 @@
 ---
 name: dartway-on-device
 description: >-
-  What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web
-  that is invisible in the simulator, a desktop browser and a widget test — each with its mechanism
+  Phone keyboard, focus, scroll and viewport behaviour on iOS and iOS web
+  that desktop testing can miss — each with its mechanism
   and the known workaround. Use for "the keyboard does not come up", "the screen jumped or went blank
   when I tapped the field", "it blinks and reopens", "works in the simulator, not on my phone" — and
   before writing anything that focuses a field, opens a sheet over the keyboard, or will be opened
   from a phone browser.
 ---
 
-# DartWay — what only the device tells you (`dartway-on-device`)
+# DartWay — keyboard, focus and viewport on phones (`dartway-on-device`)
 
-An entry here reproduces on a real device, is invisible in the iOS simulator, a desktop browser and a
-widget test, and has a known workaround. Whether an automatable case needs a test follows the risk
+These entries cover phone behaviour that desktop testing can miss, with known mechanisms and
+workarounds. Some also reproduce in the iOS simulator or a widget test; those do not replace checking
+the actual keyboard and browser on a device. Whether an automatable case needs a test follows the risk
 classes and gate of `dartway-testing` §4. A staging build is usually shown on a phone browser: if a
 change touches a field, a sheet or the web shell, open it on a phone once.
 
-## Follow native iOS keyboard frames directly
+## Follow native iOS keyboard frames; smooth inset steps elsewhere
 
-**Symptom:** sheet content trails the keyboard and keeps moving after it stops. **Mechanism:** native
-iOS already supplies animated `MediaQuery.viewInsets` frame by frame; adding a tween delays them a
-second time. **Workaround:** use the skeleton's `AppKeyboardInset` (`lib/ui_kit/utils/`). It forwards
-native iOS insets directly and smooths step changes on other platforms:
+**Native iOS:** modern Flutter already animates `MediaQuery.viewInsets` frame by frame. The engine's
+[`KeyboardInsetManager`](https://chromium.googlesource.com/external/github.com/flutter/flutter/+/69cf0c00f4c6607218c3fd66c036e75476f17a8c/engine/src/flutter/shell/platform/darwin/ios/framework/Source/KeyboardInsetManager.swift)
+follows the keyboard's native animation on each display-link tick. Read those insets directly, with no
+app-side tween. A second animation makes content lag behind the keyboard and leaves a visible tail
+after it stops, especially in a bottom sheet. This can also be reproduced in the iOS simulator.
+
+**Web, including iOS WebKit, and other platforms:** insets can arrive in steps while the keyboard is
+still travelling, so layout computed directly from them can snap ahead. Keep the skeleton's 250 ms
+ease-out tween here; it is a fallback for step changes, not a universal keyboard duration.
+
+**One helper for both:** the skeleton's `AppKeyboardInset` (`lib/ui_kit/utils/`) passes the raw inset
+through when `!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS`, and tweens it otherwise.
+Keep the web guard: an iPhone browser is web, not native iOS. Older copies of the helper that tween
+unconditionally need the same platform split. Everything keyboard-dependent reads its builder value:
 
 ```dart
 AppKeyboardInset(
@@ -32,9 +43,14 @@ AppKeyboardInset(
 )
 ```
 
-Use the same inset for height, padding and edges. During dismissal, the quick sheet freezes its
-geometry so keyboard resizing cannot fight the slide-out. Navigation reads the raw inset only to
-detect coverage; its bottom position stays anchored to `viewPadding`.
+**All of it** — height, padding, edges — uses this one value so the parts move together. Check raw
+`viewInsets` reads outside `app_keyboard_inset.dart` for a surface mixing two inset sources. In a widget
+test, feed successive inset frames on native iOS and assert each is delivered immediately with no
+250 ms tail; test step interpolation separately on web and other platforms. Device testing still
+checks whether the actual keyboard and the surface move together.
+During dismissal, the quick sheet freezes its geometry so keyboard resizing cannot fight the
+slide-out. Navigation reads the raw inset only to detect coverage; its bottom position stays anchored
+to `viewPadding`.
 
 ## WebKit raises the keyboard only for a focus inside the gesture
 
