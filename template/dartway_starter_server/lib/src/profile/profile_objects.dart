@@ -10,15 +10,7 @@ abstract final class ProfileObjects {
     List<UserProfileRow> rows,
   ) async {
     if (rows.isEmpty) return const [];
-    final identities = await ctx.accounts.listIdentitiesOf(
-      rows.map((row) => row.accountId),
-    );
-    final avatarIds = {for (final row in rows) ?row.avatarFileId};
-    // Asked only when there are photos: a server without file storage has no
-    // file ids to resolve, and `ctx.files` refuses to work there.
-    final avatarUrls = avatarIds.isEmpty
-        ? const <int, String>{}
-        : await ctx.files.publicUrls(avatarIds);
+    final (:identities, :avatarUrls) = await _loadRelations(ctx, rows);
     return [
       for (final row in rows)
         _profile(
@@ -29,34 +21,70 @@ abstract final class ProfileObjects {
     ];
   }
 
+  static Future<
+    ({Map<int, List<DwIdentityInfo>> identities, Map<int, String> avatarUrls})
+  >
+  _loadRelations(DwCallContext ctx, List<UserProfileRow> rows) async {
+    final identities = await ctx.accounts.listIdentitiesOf(
+      rows.map((row) => row.accountId),
+    );
+    final avatarIds = {for (final row in rows) ?row.avatarFileId};
+    // Asked only when there are photos: a server without file storage has no
+    // file ids to resolve, and `ctx.files` refuses to work there.
+    final avatarUrls = avatarIds.isEmpty
+        ? const <int, String>{}
+        : await ctx.files.publicUrls(avatarIds);
+    return (identities: identities, avatarUrls: avatarUrls);
+  }
+
   static Future<UserProfile> profile(
     DwCallContext ctx,
     UserProfileRow row,
   ) async => (await profiles(ctx, [row])).single;
 
-  static Future<UserCard> card(DwCallContext ctx, UserProfileRow row) async {
-    final identities = await ctx.accounts.listIdentities(row.accountId);
-    return UserCard(
-      id: row.id,
-      profile: await profile(ctx, row),
-      identifiers: [
-        for (final identity in identities)
-          // The skeleton signs in by code alone; a provider identity
-          // (`identity.kind` null) has no place in a list the admin panel
-          // reads as "phone or e-mail" — a project offering Google or Apple
-          // sign-in decides for itself how to show those here.
-          if (identity.kind case final kind?)
-            UserIdentifier(
-              id: identity.id,
-              kind: kind,
-              value: identity.value,
-              addedAt: identity.createdAt,
-              verifiedAt: identity.verifiedAt,
-            ),
-      ],
-      termsAcceptedAt: row.termsAcceptedAt,
-    );
+  static Future<List<UserCard>> cards(
+    DwCallContext ctx,
+    List<UserProfileRow> rows,
+  ) async {
+    if (rows.isEmpty) return const [];
+    final (:identities, :avatarUrls) = await _loadRelations(ctx, rows);
+    return [
+      for (final row in rows)
+        _card(
+          row,
+          identities[row.accountId] ?? const [],
+          avatarUrls[row.avatarFileId],
+        ),
+    ];
   }
+
+  static Future<UserCard> card(DwCallContext ctx, UserProfileRow row) async =>
+      (await cards(ctx, [row])).single;
+
+  static UserCard _card(
+    UserProfileRow row,
+    List<DwIdentityInfo> identities,
+    String? avatarUrl,
+  ) => UserCard(
+    id: row.id,
+    profile: _profile(row, identities, avatarUrl),
+    identifiers: [
+      for (final identity in identities)
+        // The skeleton signs in by code alone; a provider identity
+        // (`identity.kind` null) has no place in a list the admin panel
+        // reads as "phone or e-mail" — a project offering Google or Apple
+        // sign-in decides for itself how to show those here.
+        if (identity.kind case final kind?)
+          UserIdentifier(
+            id: identity.id,
+            kind: kind,
+            value: identity.value,
+            addedAt: identity.createdAt,
+            verifiedAt: identity.verifiedAt,
+          ),
+    ],
+    termsAcceptedAt: row.termsAcceptedAt,
+  );
 
   /// An account may hold several identifiers of a kind; the profile shows the
   /// oldest — the one a change by code (`DwConfirmIdentifier` with `replace`)

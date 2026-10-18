@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Fix: the template maps user cards in a batch, loading identities and avatar
+  URLs once and sharing them with the nested profiles. A single card uses a
+  batch of one (#418).
+
 - Tests: prepare external-service workers before timed CLI assertions and own
   fixture subprocess groups through timeout and teardown, so CLI and native
   analyzer children stop before their temporary directories are removed. Limit
