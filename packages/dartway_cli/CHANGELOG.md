@@ -7,6 +7,9 @@
   analyzer children stop before their temporary directories are removed. Limit
   concurrent CLI test files to two to bound nested compiler load (#609).
 
+- Tests: synchronize the deployment busy-refusal check with the real detached
+  process's startup and release, avoiding its fixed sleep window (#613).
+
 - Fix: `AppKeyboardInset` in the template and example follows native iOS engine
   frames directly, avoiding a second tween and its trailing animation. Web and
   other platforms retain step smoothing. The `dartway-on-device` skill now

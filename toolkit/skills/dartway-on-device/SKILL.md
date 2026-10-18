@@ -48,6 +48,9 @@ AppKeyboardInset(
 test, feed successive inset frames on native iOS and assert each is delivered immediately with no
 250 ms tail; test step interpolation separately on web and other platforms. Device testing still
 checks whether the actual keyboard and the surface move together.
+During dismissal, the quick sheet freezes its geometry so keyboard resizing cannot fight the
+slide-out. Navigation reads the raw inset only to detect coverage; its bottom position stays anchored
+to `viewPadding`.
 
 ## WebKit raises the keyboard only for a focus inside the gesture
 
@@ -55,10 +58,12 @@ checks whether the actual keyboard and the surface move together.
 keyboard comes only for a `focus()` made synchronously in a user gesture, and the sheet's field does not
 exist yet at the tap — `autofocus` or a post-frame `requestFocus` is too late. **Workaround — a primer
 field:** an always-mounted invisible `EditableText` (not `TextField`: no `Material` above it) bound to an
-app-level `FocusNode` provider, beside the page shell, in `Opacity(opacity: 0)`, `ExcludeSemantics` and
+scaffold-owned `FocusNode`, beside the page shell, in `Opacity(opacity: 0)`, `ExcludeSemantics` and
 `IgnorePointer`. The open-the-sheet handler calls `focusNode.requestFocus()` synchronously in the tap,
-then opens the sheet; the real field takes focus next frame and the keyboard stays up. One code path on
-every platform. Check by reading: a `requestFocus` in an `addPostFrameCallback` reached by a tap.
+then opens the sheet; the real field takes focus next frame and the keyboard stays up. Keep the primer
+inside the viewport at 1 px so Safari does not scroll toward an off-screen field. Native opening does
+not use the primer: the template's quick overlay calls `onInputReady` 150 ms into its 250 ms entrance
+so the platform has time to start the keyboard. `AppScaffold.main(quickEntry: ...)` wires both paths.
 
 ## The web shell must pin the document
 
