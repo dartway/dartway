@@ -80,7 +80,7 @@ skills → `dartway-finish`.
 | `dartway-testing` | Six must-test risk classes, rare tests outside them through the gate, agent rules and the boundary that owns each test |
 | `dartway-navigation` | The router: zones, route descriptors, guards |
 | `dartway-ui-kit` | The kit as source inside the app, and the ban on raw styles outside it |
-| `dartway-on-device` | What only a real phone shows: keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |
+| `dartway-on-device` | Phone keyboard, focus, scroll and viewport behaviour on iOS and iOS web, with the known workarounds |
 | `dartway-finish` | Before a commit or PR: fast gates and changed/mirrored tests locally when CI carries full suites, full local fallback otherwise; audit the diff and apply only what is confirmed |
 | `dartway-update` | Plan an exact target, resolve the plugin, apply and verify notes, then record dispositions |
 | `dartway-push-delivery` | Server-side push delivery |

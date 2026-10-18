@@ -1,36 +1,35 @@
 part of '../ui_kit.dart';
 
-/// A keyboard inset that arrives with the keyboard instead of ahead of it.
+/// A keyboard inset shared by every keyboard-dependent part of a surface.
 ///
-/// The system reports the keyboard as a **step change** in `viewInsets` — on
-/// iOS as two steps, first for the accessory bar above the keyboard and then
-/// for the keyboard itself — while the keyboard actually travels for about
-/// 250 ms. Layout computed straight from the raw inset therefore snaps to its
-/// final geometry while the keyboard is still on its way, and what the user
-/// sees reads as "it blinked and re-opened".
+/// Native iOS already delivers animated `viewInsets` on each engine frame.
+/// Follow them directly: an extra tween makes the layout lag behind the keyboard.
+/// Web (including iOS WebKit) and other platforms keep a 250 ms ease-out tween
+/// to smooth inset steps. This duration is a fallback, not a system guarantee.
 ///
-/// [builder] receives the same inset, travelling at the keyboard's own pace.
-/// Compute *everything* that depends on the keyboard from it — height, bottom
-/// padding, edges. Half the layout left on the raw inset drifts apart from the
-/// other half, and that looks worse than the original snap.
-///
-/// Nothing animates on the first build: with no `begin` the tween starts at its
-/// end value, so a sheet opened over an already-raised keyboard is simply in
-/// place.
+/// Compute height, bottom padding and edges from [builder]'s one inset so they
+/// move together. A surface opened over an already-raised keyboard starts at
+/// that inset without animating.
 class AppKeyboardInset extends StatelessWidget {
   const AppKeyboardInset({required this.builder, super.key});
 
-  /// Exactly as long as the keyboard itself travels.
+  /// Fallback duration for platforms whose keyboard insets arrive in steps.
   static const duration = Duration(milliseconds: 250);
   static const curve = Curves.easeOut;
 
   final Widget Function(BuildContext context, double keyboardInset) builder;
 
   @override
-  Widget build(BuildContext context) => TweenAnimationBuilder<double>(
-    tween: Tween<double>(end: MediaQuery.viewInsetsOf(context).bottom),
-    duration: duration,
-    curve: curve,
-    builder: (context, keyboardInset, _) => builder(context, keyboardInset),
-  );
+  Widget build(BuildContext context) {
+    final inset = MediaQuery.viewInsetsOf(context).bottom;
+    if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+      return builder(context, inset);
+    }
+    return TweenAnimationBuilder<double>(
+      tween: Tween<double>(end: inset),
+      duration: duration,
+      curve: curve,
+      builder: (context, keyboardInset, _) => builder(context, keyboardInset),
+    );
+  }
 }
