@@ -18,7 +18,7 @@ those locks lets a stale `pubspec.lock` pass the pull request and fail the deplo
 Add `--enforce-lockfile` to every `pub get` in the project's `.github/workflows/ci.yml`:
 `dart pub get` for the shared and server packages, and `flutter pub get` for the Flutter package.
 The `pub get` step in the framework's
-[template workflow](../../template/.github/workflows/ci.yml) is the reference:
+[template workflow](https://github.com/dartway/dartway/blob/master/template/.github/workflows/ci.yml) is the reference:
 
 ```yaml
 - name: pub get
@@ -37,7 +37,7 @@ any `pubspec.lock` that moves together with the workflow change. Otherwise the f
 fail on a stale lock already in the project's default branch.
 
 A project with no `ci.yml` adopts the template's whole file; follow the template README's
-[Continuous integration section](../../template/README.md#continuous-integration).
+[Continuous integration section](https://github.com/dartway/dartway/blob/master/template/README.md#continuous-integration).
 
 ## How to check
 
