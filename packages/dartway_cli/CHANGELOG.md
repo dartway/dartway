@@ -8,6 +8,10 @@
   regenerate Kamal files and update their web Dockerfile; see the
   [migration note](../../docs/migrations/2026-10-18-studio-migrations-and-build-number.md).
 
+- Fix: `create --framework-path` accepts a framework export without Git
+  metadata when the dependencies and lints plugin resolve by local paths
+  (#600). A full commit remains required for Git pinning.
+
 - Fix: `dartway create` initializes Git on the recorded base branch (`master`),
   even when Git defaults to `main`, so the new project's contract baseline is
   available. `create .` preserves an existing repository's branch (#599).
