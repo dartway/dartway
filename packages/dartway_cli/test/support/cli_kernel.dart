@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:path/path.dart' as p;
 
+import 'test_process.dart';
+
 Future<String>? _kernel;
 
 /// A kernel snapshot of `bin/dartway.dart`, compiled once per test file;
@@ -20,7 +22,7 @@ Future<String> cliKernel(String repository) => _kernel ??= () async {
     ..createSync(recursive: true);
   final target = p.join(directory.path, 'dartway.dill');
   final staging = '$target.$pid.${DateTime.now().microsecondsSinceEpoch}';
-  final result = await Process.run(Platform.resolvedExecutable, [
+  final result = await runTestProcess(Platform.resolvedExecutable, [
     'compile',
     'kernel',
     '--packages=${p.join(repository, '.dart_tool', 'package_config.json')}',
