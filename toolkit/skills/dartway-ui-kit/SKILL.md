@@ -75,6 +75,22 @@ card's height is a constant of the kit widget, which a feature may read but not 
 inside a kit widget is `Flexible` (wrap, or one line with ellipsis); a widget test at 360 px with
 `expect(tester.takeException(), isNull)` finds overflows. Keyboard-dependent layout: `dartway-on-device`.
 
+## Quick-entry sheets
+
+The template ships `AppQuickSheetOverlay` and `AppQuickSheetHistory` as kit source, wired by the
+optional `AppScaffold.main(quickEntry: AppQuickSheetEntry(...))`. The entry supplies localized open
+and dismiss labels and a builder receiving the input `FocusNode` and dismiss callback. Attach the
+node to the composer; keep draft state and server reads in the feature.
+
+Keep the overlay mounted and change `isOpen`; its reserved height is independent of loading.
+`AppQuickSheetHistory` takes newest-first items and `isReady`: only mark it ready once dependent
+cards are ready too. It anchors from the bottom on the first layout, without a post-frame jump,
+and reopening starts at the newest item. Loading and empty views belong to the feature.
+
+The scaffold keeps navigation and its version footer mounted at the physical bottom under the
+keyboard and sheet, and begins revealing them when dismissal starts. Do not conditionally mount
+navigation on keyboard visibility. Focus and inset rules: `dartway-on-device`.
+
 ## Assets, text, buttons, theme
 
 - **Assets**: an enum dictionary in `assets/app_icon.dart` — `brandMark('assets/dartway_mark.svg')` — and

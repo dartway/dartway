@@ -58,5 +58,12 @@ jobs:
       - run: rm pubspec.lock && flutter pub get
         working-directory: template/dartway_starter_flutter
 
+      - name: Quick-entry browser regressions
+        run: >-
+          flutter test --platform chrome
+          test/core/router/app_scaffold_test.dart
+          test/ui_kit/3_special/quick_entry/app_quick_sheet_overlay_test.dart
+        working-directory: template/dartway_starter_flutter
+
       - run: flutter build web --release
         working-directory: template/dartway_starter_flutter

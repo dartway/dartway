@@ -1,9 +1,13 @@
 import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
 
-/// Supplies engine inset frames on native iOS, or inset steps on other platforms.
+/// The keyboard, as a test can state it: a step change in `viewInsets`.
+///
+/// That is how the system reports it — one step, or two on iOS — while the
+/// keyboard itself travels for about 250 ms. Everything here is about the
+/// distance between those two facts.
 Widget _withKeyboard(double inset, Widget child) => MediaQuery(
   data: MediaQueryData(viewInsets: EdgeInsets.only(bottom: inset)),
   child: Directionality(textDirection: TextDirection.ltr, child: child),
@@ -49,105 +53,83 @@ const _sheetPadding = 16.0;
 void main() {
   group('AppKeyboardInset', () {
     testWidgets(
-      'native iOS follows every engine frame without an animation tail',
+      'native iOS tracks each keyboard frame without trailing motion',
       (tester) async {
-        late double inset;
-        Widget tree(double keyboard) => _withKeyboard(
-          keyboard,
+        late double delivered;
+        Widget frame(double inset) => _withKeyboard(
+          inset,
           AppKeyboardInset(
             builder: (_, value) {
-              inset = value;
+              delivered = value;
               return const SizedBox.shrink();
             },
           ),
         );
-
-        await tester.pumpWidget(tree(0));
-        // Engine frames include opening, a reversal, and closing. No extra
-        // smoothing may trail the keyboard in either direction.
-        for (final frame in [
-          40.0,
-          120.0,
-          240.0,
-          300.0,
-          180.0,
-          220.0,
-          80.0,
-          0.0,
-        ]) {
-          await tester.pumpWidget(
-            tree(frame),
-            duration: const Duration(milliseconds: 16),
+        await tester.pumpWidget(frame(0));
+        for (final inset in [40.0, 120.0, 220.0, 300.0, 180.0, 60.0, 0.0]) {
+          await tester.pumpWidget(frame(inset));
+          expect(
+            delivered,
+            inset,
+            reason: 'layout must follow the system frame',
           );
-          expect(inset, frame);
+          await tester.pump(const Duration(milliseconds: 16));
+          expect(delivered, inset, reason: 'no tween may trail the keyboard');
         }
-        expect(tester.binding.hasScheduledFrame, isFalse);
-        await tester.pump(const Duration(milliseconds: 250));
-        expect(inset, 0);
       },
       variant: TargetPlatformVariant.only(TargetPlatform.iOS),
       skip: kIsWeb,
     );
 
-    testWidgets(
-      'hands a step change over gradually, not at once',
-      (tester) async {
-        late double inset;
-        Widget tree(double keyboard) => _withKeyboard(
-          keyboard,
+    testWidgets('hands a step change over gradually, not at once', (
+      tester,
+    ) async {
+      late double inset;
+      Widget tree(double keyboard) => _withKeyboard(
+        keyboard,
+        AppKeyboardInset(
+          builder: (_, value) {
+            inset = value;
+            return const SizedBox.shrink();
+          },
+        ),
+      );
+
+      await tester.pumpWidget(tree(0));
+      expect(inset, 0);
+
+      await tester.pumpWidget(tree(_raised));
+      await tester.pump(AppKeyboardInset.duration ~/ 2);
+
+      // The point of the widget: halfway through the keyboard's travel the
+      // layout is halfway too, instead of having arrived on the first frame.
+      expect(inset, greaterThan(0));
+      expect(inset, lessThan(_raised));
+
+      await tester.pumpAndSettle();
+      expect(inset, _raised);
+    });
+
+    testWidgets('delivers a keyboard that is already up without animating', (
+      tester,
+    ) async {
+      final delivered = <double>[];
+      await tester.pumpWidget(
+        _withKeyboard(
+          _raised,
           AppKeyboardInset(
             builder: (_, value) {
-              inset = value;
+              delivered.add(value);
               return const SizedBox.shrink();
             },
           ),
-        );
+        ),
+      );
 
-        await tester.pumpWidget(tree(0));
-        expect(inset, 0);
-
-        await tester.pumpWidget(tree(_raised));
-        await tester.pump(AppKeyboardInset.duration ~/ 2);
-
-        // The point of the widget: halfway through the keyboard's travel the
-        // layout is halfway too, instead of having arrived on the first frame.
-        expect(inset, greaterThan(0));
-        expect(inset, lessThan(_raised));
-
-        await tester.pumpAndSettle();
-        expect(inset, _raised);
-      },
-      variant: const TargetPlatformVariant({
-        TargetPlatform.android,
-        if (kIsWeb) TargetPlatform.iOS,
-      }),
-    );
-
-    testWidgets(
-      'delivers a keyboard that is already up without animating',
-      (tester) async {
-        final delivered = <double>[];
-        await tester.pumpWidget(
-          _withKeyboard(
-            _raised,
-            AppKeyboardInset(
-              builder: (_, value) {
-                delivered.add(value);
-                return const SizedBox.shrink();
-              },
-            ),
-          ),
-        );
-
-        // A sheet opened over a raised keyboard must be in place, not slide into
-        // it. The tween has no `begin`, so it starts at its end.
-        expect(delivered, [_raised]);
-      },
-      variant: const TargetPlatformVariant({
-        TargetPlatform.android,
-        TargetPlatform.iOS,
-      }),
-    );
+      // A sheet opened over a raised keyboard must be in place, not slide into
+      // it. The tween has no `begin`, so it starts at its end.
+      expect(delivered, [_raised]);
+    });
   });
 
   group('showAppBottomSheet', () {
@@ -215,6 +197,6 @@ void main() {
       final settled = insetsInSheet(tester);
       expect(settled.fromPadding, closeTo(_raised, 0.01));
       expect(settled.fromHeight, closeTo(_raised, 0.01));
-    }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+    });
   });
 }

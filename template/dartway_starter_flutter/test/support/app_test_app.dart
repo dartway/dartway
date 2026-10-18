@@ -1,10 +1,12 @@
 import 'package:dartway_analytics_flutter/dartway_analytics_flutter.dart';
 import 'package:dartway_client/testing.dart';
-import 'package:dartway_core_flutter/dartway_core_flutter.dart';
 import 'package:dartway_starter_flutter/core/dw_core.dart';
+import 'package:dartway_starter_flutter/core/app_l10n.dart';
+import 'package:dartway_starter_flutter/core/router/app_scaffold.dart';
+import 'package:dartway_starter_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_starter_flutter/dartway_starter_app.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
-import 'package:flutter/widgets.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -228,6 +230,36 @@ final class TestApp {
     addTearDown(() => app.stop(tester));
     await app.settle(tester);
     return app;
+  }
+
+  /// Mounts the real scaffold with optional feature content, retaining the
+  /// running app's core and the same localization and theme as its root.
+  Future<void> mountQuickEntry(
+    WidgetTester tester,
+    AppQuickSheetEntry entry,
+  ) async {
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (_, _) => AppScaffold.main(
+            body: const SizedBox.shrink(),
+            quickEntry: entry,
+          ),
+        ),
+      ],
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      MaterialApp.router(
+        routerConfig: router,
+        theme: AppTheme.light,
+        locale: const Locale('en'),
+        localizationsDelegates: AppLocalizations.localizationsDelegates,
+        supportedLocales: AppLocalizations.supportedLocales,
+      ),
+    );
+    await settle(tester);
   }
 
   /// Lets the in-memory traffic, Riverpod and a page transition finish.

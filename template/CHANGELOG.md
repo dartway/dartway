@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Add optional `AppScaffold.main(quickEntry: ...)` wiring and reusable quick-sheet
+  overlay/history source: stable loading height, newest-first initial layout,
+  native entrance focus, web gesture primer, frozen dismissal geometry, and
+  navigation/footer reveal while the keyboard closes (#579).
 - `AppKeyboardInset` follows native iOS engine frames directly while retaining
   the 250 ms tween on web and other platforms, so bottom sheets do not trail
   the native keyboard (#578).
