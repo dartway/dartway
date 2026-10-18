@@ -265,6 +265,7 @@ final class DwAuthConfig {
 
   /// Minimum time between two code requests for one identifier; announced to
   /// the client as `DwCodeTicket.resendAfter` and enforced.
+  /// Zero disables this delay; [maxRequestsPerWindow] still applies.
   final Duration resendDelay;
 
   /// `last_used_at` of a session key is written at most once per this

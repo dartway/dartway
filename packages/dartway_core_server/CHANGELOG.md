@@ -2,6 +2,10 @@
 
 ## 0.22.0-dev.0
 
+- A zero auth `resendDelay` no longer refuses a repeated code request when
+  the previous ticket's timestamp is ahead of the current clock reading.
+  Positive resend delays and per-identifier request-window quotas still apply (#586).
+
 - Outbound transport failure diagnostics discard arbitrary provider/client causes, which may
   contain credentials or bearer links. Logs, exception strings and incident errors retain safe
   categories; framework-owned timeout and response-size limits remain informative.
