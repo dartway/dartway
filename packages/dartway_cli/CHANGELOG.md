@@ -6,6 +6,10 @@
   metadata when the dependencies and lints plugin resolve by local paths
   (#600). A full commit remains required for Git pinning.
 
+- Fix: `dartway create` initializes Git on the recorded base branch (`master`),
+  even when Git defaults to `main`, so the new project's contract baseline is
+  available. `create .` preserves an existing repository's branch (#599).
+
 - Fix: Compose deployments pin both serving images as
   `<project>-<service>:dw-previous` before building moves `:latest`. Retries
   keep the original journal entries, restore missing or moved pins, and
