@@ -211,6 +211,41 @@ void main() {
     expect(app().deliveredTo.where((i) => i == id), hasLength(3));
   });
 
+  group('zero resend delay', () {
+    final clock = DwTestClock(DateTime.utc(2026, 10, 18, 12));
+    final zeroDelay = useHarness(
+      build: (app, config) => app.server(
+        config,
+        auth: app.auth(resendDelay: Duration.zero),
+        clock: clock,
+      ),
+    );
+
+    test('a later ticket timestamp does not delay a second device, '
+        'but the request window still applies', () async {
+      final h = zeroDelay();
+      const id = 'zero-delay@example.com';
+      final firstDevice = h.caller();
+      final first = await h.app.signIn(firstDevice, id);
+
+      // Reproduce the timestamp ordering caused by comparing a newly
+      // committed ticket with an earlier clock reading, without a race.
+      clock.advance(const Duration(microseconds: -1));
+      final secondDevice = h.caller();
+      final second = await h.app.signIn(secondDevice, id);
+      expect(second.id, first.id);
+      expect(second.token, isNot(first.token));
+
+      final third = await requestCode(id, on: secondDevice);
+      expect(third.status, 200);
+      final limited = await requestCode(id, on: secondDevice);
+      expect(limited.status, 429);
+      expect(limited.refusal.code, 'dw.tooManyRequests');
+      expect(limited.refusal.retryAfter, const Duration(minutes: 10));
+      expect(h.app.deliveredTo.where((value) => value == id), hasLength(3));
+    });
+  });
+
   test('generateCode does not run when the request is refused by the resend '
       'delay or by the window — the limit is checked first', () async {
     const id = 'genlimit@example.com';

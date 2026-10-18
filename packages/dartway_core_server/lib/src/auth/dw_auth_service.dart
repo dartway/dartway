@@ -278,7 +278,11 @@ final class DwAuthService {
       if (count >= auth.maxRequestsPerWindow && first != null) {
         retryAt = first.add(auth.requestWindow);
       }
-      if (last != null && last.add(auth.resendDelay).isAfter(now)) {
+      // A disabled delay must not become a refusal when the clock reads
+      // earlier than the previous ticket's timestamp.
+      if (auth.resendDelay > Duration.zero &&
+          last != null &&
+          last.add(auth.resendDelay).isAfter(now)) {
         final resendAt = last.add(auth.resendDelay);
         if (retryAt == null || resendAt.isAfter(retryAt)) retryAt = resendAt;
       }
