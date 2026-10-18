@@ -9,7 +9,6 @@ import 'image_registry.dart';
 import 'kamal.dart';
 import 'kamal_runtime_inspection.dart';
 import 'remote_checks.dart';
-import 'secret_store.dart';
 import 'stack.dart';
 
 final List<DwDeployCheck> dwKamalLocalDeployChecks = [
@@ -180,7 +179,11 @@ final class DwKamalRuntime {
     ];
     final result = await context.ssh!.runAs(
       context.target.deployUser,
-      nativeKamalInspectionScript(services),
+      nativeKamalInspectionScript(
+        services,
+        secretFiles: context.target.requiredSecretFiles,
+        runtimeConfigDir: context.target.runtimeConfigDir,
+      ),
     );
     if (!result.ok)
       throw StateError(
@@ -289,25 +292,20 @@ final class DwKamalRuntime {
       return const DwDeployVerdict.fail(
         'The selected native API is not running.',
       );
-    for (final name in context.target.requiredSecretFiles) {
-      final mounts = api.mounts.where(
-        (mount) => mount.destination == '${DwStack.secretFilesDir}/$name',
+    final fileMountsValid = api.secretFileMountsValid;
+    if (fileMountsValid.length != context.target.requiredSecretFiles.length) {
+      return const DwDeployVerdict.fail(
+        'Native API file mount verification is incomplete.',
       );
-      if (mounts.length != 1 ||
-          mounts.single.type != 'bind' ||
-          mounts.single.writable ||
-          mounts.single.source != '${context.target.runtimeConfigDir}/$name') {
+    }
+    for (final (index, name) in context.target.requiredSecretFiles.indexed) {
+      if (!fileMountsValid[index]) {
         return DwDeployVerdict.fail(
           'Native API file $name lacks its per-file read-only mount.',
         );
       }
     }
-    if (api.mounts.any(
-      (mount) =>
-          mount.destination == DwStack.secretFilesDir ||
-          mount.destination ==
-              '${DwStack.secretFilesDir}/${DwSecretStore.fileName}',
-    )) {
+    if (api.mountsWholeSecretStore) {
       return const DwDeployVerdict.fail(
         'The native API mounts the whole secret store.',
       );

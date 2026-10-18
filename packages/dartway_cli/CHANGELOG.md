@@ -2,11 +2,9 @@
 
 ## 0.25.0-dev.0
 
-- Fix: generated Studio manifests declare the actual server migration and lock
-  paths. Images pass the workflow run number into web builds, preserving SHA
-  image identities and build-once behavior (#566). Existing projects must
-  regenerate Kamal files and update their web Dockerfile; see the
-  [migration note](../../docs/migrations/2026-10-18-studio-migrations-and-build-number.md).
+- Fix: native `deploy check` verifies secret-file mounts on the target before
+  masking output, so a path stored in `FCM_SERVICE_ACCOUNT_FILE` no longer
+  hides a correct per-file read-only bind from the checker (#587).
 
 - Fix: `create --framework-path` accepts a framework export without Git
   metadata when the dependencies and lints plugin resolve by local paths
@@ -109,6 +107,12 @@
 - Template and example web releases call `Uri.base.origin` and build without a
   backend address, so one image serves every destination. Deploy checks require
   the backend build argument only when the Dockerfile declares it (#530).
+
+- Fix: generated Studio manifests declare the actual server migration and lock
+  paths. Images pass the workflow run number into web builds, preserving SHA
+  image identities and build-once behavior (#566). Existing projects must
+  regenerate Kamal files and update their web Dockerfile; see the
+  [migration note](../../docs/migrations/2026-10-18-studio-migrations-and-build-number.md).
 
 ## 0.24.0
 
