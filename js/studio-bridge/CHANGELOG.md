@@ -8,9 +8,9 @@
   (source-map processing denial of service). Require Vue 3.5.42 or newer for
   development; the bridge's optional peer dependencies and wire protocol are
   unchanged.
-- Run `npm audit --audit-level=high` as part of `npm run check`, so the existing
-  repository checks reject high or critical advisories, including development
-  dependencies, instead of only printing warnings during `npm ci`.
+- Add `npm run audit` (`npm audit --audit-level=high`). It is kept out of
+  `npm run check`: the check stays offline and does not turn red on a new
+  upstream advisory or a registry outage unrelated to the change.
 
 ## 0.4.0
 

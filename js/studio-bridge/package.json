@@ -33,7 +33,7 @@
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "node --test \"test/**/*.test.ts\"",
     "audit": "npm audit --audit-level=high",
-    "check": "npm run audit && npm run typecheck && npm test && npm run build"
+    "check": "npm run typecheck && npm test && npm run build"
   },
   "peerDependencies": {
     "react": ">=18",
