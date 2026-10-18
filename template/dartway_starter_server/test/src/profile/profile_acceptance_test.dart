@@ -1,4 +1,5 @@
 import 'package:dartway_core_server/testing.dart';
+import 'package:dartway_starter_server/src/profile/profile_objects.dart';
 import 'package:dartway_starter_shared/dartway_starter_shared.dart';
 import 'package:test/test.dart';
 
@@ -13,6 +14,59 @@ void main() {
 
   setUpAll(() async => app = await AppHarness.start());
   tearDownAll(() => app.stop());
+
+  test(
+    'user cards share one identity read with their profiles, for one or many rows',
+    () async {
+      final member = await app.signUp('79990005030', firstName: 'Batch member');
+      final row = await member.profileRow();
+      final other = await app.signUp(
+        'batch5031@example.com',
+        firstName: 'Other member',
+      );
+      final otherRow = await other.profileRow();
+      await app.server.runInContext((ctx) async {
+        // Count actual reads on this transaction's connection, independent of
+        // other clients and of whether Postgres would otherwise choose an index.
+        await ctx.db.execute(
+          'SET LOCAL enable_indexscan = off; '
+          'SET LOCAL enable_bitmapscan = off',
+        );
+        final card = await ProfileObjects.card(ctx, row);
+        expect(card.profile.phone, '79990005030');
+        expect(card.identifiers.map((identity) => identity.value), [
+          '79990005030',
+        ]);
+        final stats = await ctx.db.query(
+          "SELECT seq_scan FROM pg_stat_xact_user_tables WHERE relname = 'dw_identity'",
+        );
+        expect(
+          stats.single.get<int>('seq_scan'),
+          1,
+          reason: 'the card and its nested profile share one identity read',
+        );
+        final cards = await ProfileObjects.cards(ctx, [otherRow, row]);
+        expect(cards.map((card) => card.id), [otherRow.id, row.id]);
+        expect(cards.first.profile.email, 'batch5031@example.com');
+        expect(cards.first.profile.phone, isNull);
+        expect(cards.first.identifiers.map((identity) => identity.value), [
+          'batch5031@example.com',
+        ]);
+        expect(cards.last, card);
+        expect(cards.first.termsAcceptedAt, otherRow.termsAcceptedAt);
+        expect(await ProfileObjects.cards(ctx, []), isEmpty);
+        final afterBatch = await ctx.db.query(
+          "SELECT seq_scan FROM pg_stat_xact_user_tables WHERE relname = 'dw_identity'",
+        );
+        expect(
+          afterBatch.single.get<int>('seq_scan'),
+          2,
+          reason:
+              'one more read for the whole batch and none for an empty batch',
+        );
+      });
+    },
+  );
 
   /// Asks for a code to attach [identifier] as [member] and answers the ticket
   /// and the code that arrived.

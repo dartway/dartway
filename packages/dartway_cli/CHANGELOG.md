@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Fix: the template maps user cards in a batch, loading identities and avatar
+  URLs once and sharing them with the nested profiles. A single card uses a
+  batch of one (#418).
+
 - Tests: synchronize the deployment busy-refusal check with the real detached
   process's startup and release, avoiding its fixed sleep window (#613).
 
