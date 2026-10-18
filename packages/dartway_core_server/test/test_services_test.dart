@@ -1,3 +1,6 @@
+@Timeout(Duration(minutes: 3))
+library;
+
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
@@ -5,6 +8,29 @@ import 'dart:io';
 import 'package:test/test.dart';
 
 void main() {
+  late File worker;
+  setUpAll(() async {
+    final directory = await Directory.systemTemp.createTemp(
+      'dw-test-services-',
+    );
+    addTearDown(() => directory.delete(recursive: true));
+    worker = File('${directory.path}/worker.dill');
+    // Compilation has its own setup budget, outside the cleanup deadlines.
+    // Both cases execute the same real worker with the server's resolution.
+    final compilation = await Process.run(Platform.resolvedExecutable, [
+      'compile',
+      'kernel',
+      '--packages=${packageConfigPath()}',
+      '--output=${worker.path}',
+      File('bin/dartway_test_services.dart').absolute.path,
+    ]);
+    expect(
+      compilation.exitCode,
+      0,
+      reason: '${compilation.stdout}${compilation.stderr}',
+    );
+  });
+
   for (final stalled in [false, true]) {
     test(
       stalled
@@ -51,11 +77,9 @@ void main() {
           }
           await request.response.close();
         });
-        final config = packageConfigPath();
-        final worker = File('bin/dartway_test_services.dart').absolute;
         final process = await Process.start(
           Platform.resolvedExecutable,
-          ['--packages=$config', worker.path, 'cleanup', 'storage'],
+          [worker.path, 'cleanup', 'storage'],
           environment: {
             'DW_TEST_RUN_ID': 'abcdefghijklmnop',
             'DW_STORAGE_ENDPOINT': 'http://127.0.0.1:${server.port}',
