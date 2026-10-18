@@ -12,6 +12,7 @@ import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
 import 'support/cli_kernel.dart';
+import 'support/test_process.dart';
 
 /// Real CLI over the real template: existing parser/wiring suites do not cover
 /// update's note selection or its ordering of resolution and project writes.
@@ -33,7 +34,7 @@ void main() {
     List<String> args,
     Directory cwd, {
     Map<String, String>? environment,
-  }) => Process.run(
+  }) => runTestProcess(
     Platform.resolvedExecutable,
     ['--packages=$packages', cli, ...args],
     workingDirectory: cwd.path,
@@ -87,14 +88,15 @@ void main() {
       p.join(fixture.path, 'analysis_options.yaml'),
     ).writeAsStringSync(options);
     succeeds(
-      await Process.run('flutter', [
+      await runTestProcess('flutter', [
         'pub',
         'get',
       ], workingDirectory: fixture.path),
     );
-    return Process.run(
+    return runTestProcess(
       Platform.resolvedExecutable,
       ['analyze', '--format=machine'],
+      timeout: const Duration(minutes: 3),
       workingDirectory: fixture.path,
       environment: {
         'ANALYZER_STATE_LOCATION_OVERRIDE': p.join(

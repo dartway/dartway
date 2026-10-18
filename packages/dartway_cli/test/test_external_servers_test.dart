@@ -10,6 +10,7 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import 'support/cli_kernel.dart';
+import 'support/test_process.dart';
 
 void main() {
   final repo = Directory(p.normalize(p.join(Directory.current.path, '../..')));
@@ -19,7 +20,48 @@ void main() {
   late File dockerCalled;
   late String compiledCli;
   late String kernel;
-  setUpAll(() async => kernel = await cliKernel(repo.path));
+  late Directory artifacts;
+  setUpAll(() async {
+    artifacts = await Directory.systemTemp.createTemp('dw-cli-artifacts-');
+    addTearDown(() => artifacts.delete(recursive: true));
+    kernel = await cliKernel(repo.path);
+    // Keep compilation outside the per-command behavior deadlines. The CLI
+    // still resolves and executes the real worker through the fixture config.
+    final workerRoot = Directory(p.join(artifacts.path, 'core_server'));
+    Directory(p.join(workerRoot.path, 'bin')).createSync(recursive: true);
+    Link(p.join(workerRoot.path, 'pubspec.yaml')).createSync(
+      p.join(repo.path, 'packages/dartway_core_server/pubspec.yaml'),
+    );
+    Link(
+      p.join(workerRoot.path, 'lib'),
+    ).createSync(p.join(repo.path, 'packages/dartway_core_server/lib'));
+    final worker = await runTestProcess(Platform.resolvedExecutable, [
+      'compile',
+      'kernel',
+      '--packages=${config.path}',
+      p.join(
+        repo.path,
+        'packages/dartway_core_server/bin/dartway_test_services.dart',
+      ),
+      '-o',
+      p.join(workerRoot.path, 'bin/dartway_test_services.dart'),
+    ]);
+    expect(worker.exitCode, 0, reason: '${worker.stdout}${worker.stderr}');
+    compiledCli = p.join(artifacts.path, 'dartway');
+    final compiled = await runTestProcess(Platform.resolvedExecutable, [
+      'compile',
+      'exe',
+      '--packages=${config.path}',
+      p.join(repo.path, 'packages/dartway_cli/bin/dartway.dart'),
+      '-o',
+      compiledCli,
+    ]);
+    expect(
+      compiled.exitCode,
+      0,
+      reason: '${compiled.stdout}${compiled.stderr}',
+    );
+  });
   setUp(() async {
     root = await Directory.systemTemp.createTemp('dw463_');
     server = Directory(p.join(root.path, 'proof_server'))..createSync();
@@ -31,6 +73,13 @@ void main() {
       entry['rootUri'] = config.uri
           .resolve(entry['rootUri'] as String)
           .toString();
+    }
+    for (final entry in packages['packages'] as List) {
+      if (entry['name'] == 'dartway_core_server') {
+        entry['rootUri'] = Directory(
+          p.join(artifacts.path, 'core_server'),
+        ).uri.toString();
+      }
     }
     final overrides = StringBuffer();
     for (final entry in packages['packages'] as List) {
@@ -72,34 +121,14 @@ void main() {
     bool processGroup = false,
     String command = 'test',
     String? workingDirectory,
-  }) => Process.start(
-    processGroup
-        ? '/bin/bash'
-        : compiled
-        ? compiledCli
-        : Platform.resolvedExecutable,
+  }) => startTestProcess(
+    compiled ? compiledCli : Platform.resolvedExecutable,
     [
-      if (processGroup) ...[
-        '-c',
-        // Job control gives the CLI and its descendants a separate group, while
-        // the wrapper stays outside it to report the CLI's exit status.
-        r'''
-set -m
-group_file=$1
-shift
-"$@" &
-child=$!
-printf '%s\n' "$child" > "$group_file"
-wait "$child"
-''',
-        'dartway-test-group',
-        p.join(root.path, 'process-group'),
-        compiled ? compiledCli : Platform.resolvedExecutable,
-      ],
       if (!compiled) ...['--packages=${config.path}', kernel],
       command,
       ...arguments,
     ],
+    processGroupFile: processGroup ? p.join(root.path, 'process-group') : null,
     workingDirectory: workingDirectory ?? root.path,
     environment: {
       for (final entry in Platform.environment.entries)
@@ -614,20 +643,6 @@ esac
   test(
     'compiled CLI strips test URL defaults from the suite and service workers',
     () async {
-      compiledCli = p.join(root.path, 'dartway');
-      final compiled = await Process.run(Platform.resolvedExecutable, [
-        'compile',
-        'exe',
-        '--packages=${config.path}',
-        p.join(repo.path, 'packages/dartway_cli/bin/dartway.dart'),
-        '-o',
-        compiledCli,
-      ]);
-      expect(
-        compiled.exitCode,
-        0,
-        reason: '${compiled.stdout}${compiled.stderr}',
-      );
       final storage = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
       addTearDown(() => storage.close(force: true));
       storage.listen((request) async {
