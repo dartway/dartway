@@ -766,8 +766,9 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
   without the binding needs no such argument. A Kamal web image omits the define:
   the Studio binding takes its own `Uri.base.origin` in a web release.
 - **`.dockerignore` denies everything** and admits the packages by role suffix (`*_server/`,
-  `*_flutter/`, `*_shared/`), minus build output and `.env` — so the working copy's history, build
-  output and local secrets never reach the Docker daemon.
+  `*_flutter/`, `*_shared/`), minus build output, `.env` and native app signing material
+  (`key.properties`, `*.jks`, `*.keystore`, `*.p8`) at every depth. These excluded files
+  never reach the Docker daemon.
 
 **What the web image lets a browser keep fails silently.** A Flutter web build hashes nothing:
 `index.html`, `flutter_bootstrap.js`, `main.dart.js` and everything under `assets/` carry the same

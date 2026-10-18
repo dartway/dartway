@@ -2,6 +2,11 @@
 
 ## 0.25.0-dev.0
 
+- Fix: template and example Docker contexts exclude native app signing files
+  (`key.properties`, `*.jks`, `*.keystore`, `*.p8`) at every depth (#588).
+  Existing projects must update their copied `.dockerignore`; see the
+  [migration note](../../docs/migrations/2026-10-18-docker-context-signing-files.md).
+
 - `dartway sync [<ref>]` merges the base branch in and resolves derived files
   itself: generated code, locks and l10n outputs are regenerated, the
   migrations registry is rebuilt from its directory, `.arb` files merge by key;
