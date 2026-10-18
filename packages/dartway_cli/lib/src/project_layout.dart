@@ -156,15 +156,28 @@ class ProjectLayout {
 
   Map<String, String> toolkitTokens({
     required String baseBranch,
+    String releaseBranch = '',
     String language = 'English',
     String? notesTracker,
-  }) => {
-    '__PROJECT_LANGUAGE__': language,
-    '__NOTES_TRACKER__': notesTracker ?? defaultNotesTracker,
-    '__SERVER_PKG__': serverPackage,
-    '__FLUTTER_PKG__': flutterPackage,
-    '__FLUTTER_APP_FILE__': flutterAppFile,
-    '__SHARED_PKG__': sharedPackage,
-    '__BASE_BRANCH__': baseBranch,
-  };
+  }) {
+    final contractArgs = releaseBranch.isEmpty
+        ? r' --contract-base "$CONTRACT_BASE"'
+        : '';
+    final flutterCli = '(cd $flutterPackage && dart run dartway_cli:dartway';
+    return {
+      '__PROJECT_LANGUAGE__': language,
+      '__NOTES_TRACKER__': notesTracker ?? defaultNotesTracker,
+      '__SERVER_PKG__': serverPackage,
+      '__FLUTTER_PKG__': flutterPackage,
+      '__FLUTTER_APP_FILE__': flutterAppFile,
+      '__SHARED_PKG__': sharedPackage,
+      '__BASE_BRANCH__': baseBranch,
+      '__FINISH_GENERATE_CHECK__': [
+        if (releaseBranch.isEmpty)
+          'CONTRACT_BASE="\$(git merge-base HEAD origin/$baseBranch)"  # resolve once; CI supplies its trusted SHA',
+        '$flutterCli generate --check$contractArgs)',
+      ].join('\n'),
+      '__FINISH_CHECK__': '$flutterCli check$contractArgs)',
+    };
+  }
 }
