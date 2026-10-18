@@ -76,6 +76,8 @@ void main() {
           ],
           '172.18.0.${index + 3}',
           '',
+          [true],
+          false,
         ],
       [
         '4' * 64,
@@ -97,6 +99,8 @@ void main() {
         ],
         '172.18.0.8',
         '',
+        [false],
+        false,
       ],
     ];
     routes = {
@@ -260,19 +264,25 @@ void main() {
     });
   }
 
-  test('a writable or wrong-source secret file fails', () async {
-    final mount = (containers[1][8] as List).single as List;
-    mount[4] = 1;
+  test('a rejected target-side file mount fails', () async {
+    containers[1][11] = [false];
     expect((await check('secret-files')).passed, false);
-    mount[4] = 0;
-    mount[1] = '/other/account.json';
+  });
+
+  test('incomplete target-side file verification fails closed', () async {
+    containers[1][11] = <bool>[];
+    expect((await check('secret-files')).passed, false);
+  });
+
+  test('invalid target-side file verification fails closed', () async {
+    containers[1][11] = ['true'];
     expect((await check('secret-files')).passed, false);
   });
 
   test(
     'the whole store must not be mounted alongside required files',
     () async {
-      (containers[1][8] as List).add(['bind', '/store', '/run/secrets', '', 0]);
+      containers[1][12] = true;
       expect((await check('secret-files')).passed, false);
     },
   );

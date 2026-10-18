@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Fix: native `deploy check` verifies secret-file mounts on the target before
+  masking output, so a path stored in `FCM_SERVICE_ACCOUNT_FILE` no longer
+  hides a correct per-file read-only bind from the checker (#587).
+
 - Fix: `create --framework-path` accepts a framework export without Git
   metadata when the dependencies and lints plugin resolve by local paths
   (#600). A full commit remains required for Git pinning.
