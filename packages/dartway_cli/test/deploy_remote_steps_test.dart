@@ -208,16 +208,32 @@ void main() {
     });
 
     test('refuses while a step of the last one is still running', () async {
+      final started = File(p.join(temp.path, 'started'));
+      final release = File(p.join(temp.path, 'release'));
       final first = steps(LocalShell())..beginFresh(['slow']);
-      final running = first.run('slow', 'sleep 1\n');
-      await Future<void>.delayed(const Duration(milliseconds: 300));
-
-      final second = steps(LocalShell())..beginFresh(['slow']);
-      await expectLater(
-        second.run('slow', 'true\n'),
-        throwsA(isA<DwDeployBusy>()),
-      );
-      expect((await running).ok, isTrue);
+      // The real step signals startup and stays alive until the refusal has
+      // been checked, however long the second deployment takes to run.
+      final running = first.run('slow', '''
+: > '${started.path}'
+while [ ! -f '${release.path}' ]; do sleep 0.02; done
+''');
+      try {
+        final waiting = Stopwatch()..start();
+        while (!started.existsSync()) {
+          if (waiting.elapsed > const Duration(seconds: 10)) {
+            fail('The detached step did not signal that it started.');
+          }
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        final second = steps(LocalShell())..beginFresh(['slow']);
+        await expectLater(
+          second.run('slow', 'true\n'),
+          throwsA(isA<DwDeployBusy>()),
+        );
+      } finally {
+        release.writeAsStringSync('');
+        expect((await running).ok, isTrue);
+      }
     });
   });
 }
