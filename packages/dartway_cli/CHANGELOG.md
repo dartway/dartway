@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.0
 
+- Fix: `dartway create` initializes Git on the recorded base branch (`master`),
+  even when Git defaults to `main`, so the new project's contract baseline is
+  available. `create .` preserves an existing repository's branch (#599).
+
 - Fix: the installed `dartway-finish` gate block omits `CONTRACT_BASE` and
   `--contract-base` when the project has a release branch, so task checks do not
   demand contract version bumps reserved for `generate --release` (#607).

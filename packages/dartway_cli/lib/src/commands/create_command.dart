@@ -213,7 +213,10 @@ class CreateCommand extends Command<int> {
     );
 
     if (argResults!['git'] as bool) {
-      _initGit(targetDir);
+      _initGit(
+        targetDir,
+        baseBranch: settings[ToolkitProvenance.baseBranchSetting]!,
+      );
     }
 
     stdout
@@ -512,14 +515,14 @@ class CreateCommand extends Command<int> {
     return pascal[0].toLowerCase() + pascal.substring(1);
   }
 
-  void _initGit(Directory projectRoot) {
+  void _initGit(Directory projectRoot, {required String baseBranch}) {
     // With `create .` the folder may already be a repository — initializing it
     // again is harmless but noisy, and reinitializing somebody's repo is worse.
     final alreadyARepository = Directory(
       p.join(projectRoot.path, '.git'),
     ).existsSync();
     final commands = [
-      if (!alreadyARepository) ['init', '-q'],
+      if (!alreadyARepository) ['init', '-q', '-b', baseBranch],
       ['add', '-A'],
       ['commit', '-q', '-m', 'chore: initial commit from DartWay template'],
     ];
