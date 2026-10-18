@@ -6,6 +6,10 @@
   masking output, so a path stored in `FCM_SERVICE_ACCOUNT_FILE` no longer
   hides a correct per-file read-only bind from the checker (#587).
 
+- Fix: `dartway create` initializes Git on the recorded base branch (`master`),
+  even when Git defaults to `main`, so the new project's contract baseline is
+  available. `create .` preserves an existing repository's branch (#599).
+
 - Fix: Compose deployments pin both serving images as
   `<project>-<service>:dw-previous` before building moves `:latest`. Retries
   keep the original journal entries, restore missing or moved pins, and
