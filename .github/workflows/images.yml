@@ -33,12 +33,14 @@ on:
       # it would run this on diffs that cannot affect the result. The nightly
       # run below covers it within a day.
       - 'template/**'
+      - 'example/.dockerignore'
       - 'packages/dartway_cli/**'
       - '.github/workflows/images.yml'
   push:
     branches: [master]
     paths:
       - 'template/**'
+      - 'example/.dockerignore'
       - 'packages/dartway_cli/**'
       - '.github/workflows/images.yml'
   # A daily run: the images are built from base images and a toolchain that
@@ -56,6 +58,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  context:
+    name: Signing files excluded
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.47.6
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Check the template and example contexts with synthetic signing files
+        working-directory: packages/dartway_cli
+        run: dart test -t docker --run-skipped test/template_build_context_test.dart
+
   image:
     runs-on: ubuntu-latest
     timeout-minutes: 45
