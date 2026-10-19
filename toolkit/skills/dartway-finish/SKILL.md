@@ -25,12 +25,14 @@ did not change means `generate` ran over another tree, or not at all.
 ## A.2 The gates — run them, do not assume them
 
 In this order; report each as run with its result, or not run and why. This is the one list of gates
-every other skill refers to. Fast gates always run locally, whatever CI does: generation, the
-migration check when row classes or migrations changed, all three analyzers, and `check`.
+every other skill refers to. Fast gates always run locally, whatever CI does: strict dependency
+resolution, generation, the migration check when row classes or migrations changed, all three
+analyzers, and `check`.
 
 First, resolve the dependencies in each package without permitting lockfile changes:
 
 ```bash
+set -e
 (cd __SHARED_PKG__ && dart pub get --enforce-lockfile)
 (cd __SERVER_PKG__ && dart pub get --enforce-lockfile)
 (cd __FLUTTER_PKG__ && flutter pub get --enforce-lockfile)

@@ -97,7 +97,7 @@ fi
     final script = '$selection\n$dependencyGates\n$block';
     final result = await Process.run(
       'bash',
-      ['-e', '-c', script],
+      ['-c', script],
       workingDirectory: sandbox.path,
       environment: {
         'PATH':
