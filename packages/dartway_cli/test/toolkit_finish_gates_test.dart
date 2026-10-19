@@ -38,6 +38,9 @@ else
   printf '%s:%s' "\${PWD##*/}" "\${0##*/}" >> "\$GATE_LOG"
   printf ' <%s>' "\$@" >> "\$GATE_LOG"
   printf '\\n' >> "\$GATE_LOG"
+  if [[ "\$FAIL_GATE" == "\${PWD##*/}" && "\$*" == 'pub get --enforce-lockfile' ]]; then
+    exit 65
+  fi
 fi
 ''');
       final chmod = Process.runSync('chmod', ['+x', executable.path]);
@@ -49,7 +52,9 @@ fi
   Future<List<String>> run(
     String selection, {
     String releaseBranch = '',
+    String? failPackage,
   }) async {
+    if (log.existsSync()) log.writeAsStringSync('');
     await installToolkitInto(
       projectRoot: sandbox,
       choice: ToolkitInstallChoice(
@@ -74,9 +79,12 @@ fi
       skill,
     );
     final gates = skill.split('## A.2 ').last.split('## A.3 ').first;
-    final block = RegExp(
+    final blocks = RegExp(
       r'```bash\n([\s\S]*?)\n```',
-    ).firstMatch(gates)!.group(1)!;
+    ).allMatches(gates).map((match) => match.group(1)!).toList();
+    expect(blocks, hasLength(2));
+    final dependencyGates = blocks.first;
+    final block = blocks.last;
     if (releaseBranch.isEmpty) {
       expect(
         block,
@@ -86,7 +94,7 @@ fi
       expect(block, isNot(contains('CONTRACT_BASE')));
       expect(block, isNot(contains('--contract-base')));
     }
-    final script = '$selection\n$block';
+    final script = '$selection\n$dependencyGates\n$block';
     final result = await Process.run(
       'bash',
       ['-e', '-c', script],
@@ -95,10 +103,28 @@ fi
         'PATH':
             '${p.join(sandbox.path, 'bin')}:${Platform.environment['PATH']}',
         'GATE_LOG': log.path,
+        'FAIL_GATE': failPackage ?? '',
       },
     );
-    expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
+    expect(
+      result.exitCode,
+      failPackage == null ? 0 : 65,
+      reason: '${result.stdout}\n${result.stderr}',
+    );
     final calls = log.readAsLinesSync();
+    if (failPackage != null) return calls;
+    expect(
+      calls,
+      contains('sample_shared:dart <pub> <get> <--enforce-lockfile>'),
+    );
+    expect(
+      calls,
+      contains('sample_server:dart <pub> <get> <--enforce-lockfile>'),
+    );
+    expect(
+      calls,
+      contains('sample_flutter:flutter <pub> <get> <--enforce-lockfile>'),
+    );
     // These gates cannot disappear when CI carries all three suites.
     expect(calls, contains('sample_shared:dart <analyze>'));
     expect(calls, contains('sample_server:dart <analyze>'));
@@ -165,6 +191,27 @@ FLUTTER_TEST_FILES=(test/admin/users 'test/app/sign in/page_test.dart')
     expect(calls.any((call) => call.contains('<bin/migrate.dart>')), isFalse);
   });
 
+  test('a strict dependency failure stops every later gate', () async {
+    const expectedPrefix = {
+      'sample_shared': <String>[
+        'sample_shared:dart <pub> <get> <--enforce-lockfile>',
+      ],
+      'sample_server': <String>[
+        'sample_shared:dart <pub> <get> <--enforce-lockfile>',
+        'sample_server:dart <pub> <get> <--enforce-lockfile>',
+      ],
+      'sample_flutter': <String>[
+        'sample_shared:dart <pub> <get> <--enforce-lockfile>',
+        'sample_server:dart <pub> <get> <--enforce-lockfile>',
+        'sample_flutter:flutter <pub> <get> <--enforce-lockfile>',
+      ],
+    };
+    for (final entry in expectedPrefix.entries) {
+      final calls = await run(runAll, failPackage: entry.key);
+      expect(calls, entry.value);
+    }
+  });
+
   test('no CI or an unmapped change can run full suites', () async {
     final calls = await run(runAll);
     expect(calls, contains('sample_shared:dart <test>'));
@@ -208,7 +255,7 @@ SERVER_TEST_FILES=(test/src/accounts/accounts_acceptance_test.dart)
         ),
       );
       expect(
-        calls.any((call) => call.startsWith('sample_flutter:flutter')),
+        calls.any((call) => call.startsWith('sample_flutter:flutter <test>')),
         isFalse,
       );
     },

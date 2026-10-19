@@ -28,6 +28,18 @@ In this order; report each as run with its result, or not run and why. This is t
 every other skill refers to. Fast gates always run locally, whatever CI does: generation, the
 migration check when row classes or migrations changed, all three analyzers, and `check`.
 
+First, resolve the dependencies in each package without permitting lockfile changes:
+
+```bash
+(cd __SHARED_PKG__ && dart pub get --enforce-lockfile)
+(cd __SERVER_PKG__ && dart pub get --enforce-lockfile)
+(cd __FLUTTER_PKG__ && flutter pub get --enforce-lockfile)
+```
+
+If any command fails because the lockfile does not match its package, stop and report the package;
+resolve the mismatch deliberately, then rerun all three commands before continuing. Do not let a
+later gate hide dependency drift.
+
 **Choose per suite, by reading the repository's `.github/workflows/*.yml` and `*.yaml`.** A workflow
 must run on `pull_request` and execute the suite's command in the right package: `dart test` in
 `__SHARED_PKG__`, the pinned CLI's `test` for server acceptance, or `flutter test` in
