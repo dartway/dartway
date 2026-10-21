@@ -532,7 +532,7 @@ const workTransitions = DwStateTransitions<WorkStatus>(
 final WorkStatus status;
 ```
 
-Run `dart run dartway_cli:dartway generate`. A missing source entry is terminal; a self move is allowed only if declared.
+Run `dartway generate`. A missing source entry is terminal; a self move is allowed only if declared.
 The table is ordinary data: tests can read `initial`, `moves`, `allows` and `sourcesFor`.
 
 ```dart
@@ -571,7 +571,7 @@ refuse assignments to state columns. `upsert` and `upsertAll` on state tables ar
 insert/tryInsert and transitions instead. These refusals are programming errors, not domain
 refusals: commands translate a transition's null/unchanged result into their own refusal.
 
-`dart run dartway_cli:dartway check` reports `stateWrittenDirectly` for direct state writes through row `copyWith`,
+`dartway check` reports `stateWrittenDirectly` for direct state writes through row `copyWith`,
 ordinary updates, upserts or raw SQL in server `lib/`. It reads formatted source rather than
 resolved types: typed rows and rows inferred from repository calls are recognized, including a
 local repository alias; arbitrary data flow or dynamically assembled SQL is outside this source
