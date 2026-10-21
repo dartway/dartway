@@ -1,0 +1,45 @@
+name: External seam drift
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 6 * * 1'
+
+permissions:
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 20
+    env:
+      # Add recorded integration tests tagged seam, then opt in with the
+      # credentials those integrations need. The starter has no demo tests.
+      DW_SEAM_CREDENTIALS: ${{ secrets.DW_SEAM_CREDENTIALS }}
+      DW_VERIFY_SEAMS: '1'
+    steps:
+      - name: Credentials absent
+        if: env.DW_SEAM_CREDENTIALS == ''
+        run: echo 'Seam drift skipped; configure DW_SEAM_CREDENTIALS to enable live checks.'
+      - uses: actions/checkout@v4
+        if: env.DW_SEAM_CREDENTIALS != ''
+      - name: Flutter from .fvmrc
+        if: env.DW_SEAM_CREDENTIALS != ''
+        id: fvm
+        run: echo "version=$(jq -r .flutter dartway_starter_flutter/.fvmrc)" >> "$GITHUB_OUTPUT"
+      - uses: subosito/flutter-action@v2
+        if: env.DW_SEAM_CREDENTIALS != ''
+        with:
+          flutter-version: ${{ steps.fvm.outputs.version }}
+          channel: stable
+          cache: true
+      - name: Dependencies
+        if: env.DW_SEAM_CREDENTIALS != ''
+        run: |
+          (cd dartway_starter_shared && dart pub get --enforce-lockfile)
+          (cd dartway_starter_server && dart pub get --enforce-lockfile)
+          (cd dartway_starter_flutter && flutter pub get --enforce-lockfile)
+      - name: Compare live shapes with committed cassettes
+        if: env.DW_SEAM_CREDENTIALS != ''
+        working-directory: dartway_starter_flutter
+        run: dart run dartway_cli:dartway test -- --tags seam

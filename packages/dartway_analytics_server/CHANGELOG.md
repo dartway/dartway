@@ -2,6 +2,10 @@
 
 - Targets DartWay 0.22.
 
+## 0.3.1
+
+- Require the matching core family (`0.23.0-dev.1`) for the server seam kit release (#638).
+
 ## 0.2.0
 
 - Reports, the catalog and dashboards (#360): `DwAnalyticsModule` answers `DwGetAnalyticsReport`

@@ -4,6 +4,7 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:dartway_orm/dartway_orm.dart';
 import 'package:meta/meta.dart';
 
+import '../process/dw_process_runner.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_service.dart';
 import '../auth/dw_auth_store.dart';
@@ -178,6 +179,9 @@ abstract class DwCallContext {
   /// See [DwOutboundHttp].
   DwOutboundHttp get http;
 
+  /// External commands, recorded or replayed by a test server.
+  DwProcessRunner get process;
+
   /// The app's settings: `await ctx.settings.read<SignInSettings>()` answers
   /// the stored value or its defaults, never `null`; `save` and `update`
   /// write it without a lock of the project's own. See [DwSettingsStore].
@@ -254,6 +258,7 @@ final class DwRuntimeContext extends DwCallContext {
     required this.log,
     required DwJobQueue Function(DwRuntimeContext ctx) jobs,
     required DwOutboundHttp Function(DwRuntimeContext ctx) http,
+    this.process = const DwProcessRunner(DwSystemProcess()),
     required DwAccountService Function(DwRuntimeContext ctx) accounts,
     DwFileService Function(DwRuntimeContext ctx)? files,
     Map<Type, DwServerModule> modules = const {},
@@ -291,6 +296,9 @@ final class DwRuntimeContext extends DwCallContext {
   String? authDeliveryHint;
   final DwJobQueue Function(DwRuntimeContext ctx) _jobs;
   final DwOutboundHttp Function(DwRuntimeContext ctx) _http;
+
+  @override
+  final DwProcessRunner process;
   final DwAccountService Function(DwRuntimeContext ctx) _accounts;
   final DwFileService Function(DwRuntimeContext ctx) _files;
   final Map<Type, DwServerModule> _modules;

@@ -1,6 +1,6 @@
 name: dartway_auth_google
 description: "Sign in with Google for a DartWay app: the SDK initialised with a nonce the server checks, and the ID token made into the sign-in command the app sends and, after a refused sign-up, sends again."
-version: 0.3.0
+version: 0.3.1
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -16,7 +16,7 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_auth_providers_shared: ^0.3.0
+  dartway_auth_providers_shared: ^0.3.1
   google_sign_in: ^7.2.0
 
 dev_dependencies:

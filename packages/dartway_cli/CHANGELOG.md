@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- **BREAKING (check):** reject direct `Process.run`, `Process.runSync` and
+  `Process.start`, plus `package:process` and `package:process_run` imports/exports,
+  in server `lib/` with `forbiddenProcessRun`; use `ctx.process`.
+  Ship a weekly/manual seam drift workflow in the template; keep the diagnostic
+  demo and its git runtime dependency in the example only (#638).
+
 - Remove `dartway-requirements` and `dartway-plan`: requirements analysis and approach
   selection belong to the developer or executor. Update removes their managed copies;
   projects wanting the old flow keep their own copy under a project skill name.
@@ -24,6 +30,9 @@
   paged reads, `request.readWhole` for a whole list, or `unbounded: '<reason>'`.
   Reads inside `readWhole` are accepted (#644); see the
   [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
+- Tests: own creation fixture process groups and disable background Git
+  maintenance so Linux teardown cannot race a remaining fixture writer (#638).
+
 - A `dartway` of another version no longer refuses a project command
   (`generate`, `check`, `test`, `deploy`, `dev`, `stats`, `format`): it runs the
   `dartway_cli` the project pins — in the directory it was typed in, on the

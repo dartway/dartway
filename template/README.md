@@ -127,6 +127,19 @@ creates its own database and its own buckets.
 app on its own host with `/dw/` proxied to the server, Postgres and optional
 bundled storage — `dartway deploy setup`, then `dartway deploy`.
 
+## External seam recordings
+
+External integrations use `ctx.http` and `ctx.process`. Add recorded acceptance tests
+under `test/cassettes/` and tag live verification tests `seam`. The framework repository's
+[example](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/src/system_info/system_info_acceptance_test.dart)
+demonstrates both seams; the starter has no demo integration.
+
+`.github/workflows/seam-drift.yml` compares live response shapes weekly or on manual
+dispatch. It skips live checks until the `DW_SEAM_CREDENTIALS` repository secret is set.
+Add the project's tagged tests and configure the credentials they require before enabling
+it. Live checks set `DW_VERIFY_SEAMS=1`; ordinary CI replays recordings. See the framework's
+[testing guide](https://github.com/dartway/dartway/blob/master/docs/5-tooling/testing.md#recorded-external-seams).
+
 ## Continuous integration
 
 `.github/workflows/ci.yml` runs every gate on every pull request as one check,

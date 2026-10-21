@@ -11,6 +11,7 @@ import 'package:dartway_orm/dartway_orm.dart';
 import '../context/dw_call_context.dart';
 import '../server/dw_app_server.dart';
 import 'dw_fake_outbound_http.dart';
+import 'dw_fake_process_runner.dart';
 import 'dw_test_run.dart';
 
 /// A throwaway database for one test file: created empty, dropped after.
@@ -69,14 +70,17 @@ final class DwTestDatabase {
 /// wire through [caller] and [openLive], or use the app's own client through
 /// [connectClient].
 final class DwTestServer {
-  DwTestServer._(this.server, this.http);
+  DwTestServer._(this.server, this.http, this.process);
 
   final DwAppServer server;
 
   /// What the server's `ctx.http` talks to: records every request and
   /// answers from the rules the test gives it, and refuses the rest — a test
-  /// server never reaches the network through `ctx.http`.
+  /// server stays offline unless an attached cassette explicitly records or verifies.
   final DwFakeOutboundHttp http;
+
+  /// Offline external commands, with recorded answers or explicit edge cases.
+  final DwFakeProcessRunner process;
 
   /// The UTC offset every caller of this test server reports
   /// (`Dw-Utc-Offset`, the handler's `ctx.callerUtcOffset`): [caller]s and
@@ -97,14 +101,16 @@ final class DwTestServer {
   /// grows a list past its bound is the one that says so.
   static Future<DwTestServer> start(DwAppServer server) async {
     final http = DwFakeOutboundHttp();
+    final process = DwFakeProcessRunner();
     await server.startOn(
       port: 0,
       address: InternetAddress.loopbackIPv4,
       handleSignals: false,
       outbound: http,
       strictBounds: true,
+      process: process,
     );
-    return DwTestServer._(server, http);
+    return DwTestServer._(server, http, process);
   }
 
   int get port => server.boundPort;

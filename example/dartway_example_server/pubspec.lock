@@ -111,14 +111,14 @@ packages:
       path: "../../packages/dartway_analytics_server"
       relative: true
     source: path
-    version: "0.3.0"
+    version: "0.3.1"
   dartway_analytics_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_analytics_shared"
       relative: true
     source: path
-    version: "0.3.0"
+    version: "0.3.1"
   dartway_client:
     dependency: "direct overridden"
     description:
@@ -167,14 +167,14 @@ packages:
       path: "../../packages/dartway_push_server"
       relative: true
     source: path
-    version: "0.7.0"
+    version: "0.7.1"
   dartway_push_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_push_shared"
       relative: true
     source: path
-    version: "0.7.0"
+    version: "0.7.1"
   file:
     dependency: transitive
     description:

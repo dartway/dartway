@@ -3,6 +3,9 @@
 /// project routes and alerts.
 library;
 
+export 'src/process/dw_process_runner.dart'
+    show DwProcessRunner, DwProcessRequest, DwProcessResult, DwProcessException;
+
 export 'package:dartway_core_shared/dartway_core_shared.dart';
 export 'package:dartway_orm/dartway_orm.dart';
 
