@@ -164,7 +164,7 @@ Future<int> runDeploy(
   if (!bbr.stdout.split(RegExp(r'\s+')).contains('bbr')) {
     report.problems.writeln(
       'BBR congestion control is not allowed on the server. '
-      'Run `dart run dartway_cli:dartway deploy setup` once on this server, '
+      'Run `dartway deploy setup` once on this server, '
       'then deploy again.',
     );
     return finish(1, reason: 'bbr-unavailable');

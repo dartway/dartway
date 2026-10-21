@@ -19,7 +19,7 @@ and [commands and idempotency](../2-core/commands-and-idempotency.md). This page
 
 **A screen shows a read through one of the three widgets, and nothing else.** Taking the
 `AsyncValue` of `ref.watch(dw.request(…))` apart in a widget — `.value`, `.when(`, `.hasError`, a
-`switch` over `AsyncError(…)` — is what `dart run dartway_cli:dartway check` refuses (`forbiddenRequestRead`); a
+`switch` over `AsyncError(…)` — is what `dartway check` refuses (`forbiddenRequestRead`); a
 controller in a feature's `logic/`, or wiring in `core/`, may watch a read to derive its own state.
 
 ## Reading: `dw.request`
@@ -213,7 +213,7 @@ reported. That is the one way to send a command; see
 `logic/` — `<feature>_commands.dart`, or the `<Thing>Controller` of a flow — or, for app-wide
 wiring no button starts (a push token), in `lib/core/`; only there is a result read: a controller switches over it to move the flow on, a command function reads
 `result.valueOrThrow` to hand a value to the action's `followUpIfMountedAction`. A widget reads none,
-and nothing wraps a command in `try`/`catch`: `dart run dartway_cli:dartway check` fails all of it
+and nothing wraps a command in `try`/`catch`: `dartway check` fails all of it
 as `forbiddenCommandCall`.
 
 Three things happen without code:
@@ -397,7 +397,7 @@ is held one way:
   (`example/dartway_example_flutter/lib/app/chat/logic/chat_composing_controller.dart`).
 
 `StatefulWidget`, `setState` and a `ChangeNotifier`/`ValueNotifier` held as state fail
-`dart run dartway_cli:dartway check` anywhere in `lib/` (`forbiddenStateHolder`). An API that needs a
+`dartway check` anywhere in `lib/` (`forbiddenStateHolder`). An API that needs a
 `State` or a `Listenable` of its own takes `// dw:allow-stateful <reason>` on the class, and every run
 lists it; the skeleton and the example have none, the router included
 ([the checker](../5-tooling/conventions-checker.md)).

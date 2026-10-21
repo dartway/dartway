@@ -120,7 +120,7 @@ No agent at hand? Every command is in the created project's `README.md`, and the
 
 | Package | Role |
 |---|---|
-| [`dartway_cli`](packages/dartway_cli) | `dartway quickstart`, `doctor`, `create`, `setup-ai`, `update`, `generate`, `check`, `dev`, `test`, `deploy`, `stats` |
+| [`dartway_cli`](packages/dartway_cli) | `dartway quickstart`, `doctor`, `create`, `setup-ai`, `update`, `generate`, `format`, `check`, `dev`, `test`, `deploy`, `stats` |
 | [`dartway_router`](packages/dartway_router) | A wrapper around go_router: enum-based routes, navigation zones, guards, typed parameters |
 | [`dartway_lints`](packages/dartway_lints) | Lint rules for the conventions the analyzer can see: the UI kit as the single source of styles, `ProviderScope` left to the bootstrap and tests |
 | [`dartway_shared_preferences`](packages/dartway_shared_preferences) | Local storage under `dw.plugins.prefs`, and where the skeleton keeps the signed-in session. Optional — the core does not depend on it |

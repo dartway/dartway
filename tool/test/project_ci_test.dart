@@ -56,7 +56,7 @@ $steps
     expect(parsed.services['postgres']!.ports, [5432]);
     expect(
       parsed.steps.where((step) => step.afterStep == 'deps'),
-      hasLength(10),
+      hasLength(11),
     );
   });
 
