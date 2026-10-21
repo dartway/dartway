@@ -112,10 +112,7 @@ class MonorepoSource {
   String get repoUrl => _environment['DARTWAY_REPO_URL'] ?? defaultRepoUrl;
 
   Directory get _cacheDir {
-    final home =
-        _environment['USERPROFILE'] ??
-        _environment['HOME'] ??
-        '.';
+    final home = _environment['USERPROFILE'] ?? _environment['HOME'] ?? '.';
     return Directory(p.join(home, '.dartway', 'monorepo'));
   }
 
@@ -127,6 +124,7 @@ class MonorepoSource {
   Future<ToolkitProvenance> provenance(
     Directory resolved, {
     Map<String, String> settings = const {},
+    bool interactive = true,
   }) async => ToolkitProvenance(
     source: await manifestSource(resolved),
     channel: isLocalCheckout ? null : branch,
@@ -134,6 +132,7 @@ class MonorepoSource {
     cliVersion: dartwayCliVersion,
     installedAt: DateTime.now().toUtc().toIso8601String(),
     settings: settings,
+    interactive: interactive,
   );
 
   /// The portable source recorded in a project's committed manifest.

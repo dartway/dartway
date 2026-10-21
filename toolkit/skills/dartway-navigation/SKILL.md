@@ -1,12 +1,6 @@
 ---
 name: dartway-navigation
-description: >-
-  Navigation with the DartWay Router: zones as enums implementing DwNavigationRoute, route
-  descriptors (zoneRoot / simple / parameterized), guards in zoneGuards, typed parameters
-  (DwNavigationParamsMixin), the router state as a provider of a record, DwAppRouter built in a
-  provider; a screen is a route, back is the router's, a screen's subject is its address, "new" is a
-  route of its own, and the one navigation seam without a context. Use when creating or editing
-  routes, screens, redirects and navigation between zones.
+description: "Declare zones, routes, typed parameters and guards; navigate through the app router and kit."
 ---
 
 # DartWay — navigation (`dartway-navigation`)

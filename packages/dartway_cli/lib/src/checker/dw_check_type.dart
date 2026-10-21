@@ -464,7 +464,10 @@ enum DwCheckType {
   /// its invariants, and every other writer goes through that feature's
   /// `_changes`: a second writer is a second definition of what a valid row
   /// is, and the first to drift.
-  foreignRowWrite;
+  foreignRowWrite,
+
+  /// Root CLAUDE.md duplicates project instructions beside AGENTS.md.
+  instructionsDuplicated;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -478,6 +481,7 @@ enum DwCheckType {
   /// `toolkit_law_list_test.dart` holds the two together.
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,
+    DwCheckType.instructionsDuplicated ||
     DwCheckType.uiKitContainsText ||
     DwCheckType.uiKitConstStyle ||
     DwCheckType.featureSpecMissing ||

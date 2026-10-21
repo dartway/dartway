@@ -30,39 +30,66 @@ a missing one — the agent writes non-working code with full confidence.
 ## What gets installed
 
 ```text
-AGENTS.md                    # Codex: owner text + managed connection block
-CLAUDE.md                    # Claude: owner text + managed connection block
+AGENTS.md                    # owner text + managed Codex connection block
+CLAUDE.md                    # @AGENTS.md in a fresh project
 .agents/
   DARTWAY.md                 # shared managed policy
   dartway-toolkit.json        # revision and install choices
-  skills/dartway-*/SKILL.md   # Codex skills
+  skills/dartway-*/SKILL.md   # the one physical copy
 .claude/
-  CLAUDE.md                  # pointer to shared policy
-  skills/dartway-*/SKILL.md   # generated Claude copies
+  CLAUDE.md                  # @../.agents/DARTWAY.md
+  skills -> ../.agents/skills # Claude discovers the same skills
   commands/                  # shared skill wrappers
   settings.json              # Claude permissions, merged
 ```
 
 `create`, `setup-ai` and `update` accept `--agent codex|claude|both`.
 The default is `both`; later installs preserve the recorded choice unless
-explicitly overridden. Switching removes only managed DartWay skills and
-connection blocks for the deselected agent. Custom skills and owner instructions
-are preserved. Codex permissions are not inferred from Claude settings.
+explicitly overridden. Skills always live in `.agents/skills/`, including for a Claude-only install.
+Switching to Codex removes the Claude symlink, command wrappers and managed connection;
+switching back recreates them. Custom skills and owner instructions are preserved. Codex permissions are not inferred from Claude settings.
 
-`toolkit/AGENTS.md` is the shared policy source, installed with project tokens
-as `.agents/DARTWAY.md`. Marked `dartway-toolkit:start` / `dartway-toolkit:end`
-blocks in root instructions tell both agents to read it. Malformed blocks refuse
-installation before files are changed. Skills have one source in `toolkit/skills/`.
+`toolkit/AGENTS.md` is the policy source, installed with project tokens as `.agents/DARTWAY.md`.
+It is an index: the law table stays in the entry file; procedures are opened through the skill
+for the current task. Server and contract skills route to topic references instead of loading
+all procedures. An agreed task opens its layer skill directly; requirements analysis and planning
+are opened when needed. Finish and generation instructions load when those steps are reached.
 
-The manifest moves from `.agents/dartway-toolkit.json` to `.agents/dartway-toolkit.json`;
-the first upgrade reads existing settings from the old location. Commit managed
-files and root connection blocks. Project findings remain in `docs/dev_notes/`.
-Framework laws are the checker error set; project conventions override defaults.
+Root `AGENTS.md` carries the project's rules and the managed Codex connection block. Fresh root
+`CLAUDE.md` contains only `@AGENTS.md`; managed `.claude/CLAUDE.md` imports the shared policy with
+`@../.agents/DARTWAY.md`. Claude resolves imports relative to the file containing them
+([Claude Code memory documentation](https://code.claude.com/docs/en/memory#import-additional-files)).
+Malformed connection blocks refuse installation before files are changed.
+
+On update, managed `dartway-*` copies are replaced. A custom skill found only under
+`.claude/skills/` moves into `.agents/skills/`; identical custom copies collapse. Different custom
+copies stop the install, name the conflicting skill and leave project files untouched. Resolve
+them yourself and run again. Unexpected skills-directory symlinks are refused rather than followed.
+The root instruction texts are never merged automatically: `instructionsDuplicated` is a warning
+when root `CLAUDE.md` contains prose while `AGENTS.md` exists. Move project rules into `AGENTS.md`
+and leave only `@AGENTS.md` in `CLAUDE.md`. See the
+[migration note](../migrations/2026-10-21-toolkit-one-copy.md).
+
+The first upgrade reads provenance from the old `.claude/dartway-toolkit.json` location and writes
+`.agents/dartway-toolkit.json`. Commit the shared skills, relative symlink and instruction files.
+Project findings remain in `docs/dev_notes/`.
+
+### Unattended executors
+
+The manifest's top-level `interactive` boolean defaults to `true`. Use `--no-interactive` with
+`create`, `setup-ai` or `update` to record `false`; later installs retain the choice unless explicitly
+overridden with `--interactive`. You can also edit `.agents/dartway-toolkit.json` directly.
+
+With `false`, every managed step that needs a human answer instead puts its question, proposed text
+or action in the final report and stops that step. This includes framework issue/comment publication,
+finish suggestions, requirement questions and option selection, real-key/local-setup questions,
+and migration/backfill/destructive decisions. Independent authorized work continues. Silence never
+approves an action, and the executor never waits for an answer nobody can give.
 
 ## The skills
 
-A task runs left to right: `dartway-requirements` → `dartway-plan` → implementation with the layer
-skills → `dartway-finish`.
+An unclear task uses `dartway-requirements`, then `dartway-plan` to choose an approach.
+An agreed task starts with the affected layer skill. Every task ends with `dartway-finish`.
 
 | Skill | For |
 |---|---|
@@ -124,12 +151,12 @@ see [The CLI](cli.md).
 **Managed files are the toolkit's**, and every install removes them and copies them again:
 `.agents/DARTWAY.md`, `.claude/CLAUDE.md`, every skill directory named `dartway-*`, and the `commit.md` and
 `dartway-checkup.md` commands (a retired command on the installer's list is removed the same way).
-Anything else in `.agents/skills/` or `.claude/` — a project's own skills and commands — is never touched.
+Custom skills are preserved in `.agents/skills/`; custom Claude commands stay in `.claude/commands/`.
+Migration may move a custom skill from the old Claude directory into the shared root.
 
 So do not edit a `dartway-*` skill in place: the next install drops the change. To customize,
 **copy the skill under another name** and edit the copy. The source of truth is `toolkit/` in the
-monorepo, and there is no reverse sync. Rules a project adds of its own belong in its root
-`AGENTS.md`, `CLAUDE.md` or its own skills.
+monorepo, and there is no reverse sync. Rules a project adds of its own belong in root `AGENTS.md` or its own skills.
 
 **`.claude/settings.json` is a toolkit default the project extends**, so it is merged rather than
 overwritten or skipped. It pre-approves this stack's build, test and run commands — `dart pub get`,
