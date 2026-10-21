@@ -93,7 +93,7 @@ class ToolkitInstaller {
       );
     }
     _substituteTokens(copied, tokens);
-    _installEntry(projectRoot, 'AGENTS.md', enabled: true);
+    _installEntry(projectRoot, 'AGENTS.md', enabled: agent != 'claude');
     _installEntry(projectRoot, 'CLAUDE.md', enabled: agent != 'codex');
 
     final claudeDir = Directory(p.join(projectRoot.path, '.claude'));
@@ -146,7 +146,10 @@ class ToolkitInstaller {
     final file = File(p.join(root.path, name));
     var content = file.existsSync() ? file.readAsStringSync() : '';
     if (name == 'CLAUDE.md' && enabled && content.trim().isEmpty) {
-      file.writeAsStringSync('@AGENTS.md\n');
+      final target = File(p.join(root.path, 'AGENTS.md')).existsSync()
+          ? 'AGENTS.md'
+          : '.agents/DARTWAY.md';
+      file.writeAsStringSync('@$target\n');
       return;
     }
     if (name == 'CLAUDE.md' &&

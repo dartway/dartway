@@ -212,14 +212,11 @@ void main() {
     },
   );
   test(
-    'Claude-only install creates the shared root imported by Claude',
+    'Claude-only setup resolves imports without a Codex connection',
     () async {
       await install('claude');
-      expect(
-        file('AGENTS.md').readAsStringSync(),
-        contains('.agents/DARTWAY.md'),
-      );
-      expect(file('CLAUDE.md').readAsStringSync(), '@AGENTS.md\n');
+      expect(file('AGENTS.md').existsSync(), isFalse);
+      expect(file('CLAUDE.md').readAsStringSync(), '@.agents/DARTWAY.md\n');
       expect(
         file('.agents/skills/dartway-server/SKILL.md').existsSync(),
         isTrue,

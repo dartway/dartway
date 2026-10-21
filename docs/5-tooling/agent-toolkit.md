@@ -59,6 +59,7 @@ Root `AGENTS.md` carries the project's rules and the managed Codex connection bl
 `CLAUDE.md` contains only `@AGENTS.md`; managed `.claude/CLAUDE.md` imports the shared policy with
 `@../.agents/DARTWAY.md`. Claude resolves imports relative to the file containing them
 ([Claude Code memory documentation](https://code.claude.com/docs/en/memory#import-additional-files)).
+A Claude-only setup without a root `AGENTS.md` imports `.agents/DARTWAY.md` directly.
 Malformed connection blocks refuse installation before files are changed.
 
 On update, managed `dartway-*` copies are replaced. A custom skill found only under
