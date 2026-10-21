@@ -91,7 +91,7 @@ it or an extension on it.
   for that cassette. Only strings are redacted. Automatic substring removal learns
   credentials of at least eight characters from request headers, query parameters and
   form fields; use `redactValues` for secrets in paths, positional arguments and output.
-  Unmatched requests fail with a redacted request. Replay is offline by default. `DW_VERIFY_SEAMS=1` with `dart run dartway_cli:dartway test -- --tags seam` compares live keys,
+  Unmatched requests fail with a redacted request. Replay is offline by default. `DW_VERIFY_SEAMS=1` with `dartway test -- --tags seam` compares live keys,
   types, HTTP status, response content-type and process exit codes without rewriting recordings.
   Other response headers are ignored; HTTP 403/429 reports "could not verify" for runner
   access or rate limits rather than drift. Keep live drift out of ordinary CI; the skeleton's weekly/manual workflow skips without
