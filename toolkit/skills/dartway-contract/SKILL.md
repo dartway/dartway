@@ -10,6 +10,10 @@ A rule written here (`validate()`, `matches`) runs identically on both sides; wr
 side, it drifts. Samples use the package `acme_shared`, so its enums are `AcmeChannel`, `AcmeRefusal`,
 `AcmeUpload`.
 
+Reuse the existing contract first (a field, rule, channel or screen), then extend it with DTOs,
+handlers, access rules and publications when needed. Work outside a call through a job or
+`DwHttpRoute` only with a reason a call cannot carry the work.
+
 Open only the reference needed for the edit:
 
 - [models.md](references/models.md) — DTO kinds, feature layout and complete filters.
