@@ -170,33 +170,34 @@ void main() {
       expect(dockerCalled.existsSync(), isFalse);
     },
   );
-  test(
-    'a mismatched CLI pin does not print explicit server credentials',
-    () async {
-      final heldCli = Directory(p.join(root.path, 'held_cli'))..createSync();
-      File(
-        p.join(heldCli.path, 'pubspec.yaml'),
-      ).writeAsStringSync('name: dartway_cli\nversion: 0.0.1\n');
-      final pinned = File(
-        p.join(root.path, 'proof_flutter/.dart_tool/package_config.json'),
-      );
-      pinned.createSync(recursive: true);
-      pinned.writeAsStringSync(
-        jsonEncode({
-          'packages': [
-            {'name': 'dartway_cli', 'rootUri': heldCli.uri.toString()},
-          ],
-        }),
-      );
-      final (code, output) = await run([
-        '--database-url',
-        'postgres://user:private-value@127.0.0.1/postgres',
-      ]);
-      expect(code, 1);
-      expect(output, contains('This project pins'));
-      expect(output, isNot(contains('private-value')));
-    },
-  );
+  test('handing the command to a pinned CLI of another version does not print '
+      'explicit server credentials', () async {
+    final heldCli = Directory(p.join(root.path, 'held_cli'))..createSync();
+    File(p.join(heldCli.path, 'pubspec.yaml')).writeAsStringSync(
+      'name: dartway_cli\nversion: 0.0.1\nenvironment:\n  sdk: ^3.0.0\n',
+    );
+    File(p.join(heldCli.path, 'bin/dartway.dart'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync('import "dart:io";\nvoid main() => exitCode = 3;\n');
+    final flutter = Directory(p.join(root.path, 'proof_flutter'));
+    File(p.join(flutter.path, 'pubspec.yaml')).writeAsStringSync(
+      'name: proof_flutter\nenvironment:\n  sdk: ^3.0.0\n'
+      'dev_dependencies:\n  dartway_cli:\n    path: ${heldCli.path}\n',
+    );
+    final resolved = await runTestProcess(Platform.resolvedExecutable, [
+      'pub',
+      'get',
+      '--offline',
+    ], workingDirectory: flutter.path);
+    expect(resolved.exitCode, 0, reason: '${resolved.stderr}');
+    final (code, output) = await run([
+      '--database-url',
+      'postgres://user:private-value@127.0.0.1/postgres',
+    ]);
+    expect(code, 3);
+    expect(output, contains('running the dartway_cli 0.0.1 this project'));
+    expect(output, isNot(contains('private-value')));
+  });
 
   test('inherited database coordinates still select containers', () async {
     final (code, output) = await run(

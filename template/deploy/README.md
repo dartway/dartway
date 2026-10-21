@@ -21,8 +21,8 @@ resolving the packages, generate and commit the deployment contract:
 
 ```sh
 cd dartway_starter_flutter
-dart run dartway_cli:dartway deploy kamal
-dart run dartway_cli:dartway deploy kamal --check
+dartway deploy kamal
+dartway deploy kamal --check
 ```
 
 The template includes none of these generated files. This creates or refreshes

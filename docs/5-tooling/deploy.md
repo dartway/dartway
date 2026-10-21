@@ -8,11 +8,11 @@ restarts and verification belong to the framework.
 cd <project>_flutter
 # deploy/config.yaml already describes "local"; add a deployment beside it
 
-dart run dartway_cli:dartway deploy check --env staging --local            # the working copy only
-dart run dartway_cli:dartway deploy setup --env staging                    # provision the server, render the stack
+dartway deploy check --env staging --local            # the working copy only
+dartway deploy setup --env staging                    # provision the server, render the stack
 dartway secret set SMS_API_TOKEN --env staging        # what cannot be generated
-dart run dartway_cli:dartway deploy check --env staging                    # DNS, the server, the deployed hosts
-dart run dartway_cli:dartway deploy run   --env staging                    # update, build, start, verify
+dartway deploy check --env staging                    # DNS, the server, the deployed hosts
+dartway deploy run   --env staging                    # update, build, start, verify
 ```
 
 Every subcommand takes `--env <environment>` and refuses to guess without it, naming the
@@ -23,15 +23,15 @@ environments `deploy/config.yaml` declares. Every one that connects takes `--as 
 
 ## Kamal and GHCR
 
-`dart run dartway_cli:dartway deploy kamal` generates the Studio deployment contract from
+`dartway deploy kamal` generates the Studio deployment contract from
 `deploy/config.yaml` and the Flutter package's resolved CLI lock. Configure
 `staging` (destination `stage`) and/or `production` (destination `prod`);
 `local` is never a destination. Resolve the packages first.
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway deploy kamal
-dart run dartway_cli:dartway deploy kamal --check
+dartway deploy kamal
+dartway deploy kamal --check
 ```
 
 Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
@@ -91,8 +91,8 @@ selects Kamal; projects without one retain Compose. `--engine kamal` or
 operator and always checks Compose. Generating a manifest does not deploy it.
 
 ```bash
-dart run dartway_cli:dartway deploy check --env staging --local
-dart run dartway_cli:dartway deploy check --env staging --version <full-commit-sha>
+dartway deploy check --env staging --local
+dartway deploy check --env staging --version <full-commit-sha>
 ```
 
 Without `--version`, native operator checks use the checkout's HEAD. A branch
@@ -200,7 +200,7 @@ move. After the first framework image push, the owner must make the
 project rather than to one of its machines: `requires` (below); `local`, which is what a
 developer's own machine starts a server with and is not a deployment at all — see
 [Secrets](#secrets); and `migrations`, whose `dataChecksAfter` names the last migration
-`dart run dartway_cli:dartway check` leaves out of `migrationChangesData`
+`dartway check` leaves out of `migrationChangesData`
 ([Migrations](../4-server/migrations.md#a-migration-changes-the-schema)). **The server has no configuration file of its own** — it is configured by its
 environment, which the deploy derives from this file (database coordinates, storage, port) and from
 the secret store on the server (passwords, keys). Nothing writes `config.yaml`; the deploy only
@@ -290,7 +290,7 @@ files.example.com →  the bundled storage                    (with storage: bun
 sends `/dw/` (including `/dw/live` and `/dw/health`) to the server, so a browser makes same-origin calls: no CORS,
 no preflight, and the server answers none. Web release builds use `Uri.base.origin`. The api host proxies everything to the server — calls, the live socket, and the
 project's own doors (`DwHttpRoute`) such as a webhook. The server serves no static files. Local
-development has the same shape through `dart run dartway_cli:dartway dev` ([The CLI](cli.md)).
+development has the same shape through `dartway dev` ([The CLI](cli.md)).
 
 **Storage has a host of its own because a presigned URL signs its host.** Browsers upload to the
 bundled storage directly (see [Uploads](../4-server/uploads.md)); a storage hidden behind the app's origin would be
@@ -377,7 +377,7 @@ so a value that would crash the server at startup is a check failure naming it, 
 server itself (`DwDatabaseConfig.fromEnvironment`) and by this check.
 
 **Delivering the CA file**: declare its name under `requires.files` (e.g. `db-ca.pem`), upload it with
-`dart run dartway_cli:dartway deploy secret put-file <path/to/ca.pem> --name db-ca.pem --env <environment>`
+`dartway deploy secret put-file <path/to/ca.pem> --name db-ca.pem --env <environment>`
 — it is then mounted read-only at `/run/secrets/db-ca.pem` exactly like any other declared file — and
 set `DW_DATABASE_CA_FILE` to that same mounted path. DigitalOcean Managed Postgres offers the cluster's CA
 certificate as a download next to the connection details in its control panel, or on the command line:
@@ -518,16 +518,16 @@ up a change to the rendered files. `--dry-run` prints the rendered `docker-compo
 ## `run` — deploy
 
 First `run` evaluates the working-copy checks of `deploy check` and refuses on any error, pointing at
-`dart run dartway_cli:dartway deploy check --local` for the detail. Before its first remote step it
+`dartway deploy check --local` for the detail. Before its first remote step it
 also verifies that the host allows BBR; if not, it stops before replacing anything and asks for
-`dart run dartway_cli:dartway deploy setup`. Next it **checks this server runs this project's
+`dartway deploy setup`. Next it **checks this server runs this project's
 stack** (`stack-identity`), the same guard `setup` runs. The check runs on every invocation, with
 `--resume`, `--retry-failed` and `--skip-git-update` too, and comes before the step record, the
 checkout or any step is touched. A [moved repository](#moving-the-repository) stops here with exit 1
 and the reason `stack-identity`. The server is left untouched and nothing is recorded. The check is
 not a step, so a resume still passes over the steps the resumed run finished. An existing server
-converges with one `dart run dartway_cli:dartway deploy setup`, followed by
-`dart run dartway_cli:dartway deploy run`. Then:
+converges with one `dartway deploy setup`, followed by
+`dartway deploy run`. Then:
 
 1. updates the checkout to `origin/<branch>` with `git reset --hard` — the server mirrors the
    repository, and a stray edit on the box must not block a deploy (skipped with `--skip-git-update`).
@@ -651,13 +651,13 @@ observed increase in free space on Docker's data filesystem (negative changes ar
 containerd may reclaim additional bytes asynchronously). The cache limit applies to the Docker daemon's builder across the machine, not only this stack.
 
 If an older CLI moved the image tag before it failed and left no usable rollback pin, rerun with
-`dart run dartway_cli:dartway deploy run --env <env> --without-rollback-image` to consciously allow this one deployment
+`dartway deploy run --env <env> --without-rollback-image` to consciously allow this one deployment
 when the running image cannot be resolved. The flag is not stored in config. The CLI records an
 empty previous-image entry and warns that a failure leaves the service down until the next deploy.
 When the image can be resolved, it is still pinned for rollback even with the flag.
 
 That covers deploying from inside the stack being deployed (DartWay Studio deploying itself), but the
-steps after the interruption still need someone to run them: **`dart run dartway_cli:dartway deploy run --env <env>
+steps after the interruption still need someone to run them: **`dartway deploy run --env <env>
 --resume`**. It reads the record of the last deployment on the server and, in that deployment's
 plan, passes over the steps that finished, waits for a step still running instead of starting it a
 second time, judges again from its output a finished step whose success is checked beyond its exit

@@ -105,7 +105,7 @@ accident.
 Ownership is decided in the access rule, never in the handler's body after `signedIn` or a role
 rule: an inline check is written a little differently every time, and one project that did so
 answered one question — "is the caller in this chat" — four different ways.
-`dart run dartway_cli:dartway check` warns on the inline form (`inlineOwnershipCheck`). Each shape
+`dartway check` warns on the inline form (`inlineOwnershipCheck`). Each shape
 below has one form.
 
 **A row the caller owns** — a field of the row names the caller's profile. `load` reads the row,
@@ -167,7 +167,7 @@ that returns the caller's membership, or `null`**, in the `_access.dart` of the 
 the parent, as a context extension of its own. Every access point that asks the question calls it —
 each resource rule's `load`, the channel rule of the parent's channel, and `DwFileStorage.canRead`
 for files attached inside it — and another feature asking it imports that file, the owner's surface,
-rather than writing its own (`dart run dartway_cli:dartway check` fails an import of another feature's handlers or
+rather than writing its own (`dartway check` fails an import of another feature's handlers or
 `logic/`). A second definition, written inline somewhere, is how one of them ends up skipping the
 block check:
 

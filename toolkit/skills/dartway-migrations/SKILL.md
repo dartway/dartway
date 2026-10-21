@@ -54,7 +54,7 @@ column **no released code reads**, typically one added in the same unreleased br
 A schema change always starts from `create`; a migration written by hand from scratch drifts from the
 diff `check` compares against.
 
-1. **Change the row class, then `dart run dartway_cli:dartway generate`** (from `__FLUTTER_PKG__`) —
+1. **Change the row class, then `dartway generate`** —
    always first: `create` diffs against the generated schema, and before `generate` it sees no change.
 2. **`dart run bin/migrate.dart create add_invoice_due_date`** — replays every migration on a scratch
    database, diffs it against the row classes, writes `m<timestamp>_<name>.dart` with `up` and `down`,

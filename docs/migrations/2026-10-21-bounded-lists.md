@@ -66,7 +66,7 @@ Two things are new to see:
 
 ## How to check
 
-`dart run dartway_cli:dartway check --type unboundedRead` from `<project>_flutter` reports nothing,
+`dartway check --type unboundedRead` from `<project>_flutter` reports nothing,
 and `dartway test` is green. A server started with `bin/server.dart` logs no
 `answered … items, past its bound` and no `(largeResponseBytes)` warning for the project's own
 screens; a production log that shows either names the request to page.

@@ -24,6 +24,25 @@
   paged reads, `request.readWhole` for a whole list, or `unbounded: '<reason>'`.
   Reads inside `readWhole` are accepted (#644); see the
   [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
+- A `dartway` of another version no longer refuses a project command
+  (`generate`, `check`, `test`, `deploy`, `dev`, `stats`, `format`): it runs the
+  `dartway_cli` the project pins — in the directory it was typed in, on the
+  package configuration of the package that declares it and the Dart of the
+  Flutter `.fvmrc` pins — passing the arguments, stdio and exit code through
+  (128 plus the signal for a child it ended), and says so in one line on
+  stderr; a refusal names the subcommand and nothing of its arguments.
+  `dartway format` batches its paths under 8000 characters a command line, and
+  neither it nor the hand-over goes through a shell on Windows. Only a pin whose packages are not resolved is refused, with the
+  `pub get` that resolves it. The toolkit, the skeleton's README and the docs
+  teach `dartway <command>` again; `toolkit_pinned_commands_test.dart` now
+  holds them to it. See the
+  [migration note](../../docs/migrations/2026-10-21-pinned-cli-and-format.md).
+- New `dartway format`: `dart format` on the Dart of the pinned Flutter
+  (`.fvmrc`), over the Dart files changed against the merge base with the base
+  branch plus the untracked ones (`--all` for the whole project, `--base <ref>`
+  for another baseline, `--check` for CI). Generated files and migrations are
+  never formatted. The skeleton's CI runs `format --check` on the files a pull
+  request changed, and `dartway-finish` formats with it.
 - Load the managed Claude policy by import and warn with `instructionsDuplicated`
   when root instruction texts need consolidation. Fresh projects use `@AGENTS.md`.
 - Make the first read an index with topic references and concise skill discovery

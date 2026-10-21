@@ -161,7 +161,7 @@ with the request name and observed probe count; production re-reads once with `l
 limit), serves the whole list and logs its true count and encoded size. The callback must only
 read: it can run twice. Passing `request.fetchLimit` directly to `find` and returning that probe
 would silently truncate production data. Anything that grows with use is a page, table or window.
-`dart run dartway_cli:dartway check` warns about a read in a request handler with no bound (`unboundedRead`,
+`dartway check` warns about a read in a request handler with no bound (`unboundedRead`,
 [the checker](../5-tooling/conventions-checker.md)).
 
 Any call's response above `DwServerSettings.largeResponseBytes` (256 KB) is logged as a warning with

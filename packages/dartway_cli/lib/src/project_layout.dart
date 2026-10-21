@@ -163,7 +163,6 @@ class ProjectLayout {
     final contractArgs = releaseBranch.isEmpty
         ? r' --contract-base "$CONTRACT_BASE"'
         : '';
-    final flutterCli = '(cd $flutterPackage && dart run dartway_cli:dartway';
     return {
       '__PROJECT_LANGUAGE__': language,
       '__NOTES_TRACKER__': notesTracker ?? defaultNotesTracker,
@@ -175,9 +174,9 @@ class ProjectLayout {
       '__FINISH_GENERATE_CHECK__': [
         if (releaseBranch.isEmpty)
           'CONTRACT_BASE="\$(git merge-base HEAD origin/$baseBranch)"  # resolve once; CI supplies its trusted SHA',
-        '$flutterCli generate --check$contractArgs)',
+        'dartway generate --check$contractArgs',
       ].join('\n'),
-      '__FINISH_CHECK__': '$flutterCli check$contractArgs)',
+      '__FINISH_CHECK__': 'dartway check$contractArgs',
     };
   }
 }

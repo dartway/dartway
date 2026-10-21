@@ -50,7 +50,7 @@ final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
 }
 ```
 
-The rules, each enforced by `dart run dartway_cli:dartway generate`:
+The rules, each enforced by `dartway generate`:
 
 - the class is named `<Entity>Row` and extends `DwTableRow` — a row and the data object clients see
   (`SessionBooking`) never share a name, and a row never leaves the server;
@@ -177,7 +177,7 @@ once per connection and reused.
 
 | Method | Returns |
 |---|---|
-| `find({where, orderBy, limit, offset, lock, unbounded})` | the matching rows; without `orderBy` the order is whatever the database returns, so paging needs one. `unbounded:` says why a read without `limit` stays small (`'a board's few columns'`); `dart run dartway_cli:dartway check` warns about a request handler's `find` with neither (`unboundedRead`), and the repository refuses it beside a `limit` or blank |
+| `find({where, orderBy, limit, offset, lock, unbounded})` | the matching rows; without `orderBy` the order is whatever the database returns, so paging needs one. `unbounded:` says why a read without `limit` stays small (`"a board's few columns"`); `dartway check` warns about a request handler's `find` with neither (`unboundedRead`), and the repository refuses it beside a `limit` or blank |
 | `findFirst({where, orderBy, lock})` | the first row or `null` |
 | `findById(id, {lock})` | the row or `null` |
 | `findByIds(ids)` | the rows with those ids, in one statement whatever their number; missing ids are absent, the order unspecified — index the result by id |
@@ -362,7 +362,7 @@ once, for work where "someone else is doing it" is itself the answer.
 ## Settings
 
 **The app's settings are one data object, read and written through `ctx.settings`** — a table of
-string keys and values is refused by `dart run dartway_cli:dartway check` (`settingsKeyValueTable`). Every reader of such
+string keys and values is refused by `dartway check` (`settingsKeyValueTable`). Every reader of such
 a table parses text and supplies its own default (`== 'true'`), every first save of a key races
 another, and a value nobody reads is never noticed.
 
