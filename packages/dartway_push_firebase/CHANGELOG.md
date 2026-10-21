@@ -1,12 +1,12 @@
+## 0.8.0
+
+- Targets DartWay 0.23
+
 ## 0.7.0
 
 - Creates the configurable quiet Android notification channel when the plugin attaches (#595).
 
 - Targets DartWay 0.22.
-
-## 0.7.1
-
-- Require the matching DartWay dependency versions for the seam kit release (#638).
 
 ## 0.6.0
 

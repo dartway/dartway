@@ -1,13 +1,13 @@
+## 0.8.0
+
+- Targets DartWay 0.23
+
 ## 0.7.0
 
 - Creates the configurable quiet Android channel on attach and uses it for silent data-only
   notifications (#595).
 
 - Targets DartWay 0.22.
-
-## 0.7.1
-
-- Require the matching DartWay dependency versions for the seam kit release (#638).
 
 ## 0.6.0
 

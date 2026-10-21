@@ -87,14 +87,14 @@ packages:
       path: "../../packages/dartway_analytics_shared"
       relative: true
     source: path
-    version: "0.3.1"
+    version: "0.4.0"
   dartway_core_shared:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_core_shared"
       relative: true
     source: path
-    version: "0.23.0-dev.1"
+    version: "0.23.0"
   file:
     dependency: transitive
     description:

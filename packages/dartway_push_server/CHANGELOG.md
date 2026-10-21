@@ -1,13 +1,13 @@
+## 0.8.0
+
+- Targets DartWay 0.23
+
 ## 0.7.0
 
 - Adds per-message `DwPushSound.standard` and `DwPushSound.silent`; providers select the quiet
   Android channel and suppress APNs and web sound for silent messages (#595).
 
 - Targets DartWay 0.22.
-
-## 0.7.1
-
-- Require the matching core family (`0.23.0-dev.1`) for the server seam kit release (#638).
 
 ## 0.6.0
 

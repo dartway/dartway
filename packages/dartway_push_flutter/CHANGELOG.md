@@ -1,10 +1,10 @@
+## 0.8.0
+
+- Targets DartWay 0.23
+
 ## 0.7.0
 
 - Targets DartWay 0.22.
-
-## 0.7.1
-
-- Require the matching core family (`0.23.0-dev.1`) for the server seam kit release (#638).
 
 ## 0.6.0
 

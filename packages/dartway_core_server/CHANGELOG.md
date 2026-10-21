@@ -1,10 +1,18 @@
 # Changelog
 
-## 0.23.0-dev.1
+## 0.23.0
+
+### Breaking changes
+
+- **BREAKING (source):** `DwCallContext.process` is a new abstract getter.
+  Custom context implementations must delegate it to the server context; use
+  `DwTestServer` for tests. See `docs/migrations/2026-10-21-external-process-seam.md`.
 
 - Custom `DwServerLogger` implementations now declare `isEnabled(DwLogLevel)`;
   call timing checks the selected level before building its line (#645).
   See the [migration note](../../docs/migrations/2026-10-21-deploy-side-by-side-and-stats.md).
+
+### Changes
 
 - `request.readWhole((limit) => repo.find(limit: limit))` keeps the normal
   list read bounded at `maxItems + 1`. Overflow throws before a second read in
@@ -23,9 +31,6 @@
   as a warning with the call's name, once per call per `boundWarningInterval`.
 - A project test whose list handler answers past the bound now fails; see the
   [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
-- **BREAKING (source):** `DwCallContext.process` is a new abstract getter.
-  Custom context implementations must delegate it to the server context; use
-  `DwTestServer` for tests. See `docs/migrations/2026-10-21-external-process-seam.md`.
 
 - Add recorded HTTP and external-command seams with offline replay, redaction and opt-in shape drift verification (#638). Redaction matches exact case-insensitive names, masks only strings and supports
   cassette-specific additions and exemptions. Automatic substring removal uses only
