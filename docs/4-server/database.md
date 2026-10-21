@@ -91,7 +91,7 @@ value a new row gets in Dart comes from the constructor's default (`this.bookedC
 
 A data object is not a column type: a row holds ids, and the handler builds the object.
 
-### What `dartway generate` writes
+### What `dart run dartway_cli:dartway generate` writes
 
 - `<file>.dw.dart`: `==`, `hashCode`, `toString`, a `copyWith` (nullable fields take a
   `DwFieldPatch` — keep, set or clear; the id is kept, a copy of a stored row is the same row), the
@@ -177,7 +177,7 @@ once per connection and reused.
 
 | Method | Returns |
 |---|---|
-| `find({where, orderBy, limit, offset, lock})` | the matching rows; without `orderBy` the order is whatever the database returns, so paging needs one |
+| `find({where, orderBy, limit, offset, lock, unbounded})` | the matching rows; without `orderBy` the order is whatever the database returns, so paging needs one. `unbounded:` says why a read without `limit` stays small (`"a board's few columns"`); `dartway check` warns about a request handler's `find` with neither (`unboundedRead`), and the repository refuses it beside a `limit` or blank |
 | `findFirst({where, orderBy, lock})` | the first row or `null` |
 | `findById(id, {lock})` | the row or `null` |
 | `findByIds(ids)` | the rows with those ids, in one statement whatever their number; missing ids are absent, the order unspecified — index the result by id |
@@ -190,12 +190,14 @@ once per connection and reused.
 | `exists({where})` | whether any |
 | `insert(draft)` | the row as stored, with its id and every value read back |
 | `tryInsert(draft, onConflict: …)` | the stored row, or `null` when it conflicted |
-| `upsert(draft, conflictOn: (t) => [t.key])` | inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
-| `upsertAll(drafts, conflictOn: (t) => [t.slug])` | every row inserted, or written over the row with the same key — unless that row already holds exactly these values — in one statement; the count of rows inserted or changed, `0` for a second run with the same rows. What `DwSeedRows` runs |
+| `upsert(draft, conflictOn: (t) => [t.key])` | on tables without state columns: inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
+| `upsertAll(drafts, conflictOn: (t) => [t.slug])` | on tables without state columns: every row inserted, or written over the row with the same key — unless that row already holds exactly these values — in one statement; the count of rows inserted or changed, `0` for a second run with the same rows. What `DwSeedRows` runs |
 | `insertAll(drafts)` | the rows as stored, in order, in one statement |
-| `update(row)` | writes every column by id; throws `DwRowNotFound` when no row has that id — an update that changed nothing is a failure, not a quiet success |
-| `updateWhere({where, set})` | sets columns on every matching row; returns the count |
+| `update(row)` | writes ordinary columns by id; retains and guards states. Throws `DwRowNotFound` for a missing id; `DwStaleState` for an existing row whose state no longer matches |
+| `updateWhere({where, set})` | sets ordinary columns on every matching row; returns the count; refuses state assignments |
 | `updateWhereReturning({where, set})` | the same, answering the rows as updated — what to publish, without a second read |
+| `transition(id, column: …, to: …)` | the changed row or null when missing/disallowed; one guarded state update |
+| `transitionWhere(where: …, column: …, to: …)` | only the rows that moved; compare returned ids with requested ids |
 | `delete(id)` | `1`, or `0` when there was none |
 | `deleteWhere({where})` | the count |
 
@@ -508,3 +510,74 @@ the pool from `DwAppServer(database:)`; a script opens its own and closes it
 - [Migrations](migrations.md) — how a row class change reaches the database.
 - [Handlers and the call context](handlers-and-context.md) — `ctx.db` and `ctx.transaction`.
 - [Jobs](jobs.md) — `SKIP LOCKED` claims and `LISTEN`/`NOTIFY` in the framework's own queue.
+
+## State columns
+
+A lifecycle status is a state column. Declare its initial values and directed moves as const data
+beside the enum, and annotate the non-null enum field on its row:
+
+```dart
+enum WorkStatus { open, running, completed, cancelled }
+
+const workTransitions = DwStateTransitions<WorkStatus>(
+  initial: {WorkStatus.open},
+  moves: {
+    WorkStatus.open: {WorkStatus.running, WorkStatus.cancelled},
+    WorkStatus.running: {WorkStatus.completed, WorkStatus.cancelled},
+  },
+);
+
+// In WorkItemRow:
+@DwStateColumn(workTransitions)
+final WorkStatus status;
+```
+
+Run `dartway generate`. A missing source entry is terminal; a self move is allowed only if declared.
+The table is ordinary data: tests can read `initial`, `moves`, `allows` and `sourcesFor`.
+
+```dart
+final moved = await ctx.db.workItems.transition(
+  id,
+  column: (t) => t.status,
+  to: WorkStatus.running,
+);
+if (moved == null) ctx.refuse(AppRefusal.workNotOpen);
+
+final changed = await ctx.db.workItems.transitionWhere(
+  where: (t) => t.id.inList(requestedIds),
+  column: (t) => t.status,
+  to: WorkStatus.cancelled,
+);
+final unchangedIds = requestedIds.toSet().difference(changed.map((r) => r.id).toSet());
+```
+
+Each transition uses one guarded `UPDATE ... WHERE ... AND status IN (...) RETURNING ...`, with
+parameters for all values. A concurrent writer rechecks the guard against the stored row after
+waiting for its lock. `transition` returns null for a missing row or a disallowed move;
+`transitionWhere` returns only the rows that moved, leaving all other rows untouched. An empty
+predecessor set returns immediately. There is no preliminary read. Select the column explicitly,
+including on rows with multiple state fields.
+
+All insert paths validate the initial set before writing, including the whole batch of `insertAll`.
+`update(row)` writes ordinary fields only and guards every state against the supplied row: a stale
+state on an existing row throws the catchable `DwStaleState`. A missing id throws `DwRowNotFound`
+on every table. Catch `DwStaleState` and translate it into the feature's conflict, or let the server
+answer `dw.conflict` (HTTP 409) without reporting an incident. Re-read before deciding whether to
+retry. Generated stored-row `copyWith` refuses an intentional state change with
+`DwStateWriteException`; passing the same row's state unchanged is allowed. A reconstructed row
+has no original state to compare: the repository guards the supplied state and never writes it.
+A state-only row has no ordinary update and is refused. `updateWhere` and `updateWhereReturning`
+refuse assignments to state columns. `upsert` and `upsertAll` on state tables are refused; use
+insert/tryInsert and transitions instead. These refusals are programming errors, not domain
+refusals: commands translate a transition's null/unchanged result into their own refusal.
+
+`dartway check` reports `stateWrittenDirectly` for direct state writes through row `copyWith`,
+ordinary updates, upserts or raw SQL in server `lib/`. It reads formatted source rather than
+resolved types: typed rows and rows inferred from repository calls are recognized, including a
+local repository alias; arbitrary data flow or dynamically assembled SQL is outside this source
+check. The runtime guards still hold every repository write. Raw SQL is a privileged escape and
+must not be used to bypass state rules. A schema migration may rewrite stranded values through
+`m.backfill`; that is allowed only in `lib/src/migrations/`.
+
+The framework repository's booking feature demonstrates the full path: booked → cancelled or
+attended, through its commands, publications and acceptance tests.

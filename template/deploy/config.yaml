@@ -59,6 +59,10 @@ local:
   # its codes is the admin, so it has no default.
   # DW_ADMIN_IDENTIFIER: you@example.com
 
+  # A list answered past its request's `maxItems` fails the call here, as it
+  # does in tests; a deployed server serves it whole and logs a warning.
+  DW_STRICT_BOUNDS: true
+
 # A deployment. Uncomment, fill in, and `dartway deploy setup --env staging`.
 #
 # staging:

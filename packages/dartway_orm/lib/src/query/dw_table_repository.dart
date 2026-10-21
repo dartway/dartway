@@ -7,6 +7,7 @@ import 'package:postgres/postgres.dart' as pg;
 import '../db/dw_database_handle.dart';
 import '../db/dw_errors.dart';
 import '../entity/dw_table_row.dart';
+import '../entity/dw_annotations.dart';
 import '../entity/dw_table_def.dart';
 import 'dw_table_column.dart';
 import 'dw_row_lock.dart';
@@ -31,13 +32,26 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   ///
   /// Without [orderBy] the order is whatever the database returns; paging
   /// with [limit] and [offset] needs an order to be stable.
+  ///
+  /// [unbounded] is why a read without [limit] stays small — `'a club's
+  /// coaches'` — said where the read is. `dartway check` warns about a read
+  /// in a request handler with neither (`unboundedRead`); the database never
+  /// sees it. It is refused beside a [limit], and blank.
   Future<List<R>> find({
     DwWhereCondition Function(T t)? where,
     List<DwOrderTerm> Function(T t)? orderBy,
     int? limit,
     int? offset,
     DwRowLock? lock,
+    String? unbounded,
   }) async {
+    if (unbounded != null && (limit != null || unbounded.trim().isEmpty)) {
+      throw ArgumentError.value(
+        unbounded,
+        'unbounded',
+        limit != null ? 'a read with a limit is bounded' : 'says no reason',
+      );
+    }
     _checkLock(lock);
     final writer = DwSqlWriter()..write(_sql.select);
     _writeWhere(writer, where);
@@ -241,7 +255,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     final columns = _sql.valueColumns;
     final arrays = [for (final _ in columns) <Object?>[]];
     for (final draft in list) {
-      final values = _checked(table.toDraftRow(draft));
+      final values = _initial(table.toDraftRow(draft));
       for (final (position, column) in columns.indexed) {
         final value = values[column.name];
         arrays[position].add(
@@ -255,26 +269,87 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     return _decode(result);
   }
 
-  /// Writes every column of [row] by its id and returns the stored row.
-  ///
-  /// Throws [DwRowNotFound] when no row has that id: an update that
-  /// changed nothing is a failure, not a quiet success.
+  /// Writes ordinary columns of [row] by id, retaining its stored state.
+  /// Throws [DwRowNotFound] for a missing id, or [DwStaleState] when the
+  /// stored state no longer matches [row]. Generated `copyWith` refuses an
+  /// intentional state change with [DwStateWriteException].
   Future<R> update(R row) async {
     final values = _checked(table.toRow(row));
-    final columns = _sql.valueColumns;
+    if (_sql.updateColumns.isEmpty) {
+      throw DwStateWriteException(
+        table.tableName,
+        'update: no ordinary columns',
+      );
+    }
     final result = await _db.run(
       _sql.updateById,
       [
-        for (final column in columns) column.type.parameterType,
+        for (final column in _sql.updateColumns) column.type.parameterType,
         pg.Type.bigInteger,
+        for (final column in _sql.stateColumns) column.type.parameterType,
       ],
       [
-        for (final column in columns) _encode(column, values[column.name]),
+        for (final column in _sql.updateColumns)
+          _encode(column, values[column.name]),
         row.id,
+        for (final column in _sql.stateColumns)
+          _encode(column, values[column.name]),
       ],
     );
-    if (result.isEmpty) throw DwRowNotFound(table.tableName, row.id);
+    if (result.isEmpty) {
+      // Only the failed guard needs a read; successful writes remain one SQL
+      // statement. No write is retried after inspecting the current row.
+      if (_stateColumns.isNotEmpty &&
+          await exists(where: (t) => t.id.equals(row.id))) {
+        throw DwStaleState(table.tableName, row.id);
+      }
+      throw DwRowNotFound(table.tableName, row.id);
+    }
     return _decode(result).first;
+  }
+
+  /// Atomically moves [id] if its stored state permits [to]. Returns the
+  /// changed row, or null for a missing row or a refused move.
+  Future<R?> transition<S>(
+    int id, {
+    required DwTableColumn<S> Function(T t) column,
+    required S to,
+  }) async {
+    final rows = await transitionWhere(
+      where: (t) => t.id.equals(id),
+      column: column,
+      to: to,
+    );
+    return rows.isEmpty ? null : rows.single;
+  }
+
+  /// One guarded UPDATE, returning only rows that moved. Compare returned ids
+  /// with requested ids to learn which did not move. No pre-read is made;
+  /// concurrent writers recheck the guard against the locked stored row.
+  Future<List<R>> transitionWhere<S>({
+    required DwWhereCondition Function(T t) where,
+    required DwTableColumn<S> Function(T t) column,
+    required S to,
+  }) async {
+    final selected = column(table);
+    final declared = _stateColumns
+        .where((c) => c.name == selected.name)
+        .firstOrNull;
+    if (declared == null || declared.type != selected.type) {
+      throw ArgumentError(
+        'transition: select a state column of ${table.tableName}',
+      );
+    }
+    final sources = declared.transitions!.sourcesFor(to);
+    if (sources.isEmpty) return const [];
+    final writer = DwSqlWriter()..write('UPDATE ${_sql.table} SET ');
+    declared.set(to).write(writer);
+    writer.write(' WHERE (');
+    where(table).write(writer);
+    writer.write(') AND (');
+    declared.inList(sources.cast<Object>()).write(writer);
+    writer.write(')${_sql.returning}');
+    return _decode(await _run(writer));
   }
 
   /// Sets columns on every row matching [where]; returns the number of rows.
@@ -306,6 +381,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     DwRowDraft<R> draft, {
     required List<DwTableColumn<Object?>> Function(T t) conflictOn,
   }) async {
+    _refuseStateUpsert();
     final target = conflictOn(table);
     if (target.isEmpty) throw ArgumentError('upsert: no conflict columns');
     final names = {for (final column in target) column.name};
@@ -348,6 +424,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   }) async {
     final list = drafts.toList(growable: false);
     if (list.isEmpty) return 0;
+    _refuseStateUpsert();
     final target = conflictOn(table);
     if (target.isEmpty) throw ArgumentError('upsertAll: no conflict columns');
     for (final column in target) {
@@ -365,7 +442,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
       hashCode: const ListEquality<Object?>().hash,
     );
     for (final draft in list) {
-      final values = _checked(table.toDraftRow(draft));
+      final values = _initial(table.toDraftRow(draft));
       final key = [for (final column in target) values[column.name]];
       if (!seen.add(key)) {
         throw ArgumentError(
@@ -428,6 +505,10 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     if (assignments.isEmpty) {
       throw ArgumentError('updateWhere: nothing to set');
     }
+    final stateNames = {for (final column in _stateColumns) column.name};
+    if (assignments.any((a) => stateNames.contains(a.column.name))) {
+      throw DwStateWriteException(table.tableName, 'updateWhere');
+    }
     final writer = DwSqlWriter()..write('UPDATE ${_sql.table} SET ');
     for (final (position, assignment) in assignments.indexed) {
       if (position > 0) writer.write(', ');
@@ -489,13 +570,31 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   }
 
   Future<pg.Result> _insert(DwRowDraft<R> draft, String onConflict) {
-    final values = _checked(table.toDraftRow(draft));
+    final values = _initial(table.toDraftRow(draft));
     final columns = _sql.valueColumns;
     return _db.run(
       '${_sql.insert}$onConflict${_sql.returning}',
       [for (final column in columns) column.type.parameterType],
       [for (final column in columns) _encode(column, values[column.name])],
     );
+  }
+
+  Iterable<DwTableColumn<Object?>> get _stateColumns => _sql.stateColumns;
+
+  void _refuseStateUpsert() {
+    if (_stateColumns.isNotEmpty) {
+      throw DwStateWriteException(table.tableName, 'upsert');
+    }
+  }
+
+  Map<String, Object?> _initial(Map<String, Object?> values) {
+    _checked(values);
+    for (final column in _stateColumns) {
+      if (!column.transitions!.initial.contains(values[column.name])) {
+        throw DwStateWriteException(table.tableName, 'insert: ${column.name}');
+      }
+    }
+    return values;
   }
 
   Map<String, Object?> _checked(Map<String, Object?> values) {
@@ -556,11 +655,13 @@ final class _DwTableSql {
     selectByIds = '$select WHERE "id" = ANY(\$1)';
     count = 'SELECT count(*) FROM ${this.table}';
     deleteById = 'DELETE FROM ${this.table} WHERE "id" = \$1';
-    final values = columns.skip(1).toList();
+    final values = updateColumns;
     updateById =
         'UPDATE ${this.table} SET '
         '${[for (final (i, column) in values.indexed) '${column.sql} = \$${i + 1}'].join(', ')} '
-        'WHERE "id" = \$${values.length + 1}$returning';
+        'WHERE "id" = \$${values.length + 1}'
+        '${[for (final (i, column) in stateColumns.indexed) ' AND ${column.sql} = \$${values.length + 2 + i}'].join()}'
+        '$returning';
   }
 
   static final Expando<_DwTableSql> _cache = Expando('DwTableSql');
@@ -581,6 +682,14 @@ final class _DwTableSql {
   /// Every column but the id: what an insert and an update write.
   late final List<DwTableColumn<Object?>> valueColumns = List.unmodifiable(
     columns.skip(1),
+  );
+
+  late final List<DwTableColumn<Object?>> stateColumns = List.unmodifiable(
+    valueColumns.where((c) => c.transitions != null),
+  );
+
+  late final List<DwTableColumn<Object?>> updateColumns = List.unmodifiable(
+    valueColumns.where((c) => c.transitions == null),
   );
 
   late final String insert =

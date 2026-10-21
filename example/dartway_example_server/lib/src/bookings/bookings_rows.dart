@@ -28,6 +28,7 @@ final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
   @DwForeignKey('user_profile', onDelete: DwOnDelete.cascade)
   final int clientProfileId;
 
+  @DwStateColumn(bookingTransitions)
   final BookingStatus status;
   final DateTime createdAt;
 

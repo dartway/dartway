@@ -268,7 +268,9 @@ sealed class DwCallHandler {
     required Future<T?> Function(DwCallContext ctx, Q request) handle,
   }) => DwMaybeHandler<Q, T>._(access, maxBodyBytes, handle);
 
-  /// A list request: the whole list.
+  /// A list request: the whole list. Read through
+  /// `request.readWhole((limit) => repo.find(limit: limit))` so production can
+  /// retry without a limit when the bounded probe exceeds `maxItems`.
   static DwCallHandler
   list<Q extends DwListRequest<T>, T extends DwDataObject>({
     required DwAccessRule access,

@@ -20,8 +20,11 @@ final chatHandlers = <DwCallHandler>[
   DwCallHandler.list<ListChatChannels, ChatChannel>(
     access: ProfileAccess.staff,
     handle: (ctx, request) async => [
-      for (final row in await ctx.db.chatChannels.find(
-        orderBy: (t) => [t.title.asc(), t.id.asc()],
+      for (final row in await request.readWhole(
+        (limit) => ctx.db.chatChannels.find(
+          orderBy: (t) => [t.title.asc(), t.id.asc()],
+          limit: limit,
+        ),
       ))
         ChatObjects.channel(row),
     ],
@@ -30,8 +33,12 @@ final chatHandlers = <DwCallHandler>[
   /// The caller's read state of every channel. Staff only.
   DwCallHandler.list<ListMyChatReadStates, ChatReadState>(
     access: ProfileAccess.staff,
-    handle: (ctx, request) async =>
-        ChatObjects.readStates(ctx.db, (await ctx.profile).id),
+    handle: (ctx, request) async {
+      final me = await ctx.profile;
+      return request.readWhole(
+        (limit) => ChatObjects.readStates(ctx.db, me.id, limit: limit),
+      );
+    },
   ),
 
   /// A window over a channel's messages, deleted ones left out. Staff only; a
@@ -77,12 +84,15 @@ final chatHandlers = <DwCallHandler>[
   DwCallHandler.list<ListPinnedChatMessages, ChatMessage>(
     access: ProfileAccess.staff,
     handle: (ctx, request) async {
-      final rows = await ctx.db.chatMessages.find(
-        where: (t) =>
-            t.channelId.equals(request.channelId) &
-            t.pinnedAt.isNotNull() &
-            t.deletedAt.isNull(),
-        orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
+      final rows = await request.readWhole(
+        (limit) => ctx.db.chatMessages.find(
+          where: (t) =>
+              t.channelId.equals(request.channelId) &
+              t.pinnedAt.isNotNull() &
+              t.deletedAt.isNull(),
+          orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
+          limit: limit,
+        ),
       );
       if (rows.isEmpty) await ctx.requireChatChannel(request.channelId);
       return ChatObjects.messages(ctx, rows);
@@ -101,20 +111,27 @@ final chatHandlers = <DwCallHandler>[
       final authors = [
         for (final row in await ctx.db.userProfiles.find(
           where: (t) => t.firstName.ilike(pattern) | t.lastName.ilike(pattern),
+          unbounded: "names holding two letters or more: the club's members",
         ))
           row.id,
       ];
-      final rows = await ctx.db.chatMessages.find(
-        where: (t) {
-          final matching = authors.isEmpty
-              ? t.text.ilike(pattern)
-              : t.text.ilike(pattern) | t.authorProfileId.inList(authors);
-          return t.channelId.equals(request.channelId) &
-              t.deletedAt.isNull() &
-              matching;
-        },
-        orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
-        limit: ListChatMessagesMatching.maxResults,
+      final rows = await request.readWhole(
+        (limit) => ctx.db.chatMessages.find(
+          where: (t) {
+            final matching = authors.isEmpty
+                ? t.text.ilike(pattern)
+                : t.text.ilike(pattern) | t.authorProfileId.inList(authors);
+            return t.channelId.equals(request.channelId) &
+                t.deletedAt.isNull() &
+                matching;
+          },
+          orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
+          // This request explicitly promises the top 100 matches; that
+          // semantic cap is independent of the whole-list safety bound.
+          limit: limit == null || limit > ListChatMessagesMatching.maxResults
+              ? ListChatMessagesMatching.maxResults
+              : limit,
+        ),
       );
       return ChatObjects.messages(ctx, rows);
     },

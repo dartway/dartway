@@ -147,6 +147,7 @@ final class TestApp {
   /// format would, through `ctx.refuse`.
   final Set<String> refusingDelivery = {};
   final List<int> createdAccounts = [];
+  final List<int?> boundReadLimits = [];
 
   /// Account id → the origin `onAccountCreated` was given.
   final Map<int, DwAccountOrigin> accountOrigins = {};
@@ -613,6 +614,20 @@ final class TestApp {
         return const [];
       },
     ),
+    DwCallHandler.list<BoundedNotes, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, request) => request.readWhole((limit) async {
+        boundReadLimits.add(limit);
+        return [
+          for (
+            var id = 1;
+            id <= request.count && (limit == null || id <= limit);
+            id++
+          )
+            NoteView(id: id, text: 'x' * request.padding),
+        ];
+      }),
+    ),
     DwCallHandler.list<SlowRequest, NoteView>(
       access: DwAccessRule.anonymous,
       handle: (ctx, request) async {
@@ -696,6 +711,8 @@ final class TestApp {
             ctx.refuse(DwCoreRefusal.conflict, params: {'n': n});
           case 'outdated':
             ctx.refuse(DwCoreRefusal.updateRequired);
+          case 'staleState':
+            throw DwStaleState('work_item', 42);
           case 'unknownEnum':
             // The guard itself, reached the way a handler reaches it: the
             // column type a row write uses, on a value this build read as

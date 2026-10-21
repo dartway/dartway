@@ -133,7 +133,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-four errors, thirteen warnings, one info — `DwCheckType` and its `severity` in
+Forty-five errors, fourteen warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -155,7 +155,8 @@ Forty-four errors, thirteen warnings, one info — `DwCheckType` and its `severi
 | `featureImportCycle` | error | Server features importing one another in a cycle, by any import — within the surface or not. One finding per knot of features: a shortest cycle, the import behind each step, and the other features of the knot |
 | `coreImportsFeature` | error | A file of the server's `lib/src/core/` importing a feature. Every feature imports `core/`, so what `core/` needs from a feature belongs to the feature — who the caller is in `profile/profile_access.dart`, the sign-in hooks in a feature above the ones they touch |
 | `featureImportOutsideSurface` | error | A server feature importing another's file outside its surface: only `<feature>_rows`, `_access`, `_objects`, `_publications`, `_changes` (and their `<part>` files) may be imported — never `_feature`, `_handlers`, `_jobs`, `_routes` or `logic/`; nor may any file under `lib/src/` import the package's library. `import`, `export` and `part` count. `lib/<project>_server.dart`, `migrations/`, `bin/` and `test/` are not judged |
-| `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
+| `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`transition`/`transitionWhere`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
+| `stateWrittenDirectly` | error | A declared state column written through row `copyWith`, ordinary updates, upserts or raw SQL in server `lib/`; use guarded transitions. Migration `m.backfill` is allowed. |
 | `generatedCodeStale` | error | A generated file that `dartway generate` would write differently, or whose source is gone |
 | `projectContractVersion` | error | Generated project contract is incompatible at the same breaking line, or cannot be verified against its fixed committed Git baseline. `--contract-base <revision>` supplies a trusted baseline; see the wire/version guidance |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
@@ -195,6 +196,7 @@ Forty-four errors, thirteen warnings, one info — `DwCheckType` and its `severi
 | `docCommentLanguage` | warning | A doc comment in `lib/` written in a script other than the language `dartway setup-ai --language` recorded — a heuristic on Cyrillic against Latin letters, so it warns and never fails. A comment the skeleton wrote (the same text in the template the project came from) is not judged, nor a generated file |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
 | `inlineOwnershipCheck` | warning | A handler in a `*_handlers.dart` under any rule but a resource rule (`signedIn`, a role check) that compares a row's owner field with the caller and refuses `notFound`/`forbidden` (or answers `null` from a `single`), in its body or a helper of the file it calls — the check `DwAccessRule.resource` makes once |
+| `unboundedRead` | warning | A repository `find(…)` in a request handler (`single`, `maybe`, `list`, `page`, `table`, `window`) of a `*_handlers.dart` outside `request.readWhole`, naming neither `limit:` nor `unbounded:` — a read of every row its filter matches. Fix: a page, table or window request, `request.readWhole` for a whole list, `limit:` for paged reads, or `unbounded: '<reason>'` |
 | `fileLong` | info | Over 200 lines, where `fileTooLong` looks |
 
 "Raw styles" means `Color(`, `TextStyle(`, `BorderRadius.`/`BorderRadius(`, `Theme.of(`,
@@ -370,6 +372,18 @@ rather than its meaning; it stays quiet on a list filtered by the caller in its 
 canonical "my rows"), on handlers under a resource rule, and on a membership read from a table of its
 own. The one pattern per shape is in
 [Access and roles](../2-core/access-and-roles.md#whose-row-is-it-one-rule-per-shape).
+
+**`unboundedRead`** looks for a read that answers a screen and has no bound: a repository `find(…)`
+inside a request handler — `DwCallHandler.single`, `maybe`, `list`, `page`, `table`, `window` — of a
+`*_handlers.dart`, outside `request.readWhole`, naming neither `limit:` nor `unbounded:`. Such a read is ten rows in development
+and megabytes a year later, and nothing says when it crossed. The fix is one of three: the request
+becomes a page, table or window (what grows with use); a whole list uses `request.readWhole`
+to probe one past `maxItems` and retry without a limit in production on overflow
+(paged reads take `limit: page.fetchLimit`) ([Requests](../2-core/requests-and-updates.md)); or the read says why the domain keeps it small with
+`unbounded: 'a board has a handful of columns'`. `findById`, `findFirst` and `findByIds` are bounded
+by what they are asked for; commands, jobs and migrations are not looked at. A warning, because it
+reads the handler's own body and the shape of the call: a filter on a unique key looks like any
+other, and a read in a helper the handler calls is not seen.
 
 ## State and commands: one way each, and one visible way out
 

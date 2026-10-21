@@ -1,3 +1,4 @@
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:meta/meta_meta.dart';
 
 /// Declares a row class (`<Name>Row extends DwTableRow`) stored in the table
@@ -103,4 +104,26 @@ final class DwDefaultValue {
 @Target({TargetKind.field})
 final class DwUniqueColumn {
   const DwUniqueColumn();
+}
+
+/// A non-null enum field whose changes go through a guarded transition.
+@Target({TargetKind.field})
+final class DwStateColumn<S extends Enum> {
+  const DwStateColumn(this.transitions);
+
+  final DwStateTransitions<S> transitions;
+}
+
+/// An ordinary write attempted to change a state column or insert a value
+/// outside its initial set. Use the repository's guarded transition instead.
+final class DwStateWriteException implements Exception {
+  const DwStateWriteException(this.tableName, this.operation);
+
+  final String tableName;
+  final String operation;
+
+  @override
+  String toString() =>
+      'DwStateWriteException($tableName, $operation): '
+      'state columns require an initial value on insert and a guarded transition';
 }

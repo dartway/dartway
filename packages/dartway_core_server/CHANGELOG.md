@@ -2,6 +2,23 @@
 
 ## 0.23.0-dev.1
 
+- `request.readWhole((limit) => repo.find(limit: limit))` keeps the normal
+  list read bounded at `maxItems + 1`. Overflow throws before a second read in
+  strict mode; production re-reads once without a limit and warns with the
+  whole answer's true count and size. Use this instead of passing `fetchLimit`
+  directly, which silently truncated production answers (#644).
+
+- A `list` handler answering more items than its request's `maxItems` is never
+  cut short. With `DwServerSettings.strictBounds` the call fails, naming the
+  request and the count; `DwTestServer` is always strict, and a development
+  server is through `DW_STRICT_BOUNDS=true` (`DwServerEnvironment.strictBounds`),
+  which the skeleton sets in `deploy/config.yaml > local`. Otherwise — production —
+  the whole list is served and a warning names the request, the count and the
+  response size, once per request per `boundWarningInterval` (an hour) (#644).
+- A call response above `DwServerSettings.largeResponseBytes` (256 KiB) is logged
+  as a warning with the call's name, once per call per `boundWarningInterval`.
+- A project test whose list handler answers past the bound now fails; see the
+  [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
 - **BREAKING (source):** `DwCallContext.process` is a new abstract getter.
   Custom context implementations must delegate it to the server context; use
   `DwTestServer` for tests. See `docs/migrations/2026-10-21-external-process-seam.md`.
@@ -16,6 +33,8 @@
   and answer size, at debug; a call slower than the new
   `DwServerSettings.slowCallThreshold` (default 1 s) is the same line as a
   warning, whatever the logger's level (#645).
+- Answer uncaught `DwStaleState` as `dw.conflict` (HTTP 409) without an incident (#639).
+- The family moves in lockstep with ORM state columns (#639).
 
 ## 0.22.0
 

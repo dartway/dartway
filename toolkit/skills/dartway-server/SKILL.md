@@ -15,10 +15,14 @@ the server filters their publications and deletions from response and live updat
 Publishing remains dynamic server code; no channel list or manual filtering is needed. Existing
 shape changes still require a breaking-line raise (`dartway-contract`).
 
+Ordinary edits on state tables may throw `DwStaleState` after a concurrent transition; catch it
+as a conflict (the server otherwise answers HTTP 409). Missing rows still throw `DwRowNotFound`.
+Read the rows reference for intentional state-write refusals and unchanged state arguments.
+
 Open only the reference needed for the edit:
 
 - [layout.md](references/layout.md) — feature files and cross-feature boundaries.
-- [rows-and-queries.md](references/rows-and-queries.md) — row declarations and typed queries; open `dartway-migrations` when rows change.
+- [rows-and-queries.md](references/rows-and-queries.md) — row declarations, lifecycle state columns and typed queries; open `dartway-migrations` when rows change.
 - [handlers.md](references/handlers.md) — handlers, transactions, batch mapping and call context.
 - [jobs-and-routes.md](references/jobs-and-routes.md) — jobs and external doors.
 - [accounts.md](references/accounts.md) — sign-in hooks, accounts and identities.

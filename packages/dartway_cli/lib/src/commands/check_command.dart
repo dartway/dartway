@@ -8,6 +8,7 @@ import '../checker/dw_contract_names.dart';
 import '../checker/dw_data_lifecycle.dart';
 import '../checker/dw_feature_imports.dart';
 import '../checker/dw_check_type.dart';
+import '../checker/dw_state_columns.dart';
 import '../checker/dw_instructions.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_flutter_state_rules.dart';
@@ -24,6 +25,7 @@ import '../checker/dw_shared_layout.dart';
 import '../checker/dw_package_file_size.dart';
 import '../checker/dw_server_outside_world.dart';
 import '../checker/dw_inline_ownership.dart';
+import '../checker/dw_unbounded_read.dart';
 import '../checker/dw_project_template.dart';
 import '../checker/dw_uniformity_rules.dart';
 import '../deploy/local_environment.dart';
@@ -224,6 +226,11 @@ class CheckCommand extends Command<int> {
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);
+      errorCount += DwStateColumnsInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
       errorCount += DwDataLifecycleInspector(
         serverPackageDir: layout?.serverPackageDir,
         sharedPackageDir: layout?.sharedPackageDir,
@@ -267,6 +274,11 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
       errorCount += DwInlineOwnershipInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwUnboundedReadInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

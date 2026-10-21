@@ -12,6 +12,7 @@ export 'package:dartway_core_shared/dartway_core_shared.dart'
         DwSetField,
         DwTextFieldPatch,
         DwCalendarDay,
+        DwStateTransitions,
         dwListEquals,
         dwMapEquals;
 
@@ -23,6 +24,7 @@ export 'src/db/dw_errors.dart'
         DwDatabaseException,
         DwDecodeException,
         DwRowNotFound,
+        DwStaleState,
         DwForeignKeyViolation,
         DwSerializationFailure,
         DwUniqueViolation;

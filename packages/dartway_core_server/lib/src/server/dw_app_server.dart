@@ -331,12 +331,15 @@ final class DwAppServer {
     logger.info(DwAccountCascades.noticeFor(ofProject));
   }
 
+  /// [start] on [address], for the test server too: [outbound] replaces the
+  /// network, and [strictBounds] overrides `settings.strictBounds`.
   @internal
   Future<void> startOn({
     required int port,
     required InternetAddress address,
     required bool handleSignals,
     DwOutboundTransport? outbound,
+    bool? strictBounds,
     DwProcessTransport process = const DwSystemProcess(),
   }) async {
     if (_running != null || _stopping) {
@@ -435,6 +438,7 @@ final class DwAppServer {
           runtime: runtime,
           authService: authService,
           settings: settings,
+          strictBounds: strictBounds,
           handlers: {
             for (final handler in [
               ...handlers,

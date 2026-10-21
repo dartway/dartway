@@ -219,6 +219,10 @@ final class DwHttpFront {
       );
       bytes = _jsonUtf8.convert(answer.toJson());
     }
+    calls.bounds.checkSize(
+      DwHttpContract.wireNameOf(request.uri.path) ?? request.uri.path,
+      bytes.length,
+    );
     final status = dwHttpStatusFor(answer);
     _timed(request.uri.path, status, clock.elapsed, bytes.length);
     return (status, {..._callHeaders, ...dwHttpHeadersFor(answer)}, bytes);

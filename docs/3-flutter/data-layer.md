@@ -26,9 +26,9 @@ controller in a feature's `logic/`, or wiring in `core/`, may watch a read to de
 
 ```dart
 DwReadBuilder(
-  dw.request(const ListMyBookings()),
-  placeholder: PlaceholderObjects.listOf(PlaceholderObjects.booking, 4),
-  builder: (context, bookings) => BookingList(bookings),
+  dw.request(const ListClubServices()),
+  placeholder: PlaceholderObjects.listOf(PlaceholderObjects.service, 4),
+  builder: (context, services) => ServiceList(services),
 )
 ```
 
@@ -94,7 +94,7 @@ Pull to refresh is the notifier's `refetch()`, which completes when answered —
 `DwReadBuilder`'s failed view is the same call:
 
 ```dart
-onRefresh: () => ref.read(dw.request(const ListMyBookings()).notifier).refetch(),
+onRefresh: () => ref.read(dw.request(const ListClubServices()).notifier).refetch(),
 ```
 
 Use `refetch()`, not `ref.invalidate`: the client keeps a request alive for the release delay after

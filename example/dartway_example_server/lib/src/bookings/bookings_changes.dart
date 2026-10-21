@@ -19,9 +19,12 @@ abstract final class BookingsChanges {
     SessionBookingRow booking, {
     UserProfileRow? client,
   }) async {
-    final cancelled = await ctx.db.sessionBookings.update(
-      booking.copyWith(status: BookingStatus.cancelled),
+    final cancelled = await ctx.db.sessionBookings.transition(
+      booking.id,
+      column: (t) => t.status,
+      to: BookingStatus.cancelled,
     );
+    if (cancelled == null) ctx.refuse(DartwayExampleRefusal.bookingNotActive);
     final session = await ScheduleChanges.freeSpot(ctx, booking.sessionId);
     return BookingsPublications.booking(
       ctx,

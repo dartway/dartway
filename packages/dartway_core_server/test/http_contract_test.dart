@@ -70,6 +70,16 @@ void main() {
       expect(answer.status, 409);
     });
 
+    test('a stale state write is a conflict without an incident', () async {
+      final before = harness().app.alerts.incidents.length;
+      final answer = await anonymous.call(
+        const Count('stale-state', mode: 'staleState'),
+      );
+      expect(answer.status, 409);
+      expect(answer.refusal.isCode(DwCoreRefusal.conflict), isTrue);
+      expect(harness().app.alerts.incidents.length, before);
+    });
+
     test('dw.tooManyRequests: 429 with Retry-After', () async {
       const request = DwRequestCode(
         kind: DwIdentifierKind.email,

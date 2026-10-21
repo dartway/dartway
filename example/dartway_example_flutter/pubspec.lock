@@ -201,7 +201,7 @@ packages:
       path: "../dartway_example_shared"
       relative: true
     source: path
-    version: "1.0.0"
+    version: "2.0.0"
   dartway_media_flutter:
     dependency: "direct main"
     description:

@@ -73,6 +73,10 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol(
       'ListMyChatReadStates',
       $ListMyChatReadStatesFromJson,
     ),
+    DwProtocolEntry<ListMySessionBookings>(
+      'ListMySessionBookings',
+      $ListMySessionBookingsFromJson,
+    ),
     DwProtocolEntry<ListNews>('ListNews', $ListNewsFromJson),
     DwProtocolEntry<ListPinnedChatMessages>(
       'ListPinnedChatMessages',
@@ -124,5 +128,5 @@ final DwWireProtocol dartwayExampleProtocol = DwWireProtocol(
     DwProtocolEntry<UserProfile>('UserProfile', $UserProfileFromJson),
   ],
   include: DwWireProtocol.core,
-  contractVersion: '1.0.0',
+  contractVersion: '2.0.0',
 );
