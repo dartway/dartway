@@ -1,8 +1,26 @@
 # Changelog
 
-## 0.26.0
+## 0.26.0-dev.1
+
+### Breaking changes
+
+- Install skills once in `.agents/skills/`; Claude discovers them through the
+  relative `.claude/skills` symlink. Existing Claude-only custom skills are moved;
+  conflicting custom copies stop installation before any project file changes.
+  Commit the symlink and move root Claude prose into `AGENTS.md` manually; see
+  the [migration note](../../docs/migrations/2026-10-21-toolkit-one-copy.md).
+
+### Changes
 
 - Add the `stateWrittenDirectly` checker error for direct state writes and recognize transitions as feature-owned writes (#639).
+
+- Load the managed Claude policy by import and warn with `instructionsDuplicated`
+  when root instruction texts need consolidation. Fresh projects use `@AGENTS.md`.
+- Make the first read an index with topic references and concise skill discovery
+  descriptions. Load only the procedures needed for the current step.
+- Record `interactive` (default true) in the toolkit manifest. `--no-interactive`
+  on create/setup-ai/update makes managed confirmation steps report and stop
+  that step without waiting or treating silence as approval; updates retain the choice.
 
 ## 0.25.0
 

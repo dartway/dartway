@@ -1,11 +1,6 @@
 ---
 name: dartway-feature-scaffold
-description: >-
-  Building a DartWay feature end to end, in order — contract, server, Flutter, tests — and the
-  Flutter feature law: the app's top-level layout, what a feature, a group and a building block are,
-  one public file with its DwFeatureSpec, widgets/ and logic/, where logic and state live (hooks, a
-  <Thing>Controller Notifier), a feature constructible from its address, and the DwFeatureSpec
-  fields. Use when adding functionality, a screen, a flow or a new kind of data.
+description: "Add or reshape an end-to-end feature: folders, entry point, feature spec, hooks and controller state."
 ---
 
 # DartWay — building a feature, end to end
@@ -22,7 +17,7 @@ The data object the screen shows (a two-word noun, what the reader sees, not the
 by the screen's shape, with channels (`dartway-realtime`); the commands (the user's input only,
 `DwFieldPatch` for clearable fields, `validate()`); refusal codes with doc comments. Put them in the
 file of their server feature, generate, extend the contract test. A change installed builds already
-call: the table in `dartway-contract` §8.
+call: the table in `dartway-contract`, `references/generation.md`.
 
 ## Step 2 — the server (`dartway-server`)
 
@@ -145,3 +140,12 @@ them. Extend the owner test's list or table:
 
 A second client hearing the publication is not mandatory; it must answer the §4 gate.
 Then `dartway-finish`.
+
+## Names and generators
+
+Variables say what they hold and match the type (`userProfileId`). A field referring to a profile
+says Profile; a framework account says account. Never use `id`, `data`, `info`, `obj`, `temp`,
+`val`, `item` or `x` as a whole variable name.
+
+Run `flutter gen-l10n` after changing `.arb` input and commit the output. Providers, state-class
+`copyWith`/`==` and asset constants are written by hand; no `build_runner`.

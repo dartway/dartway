@@ -9,6 +9,7 @@ import '../checker/dw_data_lifecycle.dart';
 import '../checker/dw_feature_imports.dart';
 import '../checker/dw_check_type.dart';
 import '../checker/dw_state_columns.dart';
+import '../checker/dw_instructions.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_flutter_state_rules.dart';
 import '../checker/dw_flutter_ui_rules.dart';
@@ -251,6 +252,11 @@ class CheckCommand extends Command<int> {
       // Judges the project rather than any one package, so it is skipped by
       // `--dir` for the same reason the layout check is.
       errorCount += DwFrameworkLockInspector(
+        projectRoot: layout?.root ?? flutterPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwInstructionsInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

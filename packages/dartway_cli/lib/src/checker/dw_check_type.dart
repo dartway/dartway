@@ -468,7 +468,10 @@ enum DwCheckType {
 
   /// A declared state column written through copyWith, an ordinary repository
   /// write or raw SQL in server lib/. Migration backfills are allowed.
-  stateWrittenDirectly;
+  stateWrittenDirectly,
+
+  /// Root CLAUDE.md duplicates project instructions beside AGENTS.md.
+  instructionsDuplicated;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -482,6 +485,7 @@ enum DwCheckType {
   /// `toolkit_law_list_test.dart` holds the two together.
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,
+    DwCheckType.instructionsDuplicated ||
     DwCheckType.uiKitContainsText ||
     DwCheckType.uiKitConstStyle ||
     DwCheckType.featureSpecMissing ||

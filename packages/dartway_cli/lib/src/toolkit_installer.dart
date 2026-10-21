@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path/path.dart' as p;
 
 import 'toolkit_manifest.dart';
+import 'toolkit_skills.dart';
 
 /// Installs one policy and shared skills for selected agent integrations.
 /// Managed files are regenerated; root owner instructions and custom skills
@@ -14,7 +15,8 @@ class ToolkitInstaller {
   /// lingering as a stale `/slash` nobody maintains.
   static const managedCommandFiles = ['commit.md', 'dartway-checkup.md'];
 
-  /// Copies the toolkit from [toolkitDir] into `<projectRoot>/.claude/`,
+  /// Installs the toolkit from [toolkitDir] into the shared `.agents/` root,
+  /// with Claude imports, a skills symlink and command wrappers in `.claude/`,
   /// substituting [tokens] in the managed markdown files.
   /// [provenance] is written beside the files it describes. Omitted only by
   /// tests that have no monorepo to describe.
@@ -72,48 +74,38 @@ class ToolkitInstaller {
         );
       }
     }
+    final skills = ToolkitSkills(projectRoot)..preflight();
+    skills.consolidate(enableClaude: agent != 'codex');
     final agentsDir = Directory(p.join(projectRoot.path, '.agents'))
       ..createSync(recursive: true);
     final sharedPolicy = File(p.join(agentsDir.path, 'DARTWAY.md'));
     toolkitClaudeMd.copySync(sharedPolicy.path);
     _substituteTokens([sharedPolicy], tokens);
-    if (agent != 'claude') {
-      final codexSkills = Directory(p.join(agentsDir.path, 'skills'));
-      _removeSkills(codexSkills);
-      final copied = <File>[];
-      for (final skill in toolkitSkillsDir.listSync().whereType<Directory>()) {
-        copied.addAll(
-          _copyDirectory(
-            skill,
-            Directory(p.join(codexSkills.path, p.basename(skill.path))),
-          ),
-        );
-      }
-      _substituteTokens(copied, tokens);
+    final sharedSkills = Directory(p.join(agentsDir.path, 'skills'));
+    _removeSkills(sharedSkills);
+    final copied = <File>[];
+    for (final skill in toolkitSkillsDir.listSync().whereType<Directory>()) {
+      copied.addAll(
+        _copyDirectory(
+          skill,
+          Directory(p.join(sharedSkills.path, p.basename(skill.path))),
+        ),
+      );
     }
+    _substituteTokens(copied, tokens);
     _installEntry(projectRoot, 'AGENTS.md', enabled: agent != 'claude');
     _installEntry(projectRoot, 'CLAUDE.md', enabled: agent != 'codex');
-    if (agent == 'claude') {
-      _removeSkills(Directory(p.join(agentsDir.path, 'skills')));
-    }
 
     final claudeDir = Directory(p.join(projectRoot.path, '.claude'));
     final skillsDir = Directory(p.join(claudeDir.path, 'skills'));
     final commandsDir = Directory(p.join(claudeDir.path, 'commands'));
 
-    _removeManagedFiles(claudeDir, skillsDir, commandsDir);
+    _removeManagedFiles(claudeDir, commandsDir);
     if (agent != 'codex') {
       skillsDir.createSync(recursive: true);
       commandsDir.createSync(recursive: true);
 
       final managedFiles = <File>[];
-      for (final skillDir
-          in toolkitSkillsDir.listSync().whereType<Directory>()) {
-        final installedDir = Directory(
-          p.join(skillsDir.path, p.basename(skillDir.path)),
-        );
-        managedFiles.addAll(_copyDirectory(skillDir, installedDir));
-      }
       for (final commandFile
           in toolkitCommandsDir.listSync().whereType<File>()) {
         final installedFile = File(
@@ -123,9 +115,7 @@ class ToolkitInstaller {
         managedFiles.add(installedFile);
       }
       final installedClaudeMd = File(p.join(claudeDir.path, 'CLAUDE.md'));
-      installedClaudeMd.writeAsStringSync(
-        'Read `.agents/DARTWAY.md` before working on this project.\n',
-      );
+      installedClaudeMd.writeAsStringSync('@../.agents/DARTWAY.md\n');
       managedFiles.add(installedClaudeMd);
 
       _substituteTokens(managedFiles, tokens);
@@ -155,6 +145,22 @@ class ToolkitInstaller {
   }) {
     final file = File(p.join(root.path, name));
     var content = file.existsSync() ? file.readAsStringSync() : '';
+    if (name == 'CLAUDE.md' && enabled && content.trim().isEmpty) {
+      final target = File(p.join(root.path, 'AGENTS.md')).existsSync()
+          ? 'AGENTS.md'
+          : '.agents/DARTWAY.md';
+      file.writeAsStringSync('@$target\n');
+      return;
+    }
+    if (name == 'CLAUDE.md' &&
+        content
+            .trim()
+            .split('\n')
+            .every(
+              (line) => line.trim().isEmpty || line.trim().startsWith('@'),
+            )) {
+      return;
+    }
     final start = content.indexOf(_entryStart);
     final end = content.indexOf(_entryEnd);
     if ((start < 0) != (end < 0) || (start >= 0 && end < start)) {
@@ -164,7 +170,7 @@ class ToolkitInstaller {
     }
     final block =
         '$_entryStart\n'
-        'Read `.agents/DARTWAY.md` before working on this project.\n'
+        '${name == 'CLAUDE.md' ? '@.agents/DARTWAY.md' : 'Read `.agents/DARTWAY.md` before working on this project.'}\n'
         '$_entryEnd';
     if (start >= 0) {
       content = content.replaceRange(
@@ -187,9 +193,9 @@ class ToolkitInstaller {
 
   static void _removeSkills(Directory skills) {
     if (!skills.existsSync()) return;
-    for (final dir in skills.listSync().whereType<Directory>()) {
-      if (p.basename(dir.path).startsWith('dartway-')) {
-        dir.deleteSync(recursive: true);
+    for (final entry in skills.listSync(followLinks: false)) {
+      if (p.basename(entry.path).startsWith('dartway-')) {
+        entry.deleteSync(recursive: true);
       }
     }
   }
@@ -335,7 +341,7 @@ class ToolkitInstaller {
   /// Creates `docs/dev_notes/` — the project's own findings, one file per
   /// entry, tracked like any other file in the repository.
   ///
-  /// The only place the installer writes outside `.claude/`. It used to put two
+  /// The installer also seeds project documentation. It used to put two
   /// git-ignored journals at the project root, and being ignored is what broke
   /// them: a finding written into one never travelled out through a pull
   /// request, never appeared in review, and `git worktree remove` deleted it
@@ -380,12 +386,7 @@ class ToolkitInstaller {
     }
   }
 
-  static void _removeManagedFiles(
-    Directory claudeDir,
-    Directory skillsDir,
-    Directory commandsDir,
-  ) {
-    _removeSkills(skillsDir);
+  static void _removeManagedFiles(Directory claudeDir, Directory commandsDir) {
     for (final commandFileName in managedCommandFiles) {
       final commandFile = File(p.join(commandsDir.path, commandFileName));
       if (commandFile.existsSync()) {

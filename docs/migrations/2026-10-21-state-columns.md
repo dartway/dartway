@@ -3,7 +3,7 @@ title: Declare lifecycle states and use guarded transitions
 affects:
   dartway_orm: "0.23.0-dev.1"
   dartway_core_server: "0.23.0-dev.1"
-  dartway_cli: "0.26.0"
+  dartway_cli: "0.26.0-dev.1"
 ---
 
 ## Who is affected

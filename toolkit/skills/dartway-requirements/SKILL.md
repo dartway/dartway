@@ -1,11 +1,6 @@
 ---
 name: dartway-requirements
-description: >-
-  Requirements analysis before a DartWay task: study what the project already has on the topic
-  (DTOs, rows, handlers and rules, features and their specs), note the debt in the affected feature
-  (blocking vs adjacent), ask only the blocking questions with a proposed default, and offer 2–3
-  options along the DartWay ladder (reuse the contract → extend it → a job or a door) with risks and
-  a rough estimate. Read-only: a report, no code. Run as /dartway-requirements at the start of a task.
+description: "Analyze unclear requirements against existing code, blocking debt, questions and options; read-only."
 ---
 
 # DartWay — requirements analysis (`dartway-requirements`)
@@ -25,6 +20,9 @@ to **what exists → what is missing → what gets in the way**.
 table and the layer skills: 🔧 **blocking** (it complicates the new work — account for it in the options)
 and 🧹 **adjacent** (tidy along the way, the author's call), each with `file:line`. Not a repository
 audit: that is `/dartway-checkup`.
+
+With `interactive: false` in `.agents/dartway-toolkit.json`, put blocking questions and proposed
+options in the final report and stop the dependent step; continue independent analysis.
 
 **D. Questions** — only the blocking ones, grouped (domain; access and roles; flow and states; who must
 see a change live; existing data and migrations; volumes, files, background work, installed builds), each

@@ -1,11 +1,6 @@
 ---
 name: dartway-ui-kit
-description: >-
-  The UI kit of a DartWay app — source in lib/ui_kit/, owned by the project (the framework ships no
-  design): one import, part-of structure, no raw styles outside it, kit widgets that take no visual
-  types, AppSpace spacing, assets as an enum plus one renderer, AppText/AppTextStyle, AppButton over
-  DwActionBuilder, the theme, the one spinner, the read views, and localization. Use when creating or
-  editing UI components, styles, themes, buttons, texts, or when adding widgets to the kit.
+description: "Build app kit widgets and styles; enforce sizing, assets, localization and shared UI conventions."
 ---
 
 # DartWay — the UI kit (`dartway-ui-kit`)

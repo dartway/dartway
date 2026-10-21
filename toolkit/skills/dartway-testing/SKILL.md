@@ -1,16 +1,6 @@
 ---
 name: dartway-testing
-description: >-
-  How a DartWay project tests itself, by where the behaviour lives: contract tests in __SHARED_PKG__
-  (round trip, validate(), onUpdate, channels); server acceptance tests on a real Postgres and storage
-  (`dart run dartway_cli:dartway test`, the skeleton's AppHarness, DwTestServer, real clients, raw
-  calls, DwTestClock, server.http); widget tests on the in-memory DwFakeServer through the skeleton's
-  TestApp; where test files go; the timing traps; the gate a test passes before it is written (what it
-  protects, the regression that fails it, why existing coverage misses it, no seam only the test needs),
-  the six must-test risk classes and agent rules; a bugfix test proved red before the fix;
-  quarantining flaky tests.
-  Use when writing, adding or reviewing tests, or when a test fails with "Dw is not initialized",
-  "Another dw core is alive", "found 0 widgets" or a pending Timer.
+description: "Select tests by six risk classes and their owner boundary; prove bugfix regressions red before the fix."
 ---
 
 # DartWay — how a project tests itself
