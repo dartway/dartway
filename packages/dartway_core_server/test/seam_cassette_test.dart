@@ -41,11 +41,17 @@ void main() {
             'access_token': 'response-secret',
             'privateField': 'custom-secret',
             'echo': 'header-secret',
+            'token_type': 'Bearer',
+            'usage': {'input_tokens': 12, 'output_tokens': 3},
+            'pin': 123,
           }),
         );
         await request.response.close();
       });
-      final record = cassette('DW_RECORD_SEAMS', names: ['privateField']);
+      final record = cassette(
+        'DW_RECORD_SEAMS',
+        names: ['privateField', 'pin'],
+      );
       final http = DwFakeOutboundHttp()..useCassette(record);
       final response = await http.client().post(
         url,
@@ -66,7 +72,7 @@ void main() {
       ]) {
         expect(stored, isNot(contains(secret)), reason: secret);
       }
-      final replay = cassette('', names: ['privateField']);
+      final replay = cassette('', names: ['privateField', 'pin']);
       http.reset();
       http.useCassette(replay);
       final answer = await http.client().post(
@@ -76,6 +82,12 @@ void main() {
       );
       expect(answer.statusCode, 201);
       expect(answer.json, containsPair('id', 7));
+      expect(answer.json, containsPair('token_type', 'Bearer'));
+      expect(
+        answer.json,
+        containsPair('usage', {'input_tokens': 12, 'output_tokens': 3}),
+      );
+      expect(answer.json, containsPair('pin', 0));
       replay.verifyComplete();
       await expectLater(
         http.client().get(url),

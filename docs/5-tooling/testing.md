@@ -422,7 +422,9 @@ Run a feature's test with `DW_RECORD_SEAMS=1` to call the real services and repl
 recordings. Authentication, tokens, cookies, passwords, secrets and API keys are redacted by
 name in headers, query parameters, JSON, forms, explicit environment and named command
 arguments. Add provider-specific names with `redactNames`, and values with `redactValues`
-for URL paths and positional arguments. Review every recording before committing; no tool
+for URL paths and positional arguments. Redacted JSON keeps its types and container shape;
+non-secret token metadata such as `token_type` and usage counts is retained.
+Review every recording before committing; no tool
 can identify arbitrary secret text. Never record a destructive command or request unless
 you intend to execute it. JSON bodies are stored structurally; replay encodes them again,
 so tests requiring byte-exact JSON formatting should use a real service.

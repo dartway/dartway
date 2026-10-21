@@ -16,6 +16,9 @@
 
 ### Changes
 
+- Tests: own creation fixture process groups and disable background Git
+  maintenance so Linux teardown cannot race a remaining fixture writer (#638).
+
 - Load the managed Claude policy by import and warn with `instructionsDuplicated`
   when root instruction texts need consolidation. Fresh projects use `@AGENTS.md`.
 - Make the first read an index with topic references and concise skill discovery

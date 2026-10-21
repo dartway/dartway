@@ -2,7 +2,8 @@
 
 ## 0.23.0-dev.1
 
-- Add recorded HTTP and external-command seams with offline replay, redaction and opt-in shape drift verification (#638).
+- Add recorded HTTP and external-command seams with offline replay, redaction and opt-in shape drift verification (#638). Redaction preserves JSON types and
+  non-secret OAuth and token-usage metadata.
 
 ## 0.22.0
 

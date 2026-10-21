@@ -297,13 +297,14 @@ final class _Redactor {
   bool sensitive(String key) {
     final name = _name(key);
     return names.contains(name) ||
+        name.endsWith('token') ||
+        name == 'tokens' ||
+        name.endsWith('apikey') ||
         [
           'authorization',
           'cookie',
-          'token',
           'secret',
           'password',
-          'apikey',
           'credential',
         ].any(name.contains);
   }
@@ -373,7 +374,7 @@ final class _Redactor {
       return {
         for (final entry in value.entries)
           entry.key: sensitive(entry.key as String)
-              ? '[REDACTED]'
+              ? _masked(entry.value)
               : replace(
                   entry.value,
                   structured:
@@ -400,3 +401,16 @@ final class _Redactor {
     return value;
   }
 }
+
+// Keep the recorded JSON decodable after redaction. Credential values change;
+// their types and container structure remain the provider's real contract.
+Object? _masked(Object? value) => switch (value) {
+  null => null,
+  String() => '[REDACTED]',
+  bool() => false,
+  int() => 0,
+  double() => 0.0,
+  List() => value.map(_masked).toList(),
+  Map() => {for (final entry in value.entries) entry.key: _masked(entry.value)},
+  _ => throw FormatException('Not JSON'),
+};

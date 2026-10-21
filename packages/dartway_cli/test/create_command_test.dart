@@ -8,6 +8,7 @@ import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
 import 'support/deploy_fixtures.dart';
+import 'support/test_process.dart';
 
 /// `dartway create` over this repository's own template: what a stranger's
 /// project is named after, and what it resolves against.
@@ -52,7 +53,7 @@ void main() {
     'dartway.dart',
   );
 
-  Future<ProcessResult> dartway(List<String> arguments) => Process.run(
+  Future<ProcessResult> dartway(List<String> arguments) => runTestProcess(
     Platform.resolvedExecutable,
     [cli, ...arguments],
     workingDirectory: sandbox.path,
@@ -94,7 +95,7 @@ void main() {
       read(project, '.agents/dartway-toolkit.json'),
       contains('"interactive": false'),
     );
-    final checked = await Process.run(Platform.resolvedExecutable, [
+    final checked = await runTestProcess(Platform.resolvedExecutable, [
       cli,
       'check',
       '--type',
@@ -145,11 +146,16 @@ void main() {
 
   group('git initialization (#599)', () {
     final environment = {
-      'GIT_CONFIG_COUNT': '2',
+      'GIT_CONFIG_COUNT': '4',
       'GIT_CONFIG_KEY_0': 'init.defaultBranch',
       'GIT_CONFIG_VALUE_0': 'main',
       'GIT_CONFIG_KEY_1': 'commit.gpgsign',
       'GIT_CONFIG_VALUE_1': 'false',
+      // Fixture teardown must not race Git's detached maintenance writers.
+      'GIT_CONFIG_KEY_2': 'maintenance.auto',
+      'GIT_CONFIG_VALUE_2': 'false',
+      'GIT_CONFIG_KEY_3': 'gc.auto',
+      'GIT_CONFIG_VALUE_3': '0',
       'GIT_AUTHOR_NAME': 'DartWay Test',
       'GIT_AUTHOR_EMAIL': 'test@example.com',
       'GIT_COMMITTER_NAME': 'DartWay Test',
@@ -157,7 +163,7 @@ void main() {
     };
 
     Future<String> git(Directory directory, List<String> arguments) async {
-      final result = await Process.run(
+      final result = await runTestProcess(
         'git',
         arguments,
         workingDirectory: directory.path,
@@ -179,7 +185,7 @@ void main() {
         if (existingBranch != null) {
           await git(workingDirectory, ['init', '-q', '-b', existingBranch]);
         }
-        final result = await Process.run(
+        final result = await runTestProcess(
           Platform.resolvedExecutable,
           [cli, 'create', target, '--local-repo', repository.path],
           workingDirectory: workingDirectory.path,
@@ -297,7 +303,7 @@ void main() {
     'git-pinned to the full template commit',
     () async {
       final project = await create(['shop', '--local-repo', repository.path]);
-      final revision = (await Process.run('git', [
+      final revision = (await runTestProcess('git', [
         'rev-parse',
         'HEAD',
       ], workingDirectory: repository.path)).stdout.toString().trim();
@@ -403,7 +409,7 @@ void main() {
 
   test('--framework-path works from an export without Git metadata', () async {
     final exported = Directory(p.join(sandbox.path, 'framework'));
-    final tracked = await Process.run('git', [
+    final tracked = await runTestProcess('git', [
       'ls-files',
       '--',
       'template',
@@ -416,7 +422,7 @@ void main() {
       target.parent.createSync(recursive: true);
       File(p.join(repository.path, path)).copySync(target.path);
     }
-    final revision = await Process.run('git', [
+    final revision = await runTestProcess('git', [
       'rev-parse',
       'HEAD',
     ], workingDirectory: exported.path);
@@ -466,7 +472,7 @@ void main() {
       'HOME': sandbox.path,
       'DARTWAY_REPO_URL': p.join(sandbox.path, 'nowhere.git'),
     };
-    Future<ProcessResult> run(List<String> arguments) => Process.run(
+    Future<ProcessResult> run(List<String> arguments) => runTestProcess(
       Platform.resolvedExecutable,
       [cli, 'create', ...arguments, '--no-git'],
       workingDirectory: sandbox.path,
