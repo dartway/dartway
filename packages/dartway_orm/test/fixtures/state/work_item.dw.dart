@@ -21,11 +21,16 @@ mixin _$WorkItemRow on DwTableRow {
 }
 
 extension WorkItemRowCopyWith on WorkItemRow {
-  WorkItemRow copyWith({WorkStatus? status, String? title}) => WorkItemRow(
-    id: id,
-    status: status ?? this.status,
-    title: title ?? this.title,
-  );
+  WorkItemRow copyWith({WorkStatus? status, String? title}) {
+    if (status != null && status != this.status) {
+      throw DwStateWriteException('work_item', 'copyWith: status');
+    }
+    return WorkItemRow(
+      id: id,
+      status: status ?? this.status,
+      title: title ?? this.title,
+    );
+  }
 }
 
 mixin _$NewWorkItemRow on DwRowDraft<WorkItemRow> {

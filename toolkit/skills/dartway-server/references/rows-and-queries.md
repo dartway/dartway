@@ -81,7 +81,12 @@ the requested ids to report rows that did not move. Translate this outcome to th
 refusal and publish only returned rows. A side effect follows a successful transition in the same
 command transaction. Do not read then decide and write the status yourself.
 
-`update` may change ordinary fields only and refuses a stale/different stored state.
+`update` may change ordinary fields only and guards the supplied state. A missing id throws
+`DwRowNotFound` on every table. An ordinary edit racing a transition throws the catchable
+`DwStaleState`: translate it into the feature's conflict or let the server answer `dw.conflict`
+(HTTP 409), without an incident. Re-read before deciding whether to retry; never replay blindly.
+Generated stored-row `copyWith` throws `DwStateWriteException` for an intentional state change;
+passing the same row's state unchanged is allowed, including inside `update`.
 `updateWhere`/`updateWhereReturning` cannot assign state; insert/tryInsert/insertAll require initial
 states; upsert/upsertAll on state tables are refused. `DwStateWriteException` means a programming
 error. `stateWrittenDirectly` is an error for direct state writes through copyWith, ordinary writes
@@ -116,8 +121,8 @@ final saved = await ctx.db.invoices.transition(
 Also `findById`, `findFirst`, `exists`, `count(distinct:)`, `maxBy`, `updateWhere`,
 `updateWhereReturning` (the rows to publish), `delete`; conditions `equals`, `inList`, `gt`…,
 `between`, `like`/`ilike` (escape `%`, `_`, `\` of typed text), `isEmptyList`, `contains`,
-`containsAny`, combined with `&`, `|`, `not()`. `update` of a missing id on a table without state throws `DwRowNotFound`; on state tables a
-missing row or different stored state throws `DwStateWriteException`.
+`containsAny`, combined with `&`, `|`, `not()`. `update` of a missing id throws `DwRowNotFound`; a failed state guard on an existing row throws
+`DwStaleState`.
 
 - **No joins.** Related rows load with `findByIds`, one query per relation for the whole batch — never
   one per row.

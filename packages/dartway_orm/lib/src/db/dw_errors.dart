@@ -68,6 +68,17 @@ final class DwRowNotFound extends DwDatabaseException {
   final int id;
 }
 
+/// An ordinary update lost its state guard to a concurrent transition.
+/// Catch this conflict and re-read before deciding whether to try the edit again.
+/// It does not retry or change state on the caller's behalf.
+final class DwStaleState extends DwDatabaseException {
+  DwStaleState(this.table, this.id)
+    : super(null, 'state changed in "$table" for id $id');
+
+  final String table;
+  final int id;
+}
+
 /// A value read from the database does not fit the Dart type expecting it —
 /// the schema and the row class have drifted apart.
 final class DwDecodeException extends DwDatabaseException {

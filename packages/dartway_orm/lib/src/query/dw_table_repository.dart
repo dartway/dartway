@@ -257,11 +257,9 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   }
 
   /// Writes ordinary columns of [row] by id, retaining its stored state.
-  /// Throws [DwStateWriteException] if any supplied state differs from the
-  /// stored value (including a stale row), or no state-table row matches.
-  ///
-  /// For a table without state, throws [DwRowNotFound] when no row has that id: an update that
-  /// changed nothing is a failure, not a quiet success.
+  /// Throws [DwRowNotFound] for a missing id, or [DwStaleState] when the
+  /// stored state no longer matches [row]. Generated `copyWith` refuses an
+  /// intentional state change with [DwStateWriteException].
   Future<R> update(R row) async {
     final values = _checked(table.toRow(row));
     if (_sql.updateColumns.isEmpty) {
@@ -286,11 +284,11 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
       ],
     );
     if (result.isEmpty) {
-      if (_stateColumns.isNotEmpty) {
-        throw DwStateWriteException(
-          table.tableName,
-          'update: state differs or row missing',
-        );
+      // Only the failed guard needs a read; successful writes remain one SQL
+      // statement. No write is retried after inspecting the current row.
+      if (_stateColumns.isNotEmpty &&
+          await exists(where: (t) => t.id.equals(row.id))) {
+        throw DwStaleState(table.tableName, row.id);
       }
       throw DwRowNotFound(table.tableName, row.id);
     }

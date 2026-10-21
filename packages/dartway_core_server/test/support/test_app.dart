@@ -696,6 +696,8 @@ final class TestApp {
             ctx.refuse(DwCoreRefusal.conflict, params: {'n': n});
           case 'outdated':
             ctx.refuse(DwCoreRefusal.updateRequired);
+          case 'staleState':
+            throw DwStaleState('work_item', 42);
           case 'unknownEnum':
             // The guard itself, reached the way a handler reaches it: the
             // column type a row write uses, on a value this build read as

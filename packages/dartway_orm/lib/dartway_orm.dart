@@ -24,6 +24,7 @@ export 'src/db/dw_errors.dart'
         DwDatabaseException,
         DwDecodeException,
         DwRowNotFound,
+        DwStaleState,
         DwForeignKeyViolation,
         DwSerializationFailure,
         DwUniqueViolation;

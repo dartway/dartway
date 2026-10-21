@@ -38,7 +38,7 @@ void main() {
   );
 
   test(
-    'ordinary updates retain state and refuse a state change, including a stale row',
+    'ordinary updates retain state and refuse intentional state changes',
     () async {
       final row = await items.insert(draft);
       expect(
@@ -46,7 +46,7 @@ void main() {
         WorkStatus.open,
       );
       await expectLater(
-        items.update(row.copyWith(status: WorkStatus.running)),
+        () => items.update(row.copyWith(status: WorkStatus.running)),
         refused,
       );
       await expectLater(
@@ -76,17 +76,42 @@ void main() {
         ),
         refused,
       );
-      await items.transition(
-        row.id,
-        column: (t) => t.status,
-        to: WorkStatus.running,
+    },
+  );
+
+  test(
+    'a stale ordinary edit after a worker transition is catchable',
+    () async {
+      final row = await items.insert(draft);
+      final worker = await database().openAnother();
+      addTearDown(worker.close);
+      await worker.db
+          .repository(table)
+          .transition(row.id, column: (t) => t.status, to: WorkStatus.running);
+      await expectLater(
+        items.update(row.copyWith(status: row.status, title: 'Stale')),
+        throwsA(isA<DwStaleState>()),
       );
-      await expectLater(items.update(row.copyWith(title: 'Stale')), refused);
       final stored = (await items.findById(row.id))!;
-      expect(stored.title, 'Rename');
+      expect(stored.title, 'Ship');
       expect(stored.status, WorkStatus.running);
     },
   );
+
+  test('a missing state-table row remains DwRowNotFound', () async {
+    final row = await items.insert(draft);
+    await items.delete(row.id);
+    await expectLater(
+      items.update(row.copyWith(title: 'Deleted')),
+      throwsA(isA<DwRowNotFound>()),
+    );
+  });
+
+  test('a stored row copy refuses a changed state before any write', () async {
+    final row = await items.insert(draft);
+    expect(() => row.copyWith(status: WorkStatus.running), refused);
+    expect(row.copyWith(status: row.status).status, WorkStatus.open);
+  });
 
   test('upsert paths cannot reset an existing state', () async {
     final row = await items.insert(draft);

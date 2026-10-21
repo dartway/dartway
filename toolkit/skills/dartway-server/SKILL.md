@@ -15,6 +15,10 @@ the server filters their publications and deletions from response and live updat
 Publishing remains dynamic server code; no channel list or manual filtering is needed. Existing
 shape changes still require a breaking-line raise (`dartway-contract`).
 
+Ordinary edits on state tables may throw `DwStaleState` after a concurrent transition; catch it
+as a conflict (the server otherwise answers HTTP 409). Missing rows still throw `DwRowNotFound`.
+Read the rows reference for intentional state-write refusals and unchanged state arguments.
+
 Open only the reference needed for the edit:
 
 - [layout.md](references/layout.md) — feature files and cross-feature boundaries.

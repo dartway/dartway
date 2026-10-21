@@ -2,6 +2,7 @@
 
 ## 0.23.0-dev.1
 
+- Refuse intentional state changes in stored-row `copyWith`; allow unchanged state arguments (#639).
 - Generate typed state-column transition metadata; reject nullable or non-enum state fields (#639).
 
 ## 0.22.0

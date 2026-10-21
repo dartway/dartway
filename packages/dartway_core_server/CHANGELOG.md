@@ -2,6 +2,7 @@
 
 ## 0.23.0-dev.1
 
+- Answer uncaught `DwStaleState` as `dw.conflict` (HTTP 409) without an incident (#639).
 - The family moves in lockstep with ORM state columns (#639).
 
 ## 0.22.0

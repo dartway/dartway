@@ -193,7 +193,7 @@ once per connection and reused.
 | `upsert(draft, conflictOn: (t) => [t.key])` | on tables without state columns: inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
 | `upsertAll(drafts, conflictOn: (t) => [t.slug])` | on tables without state columns: every row inserted, or written over the row with the same key — unless that row already holds exactly these values — in one statement; the count of rows inserted or changed, `0` for a second run with the same rows. What `DwSeedRows` runs |
 | `insertAll(drafts)` | the rows as stored, in order, in one statement |
-| `update(row)` | writes ordinary columns by id; retains and guards states. Throws `DwRowNotFound` for a missing id without state columns; `DwStateWriteException` for a missing row or different stored state on a state table |
+| `update(row)` | writes ordinary columns by id; retains and guards states. Throws `DwRowNotFound` for a missing id; `DwStaleState` for an existing row whose state no longer matches |
 | `updateWhere({where, set})` | sets ordinary columns on every matching row; returns the count; refuses state assignments |
 | `updateWhereReturning({where, set})` | the same, answering the rows as updated — what to publish, without a second read |
 | `transition(id, column: …, to: …)` | the changed row or null when missing/disallowed; one guarded state update |
@@ -560,7 +560,12 @@ including on rows with multiple state fields.
 
 All insert paths validate the initial set before writing, including the whole batch of `insertAll`.
 `update(row)` writes ordinary fields only and guards every state against the supplied row: a stale
-state, an attempted state change or a missing row on a state table throws `DwStateWriteException`.
+state on an existing row throws the catchable `DwStaleState`. A missing id throws `DwRowNotFound`
+on every table. Catch `DwStaleState` and translate it into the feature's conflict, or let the server
+answer `dw.conflict` (HTTP 409) without reporting an incident. Re-read before deciding whether to
+retry. Generated stored-row `copyWith` refuses an intentional state change with
+`DwStateWriteException`; passing the same row's state unchanged is allowed. A reconstructed row
+has no original state to compare: the repository guards the supplied state and never writes it.
 A state-only row has no ordinary update and is refused. `updateWhere` and `updateWhereReturning`
 refuse assignments to state columns. `upsert` and `upsertAll` on state tables are refused; use
 insert/tryInsert and transitions instead. These refusals are programming errors, not domain

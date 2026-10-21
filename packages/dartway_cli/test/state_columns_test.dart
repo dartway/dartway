@@ -35,6 +35,19 @@ void main() {
     'void f(WorkItemRow row) { row.copyWith(title: next); }': false,
     'void f(WorkItemDto row) { row.copyWith(status: next); }': false,
     'ctx.db.workItems.update(row);': false,
+    'void f(WorkItemRow row) { ctx.db.workItems.update(row.copyWith(status: row.status, title: next)); }':
+        false,
+    'final row = await ctx.db.workItems.findById(id); ctx.db.workItems.update(row!.copyWith(status: row.status, title: next));':
+        false,
+    'void f(WorkItemRow row) { row.copyWith(status: row.status); }': false,
+    'void f(WorkItemRow row, WorkItemRow other) { row.copyWith(title: change(other.copyWith(status: row.status))); }':
+        true,
+    'void f(WorkItemRow row, WorkItemRow other) { ctx.db.workItems.update(row.copyWith(status: other.status)); }':
+        true,
+    'void f(WorkItemRow row) { ctx.db.workItems.update(row.copyWith(status: transform(row.status))); }':
+        true,
+    'void f(WorkItemRow row) { ctx.db.workItems.update(WorkItemRow(id: row.id, status: row.status, title: next)); }':
+        false,
     'ctx.db.workItems.transition(id, column: (t) => t.status, to: next);':
         false,
     'ctx.db.workItems.insert(NewWorkItemRow(status: initial));': false,

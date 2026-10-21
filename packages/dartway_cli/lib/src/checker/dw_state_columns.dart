@@ -135,13 +135,68 @@ final class DwStateColumnsInspector {
         if (aliases[match.group(2)] case final row?)
           variables[match.group(1)!] = row;
       }
+      // Remove only a proven identity assignment before inspecting writes.
+      // Use this same view for the enclosing update, so it cannot flag an
+      // unchanged argument already accepted in copyWith.
+      var writes = code;
+      void keepState(int start, int end, _StateRow row, String receiver) {
+        final unchanged = RegExp(
+          '\\b(${row.fields.keys.map(RegExp.escape).join('|')})\\s*:\\s*'
+          '${RegExp.escape(receiver)}\\s*!?\\s*\\.\\s*'
+          r'\1\s*(?=,|$)',
+        );
+        for (var offset = start; offset < end; offset++) {
+          if ('([{'.contains(code[offset])) {
+            offset = outline.closeOf(offset);
+            continue;
+          }
+          final match = unchanged.matchAsPrefix(
+            writes.substring(start, end),
+            offset - start,
+          );
+          if (match == null) continue;
+          final from = start + match.start;
+          final to = start + match.end;
+          writes = writes.replaceRange(from, to, ' ' * (to - from));
+          offset = to - 1;
+        }
+      }
+
+      for (final match in RegExp(
+        r'\b(\w+)\s*[!?]?\s*\.\s*copyWith\s*\(',
+      ).allMatches(code)) {
+        final row = rows[variables[match.group(1)]];
+        if (row != null) {
+          keepState(
+            match.end,
+            outline.closeOf(match.end - 1),
+            row,
+            match.group(1)!,
+          );
+        }
+      }
+      for (final rowName in rows.keys) {
+        for (final match in RegExp('\\b$rowName\\s*\\(').allMatches(code)) {
+          final end = outline.closeOf(match.end - 1);
+          final args = code.substring(match.end, end);
+          final id = RegExp(
+            r'\bid\s*:\s*(\w+)\s*!?\s*\.\s*id\s*(?=,|$)',
+          ).firstMatch(args);
+          if (id != null && variables[id.group(1)] == rowName) {
+            keepState(match.end, end, rows[rowName]!, id.group(1)!);
+          }
+        }
+      }
       final offsets = <int>{};
       for (final match in RegExp(
         r'\b(\w+)\s*[!?]?\s*\.\s*copyWith\s*\(',
       ).allMatches(code)) {
         final row = rows[variables[match.group(1)]];
         if (row == null) continue;
-        final args = code.substring(match.end, outline.closeOf(match.end - 1));
+        final args = writes.substring(
+          match.end,
+          outline.closeOf(match.end - 1),
+        );
         if (row.fields.keys.any((f) => RegExp('\\b$f\\s*:').hasMatch(args)))
           offsets.add(match.start);
       }
@@ -150,7 +205,10 @@ final class DwStateColumnsInspector {
       ).allMatches(code)) {
         final row = rows[aliases[match.group(1)]];
         if (row == null) continue;
-        final args = code.substring(match.end, outline.closeOf(match.end - 1));
+        final args = writes.substring(
+          match.end,
+          outline.closeOf(match.end - 1),
+        );
         if (match.group(2)!.startsWith('upsert') ||
             row.fields.keys.any(
               (f) => RegExp(

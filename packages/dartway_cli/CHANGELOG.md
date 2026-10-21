@@ -2,6 +2,7 @@
 
 ## 0.26.0-dev.1
 
+- Allow unchanged state arguments from the same row through `copyWith` and enclosing `update` checks (#639).
 ### Breaking changes
 
 - Remove `dartway-requirements` and `dartway-plan`: requirements analysis and approach

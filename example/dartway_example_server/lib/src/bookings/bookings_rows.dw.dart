@@ -34,13 +34,18 @@ extension SessionBookingRowCopyWith on SessionBookingRow {
     int? clientProfileId,
     BookingStatus? status,
     DateTime? createdAt,
-  }) => SessionBookingRow(
-    id: id,
-    sessionId: sessionId ?? this.sessionId,
-    clientProfileId: clientProfileId ?? this.clientProfileId,
-    status: status ?? this.status,
-    createdAt: createdAt ?? this.createdAt,
-  );
+  }) {
+    if (status != null && status != this.status) {
+      throw DwStateWriteException('session_booking', 'copyWith: status');
+    }
+    return SessionBookingRow(
+      id: id,
+      sessionId: sessionId ?? this.sessionId,
+      clientProfileId: clientProfileId ?? this.clientProfileId,
+      status: status ?? this.status,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }
 
 mixin _$NewSessionBookingRow on DwRowDraft<SessionBookingRow> {
