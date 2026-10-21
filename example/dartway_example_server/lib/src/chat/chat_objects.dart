@@ -123,12 +123,14 @@ abstract final class ChatObjects {
   /// [profileId]'s read state of every channel, by channel id.
   static Future<List<ChatReadState>> readStates(
     DwDatabaseHandle db,
-    int profileId,
-  ) async => [
+    int profileId, {
+    int? limit,
+  }) async => [
     for (final (:state, accountId: _) in await _readStates(
       db,
       'p.id = @profile::int8',
       {'profile': profileId},
+      limit: limit,
     ))
       state,
   ];
@@ -165,8 +167,9 @@ abstract final class ChatObjects {
   static Future<List<({int accountId, ChatReadState state})>> _readStates(
     DwDatabaseHandle db,
     String where,
-    Map<String, Object?> params,
-  ) async => [
+    Map<String, Object?> params, {
+    int? limit,
+  }) async => [
     for (final row in await db.query(
       'SELECT p.account_id, c.id AS channel_id, r.message_id, r.sent_at, '
       '(SELECT count(*) FROM chat_message m '
@@ -177,8 +180,9 @@ abstract final class ChatObjects {
       'FROM user_profile p CROSS JOIN chat_channel c '
       'LEFT JOIN chat_read_position r '
       'ON r.profile_id = p.id AND r.channel_id = c.id '
-      'WHERE $where ORDER BY p.id, c.id',
-      params: params,
+      'WHERE $where ORDER BY p.id, c.id'
+      '${limit == null ? '' : ' LIMIT @limit::int8'}',
+      params: {...params, 'limit': ?limit},
     ))
       (
         accountId: row.get<int>('account_id'),

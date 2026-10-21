@@ -2,6 +2,12 @@
 
 ## 0.23.0-dev.1
 
+- `request.readWhole((limit) => repo.find(limit: limit))` keeps the normal
+  list read bounded at `maxItems + 1`. Overflow throws before a second read in
+  strict mode; production re-reads once without a limit and warns with the
+  whole answer's true count and size. Use this instead of passing `fetchLimit`
+  directly, which silently truncated production answers (#644).
+
 - A `list` handler answering more items than its request's `maxItems` is never
   cut short. With `DwServerSettings.strictBounds` the call fails, naming the
   request and the count; `DwTestServer` is always strict, and a development

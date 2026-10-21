@@ -129,8 +129,8 @@ feature is rewritten?**
 
 - A reason survives — *"the list is not cached: it changes more often than it is read."*
 - A trap survives — *"the server sends the date in UTC, the screen shows it local."*
-- A map of the code does not — *"the list comes from `dw.request(ListMyBookings())` and is drawn
-  by a `ListView`."* That is what the code already says, and unlike the code it starts lying the moment
+- A map of the code does not — *"the list comes from `dw.pages(ListMyBookings())` and is drawn
+  by a `DwPagedListView`."* That is what the code already says, and unlike the code it starts lying the moment
   someone moves the widget. Nothing checks it: not the compiler, not `dart run dartway_cli:dartway check`.
 
 Which is the whole point of the field. Everything a reader can get by opening the file belongs in

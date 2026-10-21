@@ -1,6 +1,6 @@
 {
   "codec": 1,
-  "contractVersion": "1.0.0",
+  "contractVersion": "2.0.0",
   "format": 2,
   "objects": {
     "AdminCounters": {
@@ -739,7 +739,7 @@
             "nullable": false
           }
         ],
-        "kind": "DwListRequest"
+        "kind": "DwPageRequest"
       }
     },
     "ListMyChatReadStates": {
@@ -751,6 +751,32 @@
             "core": false,
             "kind": "dto",
             "name": "ChatReadState",
+            "nullable": false
+          }
+        ],
+        "kind": "DwListRequest"
+      }
+    },
+    "ListMySessionBookings": {
+      "fields": {
+        "sessionIds": {
+          "type": {
+            "element": {
+              "kind": "int",
+              "nullable": false
+            },
+            "kind": "list",
+            "nullable": false
+          }
+        }
+      },
+      "kind": "request",
+      "result": {
+        "arguments": [
+          {
+            "core": false,
+            "kind": "dto",
+            "name": "SessionBooking",
             "nullable": false
           }
         ],

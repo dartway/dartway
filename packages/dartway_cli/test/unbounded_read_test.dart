@@ -84,7 +84,7 @@ final handlers = <DwCallHandler>[
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async => await ctx.db.tasks.find(
       orderBy: (t) => [t.id.asc()],
-      limit: request.fetchLimit,
+      limit: 20,
     ),
   ),
   DwCallHandler.list<ListColumns, Column>(
@@ -105,6 +105,28 @@ final handlers = <DwCallHandler>[
         isEmpty,
       );
     });
+
+    test(
+      'readWhole owns its reads, without hiding an adjacent unbounded read',
+      () {
+        expect(
+          lines('''final handlers = [
+  DwCallHandler.list<ListTasks, Task>(
+    access: DwAccessRule.signedIn,
+    handle: (ctx, request) async {
+      final rows = await request.readWhole((limit) async {
+        return ctx.db.tasks.find();
+      });
+      final others = await ctx.db.others.find();
+      return rows;
+    },
+  ),
+];
+'''),
+          [8],
+        );
+      },
+    );
 
     test('a command, and reads by id', () {
       expect(
@@ -172,7 +194,7 @@ final handlers = <DwCallHandler>[
     expect(inspector.findings, [
       contains('acme_server/lib/src/tasks/tasks_handlers.dart:4'),
     ]);
-    expect(inspector.findings.single, contains('request.fetchLimit'));
+    expect(inspector.findings.single, contains('request.readWhole'));
     expect(DwCheckType.unboundedRead.severity, DwCheckSeverity.warning);
   });
 }

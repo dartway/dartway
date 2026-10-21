@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:dartway_core_shared/dartway_core_shared.dart';
@@ -27,6 +28,31 @@ final class DwBoundWatch {
        largeResponseBytes = settings.largeResponseBytes,
        interval = settings.boundWarningInterval;
 
+  static final Object _zoneKey = Object();
+
+  /// Runs a handler with this server's bound policy, isolated per async call.
+  R run<R>(R Function() body) => runZoned(body, zoneValues: {_zoneKey: this});
+
+  static DwBoundWatch get current =>
+      Zone.current[_zoneKey] as DwBoundWatch? ??
+      (throw StateError('readWhole must run inside a request handler'));
+
+  /// Rejects the bounded probe before an expensive unbounded read in strict mode.
+  void checkProbe(DwListRequest<DwDataObject> request, int count) {
+    if (strict && count > request.maxItems) {
+      _overflow(request.dwTypeName, count, request.maxItems);
+    }
+  }
+
+  Never _overflow(String name, int count, int bound) => throw StateError(
+    '$name answered $count items, past its bound of $bound (maxItems): $_fix',
+  );
+
+  static const _fix =
+      'page it (DwPageRequest, DwTableRequest, DwWindowRequest), or raise its '
+      'maxItems with the reason in its doc comment; use request.readWhole '
+      'for a whole list';
+
   final DwServerLogger log;
   final DwServerClock clock;
 
@@ -53,21 +79,12 @@ final class DwBoundWatch {
     final count = encoded.length;
     final bound = request.maxItems;
     if (count <= bound) return;
-    final fix =
-        'page it (DwPageRequest, DwTableRequest, DwWindowRequest), bound the '
-        'read with `limit: request.fetchLimit`, or raise its maxItems with the '
-        'reason in its doc comment';
-    if (strict) {
-      throw StateError(
-        '$name answered $count items, past its bound of $bound (maxItems): '
-        '$fix',
-      );
-    }
+    if (strict) _overflow(name, count, bound);
     if (!_due(_listWarned, name)) return;
     final bytes = _jsonUtf8.convert(encoded).length;
     log.warning(
       '$name answered $count items, past its bound of $bound (maxItems), '
-      '$bytes bytes; served whole: $fix',
+      '$bytes bytes; served whole: $_fix',
     );
   }
 

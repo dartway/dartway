@@ -5,7 +5,9 @@
 - `DwListRequest` has a bound, `maxItems`: 200 (`DwListRequest.defaultMaxItems`)
   unless the class passes another to its super constructor, with the reason in its
   doc comment. A constant of the class, never serialised — the wire is unchanged.
-  `fetchLimit` is one past it, the `limit:` a list handler reads with (#644).
+  `fetchLimit` is one past it, the probe size used by the server's
+  `request.readWhole` helper (#644). Rename any project DTO field already named
+  `maxItems` (for example to `resultLimit`) and regenerate; see the migration note.
 
 ## 0.22.0
 

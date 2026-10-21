@@ -16,6 +16,7 @@ import 'dw_dart_source.dart';
 /// megabytes a year later. `findById`, `findFirst` and `findByIds` are bounded
 /// by what they are asked for and are not reads it looks at; neither are
 /// commands, jobs and migrations, whose reads answer nobody's screen.
+/// Reads inside `request.readWhole` are bounded by the framework helper.
 ///
 /// A heuristic, so a warning: it reads the handler's own body, not the helpers
 /// it calls, and cannot tell a filter on a unique key from any other.
@@ -54,7 +55,8 @@ class DwUnboundedReadInspector {
         _findings.add(
           'a ${read.kind} handler reads rows without a bound — '
           '$shown:${read.line}; make the request a page, table or window, '
-          'bound the read with `limit:` (`request.fetchLimit` for a list), or '
+          'use `request.readWhole((limit) => repo.find(limit: limit))` for a list, '
+          'bound a paged read with `limit:`, or '
           "say why it stays small with `unbounded: '<reason>'`",
         );
       }
@@ -72,6 +74,7 @@ class DwUnboundedReadInspector {
     r'\bDwCallHandler\s*\.\s*(single|maybe|list|page|table|window)\b',
   );
   static final _find = RegExp(r'\.\s*find\s*\(');
+  static final _whole = RegExp(r'\.\s*readWhole(?:\s*<[^;()]*>)?\s*\(');
   static final _bound = RegExp(r'\b(limit|unbounded)\s*:');
 
   /// The reads of one handlers file that name no bound: the line of each,
@@ -87,10 +90,20 @@ class DwUnboundedReadInspector {
       if (between.isNotEmpty && !between.startsWith('<')) continue;
       final close = _matching(code, open);
       if (close < 0) continue;
+      final wholeReads = [
+        for (final whole in _whole.allMatches(code.substring(open, close)))
+          (
+            start: open + whole.end - 1,
+            end: _matching(code, open + whole.end - 1),
+          ),
+      ];
       for (final find in _find.allMatches(code.substring(open, close))) {
         final start = open + find.end - 1;
         final end = _matching(code, start);
         if (end < 0) continue;
+        if (wholeReads.any((whole) => start > whole.start && end < whole.end)) {
+          continue;
+        }
         final arguments = code.substring(start, end);
         final bounded = _bound
             .allMatches(arguments)

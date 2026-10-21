@@ -263,9 +263,9 @@ abstract class DwListRequest<T extends DwDataObject>
   /// above [defaultMaxItems] says why in one line of its doc comment.
   final int maxItems;
 
-  /// The rows a handler reads at most — `find(limit: request.fetchLimit)`:
-  /// one past [maxItems], so a list that outgrew its bound is noticed rather
-  /// than cut short.
+  /// The probe size used by the server's `request.readWhole` helper: one past
+  /// [maxItems]. A probe alone is not a whole answer; production must re-read
+  /// without a limit on overflow.
   int get fetchLimit => maxItems + 1;
 
   @override

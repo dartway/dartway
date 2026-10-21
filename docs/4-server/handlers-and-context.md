@@ -72,6 +72,11 @@ DwCallHandler.list<Q extends DwListRequest<T>, T extends DwDataObject>({
 })
 ```
 
+Whole-list repository reads use `request.readWhole((limit) => repo.find(limit: limit))`.
+The nullable limit probes one row past `maxItems`; overflow throws in strict mode, while production
+re-reads once without a limit and warns with the whole answer's count and size. The callback must
+apply null as no limit and perform only reads. See [a list's bound](../2-core/requests-and-updates.md#a-lists-bound).
+
 ### `page` — an offset feed
 
 ```dart

@@ -75,8 +75,8 @@ Also `findById`, `findFirst`, `exists`, `count(distinct:)`, `maxBy`, `updateWher
 `between`, `like`/`ilike` (escape `%`, `_`, `\` of typed text), `isEmptyList`, `contains`,
 `containsAny`, combined with `&`, `|`, `not()`. `update` of a missing id throws `DwRowNotFound`.
 
-- **Every `find` in a request handler is bounded**: `limit:` (`page.fetchLimit`,
-  `request.fetchLimit` of a list), or `unbounded: '<why the domain keeps it small>'` beside the read.
+- **Every `find` in a request handler is bounded**: `request.readWhole((limit) => repo.find(limit: limit))`
+  for a whole list, `limit: page.fetchLimit` for a page, or `unbounded: '<why the domain keeps it small>'` beside the read.
   One with neither is `unboundedRead`, a warning of `dart run dartway_cli:dartway check`; jobs,
   commands and migrations are not held to it.
 - **No joins.** Related rows load with `findByIds`, one query per relation for the whole batch — never

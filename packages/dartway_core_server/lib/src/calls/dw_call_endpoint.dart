@@ -367,7 +367,9 @@ final class DwCallEndpoint {
       _requireSignIn(handler.access, ctx);
       _validate(request);
       await _check(handler.access, ctx, request);
-      final result = await handler.run(ctx, request, prepared);
+      final result = await bounds.run(
+        () => handler.run(ctx, request, prepared),
+      );
       if (request is DwListRequest<DwDataObject> && result is List<Object?>) {
         bounds.checkList(name, request, result);
       }

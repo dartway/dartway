@@ -1,6 +1,7 @@
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
+import 'package:dartway_example_server/src/bookings/bookings_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:test/test.dart';
 
@@ -40,7 +41,7 @@ void main() {
     final from = club.clock.now().subtract(const Duration(hours: 1));
 
     final olegSchedule = oleg.client.watch(ListUpcomingSessions(from: from));
-    final veraBookings = vera.client.watch(const ListMyBookings());
+    final veraBookings = vera.client.watchPages(const ListMyBookings());
     final veraSchedule = vera.client.watch(ListUpcomingSessions(from: from));
     addTearDown(() {
       olegSchedule.close();
@@ -53,7 +54,7 @@ void main() {
     int spotsLeft(DwRequestWatch<List<ClubSession>> watch) =>
         dataOf(watch.state)!.singleWhere((s) => s.id == session.id).spotsLeft;
     expect(spotsLeft(olegSchedule), 1);
-    expect(dataOf(veraBookings.state), isEmpty);
+    expect(dataOf(veraBookings.state)?.items, isEmpty);
 
     final booked = await vera.client.command(
       BookSession(sessionId: session.id),
@@ -61,7 +62,7 @@ void main() {
     expect(booked.valueOrThrow.status, BookingStatus.booked);
     expect(booked.valueOrThrow.accountId, vera.accountId);
     // Applied before the command completed: the response carried both.
-    expect(dataOf(veraBookings.state)!.map((b) => b.id), [
+    expect(dataOf(veraBookings.state)!.items.map((b) => b.id), [
       booked.valueOrThrow.id,
     ]);
     expect(spotsLeft(veraSchedule), 0);
@@ -89,7 +90,10 @@ void main() {
       CancelBooking(bookingId: booked.valueOrThrow.id),
     );
     expect(cancelled.valueOrThrow.status, BookingStatus.cancelled);
-    expect(dataOf(veraBookings.state)!.single.status, BookingStatus.cancelled);
+    expect(
+      dataOf(veraBookings.state)!.items.single.status,
+      BookingStatus.cancelled,
+    );
     await dwWaitUntil(() => spotsLeft(olegSchedule) == 1);
 
     // Nothing was read twice, and nothing of Vera's own came back to her over
@@ -109,6 +113,75 @@ void main() {
       isEmpty,
     );
   });
+
+  test(
+    'booking history pages while schedule marks include an older active booking',
+    () async {
+      final session = await sessionWithSpots(10);
+      final member = await club.signUp('79990000016', firstName: 'Mira');
+      final profile = (await club.db.userProfiles.findFirst(
+        where: (t) => t.accountId.equals(member.accountId),
+      ))!;
+      final rows = await club.db.sessionBookings.insertAll([
+        for (var i = 0; i < 45; i++)
+          NewSessionBookingRow(
+            sessionId: session.id,
+            clientProfileId: profile.id,
+            status: i == 0 ? BookingStatus.booked : BookingStatus.cancelled,
+            createdAt: club.clock.now().add(Duration(seconds: i)),
+          ),
+      ]);
+      final history = member.client.watchPages(const ListMyBookings());
+      addTearDown(history.close);
+      await dwWaitUntil(() => history.isLive);
+      expect(dataOf(history.state)!.items, hasLength(20));
+      expect(history.hasMore, isTrue);
+      expect(
+        dataOf(history.state)!.items.map((b) => b.id),
+        isNot(contains(rows.first.id)),
+      );
+
+      final marks = member.client.watch(
+        ListMySessionBookings(sessionIds: [session.id]),
+      );
+      addTearDown(marks.close);
+      await dwWaitUntil(() => marks.isLive);
+      expect(dataOf(marks.state)!.map((b) => b.id), [rows.first.id]);
+
+      await history.loadMore();
+      await history.loadMore();
+      expect(
+        dataOf(history.state)!.items.map((b) => b.id),
+        rows.reversed.map((b) => b.id),
+      );
+      expect(history.hasMore, isFalse);
+    },
+  );
+
+  test(
+    'a three-week schedule serves 480 sessions near its domain bound',
+    () async {
+      final member = await club.signUp('79990000017', firstName: 'Anna');
+      final seed = await sessionWithSpots(10);
+      final from = club.clock.now().add(const Duration(days: 100));
+      await club.db.clubSessions.insertAll([
+        for (var i = 0; i < 481; i++)
+          NewClubSessionRow(
+            serviceId: seed.serviceId,
+            startsAt: from.add(Duration(minutes: i == 480 ? 21 * 24 * 60 : i)),
+            capacity: 10,
+          ),
+      ]);
+      final schedule = member.client.watch(ListUpcomingSessions(from: from));
+      addTearDown(schedule.close);
+      await dwWaitUntil(() => schedule.isLive);
+      expect(dataOf(schedule.state), hasLength(480));
+      expect(
+        dataOf(schedule.state)!.last.startsAt,
+        from.add(const Duration(minutes: 479)),
+      );
+    },
+  );
 
   test('refusals travel as codes with honest HTTP statuses', () async {
     final session = await sessionWithSpots(1);

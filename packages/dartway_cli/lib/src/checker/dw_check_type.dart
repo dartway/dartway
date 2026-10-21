@@ -261,7 +261,7 @@ enum DwCheckType {
   /// `limit:` nor `unbounded:` (dartway/dartway#644). It reads every row its
   /// filter matches, and what was ten rows in development is megabytes in a
   /// year. The fix is a page, table or window request, a `limit:`
-  /// (`request.fetchLimit` for a list, so its bound still notices), or
+  /// (`page.fetchLimit` for a page), `request.readWhole` for a list, or
   /// `unbounded: '<reason>'` where the domain bounds the read.
   ///
   /// A warning: it reads the handler's own body and the shape of the call,

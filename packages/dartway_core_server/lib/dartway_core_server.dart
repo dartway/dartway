@@ -37,6 +37,7 @@ export 'src/handlers/dw_call_handler.dart'
         DwPageInput,
         DwTableInput,
         DwWindowInput;
+export 'src/handlers/dw_list_read.dart';
 export 'src/http/dw_http_request.dart';
 export 'src/http/dw_call_rate_limit.dart';
 export 'src/http/dw_http_response.dart';

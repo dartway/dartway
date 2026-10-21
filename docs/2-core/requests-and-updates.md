@@ -146,9 +146,21 @@ a wrong answer nobody notices:
   count and the response size, once per request per `DwServerSettings.boundWarningInterval` (an
   hour).
 
-The handler reads `request.fetchLimit` rows — one past the bound — so the read is bounded and the
-breach still shows: `ctx.db.<table>.find(…, limit: request.fetchLimit)`. Anything that grows with use
-is not a list: a feed is a page, an admin table a table, a chat a window.
+Every whole-list handler uses the server helper, applying its nullable limit to the same query:
+
+```dart
+final rows = await request.readWhole((limit) => ctx.db.clubSessions.find(
+  where: (t) => t.startsAt.gte(request.from),
+  orderBy: (t) => [t.startsAt.asc(), t.id.asc()],
+  limit: limit,
+));
+```
+
+`readWhole` first reads `request.fetchLimit` (`maxItems + 1`). On overflow, strict mode throws
+with the request name and observed probe count; production re-reads once with `limit: null` (no
+limit), serves the whole list and logs its true count and encoded size. The callback must only
+read: it can run twice. Passing `request.fetchLimit` directly to `find` and returning that probe
+would silently truncate production data. Anything that grows with use is a page, table or window.
 `dart run dartway_cli:dartway check` warns about a read in a request handler with no bound (`unboundedRead`,
 [the checker](../5-tooling/conventions-checker.md)).
 

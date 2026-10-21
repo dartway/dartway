@@ -17,19 +17,25 @@ void main() {
 
     test('a list within its bound is served', () async {
       const request = BoundedNotes(3);
+      harness().app.boundReadLimits.clear();
       expect((await caller.call(request)).value(request), hasLength(3));
+      expect(harness().app.boundReadLimits, [4]);
     });
 
     test('a list past its bound fails the call, naming the request and the '
         'count', () async {
       final incidents = harness().app.alerts.incidents.length;
-      final answer = await caller.call(const BoundedNotes(4));
+      harness().app.boundReadLimits.clear();
+      final answer = await caller.call(const BoundedNotes(8));
+      expect(harness().app.boundReadLimits, [
+        4,
+      ], reason: 'strict never re-reads');
       expect(answer.status, 500);
       expect(
         '${harness().app.alerts.incidents.skip(incidents).single.error}',
         allOf(
           contains('BoundedNotes answered 4 items, past its bound of 3'),
-          contains('request.fetchLimit'),
+          contains('request.readWhole'),
         ),
       );
     });
@@ -81,20 +87,22 @@ void main() {
     test('a list past its bound is served whole, with a warning once per '
         'request per interval', () async {
       final from = RecordingLogger.lines.length;
-      const request = BoundedNotes(5);
-      expect((await caller.call(request)).value(request), hasLength(5));
+      const request = BoundedNotes(8);
+      app.boundReadLimits.clear();
+      expect((await caller.call(request)).value(request), hasLength(8));
+      expect(app.boundReadLimits, [4, null]);
       expect(warningsSince(from, 'BoundedNotes answered'), [
         allOf(
-          contains('BoundedNotes answered 5 items, past its bound of 3'),
+          contains('BoundedNotes answered 8 items, past its bound of 3'),
           matches(RegExp(r'\d+ bytes; served whole')),
         ),
       ]);
 
-      expect((await caller.call(request)).value(request), hasLength(5));
+      expect((await caller.call(request)).value(request), hasLength(8));
       expect(warningsSince(from, 'BoundedNotes answered'), hasLength(1));
 
       clock.advance(const Duration(hours: 1));
-      expect((await caller.call(request)).value(request), hasLength(5));
+      expect((await caller.call(request)).value(request), hasLength(8));
       expect(warningsSince(from, 'BoundedNotes answered'), hasLength(2));
       expect(app.alerts.incidents, isEmpty);
     });

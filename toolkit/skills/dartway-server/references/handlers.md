@@ -7,19 +7,32 @@ when a registered call has no handler or two, or a rule is typed for another cal
 |---|---|---|
 | `DwSingleRequest<T>` | `DwCallHandler.single<Q, T>(access:, handle:)` | `T?`; `null` → `dw.notFound` |
 | `DwMaybeRequest<T>` | `.maybe<Q, T>` | `T?` |
-| `DwListRequest<T>` | `.list<Q, T>` | `List<T>`, read with `limit: request.fetchLimit` |
+| `DwListRequest<T>` | `.list<Q, T>` | `List<T>`, read through `request.readWhole` |
 | `DwPageRequest<T>` | `.page<Q, T>(handle: (ctx, request, page))` | up to `page.fetchLimit` after `page.offset` |
 | `DwTableRequest<T>` | `.table<Q, T>(rows: (ctx, request, table), count: (ctx, request))` | rows up to `table.fetchLimit`; count of all |
 | `DwWindowRequest<T, S, I>` | `.window<Q, T, S, I>(handle: (ctx, request, window))` | one direction per call: `older` — below `window.position` (at it with `includesPosition`), newest first; `newer` — above it, oldest first; compared as `(sortValue, id)` |
 | `DwActionCommand<R>` | `.command<C, R>(access:, handle:, transactional:)` | `R` |
 
-`fetchLimit` is one row past the page; reading more fails the call. A list's `request.fetchLimit` is
-one past its `maxItems` (200 unless the request raises it): a list handler answering more than
-`maxItems` is never cut short — the call fails in tests (`DwTestServer`) and on a development server
-(`DW_STRICT_BOUNDS: true` in `deploy/config.yaml > local`), and in production it is served whole with
-a warning naming the request, the count and the size, once an hour. That warning, or a failed test,
-means the list grows with use: make it a page, table or window (`dartway-contract`), not a bigger
-bound. Any response above 256 KB (`DwServerSettings.largeResponseBytes`) is logged the same way.
+A page's `fetchLimit` is one row past the page; reading more fails the call. Every whole-list
+handler uses the server helper:
+
+```dart
+final rows = await request.readWhole((limit) => ctx.db.teamMembers.find(
+  where: (t) => t.teamId.equals(request.teamId),
+  orderBy: (t) => [t.id.asc()],
+  limit: limit,
+));
+```
+
+Apply the nullable `limit` to the same query; null means no limit. The callback only reads and may
+run twice. `readWhole` probes with `request.fetchLimit`, one past `maxItems` (default 200).
+Overflow throws with the request name and observed count in tests (`DwTestServer`) and strict
+development (`DW_STRICT_BOUNDS: true` in `deploy/config.yaml > local`). Production re-reads once
+without a limit, serves everything and warns with the true count and size, once an hour. Never
+return only a `fetchLimit` probe: that silently truncates production lists. A warning or failed
+test means a growing list needs a page, table or window (`dartway-contract`); raise `maxItems` only
+with a domain reason in the request's doc comment. Any response above 256 KB
+(`DwServerSettings.largeResponseBytes`) is logged the same way.
 Before your function runs the
 framework decoded the body, checked sign-in, ran `validate()` and the access rule — do not repeat them.
 Every handler carries its `///` description (`dartway-documentation`).

@@ -1,6 +1,6 @@
 name: dartway_example_shared
 description: The contract between the example server and app — data objects, requests, commands, channels, refusal codes.
-version: 1.0.0
+version: 2.0.0
 publish_to: none
 
 environment:

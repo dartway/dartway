@@ -147,6 +147,7 @@ final class TestApp {
   /// format would, through `ctx.refuse`.
   final Set<String> refusingDelivery = {};
   final List<int> createdAccounts = [];
+  final List<int?> boundReadLimits = [];
 
   /// Account id → the origin `onAccountCreated` was given.
   final Map<int, DwAccountOrigin> accountOrigins = {};
@@ -615,10 +616,17 @@ final class TestApp {
     ),
     DwCallHandler.list<BoundedNotes, NoteView>(
       access: DwAccessRule.anonymous,
-      handle: (ctx, request) async => [
-        for (var id = 1; id <= request.count; id++)
-          NoteView(id: id, text: 'x' * request.padding),
-      ],
+      handle: (ctx, request) => request.readWhole((limit) async {
+        boundReadLimits.add(limit);
+        return [
+          for (
+            var id = 1;
+            id <= request.count && (limit == null || id <= limit);
+            id++
+          )
+            NoteView(id: id, text: 'x' * request.padding),
+        ];
+      }),
     ),
     DwCallHandler.list<SlowRequest, NoteView>(
       access: DwAccessRule.anonymous,

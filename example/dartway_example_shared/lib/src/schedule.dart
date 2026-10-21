@@ -63,7 +63,7 @@ final class ListClubServices extends DwListRequest<ClubService>
   ];
 }
 
-/// Sessions starting at or after [from], soonest first. At most 500: a club
+/// Sessions in the 21 days starting at [from], soonest first. At most 500: a club
 /// schedules about three weeks ahead, twenty sessions a day at the busiest.
 final class ListUpcomingSessions extends DwListRequest<ClubSession>
     with _$ListUpcomingSessions {
@@ -77,7 +77,9 @@ final class ListUpcomingSessions extends DwListRequest<ClubSession>
   ];
 
   @override
-  bool matches(ClubSession item) => !item.startsAt.isBefore(from);
+  bool matches(ClubSession item) =>
+      !item.startsAt.isBefore(from) &&
+      item.startsAt.isBefore(from.add(const Duration(days: 21)));
 
   @override
   int Function(ClubSession a, ClubSession b) get sort =>

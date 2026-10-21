@@ -298,18 +298,21 @@ DwCallHandler.command<EditChatMessage, ChatMessage>(
 
 (`example/dartway_example_server/lib/src/chat/chat_messages_handlers.dart`)
 
-**The caller's rows, as a list** — there is no row to check, so there is no rule beyond `signedIn`:
+**The caller's rows, page by page** — there is no row to check, so there is no rule beyond `signedIn`:
 the query names the caller in its `where`, and the request names nothing about them (next
 section). A list under a parent — the messages of a conversation — takes the parent's membership
 rule and filters by the parent's id.
 
 ```dart
-DwCallHandler.list<ListMyBookings, SessionBooking>(
+DwCallHandler.page<ListMyBookings, SessionBooking>(
   access: DwAccessRule.signedIn,
-  handle: (ctx, request) async {
+  handle: (ctx, request, page) async {
     final me = await ctx.profile;
     final rows = await ctx.db.sessionBookings.find(
-      where: (t) => t.clientProfileId.equals(me.id!),
+      where: (t) => t.clientProfileId.equals(me.id),
+      orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
+      offset: page.offset,
+      limit: page.fetchLimit,
     );
     // …
   },
