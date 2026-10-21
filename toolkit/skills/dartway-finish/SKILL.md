@@ -135,8 +135,8 @@ through the public kit widget.
   `dartway-documentation`. So is a statement in the root instruction file (`AGENTS.md` or `CLAUDE.md`) or a skill that the changed code now
   contradicts, either way; a managed file is a framework finding.
 - A risk in any of the six must-test classes without an owner test is flagged (`dartway-testing`
-  §4). Check the plan's **Risks to guard** against those classes and its expected outcomes; a
-  reasoned **"No must-test risk"** is valid. Flag a new test that fails the gate — a question it
+  §4). Check **Risks to guard** (the specification's **Risks under protection** in Studio) against
+  those classes and expected outcomes; a reasoned **"No must-test risk"** is valid. Flag a new test that fails the gate — a question it
   cannot answer, a junk shape it matches. Review assertion changes against the agent rules there.
   **For a bugfix, ask for the red its test showed before the fix** (§5).
 - When a Flutter harness changes, check the real error boundary as well as fake-server calls: an

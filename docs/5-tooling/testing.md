@@ -273,16 +273,17 @@ screen, so settling by frames waits out the timeout instead of the traffic.
 
 ## Before calling a change done
 
-`dartway-plan` selects **Risks to guard** from its risk survey and the spec: each item names a class
-(1–6) and the expected outcome from the spec. **`No must-test risk: <why>`** is a valid plan; a
-bugfix starts with its failing test. The feature scaffold extends the contract list for new DTOs
+Whoever plans the work selects **Risks to guard** from the risk survey and specification
+(**Risks under protection** in Studio): each item names a class (1–6) and the specification's
+expected outcome. Use the accepted risk list without repeating planning.
+**`No must-test risk: <why>`** is valid; a bugfix starts with its failing test. The feature scaffold extends the contract list for new DTOs
 (class 5) and starts a new acceptance file with an access refusal (class 1). A restricted channel also
 needs an outsider receiving nothing. Other tests follow the feature's risk classes; a second client
 hearing a publication must earn its place through the gate. It creates no test file for behaviour
 outside the six classes.
 
 `dartway-testing` §4 also owns the agent rules for expected values, assertion-change declarations and
-reds caused by intended changes. `dartway-finish` checks those rules and the plan's guarded risks.
+reds caused by intended changes. `dartway-finish` checks those rules and the accepted guarded risks.
 
 `dartway-finish` owns the gate list and runs fast gates locally: generation, the migration check
 when row classes or migrations changed, all three analyzers, and the conventions checker. It reads
