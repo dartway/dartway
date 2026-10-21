@@ -19,6 +19,10 @@ import 'package:test/test.dart';
 /// command after `dart run dartway_cli:dartway`. Prose naming the tool is
 /// left alone. The set of commands is the CLI's own, read rather than
 /// repeated.
+///
+/// One line is the exception, and it is one: `toolkit/AGENTS.md` says that
+/// without a global CLI the same command is run as
+/// `dart run dartway_cli:dartway <args>` from the project root.
 void main() {
   final repository = () {
     var dir = Directory.current.absolute;
@@ -36,8 +40,13 @@ void main() {
 
   final long = RegExp(
     'dart run dartway_cli:dartway '
-    '(${DwPinnedCli.projectCommands.join('|')})\\b',
+    '(?:(?:${DwPinnedCli.projectCommands.join('|')})\\b|<)',
   );
+
+  /// The one place the long form is taught: the fallback for a machine
+  /// without a global CLI.
+  const fallback = 'Without a global CLI, run the same command as';
+  final fallbackFile = p.join(repository.path, 'toolkit', 'AGENTS.md');
 
   /// `path:line: text` for every long-form project command in [file] outside
   /// a workflow.
@@ -58,7 +67,14 @@ void main() {
       if (workflow) continue;
       // A heading names the command a section is about; it is not typed.
       if (!fenced && line.startsWith('#')) continue;
+      if (file.path == fallbackFile && line.startsWith(fallback)) continue;
       for (final match in long.allMatches(line)) {
+        // `<command>` in the documentation describes the fallback; in the
+        // toolkit, which the agent copies from, it is the one line above.
+        if (match.group(0)!.endsWith('<') &&
+            !p.isWithin(p.join(repository.path, 'toolkit'), file.path)) {
+          continue;
+        }
         final inCode =
             fenced ||
             '`'.allMatches(line.substring(0, match.start)).length.isOdd;
@@ -100,6 +116,20 @@ void main() {
       reason:
           'write `dartway <command>`: it runs the CLI the project pins '
           'whichever `dartway` is on the PATH',
+    );
+  });
+
+  test('the fallback for a machine without a global CLI is taught once, in '
+      'the toolkit constitution', () {
+    final lines = File(fallbackFile).readAsLinesSync();
+    final at = [
+      for (var i = 0; i < lines.length; i++)
+        if (lines[i].startsWith(fallback)) i,
+    ];
+    expect(at, hasLength(1));
+    expect(
+      lines[at.single],
+      contains('`dart run dartway_cli:dartway <args>` from the project root'),
     );
   });
 }

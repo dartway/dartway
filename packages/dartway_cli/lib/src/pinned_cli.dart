@@ -19,9 +19,10 @@ import 'toolkit_manifest.dart' show dartwayCliVersion;
 /// `*.dw.dart`.
 ///
 /// So a project command asks this first, and a `dartway` of another version
-/// does not run it: it runs the pinned one (`dart run dartway_cli:dartway`
-/// from the package that pins it, on the Dart of the Flutter `.fvmrc` pins)
-/// and passes its exit code on. Every project then types the same
+/// does not run it: it runs the pinned one (its `bin/dartway.dart` on the
+/// package configuration of the package that pins it, in the directory the
+/// command was typed in, on the Dart of the Flutter `.fvmrc` pins) and passes
+/// its exit code on. Every project then types the same
 /// `dartway <command>`, whichever copy is on the PATH.
 class DwPinnedCli {
   const DwPinnedCli._({
@@ -29,6 +30,8 @@ class DwPinnedCli {
     required this.runningVersion,
     this.owner,
     this.pinnedVersion,
+    this.packageConfig,
+    this.cliRoot,
   });
 
   /// Commands that read or write an existing project, and so have to be the
@@ -62,6 +65,11 @@ class DwPinnedCli {
   /// The version [owner]'s resolved packages hold, or null when they are not
   /// resolved (no `pub get` yet) or name a CLI that is not there.
   final String? pinnedVersion;
+
+  /// The package configuration that resolved the pinned CLI, and the
+  /// directory of that CLI; null when [pinnedVersion] is.
+  final File? packageConfig;
+  final Directory? cliRoot;
 
   /// The version of the CLI that is running.
   final String runningVersion;
@@ -102,16 +110,27 @@ class DwPinnedCli {
       '  (cd ${p.relative(owner!.path, from: root.path)} && '
       'dart run dartway_cli:dartway $command)';
 
-  /// Runs [args] on the pinned CLI and returns its exit code: from [owner],
-  /// on the Dart of the pinned Flutter, with this process's stdio. One line
-  /// on stderr says so.
+  /// The exit code to report for a child that ended with [code]: a child
+  /// killed by a signal has the negative of its number on POSIX, which the
+  /// shell and CI report as 128 plus it (130 for an interrupt, 143 for a
+  /// termination).
+  static int exitCodeOf(int code, {bool? windows}) =>
+      code < 0 && !(windows ?? Platform.isWindows) ? 128 - code : code;
+
+  /// Runs [args] on the pinned CLI and returns its exit code: in the
+  /// directory this process runs in, so that a relative path means what it
+  /// would to a direct run, on the pinned CLI's own package configuration and
+  /// the Dart of the pinned Flutter, with this process's stdio. One line on
+  /// stderr says so.
   Future<int> runPinned(
     List<String> args, {
     Map<String, String>? environment,
   }) async {
     final env = environment ?? Platform.environment;
     if (env[reentryVariable] != null) {
-      stderr.writeln(complaintFor(args.join(' ')));
+      // Only the subcommand: the rest of the line may carry a credential
+      // (`--database-url postgres://user:password@…`).
+      stderr.writeln(complaintFor(args.first));
       return 1;
     }
     DwPinnedDart dart;
@@ -130,11 +149,13 @@ class DwPinnedCli {
     try {
       process = await Process.start(
         dart.executable,
-        ['run', 'dartway_cli:dartway', ...args],
-        workingDirectory: owner!.path,
+        [
+          '--packages=${packageConfig!.path}',
+          p.join(cliRoot!.path, 'bin', 'dartway.dart'),
+          ...args,
+        ],
         environment: {reentryVariable: pinnedVersion!},
         mode: ProcessStartMode.inheritStdio,
-        runInShell: Platform.isWindows,
       );
     } on ProcessException catch (error) {
       throw StateError('Could not start ${dart.executable}: ${error.message}.');
@@ -150,7 +171,7 @@ class DwPinnedCli {
         ),
     ];
     try {
-      return await process.exitCode;
+      return exitCodeOf(await process.exitCode);
     } finally {
       for (final signal in signals) {
         await signal.cancel();
@@ -165,11 +186,15 @@ class DwPinnedCli {
     String runningVersion = dartwayCliVersion,
   }) {
     final owner = _owner(root);
+    final resolved = owner == null ? null : _resolved(owner);
+    final version = _versionOf(resolved?.cli);
     return DwPinnedCli._(
       root: root,
       runningVersion: runningVersion,
       owner: owner,
-      pinnedVersion: owner == null ? null : _versionOf(_resolved(owner)),
+      pinnedVersion: version,
+      packageConfig: version == null ? null : resolved!.config,
+      cliRoot: version == null ? null : resolved!.cli,
     );
   }
 
@@ -206,13 +231,16 @@ class DwPinnedCli {
   /// Where [owner]'s own `dartway_cli` lives, by the nearest package config
   /// at or above it (a workspace keeps one at its root) — which resolves a
   /// path, a git and a hosted pin alike.
-  static Directory? _resolved(Directory owner) {
+  static ({File config, Directory cli})? _resolved(Directory owner) {
     var directory = owner.absolute;
     while (true) {
       final config = File(
         p.join(directory.path, '.dart_tool', 'package_config.json'),
       );
-      if (config.existsSync()) return _cliIn(config);
+      if (config.existsSync()) {
+        final cli = _cliIn(config);
+        return cli == null ? null : (config: config, cli: cli);
+      }
       final parent = directory.parent;
       if (parent.path == directory.path) return null;
       directory = parent;

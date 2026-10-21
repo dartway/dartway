@@ -162,10 +162,8 @@ void main(List<String> args) {
       final result = await dartway(['generate', '--check', 'x y'], root);
       expect(result.exitCode, 7, reason: '${result.stdout}${result.stderr}');
       expect(result.stdout, contains('pinned ran: generate --check x y'));
-      expect(
-        result.stdout,
-        contains('in: ${flutter.resolveSymbolicLinksSync()}'),
-      );
+      // Where it was typed, not in the package that pins the CLI.
+      expect(result.stdout, contains('in: ${root.resolveSymbolicLinksSync()}'));
       expect(result.stdout, contains('reentry: 0.1.0-pinned'));
       expect(
         result.stderr,
@@ -176,6 +174,30 @@ void main(List<String> args) {
           ),
           contains('the dart on PATH (no .fvmrc)'),
         ),
+      );
+    });
+
+    test('runs it where it was typed, so a relative path means the same as '
+        'to a direct run', () async {
+      cliPackage('pinned_cli', '0.1.0-pinned');
+      final root = project('pinned_cli', resolved: false);
+      await pubGet(Directory(p.join(root.path, 'shop_flutter')));
+      final server = Directory(p.join(root.path, 'shop_server'))
+        ..createSync(recursive: true);
+
+      final result = await dartway([
+        'dev',
+        'proxy',
+        '--web-dir',
+        'build/web',
+      ], server);
+      expect(
+        result.stdout,
+        contains('pinned ran: dev proxy --web-dir build/web'),
+      );
+      expect(
+        result.stdout,
+        contains('in: ${server.resolveSymbolicLinksSync()}'),
       );
     });
 
@@ -201,7 +223,7 @@ void main(List<String> args) {
         result.stderr,
         contains('the Dart of Flutter 9.9.9 (shop_flutter/.fvm/flutter_sdk)'),
       );
-      expect(log.readAsStringSync(), contains('run dartway_cli:dartway check'));
+      expect(log.readAsStringSync(), contains('bin/dartway.dart check'));
     }, skip: Platform.isWindows ? 'the fake SDK is a shell script' : null);
 
     test('refuses when the pin is not resolved, naming the fix', () async {
@@ -226,6 +248,39 @@ void main(List<String> args) {
       expect(result.exitCode, 1);
       expect(result.stdout, isNot(contains('pinned ran')));
       expect(result.stderr, contains('dart run dartway_cli:dartway check'));
+    });
+
+    test(
+      'the refusal names the subcommand and nothing of its arguments',
+      () async {
+        cliPackage('pinned_cli', '0.1.0-pinned');
+        final root = project('pinned_cli', resolved: false);
+        await pubGet(Directory(p.join(root.path, 'shop_flutter')));
+        final result = await dartway(
+          ['test', '--database-url', 'postgres://user:hunter2@db/app'],
+          root,
+          environment: {DwPinnedCli.reentryVariable: '0.1.0-pinned'},
+        );
+        expect(result.exitCode, 1);
+        expect(result.stderr, contains('dart run dartway_cli:dartway test)'));
+        expect(
+          '${result.stdout}${result.stderr}',
+          allOf(isNot(contains('hunter2')), isNot(contains('--database-url'))),
+        );
+      },
+    );
+  });
+
+  group('the exit code of a child killed by a signal', () {
+    test('is 128 plus the signal on POSIX, as a shell reports it', () {
+      expect(DwPinnedCli.exitCodeOf(-2, windows: false), 130);
+      expect(DwPinnedCli.exitCodeOf(-15, windows: false), 143);
+    });
+
+    test('an ordinary exit code is passed on as it is', () {
+      expect(DwPinnedCli.exitCodeOf(0, windows: false), 0);
+      expect(DwPinnedCli.exitCodeOf(7, windows: false), 7);
+      expect(DwPinnedCli.exitCodeOf(-1073741510, windows: true), -1073741510);
     });
   });
 }

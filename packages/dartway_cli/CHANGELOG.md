@@ -20,10 +20,13 @@
 
 - A `dartway` of another version no longer refuses a project command
   (`generate`, `check`, `test`, `deploy`, `dev`, `stats`, `format`): it runs the
-  `dartway_cli` the project pins — `dart run dartway_cli:dartway` from the
-  package that declares it, on the Dart of the Flutter `.fvmrc` pins — passing
-  the arguments, stdio and exit code through, and says so in one line on
-  stderr. Only a pin whose packages are not resolved is refused, with the
+  `dartway_cli` the project pins — in the directory it was typed in, on the
+  package configuration of the package that declares it and the Dart of the
+  Flutter `.fvmrc` pins — passing the arguments, stdio and exit code through
+  (128 plus the signal for a child it ended), and says so in one line on
+  stderr; a refusal names the subcommand and nothing of its arguments.
+  `dartway format` batches its paths under 8000 characters a command line, and
+  neither it nor the hand-over goes through a shell on Windows. Only a pin whose packages are not resolved is refused, with the
   `pub get` that resolves it. The toolkit, the skeleton's README and the docs
   teach `dartway <command>` again; `toolkit_pinned_commands_test.dart` now
   holds them to it. See the

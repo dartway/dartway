@@ -63,9 +63,31 @@ class FormatCommand extends Command<int> {
   @override
   String get invocation => 'dartway format [--all] [--check] [--base <ref>]';
 
-  /// How many paths one `dart format` is given, so a large project does not
-  /// run into the command line's length limit.
-  static const _batch = 200;
+  /// The most characters one `dart format` command line may take: Windows
+  /// refuses one past 8191, and the other systems allow more.
+  static const _commandLineLimit = 8000;
+
+  /// [files] cut into the runs one `dart format` is given each, so that the
+  /// command line of every run — [fixed] characters of executable and options
+  /// plus a quoted path and a space apiece — stays under the limit. A path
+  /// too long to share a line goes alone.
+  static List<List<String>> batches(List<String> files, {int fixed = 0}) {
+    final result = <List<String>>[];
+    var batch = <String>[];
+    var length = fixed;
+    for (final file in files) {
+      final cost = file.length + 3;
+      if (batch.isNotEmpty && length + cost > _commandLineLimit) {
+        result.add(batch);
+        batch = <String>[];
+        length = fixed;
+      }
+      batch.add(file);
+      length += cost;
+    }
+    if (batch.isNotEmpty) result.add(batch);
+    return result;
+  }
 
   @override
   Future<int> run() async {
@@ -152,23 +174,20 @@ class FormatCommand extends Command<int> {
     if (files.isEmpty) return 0;
 
     final unformatted = <String>[];
-    for (var start = 0; start < files.length; start += _batch) {
-      final batch = files.sublist(
-        start,
-        (start + _batch).clamp(0, files.length),
-      );
+    final options = [
+      'format',
+      if (check) ...['--output=none', '--set-exit-if-changed'],
+    ];
+    final fixed = dart.executable.length + 3 + options.join(' ').length + 1;
+    for (final batch in batches(files, fixed: fixed)) {
       final ProcessResult result;
       try {
-        result = await Process.run(
-          dart.executable,
-          [
-            'format',
-            if (check) ...['--output=none', '--set-exit-if-changed'],
-            ...batch,
-          ],
-          workingDirectory: top,
-          runInShell: Platform.isWindows,
-        );
+        // Not through a shell: the executable is resolved, and a shell would
+        // read the metacharacters of a path.
+        result = await Process.run(dart.executable, [
+          ...options,
+          ...batch,
+        ], workingDirectory: top);
       } on ProcessException catch (error) {
         throw StateError(
           'Could not start ${dart.executable}: ${error.message}.',

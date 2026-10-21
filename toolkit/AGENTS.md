@@ -82,6 +82,7 @@ Commands `generate`, `check`, `test`, `dev`, `deploy`, `stats`, `format` run the
 pins: `dartway <command>` from the project root or `__FLUTTER_PKG__` — a `dartway` of another version
 hands the command to the pinned one. Format with `dartway format` (the pinned Dart, changed files only),
 never a bare `dart format`.
+Without a global CLI, run the same command as `dart run dartway_cli:dartway <args>` from the project root.
 PRs target `__BASE_BRANCH__`; integration uses `dartway sync`.
 
 ## Interaction

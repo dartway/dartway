@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:dartway_cli/src/commands/format_command.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
@@ -27,6 +28,29 @@ void main() {
     sdkLog = File(p.join(temp.path, 'sdk.log'));
   });
   tearDown(() => temp.deleteSync(recursive: true));
+
+  test('the paths are batched so that no command line passes 8000 '
+      'characters', () {
+    final files = [
+      for (var i = 0; i < 700; i++) 'packages/some_package/lib/src/f$i.dart',
+    ];
+    const fixed = 120;
+    final batches = FormatCommand.batches(files, fixed: fixed);
+    expect(batches.length, greaterThan(1));
+    expect([for (final batch in batches) ...batch], files);
+    for (final batch in batches) {
+      final line = fixed + batch.fold<int>(0, (sum, f) => sum + f.length + 3);
+      expect(line, lessThanOrEqualTo(8000));
+    }
+    expect(FormatCommand.batches(const []), isEmpty);
+    // A path that fills a line on its own is not dropped.
+    final long = 'x' * 9000;
+    expect(FormatCommand.batches(['a', long, 'b']), [
+      ['a'],
+      [long],
+      ['b'],
+    ]);
+  });
 
   const unformatted = 'void  main( ){print( 1);}\n';
   const formatted = 'void main() {\n  print(1);\n}\n';

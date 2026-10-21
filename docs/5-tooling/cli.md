@@ -22,8 +22,9 @@ A globally activated `dartway` is a second copy with a life of its own, and the 
 CLI from before a release has no `generate` at all, while the project it is standing in has no
 other way to write `*.dw.dart`. So `generate`, `check`, `test`, `deploy`, `dev`, `stats` and
 `format`, started by a `dartway` of another version, are not run by it: it runs the pinned one —
-`dart run dartway_cli:dartway <command>` from the Flutter package, on the Dart of the Flutter
-`.fvmrc` pins — with the same arguments, stdio and exit code, and says so in one line on stderr:
+from the directory it was typed in, so a relative path means the same, on the Dart of the Flutter
+`.fvmrc` pins — with the same arguments, stdio and exit code (a child ended by a signal is 128 plus
+its number), and says so in one line on stderr:
 
 ```
 dartway 0.25.0: running the dartway_cli 0.26.0 this project pins, on the Dart of Flutter 3.47.6 (my_app_flutter/.fvm/flutter_sdk).
