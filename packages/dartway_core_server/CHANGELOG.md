@@ -1,29 +1,28 @@
 # Changelog
 
-## 0.22.0-dev.0
+## 0.22.0
 
-- Add `DwOutboundHttp.network` for standalone tools using the same bounded,
-  safely logged HTTP client as server contexts. Tools close their owned client;
-  borrowed context and fake clients reject `close` (#444).
-
-- A zero auth `resendDelay` no longer refuses a repeated code request when
-  the previous ticket's timestamp is ahead of the current clock reading.
-  Positive resend delays and per-identifier request-window quotas still apply (#586).
-
-- Outbound transport failure diagnostics discard arbitrary provider/client causes, which may
-  contain credentials or bearer links. Logs, exception strings and incident errors retain safe
-  categories; framework-owned timeout and response-size limits remain informative.
-
-- Auth request transactions recheck canonical idempotency before ticket writes, including
-  duplicates arriving before commit. Cleanup retains tickets through stored expiry and rate history.
-
-- Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,
-  latest-request-only across destinations, and anonymous confirmation without changing sessions.
-  Invalid/expired/used/occupied links share `dw.invalid` on `token`; success is not replayed.
+### Breaking changes
 
 - **BREAKING (source):** `DwIdentifierChangeCause` adds `updated` for trusted
   edits; exhaustive identifier hooks must handle the new cause.
 
+### Changes
+
+- Add `DwOutboundHttp.network` for standalone tools using the same bounded,
+  safely logged HTTP client as server contexts. Tools close their owned client;
+  borrowed context and fake clients reject `close` (#444).
+- A zero auth `resendDelay` no longer refuses a repeated code request when
+  the previous ticket's timestamp is ahead of the current clock reading.
+  Positive resend delays and per-identifier request-window quotas still apply (#586).
+- Outbound transport failure diagnostics discard arbitrary provider/client causes, which may
+  contain credentials or bearer links. Logs, exception strings and incident errors retain safe
+  categories; framework-owned timeout and response-size limits remain informative.
+- Auth request transactions recheck canonical idempotency before ticket writes, including
+  duplicates arriving before commit. Cleanup retains tickets through stored expiry and rate history.
+- Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,
+  latest-request-only across destinations, and anonymous confirmation without changing sessions.
+  Invalid/expired/used/occupied links share `dw.invalid` on `token`; success is not replayed.
 - Add trusted `DwAccountService.updateIdentifiers` batch phone/e-mail edits with
   keep/set/clear, stable identities, unchanged sessions and a transactional
   `beforeChange` project callback. All identity writes precede `updated` hooks;
@@ -36,7 +35,6 @@
   locks across edits, confirmations, sign-in, moves, removals and deletion.
   Optimistic owner changes use the existing bounded serialization retry policy;
   bare-database services also retry top-level conflicts at most three times.
-
 - Add optional `DwCallRateLimit` per registered HTTP call type, bounded peer
   state, explicit trusted proxy CIDRs and pre-body 429/Retry-After refusals.
   Invalid declarations fail before migrations, including quotas behind an
@@ -45,12 +43,10 @@
 - `DwServerEnvironment` reads native ingress declarations and `KAMAL_VERSION`;
   wiring `DwServerSettings.deploymentVersion` adds no-store revision ETags to
   GET/HEAD health endpoints, without changing the app wire protocol.
-
 - `GET /dw/health` and `HEAD /dw/health` use the same database health check
   as `/health`, so the app host can forward only `/dw/`; `POST /dw/health`
   remains a DTO call (#576).
 - Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
-
 - `DwFileStorageSetup.provision` sets bucket policies, GET/PUT CORS for explicit
   `allowedOrigins`, and the visibility probe object in both buckets, so outside
   checks work with `verifyBuckets: false`. CORS writes carry `Content-MD5`;

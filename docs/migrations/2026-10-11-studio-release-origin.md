@@ -1,8 +1,8 @@
 ---
 title: Require signed Studio tokens for the web release origin
 affects:
-  dartway_studio_bridge: "0.12.0-dev.0"
-  dartway_studio_binding: "0.4.0-dev.0"
+  dartway_studio_bridge: "0.12.0"
+  dartway_studio_binding: "0.4.0"
 ---
 
 ## Who is affected

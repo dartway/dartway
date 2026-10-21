@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.22.0-dev.0
+## 0.22.0
 
 - Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,
   latest-request-only across destinations, and anonymous confirmation without changing sessions.

@@ -1,9 +1,8 @@
 # Changelog
 
-## 0.8.0-dev.0
+## 0.8.0
 
-- Dependency carets follow DartWay 0.22 and its satellites on their next
-  development lines; public dependency types follow those releases (#530).
+- Targets DartWay 0.22.
 
 ## 0.7.0
 

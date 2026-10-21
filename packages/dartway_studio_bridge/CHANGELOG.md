@@ -1,6 +1,8 @@
 # Changelog
 
-## 0.12.0-dev.0
+## 0.12.0
+
+### Breaking changes
 
 - `studioSignedAccessValidator` accepts Studio tokens only for the current web
   release origin when its origin argument is empty. Debug/profile builds without

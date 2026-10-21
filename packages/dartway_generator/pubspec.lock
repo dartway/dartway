@@ -111,49 +111,49 @@ packages:
       path: "../dartway_analytics_shared"
       relative: true
     source: path
-    version: "0.3.0-dev.0"
+    version: "0.3.0"
   dartway_client:
     dependency: "direct overridden"
     description:
       path: "../dartway_client"
       relative: true
     source: path
-    version: "0.22.0-dev.0"
+    version: "0.22.0"
   dartway_core_server:
     dependency: "direct dev"
     description:
       path: "../dartway_core_server"
       relative: true
     source: path
-    version: "0.22.0-dev.0"
+    version: "0.22.0"
   dartway_core_shared:
     dependency: "direct main"
     description:
       path: "../dartway_core_shared"
       relative: true
     source: path
-    version: "0.22.0-dev.0"
+    version: "0.22.0"
   dartway_orm:
     dependency: "direct dev"
     description:
       path: "../dartway_orm"
       relative: true
     source: path
-    version: "0.22.0-dev.0"
+    version: "0.22.0"
   dartway_push_server:
     dependency: "direct dev"
     description:
       path: "../dartway_push_server"
       relative: true
     source: path
-    version: "0.7.0-dev.0"
+    version: "0.7.0"
   dartway_push_shared:
     dependency: "direct dev"
     description:
       path: "../dartway_push_shared"
       relative: true
     source: path
-    version: "0.7.0-dev.0"
+    version: "0.7.0"
   file:
     dependency: transitive
     description:
