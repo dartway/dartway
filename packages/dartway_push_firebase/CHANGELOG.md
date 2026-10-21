@@ -1,9 +1,8 @@
-## 0.7.0-dev.0
+## 0.7.0
 
 - Creates the configurable quiet Android notification channel when the plugin attaches (#595).
 
-- Dependency carets follow DartWay 0.22 and its satellites on their next
-  development lines; public dependency types follow those releases (#530).
+- Targets DartWay 0.22.
 
 ## 0.6.0
 

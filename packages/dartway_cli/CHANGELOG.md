@@ -1,56 +1,64 @@
 # Changelog
 
-## 0.25.0-dev.0
+## 0.25.0
+
+### Breaking changes
+
+- **BREAKING (`dartway create` dependency source):** new projects pin every
+  reached `dartway_*` package and the analyzer plugin to the full git commit
+  that supplied the template. `dartway update --target <sha>` moves those refs;
+  `--framework-path` continues to write local path overrides. Creation no
+  longer depends on unpublished pub.dev versions.
+- **BREAKING (native check contract):** the outside-only check image requires
+  `--version <full SHA>` and verifies it on API `/health` and app `/dw/health`.
+  Generated manifests now include `{version}`. Regenerate and wire server health
+  metadata; see the native-check migration note.
+- **BREAKING (deploy):** the app host forwards only `/dw/`. Kamal web
+  destinations no longer carry route prefixes or depend on server routes;
+  compose and `dartway dev` leave `/health` and project routes to the app.
+  Outside checks use `/dw/health` on the app host (#576). See the
+  [migration note](../../docs/migrations/2026-10-12-app-host-dw-only.md).
+
+### Changes
 
 - Keep standalone `DwOutboundHttp.network` construction and tear-offs out of
   server `lib/` with `forbiddenHttpClient`; server code uses the bounded,
   test-faked `ctx.http` (#444).
-
 - Fix: the template maps user cards in a batch, loading identities and avatar
   URLs once and sharing them with the nested profiles. A single card uses a
   batch of one (#418).
-
 - Tests: prepare external-service workers before timed CLI assertions and own
   fixture subprocess groups through timeout and teardown, so CLI and native
   analyzer children stop before their temporary directories are removed. Limit
   concurrent CLI test files to two to bound nested compiler load (#609).
-
 - Tests: synchronize the deployment busy-refusal check with the real detached
   process's startup and release, avoiding its fixed sleep window (#613).
-
 - Fix: `AppKeyboardInset` in the template and example follows native iOS engine
   frames directly, avoiding a second tween and its trailing animation. Web and
   other platforms retain step smoothing. The `dartway-on-device` skill now
   distinguishes these paths (#578); existing copies can follow the
   [migration note](../../docs/migrations/2026-10-18-native-ios-keyboard-insets.md).
-
 - Fix: native `deploy check` verifies secret-file mounts on the target before
   masking output, so a path stored in `FCM_SERVICE_ACCOUNT_FILE` no longer
   hides a correct per-file read-only bind from the checker (#587).
-
 - Fix: `create --framework-path` accepts a framework export without Git
   metadata when the dependencies and lints plugin resolve by local paths
   (#600). A full commit remains required for Git pinning.
-
 - Fix: `dartway create` initializes Git on the recorded base branch (`master`),
   even when Git defaults to `main`, so the new project's contract baseline is
   available. `create .` preserves an existing repository's branch (#599).
-
 - Fix: Compose deployments pin both serving images as
   `<project>-<service>:dw-previous` before building moves `:latest`. Retries
   keep the original journal entries, restore missing or moved pins, and
   refuse a missing rollback image before building or replacing a service
   (#602, #589).
-
 - Fix: template and example Docker contexts exclude native app signing files
   (`key.properties`, `*.jks`, `*.keystore`, `*.p8`) at every depth (#588).
   Existing projects must update their copied `.dockerignore`; see the
   [migration note](../../docs/migrations/2026-10-18-docker-context-signing-files.md).
-
 - Fix: the installed `dartway-finish` gate block omits `CONTRACT_BASE` and
   `--contract-base` when the project has a release branch, so task checks do not
   demand contract version bumps reserved for `generate --release` (#607).
-
 - `dartway sync [<ref>]` merges the base branch in and resolves derived files
   itself: generated code, locks and l10n outputs are regenerated, the
   migrations registry is rebuilt from its directory, `.arb` files merge by key;
@@ -58,35 +66,17 @@
   --release` raises the contract version once at the release and resolves the
   packages; `--release-branch` records `releaseBranch` in the toolkit settings
   (D-158).
-
-- **BREAKING (`dartway create` dependency source):** new projects pin every
-  reached `dartway_*` package and the analyzer plugin to the full git commit
-  that supplied the template. `dartway update --target <sha>` moves those refs;
-  `--framework-path` continues to write local path overrides. Creation no
-  longer depends on unpublished pub.dev versions.
-
 - Native `deploy check` selects Kamal from the Studio manifest and verifies the
   selected SHA, actual TLS routing, native data/secret mounts, BBR and explicit
   ingress trust, without inspecting secret environments. Compose `deploy run`
   retains its own checks. Native generation refuses nginx snippets rather than
   silently dropping policies.
-- **BREAKING (native check contract):** the outside-only check image requires
-  `--version <full SHA>` and verifies it on API `/health` and app `/dw/health`.
-  Generated manifests now include `{version}`. Regenerate and wire server health
-  metadata; see the native-check migration note.
-
 - Kamal destinations support `requires.files`: individual read-only API mounts
   and an executable pre-app-boot hook that checks file metadata over Kamal's
   configured SSH transport, without reading contents. Existing `secret put-file`
   delivery uses a private upload directory and atomically replaces the file;
   rotation reaches the next container boot. Delivery remains a prerequisite,
   including for Studio runners.
-
-- **BREAKING (deploy):** the app host forwards only `/dw/`. Kamal web
-  destinations no longer carry route prefixes or depend on server routes;
-  compose and `dartway dev` leave `/health` and project routes to the app.
-  Outside checks use `/dw/health` on the app host (#576). See the
-  [migration note](../../docs/migrations/2026-10-12-app-host-dw-only.md).
 - Fix: the web API proxy emits a Flutter fallback for a trailing-slash route
   only when no API prefix covers its slashless path, keeping overlapping routes
   and `/health` on the API (#571).
@@ -129,7 +119,6 @@
 - Template and example web releases call `Uri.base.origin` and build without a
   backend address, so one image serves every destination. Deploy checks require
   the backend build argument only when the Dockerfile declares it (#530).
-
 - Fix: generated Studio manifests declare the actual server migration and lock
   paths. Images pass the workflow run number into web builds, preserving SHA
   image identities and build-once behavior (#566). Existing projects must

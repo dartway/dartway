@@ -1,8 +1,8 @@
 ---
 title: Verify the selected native deployment revision
 affects:
-  dartway_cli: "0.25.0-dev.0"
-  dartway_core_server: "0.22.0-dev.0"
+  dartway_cli: "0.25.0"
+  dartway_core_server: "0.22.0"
 ---
 
 ## Who is affected

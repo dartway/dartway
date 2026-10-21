@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.22.0-dev.0
+## 0.22.0
 
 - Fix migration drafts' rename advice: every rename option explains that a released table needs
   the new name added and copied, reads switched, and the old name dropped one release later (#542).

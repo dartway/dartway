@@ -1,4 +1,6 @@
-## 4.0.0-dev.0
+## 4.0.0
+
+### Breaking changes
 
 Guards can wait for unknown facts (#556). `DwDecisionGuard` returns
 `DwGuardDecision.allow`, `.redirect(path)` or `.pending`. While undecided,

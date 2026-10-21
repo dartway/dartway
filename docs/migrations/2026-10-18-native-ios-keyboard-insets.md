@@ -1,7 +1,7 @@
 ---
 title: Follow native iOS keyboard insets without a second tween
 affects:
-  dartway_cli: "0.25.0-dev.0"
+  dartway_cli: "0.25.0"
 ---
 
 ## Who is affected

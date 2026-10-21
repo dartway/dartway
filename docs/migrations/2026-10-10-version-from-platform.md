@@ -1,7 +1,7 @@
 ---
 title: Read the app version from the platform build
 affects:
-  dartway_cli: "0.25.0-dev.0"
+  dartway_cli: "0.25.0"
 ---
 
 ## Who is affected

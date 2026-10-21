@@ -1,32 +1,34 @@
-## 0.3.0-dev.0
+## 0.3.0
 
-- Claim owned web initialization once, keep unresolved restoration ownership
-  across later surface moves, and silence retired owner callbacks immediately
-  while native disposal safely waits for its pending play.
-
-- Preserve typed browser refusal/cancellation during owned surface restoration,
-  serialize a newer user play behind its pending promise, and detach ownership
-  before native cleanup without resetting foreign video controllers.
-
-- Web video surfaces restore one browser pause caused by handing an already
-  started video to another surface, including a mini-player or fullscreen view.
-  The same controller and source stay live. User/background pauses, playback
-  errors and autoplay refusals are respected; position ticks never replay.
+### Breaking changes
 
 - **Breaking** (#555): playback intent owns play/pause; buffering and unconfirmed
   play use `waiting` instead of `DwMediaPlayState.buffering`/`isBuffering`.
   `togglePlay()` uses intent and redundant play commands do nothing. Playing an
   ended item restarts at zero. Intent survives source retries.
+- **Breaking**: remove the manual observation handle and result. The package
+  confirms spans from real playback and seals them through `playbackDelivery` on
+  pause, seek, speed, source, error or end. Waiting does not break continuity;
+  pending delivery and explicit retry keep their existing lifecycle.
+
+### Changes
+
+- Claim owned web initialization once, keep unresolved restoration ownership
+  across later surface moves, and silence retired owner callbacks immediately
+  while native disposal safely waits for its pending play.
+- Preserve typed browser refusal/cancellation during owned surface restoration,
+  serialize a newer user play behind its pending promise, and detach ownership
+  before native cleanup without resetting foreign video controllers.
+- Web video surfaces restore one browser pause caused by handing an already
+  started video to another surface, including a mini-player or fullscreen view.
+  The same controller and source stay live. User/background pauses, playback
+  errors and autoplay refusals are respected; position ticks never replay.
 - Seeks publish their target immediately, ignore stale ticks and coalesce to one
   active seek plus the latest queued target. Skips use the displayed position.
   Video position reads overlapping a seek are dropped, including reads started
   during a held seek and completed after it settles.
   Seeking away from an ended item clears the ended state immediately; play while
   that seek is pending resumes at its target instead of restarting at zero.
-- **Breaking**: remove the manual observation handle and result. The package
-  confirms spans from real playback and seals them through `playbackDelivery` on
-  pause, seek, speed, source, error or end. Waiting does not break continuity;
-  pending delivery and explicit retry keep their existing lifecycle.
 - Audio coverage follows ready, playing position ticks on every platform. A
   refused web play can therefore credit the short interval before the browser's
   refusal arrives; `just_audio_web` exposes no separate positive start signal.
@@ -38,8 +40,7 @@
 - Test fakes can hold seek completion or a position read and expose play/seek
   calls.
 - Migration: `docs/migrations/2026-10-11-media-player-state.md`.
-- Dependency carets follow DartWay 0.22 and its satellites on their next
-  development lines; public dependency types follow those releases (#530).
+- Targets DartWay 0.22.
 
 ## 0.2.0
 
