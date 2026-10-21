@@ -230,6 +230,15 @@ void main() {
       );
     },
   );
+  test('canonical absolute skills link becomes relative', () async {
+    await install('both');
+    final link = Link(p.join(root.path, '.claude/skills'));
+    link.deleteSync();
+    link.createSync(p.join(root.path, '.agents/skills'));
+    await install('both');
+    expect(link.targetSync(), '../.agents/skills');
+    expect(file('.claude/skills/dartway-server/SKILL.md').existsSync(), isTrue);
+  });
   test('malformed block refuses before writing anything', () async {
     const text = 'owner\n<!-- dartway-toolkit:start -->';
     file('AGENTS.md').writeAsStringSync(text);

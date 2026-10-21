@@ -55,7 +55,10 @@ class ToolkitSkills {
     shared.createSync(recursive: true);
     final type = FileSystemEntity.typeSync(claude.path, followLinks: false);
     if (type == FileSystemEntityType.link) {
-      if (enableClaude) return;
+      if (enableClaude &&
+          Link(claude.path).targetSync() == '../.agents/skills') {
+        return;
+      }
       Link(claude.path).deleteSync();
     } else if (type == FileSystemEntityType.directory) {
       for (final entry in claude.listSync(followLinks: false)) {
