@@ -148,8 +148,8 @@ a wrong answer nobody notices:
 
 The handler reads `request.fetchLimit` rows — one past the bound — so the read is bounded and the
 breach still shows: `ctx.db.<table>.find(…, limit: request.fetchLimit)`. Anything that grows with use
-is not a list: a feed is a page, an admin table a table, a chat a window. `dartway check` warns about
-a read in a request handler with no bound (`unboundedRead`,
+is not a list: a feed is a page, an admin table a table, a chat a window.
+`dart run dartway_cli:dartway check` warns about a read in a request handler with no bound (`unboundedRead`,
 [the checker](../5-tooling/conventions-checker.md)).
 
 Any call's response above `DwServerSettings.largeResponseBytes` (256 KB) is logged as a warning with

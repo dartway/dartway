@@ -77,8 +77,8 @@ Also `findById`, `findFirst`, `exists`, `count(distinct:)`, `maxBy`, `updateWher
 
 - **Every `find` in a request handler is bounded**: `limit:` (`page.fetchLimit`,
   `request.fetchLimit` of a list), or `unbounded: '<why the domain keeps it small>'` beside the read.
-  One with neither is `unboundedRead`, a `dartway check` warning; jobs, commands and migrations are
-  not held to it.
+  One with neither is `unboundedRead`, a warning of `dart run dartway_cli:dartway check`; jobs,
+  commands and migrations are not held to it.
 - **No joins.** Related rows load with `findByIds`, one query per relation for the whole batch — never
   one per row.
 - **An expected unique conflict is a value:** `tryInsert(draft, onConflict: DwOnConflict.doNothing((t)

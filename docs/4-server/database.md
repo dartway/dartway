@@ -177,7 +177,7 @@ once per connection and reused.
 
 | Method | Returns |
 |---|---|
-| `find({where, orderBy, limit, offset, lock, unbounded})` | the matching rows; without `orderBy` the order is whatever the database returns, so paging needs one. `unbounded:` says why a read without `limit` stays small (`'a board's few columns'`); `dartway check` warns about a request handler's `find` with neither (`unboundedRead`), and the repository refuses it beside a `limit` or blank |
+| `find({where, orderBy, limit, offset, lock, unbounded})` | the matching rows; without `orderBy` the order is whatever the database returns, so paging needs one. `unbounded:` says why a read without `limit` stays small (`'a board's few columns'`); `dart run dartway_cli:dartway check` warns about a request handler's `find` with neither (`unboundedRead`), and the repository refuses it beside a `limit` or blank |
 | `findFirst({where, orderBy, lock})` | the first row or `null` |
 | `findById(id, {lock})` | the row or `null` |
 | `findByIds(ids)` | the rows with those ids, in one statement whatever their number; missing ids are absent, the order unspecified — index the result by id |
