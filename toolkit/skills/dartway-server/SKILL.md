@@ -29,3 +29,6 @@ Open only the reference needed for the edit:
 - [startup-and-services.md](references/startup-and-services.md) — startup, settings, environment, outbound HTTP, external commands and ingress quotas.
 
 Open related references when the change reaches them, not all before the first edit.
+
+A custom `DwServerLogger` declares `isEnabled(DwLogLevel level)` and preserves that filter in
+`scoped`. Call timing builds a debug or slow-call warning line only when that level is enabled.

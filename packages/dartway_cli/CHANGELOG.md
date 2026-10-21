@@ -54,6 +54,34 @@
   for another baseline, `--check` for CI). Generated files and migrations are
   never formatted. The skeleton's CI runs `format --check` on the files a pull
   request changed, and `dartway-finish` formats with it.
+- `deploy run` no longer answers requests with 502 while it deploys: it
+  migrates while the previous server serves, starts the new server and web app
+  beside the serving ones, waits for their healthchecks before attaching their routed aliases and stops the old ones
+  after; the rendered nginx resolves every service per request through
+  Docker's DNS and retries a refused or vanished address, and is reloaded
+  instead of restarted. A failure leaves the previous version serving.
+  Replaces D-070 (D-166, #645). Existing servers: see the
+  [migration note](../../docs/migrations/2026-10-21-deploy-side-by-side-and-stats.md).
+- The rendered nginx logs each request as one JSON line (`dw_timed`: the call's
+  wire name, status, request and upstream time) into bounded files; the bundled
+  Postgres preloads `pg_stat_statements` and logs statements slower than the new
+  `slow_query_ms` key of `deploy/config.yaml` (default 500), set by every deploy
+  without a restart.
+- Protect slow and error logs from bind parameters with both parameter log limits
+  set to zero; bound Postgres Docker logs to ten files of 50 MB. Refuse a
+  Postgres command override that drops `-c shared_preload_libraries=pg_stat_statements`.
+- `migrationsDrift` rejects required column additions without a default on existing
+  tables; suggests a default or nullable/backfill/later NOT NULL. General D-143
+  compatibility remains a review obligation.
+- Warn in deploy preflight when available host memory is below the configured
+  limits for two server containers plus the migration container. Bound nginx
+  retiring workers, including WebSockets, to 30 s after reload.
+- `dartway deploy stats --env <environment> [--hours 24] [--top 10]` prints
+  p50/p95 per call from the proxy log and the costliest statements of
+  `pg_stat_statements` on a deployed environment. Read-only.
+- `deploy check` fails `override-side-by-side` when `deploy/compose.override.yml`
+  gives `server` or `web` a `container_name` or published `ports`, which would
+  stop the new container from starting beside the old.
 - Load the managed Claude policy by import and warn with `instructionsDuplicated`
   when root instruction texts need consolidation. Fresh projects use `@AGENTS.md`.
 - Make the first read an index with topic references and concise skill discovery

@@ -28,6 +28,7 @@ final class DwServerSettings {
     this.trustedProxyNetworks = const [],
     this.behindProxy = false,
     this.deploymentVersion,
+    this.slowCallThreshold = const Duration(seconds: 1),
     this.strictBounds = false,
     this.largeResponseBytes = 256 << 10,
     this.boundWarningInterval = const Duration(hours: 1),
@@ -62,6 +63,12 @@ final class DwServerSettings {
   /// Immutable revision reported by health probes. Native Kamal provides
   /// KAMAL_VERSION; local servers may omit it. It grants no access.
   final String? deploymentVersion;
+
+  /// A call answered slower than this is logged as a warning, with its wire
+  /// name, status, time and answer size. The logger filters the chosen level. Every
+  /// other call is the same line at debug. Timed from the request's arrival
+  /// to the encoded answer, so a slow body counts too.
+  final Duration slowCallThreshold;
 
   /// What a `list` handler answering more items than its request's
   /// `maxItems` does: `true` fails the call, naming the request and the count

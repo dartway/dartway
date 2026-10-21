@@ -201,6 +201,7 @@ final class DwHttpFront {
     HttpRequest request,
     DwRequestBody body,
   ) async {
+    final clock = Stopwatch()..start();
     var answer = await calls.answer(request, body);
     List<int> bytes;
     try {
@@ -222,11 +223,30 @@ final class DwHttpFront {
       DwHttpContract.wireNameOf(request.uri.path) ?? request.uri.path,
       bytes.length,
     );
-    return (
-      dwHttpStatusFor(answer),
-      {..._callHeaders, ...dwHttpHeadersFor(answer)},
-      bytes,
-    );
+    final status = dwHttpStatusFor(answer);
+    _timed(request.uri.path, status, clock.elapsed, bytes.length);
+    return (status, {..._callHeaders, ...dwHttpHeadersFor(answer)}, bytes);
+  }
+
+  /// One line per call: its wire name, status, time and answer size — from
+  /// the request's arrival to the encoded answer, body reading included.
+  /// Debug for every call; a warning for one slower than
+  /// [DwServerSettings.slowCallThreshold]. Disabled levels build no line.
+  void _timed(String path, int status, Duration elapsed, int bytes) {
+    final slow = elapsed >= settings.slowCallThreshold;
+    final level = slow ? DwLogLevel.warning : DwLogLevel.debug;
+    if (!_log.isEnabled(level)) return;
+    final name = DwHttpContract.wireNameOf(path) ?? path;
+    final ms = elapsed.inMicroseconds / 1000;
+    final line =
+        'call $name status=$status ms=${ms.toStringAsFixed(1)} bytes=$bytes';
+    if (slow) {
+      _log.warning(
+        'slow $line (over ${settings.slowCallThreshold.inMilliseconds} ms)',
+      );
+    } else {
+      _log.debug(line);
+    }
   }
 
   Future<(int, Map<String, String>, List<int>)> _health(

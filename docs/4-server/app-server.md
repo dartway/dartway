@@ -132,6 +132,22 @@ takes no token and reveals nothing else, so a load balancer or the deploy's prob
 A deploy that kills the process without a signal skips all of it: calls are cut mid-answer and a
 non-transactional job runs again after its lease.
 
+## Call timing
+
+Every HTTP call is one line of the server's log: its wire name, status, milliseconds and the size
+of its answer, timed from the request's arrival to the encoded answer, body reading included.
+
+```text
+DEBUG call ListPosts status=200 ms=12.4 bytes=5310
+WARNING slow call ListPosts status=200 ms=1840.2 bytes=5310 (over 1000 ms)
+```
+
+At debug for every call — `DwConsoleLogger(minLevel: DwLogLevel.debug)` shows them — and as a
+warning for a call slower than `DwServerSettings.slowCallThreshold`. The
+proxy of a deployment logs the same calls end to end, and `deploy stats` reads percentiles from
+there ([Speed](../5-tooling/deploy.md#speed--what-a-deployment-records)); this line is what ties a
+slow one to the handler.
+
 ## `DwServerSettings`
 
 Every limit exists because something unbounded would otherwise grow. The defaults suit a mobile
@@ -157,6 +173,7 @@ app on one server process.
 | `alertWindow` | 1 h | The window of that ceiling. |
 | `outboundTimeout` | 30 s | How long one outbound request (`ctx.http`) may take, connecting to last byte, unless the call names its own ([handlers](handlers-and-context.md#outbound-http)). |
 | `outboundMaxResponseBytes` | 10 MiB | The largest response body one outbound request reads, unless the call names its own; past it the exchange fails with `DwOutboundException`. |
+| `slowCallThreshold` | 1 s | A call slower than this is logged as a warning even when debug logging is disabled ([call timing](#call-timing)). |
 | `strictBounds` | `false` | A `list` handler answering more items than its request's `maxItems`: `true` fails the call naming the request and the count (`DwTestServer` always; a development server through `DW_STRICT_BOUNDS`), `false` serves the whole list and logs a warning with the request, the count and the response size. Never cut short ([a list's bound](../2-core/requests-and-updates.md#a-lists-bound)). |
 | `largeResponseBytes` | 256 KiB | A call response above it is logged as a warning naming the call: a read that grew into megabytes is otherwise noticed by its users first. |
 | `boundWarningInterval` | 1 h | How often one request's bound breach, or one call's large response, is logged again. |

@@ -50,8 +50,8 @@ Among the warnings, `unboundedRead` (`dartway-server`): a request handler's `fin
 | `lib/` imports by `package:` only (`check --fix` rewrites) | `relativeImport` | — |
 | The framework's lint plugin is on | `lintsPluginMissing` | `dartway-update` |
 
-Not held by any check: naming beyond DTO class names, "done", and a `DwHttpRoute` the app calls. `migrationsDrift` needs a database — `DW_DATABASE_*`, or `deploy/config.yaml > local` — and says when it did not run.
-The expand/contract rule across production releases is also held by review alone (`dartway-migrations`).
+Not held by any check: naming beyond DTO class names, "done", and a `DwHttpRoute` the app calls. `migrationsDrift` checks required column additions without a default offline; its schema replay needs a database — `DW_DATABASE_*`, or `deploy/config.yaml > local` — and says when it did not run.
+General expand/contract compatibility across production releases is held by review (`dartway-migrations`).
 
 ## Open only what the task needs
 

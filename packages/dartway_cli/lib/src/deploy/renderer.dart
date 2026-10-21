@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'deploy_target.dart';
 import 'stack.dart';
@@ -69,6 +70,7 @@ class DwStackRenderer {
       'dartway deploy renders it from the secret store}';
 
   String get composeFile {
+    _validatePostgresCommand();
     final database = _target.database == DwDatabaseMode.bundled;
     final storage = _target.storage == DwStorageMode.bundled;
     final site = _target.site;
@@ -91,6 +93,30 @@ class DwStackRenderer {
         ..writeln('  ${DwStack.postgresService}:')
         ..writeln('    image: ${_q(_image(DwStack.postgresImage))}')
         ..writeln('    restart: unless-stopped')
+        ..writeln(
+          '    # pg_stat_statements counts every statement by its shape; '
+          '`dartway deploy',
+        )
+        ..writeln(
+          '    # stats` reads the top of it. Loaded at start, so this line is '
+          'the one',
+        )
+        ..writeln(
+          '    # setting here that needs a restart; the slow-query threshold '
+          'is set by',
+        )
+        ..writeln(
+          '    # every deploy with ALTER SYSTEM and a reload, without one.',
+        )
+        ..writeln(
+          '    command: ["postgres", "-c", '
+          '"shared_preload_libraries=pg_stat_statements"]',
+        )
+        ..writeln('    logging:')
+        ..writeln('      driver: json-file')
+        ..writeln('      options:')
+        ..writeln('        max-size: 50m')
+        ..writeln('        max-file: \"10\"')
         ..writeln('    environment:')
         ..writeln('      POSTGRES_DB: ${_q(stack.databaseName)}')
         ..writeln('      POSTGRES_USER: ${_q(stack.databaseName)}')
@@ -337,6 +363,16 @@ class DwStackRenderer {
       )
       ..writeln('    sysctls:')
       ..writeln('      net.ipv4.tcp_congestion_control: bbr')
+      ..writeln(
+        '    # One line per request, kept in bounded files: `dartway deploy '
+        'stats` reads',
+      )
+      ..writeln('    # its percentiles from here.')
+      ..writeln('    logging:')
+      ..writeln('      driver: "json-file"')
+      ..writeln('      options:')
+      ..writeln('        max-size: ${_q(DwStack.proxyLogFileSize)}')
+      ..writeln('        max-file: ${_q('${DwStack.proxyLogFiles}')}')
       ..writeln('    volumes:')
       ..writeln('      - "./nginx.conf:/etc/nginx/conf.d/default.conf:ro"')
       ..writeln('      - "./nginx.d:/etc/nginx/dartway:ro"');
@@ -369,7 +405,17 @@ class DwStackRenderer {
         ..writeln('        aliases:')
         ..writeln('          - ${_q(_target.storageDomain!)}');
     }
-    buffer.writeln();
+    if (!storage) {
+      buffer
+        ..writeln('    networks:')
+        ..writeln('      default:');
+    }
+    buffer
+      ..writeln('      routed:')
+      ..writeln(
+        '    command: [\"nginx\", \"-g\", \"daemon off; worker_shutdown_timeout 30s;\"]',
+      )
+      ..writeln();
 
     // --- certbot
     if (_tls) {
@@ -403,6 +449,9 @@ class DwStackRenderer {
         ..writeln('  certbot_data:')
         ..writeln('  certbot_www:');
     }
+    buffer
+      ..writeln('networks:')
+      ..writeln('  routed:');
     return buffer.toString();
   }
 
@@ -496,7 +545,9 @@ class DwStackRenderer {
       ..writeln('    default upgrade;')
       ..writeln('    ""      close;')
       ..writeln('}')
-      ..writeln();
+      ..writeln()
+      ..write(_accessLogFormat)
+      ..write(_resolver);
 
     // Above the project's http snippets: the first `listen 80` server is the
     // default for every name no port-80 server claims, and a host added to
@@ -505,8 +556,9 @@ class DwStackRenderer {
     // `default_server`, which would collide with a snippet's own.
     final servedNames = _target.servedDomains.join(' ');
     if (_tls) {
+      buffer.writeln('server {');
+      _accessLog(buffer);
       buffer
-        ..writeln('server {')
         ..writeln('    listen 80;')
         ..writeln('    server_name $servedNames;')
         ..writeln()
@@ -563,8 +615,9 @@ class DwStackRenderer {
     buffer
       ..writeln('    }')
       ..writeln()
-      ..writeln('    location / {')
-      ..writeln('        proxy_pass http://${DwStack.webService}:80;')
+      ..writeln('    location / {');
+    _pass(buffer, webAddress);
+    buffer
       ..writeln(r'        proxy_set_header Host $http_host;')
       ..writeln(r'        proxy_set_header X-Forwarded-Proto $scheme;')
       ..writeln('    }')
@@ -639,8 +692,9 @@ class DwStackRenderer {
         ..writeln('    proxy_request_buffering off;')
         ..writeln('    proxy_buffering off;')
         ..writeln()
-        ..writeln('    location / {')
-        ..writeln('        proxy_pass http://${DwStack.storageService}:9000;')
+        ..writeln('    location / {');
+      _pass(buffer, storageAddress);
+      buffer
         ..writeln('        proxy_http_version 1.1;')
         ..writeln(r'        proxy_set_header Connection "";')
         ..writeln(
@@ -661,6 +715,80 @@ class DwStackRenderer {
     return buffer.toString();
   }
 
+  /// The name of the log format every rendered host writes with.
+  static const String accessLogFormat = 'dw_timed';
+
+  /// One JSON object per request: what `dartway deploy stats` reads, and what
+  /// a person greps. `call` is the wire name of a call (`POST /dw/<name>`),
+  /// empty for anything else — the live socket, whose time is the life of
+  /// the connection, included, and a path no wire name could be, so that
+  /// whatever a stranger sends cannot pose as a call. `upstream_time` is a string: it holds one
+  /// time per upstream tried, and `-` when none answered.
+  static const String _accessLogFormat =
+      '''# One line per request, in JSON: the call it was, how long it took
+# end to end and inside the upstream.
+map \$uri \$dw_call {
+    /dw/live    "";
+    /dw/health  "";
+    ~^/dw/(?<dw_call_name>[A-Za-z0-9_.]+)\$  \$dw_call_name;
+    default     "";
+}
+log_format $accessLogFormat escape=json
+    '{"time":"\$time_iso8601","host":"\$host","method":"\$request_method",'
+    '"uri":"\$uri","call":"\$dw_call","status":\$status,'
+    '"request_time":\$request_time,"upstream_time":"\$upstream_response_time",'
+    '"bytes":\$body_bytes_sent}';
+
+''';
+
+  /// Docker's DNS, for the services every `proxy_pass` names.
+  ///
+  /// A deploy starts the new server beside the serving one, waits for its
+  /// healthcheck and only then stops the old one (`replaceServer`): for a few
+  /// seconds the service name answers with both containers, then with the
+  /// new one alone. A name nginx resolved once, at start, would keep the
+  /// address of a container that is gone. So every `proxy_pass` names its
+  /// service through a variable ([_pass]), which nginx looks up when a
+  /// request needs it, from a cache at most [resolveSeconds] old; and a
+  /// request holds every address the lookup gave, so a refused connection —
+  /// the old server stops listening the moment it starts to drain — or one
+  /// to an address that has just gone is retried on the next
+  /// (`proxy_next_upstream` defaults to `error timeout`). No request meets
+  /// the change as a 502.
+  ///
+  /// Not an `upstream` block with `resolve`: its addresses are shared by
+  /// every request, and a request whose connection is still being tried
+  /// when a lookup changes them is not retried at all — it is answered 504.
+  String get _resolver =>
+      '''# Docker's DNS, asked again every $resolveSeconds s: a deploy starts the new server beside
+# the old one and stops the old one, and every request follows without a restart.
+resolver 127.0.0.11 valid=${resolveSeconds}s ipv6=off;
+
+''';
+
+  /// `proxy_pass` to [address] (`service:port`), looked up for the request
+  /// rather than once at start — see [_resolver].
+  static void _pass(StringBuffer buffer, String address) => buffer
+    ..writeln('        set \$dw_upstream $address;')
+    ..writeln('        proxy_pass http://\$dw_upstream;')
+    ..writeln(connectTimeout);
+
+  static const String serverAddress =
+      'dw-${DwStack.serverService}:${DwStack.serverPort}';
+  static const String webAddress = 'dw-${DwStack.webService}:80';
+  static const String storageAddress = '${DwStack.storageService}:9000';
+
+  /// How long the proxy waits for a connection to a container. Inside the
+  /// network one is made in well under a millisecond, and the connection is
+  /// made before the server accepts it, so a busy server still answers in
+  /// time; an address that takes longer is a container that has just stopped
+  /// and that the proxy has not looked up again yet, and the request goes to
+  /// the next address instead of waiting the default minute for nothing.
+  static const String connectTimeout = '        proxy_connect_timeout 1s;';
+
+  /// How often, in seconds, the proxy looks every upstream up again.
+  static const int resolveSeconds = 2;
+
   /// Compresses only the static app and site hosts. The API and `/dw/`
   /// locations stay untouched: response compression is a delivery concern for
   /// the large web build, not a change to the call protocol.
@@ -675,6 +803,7 @@ class DwStackRenderer {
 
   void _openServer(StringBuffer buffer, String domain) {
     buffer.writeln('server {');
+    _accessLog(buffer);
     switch (stack.front) {
       case DwTlsFront():
         buffer
@@ -694,16 +823,21 @@ class DwStackRenderer {
     buffer.writeln();
   }
 
+  /// Set on every rendered host rather than once for all of them: the
+  /// image's own `nginx.conf` already logs at the `http` level, and a second
+  /// `access_log` there would write every request twice.
+  static void _accessLog(StringBuffer buffer) => buffer.writeln(
+    '    access_log /var/log/nginx/access.log $accessLogFormat;',
+  );
+
   /// Headers of a proxied request to the server.
   ///
   /// `Host` is `$http_host`, port included: the live socket admits a browser
   /// whose `Origin` is the host the upgrade was sent to, and an origin carries
   /// its port.
   static void _proxy(StringBuffer buffer) {
+    _pass(buffer, serverAddress);
     buffer
-      ..writeln(
-        '        proxy_pass http://${DwStack.serverService}:${DwStack.serverPort};',
-      )
       ..writeln('        proxy_http_version 1.1;')
       ..writeln(r'        proxy_set_header Upgrade $http_upgrade;')
       ..writeln(r'        proxy_set_header Connection $connection_upgrade;')
@@ -721,6 +855,44 @@ class DwStackRenderer {
       ..writeln('        proxy_read_timeout 1h;')
       ..writeln('        proxy_send_timeout 1h;')
       ..writeln('        proxy_buffering off;');
+  }
+
+  void _validatePostgresCommand() {
+    if (_target.database != DwDatabaseMode.bundled) return;
+    final file = composeOverride;
+    if (file == null) return;
+    final document = loadYaml(file.readAsStringSync());
+    if (document is! YamlMap || document['services'] is! YamlMap) return;
+    final postgres = document['services'][DwStack.postgresService];
+    if (postgres is! YamlMap || !postgres.containsKey('command')) return;
+    final problem = postgresCommandProblem(postgres['command']);
+    if (problem != null) throw StateError(problem);
+  }
+
+  /// The effective command must retain the library that deploy stats queries.
+  static String? postgresCommandProblem(Object? command) {
+    final settings = RegExp(
+      r'''(?:--)?shared_preload_libraries\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s]+))''',
+    );
+    final values = <String>[];
+    for (final argument in command is List ? command : [command]) {
+      final text = '$argument';
+      if (command is List && text.startsWith('shared_preload_libraries=')) {
+        values.add(text.substring('shared_preload_libraries='.length));
+      } else {
+        for (final match in settings.allMatches(text)) {
+          values.add(match[1] ?? match[2] ?? match[3]!);
+        }
+      }
+    }
+    // Postgres uses the last assignment, including an empty one.
+    final libraries = values.lastOrNull?.split(',').map((s) => s.trim());
+    if (libraries == null || !libraries.contains('pg_stat_statements')) {
+      return 'deploy/compose.override.yml overrides the Postgres command. '
+          'Add -c shared_preload_libraries=pg_stat_statements to that command '
+          'so deploy stats can read statement timings.';
+    }
+    return null;
   }
 
   File? get composeOverride {

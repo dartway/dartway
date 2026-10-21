@@ -46,6 +46,11 @@ final class RecordingLogger implements DwServerLogger {
   static final bool _echo = Platform.environment['DW_TEST_LOG'] != null;
 
   @override
+  bool isEnabled(DwLogLevel level) => level.index >= minLevel.index;
+
+  static DwLogLevel minLevel = DwLogLevel.debug;
+
+  @override
   void log(
     DwLogLevel level,
     String message, {

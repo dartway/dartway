@@ -173,6 +173,8 @@ enum DwCheckType {
   /// it creates and drops throwaway databases); without one the check says it
   /// did not run rather than passing. An error: a schema the migrations do not
   /// produce is a server that refuses to start in the next environment.
+  /// Also rejects ADD COLUMN NOT NULL without DEFAULT on existing tables,
+  /// without requiring a database.
   migrationsDrift,
 
   /// The project's `dartway_*` git dependencies are locked to more than one

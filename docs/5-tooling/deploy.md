@@ -223,6 +223,7 @@ reads it.
 | `storage_domain` | with `bundled` | The public host of the bundled storage; refused without `storage: bundled` |
 | `min_free_disk` | no | Minimum free space on Docker's data root before building; defaults to `10GB`. Positive sizes in `MB` or `GB` (1024-based), for example `512MB` or `10GB` |
 | `build_cache_keep` | no | Build cache retained after a successful deploy; defaults to `10GB`. Positive sizes in `MB` or `GB`, for example `512MB` |
+| `slow_query_ms` | no | With `database: bundled`: the bundled Postgres logs every statement slower than this many milliseconds; defaults to `500`, `0` logs every one. Set by every deploy without restarting the database. Refused with `database: external`, whose slow-query log is its provider's |
 | `registry_mirror` | no | Pull the official Docker Hub images of the stack (`postgres`, `nginx`) through a mirror such as `mirror.gcr.io`; the bundled storage and certbot come from where they live |
 | `firewall_ports` | no | TCP ports to open beyond SSH, 80 and 443 |
 | `requires.secrets` | no | Secrets nobody can generate, as environment variable names |
@@ -319,11 +320,11 @@ The rendered Nginx:
 
 | Service | What it is |
 |---|---|
-| `postgres` | With `database: bundled`: `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck. Absent with `database: external` — no service, no volume, no `depends_on` on it |
+| `postgres` | With `database: bundled`: `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck, started with `pg_stat_statements` preloaded. Absent with `database: external` — no service, no volume, no `depends_on` on it |
 | `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080` always, and with `database: bundled` (and, with the bundled storage, `DW_STORAGE_*`) `DW_DATABASE_*` in the compose file too — with `database: external` none of `DW_DATABASE_*` is rendered at all, all five (`HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`) come from `.env` like any other secret. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
 | `web` | Built from `<project>_flutter/Dockerfile`; `deploy run` passes `DW_BACKEND_URL` from `app_domain` as a build argument. The template's web release calls `Uri.base.origin` |
 | `storage`, `storage-init` | With `storage: bundled`: RustFS, and a one-shot job (a generic S3 client) that creates and configures both buckets on every deploy |
-| `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443 |
+| `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443. Every host logs each request as one JSON line ([Speed](#speed--what-a-deployment-records)), into bounded files: ten of 50 MB |
 | `certbot` | Renews the certificate every 12 hours |
 
 **Data-bearing images are pinned** — Postgres to its major, the storage to an exact release — so a
@@ -565,32 +566,56 @@ converges with one `dartway deploy setup`, followed by
    take down, and the certificate is left to step 13;
 8. reads free space on Docker's data root (`docker info`, falling back to `/var/lib/docker`),
    refuses below `min_free_disk` (default `10GB`), then builds the images. The space check is
-   read-only and runs again before every build, including a resumed build;
+   read-only and runs again before every build, including a resumed build. Preflight also warns
+   when host available memory is below three times the merged Compose server memory limit
+   (two servers plus the migration container); the warning does not block deployment;
 9. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
-   bundled`, starts Postgres — with `database: external` there is nothing of the database's to start,
-   the server reaches it directly;
-10. **replaces the server, one version at a time.** The serving server stops gracefully — calls in
-   flight are answered, live sockets close with "server stopping" — and from then on the proxy
-   answers `502`, which the app's client retries for up to 30 seconds (a command keeps its
-   idempotency key, so a retry never runs it twice). The new image applies the migrations in a
-   one-off run that serves nothing and takes no jobs (`DW_MIGRATE_ONLY=true`), then the new server
-   starts and has to become healthy. The gap is the stop, the migrations and the start: seconds
-   for a routine deploy, as long as a migration takes for a heavy one. **No two versions ever run
-   at once**: old code never writes into a new schema, never claims a job only the new code
-   declares. When the migrations fail (they roll back) or the new server does not become healthy,
-   the image that was serving is started again and the step fails with the server's own log; after
-   a failure past the migrations the previous code runs on the new schema, and the message says so;
-11. replaces the web app, and converges the rest of the stack (`up -d --remove-orphans`);
+   bundled`, starts Postgres, creates the `pg_stat_statements` extension and sets the slow-statement
+   log to `slow_query_ms`, with `log_parameter_max_length = 0` and
+   `log_parameter_max_length_on_error = 0` so bind values are not logged (`ALTER SYSTEM` and a
+   reload — the database is not restarted) — with
+   `database: external` there is nothing of the database's to start, the server reaches it directly;
+10. **replaces the server without a moment in which nothing answers.** The new image applies the
+   migrations in a one-off run that serves nothing and takes no jobs (`DW_MIGRATE_ONLY=true`) while
+   the previous server still serves; then the new server starts **beside** it (`--scale` one higher,
+   the serving container left alone) without the routed network alias. Only after health passes does
+   the deploy attach it with `docker network connect --alias dw-server`; then the previous one stops
+   gracefully — calls in flight are answered, live sockets close with "server stopping" and the
+   client reconnects to the new one on its own. The proxy follows by itself: every `proxy_pass` names
+   its routing alias (`dw-server` or `dw-web`) through a variable, which Nginx looks up through
+   Docker's DNS when a request needs
+   it, from a cache at most two seconds old; and a request holds every address the lookup gave, so a
+   connection the stopping server refuses, or one to an address that has just gone (at most a
+   one-second wait), is retried on the next. No request meets the change as a `502`. The price is
+   a few seconds in which both versions run: the previous code on the new schema, which is what
+   [expand, then contract](../4-server/migrations.md) asks a release to allow anyway; each process
+   takes only the jobs it declares; a command's publication reaches the live sockets of the process
+   that ran it, and the sockets of the other reconnect within seconds and re-read what they watch.
+   When the migrations fail (they roll back) or the new server does not become healthy, the
+   previous server never stopped: the new container is removed, the service's image name points at
+   the serving image again, and the step fails with the server's own log; after a failure past the
+   migrations the previous code runs on the new schema, and the message says so. With nothing
+   serving before — a first deploy, a stand that was down — the new server simply starts, and on a
+   failure the previous image is started again;
+   An unhealthy new container receives no proxy traffic. `dartway check` rejects required column additions without a default;
+   general expand/contract compatibility remains a review obligation under D-143.
+11. replaces the web app the same way, beside the serving one, and converges the rest of the stack
+   (`up -d --remove-orphans`);
 12. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
-   the server — and runs `nginx -t` inside the running proxy. Nginx resolves an upstream once, when it
-   starts, so a snippet naming a service the stack does not have fails at the next proxy restart; this
-   stops the deploy before that restart;
+   the server — and runs `nginx -t` inside the running proxy. Nginx resolves a literal upstream in a
+   snippet when it reads its configuration, so a snippet naming a service the stack does not have
+   is refused at the next reload and stops the proxy at its next start; this stops the deploy before
+   that reload;
 13. makes the certificate cover every served host once more, through the proxy now running: what a
    first deploy could not ask for at step 7 is issued here, and a failed first issuance puts the
    self-signed certificate back. On a routine deploy step 7 has already covered every host, and
    this asks nothing;
-14. restarts Nginx and checks it is still running afterwards: `restart` exits 0 for a proxy that dies
-    a second later on its configuration;
+14. **reloads** Nginx onto the rendered configuration and the certificate — gracefully, with retiring
+   workers bounded to 30 seconds (`worker_shutdown_timeout`) even while holding WebSockets: the old
+    workers finish what they serve, new ones take every new connection, nothing is refused the way a
+    restart would — and checks that it is still running and that its log has no `[emerg]` since the
+    reload: `nginx -s reload` exits 0 having only sent a signal, and a master that rejects a
+    configuration keeps the previous one and says so only there;
 15. verifies the stack from outside (the probes below);
 16. **cleans up after success:** removes unused server and web images belonging to this Compose
     project, keeping both rollback images and every image still used by a container, then trims the
@@ -719,6 +744,44 @@ times five seconds apart:
 
 A deploy whose probes fail exits `1` and names what was observed.
 
+## Speed — what a deployment records
+
+Three logs, each where the fact is born, and one command that reads them:
+
+- **The proxy** writes every request as one JSON line (`log_format dw_timed`): `time`, `host`,
+  `method`, `uri`, `call` — the wire name of a call, `POST /dw/<name>`; empty for the live socket,
+  whose time is the life of the connection, and for anything that is not a call — `status`,
+  `request_time` (end to end, seconds), `upstream_time` (inside the server; one value per address
+  tried) and `bytes`. Read it raw with `docker compose logs nginx`. Snippets under
+  `deploy/nginx.d/http` that declare servers of their own keep the image's default format.
+- **The server** logs every call with its wire name, status, milliseconds and answer size: at debug,
+  and as a warning for a call slower than `DwServerSettings.slowCallThreshold` (1 s) — [the app server](../4-server/app-server.md#call-timing).
+- **The bundled Postgres** counts every statement by its shape in `pg_stat_statements`, and logs
+  each one slower than `slow_query_ms` (500 ms) as `duration: … ms  statement: …`.
+
+The bundled Postgres Docker log is bounded to ten files of 50 MB, like nginx's.
+If `deploy/compose.override.yml` replaces its command, keep
+`-c shared_preload_libraries=pg_stat_statements`; preflight refuses a command that drops it.
+Bind parameters are excluded from slow-query and error logs. SQL text still appears in these logs: use
+bind parameters for private values rather than SQL literals.
+
+```sh
+dartway deploy stats --env production            # the last 24 hours
+dartway deploy stats --env production --hours 2 --top 20
+```
+
+`stats` connects like `check` (`--as`, `--identity`) and changes nothing. It prints, per call, the
+count, p50, p95 and the slowest time over the last `--hours` from the proxy's log — slowest p95
+first, the 500s counted — then the `--top` statements by total time from `pg_stat_statements`
+(totals since the counters were last reset, which it names), and how many statements the slow log
+caught over the window. The percentiles are computed on the server, so one line per call crosses
+the connection, not one per request. With `database: external` it reads the proxy only: the
+provider shows the statements.
+
+The proxy's log is the source because it holds every call for as long as the proxy container
+lives, while a server container is replaced by every deploy and its log with it. It stops at ten
+files of 50 MB — a few hundred thousand requests, which is how far back a busy server can look.
+
 ## `check` — would a deployment work?
 
 `check` changes nothing. It prints the environment it resolved, then asserts over the working copy
@@ -742,6 +805,7 @@ skips DNS, the server and the deployed hosts — the form that needs no SSH key 
 | `web-cache-policy` | warning | The web image's Nginx configuration revalidates every Flutter entry point |
 | `nginx-upstreams` | error | Every `proxy_pass` in the rendered Nginx and in `deploy/nginx.d/` names a service of the stack or the override |
 | `override-web-build` | warning | `deploy/compose.override.yml` does not rebuild `web` — that would name the API address a second time, and nothing compares the copies |
+| `override-side-by-side` | error | `deploy/compose.override.yml` gives neither `server` nor `web` a `container_name` or published `ports` — a deploy starts the new container beside the serving one, and two cannot share a name or a host port |
 | `local-secrets-untracked` | error | `deploy/secrets.yaml` is not tracked by Git |
 | `local-secrets-cover-environment` | warning | `deploy/secrets.yaml` holds every required secret for the environment (reported by `check` only; `run` does not evaluate it) |
 | `dns-public-hosts` | error | Every served host resolves to the deployment host — a mismatch otherwise burns the Let's Encrypt rate limit |

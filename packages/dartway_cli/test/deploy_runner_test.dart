@@ -21,6 +21,68 @@ List<String> _ids(DwDeployRunner runner) =>
     runner.steps(skipGitUpdate: false).map((step) => step.id).toList();
 
 void main() {
+  for (final field in ['mem_limit', 'deploy']) {
+    test('low host memory warns using $field and does not fail', () async {
+      final server = field == 'mem_limit'
+          ? {'mem_limit': '1024'}
+          : {
+              'deploy': {
+                'resources': {
+                  'limits': {'memory': '1024'},
+                },
+              },
+            };
+      final ssh = RecordingSsh([
+        (
+          'config --format json',
+          DwSshResult(
+            exitCode: 0,
+            stdout:
+                '${jsonEncode({
+                  'services': {'server': server},
+                })}\n--dw-free-memory--\n2000\n',
+            stderr: '',
+          ),
+        ),
+      ]);
+      final result = await DwDeployRunner(
+        ssh: ssh,
+        stack: stackFrom(),
+      ).checkComposeConfig();
+      expect(result.ok, isTrue);
+      expect(result.stdout, contains('WARNING:'));
+      expect(result.stdout, contains('3072'));
+    });
+  }
+  test('an overridden Postgres command must keep pg_stat_statements', () async {
+    final ssh = RecordingSsh([
+      (
+        'config --format json',
+        DwSshResult(
+          exitCode: 0,
+          stdout:
+              '${jsonEncode({
+                'services': {
+                  'postgres': {
+                    'command': ['postgres', '-c', 'max_connections=200'],
+                  },
+                },
+              })}\n--dw-free-memory--\n2000\n',
+          stderr: '',
+        ),
+      ),
+    ]);
+    final result = await DwDeployRunner(
+      ssh: ssh,
+      stack: stackFrom(),
+    ).checkComposeConfig();
+    expect(result.ok, isFalse);
+    expect(
+      result.stderr,
+      contains('-c shared_preload_libraries=pg_stat_statements'),
+    );
+  });
+
   test('a local deployment cannot reset a remote journal', () {
     final ssh = RecordingSsh();
     final runner = DwDeployRunner(
@@ -148,7 +210,11 @@ case "\$*" in
   info*) echo '${temp.path}' ;;
   *" ps -aq server") echo server-container ;;
   *" ps -aq web") echo web-container ;;
-  *" ps -q server") echo new-server-container ;;
+  *" ps -q --status running server") echo server-container ;;
+  *" ps -q --status running web") echo web-container ;;
+  *" ps -q server") echo server-container; echo new-server-container ;;
+  *" ps -q web") echo web-container; echo new-web-container ;;
+  *"com.docker.compose.project"*) echo shop ;;
   "inspect -f "*"{{.State.Status}}"*) echo 'running healthy 0 0' ;;
   "inspect -f {{.Config.Image}} "*) echo "shop-\${4%-container}:latest" ;;
   "inspect -f {{.Image}} "*) echo "sha256:old-\${4%-container}" ;;
@@ -181,7 +247,9 @@ esac
 echo 'Filesystem 1024-blocks Used Available Capacity Mounted on'
 echo 'test-disk 31457280 0 20971520 0% ${temp.path}'
 ''');
-      Process.runSync('chmod', ['+x', docker.path, df.path]);
+      final sleep = File(p.join(bin.path, 'sleep'))
+        ..writeAsStringSync('#!/bin/sh\nexit 0\n');
+      Process.runSync('chmod', ['+x', docker.path, df.path, sleep.path]);
       runner = DwDeployRunner(
         ssh: LocalShell(
           environment: {'PATH': '${bin.path}:${Platform.environment['PATH']}'},
@@ -317,7 +385,7 @@ echo 'test-disk 31457280 0 20971520 0% ${temp.path}'
         'check-upstreams',
         'nginx-test',
         'certificate-started-proxy',
-        'restart-proxy',
+        'reload-proxy',
         'verify-outside',
         'cleanup',
       ]);
@@ -377,11 +445,11 @@ echo 'test-disk 31457280 0 20971520 0% ${temp.path}'
       },
     );
 
-    test('the proxy is checked, then certified, then restarted', () {
+    test('the proxy is checked, then certified, then reloaded', () {
       before('stack', 'check-upstreams');
       before('check-upstreams', 'nginx-test');
       before('nginx-test', 'certificate-started-proxy');
-      before('certificate-started-proxy', 'restart-proxy');
+      before('certificate-started-proxy', 'reload-proxy');
     });
 
     test('a certificate that fails leaves every service as it was', () async {
@@ -469,7 +537,7 @@ echo 'test-disk 31457280 0 20971520 0% ${temp.path}'
       await runner.replaceServer();
       await runner.startWeb();
       await runner.startStack();
-      await runner.restartProxy();
+      await runner.reloadProxy();
 
       expect(ssh.issued, hasLength(8));
       for (final command in ssh.issued.where(
@@ -522,6 +590,7 @@ echo 'test-disk 31457280 0 20971520 0% ${temp.path}'
       /// [image] would, and answers the result and the docker calls made.
       Future<(DwSshResult, List<String>)> replace({
         bool running = true,
+        bool stopped = false,
         bool migrationFails = false,
         bool healthy = true,
         bool digestResolvable = true,
@@ -538,8 +607,9 @@ echo 'test-disk 31457280 0 20971520 0% ${temp.path}'
 #!/bin/sh
 echo "\$*" | sed 's/-f [^ ]*//g; s/  */ /g' >> '${calls.path}'
 case "\$*" in
-  *" ps -aq server"*) ${running ? 'echo old-container' : 'true'} ;;
-  *" ps -q server"*) echo new-container ;;
+  *" ps -aq server"*) ${running || stopped ? 'echo old-container' : 'true'} ;;
+  *" ps -q --status running server"*) ${running ? 'echo old-container' : 'true'} ;;
+  *" ps -q server"*) ${running ? 'echo old-container; ' : ''}echo new-container ;;
   *"{{.Config.Image}}"*) echo shop-server ;;
   "inspect -f {{.Image}}"*) echo $image ;;
   "inspect -f {{.Id}}"*) echo old-container ;;
@@ -549,11 +619,16 @@ case "\$*" in
   "ps -aq --no-trunc --filter ancestor=sha256:previous") echo old-container ;;
   "ps -aq --no-trunc --filter ancestor="*) echo other-container ;;
   *" run --rm --no-deps -T -e DW_MIGRATE_ONLY=true server"*) ${migrationFails ? 'echo "migration 42 failed" >&2; exit 1' : 'echo migrated'} ;;
+  *"com.docker.compose.project"*) echo shop ;;
   *"{{.State.Status}}"*) echo "running ${healthy ? 'healthy' : 'unhealthy'} 0 0" ;;
 esac
 exit 0
 ''');
-        Process.runSync('chmod', ['+x', docker.path]);
+        // The proxy's catch-up pause and the health polling are waits on a
+        // real Docker; against this one they would only make the test slow.
+        final sleep = File(p.join(bin.path, 'sleep'))
+          ..writeAsStringSync('#!/bin/sh\nexit 0\n');
+        Process.runSync('chmod', ['+x', docker.path, sleep.path]);
         final runner = DwDeployRunner(
           ssh: LocalShell(
             environment: {
@@ -607,20 +682,32 @@ exit 0
         expect(previous.readAsStringSync().trim(), 'sha256:replacement');
       });
 
-      test('stops the old one, migrates in a one-off run, then starts the new '
-          'one — never two at once', () async {
+      test('migrates while the previous server serves, starts the new one '
+          'beside it, and stops the previous one only after', () async {
         final (result, calls) = await replace();
         expect(result.ok, isTrue, reason: result.stderr);
-        final stop = at(calls, 'stop -t 45 server');
         final migrate = at(calls, 'DW_MIGRATE_ONLY=true server');
-        final start = at(calls, 'up -d --no-deps server');
-        expect(stop, isNot(-1));
-        expect(migrate, greaterThan(stop));
+        final start = at(
+          calls,
+          'up -d --no-deps --no-recreate --scale server=2 server',
+        );
+        final health = at(calls, 'new-container');
+        final stop = at(calls, 'stop -t 45 old-container');
+        expect(migrate, isNot(-1));
         expect(start, greaterThan(migrate));
+        expect(health, greaterThan(start));
+        final attached = at(
+          calls,
+          'network connect --alias dw-server shop_routed new-container',
+        );
+        expect(attached, greaterThan(health));
+        expect(stop, greaterThan(attached));
+        expect(at(calls, 'rm old-container'), greaterThan(stop));
+        expect(at(calls, 'rm --force'), -1, reason: 'nothing to clear away');
         expect(
           at(calls, 'image tag sha256:previous shop-server:dw-previous'),
-          lessThan(stop),
-          reason: 'pin before removing the old container',
+          lessThan(migrate),
+          reason: 'pin before the new image runs',
         );
         expect(
           calls.where(
@@ -629,6 +716,7 @@ exit 0
           isEmpty,
           reason: 'no rollback',
         );
+        expect(result.stdout, contains('the new server serves'));
       });
 
       test(
@@ -687,11 +775,11 @@ exit 0
           );
           expect(
             result.stderr,
-            contains('there is no previous server to start again'),
+            contains('there is no previous server to fall back to'),
           );
-          expect(at(calls, 'stop -t 45 server'), isNot(-1));
+          expect(at(calls, 'stop -t 45'), -1, reason: 'it keeps serving');
           expect(at(calls, 'image tag'), -1);
-          expect(at(calls, 'up -d --no-deps server'), -1);
+          expect(at(calls, 'up -d --no-deps'), -1);
         },
       );
 
@@ -752,25 +840,61 @@ exit 0
         },
       );
 
-      test('a failed migration starts the previous image again', () async {
+      test('a failed migration leaves the previous server serving, under its '
+          'own image name', () async {
         final (result, calls) = await replace(migrationFails: true);
         expect(result.ok, isFalse);
         expect(result.stderr, contains('migration 42 failed'));
-        expect(result.stderr, contains('previous server is running again'));
+        expect(result.stderr, contains('the previous server keeps serving'));
         final tag = calls.indexWhere(
           (call) => call.endsWith('image tag sha256:previous shop-server'),
         );
         expect(tag, greaterThan(at(calls, 'DW_MIGRATE_ONLY=true')));
-        expect(at(calls.sublist(tag), 'up -d --no-deps server'), isNot(-1));
+        expect(at(calls, 'up -d --no-deps'), -1);
+        expect(at(calls, 'stop -t 45'), -1);
       });
 
-      test('a new server that does not become healthy is replaced by the '
-          'previous one, and the message names the schema', () async {
-        final (result, calls) = await replace(healthy: false);
-        expect(result.ok, isFalse);
-        expect(result.stderr, contains('previous code runs on the new schema'));
-        expect(at(calls, 'image tag sha256:previous shop-server'), isNot(-1));
-      });
+      test(
+        'a new server that does not become healthy is removed, the '
+        'previous one keeps serving, and the message names the schema',
+        () async {
+          final (result, calls) = await replace(healthy: false);
+          expect(result.ok, isFalse);
+          expect(
+            result.stderr,
+            contains('previous code runs on the new schema'),
+          );
+          expect(result.stderr, contains('the previous server keeps serving'));
+          expect(at(calls, 'network connect'), -1);
+          expect(at(calls, 'rm --force new-container'), isNot(-1));
+          expect(at(calls, 'image tag sha256:previous shop-server'), isNot(-1));
+          expect(at(calls, 'stop -t 45'), -1);
+        },
+      );
+
+      test(
+        'a stopped server is cleared away and started again when the new one '
+        'fails',
+        () async {
+          final (result, calls) = await replace(
+            running: false,
+            stopped: true,
+            migrationFails: true,
+          );
+          expect(result.ok, isFalse);
+          final cleared = at(calls, 'rm --force old-container');
+          expect(cleared, isNot(-1));
+          expect(cleared, lessThan(at(calls, 'DW_MIGRATE_ONLY=true')));
+          expect(
+            result.stderr,
+            contains('the previous server is running again'),
+          );
+          final tag = calls.indexWhere(
+            (call) => call.endsWith('image tag sha256:previous shop-server'),
+          );
+          expect(at(calls.sublist(tag), 'up -d --no-deps server'), isNot(-1));
+        },
+      );
 
       test(
         'a first deployment has nothing to stop and nothing to go back to',
@@ -778,7 +902,12 @@ exit 0
           final (result, calls) = await replace(running: false);
           expect(result.ok, isTrue, reason: result.stderr);
           expect(at(calls, 'stop -t 45'), -1);
+          expect(at(calls, '--scale'), -1);
           expect(at(calls, 'DW_MIGRATE_ONLY=true server'), isNot(-1));
+          expect(
+            at(calls, 'up -d --no-deps server'),
+            greaterThan(at(calls, 'DW_MIGRATE_ONLY=true server')),
+          );
         },
       );
     });
@@ -1549,7 +1678,7 @@ EOF
     });
   });
 
-  group('the upstream guard before the proxy restart', () {
+  group('the upstream guard before the proxy reload', () {
     test(
       'asks the server for the applied stack and the rendered config',
       () async {
@@ -1575,7 +1704,7 @@ EOF
       );
     });
 
-    test('an upstream nothing declares stops the restart and says why', () {
+    test('an upstream nothing declares stops the reload and says why', () {
       final verdict = DwDeployRunner.upstreamVerdict(
         const DwSshResult(
           exitCode: 0,
@@ -1584,7 +1713,7 @@ EOF
         ),
       );
       expect(verdict, contains('storage'));
-      expect(verdict, contains('Nothing has been restarted'));
+      expect(verdict, contains('Nothing has been reloaded'));
     });
 
     test('an answer missing its second half is a finding, not a pass', () {

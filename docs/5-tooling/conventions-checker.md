@@ -162,7 +162,7 @@ Forty-five errors, fourteen warnings, one info — `DwCheckType` and its `severi
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `forbiddenDateTimeNow` | error | `DateTime.now` or `DateTime.timestamp` (called or torn off, interpolations included), or `package:clock`'s `clock.now()` where it is imported (prefixed or not), anywhere in the server's `lib/` — the factory file included — the time there is `ctx.now`, the server's clock, which tests set and the job queue runs by. Comments and strings are passed over; `bin/` and `test/` are not judged |
-| `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
+| `migrationsDrift` | error | Required additions to existing tables without a default (checked offline), or migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
 | `redundantBangAllowed` | error | The server or the shared package's `analysis_options.yaml` (or a local file it includes) does not set `analyzer: errors: unnecessary_non_null_assertion: error` — a stored row's id is `int`, and `row.id!` hides the `!` that guards a real null (D-113) |
 | `migrationChangesData` | error | An `INSERT`, `UPDATE` or `DELETE` in a migration (`lib/src/migrations/m*.dart`) that is not an argument of `m.backfill(…)` — content is a seed step. Reads the SQL strings: adjacent literals as one string, `--` comments dropped, an interpolated table name still a table; only the dollar-quoted body of a function or procedure being defined passes. Migrations up to `deploy/config.yaml` > `migrations` > `dataChecksAfter` are not judged — and moving that key forward exempts whatever it passes, which no check can see: the agent's skills make a diff that moves it a stop for the human. A write into a `dw_*` table is refused even through `backfill`; `m.carrySettings` is the one way ([Migrations](../4-server/migrations.md#a-migration-changes-the-schema)) |
 | `workAfterServerStart` | error | `bin/server.dart` awaiting anything, or reaching `.db`, `.accounts` or `runInContext`, after the server's `start()` — the variable a `DwAppServer(…)` or `…Server.build(…)` was assigned to — in the same function; awaiting `stop()`/`close()` or a `ProcessSignal` passes ([Startup steps and seeds](../4-server/app-server.md#startup-steps-and-seeds)) |
@@ -323,7 +323,10 @@ a server that has its handler, and a field missing from a codec simply does not 
 prints is `dartway generate`, and generated files are never edited by hand. See
 [Data objects and generation](../2-core/data-objects-and-generation.md).
 
-**`migrationsDrift`** runs the project's `bin/migrate.dart check`, which replays the migrations on
+**`migrationsDrift`** first checks migration sources offline: `ADD COLUMN … NOT NULL` on an
+existing table needs `DEFAULT`, or a nullable column with backfill and `NOT NULL` in a later release,
+so the previous server can still insert during deployment. General expand/contract compatibility
+remains a review obligation. It also runs the project's `bin/migrate.dart check`, which replays the migrations on
 throwaway databases next to the one `DW_DATABASE_*` — or `deploy/config.yaml > local`, which the
 check reads the same way the entry points do — names — so it needs a Postgres where databases can
 be created; the development one will do. It fails on migrations that do not produce the schema the

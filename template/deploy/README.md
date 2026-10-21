@@ -12,6 +12,7 @@ dartway deploy setup --env staging          # provision + render the stack
 dartway secret set SMS_API_TOKEN --env staging   # what cannot be generated
 dartway deploy check --env staging          # DNS, the server, the site
 dartway deploy run   --env staging          # update, build, start, verify
+dartway deploy stats --env staging          # p50/p95 per call, costliest queries
 ```
 
 ## Kamal
@@ -107,22 +108,37 @@ a private bucket anyone can read or a public one nobody can.
    cover every host through the proxy still serving — before anything is
    replaced, so a Let's Encrypt failure leaves the previous version serving —
    then builds the images;
-4. starts storage and the database;
-5. **starts the new server beside the running one**. It applies its migrations
-   as it starts, and either answers `/health` or exits; on an exit its log is
-   printed and the deploy stops with the previous version still serving. That
-   log *is* the migration outcome, in the server's own words;
-6. replaces the server and waits for it to be healthy, then the web image;
+4. starts storage and the database, with `pg_stat_statements` on and the
+   slow-statement log at `slow_query_ms`;
+5. **applies the migrations while the previous server still serves**, in a
+   one-off run of the new image; on a failure its log is printed and the deploy
+   stops with the previous version still serving. That log *is* the migration
+   outcome, in the server's own words;
+6. **starts the new server beside the running one**, waits for its healthcheck,
+   and only then stops the previous one gracefully; the web image the same way.
+   The proxy looks the services up per request and retries a refused
+   connection on the next address, so no request is answered `502`;
 7. checks that every upstream of the proxy is a service of the applied stack and
    runs `nginx -t` inside the running proxy, issues the certificate if no proxy
-   was running to ask through before (a first deploy), and restarts the proxy —
-   and checks that it is still running afterwards;
+   was running to ask through before (a first deploy), and reloads the proxy —
+   gracefully — and checks that it is still running and accepted it;
 8. verifies from outside, as a browser and an app would: `/health` on the api host and `/dw/health` on the app host answer 200, the app host serves the Flutter `index.html` with a
    revalidating cache policy, `/dw/live` upgrades through both hosts and the
    server answers on the socket, and — where declared — the site answers and
    the storage preflight admits a PUT from the app's origin, the public
    bucket's probe object reads without credentials, the private bucket's does
    not, and neither bucket lists its keys.
+
+## Speed
+
+The proxy logs every request as one JSON line — the call's wire name, status,
+`request_time` and `upstream_time` (`docker compose logs nginx` on the
+server); the server logs every call at debug and a warning for one slower than
+`DwServerSettings.slowCallThreshold` (1 s); the bundled Postgres counts every
+statement in `pg_stat_statements` and logs each one slower than
+`slow_query_ms` (500 ms, in `config.yaml`). `dartway deploy stats --env
+staging` reads them over SSH and changes nothing: p50/p95 per call over the
+last `--hours` (24), then the `--top` (10) statements by total time.
 
 ## Caching — why a redeploy might not reach the browser
 
@@ -195,3 +211,11 @@ are the project's to deliver:
 Sign-in codes are written to the server log until a delivery is wired into
 `deliverCode` (`../dartway_starter_server/lib/src/account/logic/auth.dart`); list the gateway's
 keys under `requires.secrets` in `config.yaml` when it is.
+
+New server and web containers receive their routed Docker network aliases only after their
+healthchecks pass. A failed replacement receives no proxy traffic. Migrations still run while the
+previous server serves: required additions to existing tables need a default, or a nullable column
+followed by backfill and `NOT NULL` in a later release. `dartway check` checks this addition.
+Postgres slow/error logs omit bind parameters and Docker logs are bounded. A Postgres command
+override must retain `-c shared_preload_libraries=pg_stat_statements`. Deploy preflight warns if host
+available memory cannot fit two servers plus the migration container at the configured limits.

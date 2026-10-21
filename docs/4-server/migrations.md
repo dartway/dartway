@@ -37,6 +37,11 @@ A type change uses the same sequence through a new column. A direct `renameColum
 added in the same unreleased branch. A drop and an add in one table are usually a rename; that
 does not make a direct rename safe for released readers.
 
+`dartway check` rejects `ADD COLUMN … NOT NULL` without `DEFAULT` on an existing table.
+A default, or a nullable column with backfill and `NOT NULL` in a later release, keeps the previous
+server's inserts working during a side-by-side deployment. This narrow offline check does not
+prove general expand/contract compatibility.
+
 ## `DwDatabaseMigration`
 
 A migration adding an `invoice` table, as `create` would draft it:
@@ -107,8 +112,9 @@ months against the schema of its own day. It describes tables with schema litera
 `dropForeignKey`, `addUnique`, `dropUnique`, `createIndex`, `dropIndex`, and `sql` / `query` for
 everything else. A `backfill` is an SQL expression computed for each existing row: the column is
 added nullable, filled and then made `NOT NULL`, in the migration's transaction.
-Adding a `NOT NULL` column with only `backfill:` is an expansion only if the previous code does
-not insert into that table; otherwise the column needs a default so its inserts still work.
+A `backfill:` fills existing rows. A new required column on an existing table also needs
+`defaultSql` so the previous server can still insert during deployment; the checker rejects a
+required `addColumn` with only a backfill. Alternatively keep it nullable until a later release.
 
 `DwCalendarDay` maps to PostgreSQL `date`. Adopting it for a new field is optional and needs no
 framework migration. If a project chooses to convert an existing `timestamptz` field, the project
