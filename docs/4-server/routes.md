@@ -126,7 +126,7 @@ With `deploy kamal`, the API service is the root service on its own host. With
 topology, the app host proxies only `/dw/` to the server; its Flutter router may
 use any other path, including one that matches a server route. External callers
 reach project routes on the API domain ([deploy](../5-tooling/deploy.md)).
-In development, `dart run dartway_cli:dartway dev` forwards `/dw/*` by default;
+In development, `dartway dev` forwards `/dw/*` by default;
 use `--api-path /webhooks/payments` to opt in to forwarding a project door
 ([CLI](../5-tooling/cli.md)).
 

@@ -130,3 +130,5 @@ happened, the note says what to do about it.
 - [CI holds the committed dependency locks](2026-10-10-ci-holds-the-locks.md) — add
   `--enforce-lockfile` to every package's CI dependency step, refreshing and committing the locks
   first (`dartway_cli` 0.24.0).
+- [Type a bare dartway, and format with dartway format](2026-10-21-pinned-cli-and-format.md) — add
+  the `format --check` gate after `generate --check` (`dartway_cli` 0.26.0-dev.1).

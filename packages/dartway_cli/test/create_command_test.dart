@@ -560,6 +560,11 @@ void main() {
           'dart run dartway_cli:dartway generate --check $base',
         ),
         (
+          'format --check',
+          'shop_flutter',
+          r'dart run dartway_cli:dartway format --check --base "$CONTRACT_BASE"',
+        ),
+        (
           'deploy kamal --check',
           'shop_flutter',
           'if [ -f ../deploy/studio.yml ]; then\n'

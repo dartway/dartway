@@ -2,28 +2,38 @@
 
 It is the front door and the toolbox of a project: one command prints the whole setup instruction,
 one checks the machine, one creates a project, two install and update the agent toolkit, one runs
-the generator, one checks the conventions, one serves the web app and the server on one origin, one
+the generator, one formats, one checks the conventions, one serves the web app and the server on one origin, one
 runs the server tests on a database of their own, one deploys, and one counts lines.
 
 ```bash
 dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
 ```
 
-**Inside a project, run the CLI the project pins.** Every DartWay project carries `dartway_cli` as a
-dev dependency of its Flutter package, at the same version as the rest of the framework it pins:
+**Inside a project, `dartway` runs the CLI the project pins.** Every DartWay project carries
+`dartway_cli` as a dev dependency of its Flutter package, at the same version as the rest of the
+framework it pins:
 
 ```bash
-cd <project>_flutter
-dart run dartway_cli:dartway generate       # the project's own CLI, whatever is on PATH
+cd <project>          # the project root, or its Flutter package
+dartway generate      # the project's own CLI, whatever version is on PATH
 ```
 
 A globally activated `dartway` is a second copy with a life of its own, and the two drift — a global
 CLI from before a release has no `generate` at all, while the project it is standing in has no
-other way to write `*.dw.dart`. What that looks like is "unknown command", three steps from the
-cause. So `generate`, `check`, `test`, `deploy`, `dev` and `stats`
-refuse to run when the CLI that started them is not the one the project pins, and say which command
-would have worked. `create` and `quickstart` (there is no project yet), `update` and `setup-ai`
-(they repair the pins) and `doctor` (it touches nothing) run either way.
+other way to write `*.dw.dart`. So `generate`, `check`, `test`, `deploy`, `dev`, `stats` and
+`format`, started by a `dartway` of another version, are not run by it: it runs the pinned one —
+`dart run dartway_cli:dartway <command>` from the Flutter package, on the Dart of the Flutter
+`.fvmrc` pins — with the same arguments, stdio and exit code, and says so in one line on stderr:
+
+```
+dartway 0.25.0: running the dartway_cli 0.26.0 this project pins, on the Dart of Flutter 3.47.6 (my_app_flutter/.fvm/flutter_sdk).
+```
+
+The only refusal is a pin that cannot be found — the Flutter package declares `dartway_cli`, and its
+packages are not resolved yet. It names the `pub get` that fixes it. `create` and `quickstart`
+(there is no project yet), `update` and `setup-ai` (they repair the pins) and `doctor` (it touches
+nothing) run on whichever CLI started them. Without a `dartway` on `PATH` — a CI runner —
+`dart run dartway_cli:dartway <command>` from the Flutter package is the same command.
 
 **The complete, current option list of any command is `dartway help <command>`** — and for the
 nested ones, `dartway help secret push`. That output is generated from the parser, so it
@@ -32,7 +42,8 @@ cannot drift from the code. This page does not restate every flag. It names the 
 before relying on them.
 
 The commands, as `packages/dartway_cli/bin/dartway.dart` registers them: `quickstart`, `doctor`,
-`create`, `setup-ai`, `update`, `generate`, `check`, `dev`, `deploy`, `secret`, `stats`, `test`. A
+`create`, `setup-ai`, `update`, `generate`, `format`, `sync`, `check`, `dev`, `deploy`, `secret`,
+`stats`, `test`. A
 usage error
 exits `64`; a refusal the command explains exits `1`.
 
@@ -91,7 +102,7 @@ Checks, each with the exact fix when it fails:
 | git, with `user.name` and `user.email` | `create` commits the new project. A missing binary fails; a missing identity warns — the project is complete, but has no initial commit |
 | A pub host that answers | `pub get` sets no deadline on a connection that opens and goes quiet, so a filtered route surfaces as a resolve step that hangs without a word. The probe asks for bytes rather than a socket (a TCP connect succeeds even when the TLS handshake after it is filtered), waits 10 seconds, and honours `PUB_HOSTED_URL` |
 | Test servers (`tests`, when a test URL variable is set) | Validates `DW_TEST_DATABASE_URL` / `DW_TEST_STORAGE_URL` and reports their hosts without credentials. Doctor requires loopback and has no remote-server override |
-| A responding Docker daemon | Postgres and the storage come from it by default. Doctor drops this check when nonempty `DW_TEST_DATABASE_URL` is set; `DW_TEST_STORAGE_URL` alone still needs Docker for Postgres. Flags passed only to the test command (`dart run dartway_cli:dartway test`) do not change doctor's checks. Not installed and not running are reported apart |
+| A responding Docker daemon | Postgres and the storage come from it by default. Doctor drops this check when nonempty `DW_TEST_DATABASE_URL` is set; `DW_TEST_STORAGE_URL` alone still needs Docker for Postgres. Flags passed only to the test command (`dartway test`) do not change doctor's checks. Not installed and not running are reported apart |
 | The pub global bin directory on `PATH` | The cause of `dartway: command not found` right after a successful install. A warning: `dart pub global run dartway_cli:dartway` works regardless |
 
 Exit code `1` when anything fails, `0` otherwise (warnings included), so an agent or a CI step can
@@ -120,7 +131,7 @@ What the copy does beyond copying:
 - skips `.dart_tool`, `build`, `.git`, `.idea`, `.fvm`, `ephemeral`, `node_modules` and
   `pubspec.lock`;
 - runs `dart format` over `bin/`, `lib/` and `test/` of every package — a rename changes the length
-  of names, and without this the first commit would not be formatted and `dart run dartway_cli:dartway generate
+  of names, and without this the first commit would not be formatted and `dartway generate
   --check` would depend on where lines happened to break;
 - replaces the monorepo-only `dependency_overrides` block with git overrides for exactly the
   `dartway_*` packages each pubspec reaches, pinned to the full commit that supplied the template;
@@ -262,10 +273,10 @@ no implicit fully-migrated baseline or bulk version marker. See [Migration notes
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway generate            # write
-dart run dartway_cli:dartway generate --check --contract-base <trusted-SHA>  # read-only freshness and compatibility
-dart run dartway_cli:dartway generate -v         # list every file written or removed
-dart run dartway_cli:dartway generate --release  # the release: raise the contract version once
+dartway generate            # write
+dartway generate --check --contract-base <trusted-SHA>  # read-only freshness and compatibility
+dartway generate -v         # list every file written or removed
+dartway generate --release  # the release: raise the contract version once
 ```
 
 Runs `dartway_generator` over the project: DTO codecs (`*.dw.dart` parts) and the protocol registry
@@ -282,7 +293,7 @@ first, where the skeleton declares it as a dev dependency), and launches its res
 `dartway_generator`; without either it stops and says how to add one. Run `dart pub get` first: an
 unresolved package has no package config to find the generator in.
 
-The exit code is the generator's. `--check` is what CI runs, and what `dart run dartway_cli:dartway check` reports as
+The exit code is the generator's. `--check` is what CI runs, and what `dartway check` reports as
 `generatedCodeStale` and `projectContractVersion`.
 
 **A project with a release branch raises the contract version at the release, not in each task**
@@ -295,12 +306,40 @@ minor (the next patch below 1.0) for a new data object — generates at it and r
 package. The release CI then checks with an explicit `--contract-base` against the release branch,
 strictly, as before.
 
+## `dartway format` — the pinned Dart, on what the branch changed
+
+```bash
+dartway format                          # the Dart files changed against the base branch, untracked ones included
+dartway format --all                    # every Dart file of the project
+dartway format --check                  # write nothing; list what is not formatted and exit 1 — for CI
+dartway format --check --base <ref>     # compare against another ref (CI passes the pull request's base)
+```
+
+Two Darts format the same file differently, so `dart format` with whichever `dart` is first on
+`PATH` rewrites files the task never touched, and CI, on the pinned SDK, then disagrees with the
+result. `dartway format` runs `dart format` of the Flutter the Flutter package's `.fvmrc` pins —
+linked by FVM in `.fvm/flutter_sdk`, in FVM's cache, or the `flutter` on `PATH` when that one is
+that version, which is how CI installs it — and refuses, naming `fvm install <version>`, when none
+of them is. A project without `.fvmrc` formats with the `dart` on `PATH`.
+
+By default it formats the Dart files that differ from the merge base of `HEAD` and
+`origin/<baseBranch>` (the base branch the toolkit records, `master` when none; the local branch
+when there is no `origin` copy), committed or not, and the untracked ones `.gitignore` does not
+hide. Generated files — `*.dw.dart`, `*.g.dart`, `*.freezed.dart`, anything under `generated/`,
+the `flutter gen-l10n` outputs, a file headed `// GENERATED` — are never handed to the formatter,
+and neither is a migration: a file declaring a `DwDatabaseMigration` is sealed by the checksum of its
+source, and an applied migration whose source changed stops the server
+([Migrations](../4-server/migrations.md)).
+
+The skeleton's CI runs it as a gate: `format --check --base "$CONTRACT_BASE"`, the files the pull
+request changed.
+
 ## `dartway sync` — the base branch in, nothing derived to resolve
 
 ```bash
-dart run dartway_cli:dartway sync              # merge origin/<baseBranch>
-dart run dartway_cli:dartway sync develop      # or any ref
-dart run dartway_cli:dartway sync --continue   # after resolving a source conflict
+dartway sync              # merge origin/<baseBranch>
+dartway sync develop      # or any ref
+dartway sync --continue   # after resolving a source conflict
 ```
 
 Merges the base branch into the current one from a clean tree. A conflict in a derived file —
@@ -308,17 +347,17 @@ Merges the base branch into the current one from a clean tree. A conflict in a d
 either side; the migrations registry (`migrations.dart` headed `Maintained by \`migrate create\``) is
 rewritten from the migration files beside it; an `.arb` merges by key, and only a key both sides
 changed differently stays a conflict. Then `pub get` (and `gen-l10n`) in every package and
-`dart run dartway_cli:dartway generate` remake every derived file from the merged sources, and the merge is committed.
+`dartway generate` remake every derived file from the merged sources, and the merge is committed.
 A conflict in a source stops it: resolve, `git add`, then `--continue`.
 
 ## `dartway check` — the conventions, enforced
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway check
-dart run dartway_cli:dartway check --type forbiddenUiUsage
-dart run dartway_cli:dartway check --level error
-dart run dartway_cli:dartway check --dir lib/app/invoices
+dartway check
+dartway check --type forbiddenUiUsage
+dartway check --level error
+dartway check --dir lib/app/invoices
 ```
 
 Runs the convention checks from the project root or from inside the `*_flutter` package: the
@@ -337,18 +376,18 @@ What each check means, which ones fail, and why is [The conventions checker](con
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway dev web                                  # flutter run -d web-server + the proxy
-dart run dartway_cli:dartway dev web --api http://localhost:8080 -- --profile   # after -- goes to `flutter run`
+dartway dev web                                  # flutter run -d web-server + the proxy
+dartway dev web --api http://localhost:8080 -- --profile   # after -- goes to `flutter run`
 
-dart run dartway_cli:dartway dev proxy                                # the origin alone, in front of servers you run
-dart run dartway_cli:dartway dev proxy --web http://localhost:5000    # `flutter run -d web-server --web-port 5000`
-dart run dartway_cli:dartway dev proxy --web-dir build/web            # a built app instead
+dartway dev proxy                                # the origin alone, in front of servers you run
+dartway dev proxy --web http://localhost:5000    # `flutter run -d web-server --web-port 5000`
+dartway dev proxy --web-dir build/web            # a built app instead
 ```
 
 **The server answers no CORS, in development too** (D-039). A deployed web app reaches `/dw/*`
 (including `/dw/health`) on its own origin, because the front proxy serves the app and proxies
 `/dw/` beside it — see [Deploying the server](deploy.md). `flutter run -d chrome` breaks that on a laptop: the app
-is served from a port of its own and every call is cross-origin. `dart run dartway_cli:dartway dev` restores the deployed
+is served from a port of its own and every call is cross-origin. `dartway dev` restores the deployed
 shape: **one origin, `http://localhost:8000` by default**, where `/dw/*` (the `/dw/live` socket
 included) go to the server and everything else to the web app.
 
@@ -390,9 +429,9 @@ Two things to know:
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway test                        # finds the project from here
-dart run dartway_cli:dartway test -- --name 'sign-in'    # everything after -- goes to `dart test`
-dart run dartway_cli:dartway test --keep                 # leave the containers up to look inside them
+dartway test                        # finds the project from here
+dartway test -- --name 'sign-in'    # everything after -- goes to `dart test`
+dartway test --keep                 # leave the containers up to look inside them
 ```
 
 For environments without Docker, `--database-url` and `--storage-url`, or their test-only defaults
@@ -426,12 +465,12 @@ Why a database per run rather than a compose service, and how a suite uses it, i
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway deploy kamal                 # generate Studio/Kamal files
-dart run dartway_cli:dartway deploy kamal --check         # reject stale generated files
-dart run dartway_cli:dartway deploy setup --env staging
-dart run dartway_cli:dartway deploy check --env staging
-dart run dartway_cli:dartway deploy run   --env staging
-dart run dartway_cli:dartway deploy run   --env staging --revision "$GITHUB_SHA"
+dartway deploy kamal                 # generate Studio/Kamal files
+dartway deploy kamal --check         # reject stale generated files
+dartway deploy setup --env staging
+dartway deploy check --env staging
+dartway deploy run   --env staging
+dartway deploy run   --env staging --revision "$GITHUB_SHA"
 dartway secret set SMS_API_TOKEN --env staging
 ```
 
@@ -472,7 +511,7 @@ whole story.
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway stats
+dartway stats
 ```
 
 Files, total lines, average, maximum and minimum per top-level folder of the Flutter package's

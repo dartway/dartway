@@ -32,10 +32,10 @@ models, because the domain is the part you write. The full path, command by comm
 ## The other commands
 
 ```bash
-dart run dartway_cli:dartway check     # the conventions, enforced: layout, generated code, migrations
-dart run dartway_cli:dartway test      # server acceptance tests against a throwaway Postgres and storage
-dart run dartway_cli:dartway stats     # code size per feature — what actually grew this week
-dart run dartway_cli:dartway setup-ai  # install or update the AI toolkit (.claude/) in an existing project
+dartway check     # the conventions, enforced: layout, generated code, migrations
+dartway test      # server acceptance tests against a throwaway Postgres and storage
+dartway stats     # code size per feature — what actually grew this week
+dartway setup-ai  # install or update the AI toolkit (.claude/) in an existing project
 ```
 
 ## Options worth knowing

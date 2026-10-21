@@ -77,9 +77,11 @@ dev_dependencies:
   image_picker_platform_interface: ^2.10.0
   plugin_platform_interface: ^2.1.0
 
-  # `dart run dartway_cli:dartway <command>`: `dev web` serves the web app and
-  # the server on one origin locally, as the deployment does (no CORS);
-  # `check` grades this package against the conventions.
+  # The project's CLI: `dartway <command>` runs this version, whichever
+  # `dartway` is on the PATH. `dev web` serves the web app and the server on
+  # one origin locally, as the deployment does (no CORS); `format` formats on
+  # the Dart `.fvmrc` pins; `check` grades this package against the
+  # conventions.
   dartway_cli: ^0.26.0-dev.1
 
 # Inside the monorepo the template builds against the LOCAL framework packages.
