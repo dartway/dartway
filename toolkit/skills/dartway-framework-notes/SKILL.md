@@ -1,10 +1,6 @@
 ---
 name: dartway-framework-notes
-description: >-
-  Filing a finding back to the DartWay framework as an issue: when to file one unasked, restating it
-  for a stranger, the `impact:` and `silent` labels, showing the text before creating it, and the
-  `TODO(dartway, checked: …)` marker a workaround leaves in the code. Use the moment such a finding
-  appears, and before creating any issue in the framework tracker.
+description: "Prepare a framework issue or comment from a gap or workaround; require confirmation before publication."
 ---
 
 # DartWay — notes back to the framework (`dartway-framework-notes`)
@@ -30,6 +26,8 @@ toolkit would need it: the example, why the rule did not catch it, the wording t
    - `impact:friction` — works, but the API or its documentation pushes toward the wrong thing;
    - `silent` (orthogonal) — it broke with no error, test or log line.
 5. **Show the text and wait for a yes** — an issue is public the moment it exists.
+   With `interactive: false` in `.agents/dartway-toolkit.json`, include the proposed
+   issue or comment and labels in the final report, stop this publication step, and file nothing.
 
 With the tracker `none` (`dartway setup-ai --notes-tracker none`), nothing leaves the project: the
 finding is a `docs/dev_notes/` entry without the issue line.

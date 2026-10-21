@@ -67,6 +67,43 @@ void main() {
   String read(Directory project, String path) =>
       File(p.join(project.path, path)).readAsStringSync();
 
+  test('fresh project exposes one skills tree to both agents', () async {
+    final project = await create([
+      'shop',
+      '--local-repo',
+      repository.path,
+      '--no-interactive',
+    ]);
+    final shared = Directory(p.join(project.path, '.agents/skills'));
+    final claude = Link(p.join(project.path, '.claude/skills'));
+    expect(claude.targetSync(), '../.agents/skills');
+    expect(
+      claude.resolveSymbolicLinksSync(),
+      shared.resolveSymbolicLinksSync(),
+    );
+    for (final entry in shared.listSync().whereType<Directory>()) {
+      final relative = '${p.basename(entry.path)}/SKILL.md';
+      expect(
+        File(p.join(claude.path, relative)).resolveSymbolicLinksSync(),
+        File(p.join(shared.path, relative)).resolveSymbolicLinksSync(),
+      );
+    }
+    expect(read(project, 'CLAUDE.md'), '@AGENTS.md\n');
+    expect(read(project, '.claude/CLAUDE.md'), '@../.agents/DARTWAY.md\n');
+    expect(
+      read(project, '.agents/dartway-toolkit.json'),
+      contains('"interactive": false'),
+    );
+    final checked = await Process.run(Platform.resolvedExecutable, [
+      cli,
+      'check',
+      '--type',
+      'instructionsDuplicated',
+    ], workingDirectory: project.path);
+    expect(checked.exitCode, 0, reason: '${checked.stdout}\n${checked.stderr}');
+    expect('${checked.stdout}', isNot(contains('contains text while')));
+  }, timeout: const Timeout(Duration(minutes: 2)));
+
   test(
     'created project migration globs cover its registry and server lock',
     () async {

@@ -1,12 +1,6 @@
 ---
 name: dartway-run
-description: >-
-  Bring a DartWay project up locally and prove it is alive: dartway doctor, Postgres and RustFS from
-  docker compose (pg_isready polled), the environment from deploy/config.yaml > local
-  (DW_ADMIN_IDENTIFIER asked from the human), the server in the background, the dev seed, /health 200
-  reported as a fact, the sign-in code from the log, flutter run and dev web / dev proxy, and the
-  typical startup failures. Use for "bring the project up", "run it", "why does it not start", after
-  a fresh clone.
+description: "Bring up the local project or deploy it; verify services, ports, credentials and health."
 ---
 
 # DartWay — bring the project up locally (`dartway-run`)
@@ -34,7 +28,9 @@ coordinates — Postgres `127.0.0.1:8090` with `DW_DATABASE_SSL=false`, RustFS `
 exported variable wins over both. `dartway secret list --env local` shows what is set and missing
 (`localSecretMissing` warns on a declared secret with no local value; `devComposeDrifted` on compose
 credentials that no longer match); `dartway secret set <KEY> --env local` reads a value from stdin —
-ask the human before putting any real key anywhere.
+ask the human before putting any real key anywhere. With `interactive: false` in
+`.agents/dartway-toolkit.json`, report the required key/setup decision and stop that step.
+The same applies to an invalid identifier or Docker not running; continue independent checks.
 
 **`DW_ADMIN_IDENTIFIER` is asked from the human, never invented**: whoever receives codes on it becomes
 the administrator (`DwFirstAdministrator`, every start). Unset, the server starts and warns; a value

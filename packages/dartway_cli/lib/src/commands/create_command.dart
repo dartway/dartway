@@ -22,6 +22,11 @@ import '../toolkit_manifest.dart';
 class CreateCommand extends Command<int> {
   CreateCommand() {
     argParser
+      ..addFlag(
+        'interactive',
+        defaultsTo: true,
+        help: 'Allow managed skills to wait for human confirmation.',
+      )
       ..addOption(
         'agent',
         allowed: ['codex', 'claude', 'both'],
@@ -212,7 +217,11 @@ class CreateCommand extends Command<int> {
         language: settings[ToolkitProvenance.languageSetting]!,
         notesTracker: settings[ToolkitProvenance.notesTrackerSetting]!,
       ),
-      provenance: await source.provenance(monorepoDir, settings: settings),
+      provenance: await source.provenance(
+        monorepoDir,
+        settings: settings,
+        interactive: argResults!.flag('interactive'),
+      ),
       agent: settings[ToolkitProvenance.agentSetting]!,
     );
 
@@ -450,14 +459,14 @@ class CreateCommand extends Command<int> {
       }
       final lines = pubspecFile.readAsLinesSync();
       final clean = withoutDependencyOverrides(lines);
-      final reached = frameworkOverridesFor(clean.join('\n'), frameworkPackages);
+      final reached = frameworkOverridesFor(
+        clean.join('\n'),
+        frameworkPackages,
+      );
       final rewritten = pathFrameworkPackages != null
           ? withFrameworkOverrides(
               lines,
-              frameworkOverridesFor(
-                clean.join('\n'),
-                pathFrameworkPackages,
-              ),
+              frameworkOverridesFor(clean.join('\n'), pathFrameworkPackages),
             )
           : withFrameworkGitOverrides(
               lines,

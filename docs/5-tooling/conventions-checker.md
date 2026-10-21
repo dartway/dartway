@@ -133,11 +133,12 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-three errors, twelve warnings, one info — `DwCheckType` and its `severity` in
+Forty-three errors, thirteen warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
 |---|---|---|
+| `instructionsDuplicated` | warning | Root `CLAUDE.md` contains project text beside `AGENTS.md`; move the text to `AGENTS.md` and leave `@AGENTS.md` in `CLAUDE.md`. |
 | `uiKitPartMissing` | error | A kit file without `part of '../ui_kit.dart'` (generated files exempt) |
 | `l10nNotWired` | error | The app has no localization wiring: `flutter_localizations`, `generate: true`, `l10n.yaml`, a `.arb` in `lib/l10n`. Names the missing pieces |
 | `forbiddenUiUsage` | error | Raw styles outside `ui_kit/` — the screen is styling itself |
