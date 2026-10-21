@@ -1,7 +1,7 @@
 ---
 title: Consolidate agent skills and root instructions
 affects:
-  dartway_cli: "0.26.0-dev.1"
+  dartway_cli: "0.26.0"
 ---
 
 ## Who is affected

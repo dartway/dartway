@@ -1,8 +1,7 @@
 # Changelog
 
-## 0.26.0-dev.1
+## 0.26.0
 
-- Allow unchanged state arguments from the same row through `copyWith` and enclosing `update` checks (#639).
 ### Breaking changes
 
 - **BREAKING (check):** reject direct `Process.run`, `Process.runSync` and
@@ -24,6 +23,8 @@
   the [migration note](../../docs/migrations/2026-10-21-toolkit-one-copy.md).
 
 ### Changes
+
+- Allow unchanged state arguments from the same row through `copyWith` and enclosing `update` checks (#639).
 
 - A new warning in `dartway check`: `unboundedRead` — a repository `find(…)` in a
   request handler of a `*_handlers.dart` naming neither `limit:` nor `unbounded:`.

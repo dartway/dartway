@@ -1,9 +1,9 @@
 ---
 title: Bound whole lists and the reads behind them
 affects:
-  dartway_core_shared: "0.23.0-dev.1"
-  dartway_core_server: "0.23.0-dev.1"
-  dartway_cli: "0.26.0-dev.1"
+  dartway_core_shared: "0.23.0"
+  dartway_core_server: "0.23.0"
+  dartway_cli: "0.26.0"
 ---
 
 ## Who is affected

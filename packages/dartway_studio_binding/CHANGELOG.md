@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.4.1
+## 0.5.0
 
-- Require the matching core family (`0.23.0-dev.1`) for the server seam kit release (#638).
+- Targets DartWay 0.23
 
 ## 0.4.0
 

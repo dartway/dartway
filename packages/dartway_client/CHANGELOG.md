@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.23.0-dev.1
+## 0.23.0
 
 - Nothing changed here; the family moves in lockstep with the bounded lists of
   `dartway_core_shared` and `dartway_core_server` (#644).

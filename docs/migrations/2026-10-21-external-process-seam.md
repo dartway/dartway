@@ -1,8 +1,8 @@
 ---
 title: Run server commands through the process seam
 affects:
-  dartway_cli: "0.26.0-dev.1"
-  dartway_core_server: "0.23.0-dev.1"
+  dartway_cli: "0.26.0"
+  dartway_core_server: "0.23.0"
 ---
 
 ## Who is affected

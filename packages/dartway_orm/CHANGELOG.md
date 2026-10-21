@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.23.0-dev.1
+## 0.23.0
 
 - `find(unbounded: '<reason>')` says why a read without `limit` stays small, for
   `dartway check`'s `unboundedRead`; the database never sees it, and it is refused
