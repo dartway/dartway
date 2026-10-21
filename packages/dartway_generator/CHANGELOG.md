@@ -1,9 +1,8 @@
 # Changelog
 
-## 0.22.1-dev.1
+## 0.23.0-dev.1
 
-- Nothing changed here; the family moves in lockstep with the per-call timing
-  log in `dartway_core_server` (#645).
+- Move with the core family to support the server seam kit (#638).
 
 ## 0.22.0
 

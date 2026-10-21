@@ -1,6 +1,6 @@
 # Why a checker when you already have the analyzer?
 
-`dart run dartway_cli:dartway check` looks at the things the analyzer and the lints cannot see. The analyzer reads a
+`dartway check` looks at the things the analyzer and the lints cannot see. The analyzer reads a
 file; the checker reads the **project**: which folder is a feature, who imports whose internals,
 whether a screen styles itself, whether an asset path leads anywhere, whether the generated code
 still matches its sources and the migrations still produce the schema. All of that compiles. Some
@@ -27,7 +27,7 @@ is decidable without understanding what the code means**.
 | The answer is… | Where the rule goes | Example |
 |---|---|---|
 | decidable from the shape of an expression | `dartway_lints` (an analyzer plugin, live in the IDE and in `dart analyze`) | is this a raw `Color` outside `ui_kit/`? |
-| decidable from the shape of the project | `dart run dartway_cli:dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
+| decidable from the shape of the project | `dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
 | **only decidable by reading the meaning** | `/dartway-checkup` | is this string something a *user* reads, or an identifier, a key, a date pattern? |
 
 The third row is the one worth defending. `'Issues'`, `'issues/board'` and `'dd.MM'` are the same
@@ -48,7 +48,7 @@ A rule that needs understanding is not a weaker rule. It is a rule for a reader.
 ```bash
 cd <project>_flutter
 dart analyze --fatal-infos                      # the analyzer, the lint set and DartWay's own rules
-dart run dartway_cli:dartway check              # the structural conventions
+dartway check              # the structural conventions
 ```
 
 **`flutter analyze` does not run analyzer plugins.** The skeleton enables `dartway_lints` under
@@ -115,7 +115,7 @@ counts as one), `0` otherwise — warnings and infos print and pass. An unknown 
 error, `64`. Run outside a DartWay project, the command says so and exits `1`.
 
 **A check that could not run says so, and does not pass or fail.** When the generator does not run to
-a verdict — an unresolved package, a declaration it refuses — `dart run dartway_cli:dartway check` prints its first lines
+a verdict — an unresolved package, a declaration it refuses — `dartway check` prints its first lines
 under "Not checked". When `DW_DATABASE_HOST` is not set, the migrations are not replayed and the run
 says what to set. A finding invented from a probe that could not run is how a check earns a
 reputation for lying; a silent pass is worse.
@@ -133,7 +133,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-three errors, thirteen warnings, one info — `DwCheckType` and its `severity` in
+Forty-four errors, thirteen warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -156,7 +156,7 @@ Forty-three errors, thirteen warnings, one info — `DwCheckType` and its `sever
 | `coreImportsFeature` | error | A file of the server's `lib/src/core/` importing a feature. Every feature imports `core/`, so what `core/` needs from a feature belongs to the feature — who the caller is in `profile/profile_access.dart`, the sign-in hooks in a feature above the ones they touch |
 | `featureImportOutsideSurface` | error | A server feature importing another's file outside its surface: only `<feature>_rows`, `_access`, `_objects`, `_publications`, `_changes` (and their `<part>` files) may be imported — never `_feature`, `_handlers`, `_jobs`, `_routes` or `logic/`; nor may any file under `lib/src/` import the package's library. `import`, `export` and `part` count. `lib/<project>_server.dart`, `migrations/`, `bin/` and `test/` are not judged |
 | `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
-| `generatedCodeStale` | error | A generated file that `dart run dartway_cli:dartway generate` would write differently, or whose source is gone |
+| `generatedCodeStale` | error | A generated file that `dartway generate` would write differently, or whose source is gone |
 | `projectContractVersion` | error | Generated project contract is incompatible at the same breaking line, or cannot be verified against its fixed committed Git baseline. `--contract-base <revision>` supplies a trusted baseline; see the wire/version guidance |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
@@ -189,6 +189,7 @@ Forty-three errors, thirteen warnings, one info — `DwCheckType` and its `sever
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
 | `forbiddenEnvironmentRead` | error | `Platform.environment` in the server's `lib/` outside `lib/src/core/environment.dart`, where `AppEnvironment` reads every variable at start; in `bin/`, `Platform.environment` outside `DwLocalEnvironment.overlay(…)` or a map read by a variable's name (`env['PORT']`) |
+| `forbiddenProcessRun` | error | `Process.run`, `Process.runSync` or `Process.start` in server `lib/`, including tear-offs, or imports/exports of `package:process` or `package:process_run` — external commands use `ctx.process` |
 | `forbiddenHttpClient` | error | `HttpClient(`, `DwOutboundHttp.network` (including a tear-off), or an import of `package:http/…` in the server's `lib/` — an outbound request is `ctx.http` |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
 | `docCommentLanguage` | warning | A doc comment in `lib/` written in a script other than the language `dartway setup-ai --language` recorded — a heuristic on Cyrillic against Latin letters, so it warns and never fails. A comment the skeleton wrote (the same text in the template the project came from) is not judged, nor a generated file |
@@ -317,7 +318,7 @@ over every pass.
 **`generatedCodeStale`** runs the generator the server package resolved in check mode. The codecs are
 the wire, so this has no second reading: a request missing from the registry is refused as unknown by
 a server that has its handler, and a field missing from a codec simply does not travel. The fix it
-prints is `dart run dartway_cli:dartway generate`, and generated files are never edited by hand. See
+prints is `dartway generate`, and generated files are never edited by hand. See
 [Data objects and generation](../2-core/data-objects-and-generation.md).
 
 **`migrationsDrift`** runs the project's `bin/migrate.dart check`, which replays the migrations on

@@ -4,6 +4,18 @@
 
 ### Breaking changes
 
+- **BREAKING (check):** reject direct `Process.run`, `Process.runSync` and
+  `Process.start`, plus `package:process` and `package:process_run` imports/exports,
+  in server `lib/` with `forbiddenProcessRun`; use `ctx.process`.
+  Ship a weekly/manual seam drift workflow in the template; keep the diagnostic
+  demo and its git runtime dependency in the example only (#638).
+
+- Remove `dartway-requirements` and `dartway-plan`: requirements analysis and approach
+  selection belong to the developer or executor. Update removes their managed copies;
+  projects wanting the old flow keep their own copy under a project skill name.
+  Contract choices, layer order, risks and ADR guidance remain in the owning skills
+  and the agent index.
+
 - Install skills once in `.agents/skills/`; Claude discovers them through the
   relative `.claude/skills` symlink. Existing Claude-only custom skills are moved;
   conflicting custom copies stop installation before any project file changes.
@@ -12,13 +24,35 @@
 
 ### Changes
 
+- Tests: own creation fixture process groups and disable background Git
+  maintenance so Linux teardown cannot race a remaining fixture writer (#638).
+
+- A `dartway` of another version no longer refuses a project command
+  (`generate`, `check`, `test`, `deploy`, `dev`, `stats`, `format`): it runs the
+  `dartway_cli` the project pins — in the directory it was typed in, on the
+  package configuration of the package that declares it and the Dart of the
+  Flutter `.fvmrc` pins — passing the arguments, stdio and exit code through
+  (128 plus the signal for a child it ended), and says so in one line on
+  stderr; a refusal names the subcommand and nothing of its arguments.
+  `dartway format` batches its paths under 8000 characters a command line, and
+  neither it nor the hand-over goes through a shell on Windows. Only a pin whose packages are not resolved is refused, with the
+  `pub get` that resolves it. The toolkit, the skeleton's README and the docs
+  teach `dartway <command>` again; `toolkit_pinned_commands_test.dart` now
+  holds them to it. See the
+  [migration note](../../docs/migrations/2026-10-21-pinned-cli-and-format.md).
+- New `dartway format`: `dart format` on the Dart of the pinned Flutter
+  (`.fvmrc`), over the Dart files changed against the merge base with the base
+  branch plus the untracked ones (`--all` for the whole project, `--base <ref>`
+  for another baseline, `--check` for CI). Generated files and migrations are
+  never formatted. The skeleton's CI runs `format --check` on the files a pull
+  request changed, and `dartway-finish` formats with it.
 - `deploy run` no longer answers requests with 502 while it deploys: it
   migrates while the previous server serves, starts the new server and web app
   beside the serving ones, waits for their healthchecks and stops the old ones
   after; the rendered nginx resolves every service per request through
   Docker's DNS and retries a refused or vanished address, and is reloaded
   instead of restarted. A failure leaves the previous version serving.
-  Replaces D-070 (D-161, #645). Existing servers: see the
+  Replaces D-070 (D-163, #645). Existing servers: see the
   [migration note](../../docs/migrations/2026-10-21-deploy-side-by-side-and-stats.md).
 - The rendered nginx logs each request as one JSON line (`dw_timed`: the call's
   wire name, status, request and upstream time) into bounded files; the bundled

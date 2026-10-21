@@ -11,7 +11,7 @@ their place through the gate there. **Where** a test goes is decided by where th
 | The behaviour | Its test | Runs with |
 |---|---|---|
 | what a DTO carries, which field a command refuses, what an update does to a request, a request's channels | **contract test**, pure Dart | `dart test` in `__SHARED_PKG__` |
-| server rules: access, calculations, stored outcomes, channel audiences | **acceptance test**: the real server, a real Postgres and storage; one file per feature, a new case as a row in its table | `dart run dartway_cli:dartway test` |
+| server rules: access, calculations, stored outcomes, channel audiences | **acceptance test**: the real server, a real Postgres and storage; one file per feature, a new case as a row in its table | `dartway test` |
 | a screen's own logic: what an action sends, how it handles a refusal or update | **widget test** on the in-memory server, only where the screen has logic | `flutter test` |
 | complex pure logic (class 6): calculations, parsing, state machines, dates and time zones | **table-driven unit test**, only for class 6 | the package's runner |
 
@@ -40,7 +40,7 @@ round-trips a value of every DTO through the project's protocol
 
 ## 2. The server — acceptance tests
 
-`dart run dartway_cli:dartway test` (from `__FLUTTER_PKG__`; `-- --name x` passes arguments, `--keep`
+`dartway test` (`-- --name x` passes arguments, `--keep`
 keeps the database up, `--no-storage`) starts a Postgres and a storage on ports Docker picks, runs
 `dart test` in `__SERVER_PKG__`, and removes both. Never a test database in compose or a fixed port.
 
@@ -80,6 +80,24 @@ it or an extension on it.
   `server.http.reset()` between tests sharing a server. A rule throwing
   `DwOutboundException(request, cause: 'refused')` is an unreachable provider; one never completing runs
   into the timeout. Without a server, `DwFakeOutboundHttp()..when(…)` and `http.client()`.
+- **External systems use real recorded answers.** A test that talks to another service or
+  command replays a `DwSeamCassette` under the server package's `test/cassettes/`, or calls the
+  real system. A handwritten fake does not cover that seam. Attach recordings with
+  `server.http.useCassette(cassette)` / `server.process.useCassette(cassette)`, call the feature,
+  and `cassette.verifyComplete()`. Explicit `when` rules remain for errors a real provider
+  cannot produce on demand; the last rule wins before cassette lookup.
+  `DW_RECORD_SEAMS=1` records real exchanges; review the redacted JSON before committing.
+  `redactNames` adds exact case-insensitive field names; `exemptNames` exempts names
+  for that cassette. Only strings are redacted. Automatic substring removal learns
+  credentials of at least eight characters from request headers, query parameters and
+  form fields; use `redactValues` for secrets in paths, positional arguments and output.
+  Unmatched requests fail with a redacted request. Replay is offline by default. `DW_VERIFY_SEAMS=1` with `dartway test -- --tags seam` compares live keys,
+  types, HTTP status, response content-type and process exit codes without rewriting recordings.
+  Other response headers are ignored; HTTP 403/429 reports "could not verify" for runner
+  access or rate limits rather than drift. Keep live drift out of ordinary CI; the skeleton's weekly/manual workflow skips without
+  `DW_SEAM_CREDENTIALS`. Add the project's recorded tests tagged `seam` before enabling it. See the
+  [recorded HTTP and command example](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/src/system_info/system_info_acceptance_test.dart)
+  in the framework repository.
 - Choose cases by the risk classes and gate in §4, not by the number of handlers or publications.
 
 ## 3. Screens — widget tests on the in-memory server
@@ -129,6 +147,11 @@ refusal renders as its text and nothing else changed, that a publication changed
 re-read.
 
 ## 4. The gate — before a test is added
+
+Whoever plans the work selects **Risks to guard** from the risk survey and specification
+(**Risks under protection** in Studio). Each item names its class (1–6) and the specification's
+expected outcome, guarded once at the boundary that owns it. **`No must-test risk: <why>`** is valid.
+Use the accepted risk list directly; this step does not repeat requirements analysis or planning.
 
 **A test is mandatory only in these six risk classes:**
 
@@ -206,7 +229,7 @@ No coverage thresholds, and none reported.
   stopped before the rule is reached. Assert the code (`refusedWith`) from a caller only the rule
   stops.
 - **Structure by test**: a test reading `lib/` for an import, a call or a file. Structure is the
-  checker's (`dart run dartway_cli:dartway check`); a rule it lacks is a framework finding
+  checker's (`dartway check`); a rule it lacks is a framework finding
   (`dartway-framework-notes`).
 - **A name the test does not keep**: "hides archived invoices" over a list with no archived one,
   "retries" with a single attempt.

@@ -49,8 +49,8 @@ seeded accounts use the seed's fixed code.
 **The app**: desktop and iOS simulator call `http://localhost:8080`, an Android emulator
 `http://10.0.2.2:8080`; a phone needs `--dart-define=DW_BACKEND_URL=http://<LAN address>:8080`, and
 storage an address the device reaches (`dartway-uploads` §4). **In a browser** the app calls its own
-origin: `dart run dartway_cli:dartway dev web` (or a release build served by
-`dart run dartway_cli:dartway dev proxy --web-dir build/web`), opened at exactly `http://localhost:8000`;
+origin: `dartway dev web` (or a release build served by
+`dartway dev proxy --web-dir build/web`), opened at exactly `http://localhost:8000`;
 a `DwHttpRoute` the browser must reach goes through with `--api-path /that-path`. `DW_ALLOWED_ORIGINS`
 only for a socket from a genuinely different origin.
 
@@ -65,7 +65,7 @@ The server prints every problem at once — read the whole list.
 | `Connection refused` on start | `pg_isready` until it succeeds |
 | an SSL error against `127.0.0.1` | `DW_DATABASE_SSL=false` locally |
 | `X is a registered request without a handler` | write the handler (`dartway-server`) |
-| `answers X, which the protocol does not register` | `dart run dartway_cli:dartway generate` |
+| `answers X, which the protocol does not register` | `dartway generate` |
 | `X has more than one handler` | remove the duplicate |
 | `DwMigrationRefused` / `DwMigrationFailed` / `table "x" … missing` | `dartway-migrations`; never edit the ledger |
 | a bucket missing or wrongly readable; storage `could not be checked` | `dartway-uploads` §4 |
@@ -84,7 +84,7 @@ class or handler change: generate and restart; before calling it done: `dartway-
 
 For a project moving to Studio's Kamal deploy contract, configure `staging` and/or
 `production` in `deploy/config.yaml`, resolve `__FLUTTER_PKG__` and run
-`dart run dartway_cli:dartway deploy kamal` there. Commit the generated configs,
+`dartway deploy kamal` there. Commit the generated configs,
 Studio manifest and Images workflow; publication follows the configured
 deployments' `branch:` values after successful `CI` (PR builds do not push).
 Enable CI pushes on those branches. Install the workflow on the default branch
@@ -129,7 +129,7 @@ so they only expand (`dartway-migrations`). An override never gives `server` or
 variable so it follows the replacement too:
 `set $dw_upstream server:8080; proxy_pass http://$dw_upstream;`.
 How fast a deployed environment answers:
-`dart run dartway_cli:dartway deploy stats --env <environment> [--hours 24] [--top 10]`
+`dartway deploy stats --env <environment> [--hours 24] [--top 10]`
 — p50/p95 per call from the proxy log,
 the costliest statements of `pg_stat_statements`, slow statements over
 `slow_query_ms` (`deploy/config.yaml`, 500 by default). A call slower than

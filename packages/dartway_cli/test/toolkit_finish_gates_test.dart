@@ -18,9 +18,11 @@ void main() {
   }
   late Directory sandbox;
   late File log;
+  String root = '';
   setUp(() {
     sandbox = Directory.systemTemp.createTempSync('dw-finish-gates-');
     log = File(p.join(sandbox.path, 'calls'));
+    root = p.basename(sandbox.path);
     for (final name in [
       'sample_shared',
       'sample_server',
@@ -29,7 +31,7 @@ void main() {
     ]) {
       Directory(p.join(sandbox.path, name)).createSync();
     }
-    for (final tool in ['dart', 'flutter', 'git']) {
+    for (final tool in ['dart', 'flutter', 'git', 'dartway']) {
       final executable = File(p.join(sandbox.path, 'bin', tool));
       executable.writeAsStringSync('''#!/bin/bash
 if [[ "\${0##*/}" == git ]]; then
@@ -99,6 +101,9 @@ fi
     );
     expect(result.exitCode, 0, reason: '${result.stdout}\n${result.stderr}');
     final calls = log.readAsLinesSync();
+    // The project commands run from the root; the pinned CLI takes them
+    // from there whichever `dartway` is on the PATH.
+    expect(calls, contains('$root:dartway <format> <--check>'));
     // These gates cannot disappear when CI carries all three suites.
     expect(calls, contains('sample_shared:dart <analyze>'));
     expect(calls, contains('sample_server:dart <analyze>'));
@@ -106,18 +111,8 @@ fi
     final contractArgs = releaseBranch.isEmpty
         ? ' <--contract-base> <trusted-base>'
         : '';
-    expect(
-      calls,
-      contains(
-        'sample_flutter:dart <run> <dartway_cli:dartway> <generate> <--check>$contractArgs',
-      ),
-    );
-    expect(
-      calls,
-      contains(
-        'sample_flutter:dart <run> <dartway_cli:dartway> <check>$contractArgs',
-      ),
-    );
+    expect(calls, contains('$root:dartway <generate> <--check>$contractArgs'));
+    expect(calls, contains('$root:dartway <check>$contractArgs'));
     return calls;
   }
 
@@ -151,7 +146,7 @@ FLUTTER_TEST_FILES=(test/admin/users 'test/app/sign in/page_test.dart')
     expect(
       calls,
       contains(
-        'sample_flutter:dart <run> <dartway_cli:dartway> <test> <--> '
+        '$root:dartway <test> <--> '
         '<test/src/accounts/accounts_acceptance_test.dart>',
       ),
     );
@@ -168,10 +163,7 @@ FLUTTER_TEST_FILES=(test/admin/users 'test/app/sign in/page_test.dart')
   test('no CI or an unmapped change can run full suites', () async {
     final calls = await run(runAll);
     expect(calls, contains('sample_shared:dart <test>'));
-    expect(
-      calls,
-      contains('sample_flutter:dart <run> <dartway_cli:dartway> <test> <-->'),
-    );
+    expect(calls, contains('$root:dartway <test> <-->'));
     expect(calls, contains('sample_flutter:flutter <test>'));
     expect(
       calls,
@@ -203,7 +195,7 @@ SERVER_TEST_FILES=(test/src/accounts/accounts_acceptance_test.dart)
       expect(
         calls,
         contains(
-          'sample_flutter:dart <run> <dartway_cli:dartway> <test> <--> '
+          '$root:dartway <test> <--> '
           '<test/src/accounts/accounts_acceptance_test.dart>',
         ),
       );

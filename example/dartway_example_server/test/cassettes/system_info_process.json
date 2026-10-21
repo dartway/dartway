@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "exchanges": [
+    {
+      "kind": "process",
+      "request": {
+        "executable": "git",
+        "arguments": [
+          "--version"
+        ],
+        "workingDirectory": null,
+        "environment": {}
+      },
+      "response": {
+        "exitCode": 0,
+        "stdout": {
+          "text": "git version 2.50.1 (Apple Git-155)\n"
+        },
+        "stderr": {
+          "text": ""
+        }
+      }
+    }
+  ]
+}

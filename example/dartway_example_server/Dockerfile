@@ -23,7 +23,8 @@ FROM alpine:latest
 # libraries it needs. ca-certificates is not part of them, and without it every
 # outbound HTTPS call from the server fails on an unverifiable certificate.
 COPY --from=build /runtime/ /
-RUN apk add --no-cache ca-certificates
+# The signed-in system_info diagnostic runs git through ctx.process.
+RUN apk add --no-cache ca-certificates git
 
 COPY --from=build /server /app/server
 

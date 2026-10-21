@@ -23,7 +23,7 @@ framework issues use English.
 ## Law and default
 
 The seven laws and checker errors are mandatory; project conventions may override defaults with
-a reason. The law list is therefore derived from `DwCheckType.severity`: forty-three errors,
+a reason. The law list is therefore derived from `DwCheckType.severity`: forty-four errors,
 thirteen warnings and one info. Check messages name the correction; open the owner skill for how.
 
 | Rule | Checks that fail | Skill |
@@ -38,7 +38,7 @@ thirteen warnings and one info. Check messages name the correction; open the own
 | `dw.command` runs in the feature's `logic/`, inside `dw.action` | `forbiddenCommandCall` | `dartway-data-layer` |
 | Routes, dialogs, ids and router lifetime | `forbiddenNavigationCall`, `sentinelId`, `routeNameDuplicated`, `routerDisposedByApp` | `dartway-navigation` |
 | Server feature boundaries and row ownership | `invalidServerFeatureFile`, `misplacedServerCode`, `featureImportCycle`, `featureImportOutsideSurface`, `foreignRowWrite`, `coreImportsFeature` | `dartway-server` |
-| Server clock, environment and outbound HTTP | `forbiddenDateTimeNow`, `forbiddenEnvironmentRead`, `forbiddenHttpClient` | `dartway-server` |
+| Server clock, environment, HTTP and external commands | `forbiddenDateTimeNow`, `forbiddenEnvironmentRead`, `forbiddenHttpClient`, `forbiddenProcessRun` | `dartway-server` |
 | Startup steps, typed settings, row ids | `workAfterServerStart`, `settingsKeyValueTable`, `redundantBangAllowed` | `dartway-server` |
 | Shared layout, DTO names and patch helpers | `invalidSharedLayout`, `contractNameInvalid`, `fieldPatchMatched` | `dartway-contract` |
 | Generated code and installed-client compatibility | `generatedCodeStale`, `projectContractVersion` | `dartway-contract` |
@@ -52,27 +52,24 @@ The expand/contract rule across production releases is also held by review alone
 
 ## Open only what the task needs
 
-Start with the issue and the affected code. Open `dartway-requirements` when requirements need
-analysis; `dartway-plan` when choosing an approach. An agreed implementation task proceeds directly
-to its layer skill. Load other skills when their step is reached, never the whole toolkit first.
+Start with the issue or accepted specification and the affected code. Requirements and approach
+selection belong to the developer or executor. For implementation, follow the layer order below,
+skipping steps the change does not reach. Load each skill when its step is reached.
 
 Skills live once in `.agents/skills/`; `.claude/skills` is a relative symlink. Claude commands remain wrappers.
 
 | When | Open |
 |---|---|
-| Analyze unclear requirements; choose an approach | `dartway-requirements`, then `dartway-plan` |
-| Add a feature or change its folders/state | `dartway-feature-scaffold` |
-| Change DTOs or run generation | `dartway-contract` |
-| Change handlers, rows, jobs, environment or external services | `dartway-server` |
-| Change access, identities or roles | `dartway-access` |
-| Change live updates | `dartway-realtime` |
-| Change rows or migrations | `dartway-migrations` |
-| Work with uploads | `dartway-uploads` |
-| Change screen reads, commands or refusal text | `dartway-data-layer` |
-| Change routes or guards | `dartway-navigation` |
-| Change styles, kit or localization | `dartway-ui-kit` |
-| Select or write tests | `dartway-testing` §4 (six risk classes); §5 for a bugfix |
-| Describe behaviour or record a finding | `dartway-documentation` |
+| Change the contract: DTOs, calls, codes, channels or upload purposes | `dartway-contract`; `dartway-realtime` for channels |
+| Change rows, queries, money or counters | `dartway-server` |
+| Generate after DTO/row edits; review and apply migrations | `dartway-contract` for generation; `dartway-migrations` for schema and backfills |
+| Change handlers, their access rules, locks or publications | `dartway-server`, `dartway-access`, `dartway-realtime` |
+| Add jobs, external routes, environment or services | `dartway-server` |
+| Work with uploads and their rules | `dartway-uploads` |
+| Build the app: feature, route, reads, commands, kit and texts | `dartway-feature-scaffold`, `dartway-navigation`, `dartway-data-layer`, `dartway-ui-kit` |
+| Select or write tests for the specification's risks | `dartway-testing` §4 (six risk classes); §5 for a bugfix |
+| Reconcile descriptions; read ADRs before choosing an approach | `dartway-documentation` |
+| Change identities or roles | `dartway-access` |
 | Finish the task, before commit or PR | `dartway-finish` |
 | Run locally or deploy | `dartway-run` |
 | Fix phone keyboard, focus or viewport behaviour | `dartway-on-device` |
@@ -81,15 +78,17 @@ Skills live once in `.agents/skills/`; `.claude/skills` is a relative symlink. C
 | Report a framework gap or workaround | `dartway-framework-notes` before filing |
 | Commit or audit the whole project | `dartway-commit` (`/commit`), `dartway-checkup` (`/dartway-checkup`) |
 
-Commands `generate`, `check`, `test`, `dev`, `deploy`, `stats` use the pinned CLI:
-`dart run dartway_cli:dartway <command>` from `__FLUTTER_PKG__`.
-PRs target `__BASE_BRANCH__`; integration uses `dart run dartway_cli:dartway sync`.
+Commands `generate`, `check`, `test`, `dev`, `deploy`, `stats`, `format` run the CLI the project
+pins: `dartway <command>` from the project root or `__FLUTTER_PKG__` — a `dartway` of another version
+hands the command to the pinned one. Format with `dartway format` (the pinned Dart, changed files only),
+never a bare `dart format`.
+Without a global CLI, run the same command as `dart run dartway_cli:dartway <args>` from the project root.
+PRs target `__BASE_BRANCH__`; integration uses `dartway sync`.
 
 ## Interaction
 
 Read `interactive` in `.agents/dartway-toolkit.json` (absent means `true`). With `false`,
 **every managed step requiring a human answer or confirmation instead puts its proposed text,
 question or action in the final report and stops that step**. Continue independent authorized work;
-never treat silence as approval. This covers requirements questions and option selection,
-framework issue/comment publication, finish suggestions, real keys and local setup questions,
-and migration/backfill or destructive decisions. Each affected skill identifies its stopping point.
+never treat silence as approval. This covers framework issue/comment publication, finish suggestions,
+real keys and local setup questions, and migration/backfill or destructive decisions. Each affected skill identifies its stopping point.

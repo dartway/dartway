@@ -5,6 +5,7 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:dartway_orm/dartway_orm.dart';
 import 'package:meta/meta.dart';
 
+import '../process/dw_process_runner.dart';
 import '../alerts/dw_alert_sink.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_cascades.dart';
@@ -336,6 +337,7 @@ final class DwAppServer {
     required InternetAddress address,
     required bool handleSignals,
     DwOutboundTransport? outbound,
+    DwProcessTransport process = const DwSystemProcess(),
   }) async {
     if (_running != null || _stopping) {
       throw StateError('The server is already running');
@@ -392,6 +394,7 @@ final class DwAppServer {
         jobsFor: (ctx) => runner.jobsFor(ctx),
         channelRules: DwChannelRules(channels),
         outbound: transport,
+        process: process,
         outboundTimeout: settings.outboundTimeout,
         outboundMaxResponseBytes: settings.outboundMaxResponseBytes,
         clock: clock,

@@ -66,8 +66,8 @@ both through the development proxy:
 ```bash
 cd dartway_starter_flutter
 flutter build web --release
-dart run dartway_cli:dartway dev proxy --web-dir build/web   # open http://localhost:8000
-# or, with hot restart: dart run dartway_cli:dartway dev web
+dartway dev proxy --web-dir build/web   # open http://localhost:8000
+# or, with hot restart: dartway dev web
 ```
 
 **Signing in.** Nothing is sent over SMS or e-mail in development: the code is
@@ -90,7 +90,7 @@ its codes is the admin, so there is no default. A real delivery goes into
    handler per request and command with its access rule, publishing what a
    command changed to the channels that show it, and `<feature>_feature.dart`
    declaring it — added to `features:` in the server library.
-3. `dart run dartway_cli:dartway generate` — codecs, the protocol registry, tables and the schema.
+3. `dartway generate` — codecs, the protocol registry, tables and the schema.
 4. `dart run bin/migrate.dart create <name>` (with `DW_DATABASE_*` set) — a
    migration from the row classes; review it, it is yours.
 5. **App** — a screen with `ref.watch(dw.request(MyRequest()))`, a button with
@@ -105,14 +105,18 @@ one list: run one locally with its `run:` line from its `working-directory`.
 Outside CI, drop `--contract-base "$CONTRACT_BASE"`: the commands then compare
 with the merge-base of the project's base branch.
 
-The project's own commands run the CLI it pins, from the Flutter package:
-`dart run dartway_cli:dartway <command>` in `dartway_starter_flutter/`. A
-globally activated `dartway` refuses them when it is another version.
-`dart run bin/migrate.dart check` and `dart run dartway_cli:dartway check` replay
+The project's own commands run the CLI it pins: `dartway <command>` from the
+project root or `dartway_starter_flutter/` — a globally activated `dartway` of
+another version hands them to the pinned one, on the Dart of the Flutter
+`dartway_starter_flutter/.fvmrc` pins. In CI, where there is no global CLI, the
+same command is `dart run dartway_cli:dartway <command>` from
+`dartway_starter_flutter/`. Format with `dartway format`: the Dart files the
+branch changed, on that Dart, never a generated file or a migration.
+`dart run bin/migrate.dart check` and `dartway check` replay
 the migrations on the Postgres `DW_DATABASE_*` names (locally,
 `deploy/config.yaml > local`).
 
-`dart run dartway_cli:dartway test` starts a Postgres and a storage for the run, on ports Docker
+`dartway test` starts a Postgres and a storage for the run, on ports Docker
 picks, and removes them when it ends: nothing is shared with the development
 containers or with another project, and nothing survives. Each test file
 creates its own database and its own buckets.
@@ -121,7 +125,20 @@ creates its own database and its own buckets.
 
 `deploy/README.md`: one server process configured by its environment, the web
 app on its own host with `/dw/` proxied to the server, Postgres and optional
-bundled storage — `dart run dartway_cli:dartway deploy setup`, then `dart run dartway_cli:dartway deploy`.
+bundled storage — `dartway deploy setup`, then `dartway deploy`.
+
+## External seam recordings
+
+External integrations use `ctx.http` and `ctx.process`. Add recorded acceptance tests
+under `test/cassettes/` and tag live verification tests `seam`. The framework repository's
+[example](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/src/system_info/system_info_acceptance_test.dart)
+demonstrates both seams; the starter has no demo integration.
+
+`.github/workflows/seam-drift.yml` compares live response shapes weekly or on manual
+dispatch. It skips live checks until the `DW_SEAM_CREDENTIALS` repository secret is set.
+Add the project's tagged tests and configure the credentials they require before enabling
+it. Live checks set `DW_VERIFY_SEAMS=1`; ordinary CI replays recordings. See the framework's
+[testing guide](https://github.com/dartway/dartway/blob/master/docs/5-tooling/testing.md#recorded-external-seams).
 
 ## Continuous integration
 

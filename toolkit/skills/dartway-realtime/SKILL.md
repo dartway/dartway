@@ -11,6 +11,10 @@ command's response, everyone else's over the socket. No refetch code in the app.
 a missing one fails silently:** the request's channels (`__SHARED_PKG__`), the kind's rule (server),
 the publication (every command that changes the object).
 
+For each change, name every screen that must follow it and verify that its watched request hears
+the publication's channel. Include derived and embedded objects; the publishing screen alone does
+not establish that other screens stay current.
+
 ## 1. A channel is an audience
 
 Access is checked once, at subscription; nothing re-checks each object. **A channel's audience is

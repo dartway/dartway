@@ -41,7 +41,7 @@ code-shape rules no layer skill owns.
 
 ## Phase 1 — the sweep
 
-`dart run dartway_cli:dartway check` is the sweep for everything in the law table and its warnings:
+`dartway check` is the sweep for everything in the law table and its warnings:
 group its findings by check and by feature. Then grep only what it cannot see — the code-shape list in
 `dartway-finish` (A.3), plus:
 

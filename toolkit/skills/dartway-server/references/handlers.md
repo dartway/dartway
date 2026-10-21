@@ -45,7 +45,7 @@ way. Sample: the skeleton's `lib/src/profile/profile_objects.dart`.
 ## 6. The call context
 
 `accountId`/`requireAccountId`, `sessionKey`, `db`, `now`, `callerUtcOffset`/`callerLocalTime`,
-`transaction`, `publish`, `revoke`, `refuse`, `jobs`, `accounts`, `files`, `settings`, `http`, `log`,
+`transaction`, `publish`, `revoke`, `refuse`, `jobs`, `accounts`, `files`, `settings`, `http`, `process`, `log`,
 `memo`.
 
 - **Time is `ctx.now`** — the server's clock, which tests set and jobs run by. In a command, the

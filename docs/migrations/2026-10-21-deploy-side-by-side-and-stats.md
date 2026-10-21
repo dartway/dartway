@@ -27,7 +27,7 @@ beside the serving ones and reloads the proxy instead of restarting it.
 
 - **`deploy/compose.override.yml`** must not give `server` or `web` a `container_name` or
   published `ports`: two containers of the service run side by side during a deploy, and they
-  cannot share either. `dart run dartway_cli:dartway deploy check --env <environment> --local`
+  cannot share either. `dartway deploy check --env <environment> --local`
   fails `override-side-by-side` when one is there. Remove it; the proxy reaches both services by
   name, and a route to the server belongs in `deploy/nginx.d`.
 - **A snippet under `deploy/nginx.d/`** that proxies to a stack service by a literal name
@@ -49,5 +49,5 @@ beside the serving ones and reloads the proxy instead of restarting it.
 ## How to check
 
 After the second deploy with this CLI, run a request loop against the API host during a third,
-and `dart run dartway_cli:dartway deploy stats --env <environment>`: every call counted, no 5xx
+and `dartway deploy stats --env <environment>`: every call counted, no 5xx
 from the deploy's window, and the statements of `pg_stat_statements` listed.

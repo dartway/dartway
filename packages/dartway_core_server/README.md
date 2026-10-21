@@ -6,7 +6,10 @@ commands, channels, jobs, uploads to two buckets, routes for external doors, ale
 
 It re-exports `dartway_core_shared` (the wire contract) and `dartway_orm` (typed Postgres access),
 so a project's server package needs only this one framework dependency. `testing.dart` holds
-`DwTestServer` and the fixtures a project's own suites are written against.
+`DwTestServer` and the fixtures a project's own suites are written against, including
+`DwSeamCassette` for recorded external answers. Server integrations use `ctx.http` and
+`ctx.process`; tests replay real HTTP responses and command results offline, with explicit
+record and live drift modes.
 
 ## Where it sits
 

@@ -168,8 +168,8 @@ Future<DwDeployVerdict> _checkProxyCongestionControl(
               ? 'proxy reports ${value.isEmpty ? 'no value' : value}'
               : result.firstLine,
           fix:
-              'Run "dart run dartway_cli:dartway deploy setup" once, then '
-              '"dart run dartway_cli:dartway deploy run".',
+              'Run "dartway deploy setup" once, then '
+              '"dartway deploy run".',
         );
 }
 
@@ -187,7 +187,7 @@ Future<DwDeployVerdict> _checkHostCongestionControl(
               ? 'host reports ${value.isEmpty ? 'no value' : value}'
               : result.firstLine,
           fix:
-              'Run "dart run dartway_cli:dartway deploy setup" once on this server.',
+              'Run "dartway deploy setup" once on this server.',
         );
 }
 
