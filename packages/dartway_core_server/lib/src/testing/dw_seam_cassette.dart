@@ -115,11 +115,12 @@ final class DwSeamCassette {
     final saved = (_entries[index]['response'] as Map).cast<String, dynamic>();
     if (_verify) {
       final response = await real();
-      if (_canonical(_responseShape(_redactor.clean(response) as Map)) !=
-          _canonical(_responseShape(saved))) {
+      final actualShape = _responseShape(_redactor.clean(response) as Map);
+      final expectedShape = _responseShape(saved);
+      if (_canonical(actualShape) != _canonical(expectedShape)) {
         throw StateError(
           'Seam drift in ${_file.path}: $kind ${jsonEncode(safeRequest)}; '
-          'expected ${jsonEncode(_responseShape(saved))}, got ${jsonEncode(_responseShape(response))}',
+          'expected ${jsonEncode(expectedShape)}, got ${jsonEncode(actualShape)}',
         );
       }
       return response;

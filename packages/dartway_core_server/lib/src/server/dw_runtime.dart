@@ -58,6 +58,8 @@ final class DwRuntime {
 
   /// What `ctx.http` sends through: the network, or a test's fake.
   final DwOutboundTransport outbound;
+
+  /// What `ctx.process` runs through: system processes, or an offline test transport.
   final DwProcessTransport process;
 
   /// `DwServerSettings.outboundTimeout`.

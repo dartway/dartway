@@ -92,8 +92,9 @@ it or an extension on it.
   by default. `DW_VERIFY_SEAMS=1` with `dart run dartway_cli:dartway test -- --tags seam` compares live keys,
   types, HTTP status and process exit codes without rewriting recordings. Keep live drift
   out of ordinary CI; the skeleton's weekly/manual workflow skips without
-  `DW_SEAM_CREDENTIALS` (use `public` to enable its credential-free sample). The signed-in
-  `system_info` feature in the skeleton demonstrates HTTP and `git --version` together.
+  `DW_SEAM_CREDENTIALS` (use `public` to enable its credential-free sample). See the
+  [recorded HTTP and command example](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/src/system_info/system_info_acceptance_test.dart)
+  in the framework repository.
 - Choose cases by the risk classes and gate in §4, not by the number of handlers or publications.
 
 ## 3. Screens — widget tests on the in-memory server
