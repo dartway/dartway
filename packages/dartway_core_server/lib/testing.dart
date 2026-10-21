@@ -5,7 +5,8 @@
 /// (`DwTestClock`), and what a test watches
 /// the client with: `DwCountingTransport`, `DwRecordingConnector`,
 /// `dwWaitUntil`; and what a test answers the server's outbound requests
-/// with, `DwFakeOutboundHttp`.
+/// with, `DwFakeOutboundHttp` and `DwFakeProcessRunner`, backed by recorded
+/// real responses through `DwSeamCassette`.
 library;
 
 // The client, so an end-to-end test imports this library and the server's and
