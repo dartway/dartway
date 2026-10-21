@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.22.1-dev.1
+
+- Nothing changed here; the family moves in lockstep with the per-call timing
+  log in `dartway_core_server` (#645).
+
 ## 0.22.0
 
 - Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,

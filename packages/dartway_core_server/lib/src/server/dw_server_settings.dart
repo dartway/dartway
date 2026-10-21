@@ -28,6 +28,7 @@ final class DwServerSettings {
     this.trustedProxyNetworks = const [],
     this.behindProxy = false,
     this.deploymentVersion,
+    this.slowCallThreshold = const Duration(seconds: 1),
   }) : assert(maxBodyBytes > 0),
        assert(outboundLimitBytes > 0),
        assert(maxLiveMessageBytes > 0),
@@ -58,6 +59,12 @@ final class DwServerSettings {
   /// Immutable revision reported by health probes. Native Kamal provides
   /// KAMAL_VERSION; local servers may omit it. It grants no access.
   final String? deploymentVersion;
+
+  /// A call answered slower than this is logged as a warning, with its wire
+  /// name, status, time and answer size — whatever the logger's level. Every
+  /// other call is the same line at debug. Timed from the request's arrival
+  /// to the encoded answer, so a slow body counts too.
+  final Duration slowCallThreshold;
 
   /// How long a whole body may take to arrive. A client dripping a body a
   /// byte at a time holds a connection and a buffer; this bounds both.

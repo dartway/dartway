@@ -175,6 +175,11 @@ local:
 #   # Cleanup failures warn without failing the successful deploy. MB or GB.
 #   build_cache_keep: 10GB
 #
+#   # Optional, with `database: bundled`. Postgres logs every statement slower
+#   # than this many milliseconds (`docker compose logs postgres`), read back
+#   # by `dartway deploy stats`. Defaults to 500; 0 logs every statement.
+#   slow_query_ms: 500
+#
 #   # Optional. Ports to open beyond SSH, 80 and 443.
 #   firewall_ports: [5432]
 #

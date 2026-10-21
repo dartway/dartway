@@ -432,6 +432,7 @@ dart run dartway_cli:dartway deploy setup --env staging
 dart run dartway_cli:dartway deploy check --env staging
 dart run dartway_cli:dartway deploy run   --env staging
 dart run dartway_cli:dartway deploy run   --env staging --revision "$GITHUB_SHA"
+dart run dartway_cli:dartway deploy stats --env staging --hours 24
 dartway secret set SMS_API_TOKEN --env staging
 ```
 
@@ -441,13 +442,17 @@ lock. `kamal --check` rejects stale output without writing; web release builds
 call `Uri.base.origin`, so one image serves both destinations. See
 [Kamal and GHCR](deploy.md#kamal-and-ghcr).
 
-`setup` provisions a server and renders its Compose and Nginx configuration, `run` deploys, and
-`check` asserts that a deployment would work without changing anything. `run --revision <sha>`
+`setup` provisions a server and renders its Compose and Nginx configuration, `run` deploys — the
+new server beside the serving one, so a deploy answers no request with an error — and `check`
+asserts that a deployment would work without changing anything. `stats` reads how fast a deployed
+environment answers: p50/p95 per call over the last hours from the proxy's log and the costliest
+statements from `pg_stat_statements`, changing nothing ([Speed](deploy.md#speed--what-a-deployment-records)).
+`run --revision <sha>`
 pins a CI deployment to its verified commit and refuses if the server has already moved past it.
 Everything is
 described by `deploy/config.yaml`. The whole story is [Deploying the server](deploy.md).
 
-All three first check that the server runs this project's stack, or none at all, and refuse when it
+`setup`, `check` and `run` first check that the server runs this project's stack, or none at all, and refuse when it
 runs only other ones — a repository that moved without `project:` pinning the name its stack has on
 the server ([Moving the repository](deploy.md#moving-the-repository)). `deploy setup --new-stack`
 sets up a genuinely second project on a host that already runs others: it skips that one check and

@@ -308,11 +308,31 @@ ${DwComposeFiles.invoke} build
     '${DwComposeFiles.invoke} run --rm -T ${DwStack.storageInitService} </dev/null',
   );
 
-  /// Starts the bundled Postgres. Nothing to do with `database: external` —
-  /// there is no such service in the rendered stack, and the server reaches
-  /// the managed database directly through the secrets in `.env`.
-  Future<DwSshResult> startDatabase() =>
-      _compose('up -d --wait ${DwStack.postgresService}');
+  /// Starts the bundled Postgres, then turns on what `deploy stats` reads:
+  /// the `pg_stat_statements` extension (its library is preloaded by the
+  /// rendered command line) and the slow-statement log at `slow_query_ms`.
+  /// The threshold is `ALTER SYSTEM` and a reload, not a command-line flag,
+  /// so changing it never restarts the database under a serving server.
+  ///
+  /// Nothing to do with `database: external` — there is no such service in
+  /// the rendered stack, and the server reaches the managed database directly
+  /// through the secrets in `.env`.
+  Future<DwSshResult> startDatabase() {
+    final name = stack.databaseName;
+    final threshold = target.slowQueryMs;
+    return _as('''
+set -e
+cd '$appDir'
+${DwComposeFiles.selectFiles}
+${DwComposeFiles.invoke} up -d --wait ${DwStack.postgresService}
+${DwComposeFiles.invoke} exec -T ${DwStack.postgresService} psql -X -q -v ON_ERROR_STOP=1 -U '$name' -d '$name' >/dev/null <<'DW_SQL'
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+ALTER SYSTEM SET log_min_duration_statement = $threshold;
+SELECT pg_reload_conf();
+DW_SQL
+echo "pg_stat_statements is on; statements over $threshold ms are logged"
+''');
+  }
 
   /// Waits for a container to be healthy; on anything else prints why and the
   /// container's own log, and fails.
@@ -436,77 +456,162 @@ fi
 """;
   }
 
-  /// Replaces the server with the new image, one version at a time: the
-  /// serving server stops gracefully (calls in flight are answered; clients
-  /// retry through the gap), the new image applies the migrations in a
-  /// one-off run that serves nothing (`DW_MIGRATE_ONLY=true`), then the new
-  /// server starts and has to become healthy.
+  /// How long the proxy may keep answering from its previous lookup of a
+  /// service: two of its re-resolution periods
+  /// ([DwStackRenderer.resolveSeconds]) and a second.
+  static const int _proxyCatchUpSeconds =
+      2 * DwStackRenderer.resolveSeconds + 1;
+
+  /// Defines `dw_roll_out` and `dw_retire`, the two halves of replacing a
+  /// service without a moment in which nothing answers for it. Expects
+  /// [DwComposeFiles.selectFiles] and [waitHealthyFunction] to have run.
   ///
-  /// No two versions ever run at once, so old code never writes into a new
-  /// schema and never claims a job it does not know. The price is a short
-  /// gap — the stop, the migrations, the start — which the client's retries
-  /// cover.
-  ///
-  /// When the migrations or the new server fail, the image that was serving
-  /// is started again, and the step fails with the server's own words. A
-  /// migration that failed rolled back; a server that failed after its
-  /// migrations applied leaves the previous code on the new schema, which the
-  /// message says.
-  Future<DwSshResult> replaceServer() => _as('''
+  /// `dw_roll_out <service> <label> <serving ids…>` starts one container of
+  /// the build beside the serving ones (`--scale` one higher,
+  /// `--no-recreate` so they are left alone) and waits for its healthcheck;
+  /// it leaves its id in `dw_new`, empty when Compose started none.
+  /// `dw_retire <ids…>` waits until the proxy has looked the service up
+  /// again — it re-resolves every [DwStackRenderer.resolveSeconds] seconds —
+  /// then stops each old container gracefully, removes it, and waits for the
+  /// proxy to look it up once more, so that nothing after this step meets an
+  /// address that is gone.
+  static String get _rolloutFunctions =>
+      '''
+dw_roll_out() {
+  dw_new=""
+  dw_service=\$1
+  dw_label=\$2
+  shift 2
+  if [ \$# -eq 0 ]; then
+    ${DwComposeFiles.invoke} up -d --no-deps "\$dw_service" || return 1
+    dw_new=\$(${DwComposeFiles.invoke} ps -q "\$dw_service" | head -n 1)
+  else
+    ${DwComposeFiles.invoke} up -d --no-deps --no-recreate --scale "\$dw_service=\$((\$# + 1))" "\$dw_service" || return 1
+    for dw_c in \$(${DwComposeFiles.invoke} ps -q "\$dw_service"); do
+      case " \$* " in *" \$dw_c "*) ;; *) dw_new=\$dw_c ;; esac
+    done
+  fi
+  if [ -z "\$dw_new" ]; then
+    echo "ERROR: Compose started no new \$dw_label container" >&2
+    return 1
+  fi
+  dw_wait_healthy "\$dw_new" "the new \$dw_label"
+}
+dw_retire() {
+  [ \$# -gt 0 ] || return 0
+  sleep $_proxyCatchUpSeconds
+  for dw_c in "\$@"; do
+    docker stop -t 45 "\$dw_c" >/dev/null
+    docker rm "\$dw_c" >/dev/null
+  done
+  # And until it has forgotten them: a reload in the meantime starts workers
+  # from the lookup that still held the stopped address.
+  sleep $_proxyCatchUpSeconds
+}
+''';
+
+  /// The script that replaces [service] with its new build beside the one
+  /// serving — see [replaceServer]; [migrate] runs between the two, with the
+  /// previous version still serving, and fails the replacement when it fails.
+  String _replaceScript(String service, String label, {String? migrate}) =>
+      '''
 set -e
 cd '$appDir'
 ${DwComposeFiles.selectFiles}
 ${waitHealthyFunction()}
-${_rememberImage(DwStack.serverService)}
+$_rolloutFunctions
+${_rememberImage(service)}
 # The container supplies the image name to restore. The journal holds the
 # exported rollback image, pinned before the build moved that name.
-old=\$(${DwComposeFiles.invoke} ps -aq ${DwStack.serverService} | head -n 1)
+old=\$(${DwComposeFiles.invoke} ps -aq $service | head -n 1)
 image=""
 previous=""
 if [ -n "\$old" ]; then
   image=\$(docker inspect -f '{{.Config.Image}}' "\$old")
-  previous=\$(cat '$_journalDirectory/${DwStack.serverService}.previous')
+  previous=\$(cat '$_journalDirectory/$service.previous')
 fi
-dw_start_previous() {
+serving=\$(${DwComposeFiles.invoke} ps -q --status running $service)
+# A container that is not running serves nothing, and \`up --scale\` would
+# start it again instead of the new build.
+for c in \$(${DwComposeFiles.invoke} ps -aq $service); do
+  case " \$(echo \$serving) " in *" \$c "*) ;; *) docker rm --force "\$c" >/dev/null ;; esac
+done
+# After a failure: the service's image name means the image that serves
+# again, so that a later \`docker compose up\` does not start the failed build;
+# and with nothing serving, the previous version is started again.
+dw_fall_back() {
   if [ -z "\$previous" ]; then
-    echo "there is no previous server to start again" >&2
+    echo "there is no previous $label to fall back to" >&2
     return 0
   fi
-  if docker image tag "\$previous" "\$image" && ${DwComposeFiles.invoke} up -d --no-deps ${DwStack.serverService} >/dev/null 2>&1; then
-    echo "the previous server is running again" >&2
+  if ! docker image tag "\$previous" "\$image"; then
+    echo "ERROR: the previous $label image could not be named \$image again" >&2
+    return 0
+  fi
+  if [ -n "\$serving" ]; then
+    echo "the previous $label keeps serving" >&2
+  elif ${DwComposeFiles.invoke} up -d --no-deps $service >/dev/null 2>&1; then
+    echo "the previous $label is running again" >&2
   else
-    echo "ERROR: the previous server could not be started again" >&2
+    echo "ERROR: the previous $label could not be started again" >&2
   fi
 }
-if [ -n "\$old" ]; then
-  ${DwComposeFiles.invoke} stop -t 45 ${DwStack.serverService}
+${migrate ?? ''}
+if ! dw_roll_out $service '$label' \$serving; then
+  if [ -n "\$dw_new" ]; then docker rm --force "\$dw_new" >/dev/null 2>&1 || true; fi
+  echo "ERROR: the new $label did not become healthy${migrate == null ? '' : '; its migrations are applied, so the previous code runs on the new schema'}" >&2
+  dw_fall_back
+  exit 1
 fi
+dw_retire \$serving
+if [ -n "\$serving" ]; then
+  echo "the new $label serves; the previous one stopped after it"
+fi
+''';
+
+  /// Replaces the server with the new image without a moment in which
+  /// nothing answers: the new image applies the migrations in a one-off run
+  /// that serves nothing (`DW_MIGRATE_ONLY=true`) while the previous server
+  /// still serves, the new server starts beside it and has to become
+  /// healthy, and only then does the previous one stop gracefully — calls in
+  /// flight are answered, live sockets close with "server stopping" and
+  /// reconnect to the new one.
+  ///
+  /// The proxy re-resolves the service every few seconds and retries a
+  /// refused connection on the other address (see the rendered `nginx.conf`),
+  /// so no request meets the change as a `502`. The price is a few seconds in
+  /// which both versions run: the previous code on the new schema, which is
+  /// what the migration rule asks a release to allow anyway (expand, then
+  /// contract), each taking only the jobs it declares. A publication by a
+  /// command on one reaches the live sockets of that one; the sockets of the
+  /// other reconnect within seconds and re-read everything they watch.
+  ///
+  /// When the migrations fail (they roll back) or the new server does not
+  /// become healthy, the previous server is still serving, and the step fails
+  /// with the server's own words. A server that failed after its migrations
+  /// applied leaves the previous code on the new schema, which the message
+  /// says. With nothing serving before — a first deploy, a stand that was
+  /// down — the new server simply starts, and on a failure the previous image
+  /// is started again.
+  Future<DwSshResult> replaceServer() => _as(
+    _replaceScript(
+      DwStack.serverService,
+      'server',
+      migrate:
+          '''
 if ! ${DwComposeFiles.invoke} run --rm --no-deps -T -e ${DwStack.migrateOnlyVariable}=true ${DwStack.serverService} </dev/null; then
   echo "ERROR: the new image could not apply its migrations (the log is above); they rolled back" >&2
-  dw_start_previous
+  dw_fall_back
   exit 1
-fi
-${DwComposeFiles.invoke} up -d --no-deps ${DwStack.serverService}
-cid=\$(${DwComposeFiles.invoke} ps -q ${DwStack.serverService})
-if [ -z "\$cid" ]; then
-  echo "ERROR: Compose started no ${DwStack.serverService} container" >&2
-  dw_start_previous
-  exit 1
-fi
-if ! dw_wait_healthy "\$cid" 'the new server'; then
-  echo "ERROR: the new server did not become healthy; its migrations are applied, so the previous code runs on the new schema" >&2
-  dw_start_previous
-  exit 1
-fi
-''');
+fi''',
+    ),
+  );
 
-  Future<DwSshResult> startWeb() => _as("""
-set -e
-cd '$appDir'
-${DwComposeFiles.selectFiles}
-${_rememberImage(DwStack.webService)}
-${DwComposeFiles.invoke} up -d --no-deps --wait ${DwStack.webService}
-""");
+  /// Replaces the web app the same way as the server ([replaceServer]),
+  /// without the migrations: the new image beside the serving one, healthy
+  /// first, the previous one stopped after it.
+  Future<DwSshResult> startWeb() =>
+      _as(_replaceScript(DwStack.webService, 'web app'));
 
   /// Converges everything else — the proxy, certbot, whatever the project's
   /// override adds — and removes services the stack no longer declares.
@@ -527,7 +632,7 @@ ${DwComposeFiles.invoke} up -d --no-deps --wait ${DwStack.webService}
     "{ find nginx.d -name '*.conf' -exec cat {} + 2>/dev/null || true; }",
   );
 
-  /// Why a stack that came up is still not fit to have its proxy restarted.
+  /// Why a stack that came up is still not fit to have its proxy reloaded.
   static String? upstreamVerdict(DwSshResult result) {
     final parts = result.stdout.split(_upstreamMarker);
     if (parts.length < 2) {
@@ -543,14 +648,15 @@ ${DwComposeFiles.invoke} up -d --no-deps --wait ${DwStack.webService}
     }
     final names = missing.map((line) => line.split(': ').last).join(', ');
     return 'Nginx is configured to proxy to $names, and the applied stack has '
-        'no such service. Restarting nginx now would make it read that '
-        'configuration and refuse to start, taking the whole stand down. '
-        'Nothing has been restarted.';
+        'no such service. Reloading nginx now would make it refuse that '
+        'configuration, and the next start of the proxy — a reboot, a '
+        'recreated container — would refuse to start on it, taking the whole '
+        'stand down. Nothing has been reloaded.';
   }
 
   /// `nginx -t` inside the running proxy, on the stack's network: the syntax,
   /// the certificate files, and every upstream name resolved by the DNS the
-  /// restarted proxy will use.
+  /// reloaded proxy will use.
   Future<DwSshResult> testProxyConfiguration() =>
       _compose('exec -T ${DwStack.nginxService} nginx -t');
 
@@ -619,7 +725,7 @@ dw_certificate_coverage() {
   /// no project port-80 server claims. With no proxy running — a first
   /// deploy, a stand that is down — nothing serves that a failure could take
   /// down, and the first run leaves the issue to the second: after
-  /// the stack has started a proxy, before nginx is restarted to read what
+  /// the stack has started a proxy, before nginx is reloaded to read what
   /// was issued. On a routine deploy the second run finds every host covered
   /// and asks nothing.
   Future<DwSshResult> issueCertificate({bool throughServingProxy = false}) {
@@ -706,28 +812,41 @@ $_certbot "
 ''');
   }
 
-  /// Nginx resolves service names once at start; after the server container
-  /// is recreated its cached address points at a container that is gone. The
-  /// restart is checked, not assumed: `restart` exits 0 for a proxy that dies
-  /// a second later on its configuration.
-  Future<DwSshResult> restartProxy() => _as('''
+  /// Makes the running proxy read the rendered configuration and the
+  /// certificate: a graceful reload, in which the old workers finish what
+  /// they serve and new ones take every new connection — a restart would
+  /// refuse connections while the proxy is down. The upstreams follow the
+  /// replaced containers by themselves (they are re-resolved, see the
+  /// rendered `nginx.conf`); the reload is for what this deploy rendered.
+  ///
+  /// The outcome is read, not assumed: `nginx -s reload` exits 0 having only
+  /// sent a signal, and a master that rejects the configuration keeps the
+  /// old one and says so only in its log.
+  Future<DwSshResult> reloadProxy() => _as('''
 set -e
 cd '$appDir'
 ${DwComposeFiles.selectFiles}
 cid=\$(${DwComposeFiles.invoke} ps -q ${DwStack.nginxService})
-[ -n "\$cid" ] || { echo "ERROR: there is no nginx container to restart" >&2; exit 1; }
+[ -n "\$cid" ] || { echo "ERROR: there is no nginx container to reload" >&2; exit 1; }
 # Compared with the count before, not with zero: a proxy that crash-looped once
 # last month is not a failure of this deploy.
 before=\$(docker inspect -f '{{.RestartCount}}' "\$cid")
-${DwComposeFiles.invoke} restart ${DwStack.nginxService}
+since=\$(date +%s)
+${DwComposeFiles.invoke} exec -T ${DwStack.nginxService} nginx -s reload
 sleep 3
 state=\$(docker inspect -f '{{.State.Status}} {{.RestartCount}}' "\$cid")
 if [ "\$state" != "running \$before" ]; then
-  echo "ERROR: nginx is not running after the restart (\$state). Its log:" >&2
+  echo "ERROR: nginx is not running after the reload (\$state). Its log:" >&2
   docker logs --tail 50 "\$cid" >&2 2>&1 || true
   exit 1
 fi
-echo "nginx restarted and running"
+refused=\$(docker logs --since "\$since" "\$cid" 2>&1 | grep -E '\\[(emerg|alert)\\]' || true)
+if [ -n "\$refused" ]; then
+  echo "ERROR: nginx refused the configuration and keeps serving the previous one:" >&2
+  printf '%s\\n' "\$refused" >&2
+  exit 1
+fi
+echo "nginx reloaded its configuration and is running"
 ''');
 
   Future<DwSshResult> status() =>
@@ -851,18 +970,22 @@ echo "nginx restarted and running"
     DwDeployStep(
       id: 'server',
       title:
-          'Replace the server: stop it, migrate, start the new one (the '
-          'previous one again on a failure)',
+          'Replace the server: migrate, start the new one beside the serving '
+          'one, stop the old after it (the previous one serves on a failure)',
       run: replaceServer,
       showOutput: true,
     ),
-    DwDeployStep(id: 'web', title: 'Replace the web app', run: startWeb),
+    DwDeployStep(
+      id: 'web',
+      title: 'Replace the web app beside the serving one',
+      run: startWeb,
+    ),
     DwDeployStep(
       id: 'stack',
       title: 'Converge the rest of the stack',
       run: startStack,
     ),
-    // Between the stack coming up and the restart, and it has to be exactly
+    // Between the stack coming up and the reload, and it has to be exactly
     // here: the stack is now the one nginx will be pointed at, and the proxy
     // has not re-read anything yet. A step later this is a post-mortem.
     DwDeployStep(
@@ -888,9 +1011,9 @@ echo "nginx restarted and running"
         showOutput: true,
       ),
     DwDeployStep(
-      id: 'restart-proxy',
-      title: 'Restart nginx',
-      run: restartProxy,
+      id: 'reload-proxy',
+      title: 'Reload nginx onto the rendered configuration',
+      run: reloadProxy,
     ),
     DwDeployStep(
       id: 'verify-outside',

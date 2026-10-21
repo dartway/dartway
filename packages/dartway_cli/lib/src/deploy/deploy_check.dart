@@ -253,6 +253,13 @@ const List<DwDeployCheck> dwLocalDeployChecks = [
     evaluate: _checkOverrideWebBuild,
   ),
   DwDeployCheck(
+    id: 'override-side-by-side',
+    title: 'The compose override lets a new server start beside the old one',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: _checkOverrideSideBySide,
+  ),
+  DwDeployCheck(
     id: 'local-secrets-untracked',
     title: 'The local secrets file is outside Git',
     stage: DwDeployCheckStage.local,
@@ -876,10 +883,11 @@ Future<DwDeployVerdict> _checkNginxUpstreams(DwDeployContext context) async {
   return DwDeployVerdict.fail(
     missing.join(', '),
     fix:
-        'Nginx resolves an upstream once, when it starts, so a name no service '
-        'answers to fails at whatever restarts the proxy next — which is the '
-        "deploy's own last step. Declare the service in "
-        'deploy/compose.override.yml, or drop the snippet that names it.',
+        'Nginx resolves a snippet\'s upstream when it reads its configuration, '
+        'so a name no service answers to fails at whatever reloads or restarts '
+        "the proxy next — which is the deploy's own last step. Declare the "
+        'service in deploy/compose.override.yml, or drop the snippet that '
+        'names it.',
   );
 }
 
@@ -923,6 +931,53 @@ Future<DwDeployVerdict> _checkOverrideWebBuild(DwDeployContext context) async {
         'The deploy already builds web from the project Dockerfile. Drop the '
         'build block so the override cannot replace that build configuration; '
         'change the Dockerfile when the image itself has to differ.',
+  );
+}
+
+/// `deploy run` replaces the server and the web app by starting the new
+/// container beside the serving one (`--scale` one higher) and stopping the
+/// old one after it. A fixed `container_name` cannot be held by two
+/// containers, and a published host port cannot be bound twice: an override
+/// that gives `server` or `web` either makes every deploy fail at that step,
+/// with the previous version still serving — found here instead.
+Future<DwDeployVerdict> _checkOverrideSideBySide(
+  DwDeployContext context,
+) async {
+  final file = File(
+    p.join(context.projectRoot.path, 'deploy', 'compose.override.yml'),
+  );
+  if (!file.existsSync()) {
+    return const DwDeployVerdict.skip('no deploy/compose.override.yml');
+  }
+  final Object? document;
+  try {
+    document = loadYaml(file.readAsStringSync());
+  } on YamlException {
+    // `override-web-build` names the parse error; one report is enough.
+    return const DwDeployVerdict.skip(
+      'deploy/compose.override.yml is not YAML',
+    );
+  }
+  final services = document is YamlMap ? document['services'] : null;
+  final blocking = [
+    for (final service in [DwStack.serverService, DwStack.webService])
+      if (services is YamlMap && services[service] is YamlMap)
+        for (final key in ['container_name', 'ports'])
+          if ((services[service] as YamlMap).containsKey(key)) '$service.$key',
+  ];
+  if (blocking.isEmpty) {
+    return const DwDeployVerdict.pass(
+      'server and web can each run a second container',
+    );
+  }
+  return DwDeployVerdict.fail(
+    'deploy/compose.override.yml sets ${blocking.join(', ')}',
+    fix:
+        'A deploy starts the new container beside the serving one and stops '
+        'the old one after it, so that no request meets a gap; two containers '
+        'cannot share a container_name or bind the same host port. Drop them: '
+        'the proxy reaches both services by name, and a route to a host port '
+        'belongs in deploy/nginx.d.',
   );
 }
 

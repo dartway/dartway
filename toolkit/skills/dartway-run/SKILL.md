@@ -119,3 +119,17 @@ with the value and the `project:` key to configure. Web release builds without a
 release; debug/profile preview without the define stays open. Studio owns running
 Kamal, SSH keys, registry credentials and secrets. Existing Compose deployments
 continue using `deploy run` until their project's separate move.
+
+`deploy run` starts the new server and web app beside the serving ones and
+stops the old ones after their replacement is healthy, so a deploy answers no
+request with an error; migrations run first, while the previous version serves,
+so they only expand (`dartway-migrations`). An override never gives `server` or
+`web` a `container_name` or published `ports` (`override-side-by-side`). A
+`deploy/nginx.d` snippet proxying to a stack service names it through a
+variable so it follows the replacement too:
+`set $dw_upstream server:8080; proxy_pass http://$dw_upstream;`.
+How fast a deployed environment answers: `dartway deploy stats --env
+<environment> [--hours 24] [--top 10]` — p50/p95 per call from the proxy log,
+the costliest statements of `pg_stat_statements`, slow statements over
+`slow_query_ms` (`deploy/config.yaml`, 500 by default). A call slower than
+`DwServerSettings.slowCallThreshold` (1 s) is a server warning with its name.

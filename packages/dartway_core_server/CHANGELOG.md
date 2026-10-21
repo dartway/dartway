@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.22.1-dev.1
+
+### Changes
+
+- Every HTTP call is timed: one line with its wire name, status, milliseconds
+  and answer size, at debug; a call slower than the new
+  `DwServerSettings.slowCallThreshold` (default 1 s) is the same line as a
+  warning, whatever the logger's level (#645).
+
 ## 0.22.0
 
 ### Breaking changes

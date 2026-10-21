@@ -5,6 +5,7 @@ import 'package:args/command_runner.dart';
 
 import '../checker/dw_check_type.dart';
 import '../deploy/deploy_check.dart';
+import '../deploy/deploy_stats.dart';
 import '../deploy/deploy_target.dart';
 import '../deploy/remote_checks.dart';
 import '../deploy/kamal_runtime_checks.dart';
@@ -22,6 +23,7 @@ class DeployCommand extends Command<int> {
     addSubcommand(DeploySetupCommand());
     addSubcommand(DeployRunCommand());
     addSubcommand(DeployCheckCommand());
+    addSubcommand(DeployStatsCommand());
   }
 
   @override
@@ -201,6 +203,79 @@ class DeployRunCommand extends Command<int> {
       results,
       connection: _connection,
     );
+  }
+}
+
+/// Reads how fast a deployed environment answers, and changes nothing there.
+class DeployStatsCommand extends Command<int> {
+  DeployStatsCommand({DwStack? stack, DwSshRunner? connection, StringSink? out})
+    : _stack = stack,
+      _connection = connection,
+      _out = out {
+    argParser
+      ..addOption('env', help: 'Environment declared in deploy/config.yaml.')
+      ..addOption(
+        'hours',
+        defaultsTo: '24',
+        help: 'How far back the proxy log is read.',
+      )
+      ..addOption(
+        'top',
+        defaultsTo: '10',
+        help: 'How many statements of pg_stat_statements to show.',
+      )
+      ..addOption(
+        'as',
+        help: 'SSH login. Defaults to ssh_user from the config.',
+      )
+      ..addOption('identity', help: 'SSH private key file.');
+  }
+
+  final DwStack? _stack;
+  final DwSshRunner? _connection;
+  final StringSink? _out;
+
+  @override
+  String get name => 'stats';
+
+  @override
+  String get description =>
+      'Show p50/p95 per call from the proxy log and the costliest database '
+      'statements of a deployed environment. Read-only.';
+
+  @override
+  String get invocation =>
+      'dartway deploy stats --env <environment> [--hours 24] [--top 10]';
+
+  int _positive(String option) {
+    final value = int.tryParse(argResults!.option(option)!);
+    if (value == null || value < 1) {
+      usageException('--$option takes a whole number above 0.');
+    }
+    return value;
+  }
+
+  @override
+  Future<int> run() async {
+    final results = argResults!;
+    final hours = _positive('hours');
+    final top = _positive('top');
+    final stack =
+        _stack ?? resolveDeployStack(this, results, deployProjectRoot());
+    final target = stack.target;
+    final stats = DwDeployStats(
+      ssh:
+          _connection ??
+          DwSshRunner(
+            host: target.host,
+            user: results.option('as') ?? target.sshUser,
+            identityFile: results.option('identity'),
+          ),
+      stack: stack,
+    );
+    final report = await stats.read(hours: hours, top: top);
+    (_out ?? stdout).write(stats.format(report, hours: hours));
+    return 0;
   }
 }
 
