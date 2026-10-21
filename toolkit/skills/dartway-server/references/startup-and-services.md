@@ -48,7 +48,7 @@ the server factory; `bin/` parses nothing itself — no `env['NAME']`.
 `body:`; any status is a `DwOutboundResponse`, no answer throws `DwOutboundException`; bounded by
 `DwServerSettings.outboundTimeout` and `outboundMaxResponseBytes`; logged without path, query, headers
 or body; `followRedirects: false` when a header carries a credential. Not inside a transaction ([transactions](handlers.md)).
-A service class takes `ctx.http` per call — tests fake it (`dartway-testing`), nothing is threaded
+A service class takes `ctx.http` per call — tests replay recorded real answers (`dartway-testing`), nothing is threaded
 through the server factory for them. A standalone `bin/` or `tool/` script creates
 `DwOutboundHttp.network()` and closes it in `finally`; server code uses its context's client.
 The default response cap is 10 MiB including base64/JSON; for image APIs, raise `maxResponseBytes:`
@@ -92,3 +92,15 @@ All invalid/expired/used/superseded/occupied links refuse existing `DwCoreRefusa
 Only the latest account attach-link request works. Success is single-use, not idempotency-replayed;
 response loss can show invalid after a committed change. Publish using the change hook's account.
 Prefer web fragment URLs, clear the token before calls/diagnostics, and never log bearer links.
+
+### External commands
+
+Run external commands through `ctx.process.run('git', ['--version'])`, with optional
+`workingDirectory`, `environment`, `timeout` and `maxOutputBytes`. It uses no shell expansion,
+returns `DwProcessResult` (`exitCode`, `stdout`, `stderr`), and kills an over-limit command.
+A nonzero exit is a result; failure to start, timeout and excess output throw
+`DwProcessException`. Never hold a database transaction while awaiting an external service.
+Direct `Process.run`, `Process.runSync` and `Process.start` in server `lib/` fail
+`forbiddenProcessRun`, including tear-offs and imports/exports of `package:process`
+or `package:process_run`. Tests use `server.process` and recorded answers;
+see `dartway-testing`.

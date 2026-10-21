@@ -245,6 +245,9 @@ enum DwCheckType {
   /// threaded through the server's factory.
   forbiddenHttpClient,
 
+  /// External commands in server lib/ must use ctx.process.
+  forbiddenProcessRun,
+
   /// A handler in a `*_handlers.dart` under any rule but a resource rule
   /// (`signedIn`, a role check, …) that compares a row's owner field with the
   /// caller and refuses `notFound`/`forbidden` — in its body or in a helper of

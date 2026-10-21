@@ -3,6 +3,8 @@ library;
 
 import 'package:dartway_analytics_server/dartway_analytics_server.dart';
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_example_server/src/system_info/system_info_feature.dart';
+
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/account/account_feature.dart';
 import 'package:dartway_example_server/src/account/logic/auth.dart';
@@ -68,6 +70,7 @@ abstract final class DartwayExampleServer {
     database: database,
     auth: auth ?? AccountAuth.config,
     features: [
+      systemInfoFeature,
       profileFeature,
       scheduleFeature,
       bookingsFeature,

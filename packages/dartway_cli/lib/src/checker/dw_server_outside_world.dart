@@ -19,7 +19,10 @@ import 'dw_dart_source.dart';
 /// - [DwCheckType.forbiddenHttpClient] — `dart:io`'s `HttpClient(` or an
 ///   import of `package:http/…`, or `DwOutboundHttp.network`, anywhere in
 ///   `lib/`: an outbound request is `ctx.http`, bounded, logged and faked by
-///   the test server.
+///   the test server;
+/// - [DwCheckType.forbiddenProcessRun] — direct `Process.run`, `runSync`,
+///   `start` or imports/exports of `package:process` and `package:process_run`
+///   in `lib/`: commands run through `ctx.process`.
 ///
 /// Comments and strings are not code; an interpolation is. Known limits:
 /// another client package (`dio`, `package:http`'s re-exports through a
@@ -35,6 +38,11 @@ class DwServerOutsideWorldInspector {
          filterType,
          filterSeverity,
        ),
+       _processEnabled = _enabled(
+         DwCheckType.forbiddenProcessRun,
+         filterType,
+         filterSeverity,
+       ),
        _httpEnabled = _enabled(
          DwCheckType.forbiddenHttpClient,
          filterType,
@@ -44,6 +52,7 @@ class DwServerOutsideWorldInspector {
   final Directory? serverPackageDir;
   final bool _environmentEnabled;
   final bool _httpEnabled;
+  final bool _processEnabled;
   final _findings = <(DwCheckType, String)>[];
 
   /// The one file of `lib/` that reads the environment.
@@ -69,6 +78,19 @@ class DwServerOutsideWorldInspector {
     r'\bHttpClient\s*(\(|\.\s*new\b)|'
     r'\bDwOutboundHttp\s*\.\s*network\b',
   );
+  static final _processRun = RegExp(r'\bProcess\s*\.\s*(run|runSync|start)\b');
+
+  static final _processImport = RegExp(
+    r'''^\s*(import|export)\s+['"]package:(process|process_run)/''',
+    multiLine: true,
+  );
+
+  /// Direct process calls, tear-offs and imports that bypass the seam.
+  static List<int> processRunsIn(String content) => {
+    ..._lines(_code(content), _processRun),
+    ..._lines(_code(content, keepWordsAndPaths: true), _processImport),
+  }.toList()..sort();
+
   static final _httpImport = RegExp(
     r'''^\s*(import|export)\s+['"]package:http/''',
     multiLine: true,
@@ -127,7 +149,9 @@ class DwServerOutsideWorldInspector {
 
   int run({DwCheckTally? tally}) {
     final server = serverPackageDir;
-    if (server == null || !(_environmentEnabled || _httpEnabled)) return 0;
+    if (server == null ||
+        !(_environmentEnabled || _httpEnabled || _processEnabled))
+      return 0;
     List<File> sources(String folder) {
       final directory = Directory(p.join(server.path, folder));
       if (!directory.existsSync()) return const [];
@@ -166,6 +190,14 @@ class DwServerOutsideWorldInspector {
           ));
         }
       }
+      if (_processEnabled) {
+        for (final line in processRunsIn(content)) {
+          _findings.add((
+            DwCheckType.forbiddenProcessRun,
+            'an external command of its own — $shown:$line; run through `ctx.process` (DwProcessRunner)',
+          ));
+        }
+      }
       if (_httpEnabled) {
         for (final line in httpClientsIn(content)) {
           _findings.add((
@@ -177,7 +209,7 @@ class DwServerOutsideWorldInspector {
       }
     }
     if (_findings.isEmpty) return 0;
-    print('\n📌 Environment and outbound HTTP:\n');
+    print('\n📌 Environment and external systems:\n');
     var errors = 0;
     for (final (type, finding) in _findings) {
       print('  ${type.reportLabel}: $finding');

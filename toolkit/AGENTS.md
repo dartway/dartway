@@ -23,7 +23,7 @@ framework issues use English.
 ## Law and default
 
 The seven laws and checker errors are mandatory; project conventions may override defaults with
-a reason. The law list is therefore derived from `DwCheckType.severity`: forty-four errors,
+a reason. The law list is therefore derived from `DwCheckType.severity`: forty-five errors,
 thirteen warnings and one info. Check messages name the correction; open the owner skill for how.
 
 | Rule | Checks that fail | Skill |
@@ -38,7 +38,7 @@ thirteen warnings and one info. Check messages name the correction; open the own
 | `dw.command` runs in the feature's `logic/`, inside `dw.action` | `forbiddenCommandCall` | `dartway-data-layer` |
 | Routes, dialogs, ids and router lifetime | `forbiddenNavigationCall`, `sentinelId`, `routeNameDuplicated`, `routerDisposedByApp` | `dartway-navigation` |
 | Server feature boundaries and row ownership | `invalidServerFeatureFile`, `misplacedServerCode`, `featureImportCycle`, `featureImportOutsideSurface`, `foreignRowWrite`, `coreImportsFeature` | `dartway-server` |
-| Server clock, environment and outbound HTTP | `forbiddenDateTimeNow`, `forbiddenEnvironmentRead`, `forbiddenHttpClient` | `dartway-server` |
+| Server clock, environment, HTTP and external commands | `forbiddenDateTimeNow`, `forbiddenEnvironmentRead`, `forbiddenHttpClient`, `forbiddenProcessRun` | `dartway-server` |
 | Startup steps, typed settings, row ids | `workAfterServerStart`, `settingsKeyValueTable`, `redundantBangAllowed` | `dartway-server` |
 | Shared layout, DTO names and patch helpers | `invalidSharedLayout`, `contractNameInvalid`, `fieldPatchMatched` | `dartway-contract` |
 | Generated code and installed-client compatibility | `generatedCodeStale`, `projectContractVersion` | `dartway-contract` |

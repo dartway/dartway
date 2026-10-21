@@ -2,6 +2,7 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:dartway_orm/dartway_orm.dart';
 import 'package:meta/meta.dart';
 
+import '../process/dw_process_runner.dart';
 import '../alerts/dw_alert_sink.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_service.dart';
@@ -34,6 +35,7 @@ final class DwRuntime {
     required this.jobsFor,
     required this.channelRules,
     required this.outbound,
+    this.process = const DwSystemProcess(),
     required this.outboundTimeout,
     required this.outboundMaxResponseBytes,
     this.clock = DwServerClock.system,
@@ -56,6 +58,9 @@ final class DwRuntime {
 
   /// What `ctx.http` sends through: the network, or a test's fake.
   final DwOutboundTransport outbound;
+
+  /// What `ctx.process` runs through: system processes, or an offline test transport.
+  final DwProcessTransport process;
 
   /// `DwServerSettings.outboundTimeout`.
   final Duration outboundTimeout;
@@ -95,6 +100,7 @@ final class DwRuntime {
       timeout: outboundTimeout,
       maxResponseBytes: outboundMaxResponseBytes,
     ),
+    process: DwProcessRunner(process),
     accounts: (ctx) => DwAccountService.ofContext(ctx, this),
     files: (ctx) => files?.serviceFor(ctx) ?? const DwUnconfiguredFiles(),
     modules: modules,
