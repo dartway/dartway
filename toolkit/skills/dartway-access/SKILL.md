@@ -68,7 +68,8 @@ handle: (ctx, command) async {
 - **Visible but not yours to change** (a note on the team's board): `load` answers `null` outside the
   team before taking any lock, `allows` compares the author, `visible: (…) => true`.
 - **The caller's rows as a list** is `signedIn` and a `where` naming the caller; a list under a parent
-  takes the parent's membership rule.
+  takes the parent's membership rule. Review every filter for rows or fields it could leak to another
+  caller; the client's `matches` filter never grants access.
 
 "My" calls name nothing about the caller (`dartway-contract`, `references/models.md`). A staff screen acting on someone
 else's data is a different call with its own rule, never the "my" call with an optional id.

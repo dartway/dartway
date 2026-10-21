@@ -130,6 +130,11 @@ re-read.
 
 ## 4. The gate — before a test is added
 
+Whoever plans the work selects **Risks to guard** from the risk survey and specification
+(**Risks under protection** in Studio). Each item names its class (1–6) and the specification's
+expected outcome, guarded once at the boundary that owns it. **`No must-test risk: <why>`** is valid.
+Use the accepted risk list directly; this step does not repeat requirements analysis or planning.
+
 **A test is mandatory only in these six risk classes:**
 
 | # | Risk class | The test |

@@ -30,7 +30,10 @@ test: is there an alternative someone will propose again in six months? `docs/ad
 project's language, with **Status** (`accepted` / `superseded by NNNN`, dated), **Context**,
 **Decision**, **Rejected alternatives, each with its reason**, **Limitations accepted knowingly**.
 Never "how it works now". An ADR is superseded by a new one, never edited — a default a project may
-replace in its root instruction file (`AGENTS.md` or `CLAUDE.md`); check there before opening a number. `dartway-plan` reads them.
+replace in its root instruction file (`AGENTS.md` or `CLAUDE.md`); check there before opening a number.
+
+Before proposing an approach, read `docs/adr/`. Do not propose an approach an accepted ADR rejected
+as if it were new: name the ADR and what changed. Follow a superseded ADR to its successor.
 
 ## Where a finding goes
 
