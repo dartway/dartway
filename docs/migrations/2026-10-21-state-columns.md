@@ -32,7 +32,7 @@ alone. Do not rewrite an applied migration.
 
 ## How to check
 
-Run generation and `dart run dartway_cli:dartway check`, then the feature's acceptance suite on a real Postgres. Cover
+Run generation and `dartway check`, then the feature's acceptance suite on a real Postgres. Cover
 forbidden initial states and moves, repeated terminal moves, and competing transitions where only
 one is legal after the first completes. Also verify an ordinary edit racing a transition throws
 `DwStaleState` without overwriting fields, a deleted row throws `DwRowNotFound`, and an intentional

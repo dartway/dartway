@@ -116,7 +116,7 @@ about a call — an incompatible client learns that first, whatever else it got 
 between app and server, which the operator resolves.
 
 **`Dw-Contract-Version`** is the version of the project's contract the app was compiled with — the
-shared package's `version:`, written by `dart run dartway_cli:dartway generate` into the protocol both sides are built
+shared package's `version:`, written by `dartway generate` into the protocol both sides are built
 with (`DwWireProtocol.contractVersion`), and sent as `?contract=` on the socket. Semantic versioning
 decides compatibility: a change that removes or renames anything an installed app sends or reads
 raises the **breaking line** — the major version, or the minor one below 1.0 — and codec-compatible additions
@@ -138,7 +138,7 @@ closed, and `DwFlutterConfig.updateRequiredScreen` replaces the app — see
 
 **Calls are same-origin by deployment, and the server sends no CORS headers — also in development
 (D-039).** In production the web app's host proxies only `/dw/` to the server
-([../5-tooling/deploy.md](../5-tooling/deploy.md)); locally `dart run dartway_cli:dartway dev` does the same
+([../5-tooling/deploy.md](../5-tooling/deploy.md)); locally `dartway dev` does the same
 ([../5-tooling/cli.md](../5-tooling/cli.md)). A cross-origin browser call cannot get through anyway:
 a JSON body needs a preflight, and the server never answers one. Native apps send no `Origin` and are
 unaffected.

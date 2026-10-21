@@ -222,7 +222,7 @@ default — on every access, in UTC, the same way in a handler, a job, a route, 
 startup step. A test gives the server a `DwTestClock` and sets or moves it; the job queue decides due
 times by the same clock, so a job enqueued for tomorrow runs when the test moves the clock to
 tomorrow ([jobs](jobs.md#time-is-the-servers-clock)). `DateTime.now()` anywhere in a server's `lib/` is
-refused by `dart run dartway_cli:dartway check` (`forbiddenDateTimeNow`): a time no test can set, and one that disagrees
+refused by `dartway check` (`forbiddenDateTimeNow`): a time no test can set, and one that disagrees
 with the job queue the moment a test moves the clock.
 
 **The caller's offset travels with every call.** The app reads its device's UTC offset at each call
@@ -267,7 +267,7 @@ even when that transaction rolls back.
 ## Outbound HTTP
 
 A request to somebody else's API — an SMS gateway, a CRM, a model provider — is `ctx.http`, in a
-handler, a job, a route or a startup step alike. There is no second client: `dart run dartway_cli:dartway check` refuses
+handler, a job, a route or a startup step alike. There is no second client: `dartway check` refuses
 `HttpClient(`, `package:http` and `DwOutboundHttp.network` in `lib/` (`forbiddenHttpClient`).
 
 ```dart

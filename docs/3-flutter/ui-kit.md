@@ -28,7 +28,7 @@ Exactly the mechanisms a kit should not have to reinvent, and nothing that has a
 
 **Loading, dialogs and sheets live in the kit.** `AppProgressIndicator` is the one spinner,
 `context.showAppDialog(…)` and `context.showAppBottomSheet(…)` the one frame for a dialog and a sheet;
-`dart run dartway_cli:dartway check` refuses `CircularProgressIndicator` (`forbiddenProgressIndicator`) and `showDialog`,
+`dartway check` refuses `CircularProgressIndicator` (`forbiddenProgressIndicator`) and `showDialog`,
 `showModalBottomSheet`, `showCupertino…`, `Navigator.push…` and page routes
 (`forbiddenNavigationCall`) outside `ui_kit/` — a screen is a route of a zone, and a question before
 an action is `dw.action(confirmation: …)`.
@@ -90,7 +90,7 @@ Inside feature code, raw styling is forbidden: `Color`, `TextStyle`, `BorderRadi
 `Theme.of(context)`, `context.theme`, `context.textTheme`, `context.colorScheme`. This is not a
 wish. `dartway_lints` ships `forbidden_ui_style_usage` (an analyzer plugin rule) which allows all of
 them only inside a path containing `ui_kit`, and recognises a `BuildContext` **by its static type**,
-so renaming the variable to `ctx` does not help. `dart run dartway_cli:dartway check` flags the same patterns
+so renaming the variable to `ctx` does not help. `dartway check` flags the same patterns
 independently.
 
 **When Flutter demands a style rather than a widget** — `Icon(color:)`,
@@ -123,7 +123,7 @@ static const Color mutedColor = Color(0xFF888888);
 Color muted(BuildContext context) => context.colorScheme.onSurfaceVariant;
 ```
 
-`dart run dartway_cli:dartway check` warns on a `static const Color` or `TextStyle` under `lib/ui_kit/` —
+`dartway check` warns on a `static const Color` or `TextStyle` under `lib/ui_kit/` —
 [`uiKitConstStyle`](../5-tooling/conventions-checker.md). **`ui_kit/theme/` is exempt**: that is
 where the theme is assembled, and a seed colour has to be written down somewhere. Geometry stays
 `const` as well — a radius does not depend on the theme.
@@ -148,7 +148,7 @@ Named by value on purpose: a step the design adds goes in between (`s14`) withou
 and moving onto the scale never changes what the user sees — a project adds its own dominant values
 as steps rather than rounding them to the nearest one.
 
-`dart run dartway_cli:dartway check` fails a number in those positions outside `ui_kit/`
+`dartway check` fails a number in those positions outside `ui_kit/`
 (`rawSpacing`): a spacer `SizedBox(height:|width:)`, a `Gap`, an `EdgeInsets.*`, and the `spacing:`,
 `runSpacing:`, `mainAxisSpacing:` and `crossAxisSpacing:` of a flex, a `Wrap` or a grid — a number in
 either branch of a conditional included. Zero passes, as the absence of a step. A `SizedBox` with a
@@ -271,7 +271,7 @@ And the kit does not know the domain: it imports no app models and switches on n
 widget picks an image from the reason a course is locked, the widget moves into the kit with two
 constructors and the domain `switch` stays in the feature as one line. The enum itself does not
 move — its user-facing texts would come with it, and text constants have no place in the kit
-(`dart run dartway_cli:dartway check` warns on them).
+(`dartway check` warns on them).
 
 ## Text is content, and neither the kit nor the feature invents it
 
@@ -307,7 +307,7 @@ and moving every string, which is why it is not decided per project.
 
 **Adding a string means running a generator.** A new key goes into every `.arb`, then `flutter
 gen-l10n` regenerates the typed `AppLocalizations`. It is the project's second and last generator —
-`dart run dartway_cli:dartway generate` is the other — and like that one it is a separate command rather than
+`dartway generate` is the other — and like that one it is a separate command rather than
 `build_runner`, it runs when the `.arb` files change rather than on every save, and **its output is
 committed**, for the same reason the generated protocol is: a tree that only compiles after somebody remembers to run
 a generator is broken for whoever cloned it.

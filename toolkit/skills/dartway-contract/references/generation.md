@@ -1,7 +1,7 @@
 ## 7. Generation
 
-After any DTO (or row class) change: `dart run dartway_cli:dartway generate` from `__FLUTTER_PKG__`,
-commit the output with the change. Resolve a trusted baseline once with
+After any DTO (or row class) change: `dartway generate`, and commit the output with the change.
+Resolve a trusted baseline once with
 `git merge-base HEAD origin/__BASE_BRANCH__` and pass that SHA as `--contract-base <SHA>` to generation
 and checks — unless `.agents/dartway-toolkit.json` names a `releaseBranch`: then pass no
 `--contract-base` and never edit `version:`; the release raises it (`generate --release`, D-158).

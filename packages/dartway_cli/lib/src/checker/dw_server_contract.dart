@@ -162,7 +162,7 @@ class DwGeneratedCodeInspector {
     if (_findings.isNotEmpty) {
       print(
         '\n  Fix — in the Flutter package of ${serverDir.parent.path}:\n'
-        '    dart run dartway_cli:dartway generate\n'
+        '    dartway generate\n'
         '  and commit what it writes. Generated files are never edited by '
         'hand.',
       );
