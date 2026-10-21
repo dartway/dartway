@@ -120,7 +120,7 @@ Every task ends with `dartway-finish`.
 Two commands come with them. **`/commit`** writes one conventional-commit line in English and decides
 nothing local — whether commits carry a ticket belongs to the project's root instructions. **`/dartway-checkup`**
 reports the state of the whole project and what is worth taking into work next: it runs the
-project's gates first (`dart run dartway_cli:dartway check`, `dart run dartway_cli:dartway generate --check`, the analyzers, the tests), compares
+project's gates first (`dartway check`, `dartway generate --check`, the analyzers, the tests), compares
 them with what CI actually runs, measures how far the project trails the framework, and only then
 spends reading on features — loading only the skills its findings point at, never the whole toolkit.
 

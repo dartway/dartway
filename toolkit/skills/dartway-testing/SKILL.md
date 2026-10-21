@@ -11,7 +11,7 @@ their place through the gate there. **Where** a test goes is decided by where th
 | The behaviour | Its test | Runs with |
 |---|---|---|
 | what a DTO carries, which field a command refuses, what an update does to a request, a request's channels | **contract test**, pure Dart | `dart test` in `__SHARED_PKG__` |
-| server rules: access, calculations, stored outcomes, channel audiences | **acceptance test**: the real server, a real Postgres and storage; one file per feature, a new case as a row in its table | `dart run dartway_cli:dartway test` |
+| server rules: access, calculations, stored outcomes, channel audiences | **acceptance test**: the real server, a real Postgres and storage; one file per feature, a new case as a row in its table | `dartway test` |
 | a screen's own logic: what an action sends, how it handles a refusal or update | **widget test** on the in-memory server, only where the screen has logic | `flutter test` |
 | complex pure logic (class 6): calculations, parsing, state machines, dates and time zones | **table-driven unit test**, only for class 6 | the package's runner |
 
@@ -40,7 +40,7 @@ round-trips a value of every DTO through the project's protocol
 
 ## 2. The server — acceptance tests
 
-`dart run dartway_cli:dartway test` (from `__FLUTTER_PKG__`; `-- --name x` passes arguments, `--keep`
+`dartway test` (`-- --name x` passes arguments, `--keep`
 keeps the database up, `--no-storage`) starts a Postgres and a storage on ports Docker picks, runs
 `dart test` in `__SERVER_PKG__`, and removes both. Never a test database in compose or a fixed port.
 
@@ -229,7 +229,7 @@ No coverage thresholds, and none reported.
   stopped before the rule is reached. Assert the code (`refusedWith`) from a caller only the rule
   stops.
 - **Structure by test**: a test reading `lib/` for an import, a call or a file. Structure is the
-  checker's (`dart run dartway_cli:dartway check`); a rule it lacks is a framework finding
+  checker's (`dartway check`); a rule it lacks is a framework finding
   (`dartway-framework-notes`).
 - **A name the test does not keep**: "hides archived invoices" over a list with no archived one,
   "retries" with a single attempt.

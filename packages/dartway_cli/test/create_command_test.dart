@@ -95,6 +95,23 @@ void main() {
       read(project, '.agents/dartway-toolkit.json'),
       contains('"interactive": false'),
     );
+    // What `pub get` would resolve: the CLI of this checkout, which is the
+    // running one. Unresolved, the pin is refused before `check` runs.
+    File(p.join(project.path, 'shop_flutter/.dart_tool/package_config.json'))
+      ..createSync(recursive: true)
+      ..writeAsStringSync(
+        jsonEncode({
+          'configVersion': 2,
+          'packages': [
+            {
+              'name': 'dartway_cli',
+              'rootUri': Directory(
+                p.join(repository.path, 'packages', 'dartway_cli'),
+              ).uri.toString(),
+            },
+          ],
+        }),
+      );
     final checked = await runTestProcess(Platform.resolvedExecutable, [
       cli,
       'check',
@@ -564,6 +581,11 @@ void main() {
           'generate --check',
           'shop_flutter',
           'dart run dartway_cli:dartway generate --check $base',
+        ),
+        (
+          'format --check',
+          'shop_flutter',
+          r'dart run dartway_cli:dartway format --check --base "$CONTRACT_BASE"',
         ),
         (
           'deploy kamal --check',

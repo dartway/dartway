@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'commands/dev_command.dart' show flutterCommand;
 
@@ -30,6 +31,25 @@ List<(Directory, bool)> projectPackages(String root) {
   ];
   return [for (final directory in packages) (directory, isFlutter(directory))];
 }
+
+/// The localization outputs of [root]'s packages, as path stems relative to
+/// [top] (`shop_flutter/lib/l10n/gen/app_localizations`): `flutter gen-l10n`
+/// writes them next to the templates unless `output-dir` says otherwise, so a
+/// `.dart` path starting with one is generated.
+List<String> localizationOutputs(String root, String top) => [
+  for (final (directory, _) in projectPackages(root))
+    if (File(p.join(directory.path, 'l10n.yaml')) case final file
+        when file.existsSync())
+      if (loadYaml(file.readAsStringSync()) case final YamlMap config)
+        p.posix.join(
+          p.relative(directory.path, from: top).replaceAll(r'\', '/'),
+          (config['output-dir'] ?? config['arb-dir'] ?? 'lib/l10n') as String,
+          p.basenameWithoutExtension(
+            (config['output-localization-file'] ?? 'app_localizations.dart')
+                as String,
+          ),
+        ),
+];
 
 /// `pub get` in every package of [root] — `flutter pub get` where the package
 /// builds on Flutter, through the SDK the project pins — and `flutter gen-l10n`

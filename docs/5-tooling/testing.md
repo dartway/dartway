@@ -13,7 +13,7 @@ tier. The project's test surfaces are:
 | Tier | Runs with | Proves | Needs |
 |---|---|---|---|
 | Contract | `dart test` in `<project>_shared` | every data object, request and command survives the wire and comes back equal | nothing |
-| Server acceptance | `dart run dartway_cli:dartway test` in the Flutter package | server rules and stored outcomes — on a real Postgres and a real S3 storage, through real clients; one file per feature, new cases as rows in its table | Docker or explicit test servers |
+| Server acceptance | `dartway test` in the Flutter package | server rules and stored outcomes — on a real Postgres and a real S3 storage, through real clients; one file per feature, new cases as rows in its table | Docker or explicit test servers |
 | Widgets | `flutter test` in `<project>_flutter` | a screen's own logic, only where it has some | nothing: an in-memory server |
 | Unit | the package's runner | complex pure logic (class 6), with table-driven cases | nothing |
 
@@ -33,7 +33,7 @@ is tested in `test/admin/users/admin_users_page_test.dart`, `lib/src/core/files.
 named after the folder at its mirror: `lib/src/chat/` → `test/src/chat/chat_acceptance_test.dart`;
 extend that feature's table for a new case.
 Helpers live in `test/support/` and are imported relatively, and a test builds no server and no
-`ProviderScope` of its own. `dart run dartway_cli:dartway check` holds all three (`testLayout`,
+`ProviderScope` of its own. `dartway check` holds all three (`testLayout`,
 `testHarnessBypassed`).
 
 **Why the split is not negotiable.** A rule the server enforces — who may read a row, what a command
@@ -58,10 +58,10 @@ one that left it.
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway test                        # finds the project from here
-dart run dartway_cli:dartway test -- --name 'sign-in'    # arguments after -- go to `dart test`
-dart run dartway_cli:dartway test --keep                 # leave the containers up after the run
-dart run dartway_cli:dartway test --no-storage           # a server without uploads
+dartway test                        # finds the project from here
+dartway test -- --name 'sign-in'    # arguments after -- go to `dart test`
+dartway test --keep                 # leave the containers up after the run
+dartway test --no-storage           # a server without uploads
 ```
 
 By default the command starts `postgres:17-alpine` and `rustfs/rustfs:1.0.0` —
@@ -93,7 +93,7 @@ No Docker is needed when the environment already runs a Postgres and, for upload
 S3-compatible server. Supply them explicitly:
 
 ```bash
-dart run dartway_cli:dartway test \
+dartway test \
   --database-url postgres://test_user:test_password@127.0.0.1:5432/postgres \
   --storage-url http://test_key:test_secret@127.0.0.1:9000
 ```
@@ -103,7 +103,7 @@ Cloud setup scripts can supply the same URLs as test-only environment defaults:
 ```bash
 export DW_TEST_DATABASE_URL=postgres://test_user:test_password@127.0.0.1:5432/postgres
 export DW_TEST_STORAGE_URL=http://test_key:test_secret@127.0.0.1:9000
-dart run dartway_cli:dartway test
+dartway test
 ```
 
 Each flag overrides its environment variable; `--no-storage` ignores `DW_TEST_STORAGE_URL`, but
@@ -298,14 +298,15 @@ tests to re-run. `dartway-checkup` is a project audit and always runs every suit
 The setup brief (`dartway quickstart`) lists the full-suite commands, from the project root:
 
 ```bash
-(cd <project>_flutter && dart run dartway_cli:dartway generate --check --contract-base <trusted-SHA>)
-(cd <project>_flutter && dart run dartway_cli:dartway test)
+dartway generate --check --contract-base <trusted-SHA>
+dartway format --check
+dartway test
 (cd my_app_shared && dart test)
 (cd my_app_flutter && flutter test)
-(cd <project>_flutter && dart run dartway_cli:dartway check)
+dartway check
 ```
 
-`dart run dartway_cli:dartway check` also reports `migrationsDrift` when `DW_DATABASE_*` names a Postgres it may create
+`dartway check` also reports `migrationsDrift` when `DW_DATABASE_*` names a Postgres it may create
 throwaway databases on; see [The conventions checker](conventions-checker.md).
 
 CI runs these as `ci`: each is a step of the project's `.github/workflows/ci.yml`, on every pull
@@ -324,7 +325,7 @@ and `services` (the CLI's external test servers apart) over the suites that can 
 dependency graph, and the few test files that take minutes (`narrowTests` in
 `tool/lib/src/affected_suites.dart`) off the code they run, and hands them to the script as
 `DW_CHECKS_ONLY`; a push to `master` runs everything. Inside a job the checks run side by side. Before a PR, run `dart analyze` over touched resolution roots,
-`dart run dartway_cli:dartway check` when `template/` or `example/` changed, and the touched packages'
+`dartway check` when `template/` or `example/` changed, and the touched packages'
 suites (`dart test`
 or `flutter test` in each package, or `tool/checks.sh services` for a services package). A completed
 run means those suites are green locally and `checks.yml` is green on the PR. The full script
@@ -338,7 +339,7 @@ resolves the workspace and every package outside it, then:
   violate the rules on purpose, and `dartway_lints`' own `test/example_test.dart` runs `dart analyze`
   over it and compares the diagnostics with the ones it marks. A package is left out only by being named in the script, with its reason:
   `example/dartway_example_server` and `template/dartway_starter_server` (project servers, run by
-  `dart run dartway_cli:dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
+  `dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
   directory runs — the direction that fails loudly;
 - **services**: the suites of `packages/dartway_analytics_server`,
   `packages/dartway_auth_providers_server`, `packages/dartway_orm`, `packages/dartway_core_server`
@@ -349,9 +350,9 @@ resolves the workspace and every package outside it, then:
   variable set, or with nothing answering on the database's or the storage's port, it stops before
   running anything and names what is missing — it never skips.
 
-**The database suites of `example/` and `template/`** run through `dart run dartway_cli:dartway test`, exactly as a
+**The database suites of `example/` and `template/`** run through `dartway test`, exactly as a
 project runs them: `.github/workflows/database.yml` installs the CLI from the commit, resolves
-`example/` and runs `dart run dartway_cli:dartway test` from its root. The template is proved as
+`example/` and runs `dartway test` from its root. The template is proved as
 `dartway create` hands it out: a project created from the commit, its packages vendored in and
 committed, runs its own `.github/workflows/ci.yml` through `tool/run_project_ci.dart`, which runs
 the steps in order and refuses a construct it does not know rather than skip a gate. It runs on a daily schedule, by
