@@ -23,7 +23,7 @@ framework issues use English.
 ## Law and default
 
 The seven laws and checker errors are mandatory; project conventions may override defaults with
-a reason. The law list is therefore derived from `DwCheckType.severity`: forty-four errors,
+a reason. The law list is therefore derived from `DwCheckType.severity`: forty-five errors,
 thirteen warnings and one info. Check messages name the correction; open the owner skill for how.
 
 | Rule | Checks that fail | Skill |
@@ -42,6 +42,7 @@ thirteen warnings and one info. Check messages name the correction; open the own
 | Startup steps, typed settings, row ids | `workAfterServerStart`, `settingsKeyValueTable`, `redundantBangAllowed` | `dartway-server` |
 | Shared layout, DTO names and patch helpers | `invalidSharedLayout`, `contractNameInvalid`, `fieldPatchMatched` | `dartway-contract` |
 | Generated code and installed-client compatibility | `generatedCodeStale`, `projectContractVersion` | `dartway-contract` |
+| Lifecycle status changes use guarded state transitions | `stateWrittenDirectly` | `dartway-server` |
 | Schema and data migrations | `migrationsDrift`, `migrationChangesData` | `dartway-migrations` |
 | Test layout and harness | `testLayout`, `testHarnessBypassed` | `dartway-testing` |
 | `lib/` imports by `package:` only (`check --fix` rewrites) | `relativeImport` | — |

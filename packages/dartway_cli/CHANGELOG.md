@@ -2,6 +2,7 @@
 
 ## 0.26.0-dev.1
 
+- Allow unchanged state arguments from the same row through `copyWith` and enclosing `update` checks (#639).
 ### Breaking changes
 
 - **BREAKING (check):** reject direct `Process.run`, `Process.runSync` and
@@ -26,6 +27,7 @@
 
 - Tests: own creation fixture process groups and disable background Git
   maintenance so Linux teardown cannot race a remaining fixture writer (#638).
+- Add the `stateWrittenDirectly` checker error for direct state writes and recognize transitions as feature-owned writes (#639).
 
 - A `dartway` of another version no longer refuses a project command
   (`generate`, `check`, `test`, `deploy`, `dev`, `stats`, `format`): it runs the

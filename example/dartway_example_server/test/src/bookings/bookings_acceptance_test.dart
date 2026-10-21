@@ -110,6 +110,52 @@ void main() {
     );
   });
 
+  test(
+    'booking state moves through commands and terminal states refuse further moves',
+    () async {
+      final session = await sessionWithSpots(2);
+      final member = await club.signUp('79990000639', firstName: 'State');
+      final staff = await club.staff('79990001639', 'Staff');
+      final booking = (await member.client.command(
+        BookSession(sessionId: session.id),
+      )).valueOrThrow;
+      final attended = await staff.client.command(
+        MarkAttended(bookingId: booking.id),
+      );
+      expect(attended.valueOrThrow.status, BookingStatus.attended);
+      for (final result in [
+        await member.client.command(CancelBooking(bookingId: booking.id)),
+        await staff.client.command(MarkAttended(bookingId: booking.id)),
+      ]) {
+        expect(
+          result,
+          isA<DwCallRefused<SessionBooking>>().having(
+            (r) => r.refusal.isCode(DartwayExampleRefusal.bookingNotActive),
+            'bookingNotActive',
+            true,
+          ),
+        );
+      }
+      final another = (await member.client.command(
+        BookSession(sessionId: session.id),
+      )).valueOrThrow;
+      expect(
+        (await member.client.command(
+          CancelBooking(bookingId: another.id),
+        )).valueOrThrow.status,
+        BookingStatus.cancelled,
+      );
+      expect(
+        await staff.client.command(MarkAttended(bookingId: another.id)),
+        isA<DwCallRefused<SessionBooking>>().having(
+          (r) => r.refusal.isCode(DartwayExampleRefusal.bookingNotActive),
+          'bookingNotActive',
+          true,
+        ),
+      );
+    },
+  );
+
   test('refusals travel as codes with honest HTTP statuses', () async {
     final session = await sessionWithSpots(1);
     final vera = await club.signUp('79990000013', firstName: 'Vera');

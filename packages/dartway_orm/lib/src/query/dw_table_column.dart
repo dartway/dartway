@@ -1,4 +1,5 @@
 import 'package:meta/meta.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:postgres/postgres.dart' as pg;
 
 import '../entity/dw_annotations.dart';
@@ -21,13 +22,15 @@ final class DwTableColumn<T> {
     this.unique = false,
     this.defaultValue,
     this.references,
+    this.transitions,
   }) : primaryKey = false;
 
   const DwTableColumn._primaryKey(this.name, this.type)
     : primaryKey = true,
       unique = false,
       defaultValue = null,
-      references = null;
+      references = null,
+      transitions = null;
 
   /// The `id bigserial primary key` every table has.
   static const DwTableColumn<int> id = DwTableColumn<int>._primaryKey(
@@ -41,6 +44,9 @@ final class DwTableColumn<T> {
   final bool unique;
   final DwDefaultValue? defaultValue;
   final DwForeignKey? references;
+
+  /// Legal state writes, generated from `@DwStateColumn`.
+  final DwStateTransitions<T>? transitions;
 
   bool get nullable => null is T;
 

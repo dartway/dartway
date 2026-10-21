@@ -25,6 +25,7 @@ final class InvoiceRow extends DwTableRow with _$InvoiceRow {
   final int ownerProfileId;
 
   final int amountCents;
+  @DwStateColumn(invoiceTransitions)
   final InvoiceStatus status;
   final DateTime? paidAt;
   final DateTime createdAt;
@@ -35,7 +36,7 @@ final class InvoiceRow extends DwTableRow with _$InvoiceRow {
 
 - `id` is the stored key, `int`: `row.id` needs no `!` (`redundantBangAllowed` has the analyzer fail
   one). A row not stored yet is its generated draft `New<Entity>Row`; `insert`, `tryInsert`,
-  `insertAll`, `upsert` take drafts and answer stored rows.
+  `insertAll` take drafts and answer stored rows; `upsert` does too on tables without state columns.
 - Columns: `int`, `double`, `String`, `bool`, `DateTime`, `DwCalendarDay`, `Duration`, `Uint8List`, an enum (its name),
   `List`/`Map<String, T>` of scalars or a `List` of an enum (`jsonb`), nullable ones. A DTO is not a
   column.
@@ -45,11 +46,56 @@ final class InvoiceRow extends DwTableRow with _$InvoiceRow {
   repository insert writes every column, so there the Dart default applies.
 - "Create or save" by an optional id: read the row by id and owner with a lock, then
   `update(current.copyWith(...))`; `update(draft.withId(id))` only when the command carries every
-  column; a row keyed by a unique column is `upsert(draft, conflictOn: …)`.
+  ordinary column without changing its state; on a table without state columns, a row keyed by a
+  unique column is `upsert(draft, conflictOn: …)`.
 - Append-only is a decision about the screen: answer which event applies an edit, how the person
   triggers it and what they see meanwhile, or do not choose it.
 
-A changed row class: generate, then a migration (`dartway-migrations`).
+A changed row class: generate, then a migration when its SQL schema changes (`dartway-migrations`).
+
+### Lifecycle state columns
+
+The shared contract declares the enum and table together, for example:
+
+```dart
+enum InvoiceStatus { draft, sent, paid }
+
+const invoiceTransitions = DwStateTransitions<InvoiceStatus>(
+  initial: {InvoiceStatus.draft},
+  moves: {
+    InvoiceStatus.draft: {InvoiceStatus.sent},
+    InvoiceStatus.sent: {InvoiceStatus.paid},
+  },
+);
+```
+
+A lifecycle status is a state column: declare a const `DwStateTransitions<StatusEnum>` beside the
+non-null enum, then `@DwStateColumn(theTransitions)` on the row field and regenerate. `initial`
+is the set of legal insert values; `moves` maps each source to its allowed destinations. Missing
+sources are terminal, and self moves need an explicit entry.
+
+Change it through `ctx.db.<rows>.transition(id, column: (t) => t.status, to: next)` or
+`transitionWhere(where: ..., column: ..., to: next)`. One guarded SQL update returns the changed
+row (null means missing/disallowed), or the changed rows for a bulk call. Compare their ids with
+the requested ids to report rows that did not move. Translate this outcome to the feature's
+refusal and publish only returned rows. A side effect follows a successful transition in the same
+command transaction. Do not read then decide and write the status yourself.
+
+`update` may change ordinary fields only and guards the supplied state. A missing id throws
+`DwRowNotFound` on every table. An ordinary edit racing a transition throws the catchable
+`DwStaleState`: translate it into the feature's conflict or let the server answer `dw.conflict`
+(HTTP 409), without an incident. Re-read before deciding whether to retry; never replay blindly.
+Generated stored-row `copyWith` throws `DwStateWriteException` for an intentional state change;
+passing the same row's state unchanged is allowed, including inside `update`.
+`updateWhere`/`updateWhereReturning` cannot assign state; insert/tryInsert/insertAll require initial
+states; upsert/upsertAll on state tables are refused. `DwStateWriteException` means a programming
+error. `stateWrittenDirectly` is an error for direct state writes through copyWith, ordinary writes
+or raw SQL in server `lib/`; a migration's `m.backfill` is the explicit exception. The checker
+reads source, so it cannot resolve arbitrary aliases or dynamic SQL; never use those to bypass it.
+
+Tests at the owning feature's command boundary cover declared moves, refused moves, terminal
+states and a real Postgres race where one competing transition wins. Tests can read the table's
+`moves`; add a command-walking helper only if the feature has enough commands to make it useful.
 
 ## 3. Queries
 
@@ -67,13 +113,16 @@ final open = await ctx.db.invoices.count(where: (t) => t.paidAt.isNull());
 final byStatus = await ctx.db.invoices.countBy((t) => t.status);
 final owed = await ctx.db.invoices.sumBy((t) => t.ownerProfileId, (t) => t.amountCents);
 final latest = await ctx.db.invoices.findFirstPer((t) => t.ownerProfileId, orderBy: (t) => [t.createdAt.desc()]);
-final saved = await ctx.db.invoices.update(row.copyWith(status: InvoiceStatus.sent));
+final saved = await ctx.db.invoices.transition(
+  row.id, column: (t) => t.status, to: InvoiceStatus.sent,
+); // null: translate to the feature's refusal
 ```
 
 Also `findById`, `findFirst`, `exists`, `count(distinct:)`, `maxBy`, `updateWhere`,
 `updateWhereReturning` (the rows to publish), `delete`; conditions `equals`, `inList`, `gt`…,
 `between`, `like`/`ilike` (escape `%`, `_`, `\` of typed text), `isEmptyList`, `contains`,
-`containsAny`, combined with `&`, `|`, `not()`. `update` of a missing id throws `DwRowNotFound`.
+`containsAny`, combined with `&`, `|`, `not()`. `update` of a missing id throws `DwRowNotFound`; a failed state guard on an existing row throws
+`DwStaleState`.
 
 - **No joins.** Related rows load with `findByIds`, one query per relation for the whole batch — never
   one per row.

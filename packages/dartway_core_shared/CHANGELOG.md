@@ -3,6 +3,7 @@
 ## 0.23.0-dev.1
 
 - Move with the core family to support the server seam kit (#638).
+- Add pure-Dart `DwStateTransitions`, so lifecycle tables can live beside shared enums and be read by commands, clients and tests (#639).
 
 ## 0.22.0
 
