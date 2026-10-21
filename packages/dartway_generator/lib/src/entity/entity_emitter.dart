@@ -11,7 +11,18 @@ abstract final class EntityEmitter {
     return [
       _mixin(entity),
       // A copy of a stored row is the same row: its id is kept.
-      ?ValueClassWriter.copyWith(entity.name, values, kept: const ['id']),
+      ?ValueClassWriter.copyWith(
+        entity.name,
+        values,
+        kept: const ['id'],
+        checks: [
+          for (final field in values)
+            if (field.column!.transitions != null)
+              'if (${field.name} != null && ${field.name} != this.${field.name}) '
+                  '{throw DwStateWriteException(${dartString(entity.tableName)}, '
+                  "'copyWith: ${field.name}');}",
+        ],
+      ),
       _draft(entity, values),
       ?ValueClassWriter.copyWith(entity.draftClass, values),
       _withId(entity, values),
@@ -124,6 +135,7 @@ abstract final class EntityEmitter {
       if (column.unique) 'unique: true',
       if (column.defaultValue != null) 'defaultValue: ${column.defaultValue}',
       if (column.references != null) 'references: ${column.references}',
+      if (column.transitions != null) 'transitions: ${column.transitions}',
     ];
     return 'DwTableColumn<${field.spelling}> get ${field.name} => '
         'const DwTableColumn(${arguments.join(', ')});';

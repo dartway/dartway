@@ -6,6 +6,8 @@
   `dartway check`'s `unboundedRead`; the database never sees it, and it is refused
   beside a `limit` or blank (#644).
 - Move with the core family to support the server seam kit (#638).
+- Distinguish a stale ordinary edit (`DwStaleState`) from a missing state-table row (`DwRowNotFound`); retain the atomic state guard (#639).
+- Add `DwStateTransitions`, `@DwStateColumn` and atomic `transition` / `transitionWhere`. Refuse noninitial inserts, direct state updates and upserts on state tables (#639).
 
 ## 0.22.0
 

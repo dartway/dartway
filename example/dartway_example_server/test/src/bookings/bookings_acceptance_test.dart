@@ -1,3 +1,4 @@
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:dartway_example_server/dartway_example_server.dart';
 import 'package:dartway_example_server/src/schedule/schedule_rows.dart';
@@ -127,10 +128,15 @@ void main() {
           NewSessionBookingRow(
             sessionId: session.id,
             clientProfileId: profile.id,
-            status: i == 0 ? BookingStatus.booked : BookingStatus.cancelled,
+            status: BookingStatus.booked,
             createdAt: club.clock.now().add(Duration(seconds: i)),
           ),
       ]);
+      await club.db.sessionBookings.transitionWhere(
+        where: (t) => t.id.inList(rows.skip(1).map((row) => row.id)),
+        column: (t) => t.status,
+        to: BookingStatus.cancelled,
+      );
       final history = member.client.watchPages(const ListMyBookings());
       addTearDown(history.close);
       await dwWaitUntil(() => history.isLive);
@@ -179,6 +185,52 @@ void main() {
       expect(
         dataOf(schedule.state)!.last.startsAt,
         from.add(const Duration(minutes: 479)),
+      );
+    },
+  );
+
+  test(
+    'booking state moves through commands and terminal states refuse further moves',
+    () async {
+      final session = await sessionWithSpots(2);
+      final member = await club.signUp('79990000639', firstName: 'State');
+      final staff = await club.staff('79990001639', 'Staff');
+      final booking = (await member.client.command(
+        BookSession(sessionId: session.id),
+      )).valueOrThrow;
+      final attended = await staff.client.command(
+        MarkAttended(bookingId: booking.id),
+      );
+      expect(attended.valueOrThrow.status, BookingStatus.attended);
+      for (final result in [
+        await member.client.command(CancelBooking(bookingId: booking.id)),
+        await staff.client.command(MarkAttended(bookingId: booking.id)),
+      ]) {
+        expect(
+          result,
+          isA<DwCallRefused<SessionBooking>>().having(
+            (r) => r.refusal.isCode(DartwayExampleRefusal.bookingNotActive),
+            'bookingNotActive',
+            true,
+          ),
+        );
+      }
+      final another = (await member.client.command(
+        BookSession(sessionId: session.id),
+      )).valueOrThrow;
+      expect(
+        (await member.client.command(
+          CancelBooking(bookingId: another.id),
+        )).valueOrThrow.status,
+        BookingStatus.cancelled,
+      );
+      expect(
+        await staff.client.command(MarkAttended(bookingId: another.id)),
+        isA<DwCallRefused<SessionBooking>>().having(
+          (r) => r.refusal.isCode(DartwayExampleRefusal.bookingNotActive),
+          'bookingNotActive',
+          true,
+        ),
       );
     },
   );

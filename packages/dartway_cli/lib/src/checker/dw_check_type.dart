@@ -481,6 +481,10 @@ enum DwCheckType {
   /// is, and the first to drift.
   foreignRowWrite,
 
+  /// A declared state column written through copyWith, an ordinary repository
+  /// write or raw SQL in server lib/. Migration backfills are allowed.
+  stateWrittenDirectly,
+
   /// Root CLAUDE.md duplicates project instructions beside AGENTS.md.
   instructionsDuplicated;
 

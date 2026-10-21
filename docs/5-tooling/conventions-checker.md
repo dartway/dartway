@@ -133,7 +133,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-four errors, fourteen warnings, one info — `DwCheckType` and its `severity` in
+Forty-five errors, fourteen warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -155,7 +155,8 @@ Forty-four errors, fourteen warnings, one info — `DwCheckType` and its `severi
 | `featureImportCycle` | error | Server features importing one another in a cycle, by any import — within the surface or not. One finding per knot of features: a shortest cycle, the import behind each step, and the other features of the knot |
 | `coreImportsFeature` | error | A file of the server's `lib/src/core/` importing a feature. Every feature imports `core/`, so what `core/` needs from a feature belongs to the feature — who the caller is in `profile/profile_access.dart`, the sign-in hooks in a feature above the ones they touch |
 | `featureImportOutsideSurface` | error | A server feature importing another's file outside its surface: only `<feature>_rows`, `_access`, `_objects`, `_publications`, `_changes` (and their `<part>` files) may be imported — never `_feature`, `_handlers`, `_jobs`, `_routes` or `logic/`; nor may any file under `lib/src/` import the package's library. `import`, `export` and `part` count. `lib/<project>_server.dart`, `migrations/`, `bin/` and `test/` are not judged |
-| `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
+| `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`transition`/`transitionWhere`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
+| `stateWrittenDirectly` | error | A declared state column written through row `copyWith`, ordinary updates, upserts or raw SQL in server `lib/`; use guarded transitions. Migration `m.backfill` is allowed. |
 | `generatedCodeStale` | error | A generated file that `dartway generate` would write differently, or whose source is gone |
 | `projectContractVersion` | error | Generated project contract is incompatible at the same breaking line, or cannot be verified against its fixed committed Git baseline. `--contract-base <revision>` supplies a trusted baseline; see the wire/version guidance |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |

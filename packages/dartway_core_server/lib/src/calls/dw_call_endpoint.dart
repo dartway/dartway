@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:meta/meta.dart';
+import 'package:dartway_orm/dartway_orm.dart' show DwStaleState;
 
 import '../alerts/dw_alert_sink.dart';
 import '../alerts/dw_server_logger.dart';
@@ -628,6 +629,7 @@ final class DwCallEndpoint {
   ) => switch (error) {
     DwRefusalException(:final refusal) => _refused(refusal),
     DwNotAuthenticatedException() => const DwApiResponse.unauthenticated(),
+    DwStaleState() => _refused(DwCallRefusal(DwCoreRefusal.conflict)),
     // The call carried the `unknown` of an open enum and the handler took it
     // to a write. Stopping the write is right — no build overwrites a value
     // it did not know (D-071) — but the outcome is an answer, not an

@@ -323,6 +323,8 @@ final a = ctx.db.userProfiles.update(row);
 final b = db.userProfiles
     .insert(draft);
 final c = ctx.db.chatMessages.deleteWhere((t) => t.id.equals(1));
+final d = ctx.db.userProfiles.transition(1, column: (t) => t.status, to: next);
+final e = ctx.db.userProfiles.transitionWhere(where: (t) => t.id.equals(1), column: (t) => t.status, to: next);
 ''',
         'core/auth.dart': 'final d = ctx.db.userProfiles.upsert(draft);',
       });
@@ -334,6 +336,12 @@ final c = ctx.db.chatMessages.deleteWhere((t) => t.id.equals(1));
           contains(
             "ChatMessageRow is chat's: call a function of chat_changes.dart",
           ),
+        ),
+        startsWith(
+          'admin/admin_handlers.dart:5 writes userProfiles (transition)',
+        ),
+        startsWith(
+          'admin/admin_handlers.dart:6 writes userProfiles (transitionWhere)',
         ),
         startsWith('core/auth.dart:1 writes userProfiles (upsert)'),
       ]);

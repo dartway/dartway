@@ -9,6 +9,7 @@
   `request.readWhole` helper (#644). Rename any project DTO field already named
   `maxItems` (for example to `resultLimit`) and regenerate; see the migration note.
 - Move with the core family to support the server seam kit (#638).
+- Add pure-Dart `DwStateTransitions`, so lifecycle tables can live beside shared enums and be read by commands, clients and tests (#639).
 
 ## 0.22.0
 

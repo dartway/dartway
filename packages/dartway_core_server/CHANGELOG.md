@@ -29,6 +29,8 @@
   characters; response identifiers, booleans and numbers remain intact.
 - Verify HTTP status, body shape and content-type without comparing other response
   headers. HTTP 403/429 reports "could not verify" for runner access/rate limits.
+- Answer uncaught `DwStaleState` as `dw.conflict` (HTTP 409) without an incident (#639).
+- The family moves in lockstep with ORM state columns (#639).
 
 ## 0.22.0
 
