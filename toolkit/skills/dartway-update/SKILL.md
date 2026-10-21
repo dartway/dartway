@@ -1,10 +1,6 @@
 ---
 name: dartway-update
-description: >-
-  Plan an exact DartWay target without project edits, preflight analyzer plugin resolution,
-  apply migration notes, move dependencies, and verify the project before recording each note
-  as applied or not applicable. Toolkit provenance and dependency locks never complete notes.
-  Use when the framework has released, the project is behind, or a needed framework fix landed.
+description: "Plan an exact framework update, resolve its plugin, apply migration notes and record verified dispositions."
 ---
 
 # DartWay — updating the project (`dartway-update`)

@@ -28,7 +28,7 @@ void main() {
   });
   tearDown(() => root.deleteSync(recursive: true));
   test(
-    'reinstall preserves owner rules and installs identical skill copies',
+    'reinstall preserves owner rules and shares one physical skill tree',
     () async {
       file(
         'AGENTS.md',
@@ -65,7 +65,7 @@ void main() {
         file('.claude/skills/dartway-server/SKILL.md').existsSync(),
         isFalse,
       );
-      expect(custom.readAsStringSync(), 'local');
+      expect(file('.agents/skills/local/SKILL.md').readAsStringSync(), 'local');
       expect(file('CLAUDE.md').readAsStringSync(), contains('owner'));
       expect(
         file('CLAUDE.md').readAsStringSync(),
@@ -74,7 +74,7 @@ void main() {
       await install('claude');
       expect(
         file('.agents/skills/dartway-server/SKILL.md').existsSync(),
-        isFalse,
+        isTrue,
       );
       expect(
         file('.claude/skills/dartway-server/SKILL.md').existsSync(),
@@ -82,6 +82,160 @@ void main() {
       );
     },
   );
+  test(
+    'migration moves custom skills and links both discovery roots',
+    () async {
+      final custom = file('.claude/skills/local/SKILL.md');
+      custom.parent.createSync(recursive: true);
+      custom.writeAsStringSync('local');
+      await install('both');
+      expect(
+        Link(p.join(root.path, '.claude/skills')).targetSync(),
+        '../.agents/skills',
+      );
+      expect(file('.agents/skills/local/SKILL.md').readAsStringSync(), 'local');
+      expect(
+        file('.claude/skills/local/SKILL.md').resolveSymbolicLinksSync(),
+        file('.agents/skills/local/SKILL.md').resolveSymbolicLinksSync(),
+      );
+      expect(
+        file('.claude/CLAUDE.md').readAsStringSync(),
+        '@../.agents/DARTWAY.md\n',
+      );
+      await install('both');
+      expect(custom.readAsStringSync(), 'local');
+    },
+  );
+  test('different custom copies refuse before changing any file', () async {
+    for (final agent in ['agents', 'claude']) {
+      final custom = file('.$agent/skills/local/SKILL.md');
+      custom.parent.createSync(recursive: true);
+      custom.writeAsStringSync(agent);
+    }
+    file('AGENTS.md').writeAsStringSync('owner');
+    await expectLater(
+      install('both'),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'conflicting skill',
+          contains('local'),
+        ),
+      ),
+    );
+    expect(file('.agents/DARTWAY.md').existsSync(), isFalse);
+    expect(file('AGENTS.md').readAsStringSync(), 'owner');
+    expect(file('.agents/skills/local/SKILL.md').readAsStringSync(), 'agents');
+    expect(file('.claude/skills/local/SKILL.md').readAsStringSync(), 'claude');
+  });
+  test(
+    'identical custom trees collapse and managed copies are replaced',
+    () async {
+      for (final agent in ['agents', 'claude']) {
+        for (final (name, text) in [
+          ('local', 'custom'),
+          ('dartway-retired', 'stale'),
+        ]) {
+          final custom = file('.$agent/skills/$name/SKILL.md');
+          custom.parent.createSync(recursive: true);
+          custom.writeAsStringSync(text);
+        }
+      }
+      await install('both');
+      expect(
+        file('.agents/skills/local/SKILL.md').readAsStringSync(),
+        'custom',
+      );
+      expect(
+        file('.claude/skills/dartway-retired/SKILL.md').existsSync(),
+        isFalse,
+      );
+      expect(
+        file('.claude/skills/dartway-server/SKILL.md').readAsStringSync(),
+        'sample_server skill',
+      );
+    },
+  );
+  test('unexpected symlink refuses without touching its target', () async {
+    final outside = Directory(p.join(root.path, 'outside'))..createSync();
+    File(p.join(outside.path, 'keep')).writeAsStringSync('owner');
+    Directory(p.join(root.path, '.claude')).createSync();
+    Link(p.join(root.path, '.claude/skills')).createSync(outside.path);
+    await expectLater(install('both'), throwsStateError);
+    expect(File(p.join(outside.path, 'keep')).readAsStringSync(), 'owner');
+    expect(file('.agents/DARTWAY.md').existsSync(), isFalse);
+  });
+  test(
+    'non-interactive choice survives manifest and default reinstall choices',
+    () {
+      final parser = ArgParser();
+      addToolkitInstallOptions(parser, defaultChannel: 'stable');
+      const installed = ToolkitProvenance(
+        source: 'test',
+        channel: null,
+        commit: null,
+        cliVersion: 'test',
+        installedAt: 'test',
+        interactive: false,
+      );
+      installed.write(root);
+      final read = ToolkitProvenance.read(root)!;
+      expect(read.interactive, isFalse);
+      expect(
+        ToolkitInstallChoice.resolve(
+          args: parser.parse([]),
+          installed: read,
+        ).interactive,
+        isFalse,
+      );
+      expect(
+        ToolkitInstallChoice.resolve(
+          args: parser.parse(['--interactive']),
+          installed: read,
+        ).interactive,
+        isTrue,
+      );
+      expect(
+        ToolkitInstallChoice.resolve(
+          args: parser.parse(['--no-interactive']),
+          installed: null,
+        ).interactive,
+        isFalse,
+      );
+      expect(
+        ToolkitInstallChoice.resolve(
+          args: parser.parse([]),
+          installed: null,
+        ).interactive,
+        isTrue,
+      );
+    },
+  );
+  test(
+    'Claude-only setup resolves imports without a Codex connection',
+    () async {
+      await install('claude');
+      expect(file('AGENTS.md').existsSync(), isFalse);
+      expect(file('CLAUDE.md').readAsStringSync(), '@.agents/DARTWAY.md\n');
+      expect(
+        file('.agents/skills/dartway-server/SKILL.md').existsSync(),
+        isTrue,
+      );
+      expect(
+        file('.claude/skills/dartway-server/SKILL.md').existsSync(),
+        isTrue,
+      );
+    },
+  );
+  test('canonical absolute skills link becomes relative', () async {
+    await install('both');
+    final link = Link(p.join(root.path, '.claude/skills'));
+    link.deleteSync();
+    link.createSync(p.join(root.path, '.agents/skills'));
+    await install('both');
+    expect(link.targetSync(), '../.agents/skills');
+    expect(file('.claude/skills/dartway-server/SKILL.md').existsSync(), isTrue);
+  });
   test('malformed block refuses before writing anything', () async {
     const text = 'owner\n<!-- dartway-toolkit:start -->';
     file('AGENTS.md').writeAsStringSync(text);

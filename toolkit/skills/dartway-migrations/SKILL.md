@@ -1,13 +1,6 @@
 ---
 name: dartway-migrations
-description: >-
-  Changing the database schema: row class → generate → `dart run bin/migrate.dart create <name>` →
-  review the draft and resolve every decisionRequired (a drop that may be a rename, a NOT NULL
-  column on rows, a type change) → rehash → apply / status / rollback → check. Expand, then contract
-  across releases. Never edit an applied migration, never import row classes into one, rows change
-  only through m.backfill, dataChecksAfter is the human's. What the server says when it refuses to
-  start over the ledger.
-  Use when a row class, column, index or foreign key changes, or a migration refuses.
+description: "Review, check and apply schema migrations, backfills and expand/contract changes across releases."
 ---
 
 # DartWay — migrations (`dartway-migrations`)
@@ -116,6 +109,9 @@ diff `check` compares against.
 - Transactional by default; `bool get transactional => false` only for what Postgres refuses inside one
   (`CREATE INDEX CONCURRENTLY`) — a crash leaves it `dirty`, repaired by hand.
 - One concern per migration, named after the change; `dependsOn` only across namespaces.
+
+With `interactive: false` in `.agents/dartway-toolkit.json`, report any required backfill,
+`dataChecksAfter`, repair or destructive decision and stop that step; never invent approval.
 
 ## Never, without the human
 

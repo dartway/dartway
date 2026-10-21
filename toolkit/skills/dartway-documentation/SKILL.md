@@ -1,11 +1,6 @@
 ---
 name: dartway-documentation
-description: >-
-  Where a DartWay project's descriptions live and where a finding goes: behaviour in DwFeatureSpec,
-  a DTO's meaning above the DTO, a handler's rule above the handler, a registry as an enum;
-  `docs/adr/` for decisions and the alternatives they ruled out; `docs/dev_notes/` for findings
-  with no address in code. Use before writing any documentation, a DwFeatureSpec, knownIssues, an
-  ADR or a dev note, and when deciding where a finding goes.
+description: "Describe behaviour beside code and route project findings, ADRs and framework findings."
 ---
 
 # DartWay — documentation lives in the code (`dartway-documentation`)

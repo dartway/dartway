@@ -1,13 +1,6 @@
 ---
 name: dartway-finish
-description: >-
-  The definition of done for a DartWay task, run before the commit or PR: runs the gates
-  (generate --check, migrate check, analyzers with dartway_lints, dartway check) and tests in
-  two modes: targeted locally when pull-request CI carries the full suite, otherwise full locally.
-  Reviews the diff against the skills of the layers it touches and the code-shape rules owned here,
-  reconciles the descriptions in the code (DwFeatureSpec, doc comments) and the tests,
-  compares TODO(dartway, checked: …) markers with pubspec.lock, then shows suggestions and applies
-  only what was confirmed. Runs as /dartway-finish.
+description: "Finish a task: run gates and tests, audit changed layers, report findings and apply confirmed suggestions."
 ---
 
 # DartWay — finishing a task (`dartway-finish`)
@@ -175,6 +168,10 @@ say nothing.** Different: one line, and a decision — still needed (refresh `ch
 5. 🔖 Workarounds — only the markers A.5 found diverged; omit the item otherwise.
 
 ## Phase C — apply
+
+With `interactive: false` in `.agents/dartway-toolkit.json`, put the proposed edits and any
+framework issue/comment text in the final report and stop their confirmation steps. Do not apply
+unconfirmed suggestions or publish them. Continue gates and work already authorized by the task.
 
 Only what was confirmed, in batches the author names. Format only the files of the diff, excluding
 sealed migrations: formatting can change their checksum and cause `DwMigrationRefused`. Keep their

@@ -1,16 +1,15 @@
 ---
 name: dartway-plan
-description: >-
-  Planning after the requirements are agreed and an option chosen: re-read the code for that
-  option and produce a step-by-step end-to-end plan in the DartWay order (contract → server → app →
-  tests → descriptions), with the risks and a verification checklist. Read-only: writes no code. Run
-  as /dartway-plan after /dartway-requirements, before writing code.
+description: "Plan an agreed approach across contract, server, app, risk-based tests and verification; read-only."
 ---
 
 # DartWay — development planning (`dartway-plan`)
 
 Read-only: a plan in the chat, no code. Needs the agreed requirement and the **chosen option** from
 `dartway-requirements`; without them, send it back there. No work "just in case".
+
+With `interactive: false` in `.agents/dartway-toolkit.json`, an unchosen option or unresolved
+requirement goes in the final report; stop that dependent planning step without waiting.
 
 **A. Context.** The requirement and the option. **Read `docs/adr/`**: an approach an ADR rejected is not
 proposed again as new — reconsidering one names the ADR and what changed (skip a superseded one for its
