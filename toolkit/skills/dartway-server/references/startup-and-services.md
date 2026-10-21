@@ -101,5 +101,6 @@ returns `DwProcessResult` (`exitCode`, `stdout`, `stderr`), and kills an over-li
 A nonzero exit is a result; failure to start, timeout and excess output throw
 `DwProcessException`. Never hold a database transaction while awaiting an external service.
 Direct `Process.run`, `Process.runSync` and `Process.start` in server `lib/` fail
-`forbiddenProcessRun`, including tear-offs. Tests use `server.process` and recorded answers;
+`forbiddenProcessRun`, including tear-offs and imports/exports of `package:process`
+or `package:process_run`. Tests use `server.process` and recorded answers;
 see `dartway-testing`.

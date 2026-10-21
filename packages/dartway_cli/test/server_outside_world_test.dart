@@ -278,6 +278,31 @@ Future<void> send(DwCallContext ctx, AppSmsEnvironment sms) =>
       },
     );
 
+    test('process packages cannot bypass the server lib seam', () {
+      const imports = """
+import 'package:process/process.dart';
+export 'package:process_run/process_run.dart';
+import 'package:process_run/shell.dart' as shell;
+// import 'package:process/process.dart';
+final text = "import 'package:process_run/shell.dart';";
+""";
+      write('lib/src/commands.dart', imports);
+      for (final folder in ['bin', 'test', 'tool']) {
+        write('$folder/commands.dart', imports);
+      }
+      final inspector = DwServerOutsideWorldInspector(serverPackageDir: server);
+      expect(inspector.run(), 3);
+      expect(
+        inspector.findings.map((f) => f.$1),
+        everyElement(DwCheckType.forbiddenProcessRun),
+      );
+      expect(inspector.findings.map((f) => f.$2), [
+        contains('commands.dart:1;'),
+        contains('commands.dart:2;'),
+        contains('commands.dart:3;'),
+      ]);
+    });
+
     test('are errors, and run only when asked for or unfiltered', () {
       expect(
         DwCheckType.forbiddenEnvironmentRead.severity,

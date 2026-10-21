@@ -461,3 +461,4 @@ Keep external commands outside database transactions.
 `server.process.useCassette(DwSeamCassette('test/cassettes/command.json'))`, or add a `when`
 rule for an exceptional outcome. Direct `Process.run`, `Process.runSync` and `Process.start`
 in server `lib/` fail the `forbiddenProcessRun` check, including tear-offs.
+Imports/exports of `package:process` and `package:process_run` also fail it.

@@ -7,7 +7,8 @@ affects:
 
 ## Who is affected
 
-Projects using `Process.run`, `Process.runSync` or `Process.start` in server `lib/`.
+Projects using `Process.run`, `Process.runSync`, `Process.start`, `package:process`
+or `package:process_run` in server `lib/`, or implementing `DwCallContext`.
 
 ## What to change
 

@@ -16,10 +16,12 @@ void main() {
     String mode, {
     List<String> names = const [],
     List<String> values = const [],
+    List<String> exemptions = const [],
   }) => DwSeamCassette(
     '${directory.path}/answers.json',
     redactNames: names,
     redactValues: values,
+    exemptNames: exemptions,
     environment: {if (mode.isNotEmpty) mode: '1'},
   );
 
@@ -87,7 +89,7 @@ void main() {
         answer.json,
         containsPair('usage', {'input_tokens': 12, 'output_tokens': 3}),
       );
-      expect(answer.json, containsPair('pin', 0));
+      expect(answer.json, containsPair('pin', 123));
       replay.verifyComplete();
       await expectLater(
         http.client().get(url),
@@ -99,6 +101,138 @@ void main() {
           ),
         ),
       );
+    },
+  );
+
+  test(
+    'GitHub secrets listing replays unchanged and its names match a PUT',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      final listing = {
+        'total_count': 1,
+        'secrets': [
+          {'name': 'DEPLOY_KEY', 'created_at': '2026-10-21T00:00:00Z'},
+        ],
+        'credentials_valid': true,
+        'password': 42,
+        'token': true,
+        'api-key': 'ordinary-metadata',
+      };
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode(request.method == 'GET' ? listing : {}),
+        );
+        await request.response.close();
+      });
+      final url = Uri.parse(
+        'http://127.0.0.1:${server.port}/repos/app/secrets',
+      );
+      final fake = DwFakeOutboundHttp()
+        ..useCassette(cassette('DW_RECORD_SEAMS'));
+      await fake.client().get(url);
+      await fake.client().put(url.resolve('${url.path}/DEPLOY_KEY'));
+      await server.close(force: true);
+      final replay = cassette('');
+      fake.useCassette(replay);
+      final answer = await fake.client().get(url);
+      expect(answer.json, listing);
+      final name = ((answer.json as Map)['secrets'] as List).single['name'];
+      expect(
+        (await fake.client().put(url.resolve('${url.path}/$name'))).statusCode,
+        200,
+      );
+      replay.verifyComplete();
+    },
+  );
+
+  test(
+    'query keys and request credentials redact echoes without learning response secrets',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'echo': 'AIza-request-secret form-secret header-secret',
+            'token': 'DEPLOY_KEY',
+            'name': 'DEPLOY_KEY',
+            'short': 'abc',
+          }),
+        );
+        await request.response.close();
+      });
+      final url = Uri.parse(
+        'http://127.0.0.1:${server.port}/?key=AIza-request-secret&password=abc',
+      );
+      final fake = DwFakeOutboundHttp()
+        ..useCassette(cassette('DW_RECORD_SEAMS'));
+      await fake.client().post(
+        url,
+        headers: {'X-API-KEY': 'header-secret'},
+        body: {'password': 'form-secret'},
+      );
+      final stored = File('${directory.path}/answers.json').readAsStringSync();
+      expect(stored, isNot(contains('AIza-request-secret')));
+      expect(stored, isNot(contains('form-secret')));
+      expect(stored, isNot(contains('header-secret')));
+      fake.useCassette(cassette(''));
+      final answer = await fake.client().post(
+        url,
+        headers: {'x-api-key': 'header-secret'},
+        body: {'password': 'form-secret'},
+      );
+      expect(answer.json, {
+        'echo': '[REDACTED] [REDACTED] [REDACTED]',
+        'token': '[REDACTED]',
+        'name': 'DEPLOY_KEY',
+        'short': 'abc',
+      });
+    },
+  );
+
+  test(
+    'cassette names are exact, case insensitive and can be exempted',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      addTearDown(() => server.close(force: true));
+      server.listen((request) async {
+        request.response.headers.contentType = ContentType.json;
+        request.response.write(
+          jsonEncode({
+            'ToKeN': 'public-name',
+            'PrivateField': 'custom-secret',
+            'private_field': 'ordinary-metadata',
+            'secret': ['DEPLOY_KEY'],
+            'key': {'name': 'DEPLOY_KEY'},
+            'password': true,
+            'access_token': 7,
+          }),
+        );
+        await request.response.close();
+      });
+      final url = Uri.parse(
+        'http://127.0.0.1:${server.port}/?TOKEN=public-name',
+      );
+      DwSeamCassette configured(String mode) =>
+          cassette(mode, names: ['privateField'], exemptions: ['token']);
+      final fake = DwFakeOutboundHttp()
+        ..useCassette(configured('DW_RECORD_SEAMS'));
+      await fake.client().get(url);
+      fake.useCassette(configured(''));
+      expect((await fake.client().get(url)).json, {
+        'ToKeN': 'public-name',
+        'PrivateField': '[REDACTED]',
+        'private_field': 'ordinary-metadata',
+        'secret': ['DEPLOY_KEY'],
+        'key': {'name': 'DEPLOY_KEY'},
+        'password': true,
+        'access_token': 7,
+      });
     },
   );
 
@@ -184,10 +318,14 @@ void main() {
       addTearDown(() => server.close(force: true));
       var status = 200;
       var value = 1;
+      var extraHeader = false;
+      var contentType = ContentType.json;
+      var body = <String, Object>{'id': value};
       server.listen((request) async {
         request.response.statusCode = status;
-        request.response.headers.contentType = ContentType.json;
-        request.response.write(jsonEncode({'id': value}));
+        request.response.headers.contentType = contentType;
+        if (extraHeader) request.response.headers.set('x-runner-id', 'runner');
+        request.response.write(jsonEncode({...body, 'id': value}));
         await request.response.close();
       });
       final url = Uri.parse('http://127.0.0.1:${server.port}/');
@@ -198,9 +336,37 @@ void main() {
       value = 2;
       fake.useCassette(cassette('DW_VERIFY_SEAMS'));
       expect((await fake.client().get(url)).json, {'id': 2});
-      status = 403;
+      extraHeader = true;
+      fake.useCassette(cassette('DW_VERIFY_SEAMS'));
+      expect((await fake.client().get(url)).statusCode, 200);
+      contentType = ContentType.text;
       fake.useCassette(cassette('DW_VERIFY_SEAMS'));
       await expectLater(fake.client().get(url), throwsStateError);
+      contentType = ContentType.json;
+      body = {'newKey': true};
+      fake.useCassette(cassette('DW_VERIFY_SEAMS'));
+      await expectLater(fake.client().get(url), throwsStateError);
+      body = {};
+      status = 404;
+      fake.useCassette(cassette('DW_VERIFY_SEAMS'));
+      await expectLater(fake.client().get(url), throwsStateError);
+      for (final limited in [403, 429]) {
+        status = limited;
+        fake.useCassette(cassette('DW_VERIFY_SEAMS'));
+        await expectLater(
+          fake.client().get(url),
+          throwsA(
+            isA<StateError>().having(
+              (error) => '$error',
+              'diagnostic',
+              allOf(
+                contains('could not verify'),
+                isNot(contains('Seam drift')),
+              ),
+            ),
+          ),
+        );
+      }
       expect(File('${directory.path}/answers.json').readAsStringSync(), before);
     },
   );
@@ -217,7 +383,7 @@ void main() {
       final recorded = cassette(
         'DW_RECORD_SEAMS',
         names: ['privateField'],
-        values: ['positional-secret'],
+        values: ['positional-secret', 'flag-secret', 'token-secret'],
       );
       final http = DwFakeOutboundHttp()..useCassette(recorded);
       await http.client().post(

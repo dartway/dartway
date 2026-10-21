@@ -5,8 +5,10 @@
 ### Breaking changes
 
 - **BREAKING (check):** reject direct `Process.run`, `Process.runSync` and
-  `Process.start` in server `lib/` with `forbiddenProcessRun`; use `ctx.process`.
-  Ship a weekly/manual seam drift workflow in the template (#638).
+  `Process.start`, plus `package:process` and `package:process_run` imports/exports,
+  in server `lib/` with `forbiddenProcessRun`; use `ctx.process`.
+  Ship a weekly/manual seam drift workflow in the template; keep the diagnostic
+  demo and its git runtime dependency in the example only (#638).
 
 - Remove `dartway-requirements` and `dartway-plan`: requirements analysis and approach
   selection belong to the developer or executor. Update removes their managed copies;

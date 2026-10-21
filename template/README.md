@@ -125,16 +125,15 @@ bundled storage — `dart run dartway_cli:dartway deploy setup`, then `dart run 
 
 ## External seam recordings
 
-The signed-in `/system-info` diagnostic demonstrates `ctx.http` against GitHub's public
-Zen API and `ctx.process` with `git --version`. Its acceptance test replays committed
-`test/cassettes/` files offline. To refresh them, run the feature's test with
-`DW_RECORD_SEAMS=1` and review the redacted JSON before committing.
+External integrations use `ctx.http` and `ctx.process`. Add recorded acceptance tests
+under `test/cassettes/` and tag live verification tests `seam`. The framework repository's
+[example](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/src/system_info/system_info_acceptance_test.dart)
+demonstrates both seams; the starter has no demo integration.
 
 `.github/workflows/seam-drift.yml` compares live response shapes weekly or on manual
-dispatch. It skips live checks until the `DW_SEAM_CREDENTIALS` repository secret is set;
-use `public` for this credential-free sample. Adapt the readiness condition and environment
-for authenticated providers. Live checks set `DW_VERIFY_SEAMS=1` and select the `seam` tag;
-ordinary CI replays recordings. See the framework's
+dispatch. It skips live checks until the `DW_SEAM_CREDENTIALS` repository secret is set.
+Add the project's tagged tests and configure the credentials they require before enabling
+it. Live checks set `DW_VERIFY_SEAMS=1`; ordinary CI replays recordings. See the framework's
 [testing guide](https://github.com/dartway/dartway/blob/master/docs/5-tooling/testing.md#recorded-external-seams).
 
 ## Continuous integration

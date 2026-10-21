@@ -87,12 +87,15 @@ it or an extension on it.
   and `cassette.verifyComplete()`. Explicit `when` rules remain for errors a real provider
   cannot produce on demand; the last rule wins before cassette lookup.
   `DW_RECORD_SEAMS=1` records real exchanges; review the redacted JSON before committing.
-  `redactNames` adds sensitive field names; `redactValues` covers secrets in paths and
-  positional arguments. Unmatched requests fail with a redacted request. Replay is offline
-  by default. `DW_VERIFY_SEAMS=1` with `dart run dartway_cli:dartway test -- --tags seam` compares live keys,
-  types, HTTP status and process exit codes without rewriting recordings. Keep live drift
-  out of ordinary CI; the skeleton's weekly/manual workflow skips without
-  `DW_SEAM_CREDENTIALS` (use `public` to enable its credential-free sample). See the
+  `redactNames` adds exact case-insensitive field names; `exemptNames` exempts names
+  for that cassette. Only strings are redacted. Automatic substring removal learns
+  credentials of at least eight characters from request headers, query parameters and
+  form fields; use `redactValues` for secrets in paths, positional arguments and output.
+  Unmatched requests fail with a redacted request. Replay is offline by default. `DW_VERIFY_SEAMS=1` with `dart run dartway_cli:dartway test -- --tags seam` compares live keys,
+  types, HTTP status, response content-type and process exit codes without rewriting recordings.
+  Other response headers are ignored; HTTP 403/429 reports "could not verify" for runner
+  access or rate limits rather than drift. Keep live drift out of ordinary CI; the skeleton's weekly/manual workflow skips without
+  `DW_SEAM_CREDENTIALS`. Add the project's recorded tests tagged `seam` before enabling it. See the
   [recorded HTTP and command example](https://github.com/dartway/dartway/blob/master/example/dartway_example_server/test/src/system_info/system_info_acceptance_test.dart)
   in the framework repository.
 - Choose cases by the risk classes and gate in §4, not by the number of handlers or publications.

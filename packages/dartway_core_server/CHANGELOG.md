@@ -2,8 +2,16 @@
 
 ## 0.23.0-dev.1
 
-- Add recorded HTTP and external-command seams with offline replay, redaction and opt-in shape drift verification (#638). Redaction preserves JSON types and
-  non-secret OAuth and token-usage metadata.
+- **BREAKING (source):** `DwCallContext.process` is a new abstract getter.
+  Custom context implementations must delegate it to the server context; use
+  `DwTestServer` for tests. See `docs/migrations/2026-10-21-external-process-seam.md`.
+
+- Add recorded HTTP and external-command seams with offline replay, redaction and opt-in shape drift verification (#638). Redaction matches exact case-insensitive names, masks only strings and supports
+  cassette-specific additions and exemptions. Automatic substring removal uses only
+  request headers, query parameters and form fields with values of at least eight
+  characters; response identifiers, booleans and numbers remain intact.
+- Verify HTTP status, body shape and content-type without comparing other response
+  headers. HTTP 403/429 reports "could not verify" for runner access/rate limits.
 
 ## 0.22.0
 

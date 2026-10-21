@@ -16,13 +16,19 @@ import '../process/dw_process_runner.dart';
 /// files before committing. Add provider-specific secret names and values,
 /// especially credentials in URL paths or positional command arguments.
 final class DwSeamCassette {
+  /// Adds exact case-insensitive [redactNames] or removes [exemptNames] from
+  /// the default credential names. Only string field values are masked.
+  /// [redactValues] explicitly removes secrets from all string values.
+  /// Automatic substring removal learns only request header/query/form
+  /// credentials at least eight characters long, never response identifiers.
   DwSeamCassette(
     String path, {
     List<String> redactNames = const [],
     List<String> redactValues = const [],
+    List<String> exemptNames = const [],
     Map<String, String>? environment,
   }) : _file = File(path),
-       _redactor = _Redactor(redactNames, redactValues) {
+       _redactor = _Redactor(redactNames, redactValues, exemptNames) {
     final testRoot = Directory('test').absolute.resolveSymbolicLinksSync();
     final parent = _file.absolute.parent;
     var ancestor = parent;
@@ -77,15 +83,13 @@ final class DwSeamCassette {
     Map<String, Object?> request,
     Future<Map<String, Object?>> Function() real,
   ) async {
-    final safeRequest = _redactor.clean(request);
+    final safeRequest = _redactor.request(kind, request);
     if (_record) {
       final response = await real();
-      // Discover response secrets before writing either side (including echoes).
-      final pair =
-          _redactor.clean({'request': request, 'response': response}) as Map;
       final entry = <String, dynamic>{
         'kind': kind,
-        ...pair.cast<String, dynamic>(),
+        'request': safeRequest,
+        'response': _redactor.clean(response),
       };
       _entries.add(entry);
       final temporary = File('${_file.path}.tmp');
@@ -115,6 +119,13 @@ final class DwSeamCassette {
     final saved = (_entries[index]['response'] as Map).cast<String, dynamic>();
     if (_verify) {
       final response = await real();
+      if (kind == 'http' &&
+          (response['statusCode'] == 403 || response['statusCode'] == 429)) {
+        throw StateError(
+          'Seam could not verify in ${_file.path}: HTTP ${response['statusCode']}; '
+          'check runner access and rate limits, then retry',
+        );
+      }
       final actualShape = _responseShape(_redactor.clean(response) as Map);
       final expectedShape = _responseShape(saved);
       if (_canonical(actualShape) != _canonical(expectedShape)) {
@@ -255,6 +266,8 @@ Object? _responseShape(Map value) => {
   for (final entry in value.entries)
     entry.key: entry.key == 'statusCode' || entry.key == 'exitCode'
         ? entry.value
+        : entry.key == 'headers'
+        ? {'content-type': (entry.value as Map)['content-type']}
         : _shape(entry.value),
 };
 
@@ -288,95 +301,111 @@ Object? _sorted(Object? value) {
 }
 
 final class _Redactor {
-  _Redactor(List<String> names, List<String> values)
-    : names = names.map(_name).toSet(),
+  _Redactor(List<String> names, List<String> values, List<String> exemptions)
+    : names = {..._defaults, ...names.map((name) => name.toLowerCase())}
+        ..removeAll(exemptions.map((name) => name.toLowerCase())),
       values = {...values.where((value) => value.isNotEmpty)};
+
+  static const _defaults = {
+    'authorization',
+    'cookie',
+    'set-cookie',
+    'x-api-key',
+    'x-auth-key',
+    'api_key',
+    'apikey',
+    'key',
+    'token',
+    'access_token',
+    'refresh_token',
+    'client_secret',
+    'password',
+    'private_key',
+    'secret',
+  };
   final Set<String> names;
   final Set<String> values;
-  static String _name(String name) =>
-      name.toLowerCase().replaceAll(RegExp('[^a-z0-9]'), '');
-  bool sensitive(String key) {
-    final name = _name(key);
-    return names.contains(name) ||
-        name.endsWith('token') ||
-        name == 'tokens' ||
-        name.endsWith('apikey') ||
-        [
-          'authorization',
-          'cookie',
-          'secret',
-          'password',
-          'credential',
-        ].any(name.contains);
-  }
 
-  void discover(Object? value) {
-    if (value is Map) {
-      for (final entry in value.entries) {
-        if (sensitive(entry.key as String)) {
-          void remember(Object? item) {
-            if (item is String && item.isNotEmpty) {
-              values.add(item);
-              if (item.startsWith('Bearer ') || item.startsWith('Basic ')) {
-                values.add(item.split(' ').last);
-              }
-            } else if (item is Map) {
-              item.values.forEach(remember);
-            } else if (item is List) {
-              item.forEach(remember);
-            }
-          }
+  bool sensitive(String key) => names.contains(key.toLowerCase());
 
-          remember(entry.value);
-        } else {
-          discover(entry.value);
-        }
-      }
-    } else if (value is List) {
-      for (var i = 0; i < value.length; i++) {
-        final item = value[i];
-        if (item is String && item.startsWith('-')) {
-          final parts = item.split('=');
-          if (sensitive(parts.first)) {
-            final secret = parts.length > 1
-                ? parts.skip(1).join('=')
-                : (i + 1 < value.length ? value[i + 1] : null);
-            if (secret is String && secret.isNotEmpty) values.add(secret);
-          }
-        }
-      }
-      value.forEach(discover);
-    } else if (value is String) {
-      final uri = Uri.tryParse(value);
-      if (uri != null && uri.hasScheme) {
-        if (uri.userInfo.isNotEmpty) values.add(uri.userInfo);
-        for (final entry in uri.queryParametersAll.entries) {
-          if (sensitive(entry.key)) {
-            values.addAll(entry.value.where((v) => v.isNotEmpty));
-          }
-        }
-      }
+  // Only request headers, query parameters and form fields supply automatic
+  // substring redactions. Response data can contain identifiers needed later.
+  void _remember(Object? value) {
+    if (value is! String) return;
+    if (value.length >= 8) values.add(value);
+    if (value.startsWith('Bearer ') || value.startsWith('Basic ')) {
+      final credential = value.split(' ').last;
+      if (credential.length >= 8) values.add(credential);
     }
   }
 
-  Object? clean(Object? value) {
-    discover(value);
-    return replace(value);
+  void _discoverFields(Map fields) {
+    for (final entry in fields.entries) {
+      if (sensitive(entry.key as String)) _remember(entry.value);
+    }
   }
 
-  Object? replace(Object? value, {bool structured = false}) {
+  Object? request(String kind, Map<String, Object?> request) {
+    if (kind == 'http') {
+      _discoverFields(request['headers'] as Map);
+      final uri = Uri.parse(request['url'] as String);
+      final query = uri.queryParametersAll;
+      for (final entry in query.entries) {
+        if (sensitive(entry.key)) entry.value.forEach(_remember);
+      }
+      final body = request['body'] as Map;
+      if (body['form'] is Map) _discoverFields(body['form'] as Map);
+      final hasSecretQuery = query.keys.any(sensitive);
+      return clean({
+        ...request,
+        if (hasSecretQuery)
+          'url': uri
+              .replace(
+                queryParameters: {
+                  for (final entry in query.entries)
+                    entry.key: sensitive(entry.key)
+                        ? entry.value.map((_) => '[REDACTED]').toList()
+                        : entry.value,
+                },
+              )
+              .toString(),
+      });
+    }
+    final arguments = (request['arguments'] as List).cast<String>();
+    final safeArguments = <String>[];
+    for (var i = 0; i < arguments.length; i++) {
+      final argument = arguments[i];
+      final equal = argument.indexOf('=');
+      final flag = equal < 0 ? argument : argument.substring(0, equal);
+      if (flag.startsWith('-') &&
+          sensitive(flag.replaceFirst(RegExp(r'^-+'), ''))) {
+        if (equal >= 0) {
+          safeArguments.add('$flag=[REDACTED]');
+        } else {
+          safeArguments.add(flag);
+          if (i + 1 < arguments.length) {
+            safeArguments.add('[REDACTED]');
+            i++;
+          }
+        }
+      } else {
+        safeArguments.add(argument);
+      }
+    }
+    return clean({...request, 'arguments': safeArguments});
+  }
+
+  Object? clean(Object? value, {bool structured = false}) {
     if (value is Map) {
       if (!structured && value.length == 1 && value['base64'] is String) {
         final bytes = latin1.decode(base64Decode(value['base64'] as String));
-        return {
-          'base64': base64Encode(latin1.encode(replace(bytes) as String)),
-        };
+        return {'base64': base64Encode(latin1.encode(clean(bytes) as String))};
       }
       return {
         for (final entry in value.entries)
-          entry.key: sensitive(entry.key as String)
-              ? _masked(entry.value)
-              : replace(
+          entry.key: sensitive(entry.key as String) && entry.value is String
+              ? '[REDACTED]'
+              : clean(
                   entry.value,
                   structured:
                       structured || entry.key == 'json' || entry.key == 'form',
@@ -384,9 +413,7 @@ final class _Redactor {
       };
     }
     if (value is List) {
-      return value
-          .map((item) => replace(item, structured: structured))
-          .toList();
+      return value.map((item) => clean(item, structured: structured)).toList();
     }
     if (value is String) {
       var safe = value;
@@ -402,16 +429,3 @@ final class _Redactor {
     return value;
   }
 }
-
-// Keep the recorded JSON decodable after redaction. Credential values change;
-// their types and container structure remain the provider's real contract.
-Object? _masked(Object? value) => switch (value) {
-  null => null,
-  String() => '[REDACTED]',
-  bool() => false,
-  int() => 0,
-  double() => 0.0,
-  List() => value.map(_masked).toList(),
-  Map() => {for (final entry in value.entries) entry.key: _masked(entry.value)},
-  _ => throw FormatException('Not JSON'),
-};

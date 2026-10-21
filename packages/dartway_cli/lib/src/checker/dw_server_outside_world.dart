@@ -19,7 +19,10 @@ import 'dw_dart_source.dart';
 /// - [DwCheckType.forbiddenHttpClient] — `dart:io`'s `HttpClient(` or an
 ///   import of `package:http/…`, or `DwOutboundHttp.network`, anywhere in
 ///   `lib/`: an outbound request is `ctx.http`, bounded, logged and faked by
-///   the test server.
+///   the test server;
+/// - [DwCheckType.forbiddenProcessRun] — direct `Process.run`, `runSync`,
+///   `start` or imports/exports of `package:process` and `package:process_run`
+///   in `lib/`: commands run through `ctx.process`.
 ///
 /// Comments and strings are not code; an interpolation is. Known limits:
 /// another client package (`dio`, `package:http`'s re-exports through a
@@ -77,9 +80,16 @@ class DwServerOutsideWorldInspector {
   );
   static final _processRun = RegExp(r'\bProcess\s*\.\s*(run|runSync|start)\b');
 
-  /// Direct process calls and tear-offs, including synchronous execution.
-  static List<int> processRunsIn(String content) =>
-      _lines(_code(content), _processRun);
+  static final _processImport = RegExp(
+    r'''^\s*(import|export)\s+['"]package:(process|process_run)/''',
+    multiLine: true,
+  );
+
+  /// Direct process calls, tear-offs and imports that bypass the seam.
+  static List<int> processRunsIn(String content) => {
+    ..._lines(_code(content), _processRun),
+    ..._lines(_code(content, keepWordsAndPaths: true), _processImport),
+  }.toList()..sort();
 
   static final _httpImport = RegExp(
     r'''^\s*(import|export)\s+['"]package:http/''',
@@ -199,7 +209,7 @@ class DwServerOutsideWorldInspector {
       }
     }
     if (_findings.isEmpty) return 0;
-    print('\n📌 Environment and outbound HTTP:\n');
+    print('\n📌 Environment and external systems:\n');
     var errors = 0;
     for (final (type, finding) in _findings) {
       print('  ${type.reportLabel}: $finding');

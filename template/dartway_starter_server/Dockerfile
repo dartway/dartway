@@ -29,8 +29,7 @@ FROM alpine:latest
 # outbound HTTPS call from the server fails on an unverifiable certificate.
 # Alpine also brings busybox `wget`, which the deployment's healthcheck calls.
 COPY --from=build /runtime/ /
-# The signed-in system_info diagnostic runs git through ctx.process.
-RUN apk add --no-cache ca-certificates git
+RUN apk add --no-cache ca-certificates
 
 COPY --from=build /server /app/server
 

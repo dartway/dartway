@@ -13,8 +13,8 @@ jobs:
     runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 20
     env:
-      # Opt in with the credentials your external integrations need. For the
-      # public sample, the value `public` explicitly enables live requests.
+      # Add recorded integration tests tagged seam, then opt in with the
+      # credentials those integrations need. The starter has no demo tests.
       DW_SEAM_CREDENTIALS: ${{ secrets.DW_SEAM_CREDENTIALS }}
       DW_VERIFY_SEAMS: '1'
     steps:
