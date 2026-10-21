@@ -399,3 +399,14 @@ All invalid/expired/used/superseded/occupied links refuse existing `DwCoreRefusa
 Only the latest account attach-link request works. Success is single-use, not idempotency-replayed;
 response loss can show invalid after a committed change. Publish using the change hook's account.
 Prefer web fragment URLs, clear the token before calls/diagnostics, and never log bearer links.
+
+### External commands
+
+Run external commands through `ctx.process.run('git', ['--version'])`, with optional
+`workingDirectory`, `environment`, `timeout` and `maxOutputBytes`. It uses no shell expansion,
+returns `DwProcessResult` (`exitCode`, `stdout`, `stderr`), and kills an over-limit command.
+A nonzero exit is a result; failure to start, timeout and excess output throw
+`DwProcessException`. Never hold a database transaction while awaiting an external service.
+Direct `Process.run`, `Process.runSync` and `Process.start` in server `lib/` fail
+`forbiddenProcessRun`, including tear-offs. Tests use `server.process` and recorded answers;
+see `dartway-testing`.

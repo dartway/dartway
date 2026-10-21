@@ -107,6 +107,21 @@ final class AppHarness {
     }
   }
 
+  /// Calls the diagnostic door as an authenticated member.
+  Future<DwTestAnswer> systemInfo() async {
+    final member = await signUp('+79990006381', firstName: 'Seam');
+    final caller = server.caller(token: member.session.token);
+    try {
+      return await caller.raw(
+        'GET',
+        '/system-info',
+        headers: {'authorization': 'Bearer ${member.session.token}'},
+      );
+    } finally {
+      caller.close();
+    }
+  }
+
   Future<void> stop() async {
     await server.stop();
     await database.drop();

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.0-dev.1
+
+- Move with the core family to support the server seam kit (#638).
+
 ## 0.22.0
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).

@@ -35,6 +35,11 @@ class DwServerOutsideWorldInspector {
          filterType,
          filterSeverity,
        ),
+       _processEnabled = _enabled(
+         DwCheckType.forbiddenProcessRun,
+         filterType,
+         filterSeverity,
+       ),
        _httpEnabled = _enabled(
          DwCheckType.forbiddenHttpClient,
          filterType,
@@ -44,6 +49,7 @@ class DwServerOutsideWorldInspector {
   final Directory? serverPackageDir;
   final bool _environmentEnabled;
   final bool _httpEnabled;
+  final bool _processEnabled;
   final _findings = <(DwCheckType, String)>[];
 
   /// The one file of `lib/` that reads the environment.
@@ -69,6 +75,12 @@ class DwServerOutsideWorldInspector {
     r'\bHttpClient\s*(\(|\.\s*new\b)|'
     r'\bDwOutboundHttp\s*\.\s*network\b',
   );
+  static final _processRun = RegExp(r'\bProcess\s*\.\s*(run|runSync|start)\b');
+
+  /// Direct process calls and tear-offs, including synchronous execution.
+  static List<int> processRunsIn(String content) =>
+      _lines(_code(content), _processRun);
+
   static final _httpImport = RegExp(
     r'''^\s*(import|export)\s+['"]package:http/''',
     multiLine: true,
@@ -127,7 +139,9 @@ class DwServerOutsideWorldInspector {
 
   int run({DwCheckTally? tally}) {
     final server = serverPackageDir;
-    if (server == null || !(_environmentEnabled || _httpEnabled)) return 0;
+    if (server == null ||
+        !(_environmentEnabled || _httpEnabled || _processEnabled))
+      return 0;
     List<File> sources(String folder) {
       final directory = Directory(p.join(server.path, folder));
       if (!directory.existsSync()) return const [];
@@ -163,6 +177,14 @@ class DwServerOutsideWorldInspector {
             '`Platform.environment` — $shown:$line; read the variable in '
                 '${p.join('lib', 'src', 'core', 'environment.dart')} '
                 '(AppEnvironment) and pass the value in',
+          ));
+        }
+      }
+      if (_processEnabled) {
+        for (final line in processRunsIn(content)) {
+          _findings.add((
+            DwCheckType.forbiddenProcessRun,
+            'an external command of its own — $shown:$line; run through `ctx.process` (DwProcessRunner)',
           ));
         }
       }

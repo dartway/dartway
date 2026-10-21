@@ -70,6 +70,23 @@ final response = await ctx.http.post(url, json: body);
     });
   });
 
+  group('external commands', () {
+    test('finds direct calls, aliases, tear-offs and interpolations', () {
+      expect(
+        DwServerOutsideWorldInspector.processRunsIn(r"""
+final a = Process.run('git', []);
+final b = io.Process.start;
+final c = Process . runSync('git', []);
+final d = '${Process.run("git", [])}';
+// Process.run('git', []);
+final text = 'Process.start';
+final allowed = ctx.process.run('git', []);
+"""),
+        [1, 2, 3, 4],
+      );
+    });
+  });
+
   group('entry points', () {
     test('pass the environment to the overlay and read nothing themselves', () {
       expect(
@@ -242,6 +259,24 @@ Future<void> send(DwCallContext ctx, AppSmsEnvironment sms) =>
       expect(inspector.run(), 0);
       expect(inspector.findings, isEmpty);
     });
+
+    test(
+      'process calls fail as errors in lib, with filter and tally support',
+      () {
+        write('lib/src/a/a_handlers.dart', "final start = Process.start;\n");
+        write('bin/tool.dart', "Process.run('git', []);\n");
+        write('test/tool_test.dart', "Process.run('git', []);\n");
+        final tally = DwCheckTally();
+        final inspector = DwServerOutsideWorldInspector(
+          serverPackageDir: server,
+          filterType: DwCheckType.forbiddenProcessRun,
+        );
+        expect(inspector.run(tally: tally), 1);
+        expect(inspector.findings.single.$1, DwCheckType.forbiddenProcessRun);
+        expect(inspector.findings.single.$2, contains('a_handlers.dart:1'));
+        expect(DwCheckType.forbiddenProcessRun.severity, DwCheckSeverity.error);
+      },
+    );
 
     test('are errors, and run only when asked for or unfiltered', () {
       expect(

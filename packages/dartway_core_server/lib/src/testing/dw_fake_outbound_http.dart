@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'dw_seam_cassette.dart';
+
 import '../alerts/dw_server_logger.dart';
 import '../outbound/dw_outbound_http.dart';
 
@@ -36,6 +38,10 @@ final class DwFakeOutboundHttp implements DwOutboundTransport {
   final List<DwOutboundRequest> _requests = [];
   final List<_Rule> _rules = [];
   bool _closed = false;
+  DwSeamCassette? _cassette;
+
+  /// Uses recorded real answers; explicit rules take precedence.
+  void useCassette(DwSeamCassette cassette) => _cassette = cassette;
 
   /// A `DwOutboundHttp` over this fake, for code tested without a server:
   /// what `ctx.http` is under a `DwTestServer`, with [timeout] and
@@ -68,6 +74,7 @@ final class DwFakeOutboundHttp implements DwOutboundTransport {
   void reset() {
     _requests.clear();
     _rules.clear();
+    _cassette = null;
   }
 
   @override
@@ -80,6 +87,9 @@ final class DwFakeOutboundHttp implements DwOutboundTransport {
     _requests.add(request);
     for (final rule in _rules) {
       if (rule.matches(request)) return rule.respond(request);
+    }
+    if (_cassette case final cassette?) {
+      return cassette.http(request, timeout, maxResponseBytes);
     }
     throw StateError(
       'No DwFakeOutboundHttp rule answers ${request.method} ${request.origin}: '

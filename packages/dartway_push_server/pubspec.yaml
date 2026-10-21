@@ -1,6 +1,6 @@
 name: dartway_push_server
 description: Push notifications for a DartWay server — device tokens, messages queued in the caller's transaction, delivery by the framework's job queue through FCM and RuStore.
-version: 0.7.0
+version: 0.7.1
 repository: https://github.com/dartway/dartway
 license: Apache-2.0
 resolution: workspace
@@ -8,8 +8,8 @@ environment:
   sdk: ^3.11.0
 dependencies:
   crypto: ^3.0.6
-  dartway_core_server: ^0.22.0
-  dartway_push_shared: ^0.7.0
+  dartway_core_server: ^0.23.0-dev.1
+  dartway_push_shared: ^0.7.1
   meta: ^1.16.0
 dev_dependencies:
   lints: ^6.0.0

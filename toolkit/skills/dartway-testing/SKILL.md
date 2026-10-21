@@ -90,6 +90,20 @@ it or an extension on it.
   `server.http.reset()` between tests sharing a server. A rule throwing
   `DwOutboundException(request, cause: 'refused')` is an unreachable provider; one never completing runs
   into the timeout. Without a server, `DwFakeOutboundHttp()..when(…)` and `http.client()`.
+- **External systems use real recorded answers.** A test that talks to another service or
+  command replays a `DwSeamCassette` under the server package's `test/cassettes/`, or calls the
+  real system. A handwritten fake does not cover that seam. Attach recordings with
+  `server.http.useCassette(cassette)` / `server.process.useCassette(cassette)`, call the feature,
+  and `cassette.verifyComplete()`. Explicit `when` rules remain for errors a real provider
+  cannot produce on demand; the last rule wins before cassette lookup.
+  `DW_RECORD_SEAMS=1` records real exchanges; review the redacted JSON before committing.
+  `redactNames` adds sensitive field names; `redactValues` covers secrets in paths and
+  positional arguments. Unmatched requests fail with a redacted request. Replay is offline
+  by default. `DW_VERIFY_SEAMS=1` with `dart run dartway_cli:dartway test -- --tags seam` compares live keys,
+  types, HTTP status and process exit codes without rewriting recordings. Keep live drift
+  out of ordinary CI; the skeleton's weekly/manual workflow skips without
+  `DW_SEAM_CREDENTIALS` (use `public` to enable its credential-free sample). The signed-in
+  `system_info` feature in the skeleton demonstrates HTTP and `git --version` together.
 - Choose cases by the risk classes and gate in §4, not by the number of handlers or publications.
 
 ## 3. Screens — widget tests on the in-memory server

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.0
+
+- **BREAKING (check):** reject direct `Process.run`, `Process.runSync` and `Process.start` in server `lib/` with `forbiddenProcessRun`; use `ctx.process`. Ship a weekly/manual seam drift workflow in the template (#638).
+
 ## 0.25.0
 
 ### Breaking changes

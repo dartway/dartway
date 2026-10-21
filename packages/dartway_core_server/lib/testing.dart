@@ -20,3 +20,6 @@ export 'src/testing/dw_test_client_support.dart';
 export 'src/testing/dw_test_clock.dart';
 export 'src/testing/dw_test_server.dart';
 export 'src/testing/dw_test_storage.dart';
+
+export 'src/testing/dw_fake_process_runner.dart';
+export 'src/testing/dw_seam_cassette.dart';

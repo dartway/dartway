@@ -4,6 +4,7 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:dartway_orm/dartway_orm.dart';
 import 'package:meta/meta.dart';
 
+import '../process/dw_process_runner.dart';
 import '../alerts/dw_server_logger.dart';
 import '../context/dw_call_context.dart';
 import '../files/dw_file_service.dart';
@@ -1355,6 +1356,9 @@ final class _DetachedContext extends DwCallContext {
 
   @override
   DwOutboundHttp get http => _noServer('http');
+
+  @override
+  DwProcessRunner get process => _noServer('process');
 
   @override
   M module<M extends DwServerModule>() => _noServer('module<$M>()');
