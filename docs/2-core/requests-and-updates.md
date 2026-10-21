@@ -28,7 +28,8 @@ table page refetch.
   absence as an answer, and its `matches` is **required**: no default can say which object on the
   channel is "the one" — "every object" would fill the state with the first stranger, "none" would
   empty it on every update of the held one.
-- **List** — the whole list, when it is small enough to read at once.
+- **List** — the whole list, for what the domain bounds: a member's settings, a project's members,
+  a club's services. Bounded by `maxItems` ([below](#a-lists-bound)).
 - **Page** — an accumulating feed read by offset: "load more" appends.
 - **Table** — numbered pages with a total, for an admin table.
 - **Window** — a long newest-first sequence read both ways from an anchor: a chat, a log. The
@@ -116,6 +117,43 @@ Each kind bounds that further:
 A load in flight does not lose updates. Objects that arrive while a call is on its way are applied
 to what is shown and applied again to the answer, because the server may have read before the
 update was committed; every action is idempotent, so applying one twice changes nothing.
+
+## A list's bound
+
+A whole list is the default an agent reaches for, and nothing notices when it stops being small: a
+list of tasks is ten rows in development and three megabytes a year later. So a `DwListRequest` has a
+bound, `maxItems` — 200 (`DwListRequest.defaultMaxItems`) unless the class names another as a
+super-constructor argument, a constant of the class like a page size, never serialised. A class that
+raises it says why in one line of its doc comment
+(`example/dartway_example_shared/lib/src/schedule.dart`):
+
+```dart
+/// … At most `maxItems`: a club schedules about three weeks ahead, twenty
+/// sessions a day at the busiest.
+final class ListUpcomingSessions extends DwListRequest<ClubSession>
+    with _$ListUpcomingSessions {
+  const ListUpcomingSessions({required this.from}) : super(maxItems: 500);
+```
+
+A `list` handler answering more items than `maxItems` is never cut short — a silently shorter list is
+a wrong answer nobody notices:
+
+- **in tests and on a development server** the call fails, naming the request and the count.
+  `DwTestServer` is strict whatever its settings say; a server started on a developer's machine is
+  strict through `DW_STRICT_BOUNDS: true` in `deploy/config.yaml > local`
+  (`DwServerEnvironment.strictBounds` → `DwServerSettings.strictBounds`);
+- **in production** the whole list is served, and the server logs a warning with the request, the
+  count and the response size, once per request per `DwServerSettings.boundWarningInterval` (an
+  hour).
+
+The handler reads `request.fetchLimit` rows — one past the bound — so the read is bounded and the
+breach still shows: `ctx.db.<table>.find(…, limit: request.fetchLimit)`. Anything that grows with use
+is not a list: a feed is a page, an admin table a table, a chat a window. `dartway check` warns about
+a read in a request handler with no bound (`unboundedRead`,
+[the checker](../5-tooling/conventions-checker.md)).
+
+Any call's response above `DwServerSettings.largeResponseBytes` (256 KB) is logged as a warning with
+the call's name, once per call per the same interval — the same line in every project.
 
 ## Page sizes
 

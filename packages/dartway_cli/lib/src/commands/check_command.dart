@@ -24,6 +24,7 @@ import '../checker/dw_shared_layout.dart';
 import '../checker/dw_package_file_size.dart';
 import '../checker/dw_server_outside_world.dart';
 import '../checker/dw_inline_ownership.dart';
+import '../checker/dw_unbounded_read.dart';
 import '../checker/dw_project_template.dart';
 import '../checker/dw_uniformity_rules.dart';
 import '../deploy/local_environment.dart';
@@ -267,6 +268,11 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
       errorCount += DwInlineOwnershipInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwUnboundedReadInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

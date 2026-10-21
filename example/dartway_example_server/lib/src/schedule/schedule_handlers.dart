@@ -14,6 +14,7 @@ final scheduleHandlers = <DwCallHandler>[
     handle: (ctx, request) async => [
       for (final row in await ctx.db.clubServices.find(
         orderBy: (t) => [t.title.asc(), t.id.asc()],
+        limit: request.fetchLimit,
       ))
         ScheduleObjects.service(row),
     ],
@@ -27,6 +28,7 @@ final scheduleHandlers = <DwCallHandler>[
       await ctx.db.clubSessions.find(
         where: (t) => t.startsAt.gte(request.from),
         orderBy: (t) => [t.startsAt.asc(), t.id.asc()],
+        limit: request.fetchLimit,
       ),
     ),
   ),

@@ -613,6 +613,13 @@ final class TestApp {
         return const [];
       },
     ),
+    DwCallHandler.list<BoundedNotes, NoteView>(
+      access: DwAccessRule.anonymous,
+      handle: (ctx, request) async => [
+        for (var id = 1; id <= request.count; id++)
+          NoteView(id: id, text: 'x' * request.padding),
+      ],
+    ),
     DwCallHandler.list<SlowRequest, NoteView>(
       access: DwAccessRule.anonymous,
       handle: (ctx, request) async {

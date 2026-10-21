@@ -63,10 +63,11 @@ final class ListClubServices extends DwListRequest<ClubService>
   ];
 }
 
-/// Sessions starting at or after [from], soonest first.
+/// Sessions starting at or after [from], soonest first. At most 500: a club
+/// schedules about three weeks ahead, twenty sessions a day at the busiest.
 final class ListUpcomingSessions extends DwListRequest<ClubSession>
     with _$ListUpcomingSessions {
-  const ListUpcomingSessions({required this.from});
+  const ListUpcomingSessions({required this.from}) : super(maxItems: 500);
 
   final DateTime from;
 

@@ -24,7 +24,9 @@ framework issues use English.
 
 The seven laws and checker errors are mandatory; project conventions may override defaults with
 a reason. The law list is therefore derived from `DwCheckType.severity`: forty-three errors,
-thirteen warnings and one info. Check messages name the correction; open the owner skill for how.
+fourteen warnings and one info. Check messages name the correction; open the owner skill for how.
+Among the warnings, `unboundedRead` (`dartway-server`): a request handler's `find` names neither
+`limit:` nor `unbounded:` — what grows with use is a page, table or window (`dartway-contract`).
 
 | Rule | Checks that fail | Skill |
 |---|---|---|

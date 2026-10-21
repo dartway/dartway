@@ -37,6 +37,9 @@ import 'package:dartway_example_server/dartway_example_server.dart';
 /// - `DW_ADMIN_IDENTIFIER` — the phone or e-mail of the first administrator,
 ///   made one on every start by the framework's `DwFirstAdministrator` step;
 ///   unset for none;
+/// - `DW_STRICT_BOUNDS=true` — a list answered past its request's `maxItems`
+///   fails the call instead of being served whole with a warning: on for this
+///   machine in `deploy/config.yaml > local`, off in a deployment;
 /// - `FCM_SERVICE_ACCOUNT_FILE`, `FCM_WEB_LINK_BASE`,
 ///   `RUSTORE_PUSH_PROJECT_ID`, `RUSTORE_PUSH_SERVICE_TOKEN` — push providers
 ///   (`AppPushEnvironment`); without them the server queues and records
@@ -65,6 +68,7 @@ Future<void> main() async {
       trustedProxyNetworks: env.server.trustedProxyNetworks,
       behindProxy: env.server.httpBehindProxy,
       deploymentVersion: env.server.deploymentVersion,
+      strictBounds: env.server.strictBounds,
       // The project chooses which calls need peer quotas. With an ingress,
       // declare its actual network before adding entries here.
       callRateLimits: const <Type, DwCallRateLimit>{},

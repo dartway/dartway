@@ -8,7 +8,7 @@ environment:
   sdk: ^3.11.0
 dependencies:
   crypto: ^3.0.6
-  dartway_core_server: ^0.22.0
+  dartway_core_server: ^0.23.0-dev.1
   dartway_push_shared: ^0.7.0
   meta: ^1.16.0
 dev_dependencies:

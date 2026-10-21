@@ -257,6 +257,18 @@ void main() {
       expect(const ListBookingsUpdateOnly(), const ListBookingsUpdateOnly());
     });
 
+    test('list: a bound of 200 unless the class names one, never '
+        'serialised; a handler reads one past it', () {
+      const list = _PinnedFirst();
+      expect(list.maxItems, DwListRequest.defaultMaxItems);
+      expect(list.maxItems, 200);
+      expect(list.fetchLimit, 201);
+      const raised = _Raised();
+      expect(raised.maxItems, 500);
+      expect(raised.fetchLimit, 501);
+      expect(raised.toJson(), isEmpty);
+    });
+
     test('table: page and pageSize are fields; the server clamps', () {
       const table = ListBookingTable(page: 3, pageSize: 80);
       expect(table.toJson(), {'page': 3, 'pageSize': 80});
@@ -407,6 +419,16 @@ final class _PinnedFirst extends DwListRequest<ClubBooking> {
 
   @override
   String get dwTypeName => '_PinnedFirst';
+
+  @override
+  Map<String, Object?> toJson() => const {};
+}
+
+final class _Raised extends DwListRequest<ClubBooking> {
+  const _Raised() : super.updateOnly(maxItems: 500);
+
+  @override
+  String get dwTypeName => '_Raised';
 
   @override
   Map<String, Object?> toJson() => const {};

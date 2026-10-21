@@ -235,13 +235,38 @@ abstract class DwMaybeRequest<T extends DwDataObject>
 /// request's channels counts, whatever its type: a ranking re-runs on a score
 /// published beside it. [onUpdate] still sees only objects of type [T]; the
 /// other types re-run the request without reaching it.
+///
+/// A whole list is for what the domain bounds — a member's settings, a
+/// project's members; what grows with use is a [DwPageRequest],
+/// [DwTableRequest] or [DwWindowRequest]. [maxItems] says how whole: a list
+/// answered past it fails the call in tests and on a development server, and
+/// is served with a warning in production — never cut short.
 abstract class DwListRequest<T extends DwDataObject>
     extends DwDataRequest<List<T>> {
-  const DwListRequest() : super._(_DwUpdatePolicy.matching);
+  const DwListRequest({this.maxItems = defaultMaxItems})
+    : assert(maxItems > 0, 'maxItems must be positive'),
+      super._(_DwUpdatePolicy.matching);
 
-  const DwListRequest.updateOnly() : super._(_DwUpdatePolicy.update);
+  const DwListRequest.updateOnly({this.maxItems = defaultMaxItems})
+    : assert(maxItems > 0, 'maxItems must be positive'),
+      super._(_DwUpdatePolicy.update);
 
-  const DwListRequest.refetchOnUpdate() : super._(_DwUpdatePolicy.refetch);
+  const DwListRequest.refetchOnUpdate({this.maxItems = defaultMaxItems})
+    : assert(maxItems > 0, 'maxItems must be positive'),
+      super._(_DwUpdatePolicy.refetch);
+
+  /// The bound of a list that names none.
+  static const int defaultMaxItems = 200;
+
+  /// The most items this list is expected to hold: a constant of the class,
+  /// passed to the super constructor and never serialised. A class raising it
+  /// above [defaultMaxItems] says why in one line of its doc comment.
+  final int maxItems;
+
+  /// The rows a handler reads at most — `find(limit: request.fetchLimit)`:
+  /// one past [maxItems], so a list that outgrew its bound is noticed rather
+  /// than cut short.
+  int get fetchLimit => maxItems + 1;
 
   @override
   bool acceptsItem(Object? item) => item is T;

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.23.0-dev.1
+
+- A `list` handler answering more items than its request's `maxItems` is never
+  cut short. With `DwServerSettings.strictBounds` the call fails, naming the
+  request and the count; `DwTestServer` is always strict, and a development
+  server is through `DW_STRICT_BOUNDS=true` (`DwServerEnvironment.strictBounds`),
+  which the skeleton sets in `deploy/config.yaml > local`. Otherwise — production —
+  the whole list is served and a warning names the request, the count and the
+  response size, once per request per `boundWarningInterval` (an hour) (#644).
+- A call response above `DwServerSettings.largeResponseBytes` (256 KiB) is logged
+  as a warning with the call's name, once per call per `boundWarningInterval`.
+- A project test whose list handler answers past the bound now fails; see the
+  [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
+
 ## 0.22.0
 
 ### Breaking changes

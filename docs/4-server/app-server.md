@@ -157,6 +157,9 @@ app on one server process.
 | `alertWindow` | 1 h | The window of that ceiling. |
 | `outboundTimeout` | 30 s | How long one outbound request (`ctx.http`) may take, connecting to last byte, unless the call names its own ([handlers](handlers-and-context.md#outbound-http)). |
 | `outboundMaxResponseBytes` | 10 MiB | The largest response body one outbound request reads, unless the call names its own; past it the exchange fails with `DwOutboundException`. |
+| `strictBounds` | `false` | A `list` handler answering more items than its request's `maxItems`: `true` fails the call naming the request and the count (`DwTestServer` always; a development server through `DW_STRICT_BOUNDS`), `false` serves the whole list and logs a warning with the request, the count and the response size. Never cut short ([a list's bound](../2-core/requests-and-updates.md#a-lists-bound)). |
+| `largeResponseBytes` | 256 KiB | A call response above it is logged as a warning naming the call: a read that grew into megabytes is otherwise noticed by its users first. |
+| `boundWarningInterval` | 1 h | How often one request's bound breach, or one call's large response, is logged again. |
 
 ### Per-peer call quotas
 
@@ -255,6 +258,7 @@ hears about all three in one start. A problem never repeats a text value; a numb
 | `DW_ALLOWED_ORIGINS` | `allowedOrigins`, comma-separated, for `DwServerSettings.allowedOrigins` |
 | `DW_ADMIN_IDENTIFIER` | `adminIdentifier`, for `DwFirstAdministrator(identifier:)` (below) |
 | `DW_MIGRATE_ONLY=true` | `migrateOnly`, for `DwAppServer.start(migrateOnly:)`: apply the migrations and exit |
+| `DW_STRICT_BOUNDS=true` | `strictBounds`, for `DwServerSettings.strictBounds`: a list past its `maxItems` fails the call. Set in `deploy/config.yaml > local`, so a development server is as strict as the tests |
 
 Every one of them comes through the local overlay and into the one error list — nothing of the
 framework's reads `Platform.environment` behind the project's back. The two groups above that have

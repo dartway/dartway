@@ -21,6 +21,7 @@ final bookingsHandlers = <DwCallHandler>[
         await ctx.db.sessionBookings.find(
           where: (t) => t.clientProfileId.equals(me.id),
           orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
+          limit: request.fetchLimit,
         ),
         client: me,
       );

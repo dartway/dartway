@@ -22,6 +22,7 @@ final chatHandlers = <DwCallHandler>[
     handle: (ctx, request) async => [
       for (final row in await ctx.db.chatChannels.find(
         orderBy: (t) => [t.title.asc(), t.id.asc()],
+        limit: request.fetchLimit,
       ))
         ChatObjects.channel(row),
     ],
@@ -83,6 +84,7 @@ final chatHandlers = <DwCallHandler>[
             t.pinnedAt.isNotNull() &
             t.deletedAt.isNull(),
         orderBy: (t) => [t.sentAt.desc(), t.id.desc()],
+        limit: request.fetchLimit,
       );
       if (rows.isEmpty) await ctx.requireChatChannel(request.channelId);
       return ChatObjects.messages(ctx, rows);
@@ -101,6 +103,7 @@ final chatHandlers = <DwCallHandler>[
       final authors = [
         for (final row in await ctx.db.userProfiles.find(
           where: (t) => t.firstName.ilike(pattern) | t.lastName.ilike(pattern),
+          unbounded: "names holding two letters or more: the club's members",
         ))
           row.id,
       ];

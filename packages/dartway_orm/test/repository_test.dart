@@ -281,6 +281,22 @@ void main() {
       ]);
     });
 
+    test('unbounded is a reason for a read without a limit, refused beside '
+        'one and blank', () async {
+      expect(
+        await db().clubServices.find(unbounded: "a club's few services"),
+        hasLength(3),
+      );
+      expect(
+        () => db().clubServices.find(limit: 1, unbounded: 'small'),
+        throwsArgumentError,
+      );
+      expect(
+        () => db().clubServices.find(unbounded: '  '),
+        throwsArgumentError,
+      );
+    });
+
     test('isNull and isNotNull', () async {
       expect(await titles((t) => t.archivedAt.isNull()), ['Alpha', 'beta']);
       expect(await titles((t) => t.archivedAt.isNotNull()), ['Gamma']);

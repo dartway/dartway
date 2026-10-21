@@ -28,7 +28,11 @@ final class DwServerSettings {
     this.trustedProxyNetworks = const [],
     this.behindProxy = false,
     this.deploymentVersion,
+    this.strictBounds = false,
+    this.largeResponseBytes = 256 << 10,
+    this.boundWarningInterval = const Duration(hours: 1),
   }) : assert(maxBodyBytes > 0),
+       assert(largeResponseBytes > 0),
        assert(outboundLimitBytes > 0),
        assert(maxLiveMessageBytes > 0),
        assert(tokenCacheSize >= 0),
@@ -58,6 +62,25 @@ final class DwServerSettings {
   /// Immutable revision reported by health probes. Native Kamal provides
   /// KAMAL_VERSION; local servers may omit it. It grants no access.
   final String? deploymentVersion;
+
+  /// What a `list` handler answering more items than its request's
+  /// `maxItems` does: `true` fails the call, naming the request and the count
+  /// — what tests (`DwTestServer`, whatever this says) and a development
+  /// server (`DW_STRICT_BOUNDS` in `deploy/config.yaml > local`) want, where
+  /// the list that outgrew its bound is found by whoever made it; `false`
+  /// serves the whole list and logs a warning with the request, the count and
+  /// the response size, at most once per request per [boundWarningInterval].
+  /// The list is never cut short: a silently shorter list is a wrong answer.
+  final bool strictBounds;
+
+  /// A call response above this many bytes is logged as a warning naming the
+  /// call, at most once per call per [boundWarningInterval]: a read that grew
+  /// into megabytes is otherwise noticed by its users first.
+  final int largeResponseBytes;
+
+  /// How often one request's bound breach, or one call's large response, is
+  /// logged again.
+  final Duration boundWarningInterval;
 
   /// How long a whole body may take to arrive. A client dripping a body a
   /// byte at a time holds a connection and a buffer; this bounds both.

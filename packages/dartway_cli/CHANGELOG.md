@@ -12,6 +12,11 @@
 
 ### Changes
 
+- A new warning in `dartway check`: `unboundedRead` — a repository `find(…)` in a
+  request handler of a `*_handlers.dart` naming neither `limit:` nor `unbounded:`.
+  The message names the fix: a page, table or window request, `limit:`
+  (`request.fetchLimit` for a list), or `unbounded: '<reason>'` (#644); see the
+  [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
 - Load the managed Claude policy by import and warn with `instructionsDuplicated`
   when root instruction texts need consolidation. Fresh projects use `@AGENTS.md`.
 - Make the first read an index with topic references and concise skill discovery

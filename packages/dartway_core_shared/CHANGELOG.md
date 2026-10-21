@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.23.0-dev.1
+
+- `DwListRequest` has a bound, `maxItems`: 200 (`DwListRequest.defaultMaxItems`)
+  unless the class passes another to its super constructor, with the reason in its
+  doc comment. A constant of the class, never serialised — the wire is unchanged.
+  `fetchLimit` is one past it, the `limit:` a list handler reads with (#644).
+
 ## 0.22.0
 
 - Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,

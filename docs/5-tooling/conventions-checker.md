@@ -133,7 +133,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-three errors, thirteen warnings, one info — `DwCheckType` and its `severity` in
+Forty-three errors, fourteen warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -194,6 +194,7 @@ Forty-three errors, thirteen warnings, one info — `DwCheckType` and its `sever
 | `docCommentLanguage` | warning | A doc comment in `lib/` written in a script other than the language `dartway setup-ai --language` recorded — a heuristic on Cyrillic against Latin letters, so it warns and never fails. A comment the skeleton wrote (the same text in the template the project came from) is not judged, nor a generated file |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
 | `inlineOwnershipCheck` | warning | A handler in a `*_handlers.dart` under any rule but a resource rule (`signedIn`, a role check) that compares a row's owner field with the caller and refuses `notFound`/`forbidden` (or answers `null` from a `single`), in its body or a helper of the file it calls — the check `DwAccessRule.resource` makes once |
+| `unboundedRead` | warning | A repository `find(…)` in a request handler (`single`, `maybe`, `list`, `page`, `table`, `window`) of a `*_handlers.dart` naming neither `limit:` nor `unbounded:` — a read of every row its filter matches. Fix: a page, table or window request, `limit:` (`request.fetchLimit` for a list), or `unbounded: '<reason>'` |
 | `fileLong` | info | Over 200 lines, where `fileTooLong` looks |
 
 "Raw styles" means `Color(`, `TextStyle(`, `BorderRadius.`/`BorderRadius(`, `Theme.of(`,
@@ -369,6 +370,18 @@ rather than its meaning; it stays quiet on a list filtered by the caller in its 
 canonical "my rows"), on handlers under a resource rule, and on a membership read from a table of its
 own. The one pattern per shape is in
 [Access and roles](../2-core/access-and-roles.md#whose-row-is-it-one-rule-per-shape).
+
+**`unboundedRead`** looks for a read that answers a screen and has no bound: a repository `find(…)`
+inside a request handler — `DwCallHandler.single`, `maybe`, `list`, `page`, `table`, `window` — of a
+`*_handlers.dart`, naming neither `limit:` nor `unbounded:`. Such a read is ten rows in development
+and megabytes a year later, and nothing says when it crossed. The fix is one of three: the request
+becomes a page, table or window (what grows with use); the read takes `limit:` — `request.fetchLimit`
+in a list handler, one past the request's `maxItems`, so the server still notices a list that outgrew
+its bound ([Requests](../2-core/requests-and-updates.md)); or the read says why the domain keeps it small with
+`unbounded: 'a board has a handful of columns'`. `findById`, `findFirst` and `findByIds` are bounded
+by what they are asked for; commands, jobs and migrations are not looked at. A warning, because it
+reads the handler's own body and the shape of the call: a filter on a unique key looks like any
+other, and a read in a helper the handler calls is not seen.
 
 ## State and commands: one way each, and one visible way out
 
