@@ -30,3 +30,7 @@ local:
   # DW_STORAGE_ACCESS_KEY: club
   # DW_STORAGE_SECRET_KEY: club-secret
   # DW_STORAGE_PROVISION: true
+
+  # A list answered past its request's `maxItems` fails the call here, as it
+  # does in tests; a deployed server serves it whole and logs a warning.
+  DW_STRICT_BOUNDS: true

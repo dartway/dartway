@@ -2,6 +2,12 @@
 
 ## 0.23.0-dev.1
 
+- `DwListRequest` has a bound, `maxItems`: 200 (`DwListRequest.defaultMaxItems`)
+  unless the class passes another to its super constructor, with the reason in its
+  doc comment. A constant of the class, never serialised — the wire is unchanged.
+  `fetchLimit` is one past it, the probe size used by the server's
+  `request.readWhole` helper (#644). Rename any project DTO field already named
+  `maxItems` (for example to `resultLimit`) and regenerate; see the migration note.
 - Move with the core family to support the server seam kit (#638).
 - Add pure-Dart `DwStateTransitions`, so lifecycle tables can live beside shared enums and be read by commands, clients and tests (#639).
 

@@ -259,6 +259,18 @@ enum DwCheckType {
   /// comparison it matches may be something else.
   inlineOwnershipCheck,
 
+  /// A repository `find(…)` in a request handler of a `*_handlers.dart` —
+  /// `single`, `maybe`, `list`, `page`, `table`, `window` — naming neither
+  /// `limit:` nor `unbounded:` (dartway/dartway#644). It reads every row its
+  /// filter matches, and what was ten rows in development is megabytes in a
+  /// year. The fix is a page, table or window request, a `limit:`
+  /// (`page.fetchLimit` for a page), `request.readWhole` for a list, or
+  /// `unbounded: '<reason>'` where the domain bounds the read.
+  ///
+  /// A warning: it reads the handler's own body and the shape of the call,
+  /// and a filter on a unique key looks like any other.
+  unboundedRead,
+
   /// The server or the shared package's `analysis_options.yaml` does not raise
   /// `unnecessary_non_null_assertion` to an error (D-113). A stored row's id is
   /// `int`, so `row.id!` is a `!` that means nothing — and one that means
@@ -499,6 +511,7 @@ enum DwCheckType {
     DwCheckType.localSecretMissing ||
     DwCheckType.devComposeDrifted ||
     DwCheckType.inlineOwnershipCheck ||
+    DwCheckType.unboundedRead ||
     DwCheckType.docCommentLanguage ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,

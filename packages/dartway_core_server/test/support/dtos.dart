@@ -427,6 +427,24 @@ final class SlowRequest extends DwListRequest<NoteView> {
       SlowRequest(json['millis']! as int);
 }
 
+/// Answers [count] notes, each with a [padding]-character text, read from
+/// nowhere; at most three by its bound.
+final class BoundedNotes extends DwListRequest<NoteView> {
+  const BoundedNotes(this.count, {this.padding = 0}) : super(maxItems: 3);
+
+  final int count;
+  final int padding;
+
+  @override
+  String get dwTypeName => 'BoundedNotes';
+
+  @override
+  Map<String, Object?> toJson() => {'count': count, 'padding': padding};
+
+  static BoundedNotes fromJson(Map<String, Object?> json) =>
+      BoundedNotes(json['count']! as int, padding: json['padding']! as int);
+}
+
 /// Without a handler; registered only by the startup test's protocol.
 final class OrphanRequest extends DwListRequest<NoteView> {
   const OrphanRequest();
@@ -925,6 +943,7 @@ final DwWireProtocol testProtocol = DwWireProtocol([
     PublishingRequest.fromJson,
   ),
   DwProtocolEntry<SlowRequest>('SlowRequest', SlowRequest.fromJson),
+  DwProtocolEntry<BoundedNotes>('BoundedNotes', BoundedNotes.fromJson),
   DwProtocolEntry<RevokeSessions>('RevokeSessions', RevokeSessions.fromJson),
   DwProtocolEntry<EnsureAccount>('EnsureAccount', EnsureAccount.fromJson),
   DwProtocolEntry<CreateNote>('CreateNote', CreateNote.fromJson),

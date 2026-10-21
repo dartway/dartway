@@ -2,6 +2,8 @@
 
 ## 0.23.0-dev.1
 
+- Nothing changed here; the family moves in lockstep with the bounded lists of
+  `dartway_core_shared` and `dartway_core_server` (#644).
 - Move with the core family to support the server seam kit (#638).
 - Refuse intentional state changes in stored-row `copyWith`; allow unchanged state arguments (#639).
 - Generate typed state-column transition metadata; reject nullable or non-enum state fields (#639).

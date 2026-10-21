@@ -53,6 +53,10 @@ final class FakeApp {
         (request, call) => DwCallOk(<ClubSession>[...sessions]),
       )
       ..onRequest<ListMyBookings>(
+        (request, call) =>
+            DwCallOk(dwFakeOffsetPage(bookings, request, call.page)),
+      )
+      ..onRequest<ListMySessionBookings>(
         (request, call) => DwCallOk(<SessionBooking>[...bookings]),
       )
       ..onRequest<ListNews>(

@@ -32,13 +32,26 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   ///
   /// Without [orderBy] the order is whatever the database returns; paging
   /// with [limit] and [offset] needs an order to be stable.
+  ///
+  /// [unbounded] is why a read without [limit] stays small — `'a club's
+  /// coaches'` — said where the read is. `dartway check` warns about a read
+  /// in a request handler with neither (`unboundedRead`); the database never
+  /// sees it. It is refused beside a [limit], and blank.
   Future<List<R>> find({
     DwWhereCondition Function(T t)? where,
     List<DwOrderTerm> Function(T t)? orderBy,
     int? limit,
     int? offset,
     DwRowLock? lock,
+    String? unbounded,
   }) async {
+    if (unbounded != null && (limit != null || unbounded.trim().isEmpty)) {
+      throw ArgumentError.value(
+        unbounded,
+        'unbounded',
+        limit != null ? 'a read with a limit is bounded' : 'says no reason',
+      );
+    }
     _checkLock(lock);
     final writer = DwSqlWriter()..write(_sql.select);
     _writeWhere(writer, where);

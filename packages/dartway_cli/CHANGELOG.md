@@ -25,6 +25,12 @@
 
 ### Changes
 
+- A new warning in `dartway check`: `unboundedRead` — a repository `find(…)` in a
+  request handler of a `*_handlers.dart` naming neither `limit:` nor `unbounded:`.
+  The message names the fix: a page, table or window request, `limit:` for
+  paged reads, `request.readWhole` for a whole list, or `unbounded: '<reason>'`.
+  Reads inside `readWhole` are accepted (#644); see the
+  [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
 - Tests: own creation fixture process groups and disable background Git
   maintenance so Linux teardown cannot race a remaining fixture writer (#638).
 - Add the `stateWrittenDirectly` checker error for direct state writes and recognize transitions as feature-owned writes (#639).

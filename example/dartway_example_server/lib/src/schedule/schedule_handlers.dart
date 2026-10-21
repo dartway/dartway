@@ -12,8 +12,11 @@ final scheduleHandlers = <DwCallHandler>[
   DwCallHandler.list<ListClubServices, ClubService>(
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async => [
-      for (final row in await ctx.db.clubServices.find(
-        orderBy: (t) => [t.title.asc(), t.id.asc()],
+      for (final row in await request.readWhole(
+        (limit) => ctx.db.clubServices.find(
+          orderBy: (t) => [t.title.asc(), t.id.asc()],
+          limit: limit,
+        ),
       ))
         ScheduleObjects.service(row),
     ],
@@ -24,9 +27,14 @@ final scheduleHandlers = <DwCallHandler>[
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async => ScheduleObjects.sessions(
       ctx.db,
-      await ctx.db.clubSessions.find(
-        where: (t) => t.startsAt.gte(request.from),
-        orderBy: (t) => [t.startsAt.asc(), t.id.asc()],
+      await request.readWhole(
+        (limit) => ctx.db.clubSessions.find(
+          where: (t) =>
+              t.startsAt.gte(request.from) &
+              t.startsAt.lt(request.from.add(const Duration(days: 21))),
+          orderBy: (t) => [t.startsAt.asc(), t.id.asc()],
+          limit: limit,
+        ),
       ),
     ),
   ),

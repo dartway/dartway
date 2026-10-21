@@ -1,6 +1,5 @@
 import 'package:dartway_example_flutter/app/bookings/widgets/booking_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/core/router/app_scaffold.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
@@ -43,22 +42,17 @@ class MyBookingsPage extends StatelessWidget implements DwFeatureWidget {
 
     return AppScaffold.main(
       appBar: AppBar(title: AppText.title(context.l10n.tabBookings)),
-      body: DwReadBuilder(
-        dw.request(request),
-        placeholder: PlaceholderObjects.listOf(PlaceholderObjects.booking, 3),
-        builder: (context, bookings) {
-          if (bookings.isEmpty) {
-            return Center(child: AppText.body(context.l10n.noBookingsYet));
-          }
-
-          return ListView.separated(
-            padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
-            itemCount: bookings.length,
-            separatorBuilder: (_, _) => const SizedBox(height: AppSpace.s8),
-            itemBuilder: (context, index) =>
-                BookingCard(booking: bookings[index]),
-          );
-        },
+      body: DwPagedListView<SessionBooking>(
+        request: request,
+        placeholder: PlaceholderObjects.booking,
+        placeholderCount: 3,
+        padding: const EdgeInsets.symmetric(vertical: AppSpace.s8),
+        emptyBuilder: (context) =>
+            Center(child: AppText.body(context.l10n.noBookingsYet)),
+        itemBuilder: (context, booking) => Padding(
+          padding: const EdgeInsets.only(bottom: AppSpace.s8),
+          child: BookingCard(booking: booking),
+        ),
       ),
     );
   }

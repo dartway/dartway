@@ -95,6 +95,10 @@ final class DwTestServer {
   /// Starts [server] on port 0 of the loopback interface, without signal
   /// handling (the test runner owns the process), its outbound requests
   /// answered by [http].
+  ///
+  /// Strict about bounds whatever its settings say: a `list` handler
+  /// answering past its request's `maxItems` fails the call, so the test that
+  /// grows a list past its bound is the one that says so.
   static Future<DwTestServer> start(DwAppServer server) async {
     final http = DwFakeOutboundHttp();
     final process = DwFakeProcessRunner();
@@ -103,6 +107,7 @@ final class DwTestServer {
       address: InternetAddress.loopbackIPv4,
       handleSignals: false,
       outbound: http,
+      strictBounds: true,
       process: process,
     );
     return DwTestServer._(server, http, process);
