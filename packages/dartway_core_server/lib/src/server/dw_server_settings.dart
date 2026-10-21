@@ -65,10 +65,11 @@ final class DwServerSettings {
   final String? deploymentVersion;
 
   /// A call answered slower than this is logged as a warning, with its wire
-  /// name, status, time and answer size — whatever the logger's level. Every
+  /// name, status, time and answer size. The logger filters the chosen level. Every
   /// other call is the same line at debug. Timed from the request's arrival
   /// to the encoded answer, so a slow body counts too.
   final Duration slowCallThreshold;
+
   /// What a `list` handler answering more items than its request's
   /// `maxItems` does: `true` fails the call, naming the request and the count
   /// — what tests (`DwTestServer`, whatever this says) and a development

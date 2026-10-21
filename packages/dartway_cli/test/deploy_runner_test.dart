@@ -21,6 +21,68 @@ List<String> _ids(DwDeployRunner runner) =>
     runner.steps(skipGitUpdate: false).map((step) => step.id).toList();
 
 void main() {
+  for (final field in ['mem_limit', 'deploy']) {
+    test('low host memory warns using $field and does not fail', () async {
+      final server = field == 'mem_limit'
+          ? {'mem_limit': '1024'}
+          : {
+              'deploy': {
+                'resources': {
+                  'limits': {'memory': '1024'},
+                },
+              },
+            };
+      final ssh = RecordingSsh([
+        (
+          'config --format json',
+          DwSshResult(
+            exitCode: 0,
+            stdout:
+                '${jsonEncode({
+                  'services': {'server': server},
+                })}\n--dw-free-memory--\n2000\n',
+            stderr: '',
+          ),
+        ),
+      ]);
+      final result = await DwDeployRunner(
+        ssh: ssh,
+        stack: stackFrom(),
+      ).checkComposeConfig();
+      expect(result.ok, isTrue);
+      expect(result.stdout, contains('WARNING:'));
+      expect(result.stdout, contains('3072'));
+    });
+  }
+  test('an overridden Postgres command must keep pg_stat_statements', () async {
+    final ssh = RecordingSsh([
+      (
+        'config --format json',
+        DwSshResult(
+          exitCode: 0,
+          stdout:
+              '${jsonEncode({
+                'services': {
+                  'postgres': {
+                    'command': ['postgres', '-c', 'max_connections=200'],
+                  },
+                },
+              })}\n--dw-free-memory--\n2000\n',
+          stderr: '',
+        ),
+      ),
+    ]);
+    final result = await DwDeployRunner(
+      ssh: ssh,
+      stack: stackFrom(),
+    ).checkComposeConfig();
+    expect(result.ok, isFalse);
+    expect(
+      result.stderr,
+      contains('-c shared_preload_libraries=pg_stat_statements'),
+    );
+  });
+
   test('a local deployment cannot reset a remote journal', () {
     final ssh = RecordingSsh();
     final runner = DwDeployRunner(
@@ -152,6 +214,7 @@ case "\$*" in
   *" ps -q --status running web") echo web-container ;;
   *" ps -q server") echo server-container; echo new-server-container ;;
   *" ps -q web") echo web-container; echo new-web-container ;;
+  *"com.docker.compose.project"*) echo shop ;;
   "inspect -f "*"{{.State.Status}}"*) echo 'running healthy 0 0' ;;
   "inspect -f {{.Config.Image}} "*) echo "shop-\${4%-container}:latest" ;;
   "inspect -f {{.Image}} "*) echo "sha256:old-\${4%-container}" ;;
@@ -556,6 +619,7 @@ case "\$*" in
   "ps -aq --no-trunc --filter ancestor=sha256:previous") echo old-container ;;
   "ps -aq --no-trunc --filter ancestor="*) echo other-container ;;
   *" run --rm --no-deps -T -e DW_MIGRATE_ONLY=true server"*) ${migrationFails ? 'echo "migration 42 failed" >&2; exit 1' : 'echo migrated'} ;;
+  *"com.docker.compose.project"*) echo shop ;;
   *"{{.State.Status}}"*) echo "running ${healthy ? 'healthy' : 'unhealthy'} 0 0" ;;
 esac
 exit 0
@@ -632,7 +696,12 @@ exit 0
         expect(migrate, isNot(-1));
         expect(start, greaterThan(migrate));
         expect(health, greaterThan(start));
-        expect(stop, greaterThan(health));
+        final attached = at(
+          calls,
+          'network connect --alias dw-server shop_routed new-container',
+        );
+        expect(attached, greaterThan(health));
+        expect(stop, greaterThan(attached));
         expect(at(calls, 'rm old-container'), greaterThan(stop));
         expect(at(calls, 'rm --force'), -1, reason: 'nothing to clear away');
         expect(
@@ -796,6 +865,7 @@ exit 0
             contains('previous code runs on the new schema'),
           );
           expect(result.stderr, contains('the previous server keeps serving'));
+          expect(at(calls, 'network connect'), -1);
           expect(at(calls, 'rm --force new-container'), isNot(-1));
           expect(at(calls, 'image tag sha256:previous shop-server'), isNot(-1));
           expect(at(calls, 'stop -t 45'), -1);

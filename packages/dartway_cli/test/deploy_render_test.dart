@@ -39,6 +39,56 @@ String _location(String block, String spec) {
 }
 
 void main() {
+  for (final (command, accepted) in <(Object?, bool)>[
+    (null, false),
+    (['postgres', '-c', 'max_connections=200'], false),
+    (['postgres', '-c', 'shared_preload_libraries=pg_stat_statements'], true),
+    (
+      ['postgres', '-c', 'shared_preload_libraries=other, pg_stat_statements'],
+      true,
+    ),
+    (
+      [
+        'postgres',
+        '-c',
+        'shared_preload_libraries=pg_stat_statements',
+        '-c',
+        'shared_preload_libraries=',
+      ],
+      false,
+    ),
+    ('postgres -c shared_preload_libraries="other,pg_stat_statements"', true),
+  ]) {
+    test('Postgres command override: $command', () {
+      final root = Directory.systemTemp.createTempSync('dw-pg-command-');
+      addTearDown(() => root.deleteSync(recursive: true));
+      File(p.join(root.path, 'deploy/compose.override.yml'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync(
+          jsonEncode({
+            'services': {
+              'postgres': {'command': command},
+            },
+          }),
+        );
+      final renderer = DwStackRenderer(stack: stackFrom(), projectRoot: root);
+      if (accepted) {
+        expect(renderer.composeFile, contains('pg_stat_statements'));
+      } else {
+        expect(
+          () => renderer.composeFile,
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'fix',
+              contains('-c shared_preload_libraries=pg_stat_statements'),
+            ),
+          ),
+        );
+      }
+    });
+  }
+
   test('the front proxy selects BBR in its own network namespace', () {
     final sysctls =
         _service(stackFrom(), DwStack.nginxService)['sysctls'] as YamlMap;
@@ -696,10 +746,10 @@ void main() {
 
     test('app: files from the web image, only /dw/ to the server', () {
       final app = _serverBlock(nginx, 'app.example.com');
-      expect(_location(app, '/'), contains(r'set $dw_upstream web:80;'));
+      expect(_location(app, '/'), contains(r'set $dw_upstream dw-web:80;'));
       expect(
         _location(app, '/dw/'),
-        contains(r'set $dw_upstream server:8080;'),
+        contains(r'set $dw_upstream dw-server:8080;'),
       );
       expect(app, isNot(contains('location = /health')));
     });
@@ -707,7 +757,11 @@ void main() {
     test('app and api: /dw/live upgrades and stays open', () {
       for (final host in ['app.example.com', 'api.example.com']) {
         final live = _location(_serverBlock(nginx, host), '= /dw/live');
-        expect(live, contains(r'set $dw_upstream server:8080;'), reason: host);
+        expect(
+          live,
+          contains(r'set $dw_upstream dw-server:8080;'),
+          reason: host,
+        );
         expect(live, contains(r'proxy_set_header Upgrade $http_upgrade;'));
         expect(
           live,
@@ -730,7 +784,10 @@ void main() {
 
     test('api: everything to the server', () {
       final api = _serverBlock(nginx, 'api.example.com');
-      expect(_location(api, '/'), contains(r'set $dw_upstream server:8080;'));
+      expect(
+        _location(api, '/'),
+        contains(r'set $dw_upstream dw-server:8080;'),
+      );
     });
 
     test('the proxy lets the server refuse an oversized call itself', () {

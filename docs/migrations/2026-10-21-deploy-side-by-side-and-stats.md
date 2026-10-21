@@ -2,6 +2,7 @@
 title: Deploys start the new server beside the old one
 affects:
   dartway_cli: "0.26.0-dev.1"
+  dartway_core_server: "0.23.0-dev.1"
 ---
 
 ## Who is affected
@@ -13,7 +14,9 @@ changes; the next deploy changes the server, and two kinds of project files can 
 
 - recreates the Postgres container, because it now starts with `pg_stat_statements` preloaded —
   a database restart of a few seconds while the previous server is still serving; then creates the
-  extension and sets the slow-statement log (`slow_query_ms`, 500 ms by default);
+  extension and sets the slow-statement log (`slow_query_ms`, 500 ms by default), disables
+  bind parameter logging (`log_parameter_max_length = 0`, `log_parameter_max_length_on_error = 0`),
+  and bounds the Docker log to ten files of 50 MB;
 - recreates the nginx container, because its log is now bounded (ten files of 50 MB) — the
   previous proxy log is dropped with it;
 - still has the short gap of the old deploy at the server step: the proxy that is running then
@@ -51,3 +54,16 @@ beside the serving ones and reloads the proxy instead of restarting it.
 After the second deploy with this CLI, run a request loop against the API host during a third,
 and `dartway deploy stats --env <environment>`: every call counted, no 5xx
 from the deploy's window, and the statements of `pg_stat_statements` listed.
+
+## Check the overlap and logging settings
+
+- Re-run the current deployment procedure so nginx joins the routed network. New server and web
+  containers have no routed alias until their healthchecks pass. Failed replacements receive no
+  proxy traffic; the previous container keeps serving. Do not attach these aliases in an override.
+- If the Postgres command is overridden, add `-c shared_preload_libraries=pg_stat_statements`
+  to it. Deployment refuses an override that drops this library.
+- For a new required column on an existing table, supply `DEFAULT`, or add it nullable, backfill,
+  then set `NOT NULL` in a later release. `dartway check` now refuses an addition without a default;
+  it does not prove every D-143 expand/contract obligation. Do not edit already applied migrations.
+- Custom implementations of `DwServerLogger` must implement `bool isEnabled(DwLogLevel level)`
+  and preserve their filter in `scoped`. Call timing checks it before building a log line.

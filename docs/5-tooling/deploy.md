@@ -566,18 +566,24 @@ converges with one `dartway deploy setup`, followed by
    take down, and the certificate is left to step 13;
 8. reads free space on Docker's data root (`docker info`, falling back to `/var/lib/docker`),
    refuses below `min_free_disk` (default `10GB`), then builds the images. The space check is
-   read-only and runs again before every build, including a resumed build;
+   read-only and runs again before every build, including a resumed build. Preflight also warns
+   when host available memory is below three times the merged Compose server memory limit
+   (two servers plus the migration container); the warning does not block deployment;
 9. with the bundled storage, starts it and runs `storage-init`, printing what it did; with `database:
    bundled`, starts Postgres, creates the `pg_stat_statements` extension and sets the slow-statement
-   log to `slow_query_ms` (`ALTER SYSTEM` and a reload — the database is not restarted) — with
+   log to `slow_query_ms`, with `log_parameter_max_length = 0` and
+   `log_parameter_max_length_on_error = 0` so bind values are not logged (`ALTER SYSTEM` and a
+   reload — the database is not restarted) — with
    `database: external` there is nothing of the database's to start, the server reaches it directly;
 10. **replaces the server without a moment in which nothing answers.** The new image applies the
    migrations in a one-off run that serves nothing and takes no jobs (`DW_MIGRATE_ONLY=true`) while
    the previous server still serves; then the new server starts **beside** it (`--scale` one higher,
-   the serving container left alone) and has to become healthy; only then does the previous one stop
+   the serving container left alone) without the routed network alias. Only after health passes does
+   the deploy attach it with `docker network connect --alias dw-server`; then the previous one stops
    gracefully — calls in flight are answered, live sockets close with "server stopping" and the
    client reconnects to the new one on its own. The proxy follows by itself: every `proxy_pass` names
-   its service through a variable, which Nginx looks up through Docker's DNS when a request needs
+   its routing alias (`dw-server` or `dw-web`) through a variable, which Nginx looks up through
+   Docker's DNS when a request needs
    it, from a cache at most two seconds old; and a request holds every address the lookup gave, so a
    connection the stopping server refuses, or one to an address that has just gone (at most a
    one-second wait), is retried on the next. No request meets the change as a `502`. The price is
@@ -591,6 +597,8 @@ converges with one `dartway deploy setup`, followed by
    migrations the previous code runs on the new schema, and the message says so. With nothing
    serving before — a first deploy, a stand that was down — the new server simply starts, and on a
    failure the previous image is started again;
+   An unhealthy new container receives no proxy traffic. `dartway check` rejects required column additions without a default;
+   general expand/contract compatibility remains a review obligation under D-143.
 11. replaces the web app the same way, beside the serving one, and converges the rest of the stack
    (`up -d --remove-orphans`);
 12. **checks the Nginx upstreams against the applied stack** — `docker compose config --services` on
@@ -602,7 +610,8 @@ converges with one `dartway deploy setup`, followed by
    first deploy could not ask for at step 7 is issued here, and a failed first issuance puts the
    self-signed certificate back. On a routine deploy step 7 has already covered every host, and
    this asks nothing;
-14. **reloads** Nginx onto the rendered configuration and the certificate — gracefully: the old
+14. **reloads** Nginx onto the rendered configuration and the certificate — gracefully, with retiring
+   workers bounded to 30 seconds (`worker_shutdown_timeout`) even while holding WebSockets: the old
     workers finish what they serve, new ones take every new connection, nothing is refused the way a
     restart would — and checks that it is still running and that its log has no `[emerg]` since the
     reload: `nginx -s reload` exits 0 having only sent a signal, and a master that rejects a
@@ -746,10 +755,15 @@ Three logs, each where the fact is born, and one command that reads them:
   tried) and `bytes`. Read it raw with `docker compose logs nginx`. Snippets under
   `deploy/nginx.d/http` that declare servers of their own keep the image's default format.
 - **The server** logs every call with its wire name, status, milliseconds and answer size: at debug,
-  and as a warning for a call slower than `DwServerSettings.slowCallThreshold` (1 s), whatever the
-  level — [the app server](../4-server/app-server.md#call-timing).
+  and as a warning for a call slower than `DwServerSettings.slowCallThreshold` (1 s) — [the app server](../4-server/app-server.md#call-timing).
 - **The bundled Postgres** counts every statement by its shape in `pg_stat_statements`, and logs
   each one slower than `slow_query_ms` (500 ms) as `duration: … ms  statement: …`.
+
+The bundled Postgres Docker log is bounded to ten files of 50 MB, like nginx's.
+If `deploy/compose.override.yml` replaces its command, keep
+`-c shared_preload_libraries=pg_stat_statements`; preflight refuses a command that drops it.
+Bind parameters are excluded from slow-query and error logs. SQL text still appears in these logs: use
+bind parameters for private values rather than SQL literals.
 
 ```sh
 dartway deploy stats --env production            # the last 24 hours

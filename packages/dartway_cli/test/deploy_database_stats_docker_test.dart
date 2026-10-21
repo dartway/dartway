@@ -20,7 +20,9 @@ import 'support/deploy_fixtures.dart';
 void main() {
   late Directory dir;
   final shell = LocalShell();
-  final stack = stackFrom(extra: '  slow_query_ms: 200\n');
+  final stack = stackFrom(
+    extra: '  project: dwpgstats645\n  slow_query_ms: 200\n',
+  );
 
   Future<DwSshResult> sh(String script) async {
     final result = await shell.run(script);
@@ -78,6 +80,8 @@ void main() {
       expect(started.stdout, contains('statements over 200 ms are logged'));
       expect(await psql('SHOW shared_preload_libraries'), 'pg_stat_statements');
       expect(await psql('SHOW log_min_duration_statement'), '200ms');
+      expect(await psql('SHOW log_parameter_max_length'), '0');
+      expect(await psql('SHOW log_parameter_max_length_on_error'), '0');
 
       // Run again: the database is not restarted, the step is idempotent.
       final startedAt = await psql('SELECT pg_postmaster_start_time()');
@@ -89,6 +93,25 @@ void main() {
         await psql('SELECT count(*) FROM post WHERE id = $i');
       }
       await psql('SELECT pg_sleep(0.3)');
+
+      // Extended-query bind values never reach either slow or error logs.
+      await sh('''
+cd '${dir.path}'
+docker compose exec -T postgres psql -X -q -U ${stack.databaseName} -d ${stack.databaseName} <<'SQL'
+SELECT pg_sleep(0.3), \$1::text
+\\bind 'dw-private-slow-parameter'
+\\g
+SELECT 1 / \$1::int
+\\bind '0'
+\\g
+SQL
+''');
+      final log = (await sh(
+        "cd '${dir.path}' && docker compose logs postgres",
+      )).stdout;
+      expect(log, contains('duration:'));
+      expect(log, isNot(contains('dw-private-slow-parameter')));
+      expect(log, isNot(contains('parameters:')));
 
       final stats = DwDeployStats(ssh: shell, stack: stack, appDir: dir.path);
       final report = await stats.read(hours: 1, top: 50);

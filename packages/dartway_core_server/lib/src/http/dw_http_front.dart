@@ -231,13 +231,16 @@ final class DwHttpFront {
   /// One line per call: its wire name, status, time and answer size — from
   /// the request's arrival to the encoded answer, body reading included.
   /// Debug for every call; a warning for one slower than
-  /// [DwServerSettings.slowCallThreshold], whatever the level.
+  /// [DwServerSettings.slowCallThreshold]. Disabled levels build no line.
   void _timed(String path, int status, Duration elapsed, int bytes) {
+    final slow = elapsed >= settings.slowCallThreshold;
+    final level = slow ? DwLogLevel.warning : DwLogLevel.debug;
+    if (!_log.isEnabled(level)) return;
     final name = DwHttpContract.wireNameOf(path) ?? path;
     final ms = elapsed.inMicroseconds / 1000;
     final line =
         'call $name status=$status ms=${ms.toStringAsFixed(1)} bytes=$bytes';
-    if (elapsed >= settings.slowCallThreshold) {
+    if (slow) {
       _log.warning(
         'slow $line (over ${settings.slowCallThreshold.inMilliseconds} ms)',
       );

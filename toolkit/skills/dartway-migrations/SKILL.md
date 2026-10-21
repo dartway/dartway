@@ -93,7 +93,7 @@ diff `check` compares against.
    migrations produce exactly the declared schema, and each rolls back and re-applies. `note:` lines
    (what a row class cannot declare) are informational, `FAIL` fails. `check`'s `migrationsDrift` runs
    the same when a database is named — `DW_DATABASE_*` or `deploy/config.yaml > local` — and says "Not
-   checked" otherwise.
+   checked" otherwise for schema replay. Its required-column source check runs offline.
 
 ## The body of a migration
 
@@ -141,3 +141,8 @@ It prints every problem at once (`DwMigrationRefused`):
 | `registered twice` / `dependency cycle` | fix `migrations.dart` or `dependsOn` |
 | `up of app/… failed: <postgres error>` | read the SQL error: a NOT NULL without backfill, a unique index over duplicates, a missing cast |
 | `table "x" is declared in the schema and missing` | a row class changed without `create`, or the file is not registered |
+
+`dartway check` rejects `ADD COLUMN … NOT NULL` without `DEFAULT` on an existing table:
+the previous server still inserts during a side-by-side deploy. Add a default, or add the column
+nullable, backfill it, then set `NOT NULL` in a later release. This narrow check does not prove
+general expand/contract compatibility; review the previous release against the new schema.

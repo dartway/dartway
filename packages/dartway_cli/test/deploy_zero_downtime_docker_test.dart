@@ -93,11 +93,20 @@ ${health(80)}
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - ./nginx.d:/etc/nginx/dartway:ro
     depends_on: [${DwStack.serverService}, ${DwStack.webService}]
+    networks: [default, routed]
+networks:
+  routed:
+    name: ${project}_routed
 ''');
     File(p.join(dir.path, 'version')).writeAsStringSync('v1\n');
     await sh(
       "cd '${dir.path}' && docker compose build -q && docker compose up -d --wait",
     );
+    for (final service in ['server', 'web']) {
+      await sh(
+        "cd '${dir.path}' && docker network connect --alias dw-$service '${project}_routed' \$(docker compose ps -q $service)",
+      );
+    }
   });
 
   tearDown(() async {
@@ -144,6 +153,7 @@ docker run -d --name '$project-loop' --network '${project}_default' -v '$project
         runner.build,
         runner.replaceServer,
         runner.startWeb,
+        runner.startStack,
         runner.reloadProxy,
       ]) {
         final result = await step();
@@ -216,4 +226,63 @@ docker wait '$project-loop' >/dev/null
     );
     expect(remaining.stdout.trim(), '1');
   }, timeout: const Timeout(Duration(minutes: 5)));
+  test(
+    'a listening but unhealthy replacement receives zero routed calls',
+    () async {
+      // Keep the port open long enough for Docker DNS to refresh while health
+      // stays 503. A routing bug returns vbad even though rollout fails.
+      final dockerfile = File(p.join(dir.path, 'server.Dockerfile'));
+      dockerfile.writeAsStringSync(
+        dockerfile.readAsStringSync().replaceFirst(
+          'root /www;',
+          'root /www; location = /health { return 503; }',
+        ),
+      );
+      final compose = File(p.join(dir.path, 'docker-compose.yml'));
+      compose.writeAsStringSync(
+        compose.readAsStringSync().replaceFirst(
+          '      retries: 3',
+          '      retries: 3\n      start_period: 8s',
+        ),
+      );
+      File(p.join(dir.path, 'version')).writeAsStringSync('vbad\n');
+      final runner = DwDeployRunner(
+        ssh: shell,
+        stack: stackFrom(extra: '  project: $project\n  min_free_disk: 1MB\n'),
+        appDir: dir.path,
+        storeDir: p.join(dir.path, 'state'),
+      );
+      await runner.beginLocalDeployment();
+      final built = await runner.build();
+      expect(built.ok, isTrue, reason: built.stderr);
+      await sh('''
+docker volume create '$project-control' >/dev/null
+docker run -d --name '$project-loop' --network '${project}_default' -v '$project-control:/control' busybox:1.37 sh -c '
+  while [ ! -f /control/stop ]; do
+    wget -q -T 2 -O - --header "Host: api.example.com" "http://nginx:$port/dw/GetVersion" || echo FAILED
+    sleep 0.05
+  done' >/dev/null
+''');
+      final replaced = await runner.replaceServer();
+      expect(replaced.ok, isFalse);
+      expect(replaced.stderr, contains('previous server keeps serving'));
+      await sh('''
+docker run --rm -v '$project-control:/control' busybox:1.37 touch /control/stop
+docker wait '$project-loop' >/dev/null
+''');
+      final responses = (await sh("docker logs '$project-loop'")).stdout;
+      expect(responses, contains('v1'));
+      expect(
+        responses,
+        isNot(contains('vbad')),
+        reason: 'an unhealthy server must never receive routed calls',
+      );
+      expect(responses, isNot(contains('FAILED')));
+      final after = await sh(
+        "docker run --rm --network '${project}_default' busybox:1.37 wget -q -O - --header 'Host: api.example.com' http://nginx:$port/dw/GetVersion",
+      );
+      expect(after.stdout.trim(), 'v1');
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
 }

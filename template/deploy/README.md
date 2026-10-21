@@ -211,3 +211,11 @@ are the project's to deliver:
 Sign-in codes are written to the server log until a delivery is wired into
 `deliverCode` (`../dartway_starter_server/lib/src/account/logic/auth.dart`); list the gateway's
 keys under `requires.secrets` in `config.yaml` when it is.
+
+New server and web containers receive their routed Docker network aliases only after their
+healthchecks pass. A failed replacement receives no proxy traffic. Migrations still run while the
+previous server serves: required additions to existing tables need a default, or a nullable column
+followed by backfill and `NOT NULL` in a later release. `dartway check` checks this addition.
+Postgres slow/error logs omit bind parameters and Docker logs are bounded. A Postgres command
+override must retain `-c shared_preload_libraries=pg_stat_statements`. Deploy preflight warns if host
+available memory cannot fit two servers plus the migration container at the configured limits.

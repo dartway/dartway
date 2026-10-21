@@ -32,6 +32,17 @@ void main() {
       expect(bytes, answer.text.length);
     });
 
+    test('disabled debug timing does not reach the logger', () async {
+      RecordingLogger.minLevel = DwLogLevel.warning;
+      addTearDown(() => RecordingLogger.minLevel = DwLogLevel.debug);
+      final from = RecordingLogger.lines.length;
+      expect(
+        (await harness().caller().call(const ListNotes(ownerId: -1))).status,
+        200,
+      );
+      expect(linesOf(from, 'ListNotes'), isEmpty);
+    });
+
     test('a refused call is timed too, with its status', () async {
       final from = RecordingLogger.lines.length;
       expect((await harness().caller().call(const MyNotes())).status, 401);
@@ -48,8 +59,10 @@ void main() {
     );
 
     test(
-      'a call is a warning, whatever the level, and names the threshold',
+      'a slow call warns with debug disabled and names the threshold',
       () async {
+        RecordingLogger.minLevel = DwLogLevel.warning;
+        addTearDown(() => RecordingLogger.minLevel = DwLogLevel.debug);
         final from = RecordingLogger.lines.length;
         expect(
           (await harness().caller().call(const ListNotes(ownerId: -1))).status,

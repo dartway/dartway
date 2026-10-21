@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
 
 import 'deploy_target.dart';
 import 'stack.dart';
@@ -69,6 +70,7 @@ class DwStackRenderer {
       'dartway deploy renders it from the secret store}';
 
   String get composeFile {
+    _validatePostgresCommand();
     final database = _target.database == DwDatabaseMode.bundled;
     final storage = _target.storage == DwStorageMode.bundled;
     final site = _target.site;
@@ -110,6 +112,11 @@ class DwStackRenderer {
           '    command: ["postgres", "-c", '
           '"shared_preload_libraries=pg_stat_statements"]',
         )
+        ..writeln('    logging:')
+        ..writeln('      driver: json-file')
+        ..writeln('      options:')
+        ..writeln('        max-size: 50m')
+        ..writeln('        max-file: \"10\"')
         ..writeln('    environment:')
         ..writeln('      POSTGRES_DB: ${_q(stack.databaseName)}')
         ..writeln('      POSTGRES_USER: ${_q(stack.databaseName)}')
@@ -398,7 +405,17 @@ class DwStackRenderer {
         ..writeln('        aliases:')
         ..writeln('          - ${_q(_target.storageDomain!)}');
     }
-    buffer.writeln();
+    if (!storage) {
+      buffer
+        ..writeln('    networks:')
+        ..writeln('      default:');
+    }
+    buffer
+      ..writeln('      routed:')
+      ..writeln(
+        '    command: [\"nginx\", \"-g\", \"daemon off; worker_shutdown_timeout 30s;\"]',
+      )
+      ..writeln();
 
     // --- certbot
     if (_tls) {
@@ -432,6 +449,9 @@ class DwStackRenderer {
         ..writeln('  certbot_data:')
         ..writeln('  certbot_www:');
     }
+    buffer
+      ..writeln('networks:')
+      ..writeln('  routed:');
     return buffer.toString();
   }
 
@@ -754,8 +774,8 @@ resolver 127.0.0.11 valid=${resolveSeconds}s ipv6=off;
     ..writeln(connectTimeout);
 
   static const String serverAddress =
-      '${DwStack.serverService}:${DwStack.serverPort}';
-  static const String webAddress = '${DwStack.webService}:80';
+      'dw-${DwStack.serverService}:${DwStack.serverPort}';
+  static const String webAddress = 'dw-${DwStack.webService}:80';
   static const String storageAddress = '${DwStack.storageService}:9000';
 
   /// How long the proxy waits for a connection to a container. Inside the
@@ -835,6 +855,44 @@ resolver 127.0.0.11 valid=${resolveSeconds}s ipv6=off;
       ..writeln('        proxy_read_timeout 1h;')
       ..writeln('        proxy_send_timeout 1h;')
       ..writeln('        proxy_buffering off;');
+  }
+
+  void _validatePostgresCommand() {
+    if (_target.database != DwDatabaseMode.bundled) return;
+    final file = composeOverride;
+    if (file == null) return;
+    final document = loadYaml(file.readAsStringSync());
+    if (document is! YamlMap || document['services'] is! YamlMap) return;
+    final postgres = document['services'][DwStack.postgresService];
+    if (postgres is! YamlMap || !postgres.containsKey('command')) return;
+    final problem = postgresCommandProblem(postgres['command']);
+    if (problem != null) throw StateError(problem);
+  }
+
+  /// The effective command must retain the library that deploy stats queries.
+  static String? postgresCommandProblem(Object? command) {
+    final settings = RegExp(
+      r'''(?:--)?shared_preload_libraries\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s]+))''',
+    );
+    final values = <String>[];
+    for (final argument in command is List ? command : [command]) {
+      final text = '$argument';
+      if (command is List && text.startsWith('shared_preload_libraries=')) {
+        values.add(text.substring('shared_preload_libraries='.length));
+      } else {
+        for (final match in settings.allMatches(text)) {
+          values.add(match[1] ?? match[2] ?? match[3]!);
+        }
+      }
+    }
+    // Postgres uses the last assignment, including an empty one.
+    final libraries = values.lastOrNull?.split(',').map((s) => s.trim());
+    if (libraries == null || !libraries.contains('pg_stat_statements')) {
+      return 'deploy/compose.override.yml overrides the Postgres command. '
+          'Add -c shared_preload_libraries=pg_stat_statements to that command '
+          'so deploy stats can read statement timings.';
+    }
+    return null;
   }
 
   File? get composeOverride {

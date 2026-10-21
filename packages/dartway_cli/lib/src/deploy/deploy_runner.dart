@@ -257,7 +257,42 @@ rm -f "\$dw_new"''';
   /// Asks Compose whether the merged stack is one it can run, before anything
   /// is built: a broken override or a missing interpolation is found here in
   /// a second, not after a ten-minute build.
-  Future<DwSshResult> checkComposeConfig() => _compose('config --quiet');
+  Future<DwSshResult> checkComposeConfig() async {
+    const marker = '--dw-free-memory--';
+    final result = await _as(
+      "cd '$appDir' && ${DwComposeFiles.selectFiles} && "
+      '${DwComposeFiles.invoke} config --format json && '
+      "echo '$marker' && { awk '/^MemAvailable:/ {print \$2 * 1024}' /proc/meminfo 2>/dev/null || true; }",
+    );
+    if (!result.ok) return result;
+    final parts = result.stdout.split(marker);
+    if (parts.length != 2) return result;
+    final available = num.tryParse(parts.last.trim());
+    final config = jsonDecode(parts.first) as Map<String, dynamic>;
+    final services = config['services'] as Map?;
+    final command = (services?[DwStack.postgresService] as Map?)?['command'];
+    if (target.database == DwDatabaseMode.bundled &&
+        services?.containsKey(DwStack.postgresService) == true) {
+      final problem = DwStackRenderer.postgresCommandProblem(command);
+      if (problem != null)
+        return DwSshResult(exitCode: 1, stdout: '', stderr: problem);
+    }
+    final server = services?['server'] as Map?;
+    final limit =
+        server?['mem_limit'] ??
+        server?['deploy']?['resources']?['limits']?['memory'];
+    final bytes = num.tryParse(
+      '$limit',
+    ); // Compose normalizes memory limits to bytes.
+    final needed =
+        (bytes ?? 0) * 3; // Two servers plus the migration container.
+    final warning = available != null && needed > available
+        ? 'WARNING: host free memory is $available bytes; two server containers '
+              'plus the migration container need $needed bytes at the configured limits. '
+              'Reduce the server memory limit or add host memory before deployment.\n'
+        : '';
+    return DwSshResult(exitCode: 0, stdout: warning, stderr: result.stderr);
+  }
 
   /// The same guard `deploy setup` runs before it ever writes a compose file
   /// ([judgeDataVolumes]) — run again here, because `run` starts the stack
@@ -327,6 +362,8 @@ ${DwComposeFiles.selectFiles}
 ${DwComposeFiles.invoke} up -d --wait ${DwStack.postgresService}
 ${DwComposeFiles.invoke} exec -T ${DwStack.postgresService} psql -X -q -v ON_ERROR_STOP=1 -U '$name' -d '$name' >/dev/null <<'DW_SQL'
 CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
+ALTER SYSTEM SET log_parameter_max_length = 0;
+ALTER SYSTEM SET log_parameter_max_length_on_error = 0;
 ALTER SYSTEM SET log_min_duration_statement = $threshold;
 SELECT pg_reload_conf();
 DW_SQL
@@ -495,7 +532,19 @@ dw_roll_out() {
     echo "ERROR: Compose started no new \$dw_label container" >&2
     return 1
   fi
-  dw_wait_healthy "\$dw_new" "the new \$dw_label"
+  dw_wait_healthy "\$dw_new" "the new \$dw_label" || return 1
+  # Compose gives every container its service alias immediately, regardless
+  # of health. The proxy uses only this separate network's gated alias.
+  dw_project=\$(docker inspect -f '{{index .Config.Labels "com.docker.compose.project"}}' "\$dw_new") || return 1
+  if [ -z "\$dw_project" ]; then
+    echo "ERROR: the new \$dw_label has no Compose project label" >&2
+    return 1
+  fi
+  dw_network="\${dw_project}_routed"
+  if ! docker network inspect "\$dw_network" >/dev/null 2>&1; then
+    docker network create --label "com.docker.compose.project=\$dw_project" --label 'com.docker.compose.network=routed' "\$dw_network" >/dev/null || return 1
+  fi
+  docker network connect --alias "dw-\$dw_service" "\$dw_network" "\$dw_new" || return 1
 }
 dw_retire() {
   [ \$# -gt 0 ] || return 0
@@ -550,7 +599,7 @@ dw_fall_back() {
   fi
   if [ -n "\$serving" ]; then
     echo "the previous $label keeps serving" >&2
-  elif ${DwComposeFiles.invoke} up -d --no-deps $service >/dev/null 2>&1; then
+  elif dw_roll_out $service 'previous $label' >/dev/null 2>&1; then
     echo "the previous $label is running again" >&2
   else
     echo "ERROR: the previous $label could not be started again" >&2
@@ -928,6 +977,7 @@ echo "nginx reloaded its configuration and is running"
       id: 'compose-config',
       title: 'Check the merged compose configuration',
       run: checkComposeConfig,
+      showOutput: true,
     ),
     // Before anything starts: an expected data volume that does not exist
     // while another one of this project's does is a config change about to

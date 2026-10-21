@@ -2,6 +2,10 @@
 
 ## 0.23.0-dev.1
 
+- Custom `DwServerLogger` implementations now declare `isEnabled(DwLogLevel)`;
+  call timing checks the selected level before building its line (#645).
+  See the [migration note](../../docs/migrations/2026-10-21-deploy-side-by-side-and-stats.md).
+
 - `request.readWhole((limit) => repo.find(limit: limit))` keeps the normal
   list read bounded at `maxItems + 1`. Overflow throws before a second read in
   strict mode; production re-reads once without a limit and warns with the
@@ -32,7 +36,7 @@
 - Every HTTP call is timed: one line with its wire name, status, milliseconds
   and answer size, at debug; a call slower than the new
   `DwServerSettings.slowCallThreshold` (default 1 s) is the same line as a
-  warning, whatever the logger's level (#645).
+  warning when that level is enabled (#645).
 - Answer uncaught `DwStaleState` as `dw.conflict` (HTTP 409) without an incident (#639).
 - The family moves in lockstep with ORM state columns (#639).
 

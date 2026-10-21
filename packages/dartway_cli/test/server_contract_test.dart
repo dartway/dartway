@@ -120,6 +120,89 @@ void main() {
   });
 
   group('migrationsDrift', () {
+    test('refuses a required addColumn with only a backfill', () {
+      final file = File(p.join(server.path, 'lib/src/migrations/m_added.dart'));
+      file.parent.createSync(recursive: true);
+      file.writeAsStringSync(
+        "void up(m) { m.addColumn('orders', DwColumnSchema('label', 'text'), backfill: 'old'); }",
+      );
+      final inspector = DwMigrationsInspector(
+        serverPackageDir: server,
+        environment: const {},
+      );
+      expect(inspector.run(), 1);
+    });
+    for (final body in [
+      "m.addColumn('orders', DwColumnSchema('label', 'text', nullable: true));",
+      "m.addColumn('orders', DwColumnSchema('label', 'text', defaultSql: 'current_user'));",
+      "m.createTable(DwTableSchema('orders', columns: [])); m.addColumn('orders', DwColumnSchema('label', 'text'));",
+      "} void down(m) { m.addColumn('orders', DwColumnSchema('label', 'text'));",
+    ]) {
+      test('accepts safe migration builder: $body', () {
+        final file = File(
+          p.join(server.path, 'lib/src/migrations/m_safe.dart'),
+        );
+        file.parent.createSync(recursive: true);
+        file.writeAsStringSync('void up(m) { $body }');
+        final inspector = DwMigrationsInspector(
+          serverPackageDir: server,
+          environment: const {},
+        );
+        expect(inspector.run(), 0);
+      });
+    }
+    test('refuses a new required column without a default even offline', () {
+      final migration = File(
+        p.join(server.path, 'lib/src/migrations/m_new.dart'),
+      );
+      migration.parent.createSync(recursive: true);
+      migration.writeAsStringSync(
+        "void up(m) { m.execute('ALTER TABLE orders ADD COLUMN label text NOT NULL'); }",
+      );
+      final inspector = DwMigrationsInspector(
+        serverPackageDir: server,
+        environment: const {},
+      );
+      expect(inspector.run(), 1);
+      expect(inspector.findings.single, contains('nullable'));
+      expect(inspector.findings.single, contains('DEFAULT'));
+    });
+
+    for (final sql in [
+      'ALTER TABLE orders ADD COLUMN label text NOT NULL DEFAULT \"new\"',
+      'ALTER TABLE orders ADD COLUMN label text',
+      'CREATE TABLE orders (id int); ALTER TABLE orders ADD label text NOT NULL',
+      'ALTER TABLE orders ADD COLUMN id int GENERATED ALWAYS AS IDENTITY NOT NULL',
+    ]) {
+      test('accepts safe addition: $sql', () {
+        final file = File(
+          p.join(server.path, 'lib/src/migrations/m_safe.dart'),
+        );
+        file.parent.createSync(recursive: true);
+        file.writeAsStringSync("void up(m) { m.execute('$sql'); }");
+        final inspector = DwMigrationsInspector(
+          serverPackageDir: server,
+          environment: const {},
+        );
+        expect(inspector.run(), 0);
+        expect(inspector.findings, isEmpty);
+      });
+    }
+    test(
+      'refuses the required column in a multi-action ALTER with a default on another column',
+      () {
+        final file = File(p.join(server.path, 'lib/src/migrations/m_bad.dart'));
+        file.parent.createSync(recursive: true);
+        file.writeAsStringSync(
+          "void up(m) { m.execute('ALTER TABLE orders ADD amount numeric(10,2) DEFAULT 0, ADD label text NOT NULL'); }",
+        );
+        final inspector = DwMigrationsInspector(
+          serverPackageDir: server,
+          environment: const {},
+        );
+        expect(inspector.run(), 1);
+      },
+    );
     test('without a database it says it did not run, and passes nothing', () {
       var ran = false;
       final inspector = DwMigrationsInspector(
