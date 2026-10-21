@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.0-dev.1
+
+- Generate typed state-column transition metadata; reject nullable or non-enum state fields (#639).
+
 ## 0.22.0
 
 - With `releaseBranch` in the toolkit settings, a task's contract changes no

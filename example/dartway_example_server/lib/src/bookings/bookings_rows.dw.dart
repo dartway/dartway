@@ -124,8 +124,16 @@ final class SessionBookingTable extends DwTableDef<SessionBookingRow> {
     references: DwForeignKey('user_profile', onDelete: DwOnDelete.cascade),
   );
 
-  DwTableColumn<BookingStatus> get status =>
-      const DwTableColumn('status', DwEnumType(BookingStatus.values));
+  DwTableColumn<BookingStatus> get status => const DwTableColumn(
+    'status',
+    DwEnumType(BookingStatus.values),
+    transitions: DwStateTransitions<BookingStatus>(
+      initial: {BookingStatus.booked},
+      moves: {
+        BookingStatus.booked: {BookingStatus.cancelled, BookingStatus.attended},
+      },
+    ),
+  );
 
   DwTableColumn<DateTime> get createdAt =>
       const DwTableColumn('created_at', DwColumnType.timestamptz);

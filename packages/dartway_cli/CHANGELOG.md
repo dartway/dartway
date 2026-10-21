@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.0
+
+- Add the `stateWrittenDirectly` checker error for direct state writes and recognize transitions as feature-owned writes (#639).
+
 ## 0.25.0
 
 ### Breaking changes

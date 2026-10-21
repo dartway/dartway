@@ -7,6 +7,13 @@ part 'bookings.dw.dart';
 
 enum BookingStatus { booked, cancelled, attended }
 
+const bookingTransitions = DwStateTransitions<BookingStatus>(
+  initial: {BookingStatus.booked},
+  moves: {
+    BookingStatus.booked: {BookingStatus.cancelled, BookingStatus.attended},
+  },
+);
+
 /// A member's review of a visit.
 final class SessionReview extends DwDataObject with _$SessionReview {
   const SessionReview({

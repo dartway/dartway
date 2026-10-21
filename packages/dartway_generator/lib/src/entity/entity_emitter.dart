@@ -124,6 +124,7 @@ abstract final class EntityEmitter {
       if (column.unique) 'unique: true',
       if (column.defaultValue != null) 'defaultValue: ${column.defaultValue}',
       if (column.references != null) 'references: ${column.references}',
+      if (column.transitions != null) 'transitions: ${column.transitions}',
     ];
     return 'DwTableColumn<${field.spelling}> get ${field.name} => '
         'const DwTableColumn(${arguments.join(', ')});';

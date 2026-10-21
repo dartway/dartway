@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.0-dev.1
+
+- The family moves in lockstep with ORM state columns (#639).
+
 ## 0.22.0
 
 - Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).

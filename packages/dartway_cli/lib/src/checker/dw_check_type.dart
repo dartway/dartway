@@ -464,7 +464,11 @@ enum DwCheckType {
   /// its invariants, and every other writer goes through that feature's
   /// `_changes`: a second writer is a second definition of what a valid row
   /// is, and the first to drift.
-  foreignRowWrite;
+  foreignRowWrite,
+
+  /// A declared state column written through copyWith, an ordinary repository
+  /// write or raw SQL in server lib/. Migration backfills are allowed.
+  stateWrittenDirectly;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///

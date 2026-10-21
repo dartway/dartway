@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.0-dev.1
+
+- Add `DwStateTransitions`, `@DwStateColumn` and atomic `transition` / `transitionWhere`. Refuse noninitial inserts, direct state updates and upserts on state tables (#639).
+
 ## 0.22.0
 
 - Fix migration drafts' rename advice: every rename option explains that a released table needs

@@ -8,6 +8,7 @@ import '../checker/dw_contract_names.dart';
 import '../checker/dw_data_lifecycle.dart';
 import '../checker/dw_feature_imports.dart';
 import '../checker/dw_check_type.dart';
+import '../checker/dw_state_columns.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_flutter_state_rules.dart';
 import '../checker/dw_flutter_ui_rules.dart';
@@ -219,6 +220,11 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
       errorCount += DwServerOutsideWorldInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwStateColumnsInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

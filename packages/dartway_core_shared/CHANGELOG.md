@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.23.0-dev.1
+
+- Add pure-Dart `DwStateTransitions`, so lifecycle tables can live beside shared enums and be read by commands, clients and tests (#639).
+
 ## 0.22.0
 
 - Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,

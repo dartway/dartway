@@ -437,7 +437,7 @@ final class DwStringGroup {
 }
 
 /// How the data checks read a source's strings: as the SQL they hold.
-extension on DwDartSource {
+extension DwDataSqlSource on DwDartSource {
   /// Runs of literals separated by nothing but whitespace, each read as the
   /// one string it is.
   List<DwStringGroup> stringGroups() {
