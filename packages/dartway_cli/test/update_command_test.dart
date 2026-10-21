@@ -207,6 +207,43 @@ void main() {
     },
   );
 
+  for (final layout in ['shared', 'legacy Claude']) {
+    test('update removes retired managed skills from $layout layout', () async {
+      if (layout == 'legacy Claude') {
+        Link(p.join(project.path, '.claude/skills')).deleteSync();
+      }
+      final roots = layout == 'shared' ? ['agents'] : ['agents', 'claude'];
+      const retired = ['dartway-retired-analysis', 'dartway-retired-design'];
+      for (final root in roots) {
+        for (final name in [...retired, 'project-planning']) {
+          final skill = file('.$root/skills/$name/SKILL.md');
+          skill.parent.createSync(recursive: true);
+          skill.writeAsStringSync('Project procedure: $name');
+        }
+      }
+
+      succeeds(await update([]));
+
+      for (final root in ['agents', 'claude']) {
+        for (final name in retired) {
+          expect(
+            Directory(p.join(project.path, '.$root/skills/$name')).existsSync(),
+            isFalse,
+            reason: 'Retired managed skill must disappear from both agents',
+          );
+        }
+        expect(
+          file('.$root/skills/project-planning/SKILL.md').readAsStringSync(),
+          'Project procedure: project-planning',
+        );
+        expect(
+          file('.$root/skills/dartway-contract/SKILL.md').existsSync(),
+          isTrue,
+        );
+      }
+    });
+  }
+
   test(
     'target lock and toolkit install leave notes unconfirmed; plan is read-only',
     () async {

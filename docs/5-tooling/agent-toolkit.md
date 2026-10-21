@@ -83,19 +83,19 @@ overridden with `--interactive`. You can also edit `.agents/dartway-toolkit.json
 
 With `false`, every managed step that needs a human answer instead puts its question, proposed text
 or action in the final report and stops that step. This includes framework issue/comment publication,
-finish suggestions, requirement questions and option selection, real-key/local-setup questions,
-and migration/backfill/destructive decisions. Independent authorized work continues. Silence never
+finish suggestions, real-key/local-setup questions, and migration/backfill/destructive decisions. Independent authorized work continues. Silence never
 approves an action, and the executor never waits for an answer nobody can give.
 
 ## The skills
 
-An unclear task uses `dartway-requirements`, then `dartway-plan` to choose an approach.
-An agreed task starts with the affected layer skill. Every task ends with `dartway-finish`.
+Requirements analysis and approach selection belong to the developer or executor, including
+Studio's specify and design steps. Start implementation from the issue or accepted specification
+and the affected layer skill. The managed index follows the layer order: contract → rows → generate
+and migrate → handlers → jobs/routes → app → tests and descriptions, skipping unaffected steps.
+Every task ends with `dartway-finish`.
 
 | Skill | For |
 |---|---|
-| `dartway-requirements` | Read-only analysis before a task: what the project already has, the debt in the way, the questions worth asking, options with their trade-offs |
-| `dartway-plan` | Read-only planning once the requirements are agreed: an end-to-end plan; **Risks to guard** selects from the risk survey and spec, with a class (1–6) and expected outcome per item, or `No must-test risk: <why>` |
 | `dartway-run` | Bringing the project up locally — the order of the steps and the real ports — and confirming it is alive |
 | `dartway-feature-scaffold` | A feature end to end: its folder, its entry point and `DwFeatureSpec`, its layers |
 | `dartway-contract` | The shared package: data objects, requests and commands, refusal codes, validation, generation |
@@ -214,6 +214,6 @@ name. The details of both commands are in [The CLI](cli.md).
 
 ## What the toolkit does not do
 
-It never changes code silently. `dartway-requirements` and `dartway-plan` write nothing at all;
-`dartway-finish` shows what it would change and applies only the confirmed part. The point is a
-reviewer that is awake at 2 a.m., not an autopilot.
+The toolkit supplies DartWay knowledge and verification procedures; the developer or executor
+owns the working method. `dartway-finish` shows what it would change and applies only the confirmed
+part.

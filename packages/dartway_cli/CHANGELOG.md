@@ -4,6 +4,12 @@
 
 ### Breaking changes
 
+- Remove `dartway-requirements` and `dartway-plan`: requirements analysis and approach
+  selection belong to the developer or executor. Update removes their managed copies;
+  projects wanting the old flow keep their own copy under a project skill name.
+  Contract choices, layer order, risks and ADR guidance remain in the owning skills
+  and the agent index.
+
 - Install skills once in `.agents/skills/`; Claude discovers them through the
   relative `.claude/skills` symlink. Existing Claude-only custom skills are moved;
   conflicting custom copies stop installation before any project file changes.
