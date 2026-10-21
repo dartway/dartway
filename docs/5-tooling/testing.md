@@ -396,3 +396,61 @@ base SHA to `generate --check`/`check --contract-base`; regeneration cannot sile
 DTO edit. Fixture tests exercise old/new generated codecs and real CLI/Git baselines, including
 read-only project byte identity and pin-move adoption, changed-source rejection and blocking unsupported contracts. Tooling metadata alone
 does not trigger a core wire bump or runtime interoperability tier.
+
+## Recorded external seams
+
+Server integrations use `ctx.http` and `ctx.process`. A handwritten fake of an external system
+is not coverage of its seam: replay recorded real responses, or run against the real system.
+The signed-in `system_info` feature in the example calls GitHub's public Zen API
+and `git --version`. Its two committed cassettes replay with no external network or commands.
+
+```dart
+final cassette = DwSeamCassette('test/cassettes/provider.json',
+  redactNames: ['private_field'], redactValues: [providerKey]);
+server.http.useCassette(cassette); // or server.process.useCassette(cassette)
+// Call the feature through the harness.
+cassette.verifyComplete();
+```
+
+`DwSeamCassette` is exported from `package:dartway_core_server/testing.dart`. The file must
+live under the current package's `test/`. Matching includes method, URL, headers, body and
+redirect policy for HTTP; executable, arguments, directory and explicit environment for
+commands. Repeated requests replay in recorded order. Unmatched requests fail with the
+redacted request; unused answers fail `verifyComplete()`. Use one file per test to avoid
+concurrent writers. `rewind()` resets replay consumption. `when` rules take precedence and
+remain useful for edge cases a service cannot produce on demand.
+
+Run a feature's test with `DW_RECORD_SEAMS=1` to call the real services and replace its
+recordings. Redaction replaces only string values under exact, case-insensitive names:
+`authorization`, `cookie`, `set-cookie`, `x-api-key`, `x-auth-key`, `api_key`, `apikey`,
+`key`, `token`, `access_token`, `refresh_token`, `client_secret`, `password`, `private_key`
+and `secret`. It applies to headers, query parameters, JSON, forms, explicit environment
+and named command arguments. Numbers, booleans and container structure retain their values;
+`credentials_valid`, token usage counts and a `secrets` list of names remain intact.
+Add exact provider-specific names with `redactNames`; remove names for that cassette with
+`exemptNames`. Only credentials from sensitive request headers, query parameters and form
+fields supply automatic substring redactions across the cassette, and only when at least
+eight characters long. Response fields never supply them: a returned secret name may be
+needed in a subsequent request path. Use explicit `redactValues` for secrets in URL paths,
+positional arguments, command output or other text; these explicit values have no minimum
+length. Exemptions affect name matching, not explicit or discovered substring redactions.
+Review every recording before committing; no tool can identify arbitrary secret text. Never record a destructive command or request unless
+you intend to execute it. JSON bodies are stored structurally; replay encodes them again,
+so tests requiring byte-exact JSON formatting should use a real service.
+
+`ctx.process.run(executable, arguments)` uses no shell expansion. Optional
+`workingDirectory`, `environment`, `timeout` (30 seconds) and `maxOutputBytes` (10 MiB across
+stdout and stderr) bound a command. `DwProcessResult` includes exit code and UTF-8 stdout
+and stderr. Nonzero exits are results; startup failure, timeout and excess output throw
+`DwProcessException`. Avoid running commands while holding a transaction. Commands inherit
+the server's environment; only explicit overrides enter a cassette.
+
+Live drift tests carry the `seam` tag and run with `DW_VERIFY_SEAMS=1`. They compare keys,
+JSON types, HTTP status codes, response `content-type` and process exit codes, ignoring
+other response headers, scalar body values and array lengths. A live HTTP 403 or 429
+reports "could not verify": check runner access and rate limits before retrying, rather
+than treating an unavailable provider as contract drift. They never modify the committed
+file. The skeleton's `seam-drift.yml` runs weekly or manually, outside ordinary CI, and skips live work without `DW_SEAM_CREDENTIALS`.
+The template ships the workflow without demo routes or recordings. Add the project's
+recorded integration tests with the `seam` tag before enabling it; configure the actual
+required credentials and adapt the workflow's readiness condition.

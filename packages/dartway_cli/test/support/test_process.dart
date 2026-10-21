@@ -15,6 +15,7 @@ Future<Process> startTestProcess(
   String? workingDirectory,
   Map<String, String>? environment,
   String? processGroupFile,
+  bool includeParentEnvironment = true,
 }) async {
   final control = Directory.systemTemp.createTempSync('dw-process-group-');
   final marker = File(processGroupFile ?? p.join(control.path, 'pid'));
@@ -39,6 +40,7 @@ wait "$child"
     ],
     workingDirectory: workingDirectory,
     environment: environment,
+    includeParentEnvironment: includeParentEnvironment,
   );
   Future<void>? stopping;
   Future<void> stop() => stopping ??= () async {
@@ -82,12 +84,14 @@ Future<ProcessResult> runTestProcess(
   String? workingDirectory,
   Map<String, String>? environment,
   Duration timeout = const Duration(minutes: 2),
+  bool includeParentEnvironment = true,
 }) async {
   final process = await startTestProcess(
     executable,
     arguments,
     workingDirectory: workingDirectory,
     environment: environment,
+    includeParentEnvironment: includeParentEnvironment,
   );
   final output = process.stdout.transform(utf8.decoder).join();
   final errors = process.stderr.transform(utf8.decoder).join();

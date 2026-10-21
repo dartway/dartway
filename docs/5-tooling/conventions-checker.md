@@ -133,7 +133,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-three errors, thirteen warnings, one info — `DwCheckType` and its `severity` in
+Forty-four errors, thirteen warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -189,6 +189,7 @@ Forty-three errors, thirteen warnings, one info — `DwCheckType` and its `sever
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
 | `forbiddenEnvironmentRead` | error | `Platform.environment` in the server's `lib/` outside `lib/src/core/environment.dart`, where `AppEnvironment` reads every variable at start; in `bin/`, `Platform.environment` outside `DwLocalEnvironment.overlay(…)` or a map read by a variable's name (`env['PORT']`) |
+| `forbiddenProcessRun` | error | `Process.run`, `Process.runSync` or `Process.start` in server `lib/`, including tear-offs, or imports/exports of `package:process` or `package:process_run` — external commands use `ctx.process` |
 | `forbiddenHttpClient` | error | `HttpClient(`, `DwOutboundHttp.network` (including a tear-off), or an import of `package:http/…` in the server's `lib/` — an outbound request is `ctx.http` |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
 | `docCommentLanguage` | warning | A doc comment in `lib/` written in a script other than the language `dartway setup-ai --language` recorded — a heuristic on Cyrillic against Latin letters, so it warns and never fails. A comment the skeleton wrote (the same text in the template the project came from) is not judged, nor a generated file |

@@ -22,6 +22,6 @@ Open only the reference needed for the edit:
 - [handlers.md](references/handlers.md) — handlers, transactions, batch mapping and call context.
 - [jobs-and-routes.md](references/jobs-and-routes.md) — jobs and external doors.
 - [accounts.md](references/accounts.md) — sign-in hooks, accounts and identities.
-- [startup-and-services.md](references/startup-and-services.md) — startup, settings, environment, outbound HTTP and ingress quotas.
+- [startup-and-services.md](references/startup-and-services.md) — startup, settings, environment, outbound HTTP, external commands and ingress quotas.
 
 Open related references when the change reaches them, not all before the first edit.
