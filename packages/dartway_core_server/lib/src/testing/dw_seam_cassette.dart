@@ -115,11 +115,11 @@ final class DwSeamCassette {
     final saved = (_entries[index]['response'] as Map).cast<String, dynamic>();
     if (_verify) {
       final response = await real();
-      if (_canonical(_shape(_redactor.clean(response))) !=
-          _canonical(_shape(saved))) {
+      if (_canonical(_responseShape(_redactor.clean(response) as Map)) !=
+          _canonical(_responseShape(saved))) {
         throw StateError(
           'Seam drift in ${_file.path}: $kind ${jsonEncode(safeRequest)}; '
-          'expected ${jsonEncode(_shape(saved))}, got ${jsonEncode(_shape(response))}',
+          'expected ${jsonEncode(_responseShape(saved))}, got ${jsonEncode(_responseShape(response))}',
         );
       }
       return response;
@@ -248,13 +248,18 @@ List<int> _bytes(Map value) => value.containsKey('form')
     ? base64Decode(value['base64'] as String)
     : utf8.encode(_string(value));
 
-Object? _shape(Object? value, [String? key]) {
-  if (key == 'statusCode' || key == 'exitCode') return value;
+// Status values belong only to the transport envelope. Provider JSON may
+// contain fields with these same names; their scalar values are not a shape.
+Object? _responseShape(Map value) => {
+  for (final entry in value.entries)
+    entry.key: entry.key == 'statusCode' || entry.key == 'exitCode'
+        ? entry.value
+        : _shape(entry.value),
+};
+
+Object? _shape(Object? value) {
   if (value is Map) {
-    return {
-      for (final entry in value.entries)
-        entry.key: _shape(entry.value, entry.key as String),
-    };
+    return {for (final entry in value.entries) entry.key: _shape(entry.value)};
   }
   if (value is List) {
     return (value.map((item) => _canonical(_shape(item))).toSet().toList()

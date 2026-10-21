@@ -134,15 +134,15 @@ void main() {
         "import 'dart:io'; void main() { stdout.write('$output'); exitCode = $code; }",
       );
       final request = [script.path];
-      write('{"items":[{"id":1}]}');
+      write('{"items":[{"statusCode":1}]}');
       final record = DwFakeProcessRunner()
         ..useCassette(cassette('DW_RECORD_SEAMS'));
       await record.client().run(Platform.resolvedExecutable, request);
       for (final (output, code, drift) in [
-        ('{"items":[{"id":2},{"id":3}]}', 0, false),
+        ('{"items":[{"statusCode":2},{"statusCode":3}]}', 0, false),
         ('{"items":[{"name":2}]}', 0, true),
-        ('{"items":[{"id":"2"}]}', 0, true),
-        ('{"items":[{"id":2}]}', 1, true),
+        ('{"items":[{"statusCode":"2"}]}', 0, true),
+        ('{"items":[{"statusCode":2}]}', 1, true),
       ]) {
         write(output, code);
         final verify = DwFakeProcessRunner()
@@ -160,7 +160,7 @@ void main() {
           Platform.resolvedExecutable,
           request,
         )).stdout,
-        '{"items":[{"id":1}]}',
+        '{"items":[{"statusCode":1}]}',
       );
     },
   );
