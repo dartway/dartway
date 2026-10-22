@@ -6,8 +6,10 @@ the generator, one formats, one checks the conventions, one serves the web app a
 runs the server tests on a database of their own, one deploys, and one counts lines.
 
 ```bash
-dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
+dart pub global activate dartway_cli
 ```
+
+If pub.dev is unavailable, use `dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable` as a fallback.
 
 **Inside a project, `dartway` runs the CLI the project pins.** Every DartWay project carries
 `dartway_cli` as a dev dependency of its Flutter package, at the same version as the rest of the
@@ -86,7 +88,7 @@ of the bring-up steps and why, how to verify the server answers, how to hand ove
 the checks to run before calling a change done. It writes nothing and asks nothing.
 
 It is a printed text rather than an extension for one assistant on purpose: **whatever agent you
-use, its way in is two commands** — `dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable` and `dartway
+use, its way in is two commands** — `dart pub global activate dartway_cli` and `dartway
 quickstart` — after which the instruction is in that agent's context. A plugin for one vendor would
 make the front door of an open framework depend on a format nobody here controls. A human reads the
 same text; there is no second, friendlier version to drift from it. The source is

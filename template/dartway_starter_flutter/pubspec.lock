@@ -135,14 +135,14 @@ packages:
       path: "../../packages/dartway_analytics_flutter"
       relative: true
     source: path
-    version: "0.4.0"
+    version: "0.5.0"
   dartway_analytics_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_analytics_shared"
       relative: true
     source: path
-    version: "0.4.0"
+    version: "0.5.0"
   dartway_cli:
     dependency: "direct dev"
     description:
@@ -156,21 +156,21 @@ packages:
       path: "../../packages/dartway_client"
       relative: true
     source: path
-    version: "0.24.0-dev.1"
+    version: "0.24.0"
   dartway_core_flutter:
     dependency: "direct main"
     description:
       path: "../../packages/dartway_core_flutter"
       relative: true
     source: path
-    version: "0.24.0-dev.1"
+    version: "0.24.0"
   dartway_core_shared:
     dependency: "direct overridden"
     description:
       path: "../../packages/dartway_core_shared"
       relative: true
     source: path
-    version: "0.24.0-dev.1"
+    version: "0.24.0"
   dartway_router:
     dependency: "direct main"
     description:
@@ -184,7 +184,7 @@ packages:
       path: "../../packages/dartway_shared_preferences"
       relative: true
     source: path
-    version: "0.9.0"
+    version: "0.10.0"
   dartway_starter_shared:
     dependency: "direct main"
     description:

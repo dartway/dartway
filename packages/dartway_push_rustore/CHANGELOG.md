@@ -2,6 +2,10 @@
 
 - Targets DartWay 0.23
 
+## 0.9.0
+
+- Targets DartWay 0.24
+
 ## 0.7.0
 
 - Creates the configurable quiet Android channel on attach and uses it for silent data-only

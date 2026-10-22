@@ -32,24 +32,24 @@ dependencies:
 
   # The DartWay app skeleton: the client, its Riverpod bindings, the router
   # and the shared contract, re-exported — one framework import.
-  dartway_core_flutter: ^0.24.0-dev.1
+  dartway_core_flutter: ^0.24.0
   # Decision guards can wait for nullable router-state facts to become known.
   dartway_router: ^4.0.0
   # Where the signed-in session is kept: the core asks the plugins for whoever
   # claimed the DwKeyValueStorePlugin role, and without one there is nowhere
   # to put the session.
-  dartway_shared_preferences: ^0.9.0
+  dartway_shared_preferences: ^0.10.0
   # Push: the plugin that registers the device and hands over opened
   # notifications, and FCM as its transport (inert until Firebase is
   # configured by --dart-define, see main.dart).
-  dartway_push_flutter: ^0.8.0
+  dartway_push_flutter: ^0.9.0
   # Analytics: the app's events, and the calls the admin dashboards change
   # through (`dw.plugins.analytics`).
-  dartway_analytics_flutter: ^0.4.0
-  dartway_push_firebase: ^0.8.0
+  dartway_analytics_flutter: ^0.5.0
+  dartway_push_firebase: ^0.9.0
   # Video and audio: workout videos, the mini-player (`dw.plugins.media`).
   # The controls are this app's own, in `ui_kit/3_special/media/`.
-  dartway_media_flutter: ^0.4.0
+  dartway_media_flutter: ^0.5.0
   firebase_core: ">=3.13.1 <5.0.0"
 
   flutter_hooks: ^0.21.2
@@ -78,7 +78,7 @@ dev_dependencies:
 
   # `DwFakeServer`: widget tests talk to an in-memory server that speaks the
   # real HTTP contract and live socket.
-  dartway_client: ^0.24.0-dev.1
+  dartway_client: ^0.24.0
 
   dartway_cli: ^0.26.1
 

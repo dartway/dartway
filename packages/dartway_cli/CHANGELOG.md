@@ -2,6 +2,8 @@
 
 ## 0.26.1
 
+- Install and reinstall the CLI from pub.dev; update plans name the exact target CLI version in the activation command.
+
 - Warn with `unboundedRead` when a handler includes a to-many relation without `take(n)` or `unbounded(reason)`.
 
 ## 0.26.0

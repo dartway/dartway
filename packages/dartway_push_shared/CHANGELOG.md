@@ -2,6 +2,10 @@
 
 - Targets DartWay 0.23
 
+## 0.9.0
+
+- Targets DartWay 0.24
+
 ## 0.7.0
 
 - Adds the `DwPushData.soundKey` used by native renderers for data-only silent notifications (#595).

@@ -3,14 +3,9 @@
 Command-line tool for the [DartWay](https://dartway.dev) framework.
 
 ```bash
-dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
+dart pub global activate dartway_cli
 ```
 
-Or straight from the monorepo (the `stable` channel):
-
-```bash
-dart pub global activate --source git https://github.com/dartway/dartway.git --git-path packages/dartway_cli --git-ref stable
-```
 
 `create`, `setup-ai` and `update` take the template and the toolkit from a checkout you name
 (`--local-repo`, `--framework-path`), else from a channel you choose (`--channel`,

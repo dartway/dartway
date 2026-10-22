@@ -2,6 +2,10 @@
 
 - Targets DartWay 0.23
 
+## 0.9.0
+
+- Targets DartWay 0.24
+
 ## 0.7.0
 
 - Adds per-message `DwPushSound.standard` and `DwPushSound.silent`; providers select the quiet
