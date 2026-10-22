@@ -319,8 +319,7 @@ class UpdateCommand extends Command<int> {
       '\n⚠️  This CLI is $dartwayCliVersion, the target has $channelVersion.\n'
       '   Update it first and run this again — an older CLI installs an older '
       'idea of what a project needs:\n'
-      '   dart pub global activate --source git https://github.com/dartway/dartway '
-      '--git-path packages/dartway_cli --git-ref stable',
+      '   dart pub global activate dartway_cli $channelVersion',
     );
   }
 

@@ -9,7 +9,7 @@ Working with an AI assistant instead? It runs this same path for you — see
 ## 1. Install the CLI and check the machine
 
 ```bash
-dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
+dart pub global activate dartway_cli
 dartway doctor
 ```
 

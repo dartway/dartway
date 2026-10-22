@@ -1,8 +1,8 @@
 ---
 title: Generate typed ORM relations and index foreign keys
 affects:
-  dartway_generator: "0.24.0-dev.1"
-  dartway_orm: "0.24.0-dev.1"
+  dartway_generator: "0.24.0"
+  dartway_orm: "0.24.0"
 ---
 
 ## Who is affected

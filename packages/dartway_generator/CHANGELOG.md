@@ -1,12 +1,14 @@
 # Changelog
 
-## 0.24.0-dev.1
-
-- Generate forward and reverse typed relations between project row classes; diagnose ambiguous names and warn on foreign keys without a leading index.
+## 0.24.0
 
 ### Breaking changes
 
 - Row fields named `tablePath`, and referenced row fields named `include` or `includeSpec`, must be renamed in Dart (retain the SQL name with `@DwColumnName`). Ambiguous or colliding relation names warn and omit the relation without blocking generation.
+
+### Changes
+
+- Generate forward and reverse typed relations between project row classes; diagnose ambiguous names and warn on foreign keys without a leading index.
 
 ## 0.23.0
 

@@ -171,6 +171,62 @@ void main() {
   tearDown(() => sandbox.deleteSync(recursive: true));
 
   test(
+    'older CLI reports the exact pub.dev activation for its target',
+    () async {
+      final source = Directory(p.join(sandbox.path, 'newer-framework'));
+      succeeds(
+        await Process.run('git', [
+          'clone',
+          '--shared',
+          '--quiet',
+          '--no-checkout',
+          repository.path,
+          source.path,
+        ]),
+      );
+      Future<ProcessResult> git(List<String> args) =>
+          Process.run('git', args, workingDirectory: source.path);
+      succeeds(await git(['checkout', '--quiet', target]));
+      final pubspec = File(
+        p.join(source.path, 'packages/dartway_cli/pubspec.yaml'),
+      );
+      pubspec.writeAsStringSync(
+        pubspec.readAsStringSync().replaceFirst(
+          RegExp(r'^version: .*$', multiLine: true),
+          'version: 99.0.0',
+        ),
+      );
+      succeeds(await git(['add', 'packages/dartway_cli/pubspec.yaml']));
+      succeeds(
+        await git([
+          '-c',
+          'user.name=Fixture',
+          '-c',
+          'user.email=fixture@example.com',
+          'commit',
+          '--quiet',
+          '--message',
+          'Newer target CLI',
+        ]),
+      );
+      final revision = await git(['rev-parse', 'HEAD']);
+      succeeds(revision);
+      final result = await update([
+        '--plan',
+        '--local-repo',
+        source.path,
+        '--target',
+        (revision.stdout as String).trim(),
+      ]);
+      succeeds(result);
+      expect(
+        output(result),
+        contains('dart pub global activate dartway_cli 99.0.0'),
+      );
+    },
+  );
+
+  test(
     'update migrates physical Claude skills and retains unattended mode',
     () async {
       Link(p.join(project.path, '.claude/skills')).deleteSync();

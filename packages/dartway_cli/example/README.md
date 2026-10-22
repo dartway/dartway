@@ -1,7 +1,7 @@
 # Example — from nothing to a running fullstack app
 
 ```bash
-dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
+dart pub global activate dartway_cli
 dartway create my_app
 ```
 
