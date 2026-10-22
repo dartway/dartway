@@ -27,6 +27,8 @@ final class ClubServiceRow extends DwTableRow with _$ClubServiceRow {
 @DwSqlTable(
   'club_session',
   indexes: [
+    DwTableIndex(['coachProfileId']),
+    DwTableIndex(['serviceId']),
     DwTableIndex(['startsAt']),
   ],
 )

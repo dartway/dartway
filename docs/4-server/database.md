@@ -1,10 +1,9 @@
 # The database: how do rows, queries and transactions work?
 
 The server reads and writes PostgreSQL through `dartway_orm`, which `dartway_core_server`
-re-exports. It is small on purpose: typed single-table queries, raw SQL when that is not enough,
-transactions with savepoints, and locks. There are no joins and no lazy relations (D-011) — related
-rows load with `findByIds`, one query per relation for a whole list, so there is no N+1 to fall
-into and nothing an ORM hides behind a getter.
+re-exports. It provides typed queries and foreign-key relations, explicit includes, raw SQL,
+transactions with savepoints, and locks. Each repository call is one SQL statement; related rows
+never load lazily. Statement shapes are prepared once per connection, just as for plain reads.
 
 ## Row classes
 
@@ -293,6 +292,81 @@ await db.chatUnreads.updateWhere(
 `increment` exists only on a non-null number column: on a nullable one `NULL + 1` is `NULL`, and
 treating null as zero is the project's decision to write, not the ORM's to hide.
 
+## Relations and includes
+
+Import the generated `dw_schema.dart` to use the relation extensions. The generator derives a
+to-one from an FK field (`sessionId` → `session`) and a reverse to-many from the referencing
+entity's plural name. When two FKs reference the same table, name both directions on each:
+`@DwForeignKey('user_profile', relation: 'authorProfile', reverse: 'authoredMessages')`.
+A collision fails generation and names the fields; `relation:` and `reverse:` resolve it.
+Only row classes in the project's generation input participate; FKs to framework, module or
+SQL-only tables remain valid and get no relation in either direction.
+
+```dart
+final rows = await ctx.db.sessionBookings.find(
+  where: (t) => t.session.startsAt.gte(day),
+  orderBy: (t) => [t.session.startsAt.asc(), t.id.asc()],
+  limit: page.fetchLimit,
+  include: (t) => [
+    t.session.include((s) => [s.service, s.coachProfile]),
+    t.clientProfile,
+    t.sessionReviews.take(1),
+  ],
+);
+const t = SessionBookingRow.tableDef;
+for (final row in rows) {
+  final ClubSessionRow session = row.one(t.session);
+  final List<SessionReviewRow> reviews = row.many(t.sessionReviews);
+  // Map the explicitly loaded rows to the project's DTOs.
+}
+```
+
+`find`, `findFirst` and `findById` keep returning ordinary generated rows. `row.one(token)`
+returns the relation's row type (`Row?` for a nullable FK); `row.many(token)` returns `List<Row>`.
+Both throw `StateError` when the relation was not included. An included empty collection is `[]`,
+an included missing nullable to-one is `null`. Inclusion belongs to that returned row instance;
+`copyWith`, drafts, later reads and writes do not inherit it. No casts or string keys are needed.
+Nested includes select their own relations explicitly and may extend beyond three levels.
+
+Each to-many include needs `.take(n, where: ..., orderBy: ..., include: ...)` or
+`.unbounded('<domain reason>', where: ..., orderBy: ..., include: ...)`. A bare to-many token
+is refused; `dartway check` also warns with `unboundedRead` at a handler's include site.
+A parent limit does not bound its children. Nonnegative child limits are bound parameters.
+`lock:` together with `include:` is refused, even inside a transaction; keep locked reads separate.
+
+Related columns work in every repository `where` callback, including `count`, `exists`,
+`updateWhere` and aggregates. Chains such as `t.session.coachProfile.firstName` work in filters
+and orders. Reverse collections have no `asc`/`desc`: use `any`, `none`, `every`, or a filtered
+`count(where: ...)` with `equals`/`gt`/`gte`/`lt`/`lte`:
+
+```dart
+where: (t) => t.sessionBookings.any((b) => b.status.equals(BookingStatus.booked))
+where: (t) => t.sessionBookings.none((b) => b.status.equals(BookingStatus.cancelled))
+where: (t) => t.sessionBookings.every((b) => b.status.equals(BookingStatus.attended))
+where: (t) => t.sessionBookings.count(where: (b) => b.status.equals(BookingStatus.booked)).gte(2)
+```
+
+`any` is `EXISTS`, `none` is `NOT EXISTS`, and `every` is `NOT EXISTS` of a child whose
+predicate `IS NOT TRUE`: it includes parents without children and treats a null comparison as
+false. Counts are correlated subqueries. To-one paths use `LEFT JOIN`; mutations with such paths
+select matching parent ids within the same statement. Ordinary mutations keep their direct SQL.
+To-many includes aggregate each collection separately, avoiding row multiplication and cartesian
+products. Bounded or filtered parent reads use a lateral aggregate over a limited, ordered child
+subquery; reads with no parent limit, offset or filter group unbounded child collections once and
+join them by FK. Parent `limit`/`offset` counts parents. Related JSON rows pass through the same
+generated codec as ordinary reads, with exact timestamp microseconds, calendar dates, durations,
+bytes, doubles, enums, state columns, collections and nulls. The calendar-day-in-jsonb restriction
+for user-declared collection columns does not apply to included date columns.
+
+Postgres does not create an index on an FK column. Generation warns if no unique constraint or
+index starts with that column, including FKs to external tables. Add `DwTableIndex(['fieldId'])`
+to the row's `@DwSqlTable(indexes: [...])`, regenerate and create a migration. A composite index
+starting with the FK already satisfies the warning.
+
+Includes are reads, not an access path: the handler's `access:` / `DwAccessRule.resource` still
+owns authorization. `findByIds` remains useful when the caller already has the ids; raw SQL,
+transactions and locks keep their existing meanings.
+
 ## Transactions
 
 ```dart
@@ -438,7 +512,7 @@ defaults.
 
 ## Raw SQL
 
-When a statement is not one table's — a `WITH`, a join the batch loaders cannot express, a
+When a statement is not one table's — a `WITH`, a join or aggregate outside the typed relation API, a
 `UNION` — write SQL. An aggregate over one table is not a reason: `countBy`, `sumBy`, `maxBy` and
 `findFirstPer` keep enum values typed, where a literal like `'accepted'` in SQL breaks silently on a
 rename.

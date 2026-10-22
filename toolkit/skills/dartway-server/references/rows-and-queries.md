@@ -128,8 +128,21 @@ Also `findById`, `findFirst`, `exists`, `count(distinct:)`, `maxBy`, `updateWher
   for a whole list, `limit: page.fetchLimit` for a page, or `unbounded: '<why the domain keeps it small>'` beside the read.
   One with neither is `unboundedRead`, a warning of `dartway check`; jobs,
   commands and migrations are not held to it.
-- **No joins.** Related rows load with `findByIds`, one query per relation for the whole batch — never
-  one per row.
+- **Typed relations are derived from `@DwForeignKey`**, between row classes in this project's generation
+  input. Import generated `dw_schema.dart`; `t.customer.displayName` works in `where` / `orderBy`,
+  including chains. Reverse collections support `any`, `none`, `every` (true for no children), and
+  `count(where: ...)` with numeric comparisons; they cannot be ordered directly.
+- **Include related rows in the same statement**: `include: (t) => [t.customer, t.invoiceLines.take(20,
+  orderBy: (l) => [l.id.asc()])]`. Nested to-one: `t.customer.include((c) => [c.organization])`;
+  nested to-many uses `take(..., include: ...)`. An intentionally unbounded collection uses
+  `.unbounded('<domain reason>')`. A bare to-many token is refused and warns with `unboundedRead`.
+  Read with `row.one(InvoiceRow.tableDef.customer)` / `row.many(InvoiceRow.tableDef.invoiceLines)`;
+  types follow the FK and an un-included relation throws. Include is available on `find`, `findFirst`,
+  `findById`; it cannot be combined with a lock. It never changes the handler's access rule.
+  FKs to tables without input row classes have no typed relations; framework tables use services.
+- **An FK needs a leading index**: generation warns; add `DwTableIndex(['customerId'])`, regenerate
+  and create a migration. A unique FK or a composite index starting with it already qualifies.
+  Keep `findByIds` when ids are already known; avoid pre-reading unbounded ids to filter a relation.
 - **An expected unique conflict is a value:** `tryInsert(draft, onConflict: DwOnConflict.doNothing((t)
   => [t.invoiceId]))` answers `null`, and the handler refuses.
 - **Raw SQL** (`ctx.db.query(sql, params: {…})`, `ctx.db.execute`) only for what the repository cannot

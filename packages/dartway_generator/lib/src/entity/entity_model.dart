@@ -56,7 +56,14 @@ final class EntityColumn {
     required this.defaultValue,
     required this.references,
     this.transitions,
+    this.foreignTable,
+    this.relation,
+    this.reverse,
   });
+
+  final String? foreignTable;
+  final String? relation;
+  final String? reverse;
 
   final String sqlName;
 

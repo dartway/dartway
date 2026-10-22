@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.0-dev.1
+
+- Generate forward and reverse typed relations between project row classes; diagnose ambiguous names and warn on foreign keys without a leading index.
+
 ## 0.23.0
 
 - Nothing changed here; the family moves in lockstep with the bounded lists of

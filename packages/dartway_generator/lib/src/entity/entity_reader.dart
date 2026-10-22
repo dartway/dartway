@@ -356,6 +356,11 @@ final class EntityReader {
                 ? 'DwDefaultValue.now()'
                 : 'DwDefaultValue(${dartString(defaultSql)})',
             references: references,
+            foreignTable: referencesValue
+                ?.getField('tableName')
+                ?.toStringValue(),
+            relation: referencesValue?.getField('relation')?.toStringValue(),
+            reverse: referencesValue?.getField('reverse')?.toStringValue(),
             transitions: transitions,
           ),
           constructor: constructor,

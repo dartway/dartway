@@ -109,23 +109,29 @@ extension NewNewsPostRowWithId on NewNewsPostRow {
   );
 }
 
-final class NewsPostTable extends DwTableDef<NewsPostRow> {
-  const NewsPostTable() : super('news_post');
+class NewsPostTable extends DwTableDef<NewsPostRow> {
+  const NewsPostTable({super.tablePath}) : super('news_post');
 
-  DwTableColumn<int> get authorProfileId => const DwTableColumn(
+  DwTableColumn<int> get authorProfileId => (const DwTableColumn<int>(
     'author_profile_id',
     DwColumnType.bigint,
     references: DwForeignKey('user_profile', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<String> get title =>
-      const DwTableColumn('title', DwColumnType.text);
+  DwTableColumn<String> get title => (const DwTableColumn<String>(
+    'title',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<String> get text =>
-      const DwTableColumn('text', DwColumnType.text);
+  DwTableColumn<String> get text => (const DwTableColumn<String>(
+    'text',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime> get createdAt =>
-      const DwTableColumn('created_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime> get createdAt => (const DwTableColumn<DateTime>(
+    'created_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [
@@ -138,6 +144,7 @@ final class NewsPostTable extends DwTableDef<NewsPostRow> {
 
   @override
   List<DwIndexSchema> get indexSchemas => [
+    DwIndexSchema('news_post_author_profile_id_idx', ['author_profile_id']),
     DwIndexSchema('news_post_created_at_idx', ['created_at']),
   ];
 

@@ -99,7 +99,7 @@ abstract final class EntityEmitter {
     final name = entity.name;
     final columns = _values(entity);
     final members = <String>[
-      'const ${entity.tableClass}() : super(${dartString(entity.tableName)});',
+      'const ${entity.tableClass}({super.tablePath}) : super(${dartString(entity.tableName)});',
       for (final field in columns) _columnGetter(field),
       '@override\nList<DwTableColumn<Object?>> get tableColumns => '
           '[id, ${columns.map((field) => field.name).join(', ')}];',
@@ -113,7 +113,7 @@ abstract final class EntityEmitter {
       '@override\nMap<String, Object?> toDraftRow(${entity.draftClass} draft) => '
           '${_valueMap(columns, 'draft')};',
     ];
-    return 'final class ${entity.tableClass} extends DwTableDef<$name> {\n'
+    return 'class ${entity.tableClass} extends DwTableDef<$name> {\n'
         '${members.join('\n\n')}\n'
         '}';
   }
@@ -138,7 +138,7 @@ abstract final class EntityEmitter {
       if (column.transitions != null) 'transitions: ${column.transitions}',
     ];
     return 'DwTableColumn<${field.spelling}> get ${field.name} => '
-        'const DwTableColumn(${arguments.join(', ')});';
+        '(const DwTableColumn<${field.spelling}>(${arguments.join(', ')})).atPath(tablePath);';
   }
 
   static String _index(EntityIndex index) =>

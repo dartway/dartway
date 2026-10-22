@@ -114,34 +114,40 @@ extension NewSessionBookingRowWithId on NewSessionBookingRow {
   );
 }
 
-final class SessionBookingTable extends DwTableDef<SessionBookingRow> {
-  const SessionBookingTable() : super('session_booking');
+class SessionBookingTable extends DwTableDef<SessionBookingRow> {
+  const SessionBookingTable({super.tablePath}) : super('session_booking');
 
-  DwTableColumn<int> get sessionId => const DwTableColumn(
+  DwTableColumn<int> get sessionId => (const DwTableColumn<int>(
     'session_id',
     DwColumnType.bigint,
     references: DwForeignKey('club_session', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get clientProfileId => const DwTableColumn(
+  DwTableColumn<int> get clientProfileId => (const DwTableColumn<int>(
     'client_profile_id',
     DwColumnType.bigint,
     references: DwForeignKey('user_profile', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<BookingStatus> get status => const DwTableColumn(
-    'status',
-    DwEnumType(BookingStatus.values),
-    transitions: DwStateTransitions<BookingStatus>(
-      initial: {BookingStatus.booked},
-      moves: {
-        BookingStatus.booked: {BookingStatus.cancelled, BookingStatus.attended},
-      },
-    ),
-  );
+  DwTableColumn<BookingStatus> get status =>
+      (const DwTableColumn<BookingStatus>(
+        'status',
+        DwEnumType(BookingStatus.values),
+        transitions: DwStateTransitions<BookingStatus>(
+          initial: {BookingStatus.booked},
+          moves: {
+            BookingStatus.booked: {
+              BookingStatus.cancelled,
+              BookingStatus.attended,
+            },
+          },
+        ),
+      )).atPath(tablePath);
 
-  DwTableColumn<DateTime> get createdAt =>
-      const DwTableColumn('created_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime> get createdAt => (const DwTableColumn<DateTime>(
+    'created_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [
@@ -294,24 +300,30 @@ extension NewSessionReviewRowWithId on NewSessionReviewRow {
   );
 }
 
-final class SessionReviewTable extends DwTableDef<SessionReviewRow> {
-  const SessionReviewTable() : super('session_review');
+class SessionReviewTable extends DwTableDef<SessionReviewRow> {
+  const SessionReviewTable({super.tablePath}) : super('session_review');
 
-  DwTableColumn<int> get bookingId => const DwTableColumn(
+  DwTableColumn<int> get bookingId => (const DwTableColumn<int>(
     'booking_id',
     DwColumnType.bigint,
     unique: true,
     references: DwForeignKey('session_booking', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get rating =>
-      const DwTableColumn('rating', DwColumnType.bigint);
+  DwTableColumn<int> get rating => (const DwTableColumn<int>(
+    'rating',
+    DwColumnType.bigint,
+  )).atPath(tablePath);
 
-  DwTableColumn<String?> get text =>
-      const DwTableColumn('text', DwColumnType.text);
+  DwTableColumn<String?> get text => (const DwTableColumn<String?>(
+    'text',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime> get createdAt =>
-      const DwTableColumn('created_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime> get createdAt => (const DwTableColumn<DateTime>(
+    'created_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [

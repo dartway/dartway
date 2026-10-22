@@ -77,6 +77,34 @@ abstract final class DwColumnType<T> {
   @internal
   T decode(Object raw);
 
+  /// SQL projection used inside a JSON-aggregated relation row. Timestamp
+  /// microseconds travel as text: no floating point or session time zone.
+  @internal
+  String jsonSql(String column) => sqlType == 'timestamp with time zone'
+      ? '(extract(epoch FROM $column) * 1000000)::bigint::text'
+      : sqlType == 'double precision'
+      ? '$column::text'
+      : sqlType == 'bytea'
+      ? "encode($column, 'hex')"
+      : column;
+
+  /// Convert the JSON carrier to exactly what the binary driver returns,
+  /// then let the same generated row codec decode it.
+  @internal
+  Object jsonCarrier(Object raw) => switch (sqlType) {
+    'timestamp with time zone' => DateTime.fromMicrosecondsSinceEpoch(
+      int.parse(raw as String),
+      isUtc: true,
+    ),
+    'date' => DateTime.parse(raw as String),
+    'bytea' => Uint8List.fromList([
+      for (var i = 0; i < (raw as String).length; i += 2)
+        int.parse(raw.substring(i, i + 2), radix: 16),
+    ]),
+    'double precision' => raw is String ? double.parse(raw) : raw,
+    _ => raw,
+  };
+
   @override
   String toString() => 'DwColumnType($sqlType)';
 }

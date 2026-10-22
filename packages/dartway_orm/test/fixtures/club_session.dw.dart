@@ -131,32 +131,41 @@ extension NewClubSessionRowWithId on NewClubSessionRow {
   );
 }
 
-final class ClubSessionTable extends DwTableDef<ClubSessionRow> {
-  const ClubSessionTable() : super('club_session');
+class ClubSessionTable extends DwTableDef<ClubSessionRow> {
+  const ClubSessionTable({super.tablePath}) : super('club_session');
 
-  DwTableColumn<int> get serviceId => const DwTableColumn(
+  DwTableColumn<int> get serviceId => (const DwTableColumn<int>(
     'service_id',
     DwColumnType.bigint,
     references: DwForeignKey('club_service', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int?> get previousSessionId => const DwTableColumn(
+  DwTableColumn<int?> get previousSessionId => (const DwTableColumn<int?>(
     'previous_session_id',
     DwColumnType.bigint,
     references: DwForeignKey('club_session', onDelete: DwOnDelete.setNull),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime> get startsAt =>
-      const DwTableColumn('starts_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime> get startsAt => (const DwTableColumn<DateTime>(
+    'starts_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get capacity =>
-      const DwTableColumn('capacity', DwColumnType.bigint);
+  DwTableColumn<int> get capacity => (const DwTableColumn<int>(
+    'capacity',
+    DwColumnType.bigint,
+  )).atPath(tablePath);
 
-  DwTableColumn<String?> get note =>
-      const DwTableColumn('note_text', DwColumnType.text);
+  DwTableColumn<String?> get note => (const DwTableColumn<String?>(
+    'note_text',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
   DwTableColumn<List<String>?> get labels =>
-      const DwTableColumn('labels', DwJsonListType<String>());
+      (const DwTableColumn<List<String>?>(
+        'labels',
+        DwJsonListType<String>(),
+      )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [

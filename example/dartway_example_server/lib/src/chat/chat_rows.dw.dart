@@ -66,14 +66,19 @@ extension NewChatChannelRowWithId on NewChatChannelRow {
       ChatChannelRow(id: id, slug: slug, title: title);
 }
 
-final class ChatChannelTable extends DwTableDef<ChatChannelRow> {
-  const ChatChannelTable() : super('chat_channel');
+class ChatChannelTable extends DwTableDef<ChatChannelRow> {
+  const ChatChannelTable({super.tablePath}) : super('chat_channel');
 
-  DwTableColumn<String> get slug =>
-      const DwTableColumn('slug', DwColumnType.text, unique: true);
+  DwTableColumn<String> get slug => (const DwTableColumn<String>(
+    'slug',
+    DwColumnType.text,
+    unique: true,
+  )).atPath(tablePath);
 
-  DwTableColumn<String> get title =>
-      const DwTableColumn('title', DwColumnType.text);
+  DwTableColumn<String> get title => (const DwTableColumn<String>(
+    'title',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [id, slug, title];
@@ -261,47 +266,57 @@ extension NewChatMessageRowWithId on NewChatMessageRow {
   );
 }
 
-final class ChatMessageTable extends DwTableDef<ChatMessageRow> {
-  const ChatMessageTable() : super('chat_message');
+class ChatMessageTable extends DwTableDef<ChatMessageRow> {
+  const ChatMessageTable({super.tablePath}) : super('chat_message');
 
-  DwTableColumn<int> get channelId => const DwTableColumn(
+  DwTableColumn<int> get channelId => (const DwTableColumn<int>(
     'channel_id',
     DwColumnType.bigint,
     references: DwForeignKey('chat_channel', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get authorProfileId => const DwTableColumn(
+  DwTableColumn<int> get authorProfileId => (const DwTableColumn<int>(
     'author_profile_id',
     DwColumnType.bigint,
     references: DwForeignKey('user_profile', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<String> get text =>
-      const DwTableColumn('text', DwColumnType.text);
+  DwTableColumn<String> get text => (const DwTableColumn<String>(
+    'text',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime> get sentAt =>
-      const DwTableColumn('sent_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime> get sentAt => (const DwTableColumn<DateTime>(
+    'sent_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime?> get editedAt =>
-      const DwTableColumn('edited_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime?> get editedAt => (const DwTableColumn<DateTime?>(
+    'edited_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime?> get pinnedAt =>
-      const DwTableColumn('pinned_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime?> get pinnedAt => (const DwTableColumn<DateTime?>(
+    'pinned_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
-  DwTableColumn<int?> get pinnedByProfileId => const DwTableColumn(
+  DwTableColumn<int?> get pinnedByProfileId => (const DwTableColumn<int?>(
     'pinned_by_profile_id',
     DwColumnType.bigint,
     references: DwForeignKey('user_profile', onDelete: DwOnDelete.setNull),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int?> get replyToMessageId => const DwTableColumn(
+  DwTableColumn<int?> get replyToMessageId => (const DwTableColumn<int?>(
     'reply_to_message_id',
     DwColumnType.bigint,
     references: DwForeignKey('chat_message', onDelete: DwOnDelete.setNull),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime?> get deletedAt =>
-      const DwTableColumn('deleted_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime?> get deletedAt => (const DwTableColumn<DateTime?>(
+    'deleted_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [
@@ -319,10 +334,17 @@ final class ChatMessageTable extends DwTableDef<ChatMessageRow> {
 
   @override
   List<DwIndexSchema> get indexSchemas => [
+    DwIndexSchema('chat_message_author_profile_id_idx', ['author_profile_id']),
     DwIndexSchema('chat_message_channel_id_sent_at_id_idx', [
       'channel_id',
       'sent_at',
       'id',
+    ]),
+    DwIndexSchema('chat_message_pinned_by_profile_id_idx', [
+      'pinned_by_profile_id',
+    ]),
+    DwIndexSchema('chat_message_reply_to_message_id_idx', [
+      'reply_to_message_id',
     ]),
   ];
 
@@ -487,31 +509,37 @@ extension NewChatMessageAttachmentRowWithId on NewChatMessageAttachmentRow {
   );
 }
 
-final class ChatMessageAttachmentTable
-    extends DwTableDef<ChatMessageAttachmentRow> {
-  const ChatMessageAttachmentTable() : super('chat_message_attachment');
+class ChatMessageAttachmentTable extends DwTableDef<ChatMessageAttachmentRow> {
+  const ChatMessageAttachmentTable({super.tablePath})
+    : super('chat_message_attachment');
 
-  DwTableColumn<int> get messageId => const DwTableColumn(
+  DwTableColumn<int> get messageId => (const DwTableColumn<int>(
     'message_id',
     DwColumnType.bigint,
     references: DwForeignKey('chat_message', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get fileId => const DwTableColumn(
+  DwTableColumn<int> get fileId => (const DwTableColumn<int>(
     'file_id',
     DwColumnType.bigint,
     unique: true,
     references: DwForeignKey('dw_stored_file', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get position =>
-      const DwTableColumn('position', DwColumnType.bigint);
+  DwTableColumn<int> get position => (const DwTableColumn<int>(
+    'position',
+    DwColumnType.bigint,
+  )).atPath(tablePath);
 
-  DwTableColumn<int?> get width =>
-      const DwTableColumn('width', DwColumnType.bigint);
+  DwTableColumn<int?> get width => (const DwTableColumn<int?>(
+    'width',
+    DwColumnType.bigint,
+  )).atPath(tablePath);
 
-  DwTableColumn<int?> get height =>
-      const DwTableColumn('height', DwColumnType.bigint);
+  DwTableColumn<int?> get height => (const DwTableColumn<int?>(
+    'height',
+    DwColumnType.bigint,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [
@@ -650,24 +678,27 @@ extension NewChatMessageReactionRowWithId on NewChatMessageReactionRow {
   );
 }
 
-final class ChatMessageReactionTable
-    extends DwTableDef<ChatMessageReactionRow> {
-  const ChatMessageReactionTable() : super('chat_message_reaction');
+class ChatMessageReactionTable extends DwTableDef<ChatMessageReactionRow> {
+  const ChatMessageReactionTable({super.tablePath})
+    : super('chat_message_reaction');
 
-  DwTableColumn<int> get messageId => const DwTableColumn(
+  DwTableColumn<int> get messageId => (const DwTableColumn<int>(
     'message_id',
     DwColumnType.bigint,
     references: DwForeignKey('chat_message', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get profileId => const DwTableColumn(
+  DwTableColumn<int> get profileId => (const DwTableColumn<int>(
     'profile_id',
     DwColumnType.bigint,
     references: DwForeignKey('user_profile', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
   DwTableColumn<ChatReaction> get reaction =>
-      const DwTableColumn('reaction', DwEnumType(ChatReaction.values));
+      (const DwTableColumn<ChatReaction>(
+        'reaction',
+        DwEnumType(ChatReaction.values),
+      )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [
@@ -683,6 +714,7 @@ final class ChatMessageReactionTable
       'message_id',
       'profile_id',
     ], unique: true),
+    DwIndexSchema('chat_message_reaction_profile_id_idx', ['profile_id']),
   ];
 
   @override
@@ -816,29 +848,31 @@ extension NewChatReadPositionRowWithId on NewChatReadPositionRow {
   );
 }
 
-final class ChatReadPositionTable extends DwTableDef<ChatReadPositionRow> {
-  const ChatReadPositionTable() : super('chat_read_position');
+class ChatReadPositionTable extends DwTableDef<ChatReadPositionRow> {
+  const ChatReadPositionTable({super.tablePath}) : super('chat_read_position');
 
-  DwTableColumn<int> get profileId => const DwTableColumn(
+  DwTableColumn<int> get profileId => (const DwTableColumn<int>(
     'profile_id',
     DwColumnType.bigint,
     references: DwForeignKey('user_profile', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get channelId => const DwTableColumn(
+  DwTableColumn<int> get channelId => (const DwTableColumn<int>(
     'channel_id',
     DwColumnType.bigint,
     references: DwForeignKey('chat_channel', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get messageId => const DwTableColumn(
+  DwTableColumn<int> get messageId => (const DwTableColumn<int>(
     'message_id',
     DwColumnType.bigint,
     references: DwForeignKey('chat_message', onDelete: DwOnDelete.cascade),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime> get sentAt =>
-      const DwTableColumn('sent_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime> get sentAt => (const DwTableColumn<DateTime>(
+    'sent_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [
@@ -851,6 +885,8 @@ final class ChatReadPositionTable extends DwTableDef<ChatReadPositionRow> {
 
   @override
   List<DwIndexSchema> get indexSchemas => [
+    DwIndexSchema('chat_read_position_channel_id_idx', ['channel_id']),
+    DwIndexSchema('chat_read_position_message_id_idx', ['message_id']),
     DwIndexSchema('chat_read_position_profile_id_channel_id_key', [
       'profile_id',
       'channel_id',

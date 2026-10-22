@@ -17,8 +17,8 @@ final bookingsHandlers = <DwCallHandler>[
     handle: (ctx, request, page) async {
       final me = await ctx.profile;
       return BookingsObjects.bookings(
-        ctx.db,
         await ctx.db.sessionBookings.find(
+          include: (t) => BookingsObjects.includes(t, client: me),
           where: (t) => t.clientProfileId.equals(me.id),
           orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
           limit: page.fetchLimit,
@@ -35,9 +35,9 @@ final bookingsHandlers = <DwCallHandler>[
     handle: (ctx, request) async {
       final me = await ctx.profile;
       return BookingsObjects.bookings(
-        ctx.db,
         await request.readWhole(
           (limit) => ctx.db.sessionBookings.find(
+            include: (t) => BookingsObjects.includes(t, client: me),
             where: (t) =>
                 t.clientProfileId.equals(me.id) &
                 t.status.equals(BookingStatus.booked) &

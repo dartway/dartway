@@ -1,77 +1,71 @@
 import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/bookings/bookings_rows.dart';
-import 'package:dartway_example_server/src/profile/profile_objects.dart';
 import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_server/src/schedule/schedule_objects.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
-/// Booking rows → the data objects clients see. Related rows are loaded in one
-/// query per relation for the whole batch, never per row, and not at all when
-/// the caller already holds them.
+/// Booking rows → client objects from explicit typed includes.
 abstract final class BookingsObjects {
-  /// [client] is the profile every row belongs to, when the caller holds it;
-  /// [session] the data object of every row's session, likewise.
-  static Future<List<SessionBooking>> bookings(
-    DwDatabaseHandle db,
+  static List<DwRelationInclude> includes(
+    SessionBookingTable t, {
+    UserProfileRow? client,
+    ClubSession? session,
+  }) => [
+    if (client == null) t.clientProfile,
+    if (session == null) t.session.include(ScheduleObjects.includes),
+    t.sessionReviews.take(1),
+  ];
+
+  static List<SessionBooking> bookings(
     List<SessionBookingRow> rows, {
     UserProfileRow? client,
     ClubSession? session,
-  }) async {
-    if (rows.isEmpty) return const [];
-    final sessionsById = session != null
-        ? {session.id: session}
-        : {
-            for (final s in await ScheduleObjects.sessions(
-              db,
-              await db.clubSessions.findByIds(
-                rows.map((b) => b.sessionId).toSet(),
-              ),
-            ))
-              s.id: s,
-          };
-    final clients = client != null
-        ? {client.id: client}
-        : await ProfileObjects.rowsById(db, rows.map((b) => b.clientProfileId));
-    // Only an attended visit can have been reviewed.
-    final attended = [
-      for (final row in rows)
-        if (row.status == BookingStatus.attended) row.id,
-    ];
-    final reviews = attended.isEmpty
-        ? const <int, SessionReview>{}
-        : {
-            for (final r in await db.sessionReviews.find(
-              where: (t) => t.bookingId.inList(attended),
-            ))
-              r.bookingId: SessionReview(
-                id: r.id,
-                rating: r.rating,
-                text: r.text,
-                createdAt: r.createdAt,
-              ),
-          };
-    return [
-      for (final row in rows)
-        SessionBooking(
-          id: row.id,
-          // A booking always belongs to someone who is here: the last thing
-          // a member's deletion does is cancel the ones still ahead, and the
-          // ones behind are read by nobody but them.
-          accountId: clients[row.clientProfileId]!.ownerAccountId,
-          session: sessionsById[row.sessionId]!,
-          status: row.status,
-          createdAt: row.createdAt,
-          review: reviews[row.id],
-        ),
-    ];
-  }
+  }) => [
+    for (final row in rows)
+      SessionBooking(
+        id: row.id,
+        accountId:
+            (client ??
+                    row.one<UserProfileRow>(
+                      SessionBookingRow.tableDef.clientProfile,
+                    ))
+                .ownerAccountId,
+        session:
+            session ??
+            ScheduleObjects.sessionObject(
+              row.one(SessionBookingRow.tableDef.session),
+            ),
+        status: row.status,
+        createdAt: row.createdAt,
+        review: switch (row
+            .many(SessionBookingRow.tableDef.sessionReviews)
+            .firstOrNull) {
+          final review? when row.status == BookingStatus.attended =>
+            SessionReview(
+              id: review.id,
+              rating: review.rating,
+              text: review.text,
+              createdAt: review.createdAt,
+            ),
+          _ => null,
+        },
+      ),
+  ];
 
   static Future<SessionBooking> booking(
     DwDatabaseHandle db,
     SessionBookingRow row, {
     UserProfileRow? client,
     ClubSession? session,
-  }) async =>
-      (await bookings(db, [row], client: client, session: session)).single;
+  }) async => bookings(
+    [
+      (await db.sessionBookings.findById(
+        row.id,
+        include: (t) => includes(t, client: client, session: session),
+      ))!,
+    ],
+    client: client,
+    session: session,
+  ).single;
 }

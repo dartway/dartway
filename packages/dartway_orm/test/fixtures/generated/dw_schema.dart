@@ -21,3 +21,95 @@ extension FixtureDb on DwDatabaseHandle {
   DwTableRepository<ClubSessionRow, ClubSessionTable> get clubSessions =>
       repository(ClubSessionRow.tableDef);
 }
+
+extension AppSettingRelations on AppSettingTable {
+  ClubServiceRelation<ClubServiceRow?> get featuredService =>
+      ClubServiceRelation(
+        DwRelationPath(
+          'app_setting',
+          'club_service',
+          'featured_service_id',
+          parent: tablePath,
+        ),
+      );
+}
+
+extension ClubServiceRelations on ClubServiceTable {
+  DwToManyRelation<AppSettingRow, AppSettingTable> get appSettings =>
+      DwToManyRelation(
+        const AppSettingTable(),
+        DwRelationPath(
+          'club_service',
+          'app_setting',
+          'featured_service_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ClubSessionRow, ClubSessionTable> get clubSessions =>
+      DwToManyRelation(
+        const ClubSessionTable(),
+        DwRelationPath(
+          'club_service',
+          'club_session',
+          'service_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+}
+
+final class ClubServiceRelation<R extends ClubServiceRow?>
+    extends ClubServiceTable
+    implements DwToOneRelation<R> {
+  const ClubServiceRelation(DwRelationPath path) : super(tablePath: path);
+  @override
+  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(ClubServiceTable t) select,
+  ) =>
+      DwIncludeSpec(this, tablePath!, nested: select(const ClubServiceTable()));
+}
+
+extension ClubSessionRelations on ClubSessionTable {
+  ClubServiceRelation<ClubServiceRow> get service => ClubServiceRelation(
+    DwRelationPath(
+      'club_session',
+      'club_service',
+      'service_id',
+      parent: tablePath,
+    ),
+  );
+  ClubSessionRelation<ClubSessionRow?> get previousSession =>
+      ClubSessionRelation(
+        DwRelationPath(
+          'club_session',
+          'club_session',
+          'previous_session_id',
+          parent: tablePath,
+        ),
+      );
+  DwToManyRelation<ClubSessionRow, ClubSessionTable> get clubSessions =>
+      DwToManyRelation(
+        const ClubSessionTable(),
+        DwRelationPath(
+          'club_session',
+          'club_session',
+          'previous_session_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+}
+
+final class ClubSessionRelation<R extends ClubSessionRow?>
+    extends ClubSessionTable
+    implements DwToOneRelation<R> {
+  const ClubSessionRelation(DwRelationPath path) : super(tablePath: path);
+  @override
+  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(ClubSessionTable t) select,
+  ) =>
+      DwIncludeSpec(this, tablePath!, nested: select(const ClubSessionTable()));
+}

@@ -165,3 +165,7 @@ top-level `providerFamily<String, int>(keyFor: (id) => 'invoices.$id.sort', defa
 
 Notifications are `dw.notify.success / info / warning / error(text)`, the text localized
 (`dartway-ui-kit`) — never `ScaffoldMessenger` or a `SnackBar`.
+
+On the server, related filters and explicit `include` belong in the original repository read;
+the `dartway-server` rows-and-queries reference covers generated FK paths and bounded collections.
+Authorization remains the handler's responsibility.

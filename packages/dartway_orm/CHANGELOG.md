@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.0-dev.1
+
+- Typed foreign-key relations, chained filters/order, any/none/every/count, and explicit typed includes in one SQL statement. Includes preserve column codecs, enforce child bounds and refuse row locks.
+
 ## 0.23.0
 
 - `find(unbounded: '<reason>')` says why a read without `limit` stays small, for

@@ -49,6 +49,7 @@ final chatHandlers = <DwCallHandler>[
       final position = window.position;
       final older = window.direction == DwWindowDirection.older;
       final rows = await ctx.db.chatMessages.find(
+        include: ChatObjects.includes,
         where: (t) {
           final inChannel =
               t.channelId.equals(request.channelId) & t.deletedAt.isNull();
@@ -86,6 +87,7 @@ final chatHandlers = <DwCallHandler>[
     handle: (ctx, request) async {
       final rows = await request.readWhole(
         (limit) => ctx.db.chatMessages.find(
+          include: ChatObjects.includes,
           where: (t) =>
               t.channelId.equals(request.channelId) &
               t.pinnedAt.isNotNull() &
@@ -106,21 +108,14 @@ final chatHandlers = <DwCallHandler>[
       // LIKE's own characters in what was typed are matched literally.
       final pattern =
           '%${request.query.trim().replaceAllMapped(RegExp(r'[\\%_]'), (m) => '\\${m[0]}')}%';
-      // Authors by name first, once: the messages are then one query on
-      // their own table, by text or by one of these authors.
-      final authors = [
-        for (final row in await ctx.db.userProfiles.find(
-          where: (t) => t.firstName.ilike(pattern) | t.lastName.ilike(pattern),
-          unbounded: "names holding two letters or more: the club's members",
-        ))
-          row.id,
-      ];
       final rows = await request.readWhole(
         (limit) => ctx.db.chatMessages.find(
+          include: ChatObjects.includes,
           where: (t) {
-            final matching = authors.isEmpty
-                ? t.text.ilike(pattern)
-                : t.text.ilike(pattern) | t.authorProfileId.inList(authors);
+            final matching =
+                t.text.ilike(pattern) |
+                t.authorProfile.firstName.ilike(pattern) |
+                t.authorProfile.lastName.ilike(pattern);
             return t.channelId.equals(request.channelId) &
                 t.deletedAt.isNull() &
                 matching;

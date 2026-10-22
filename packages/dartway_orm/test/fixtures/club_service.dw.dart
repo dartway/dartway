@@ -197,50 +197,74 @@ extension NewClubServiceRowWithId on NewClubServiceRow {
   );
 }
 
-final class ClubServiceTable extends DwTableDef<ClubServiceRow> {
-  const ClubServiceTable() : super('club_service');
+class ClubServiceTable extends DwTableDef<ClubServiceRow> {
+  const ClubServiceTable({super.tablePath}) : super('club_service');
 
-  DwTableColumn<String> get title =>
-      const DwTableColumn('title', DwColumnType.text);
+  DwTableColumn<String> get title => (const DwTableColumn<String>(
+    'title',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
   DwTableColumn<ClubServiceKind> get kind =>
-      const DwTableColumn('kind', DwEnumType(ClubServiceKind.values));
+      (const DwTableColumn<ClubServiceKind>(
+        'kind',
+        DwEnumType(ClubServiceKind.values),
+      )).atPath(tablePath);
 
-  DwTableColumn<double?> get price =>
-      const DwTableColumn('price', DwColumnType.doublePrecision);
+  DwTableColumn<double?> get price => (const DwTableColumn<double?>(
+    'price',
+    DwColumnType.doublePrecision,
+  )).atPath(tablePath);
 
-  DwTableColumn<Duration> get duration =>
-      const DwTableColumn('duration', DwColumnType.duration);
+  DwTableColumn<Duration> get duration => (const DwTableColumn<Duration>(
+    'duration',
+    DwColumnType.duration,
+  )).atPath(tablePath);
 
   DwTableColumn<DwCalendarDay> get availableOn =>
-      const DwTableColumn('available_on', DwColumnType.calendarDay);
+      (const DwTableColumn<DwCalendarDay>(
+        'available_on',
+        DwColumnType.calendarDay,
+      )).atPath(tablePath);
 
   DwTableColumn<DwCalendarDay?> get discontinuedOn =>
-      const DwTableColumn('discontinued_on', DwColumnType.calendarDay);
+      (const DwTableColumn<DwCalendarDay?>(
+        'discontinued_on',
+        DwColumnType.calendarDay,
+      )).atPath(tablePath);
 
-  DwTableColumn<List<String>> get tags =>
-      const DwTableColumn('tags', DwJsonListType<String>());
+  DwTableColumn<List<String>> get tags => (const DwTableColumn<List<String>>(
+    'tags',
+    DwJsonListType<String>(),
+  )).atPath(tablePath);
 
   DwTableColumn<List<ClubServiceKind>> get offeredAs =>
-      const DwTableColumn('offered_as', DwEnumListType(ClubServiceKind.values));
+      (const DwTableColumn<List<ClubServiceKind>>(
+        'offered_as',
+        DwEnumListType(ClubServiceKind.values),
+      )).atPath(tablePath);
 
-  DwTableColumn<DateTime> get createdAt => const DwTableColumn(
+  DwTableColumn<DateTime> get createdAt => (const DwTableColumn<DateTime>(
     'created_at',
     DwColumnType.timestamptz,
     defaultValue: DwDefaultValue.now(),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime?> get archivedAt =>
-      const DwTableColumn('archived_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime?> get archivedAt => (const DwTableColumn<DateTime?>(
+    'archived_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
-  DwTableColumn<Uint8List?> get cover =>
-      const DwTableColumn('cover', DwColumnType.bytea);
+  DwTableColumn<Uint8List?> get cover => (const DwTableColumn<Uint8List?>(
+    'cover',
+    DwColumnType.bytea,
+  )).atPath(tablePath);
 
-  DwTableColumn<bool> get active => const DwTableColumn(
+  DwTableColumn<bool> get active => (const DwTableColumn<bool>(
     'active',
     DwColumnType.boolean,
     defaultValue: DwDefaultValue('true'),
-  );
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [

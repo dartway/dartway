@@ -142,29 +142,41 @@ extension NewCatalogEntryRowWithId on NewCatalogEntryRow {
   );
 }
 
-final class CatalogEntryTable extends DwTableDef<CatalogEntryRow> {
-  const CatalogEntryTable() : super('catalog_entry');
+class CatalogEntryTable extends DwTableDef<CatalogEntryRow> {
+  const CatalogEntryTable({super.tablePath}) : super('catalog_entry');
 
-  DwTableColumn<String> get name =>
-      const DwTableColumn('name', DwColumnType.text);
+  DwTableColumn<String> get name => (const DwTableColumn<String>(
+    'name',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<String?> get schema =>
-      const DwTableColumn('schema', DwColumnType.text);
+  DwTableColumn<String?> get schema => (const DwTableColumn<String?>(
+    'schema',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get columns =>
-      const DwTableColumn('columns', DwColumnType.bigint);
+  DwTableColumn<int> get columns => (const DwTableColumn<int>(
+    'columns',
+    DwColumnType.bigint,
+  )).atPath(tablePath);
 
-  DwTableColumn<int?> get table =>
-      const DwTableColumn('table', DwColumnType.bigint);
+  DwTableColumn<int?> get table => (const DwTableColumn<int?>(
+    'table',
+    DwColumnType.bigint,
+  )).atPath(tablePath);
 
   DwTableColumn<String> get row =>
-      const DwTableColumn('row', DwColumnType.text);
+      (const DwTableColumn<String>('row', DwColumnType.text)).atPath(tablePath);
 
-  DwTableColumn<String> get where =>
-      const DwTableColumn('where', DwColumnType.text);
+  DwTableColumn<String> get where => (const DwTableColumn<String>(
+    'where',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<int> get order =>
-      const DwTableColumn('order', DwColumnType.bigint);
+  DwTableColumn<int> get order => (const DwTableColumn<int>(
+    'order',
+    DwColumnType.bigint,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [

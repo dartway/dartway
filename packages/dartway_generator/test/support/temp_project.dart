@@ -209,7 +209,10 @@ final class TempProject {
   Future<DwGenerationReport> generateClean() async {
     final report = await generate();
     expect(
-      report.diagnostics.map((d) => d.format(root)).toList(),
+      report.diagnostics
+          .where((d) => !d.isWarning)
+          .map((d) => d.format(root))
+          .toList(),
       isEmpty,
       reason: 'generation must succeed',
     );

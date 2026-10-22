@@ -193,6 +193,7 @@ final class DwPooledConnection {
 @internal
 final class DwRoundTripCounter {
   int count = 0;
+  int statements = 0;
 }
 
 /// The tap every connection's protocol stream passes through.
@@ -225,6 +226,7 @@ final class _DwWireTap
       )
       .changeStream(
         (messages) => messages.where((message) {
+          if (message is pgm.CommandCompleteMessage) _counter?.statements++;
           if (message is pgm.ReadyForQueryMessage) {
             _counter?.count++;
             _inScript = false;

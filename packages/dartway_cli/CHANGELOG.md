@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.26.1
+
+- Warn with `unboundedRead` when a handler includes a to-many relation without `take(n)` or `unbounded(reason)`.
+
 ## 0.26.0
 
 ### Breaking changes

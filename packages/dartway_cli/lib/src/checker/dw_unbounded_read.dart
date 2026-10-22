@@ -42,6 +42,13 @@ class DwUnboundedReadInspector {
     if (!_enabled || server == null) return 0;
     final lib = Directory(p.join(server.path, 'lib'));
     if (!lib.existsSync()) return 0;
+    final schema = File(p.join(lib.path, 'generated', 'dw_schema.dart'));
+    final many = schema.existsSync()
+        ? RegExp(r'DwToManyRelation<[^;{}]*?>\s+get\s+(\w+)')
+              .allMatches(schema.readAsStringSync())
+              .map((m) => m.group(1)!)
+              .toSet()
+        : <String>{};
     final files =
         lib
             .listSync(recursive: true)
@@ -51,13 +58,16 @@ class DwUnboundedReadInspector {
           ..sort((a, b) => a.path.compareTo(b.path));
     for (final file in files) {
       final shown = p.relative(file.path, from: server.parent.path);
-      for (final read in unboundedReadsIn(file.readAsStringSync())) {
+      for (final read in unboundedReadsIn(
+        file.readAsStringSync(),
+        toManyRelations: many,
+      )) {
         _findings.add(
           'a ${read.kind} handler reads rows without a bound — '
           '$shown:${read.line}; make the request a page, table or window, '
           'use `request.readWhole((limit) => repo.find(limit: limit))` for a list, '
-          'bound a paged read with `limit:`, or '
-          "say why it stays small with `unbounded: '<reason>'`",
+          'bound a paged read with `limit:`, bound each to-many include with `take(n)` '
+          "or `unbounded('<reason>')`, or say why the read stays small with `unbounded: '<reason>'`",
         );
       }
     }
@@ -79,7 +89,10 @@ class DwUnboundedReadInspector {
 
   /// The reads of one handlers file that name no bound: the line of each,
   /// and the kind of the request handler it sits in.
-  static List<({int line, String kind})> unboundedReadsIn(String content) {
+  static List<({int line, String kind})> unboundedReadsIn(
+    String content, {
+    Set<String> toManyRelations = const {},
+  }) {
     final code = DwDartSource(content).code;
     final reads = <({int line, String kind})>[];
     for (final handler in _handlerStart.allMatches(code)) {
@@ -90,6 +103,31 @@ class DwUnboundedReadInspector {
       if (between.isNotEmpty && !between.startsWith('<')) continue;
       final close = _matching(code, open);
       if (close < 0) continue;
+      // Generated relation names distinguish to-many tokens from to-one.
+      // A bare token is refused at runtime too; warn here at the read site.
+      for (final include in RegExp(
+        r'\binclude\s*:\s*\([^)]*\)\s*=>\s*\[',
+      ).allMatches(code.substring(open, close))) {
+        final start = open + include.end;
+        var end = start;
+        var depth = 1;
+        while (end < close && depth > 0) {
+          if (code[end] == '[') depth++;
+          if (code[end] == ']') depth--;
+          end++;
+        }
+        for (final token in RegExp(
+          r'\.\s*(\w+)\b',
+        ).allMatches(code.substring(start, end))) {
+          if (!toManyRelations.contains(token.group(1))) continue;
+          final after = code.substring(start + token.end, end).trimLeft();
+          if (after.startsWith('.')) continue;
+          reads.add((
+            line: _lineOf(code, start + token.start),
+            kind: 'to-many include in ${handler.group(1)!}',
+          ));
+        }
+      }
       final wholeReads = [
         for (final whole in _whole.allMatches(code.substring(open, close)))
           (
