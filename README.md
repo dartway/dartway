@@ -105,7 +105,7 @@ No agent at hand? Every command is in the created project's `README.md`, and the
 
 ## The packages
 
-**The core family** — versioned in lockstep, at `0.20.0`:
+**The core family** — versioned in lockstep, all six packages always on the same version:
 
 | Package | Role |
 |---|---|
