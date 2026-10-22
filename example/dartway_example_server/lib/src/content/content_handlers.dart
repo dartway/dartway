@@ -14,8 +14,8 @@ final contentHandlers = <DwCallHandler>[
   DwCallHandler.page<ListNews, NewsPost>(
     access: DwAccessRule.signedIn,
     handle: (ctx, request, page) async => ContentObjects.news(
-      ctx.db,
       await ctx.db.newsPosts.find(
+        include: (t) => [t.authorProfile],
         orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
         limit: page.fetchLimit,
         offset: page.offset,
@@ -37,9 +37,7 @@ final contentHandlers = <DwCallHandler>[
           createdAt: ctx.now,
         ),
       );
-      final post = (await ContentObjects.news(ctx.db, [
-        row,
-      ], author: me)).single;
+      final post = ContentObjects.news([row], author: me).single;
       ctx.publish(AppChannels.news, post);
       await AdminPublications.counters(ctx);
       // Queued in this transaction: a refused or failed publication notifies

@@ -6,6 +6,7 @@ import 'package:postgres/postgres.dart' as pg;
 
 import '../db/dw_database_handle.dart';
 import '../db/dw_errors.dart';
+import '../db/dw_result_row.dart';
 import '../entity/dw_table_row.dart';
 import '../entity/dw_annotations.dart';
 import '../entity/dw_table_def.dart';
@@ -38,6 +39,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   /// in a request handler with neither (`unboundedRead`); the database never
   /// sees it. It is refused beside a [limit], and blank.
   Future<List<R>> find({
+    List<DwRelationInclude> Function(T t)? include,
     DwWhereCondition Function(T t)? where,
     List<DwOrderTerm> Function(T t)? orderBy,
     int? limit,
@@ -53,12 +55,35 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
       );
     }
     _checkLock(lock);
-    final writer = DwSqlWriter()..write(_sql.select);
+    if (include != null && lock != null) {
+      throw ArgumentError('include cannot be combined with a row lock');
+    }
+    final specs =
+        include?.call(table).map((i) => i.includeSpec).toList() ??
+        const <DwIncludeSpec>[];
+    if (specs.map((s) => s.path.key).toSet().length != specs.length) {
+      throw ArgumentError('a relation may only be included once per row');
+    }
+    final writer = DwSqlWriter(rootTable: table.tableName);
+    final projections = [
+      for (final (i, spec) in specs.indexed)
+        '${dwIncludeProjection(writer, spec, grouped: limit == null && offset == null && where == null)} AS "dw_include_$i"',
+    ];
+    writer.write(
+      projections.isEmpty
+          ? _sql.select
+          : _sql.select.replaceFirst(
+              ' FROM ',
+              ', ${projections.join(', ')} FROM ',
+            ),
+    );
     _writeWhere(writer, where);
     if (orderBy != null) {
       final terms = orderBy(table);
       if (terms.isNotEmpty) {
-        writer.write(' ORDER BY ${terms.map((term) => term.sql).join(', ')}');
+        writer.write(
+          ' ORDER BY ${terms.map((term) => term.sqlIn(writer)).join(', ')}',
+        );
       }
     }
     if (limit != null) {
@@ -69,16 +94,31 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
       RangeError.checkNotNegative(offset, 'offset');
       writer.write(' OFFSET ${writer.parameter(offset, pg.Type.bigInteger)}');
     }
-    if (lock != null) writer.write(lock.sql);
-    return _decode(await _run(writer));
+    if (lock != null) {
+      writer.write(
+        writer.joins.isEmpty
+            ? lock.sql
+            : lock.sql.replaceFirst(
+                'FOR UPDATE',
+                'FOR UPDATE OF ${_sql.table}',
+              ),
+      );
+    }
+    final result = await _run(writer);
+    if (specs.isEmpty) return _decode(result);
+    return [
+      for (final raw in dwResultRows(result)) _decodeIncluded(raw, specs),
+    ];
   }
 
   Future<R?> findFirst({
+    List<DwRelationInclude> Function(T t)? include,
     DwWhereCondition Function(T t)? where,
     List<DwOrderTerm> Function(T t)? orderBy,
     DwRowLock? lock,
   }) async {
     final rows = await find(
+      include: include,
       where: where,
       orderBy: orderBy,
       limit: 1,
@@ -87,7 +127,18 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     return rows.isEmpty ? null : rows.first;
   }
 
-  Future<R?> findById(int id, {DwRowLock? lock}) async {
+  Future<R?> findById(
+    int id, {
+    DwRowLock? lock,
+    List<DwRelationInclude> Function(T t)? include,
+  }) async {
+    if (include != null) {
+      return findFirst(
+        where: (t) => t.id.equals(id),
+        include: include,
+        lock: lock,
+      );
+    }
     _checkLock(lock);
     final result = await _db.run(
       lock == null ? _sql.selectById : '${_sql.selectById}${lock.sql}',
@@ -118,12 +169,12 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     DwWhereCondition Function(T t)? where,
     DwTableColumn<Object?> Function(T t)? distinct,
   }) async {
-    final writer = DwSqlWriter()
-      ..write(
-        distinct == null
-            ? _sql.count
-            : 'SELECT count(DISTINCT ${distinct(table).sql}) FROM ${_sql.table}',
-      );
+    final writer = DwSqlWriter(rootTable: table.tableName);
+    writer.write(
+      distinct == null
+          ? _sql.count
+          : 'SELECT count(DISTINCT ${distinct(table).sqlIn(writer)}) FROM ${_sql.table}',
+    );
     _writeWhere(writer, where);
     final result = await _run(writer);
     return result.first.first! as int;
@@ -136,7 +187,9 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     DwTableColumn<Object?> Function(T t)? distinct,
   }) => _grouped(
     group(table),
-    distinct == null ? 'count(*)' : 'count(DISTINCT ${distinct(table).sql})',
+    (writer) => distinct == null
+        ? 'count(*)'
+        : 'count(DISTINCT ${distinct(table).sqlIn(writer)})',
     (raw) => raw! as int,
     where,
   );
@@ -148,8 +201,10 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     DwWhereCondition Function(T t)? where,
   }) async {
     final column = of(table);
-    final writer = DwSqlWriter()
-      ..write('SELECT ${_sumOf(column)} AS "dw_value" FROM ${_sql.table}');
+    final writer = DwSqlWriter(rootTable: table.tableName);
+    writer.write(
+      'SELECT ${_sumOf(column, writer)} AS "dw_value" FROM ${_sql.table}',
+    );
     _writeWhere(writer, where);
     return column.type.decode((await _run(writer)).first.first!) as N;
   }
@@ -163,7 +218,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     final column = of(table);
     return _grouped(
       group(table),
-      _sumOf(column),
+      (writer) => _sumOf(column, writer),
       (raw) => column.type.decode(raw!) as N,
       where,
     );
@@ -206,25 +261,29 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     DwWhereCondition Function(T t)? where,
   }) async {
     final key = group(table);
+    final keyAlias = _sql.keyAlias;
     final terms = orderBy(table);
-    final writer = DwSqlWriter()
-      ..write(
-        _sql.select.replaceFirst('SELECT ', 'SELECT DISTINCT ON (${key.sql}) '),
-      );
+    final writer = DwSqlWriter(rootTable: table.tableName);
+    writer.write(
+      _sql.select.replaceFirst(
+        'SELECT ',
+        'SELECT DISTINCT ON (${key.sqlIn(writer)}) ${key.sqlIn(writer)} AS ${dwQuoteIdentifier(keyAlias)}, ',
+      ),
+    );
     _writeWhere(writer, where);
     writer.write(
-      ' ORDER BY ${[key.sql, for (final term in terms) term.sql].join(', ')}',
+      ' ORDER BY ${[key.sqlIn(writer), for (final term in terms) term.sqlIn(writer)].join(', ')}',
     );
     final result = await _run(writer);
     return {
       for (final row in dwResultRows(result))
-        row.decode(key): table.fromRow(row),
+        row.decode(key, name: keyAlias): table.fromRow(row),
     };
   }
 
   Future<bool> exists({DwWhereCondition Function(T t)? where}) async {
-    final writer = DwSqlWriter()
-      ..write('SELECT EXISTS (SELECT 1 FROM ${_sql.table}');
+    final writer = DwSqlWriter(rootTable: table.tableName);
+    writer.write('SELECT EXISTS (SELECT 1 FROM ${_sql.table}');
     _writeWhere(writer, where);
     writer.write(')');
     final result = await _run(writer);
@@ -335,20 +394,23 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     final declared = _stateColumns
         .where((c) => c.name == selected.name)
         .firstOrNull;
-    if (declared == null || declared.type != selected.type) {
+    if (selected.relationPath != null ||
+        declared == null ||
+        declared.type != selected.type) {
       throw ArgumentError(
         'transition: select a state column of ${table.tableName}',
       );
     }
     final sources = declared.transitions!.sourcesFor(to);
     if (sources.isEmpty) return const [];
-    final writer = DwSqlWriter()..write('UPDATE ${_sql.table} SET ');
+    final writer = DwSqlWriter(rootTable: table.tableName)
+      ..write('UPDATE ${_sql.table} SET ');
     declared.set(to).write(writer);
-    writer.write(' WHERE (');
-    where(table).write(writer);
-    writer.write(') AND (');
-    declared.inList(sources.cast<Object>()).write(writer);
-    writer.write(')${_sql.returning}');
+    _writeWhere(
+      writer,
+      (t) => where(t) & declared.inList(sources.cast<Object>()),
+    );
+    writer.write(_sql.returning);
     return _decode(await _run(writer));
   }
 
@@ -492,7 +554,8 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   Future<int> deleteWhere({
     required DwWhereCondition Function(T t) where,
   }) async {
-    final writer = DwSqlWriter()..write('DELETE FROM ${_sql.table}');
+    final writer = DwSqlWriter(rootTable: table.tableName)
+      ..write('DELETE FROM ${_sql.table}');
     _writeWhere(writer, where);
     return (await _run(writer)).affectedRows;
   }
@@ -505,11 +568,15 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     if (assignments.isEmpty) {
       throw ArgumentError('updateWhere: nothing to set');
     }
+    if (assignments.any((a) => a.column.relationPath != null)) {
+      throw ArgumentError('updateWhere: assignments must select this table');
+    }
     final stateNames = {for (final column in _stateColumns) column.name};
     if (assignments.any((a) => stateNames.contains(a.column.name))) {
       throw DwStateWriteException(table.tableName, 'updateWhere');
     }
-    final writer = DwSqlWriter()..write('UPDATE ${_sql.table} SET ');
+    final writer = DwSqlWriter(rootTable: table.tableName)
+      ..write('UPDATE ${_sql.table} SET ');
     for (final (position, assignment) in assignments.indexed) {
       if (position > 0) writer.write(', ');
       assignment.write(writer);
@@ -520,16 +587,18 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
 
   /// `SUM` in the column's own type — Postgres widens a `bigint` sum to
   /// `numeric` — and 0 rather than null over no rows.
-  String _sumOf(DwTableColumn<Object?> column) =>
-      'CAST(COALESCE(sum(${column.sql}), 0) AS ${column.type.sqlType})';
+  String _sumOf(DwTableColumn<Object?> column, DwSqlWriter writer) =>
+      'CAST(COALESCE(sum(${column.sqlIn(writer)}), 0) AS ${column.type.sqlType})';
 
   Future<V?> _extreme<V>(
     String function,
     DwTableColumn<V?> column,
     DwWhereCondition Function(T t)? where,
   ) async {
-    final writer = DwSqlWriter()
-      ..write('SELECT $function(${column.sql}) FROM ${_sql.table}');
+    final writer = DwSqlWriter(rootTable: table.tableName);
+    writer.write(
+      'SELECT $function(${column.sqlIn(writer)}) FROM ${_sql.table}',
+    );
     _writeWhere(writer, where);
     final raw = (await _run(writer)).first.first;
     return raw == null ? null : column.type.decode(raw);
@@ -543,7 +612,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   ) async {
     final all = await _grouped<K, V?>(
       group,
-      '$function(${column.sql})',
+      (writer) => '$function(${column.sqlIn(writer)})',
       (raw) => raw == null ? null : column.type.decode(raw),
       where,
     );
@@ -553,19 +622,19 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   /// `SELECT group, aggregate … GROUP BY group`, keyed by the group's value.
   Future<Map<K, V>> _grouped<K, V>(
     DwTableColumn<K> group,
-    String aggregate,
+    String Function(DwSqlWriter writer) aggregate,
     V Function(Object? raw) decode,
     DwWhereCondition Function(T t)? where,
   ) async {
-    final writer = DwSqlWriter()
-      ..write(
-        'SELECT ${group.sql}, $aggregate AS "dw_value" FROM ${_sql.table}',
-      );
+    final writer = DwSqlWriter(rootTable: table.tableName);
+    writer.write(
+      'SELECT ${group.sqlIn(writer)} AS "dw_key", ${aggregate(writer)} AS "dw_value" FROM ${_sql.table}',
+    );
     _writeWhere(writer, where);
-    writer.write(' GROUP BY ${group.sql}');
+    writer.write(' GROUP BY ${group.sqlIn(writer)}');
     return {
       for (final row in dwResultRows(await _run(writer)))
-        row.decode(group): decode(row['dw_value']),
+        row.decode(group, name: 'dw_key'): decode(row['dw_value']),
     };
   }
 
@@ -622,12 +691,23 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
 
   void _writeWhere(DwSqlWriter writer, DwWhereCondition Function(T t)? where) {
     if (where == null) return;
-    writer.write(' WHERE ');
-    where(table).write(writer);
+    if (writer.sql.startsWith('UPDATE ') || writer.sql.startsWith('DELETE ')) {
+      writer.write(' WHERE ');
+      where(table).writeMutation(writer);
+    } else {
+      writer.write(' WHERE ');
+      where(table).write(writer);
+    }
   }
 
   Future<pg.Result> _run(DwSqlWriter writer) =>
       _db.run(writer.sql, writer.types, writer.values);
+
+  R _decodeIncluded(DwResultRow raw, List<DwIncludeSpec> specs) {
+    final row = table.fromRow(raw);
+    dwDecodeIncludes(row, specs, raw);
+    return row;
+  }
 
   List<R> _decode(pg.Result result) => [
     for (final row in dwResultRows(result)) table.fromRow(row),
@@ -650,7 +730,8 @@ final class _DwTableSql {
     }
     final list = columns.map((column) => column.sql).join(', ');
     returning = ' RETURNING $list';
-    select = 'SELECT $list FROM ${this.table}';
+    select =
+        'SELECT ${columns.map((c) => '${this.table}.${c.sql}').join(', ')} FROM ${this.table}';
     selectById = '$select WHERE "id" = \$1';
     selectByIds = '$select WHERE "id" = ANY(\$1)';
     count = 'SELECT count(*) FROM ${this.table}';
@@ -672,6 +753,15 @@ final class _DwTableSql {
   final String table;
   final List<DwTableColumn<Object?>> columns;
   late final String returning;
+  late final String keyAlias = () {
+    final names = columns.map((c) => c.name).toSet();
+    var alias = 'dw_key';
+    while (names.contains(alias)) {
+      alias = '${alias}_';
+    }
+    return alias;
+  }();
+
   late final String select;
   late final String selectById;
   late final String selectByIds;

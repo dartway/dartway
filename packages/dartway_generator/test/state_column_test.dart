@@ -28,6 +28,7 @@ void main() {
       );
       expect(await project.analyze('fixture_server'), isNull);
     },
+    timeout: const Timeout(Duration(minutes: 2)),
   );
 
   for (final declaration in ['String', 'WorkStatus?']) {

@@ -50,7 +50,16 @@ enum DwOnDelete {
 /// reference is.
 @Target({TargetKind.field})
 final class DwForeignKey {
-  const DwForeignKey(this.tableName, {this.onDelete = DwOnDelete.noAction});
+  const DwForeignKey(
+    this.tableName, {
+    this.onDelete = DwOnDelete.noAction,
+    this.relation,
+    this.reverse,
+  });
+
+  /// Generated forward and reverse relation names; not database schema.
+  final String? relation;
+  final String? reverse;
 
   final String tableName;
   final DwOnDelete onDelete;

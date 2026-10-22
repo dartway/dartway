@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.24.0-dev.1
+
+- Typed foreign-key relations, chained filters/order, any/none/every/count, and explicit typed includes in one SQL statement. Includes preserve column codecs, enforce child bounds and refuse row locks.
+
+- Preserve nullable related key types and projected group keys; recheck root mutation guards after lock waits. Includes retain exact double bits, refuse unrepresentable dates with `DwDecodeException`, and explicitly aggregate ordered child pages. `take(n)` defaults to child primary-key order. Related columns are refused in pathless write targets.
+
+### Breaking changes
+
+- Row fields named `tablePath`, and referenced row fields named `include` or `includeSpec`, must be renamed in Dart (retain the SQL name with `@DwColumnName`). Ambiguous or colliding relation names warn and omit the relation without blocking generation.
+
 ## 0.23.0
 
 - `find(unbounded: '<reason>')` says why a read without `limit` stays small, for

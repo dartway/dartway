@@ -5,9 +5,8 @@ import 'package:dartway_example_server/src/profile/profile_objects.dart';
 import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
-/// Chat rows → the data objects staff see. Every relation
-/// of a batch is one query — authors, quoted messages, attachments, their
-/// files, reactions — whatever the number of messages.
+/// Chat rows → staff objects. Typed includes load project rows in one
+/// statement; framework-owned file metadata comes from the file service.
 abstract final class ChatObjects {
   static ChatChannel channel(ChatChannelRow row) =>
       ChatChannel(id: row.id, title: row.title);
@@ -21,47 +20,15 @@ abstract final class ChatObjects {
     UserProfileRow? author,
   }) async {
     if (rows.isEmpty) return const [];
-    final db = ctx.db;
-    final ids = [for (final row in rows) row.id];
-
-    final quoted = {
-      for (final row in await db.chatMessages.findByIds(
-        rows.map((m) => m.replyToMessageId).whereType<int>(),
-      ))
-        row.id: row,
-    };
-
-    final wantedAuthors = {
-      for (final row in rows) row.authorProfileId,
-      for (final row in quoted.values) row.authorProfileId,
-    };
-    if (author != null) wantedAuthors.remove(author.id);
-    // An empty set asks nothing of the database.
-    final authors = {
-      for (final row in await db.userProfiles.findByIds(wantedAuthors))
-        row.id: row,
-    };
-    if (author != null) authors[author.id] = author;
-
-    // The quotes' attachments only tell whether a quote has any; they are
-    // read in the same query as the messages' own.
-    final attachmentRows = await db.chatMessageAttachments.find(
-      where: (t) => t.messageId.inList({...ids, ...quoted.keys}),
-      orderBy: (t) => [t.messageId.asc(), t.position.asc()],
-    );
-    final ownIds = ids.toSet();
-    // Name, type and size of every attached file, in one query.
+    const table = ChatMessageRow.tableDef;
+    final attachmentRows = [
+      for (final row in rows) ...row.many(table.chatMessageAttachments),
+    ];
     final files = await ctx.files.describe([
-      for (final a in attachmentRows)
-        if (ownIds.contains(a.messageId)) a.fileId,
+      for (final a in attachmentRows) a.fileId,
     ]);
     final attachments = <int, List<ChatAttachment>>{};
-    final quotedWithAttachments = <int>{};
     for (final row in attachmentRows) {
-      quotedWithAttachments.add(row.messageId);
-      if (!ownIds.contains(row.messageId)) continue;
-      // Absent only when the file went between the two reads: the attachment
-      // row goes with it (cascade), so it is not shown.
       final file = files[row.fileId];
       if (file == null) continue;
       (attachments[row.messageId] ??= []).add(
@@ -75,45 +42,70 @@ abstract final class ChatObjects {
         ),
       );
     }
-
-    final reactions = <int, List<ChatMessageReaction>>{};
-    for (final row in await db.chatMessageReactions.find(
-      where: (t) => t.messageId.inList(ids),
-      orderBy: (t) => [t.id.asc()],
-    )) {
-      (reactions[row.messageId] ??= []).add(
-        ChatMessageReaction(id: row.profileId, reaction: row.reaction),
-      );
-    }
-
     return [
       for (final row in rows)
         ChatMessage(
           id: row.id,
           channelId: row.channelId,
           text: row.text,
-          author: ProfileObjects.person(authors[row.authorProfileId]!),
+          author: ProfileObjects.person(author ?? row.one(table.authorProfile)),
           sentAt: row.sentAt,
           editedAt: row.editedAt,
           pinnedAt: row.pinnedAt,
-          replyTo: switch (quoted[row.replyToMessageId]) {
+          replyTo: switch (row.one(table.replyToMessage)) {
             final quote? => ChatMessageQuote(
               id: quote.id,
               sentAt: quote.sentAt,
-              authorName: _nameOf(authors[quote.authorProfileId]!),
-              authorDeleted: authors[quote.authorProfileId]!.deletedAt != null,
+              authorName: _nameOf(quote.one(table.authorProfile)),
+              authorDeleted: quote.one(table.authorProfile).deletedAt != null,
               text: quote.isDeleted ? '' : quote.text,
               isDeleted: quote.isDeleted,
               hasAttachments:
-                  !quote.isDeleted && quotedWithAttachments.contains(quote.id),
+                  !quote.isDeleted &&
+                  quote.many(table.chatMessageAttachments).isNotEmpty,
             ),
             null => null,
           },
           attachments: attachments[row.id] ?? const [],
-          reactions: reactions[row.id] ?? const [],
+          reactions: [
+            for (final reaction in row.many(table.chatMessageReactions))
+              ChatMessageReaction(
+                id: reaction.profileId,
+                reaction: reaction.reaction,
+              ),
+          ],
         ),
     ];
   }
+
+  static List<DwRelationInclude> includes(
+    ChatMessageTable t, {
+    UserProfileRow? author,
+  }) => [
+    if (author == null) t.authorProfile,
+    t.replyToMessage.include(
+      (q) => [q.authorProfile, q.chatMessageAttachments.take(1)],
+    ),
+    t.chatMessageAttachments.unbounded(
+      'attachments accepted by the upload policy',
+      orderBy: (a) => [a.position.asc()],
+    ),
+    t.chatMessageReactions.unbounded(
+      'one reaction per club member',
+      orderBy: (r) => [r.id.asc()],
+    ),
+  ];
+
+  static Future<ChatMessage> message(
+    DwCallContext ctx,
+    ChatMessageRow row, {
+    UserProfileRow? author,
+  }) async => (await messages(ctx, [
+    (await ctx.db.chatMessages.findById(
+      row.id,
+      include: (t) => includes(t, author: author),
+    ))!,
+  ], author: author)).single;
 
   static String _nameOf(UserProfileRow profile) => switch (profile.lastName) {
     final last? when last.isNotEmpty => '${profile.firstName} $last',

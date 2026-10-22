@@ -14,6 +14,25 @@ void main() {
       read.line,
   ];
 
+  test(
+    'to-many includes need an explicit child bound, independent of parent limit',
+    () {
+      final reads = DwUnboundedReadInspector.unboundedReadsIn(
+        """
+final handlers = [DwCallHandler.page<ListThings, Thing>(
+  handle: (ctx, request, page) => ctx.db.things.find(
+    limit: page.fetchLimit,
+    include: (t) => [t.comments, t.owner, t.replies.take(20),
+      t.notes.unbounded('few notes per thing')],
+  ),
+)];
+""",
+        toManyRelations: {'comments', 'replies', 'notes'},
+      );
+      expect(reads, [(line: 4, kind: 'to-many include in page')]);
+    },
+  );
+
   group('flags', () {
     test('a list handler reading without a limit', () {
       expect(

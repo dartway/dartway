@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.24.0-dev.1
+
+- Advance with the core family for typed ORM relations.
+
 ## 0.23.0
 
 ### Breaking changes

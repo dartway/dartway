@@ -1,12 +1,13 @@
 import '../emit/source_text.dart';
 import '../emit/value_class_writer.dart';
 import 'entity_model.dart';
+import 'relation_emitter.dart';
 
 /// Writes the generated code of one row class: the value mixin, `copyWith`,
 /// the draft (`New<Name>Row`) and the table definition (the shape of
 /// `packages/dartway_orm/test/fixtures`).
 abstract final class EntityEmitter {
-  static String emit(EntityClass entity) {
+  static String emit(EntityClass entity, {bool relationTarget = false}) {
     final values = _values(entity);
     return [
       _mixin(entity),
@@ -27,6 +28,7 @@ abstract final class EntityEmitter {
       ?ValueClassWriter.copyWith(entity.draftClass, values),
       _withId(entity, values),
       _table(entity),
+      if (relationTarget) emitRelationViews(entity),
     ].join('\n\n');
   }
 
@@ -99,7 +101,7 @@ abstract final class EntityEmitter {
     final name = entity.name;
     final columns = _values(entity);
     final members = <String>[
-      'const ${entity.tableClass}() : super(${dartString(entity.tableName)});',
+      'const ${entity.tableClass}({super.tablePath}) : super(${dartString(entity.tableName)});',
       for (final field in columns) _columnGetter(field),
       '@override\nList<DwTableColumn<Object?>> get tableColumns => '
           '[id, ${columns.map((field) => field.name).join(', ')}];',
@@ -138,7 +140,7 @@ abstract final class EntityEmitter {
       if (column.transitions != null) 'transitions: ${column.transitions}',
     ];
     return 'DwTableColumn<${field.spelling}> get ${field.name} => '
-        'const DwTableColumn(${arguments.join(', ')});';
+        '(const DwTableColumn<${field.spelling}>(${arguments.join(', ')})).atPath(tablePath);';
   }
 
   static String _index(EntityIndex index) =>

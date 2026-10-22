@@ -57,10 +57,14 @@ mapping through `_objects`, publishing through `_publications`.
 
 ## 5. Rows → data objects, in batch
 
-One `_objects.dart` function per data object takes a list of rows, loads each relation once
-(`findByIds`, `ctx.accounts.listIdentitiesOf`, `ctx.files.publicUrls`) and maps; a single object is a
-batch of one. Every handler and publication goes through it, so every exit shows the object the same
-way. Sample: the skeleton's `lib/src/profile/profile_objects.dart`.
+One `_objects.dart` mapper per data object consumes rows with explicit `include` selections and
+reads them through `row.one(token)` / `row.many(token)`. Put the shared include callback beside it;
+request handlers pass it into their original read. After a write, a publication can load that
+projection with `findById(include: ...)`. Use relation filters directly instead of pre-reading ids
+or writing raw JOIN SQL. Framework-owned accounts and files still use their services, batched once
+(`ctx.accounts.listIdentitiesOf`, `ctx.files.publicUrls`). Every handler and publication maps the
+object the same way. The framework repository's example demonstrates this in
+`schedule_objects.dart`, `bookings_objects.dart` and `chat_objects.dart`.
 
 ## 6. The call context
 

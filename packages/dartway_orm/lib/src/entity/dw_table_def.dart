@@ -15,13 +15,16 @@ import 'dw_table_row.dart';
 /// field, so the members declared here are named the way no row field would
 /// want to be (`tableName`, not `name`): a field cannot take a member's name.
 abstract class DwTableDef<R extends DwTableRow> {
-  const DwTableDef(this.tableName);
+  const DwTableDef(this.tableName, {this.tablePath});
+
+  /// The generated path when this table describes a related row.
+  final DwRelationPath? tablePath;
 
   /// The SQL table name.
   final String tableName;
 
   /// The primary key every table has.
-  DwTableColumn<int> get id => DwTableColumn.id;
+  DwTableColumn<int> get id => DwTableColumn.id.atPath(tablePath);
 
   /// Every column in declaration order, [id] first.
   List<DwTableColumn<Object?>> get tableColumns;

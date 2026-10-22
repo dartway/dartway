@@ -72,9 +72,9 @@ extension NewWorkItemRowWithId on NewWorkItemRow {
 }
 
 final class WorkItemTable extends DwTableDef<WorkItemRow> {
-  const WorkItemTable() : super('work_item');
+  const WorkItemTable({super.tablePath}) : super('work_item');
 
-  DwTableColumn<WorkStatus> get status => const DwTableColumn(
+  DwTableColumn<WorkStatus> get status => (const DwTableColumn<WorkStatus>(
     'status',
     DwEnumType(WorkStatus.values),
     transitions: DwStateTransitions<WorkStatus>(
@@ -84,10 +84,13 @@ final class WorkItemTable extends DwTableDef<WorkItemRow> {
         WorkStatus.running: {WorkStatus.completed, WorkStatus.cancelled},
       },
     ),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<String> get title =>
-      const DwTableColumn('title', DwColumnType.text, unique: true);
+  DwTableColumn<String> get title => (const DwTableColumn<String>(
+    'title',
+    DwColumnType.text,
+    unique: true,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [id, status, title];

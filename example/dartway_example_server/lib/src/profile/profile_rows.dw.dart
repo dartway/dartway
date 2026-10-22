@@ -187,44 +187,66 @@ extension NewUserProfileRowWithId on NewUserProfileRow {
 }
 
 final class UserProfileTable extends DwTableDef<UserProfileRow> {
-  const UserProfileTable() : super('user_profile');
+  const UserProfileTable({super.tablePath}) : super('user_profile');
 
-  DwTableColumn<int?> get accountId => const DwTableColumn(
+  DwTableColumn<int?> get accountId => (const DwTableColumn<int?>(
     'account_id',
     DwColumnType.bigint,
     unique: true,
     references: DwForeignKey('dw_account', onDelete: DwOnDelete.setNull),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<String> get phone =>
-      const DwTableColumn('phone', DwColumnType.text);
+  DwTableColumn<String> get phone => (const DwTableColumn<String>(
+    'phone',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<String> get firstName =>
-      const DwTableColumn('first_name', DwColumnType.text);
+  DwTableColumn<String> get firstName => (const DwTableColumn<String>(
+    'first_name',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<String?> get lastName =>
-      const DwTableColumn('last_name', DwColumnType.text);
+  DwTableColumn<String?> get lastName => (const DwTableColumn<String?>(
+    'last_name',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<String?> get imageUrl =>
-      const DwTableColumn('image_url', DwColumnType.text);
+  DwTableColumn<String?> get imageUrl => (const DwTableColumn<String?>(
+    'image_url',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
-  DwTableColumn<UserGender?> get gender =>
-      const DwTableColumn('gender', DwEnumType(UserGender.values));
+  DwTableColumn<UserGender?> get gender => (const DwTableColumn<UserGender?>(
+    'gender',
+    DwEnumType(UserGender.values),
+  )).atPath(tablePath);
 
-  DwTableColumn<UserRole> get role =>
-      const DwTableColumn('role', DwEnumType(UserRole.values));
+  DwTableColumn<UserRole> get role => (const DwTableColumn<UserRole>(
+    'role',
+    DwEnumType(UserRole.values),
+  )).atPath(tablePath);
 
-  DwTableColumn<bool> get agreedForMarketing =>
-      const DwTableColumn('agreed_for_marketing', DwColumnType.boolean);
+  DwTableColumn<bool> get agreedForMarketing => (const DwTableColumn<bool>(
+    'agreed_for_marketing',
+    DwColumnType.boolean,
+  )).atPath(tablePath);
 
   DwTableColumn<DateTime> get conditionsAcceptedAt =>
-      const DwTableColumn('conditions_accepted_at', DwColumnType.timestamptz);
+      (const DwTableColumn<DateTime>(
+        'conditions_accepted_at',
+        DwColumnType.timestamptz,
+      )).atPath(tablePath);
 
   DwTableColumn<String?> get testVerificationCode =>
-      const DwTableColumn('test_verification_code', DwColumnType.text);
+      (const DwTableColumn<String?>(
+        'test_verification_code',
+        DwColumnType.text,
+      )).atPath(tablePath);
 
-  DwTableColumn<DateTime?> get deletedAt =>
-      const DwTableColumn('deleted_at', DwColumnType.timestamptz);
+  DwTableColumn<DateTime?> get deletedAt => (const DwTableColumn<DateTime?>(
+    'deleted_at',
+    DwColumnType.timestamptz,
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [
@@ -292,4 +314,84 @@ final class UserProfileTable extends DwTableDef<UserProfileRow> {
     'test_verification_code': draft.testVerificationCode,
     'deleted_at': draft.deletedAt,
   };
+}
+
+final class UserProfileRelation implements DwToOneRelation<UserProfileRow> {
+  const UserProfileRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int> get id => (const UserProfileTable()).id.atPath(tablePath);
+  DwTableColumn<int?> get accountId =>
+      (const UserProfileTable()).accountId.atPath(tablePath);
+  DwTableColumn<String> get phone =>
+      (const UserProfileTable()).phone.atPath(tablePath);
+  DwTableColumn<String> get firstName =>
+      (const UserProfileTable()).firstName.atPath(tablePath);
+  DwTableColumn<String?> get lastName =>
+      (const UserProfileTable()).lastName.atPath(tablePath);
+  DwTableColumn<String?> get imageUrl =>
+      (const UserProfileTable()).imageUrl.atPath(tablePath);
+  DwTableColumn<UserGender?> get gender =>
+      (const UserProfileTable()).gender.atPath(tablePath);
+  DwTableColumn<UserRole> get role =>
+      (const UserProfileTable()).role.atPath(tablePath);
+  DwTableColumn<bool> get agreedForMarketing =>
+      (const UserProfileTable()).agreedForMarketing.atPath(tablePath);
+  DwTableColumn<DateTime> get conditionsAcceptedAt =>
+      (const UserProfileTable()).conditionsAcceptedAt.atPath(tablePath);
+  DwTableColumn<String?> get testVerificationCode =>
+      (const UserProfileTable()).testVerificationCode.atPath(tablePath);
+  DwTableColumn<DateTime?> get deletedAt =>
+      (const UserProfileTable()).deletedAt.atPath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const UserProfileTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(UserProfileTable t) select,
+  ) => DwIncludeSpec(
+    const UserProfileTable(),
+    tablePath,
+    nested: select(const UserProfileTable()),
+  );
+}
+
+final class UserProfileNullableRelation
+    implements DwToOneRelation<UserProfileRow?> {
+  const UserProfileNullableRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int?> get id =>
+      (const UserProfileTable()).id.atNullablePath(tablePath);
+  DwTableColumn<int?> get accountId =>
+      (const UserProfileTable()).accountId.atNullablePath(tablePath);
+  DwTableColumn<String?> get phone =>
+      (const UserProfileTable()).phone.atNullablePath(tablePath);
+  DwTableColumn<String?> get firstName =>
+      (const UserProfileTable()).firstName.atNullablePath(tablePath);
+  DwTableColumn<String?> get lastName =>
+      (const UserProfileTable()).lastName.atNullablePath(tablePath);
+  DwTableColumn<String?> get imageUrl =>
+      (const UserProfileTable()).imageUrl.atNullablePath(tablePath);
+  DwTableColumn<UserGender?> get gender =>
+      (const UserProfileTable()).gender.atNullablePath(tablePath);
+  DwTableColumn<UserRole?> get role =>
+      (const UserProfileTable()).role.atNullablePath(tablePath);
+  DwTableColumn<bool?> get agreedForMarketing =>
+      (const UserProfileTable()).agreedForMarketing.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get conditionsAcceptedAt =>
+      (const UserProfileTable()).conditionsAcceptedAt.atNullablePath(tablePath);
+  DwTableColumn<String?> get testVerificationCode =>
+      (const UserProfileTable()).testVerificationCode.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get deletedAt =>
+      (const UserProfileTable()).deletedAt.atNullablePath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const UserProfileTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(UserProfileTable t) select,
+  ) => DwIncludeSpec(
+    const UserProfileTable(),
+    tablePath,
+    nested: select(const UserProfileTable()),
+  );
 }

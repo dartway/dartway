@@ -32,3 +32,7 @@ Open related references when the change reaches them, not all before the first e
 
 A custom `DwServerLogger` declares `isEnabled(DwLogLevel level)` and preserves that filter in
 `scoped`. Call timing builds a debug or slow-call warning line only when that level is enabled.
+
+Related reads use generated FK paths and explicit `include` in the original repository read;
+`references/rows-and-queries.md` covers filters, quantifiers, child bounds and typed access.
+`references/handlers.md` keeps those selections beside the DTO mapper.

@@ -5,6 +5,7 @@ part 'content_rows.dw.dart';
 @DwSqlTable(
   'news_post',
   indexes: [
+    DwTableIndex(['authorProfileId']),
     DwTableIndex(['createdAt']),
   ],
 )
