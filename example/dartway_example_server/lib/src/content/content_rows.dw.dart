@@ -109,7 +109,7 @@ extension NewNewsPostRowWithId on NewNewsPostRow {
   );
 }
 
-class NewsPostTable extends DwTableDef<NewsPostRow> {
+final class NewsPostTable extends DwTableDef<NewsPostRow> {
   const NewsPostTable({super.tablePath}) : super('news_post');
 
   DwTableColumn<int> get authorProfileId => (const DwTableColumn<int>(

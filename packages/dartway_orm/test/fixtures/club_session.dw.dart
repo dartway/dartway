@@ -131,7 +131,7 @@ extension NewClubSessionRowWithId on NewClubSessionRow {
   );
 }
 
-class ClubSessionTable extends DwTableDef<ClubSessionRow> {
+final class ClubSessionTable extends DwTableDef<ClubSessionRow> {
   const ClubSessionTable({super.tablePath}) : super('club_session');
 
   DwTableColumn<int> get serviceId => (const DwTableColumn<int>(
@@ -217,4 +217,64 @@ class ClubSessionTable extends DwTableDef<ClubSessionRow> {
     'note_text': draft.note,
     'labels': draft.labels,
   };
+}
+
+final class ClubSessionRelation implements DwToOneRelation<ClubSessionRow> {
+  const ClubSessionRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int> get id => (const ClubSessionTable()).id.atPath(tablePath);
+  DwTableColumn<int> get serviceId =>
+      (const ClubSessionTable()).serviceId.atPath(tablePath);
+  DwTableColumn<int?> get previousSessionId =>
+      (const ClubSessionTable()).previousSessionId.atPath(tablePath);
+  DwTableColumn<DateTime> get startsAt =>
+      (const ClubSessionTable()).startsAt.atPath(tablePath);
+  DwTableColumn<int> get capacity =>
+      (const ClubSessionTable()).capacity.atPath(tablePath);
+  DwTableColumn<String?> get note =>
+      (const ClubSessionTable()).note.atPath(tablePath);
+  DwTableColumn<List<String>?> get labels =>
+      (const ClubSessionTable()).labels.atPath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const ClubSessionTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(ClubSessionTable t) select,
+  ) => DwIncludeSpec(
+    const ClubSessionTable(),
+    tablePath,
+    nested: select(const ClubSessionTable()),
+  );
+}
+
+final class ClubSessionNullableRelation
+    implements DwToOneRelation<ClubSessionRow?> {
+  const ClubSessionNullableRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int?> get id =>
+      (const ClubSessionTable()).id.atNullablePath(tablePath);
+  DwTableColumn<int?> get serviceId =>
+      (const ClubSessionTable()).serviceId.atNullablePath(tablePath);
+  DwTableColumn<int?> get previousSessionId =>
+      (const ClubSessionTable()).previousSessionId.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get startsAt =>
+      (const ClubSessionTable()).startsAt.atNullablePath(tablePath);
+  DwTableColumn<int?> get capacity =>
+      (const ClubSessionTable()).capacity.atNullablePath(tablePath);
+  DwTableColumn<String?> get note =>
+      (const ClubSessionTable()).note.atNullablePath(tablePath);
+  DwTableColumn<List<String>?> get labels =>
+      (const ClubSessionTable()).labels.atNullablePath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const ClubSessionTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(ClubSessionTable t) select,
+  ) => DwIncludeSpec(
+    const ClubSessionTable(),
+    tablePath,
+    nested: select(const ClubSessionTable()),
+  );
 }

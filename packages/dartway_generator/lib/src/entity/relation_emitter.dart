@@ -23,6 +23,7 @@ List<EntityRelation> resolveRelations(
   List<DwGenerationDiagnostic> diagnostics,
 ) {
   final relations = <EntityRelation>[];
+  final ambiguousPairs = <String>{};
   final byTable = {for (final e in entities) e.tableName: e};
   for (final source in entities) {
     for (final field in source.fields) {
@@ -32,7 +33,7 @@ List<EntityRelation> resolveRelations(
           !source.indexes.any((i) => i.columns.first == column.sqlName)) {
         diagnostics.add(
           DwGenerationDiagnostic.at(
-            source.element,
+            source.element.getField(field.name) ?? source.element,
             'foreign key ${source.name}.${field.name} has no leading index; '
             "add DwTableIndex(['${field.name}']) and generate a migration",
             isWarning: true,
@@ -43,7 +44,7 @@ List<EntityRelation> resolveRelations(
       // External SQL/module/framework tables deliberately have no typed path.
       if (target == null) continue;
       final hidden = target.fields.where(
-        (f) => const {'include', 'includeSpec'}.contains(f.name),
+        (f) => const {'tablePath', 'include', 'includeSpec'}.contains(f.name),
       );
       if (hidden.isNotEmpty) {
         diagnostics.add(
@@ -59,12 +60,18 @@ List<EntityRelation> resolveRelations(
           .where((f) => f.column?.foreignTable == column.foreignTable)
           .toList();
       if (siblings.length > 1 &&
-          (column.relation == null || column.reverse == null)) {
+          siblings.any(
+            (f) => f.column!.relation == null || f.column!.reverse == null,
+          )) {
+        if (!ambiguousPairs.add('${source.tableName}/${target.tableName}')) {
+          continue;
+        }
         diagnostics.add(
           DwGenerationDiagnostic.at(
             source.element,
             'ambiguous relations ${siblings.map((f) => '${source.name}.${f.name}').join(', ')} '
-            'to ${target.name}; name each with relation: and reverse: on @DwForeignKey',
+            'to ${target.name}; name each with relation: and reverse: on @DwForeignKey; no relation emitted',
+            isWarning: true,
           ),
         );
         continue;
@@ -89,6 +96,7 @@ List<EntityRelation> resolveRelations(
     }
   }
   const reserved = {
+    'id',
     'tableName',
     'tablePath',
     'tableColumns',
@@ -119,13 +127,16 @@ List<EntityRelation> resolveRelations(
         DwGenerationDiagnostic.at(
           relation.source.element,
           'relation name `${relation.name}` collides or is invalid on ${relation.source.name}: '
-          '${conflicts.map((r) => '${r.field.name} (${r.target.name})').join(', ')}; '
-          'set relation: / reverse: on @DwForeignKey',
+          '${conflicts.map((r) => '${r.field.name} (${r.target.name})').join(', ')}'
+          '${relation.source.fields.any((f) => f.name == relation.name) ? '; field ${relation.source.name}.${relation.name}' : ''}; '
+          'set relation: / reverse: on @DwForeignKey; no relation emitted',
+          isWarning: true,
         ),
       );
     }
   }
-  return relations.where((r) => !invalid.contains(r)).toList();
+  final invalidFields = {for (final r in invalid) r.field};
+  return relations.where((r) => !invalidFields.contains(r.field)).toList();
 }
 
 String emitRelations(
@@ -135,10 +146,17 @@ String emitRelations(
   final out = StringBuffer();
   for (final entity in entities) {
     final own = relations.where((r) => r.source == entity).toList();
-    if (own.isNotEmpty) {
-      out.writeln(
-        'extension ${entity.entityName}Relations on ${entity.tableClass} {',
-      );
+    final referenced = relations.any((r) => r.target == entity && !r.many);
+    final receivers = [
+      (entity.tableClass, false),
+      if (referenced) ...[
+        ('${entity.entityName}Relation', false),
+        ('${entity.entityName}NullableRelation', true),
+      ],
+    ];
+    for (final (receiver, nullablePath) in receivers) {
+      if (own.isEmpty) continue;
+      out.writeln('extension ${receiver}Relations on $receiver {');
       for (final r in own) {
         final path =
             'DwRelationPath(${dartString(r.source.tableName)}, '
@@ -150,23 +168,40 @@ String emitRelations(
             'DwToManyRelation(const ${r.target.tableClass}(), $path);',
           );
         } else {
-          final nullable = r.field.type.nullable ? '?' : '';
-          out.writeln(
-            '${r.target.entityName}Relation<${r.target.name}$nullable> get ${r.name} => '
-            '${r.target.entityName}Relation($path);',
-          );
+          final nullable = nullablePath || r.field.type.nullable;
+          final type =
+              '${r.target.entityName}${nullable ? 'Nullable' : ''}Relation';
+          out.writeln('$type get ${r.name} => $type($path);');
         }
       }
       out.writeln('}');
     }
-    if (!relations.any((r) => r.target == entity && !r.many)) continue;
+  }
+  return out.toString();
+}
+
+String emitRelationViews(EntityClass entity) {
+  final out = StringBuffer();
+  for (final nullable in [false, true]) {
+    final type = '${entity.entityName}${nullable ? 'Nullable' : ''}Relation';
     out.writeln(
-      'final class ${entity.entityName}Relation<R extends ${entity.name}?> '
-      'extends ${entity.tableClass} implements DwToOneRelation<R> {\n'
-      'const ${entity.entityName}Relation(DwRelationPath path) : super(tablePath: path);\n'
-      '@override DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);\n'
+      'final class $type implements DwToOneRelation<${entity.name}${nullable ? '?' : ''}> {\n'
+      'const $type(this.tablePath);\n'
+      'final DwRelationPath tablePath;\n',
+    );
+    for (final field in entity.fields) {
+      final spelling = nullable && !field.type.nullable
+          ? '${field.spelling}?'
+          : field.spelling;
+      out.writeln(
+        'DwTableColumn<$spelling> get ${field.name} => '
+        '(const ${entity.tableClass}()).${field.name}.${nullable ? 'atNullablePath' : 'atPath'}(tablePath);',
+      );
+    }
+    out.writeln(
+      '@override DwIncludeSpec get includeSpec => DwIncludeSpec(const ${entity.tableClass}(), tablePath);\n'
       'DwRelationInclude include(List<DwRelationInclude> Function(${entity.tableClass} t) select) => '
-      'DwIncludeSpec(this, tablePath!, nested: select(const ${entity.tableClass}()));\n'
+      'DwIncludeSpec(const ${entity.tableClass}(), tablePath, nested: select(const ${entity.tableClass}()));\n'
       '}',
     );
   }

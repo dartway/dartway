@@ -298,7 +298,10 @@ Import the generated `dw_schema.dart` to use the relation extensions. The genera
 to-one from an FK field (`sessionId` → `session`) and a reverse to-many from the referencing
 entity's plural name. When two FKs reference the same table, name both directions on each:
 `@DwForeignKey('user_profile', relation: 'authorProfile', reverse: 'authoredMessages')`.
-A collision fails generation and names the fields; `relation:` and `reverse:` resolve it.
+Ambiguous pairs and relation names colliding with fields, `id` or reserved words warn and emit
+no relation in either direction until named with `relation:` and `reverse:`. Generation continues.
+A referenced row field named `tablePath`, `include` or `includeSpec` remains a generation error;
+rename the Dart field and retain its SQL name with `@DwColumnName`.
 Only row classes in the project's generation input participate; FKs to framework, module or
 SQL-only tables remain valid and get no relation in either direction.
 
@@ -332,6 +335,9 @@ Each to-many include needs `.take(n, where: ..., orderBy: ..., include: ...)` or
 `.unbounded('<domain reason>', where: ..., orderBy: ..., include: ...)`. A bare to-many token
 is refused; `dartway check` also warns with `unboundedRead` at a handler's include site.
 A parent limit does not bound its children. Nonnegative child limits are bound parameters.
+Without a nonempty `orderBy`, `take(n)` orders children by their primary key.
+Columns reached through a nullable to-one have nullable Dart types, including grouping keys and
+aggregate values; grouped reads retain the NULL group.
 `lock:` together with `include:` is refused, even inside a transaction; keep locked reads separate.
 
 Related columns work in every repository `where` callback, including `count`, `exists`,

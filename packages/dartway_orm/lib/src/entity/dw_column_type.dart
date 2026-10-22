@@ -81,9 +81,9 @@ abstract final class DwColumnType<T> {
   /// microseconds travel as text: no floating point or session time zone.
   @internal
   String jsonSql(String column) => sqlType == 'timestamp with time zone'
-      ? '(extract(epoch FROM $column) * 1000000)::bigint::text'
+      ? 'CASE WHEN isfinite($column) THEN (extract(epoch FROM $column) * 1000000)::bigint::text ELSE $column::text END'
       : sqlType == 'double precision'
-      ? '$column::text'
+      ? "encode(float8send($column), 'hex')"
       : sqlType == 'bytea'
       ? "encode($column, 'hex')"
       : column;
@@ -91,19 +91,33 @@ abstract final class DwColumnType<T> {
   /// Convert the JSON carrier to exactly what the binary driver returns,
   /// then let the same generated row codec decode it.
   @internal
-  Object jsonCarrier(Object raw) => switch (sqlType) {
-    'timestamp with time zone' => DateTime.fromMicrosecondsSinceEpoch(
-      int.parse(raw as String),
-      isUtc: true,
-    ),
-    'date' => DateTime.parse(raw as String),
-    'bytea' => Uint8List.fromList([
-      for (var i = 0; i < (raw as String).length; i += 2)
-        int.parse(raw.substring(i, i + 2), radix: 16),
-    ]),
-    'double precision' => raw is String ? double.parse(raw) : raw,
-    _ => raw,
-  };
+  Object jsonCarrier(Object raw) {
+    try {
+      return switch (sqlType) {
+        'timestamp with time zone' => DateTime.fromMicrosecondsSinceEpoch(
+          int.parse(raw as String),
+          isUtc: true,
+        ),
+        'date' => DateTime.parse(raw as String),
+        'bytea' => _hexBytes(raw as String),
+        'double precision' => ByteData.sublistView(
+          _hexBytes(raw as String),
+        ).getFloat64(0),
+        _ => raw,
+      };
+    } on FormatException {
+      throw DwDecodeException(
+        'unrepresentable $sqlType relation carrier: $raw',
+      );
+    } on ArgumentError {
+      throw DwDecodeException('out-of-range $sqlType relation carrier: $raw');
+    }
+  }
+
+  static Uint8List _hexBytes(String raw) => Uint8List.fromList([
+    for (var i = 0; i < raw.length; i += 2)
+      int.parse(raw.substring(i, i + 2), radix: 16),
+  ]);
 
   @override
   String toString() => 'DwColumnType($sqlType)';

@@ -66,7 +66,7 @@ extension NewChatChannelRowWithId on NewChatChannelRow {
       ChatChannelRow(id: id, slug: slug, title: title);
 }
 
-class ChatChannelTable extends DwTableDef<ChatChannelRow> {
+final class ChatChannelTable extends DwTableDef<ChatChannelRow> {
   const ChatChannelTable({super.tablePath}) : super('chat_channel');
 
   DwTableColumn<String> get slug => (const DwTableColumn<String>(
@@ -101,6 +101,50 @@ class ChatChannelTable extends DwTableDef<ChatChannelRow> {
     'slug': draft.slug,
     'title': draft.title,
   };
+}
+
+final class ChatChannelRelation implements DwToOneRelation<ChatChannelRow> {
+  const ChatChannelRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int> get id => (const ChatChannelTable()).id.atPath(tablePath);
+  DwTableColumn<String> get slug =>
+      (const ChatChannelTable()).slug.atPath(tablePath);
+  DwTableColumn<String> get title =>
+      (const ChatChannelTable()).title.atPath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const ChatChannelTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(ChatChannelTable t) select,
+  ) => DwIncludeSpec(
+    const ChatChannelTable(),
+    tablePath,
+    nested: select(const ChatChannelTable()),
+  );
+}
+
+final class ChatChannelNullableRelation
+    implements DwToOneRelation<ChatChannelRow?> {
+  const ChatChannelNullableRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int?> get id =>
+      (const ChatChannelTable()).id.atNullablePath(tablePath);
+  DwTableColumn<String?> get slug =>
+      (const ChatChannelTable()).slug.atNullablePath(tablePath);
+  DwTableColumn<String?> get title =>
+      (const ChatChannelTable()).title.atNullablePath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const ChatChannelTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(ChatChannelTable t) select,
+  ) => DwIncludeSpec(
+    const ChatChannelTable(),
+    tablePath,
+    nested: select(const ChatChannelTable()),
+  );
 }
 
 mixin _$ChatMessageRow on DwTableRow {
@@ -266,7 +310,7 @@ extension NewChatMessageRowWithId on NewChatMessageRow {
   );
 }
 
-class ChatMessageTable extends DwTableDef<ChatMessageRow> {
+final class ChatMessageTable extends DwTableDef<ChatMessageRow> {
   const ChatMessageTable({super.tablePath}) : super('chat_message');
 
   DwTableColumn<int> get channelId => (const DwTableColumn<int>(
@@ -389,6 +433,78 @@ class ChatMessageTable extends DwTableDef<ChatMessageRow> {
   };
 }
 
+final class ChatMessageRelation implements DwToOneRelation<ChatMessageRow> {
+  const ChatMessageRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int> get id => (const ChatMessageTable()).id.atPath(tablePath);
+  DwTableColumn<int> get channelId =>
+      (const ChatMessageTable()).channelId.atPath(tablePath);
+  DwTableColumn<int> get authorProfileId =>
+      (const ChatMessageTable()).authorProfileId.atPath(tablePath);
+  DwTableColumn<String> get text =>
+      (const ChatMessageTable()).text.atPath(tablePath);
+  DwTableColumn<DateTime> get sentAt =>
+      (const ChatMessageTable()).sentAt.atPath(tablePath);
+  DwTableColumn<DateTime?> get editedAt =>
+      (const ChatMessageTable()).editedAt.atPath(tablePath);
+  DwTableColumn<DateTime?> get pinnedAt =>
+      (const ChatMessageTable()).pinnedAt.atPath(tablePath);
+  DwTableColumn<int?> get pinnedByProfileId =>
+      (const ChatMessageTable()).pinnedByProfileId.atPath(tablePath);
+  DwTableColumn<int?> get replyToMessageId =>
+      (const ChatMessageTable()).replyToMessageId.atPath(tablePath);
+  DwTableColumn<DateTime?> get deletedAt =>
+      (const ChatMessageTable()).deletedAt.atPath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const ChatMessageTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(ChatMessageTable t) select,
+  ) => DwIncludeSpec(
+    const ChatMessageTable(),
+    tablePath,
+    nested: select(const ChatMessageTable()),
+  );
+}
+
+final class ChatMessageNullableRelation
+    implements DwToOneRelation<ChatMessageRow?> {
+  const ChatMessageNullableRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int?> get id =>
+      (const ChatMessageTable()).id.atNullablePath(tablePath);
+  DwTableColumn<int?> get channelId =>
+      (const ChatMessageTable()).channelId.atNullablePath(tablePath);
+  DwTableColumn<int?> get authorProfileId =>
+      (const ChatMessageTable()).authorProfileId.atNullablePath(tablePath);
+  DwTableColumn<String?> get text =>
+      (const ChatMessageTable()).text.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get sentAt =>
+      (const ChatMessageTable()).sentAt.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get editedAt =>
+      (const ChatMessageTable()).editedAt.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get pinnedAt =>
+      (const ChatMessageTable()).pinnedAt.atNullablePath(tablePath);
+  DwTableColumn<int?> get pinnedByProfileId =>
+      (const ChatMessageTable()).pinnedByProfileId.atNullablePath(tablePath);
+  DwTableColumn<int?> get replyToMessageId =>
+      (const ChatMessageTable()).replyToMessageId.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get deletedAt =>
+      (const ChatMessageTable()).deletedAt.atNullablePath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const ChatMessageTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(ChatMessageTable t) select,
+  ) => DwIncludeSpec(
+    const ChatMessageTable(),
+    tablePath,
+    nested: select(const ChatMessageTable()),
+  );
+}
+
 mixin _$ChatMessageAttachmentRow on DwTableRow {
   ChatMessageAttachmentRow get _self => this as ChatMessageAttachmentRow;
 
@@ -509,7 +625,8 @@ extension NewChatMessageAttachmentRowWithId on NewChatMessageAttachmentRow {
   );
 }
 
-class ChatMessageAttachmentTable extends DwTableDef<ChatMessageAttachmentRow> {
+final class ChatMessageAttachmentTable
+    extends DwTableDef<ChatMessageAttachmentRow> {
   const ChatMessageAttachmentTable({super.tablePath})
     : super('chat_message_attachment');
 
@@ -678,7 +795,8 @@ extension NewChatMessageReactionRowWithId on NewChatMessageReactionRow {
   );
 }
 
-class ChatMessageReactionTable extends DwTableDef<ChatMessageReactionRow> {
+final class ChatMessageReactionTable
+    extends DwTableDef<ChatMessageReactionRow> {
   const ChatMessageReactionTable({super.tablePath})
     : super('chat_message_reaction');
 
@@ -848,7 +966,7 @@ extension NewChatReadPositionRowWithId on NewChatReadPositionRow {
   );
 }
 
-class ChatReadPositionTable extends DwTableDef<ChatReadPositionRow> {
+final class ChatReadPositionTable extends DwTableDef<ChatReadPositionRow> {
   const ChatReadPositionTable({super.tablePath}) : super('chat_read_position');
 
   DwTableColumn<int> get profileId => (const DwTableColumn<int>(

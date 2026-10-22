@@ -56,7 +56,7 @@ extension DartwayExampleDb on DwDatabaseHandle {
       repository(UserProfileRow.tableDef);
 }
 
-extension ChatChannelRelations on ChatChannelTable {
+extension ChatChannelTableRelations on ChatChannelTable {
   DwToManyRelation<ChatMessageRow, ChatMessageTable> get chatMessages =>
       DwToManyRelation(
         const ChatMessageTable(),
@@ -81,20 +81,58 @@ extension ChatChannelRelations on ChatChannelTable {
   );
 }
 
-final class ChatChannelRelation<R extends ChatChannelRow?>
-    extends ChatChannelTable
-    implements DwToOneRelation<R> {
-  const ChatChannelRelation(DwRelationPath path) : super(tablePath: path);
-  @override
-  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
-  DwRelationInclude include(
-    List<DwRelationInclude> Function(ChatChannelTable t) select,
-  ) =>
-      DwIncludeSpec(this, tablePath!, nested: select(const ChatChannelTable()));
+extension ChatChannelRelationRelations on ChatChannelRelation {
+  DwToManyRelation<ChatMessageRow, ChatMessageTable> get chatMessages =>
+      DwToManyRelation(
+        const ChatMessageTable(),
+        DwRelationPath(
+          'chat_channel',
+          'chat_message',
+          'channel_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ChatReadPositionRow, ChatReadPositionTable>
+  get chatReadPositions => DwToManyRelation(
+    const ChatReadPositionTable(),
+    DwRelationPath(
+      'chat_channel',
+      'chat_read_position',
+      'channel_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
 }
 
-extension ChatMessageAttachmentRelations on ChatMessageAttachmentTable {
-  ChatMessageRelation<ChatMessageRow> get message => ChatMessageRelation(
+extension ChatChannelNullableRelationRelations on ChatChannelNullableRelation {
+  DwToManyRelation<ChatMessageRow, ChatMessageTable> get chatMessages =>
+      DwToManyRelation(
+        const ChatMessageTable(),
+        DwRelationPath(
+          'chat_channel',
+          'chat_message',
+          'channel_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ChatReadPositionRow, ChatReadPositionTable>
+  get chatReadPositions => DwToManyRelation(
+    const ChatReadPositionTable(),
+    DwRelationPath(
+      'chat_channel',
+      'chat_read_position',
+      'channel_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+}
+
+extension ChatMessageAttachmentTableRelations on ChatMessageAttachmentTable {
+  ChatMessageRelation get message => ChatMessageRelation(
     DwRelationPath(
       'chat_message_attachment',
       'chat_message',
@@ -104,8 +142,8 @@ extension ChatMessageAttachmentRelations on ChatMessageAttachmentTable {
   );
 }
 
-extension ChatMessageReactionRelations on ChatMessageReactionTable {
-  ChatMessageRelation<ChatMessageRow> get message => ChatMessageRelation(
+extension ChatMessageReactionTableRelations on ChatMessageReactionTable {
+  ChatMessageRelation get message => ChatMessageRelation(
     DwRelationPath(
       'chat_message_reaction',
       'chat_message',
@@ -113,7 +151,7 @@ extension ChatMessageReactionRelations on ChatMessageReactionTable {
       parent: tablePath,
     ),
   );
-  UserProfileRelation<UserProfileRow> get profile => UserProfileRelation(
+  UserProfileRelation get profile => UserProfileRelation(
     DwRelationPath(
       'chat_message_reaction',
       'user_profile',
@@ -123,8 +161,8 @@ extension ChatMessageReactionRelations on ChatMessageReactionTable {
   );
 }
 
-extension ChatMessageRelations on ChatMessageTable {
-  ChatChannelRelation<ChatChannelRow> get channel => ChatChannelRelation(
+extension ChatMessageTableRelations on ChatMessageTable {
+  ChatChannelRelation get channel => ChatChannelRelation(
     DwRelationPath(
       'chat_message',
       'chat_channel',
@@ -132,7 +170,7 @@ extension ChatMessageRelations on ChatMessageTable {
       parent: tablePath,
     ),
   );
-  UserProfileRelation<UserProfileRow> get authorProfile => UserProfileRelation(
+  UserProfileRelation get authorProfile => UserProfileRelation(
     DwRelationPath(
       'chat_message',
       'user_profile',
@@ -140,8 +178,8 @@ extension ChatMessageRelations on ChatMessageTable {
       parent: tablePath,
     ),
   );
-  UserProfileRelation<UserProfileRow?> get pinnedByProfile =>
-      UserProfileRelation(
+  UserProfileNullableRelation get pinnedByProfile =>
+      UserProfileNullableRelation(
         DwRelationPath(
           'chat_message',
           'user_profile',
@@ -149,15 +187,14 @@ extension ChatMessageRelations on ChatMessageTable {
           parent: tablePath,
         ),
       );
-  ChatMessageRelation<ChatMessageRow?> get replyToMessage =>
-      ChatMessageRelation(
-        DwRelationPath(
-          'chat_message',
-          'chat_message',
-          'reply_to_message_id',
-          parent: tablePath,
-        ),
-      );
+  ChatMessageNullableRelation get replyToMessage => ChatMessageNullableRelation(
+    DwRelationPath(
+      'chat_message',
+      'chat_message',
+      'reply_to_message_id',
+      parent: tablePath,
+    ),
+  );
   DwToManyRelation<ChatMessageRow, ChatMessageTable> get chatMessages =>
       DwToManyRelation(
         const ChatMessageTable(),
@@ -204,20 +241,168 @@ extension ChatMessageRelations on ChatMessageTable {
   );
 }
 
-final class ChatMessageRelation<R extends ChatMessageRow?>
-    extends ChatMessageTable
-    implements DwToOneRelation<R> {
-  const ChatMessageRelation(DwRelationPath path) : super(tablePath: path);
-  @override
-  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
-  DwRelationInclude include(
-    List<DwRelationInclude> Function(ChatMessageTable t) select,
-  ) =>
-      DwIncludeSpec(this, tablePath!, nested: select(const ChatMessageTable()));
+extension ChatMessageRelationRelations on ChatMessageRelation {
+  ChatChannelRelation get channel => ChatChannelRelation(
+    DwRelationPath(
+      'chat_message',
+      'chat_channel',
+      'channel_id',
+      parent: tablePath,
+    ),
+  );
+  UserProfileRelation get authorProfile => UserProfileRelation(
+    DwRelationPath(
+      'chat_message',
+      'user_profile',
+      'author_profile_id',
+      parent: tablePath,
+    ),
+  );
+  UserProfileNullableRelation get pinnedByProfile =>
+      UserProfileNullableRelation(
+        DwRelationPath(
+          'chat_message',
+          'user_profile',
+          'pinned_by_profile_id',
+          parent: tablePath,
+        ),
+      );
+  ChatMessageNullableRelation get replyToMessage => ChatMessageNullableRelation(
+    DwRelationPath(
+      'chat_message',
+      'chat_message',
+      'reply_to_message_id',
+      parent: tablePath,
+    ),
+  );
+  DwToManyRelation<ChatMessageRow, ChatMessageTable> get chatMessages =>
+      DwToManyRelation(
+        const ChatMessageTable(),
+        DwRelationPath(
+          'chat_message',
+          'chat_message',
+          'reply_to_message_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ChatMessageAttachmentRow, ChatMessageAttachmentTable>
+  get chatMessageAttachments => DwToManyRelation(
+    const ChatMessageAttachmentTable(),
+    DwRelationPath(
+      'chat_message',
+      'chat_message_attachment',
+      'message_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<ChatMessageReactionRow, ChatMessageReactionTable>
+  get chatMessageReactions => DwToManyRelation(
+    const ChatMessageReactionTable(),
+    DwRelationPath(
+      'chat_message',
+      'chat_message_reaction',
+      'message_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<ChatReadPositionRow, ChatReadPositionTable>
+  get chatReadPositions => DwToManyRelation(
+    const ChatReadPositionTable(),
+    DwRelationPath(
+      'chat_message',
+      'chat_read_position',
+      'message_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
 }
 
-extension ChatReadPositionRelations on ChatReadPositionTable {
-  UserProfileRelation<UserProfileRow> get profile => UserProfileRelation(
+extension ChatMessageNullableRelationRelations on ChatMessageNullableRelation {
+  ChatChannelNullableRelation get channel => ChatChannelNullableRelation(
+    DwRelationPath(
+      'chat_message',
+      'chat_channel',
+      'channel_id',
+      parent: tablePath,
+    ),
+  );
+  UserProfileNullableRelation get authorProfile => UserProfileNullableRelation(
+    DwRelationPath(
+      'chat_message',
+      'user_profile',
+      'author_profile_id',
+      parent: tablePath,
+    ),
+  );
+  UserProfileNullableRelation get pinnedByProfile =>
+      UserProfileNullableRelation(
+        DwRelationPath(
+          'chat_message',
+          'user_profile',
+          'pinned_by_profile_id',
+          parent: tablePath,
+        ),
+      );
+  ChatMessageNullableRelation get replyToMessage => ChatMessageNullableRelation(
+    DwRelationPath(
+      'chat_message',
+      'chat_message',
+      'reply_to_message_id',
+      parent: tablePath,
+    ),
+  );
+  DwToManyRelation<ChatMessageRow, ChatMessageTable> get chatMessages =>
+      DwToManyRelation(
+        const ChatMessageTable(),
+        DwRelationPath(
+          'chat_message',
+          'chat_message',
+          'reply_to_message_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ChatMessageAttachmentRow, ChatMessageAttachmentTable>
+  get chatMessageAttachments => DwToManyRelation(
+    const ChatMessageAttachmentTable(),
+    DwRelationPath(
+      'chat_message',
+      'chat_message_attachment',
+      'message_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<ChatMessageReactionRow, ChatMessageReactionTable>
+  get chatMessageReactions => DwToManyRelation(
+    const ChatMessageReactionTable(),
+    DwRelationPath(
+      'chat_message',
+      'chat_message_reaction',
+      'message_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<ChatReadPositionRow, ChatReadPositionTable>
+  get chatReadPositions => DwToManyRelation(
+    const ChatReadPositionTable(),
+    DwRelationPath(
+      'chat_message',
+      'chat_read_position',
+      'message_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+}
+
+extension ChatReadPositionTableRelations on ChatReadPositionTable {
+  UserProfileRelation get profile => UserProfileRelation(
     DwRelationPath(
       'chat_read_position',
       'user_profile',
@@ -225,7 +410,7 @@ extension ChatReadPositionRelations on ChatReadPositionTable {
       parent: tablePath,
     ),
   );
-  ChatChannelRelation<ChatChannelRow> get channel => ChatChannelRelation(
+  ChatChannelRelation get channel => ChatChannelRelation(
     DwRelationPath(
       'chat_read_position',
       'chat_channel',
@@ -233,7 +418,7 @@ extension ChatReadPositionRelations on ChatReadPositionTable {
       parent: tablePath,
     ),
   );
-  ChatMessageRelation<ChatMessageRow> get message => ChatMessageRelation(
+  ChatMessageRelation get message => ChatMessageRelation(
     DwRelationPath(
       'chat_read_position',
       'chat_message',
@@ -243,7 +428,7 @@ extension ChatReadPositionRelations on ChatReadPositionTable {
   );
 }
 
-extension ClubServiceRelations on ClubServiceTable {
+extension ClubServiceTableRelations on ClubServiceTable {
   DwToManyRelation<ClubSessionRow, ClubSessionTable> get clubSessions =>
       DwToManyRelation(
         const ClubSessionTable(),
@@ -257,19 +442,35 @@ extension ClubServiceRelations on ClubServiceTable {
       );
 }
 
-final class ClubServiceRelation<R extends ClubServiceRow?>
-    extends ClubServiceTable
-    implements DwToOneRelation<R> {
-  const ClubServiceRelation(DwRelationPath path) : super(tablePath: path);
-  @override
-  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
-  DwRelationInclude include(
-    List<DwRelationInclude> Function(ClubServiceTable t) select,
-  ) =>
-      DwIncludeSpec(this, tablePath!, nested: select(const ClubServiceTable()));
+extension ClubServiceRelationRelations on ClubServiceRelation {
+  DwToManyRelation<ClubSessionRow, ClubSessionTable> get clubSessions =>
+      DwToManyRelation(
+        const ClubSessionTable(),
+        DwRelationPath(
+          'club_service',
+          'club_session',
+          'service_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
 }
 
-extension ClubSessionRelations on ClubSessionTable {
+extension ClubServiceNullableRelationRelations on ClubServiceNullableRelation {
+  DwToManyRelation<ClubSessionRow, ClubSessionTable> get clubSessions =>
+      DwToManyRelation(
+        const ClubSessionTable(),
+        DwRelationPath(
+          'club_service',
+          'club_session',
+          'service_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+}
+
+extension ClubSessionTableRelations on ClubSessionTable {
   DwToManyRelation<SessionBookingRow, SessionBookingTable>
   get sessionBookings => DwToManyRelation(
     const SessionBookingTable(),
@@ -281,7 +482,7 @@ extension ClubSessionRelations on ClubSessionTable {
       many: true,
     ),
   );
-  ClubServiceRelation<ClubServiceRow> get service => ClubServiceRelation(
+  ClubServiceRelation get service => ClubServiceRelation(
     DwRelationPath(
       'club_session',
       'club_service',
@@ -289,7 +490,7 @@ extension ClubSessionRelations on ClubSessionTable {
       parent: tablePath,
     ),
   );
-  UserProfileRelation<UserProfileRow?> get coachProfile => UserProfileRelation(
+  UserProfileNullableRelation get coachProfile => UserProfileNullableRelation(
     DwRelationPath(
       'club_session',
       'user_profile',
@@ -299,20 +500,68 @@ extension ClubSessionRelations on ClubSessionTable {
   );
 }
 
-final class ClubSessionRelation<R extends ClubSessionRow?>
-    extends ClubSessionTable
-    implements DwToOneRelation<R> {
-  const ClubSessionRelation(DwRelationPath path) : super(tablePath: path);
-  @override
-  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
-  DwRelationInclude include(
-    List<DwRelationInclude> Function(ClubSessionTable t) select,
-  ) =>
-      DwIncludeSpec(this, tablePath!, nested: select(const ClubSessionTable()));
+extension ClubSessionRelationRelations on ClubSessionRelation {
+  DwToManyRelation<SessionBookingRow, SessionBookingTable>
+  get sessionBookings => DwToManyRelation(
+    const SessionBookingTable(),
+    DwRelationPath(
+      'club_session',
+      'session_booking',
+      'session_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  ClubServiceRelation get service => ClubServiceRelation(
+    DwRelationPath(
+      'club_session',
+      'club_service',
+      'service_id',
+      parent: tablePath,
+    ),
+  );
+  UserProfileNullableRelation get coachProfile => UserProfileNullableRelation(
+    DwRelationPath(
+      'club_session',
+      'user_profile',
+      'coach_profile_id',
+      parent: tablePath,
+    ),
+  );
 }
 
-extension NewsPostRelations on NewsPostTable {
-  UserProfileRelation<UserProfileRow> get authorProfile => UserProfileRelation(
+extension ClubSessionNullableRelationRelations on ClubSessionNullableRelation {
+  DwToManyRelation<SessionBookingRow, SessionBookingTable>
+  get sessionBookings => DwToManyRelation(
+    const SessionBookingTable(),
+    DwRelationPath(
+      'club_session',
+      'session_booking',
+      'session_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  ClubServiceNullableRelation get service => ClubServiceNullableRelation(
+    DwRelationPath(
+      'club_session',
+      'club_service',
+      'service_id',
+      parent: tablePath,
+    ),
+  );
+  UserProfileNullableRelation get coachProfile => UserProfileNullableRelation(
+    DwRelationPath(
+      'club_session',
+      'user_profile',
+      'coach_profile_id',
+      parent: tablePath,
+    ),
+  );
+}
+
+extension NewsPostTableRelations on NewsPostTable {
+  UserProfileRelation get authorProfile => UserProfileRelation(
     DwRelationPath(
       'news_post',
       'user_profile',
@@ -322,8 +571,8 @@ extension NewsPostRelations on NewsPostTable {
   );
 }
 
-extension SessionBookingRelations on SessionBookingTable {
-  ClubSessionRelation<ClubSessionRow> get session => ClubSessionRelation(
+extension SessionBookingTableRelations on SessionBookingTable {
+  ClubSessionRelation get session => ClubSessionRelation(
     DwRelationPath(
       'session_booking',
       'club_session',
@@ -331,7 +580,7 @@ extension SessionBookingRelations on SessionBookingTable {
       parent: tablePath,
     ),
   );
-  UserProfileRelation<UserProfileRow> get clientProfile => UserProfileRelation(
+  UserProfileRelation get clientProfile => UserProfileRelation(
     DwRelationPath(
       'session_booking',
       'user_profile',
@@ -352,34 +601,79 @@ extension SessionBookingRelations on SessionBookingTable {
       );
 }
 
-final class SessionBookingRelation<R extends SessionBookingRow?>
-    extends SessionBookingTable
-    implements DwToOneRelation<R> {
-  const SessionBookingRelation(DwRelationPath path) : super(tablePath: path);
-  @override
-  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
-  DwRelationInclude include(
-    List<DwRelationInclude> Function(SessionBookingTable t) select,
-  ) => DwIncludeSpec(
-    this,
-    tablePath!,
-    nested: select(const SessionBookingTable()),
+extension SessionBookingRelationRelations on SessionBookingRelation {
+  ClubSessionRelation get session => ClubSessionRelation(
+    DwRelationPath(
+      'session_booking',
+      'club_session',
+      'session_id',
+      parent: tablePath,
+    ),
   );
-}
-
-extension SessionReviewRelations on SessionReviewTable {
-  SessionBookingRelation<SessionBookingRow> get booking =>
-      SessionBookingRelation(
+  UserProfileRelation get clientProfile => UserProfileRelation(
+    DwRelationPath(
+      'session_booking',
+      'user_profile',
+      'client_profile_id',
+      parent: tablePath,
+    ),
+  );
+  DwToManyRelation<SessionReviewRow, SessionReviewTable> get sessionReviews =>
+      DwToManyRelation(
+        const SessionReviewTable(),
         DwRelationPath(
-          'session_review',
           'session_booking',
+          'session_review',
           'booking_id',
           parent: tablePath,
+          many: true,
         ),
       );
 }
 
-extension UserProfileRelations on UserProfileTable {
+extension SessionBookingNullableRelationRelations
+    on SessionBookingNullableRelation {
+  ClubSessionNullableRelation get session => ClubSessionNullableRelation(
+    DwRelationPath(
+      'session_booking',
+      'club_session',
+      'session_id',
+      parent: tablePath,
+    ),
+  );
+  UserProfileNullableRelation get clientProfile => UserProfileNullableRelation(
+    DwRelationPath(
+      'session_booking',
+      'user_profile',
+      'client_profile_id',
+      parent: tablePath,
+    ),
+  );
+  DwToManyRelation<SessionReviewRow, SessionReviewTable> get sessionReviews =>
+      DwToManyRelation(
+        const SessionReviewTable(),
+        DwRelationPath(
+          'session_booking',
+          'session_review',
+          'booking_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+}
+
+extension SessionReviewTableRelations on SessionReviewTable {
+  SessionBookingRelation get booking => SessionBookingRelation(
+    DwRelationPath(
+      'session_review',
+      'session_booking',
+      'booking_id',
+      parent: tablePath,
+    ),
+  );
+}
+
+extension UserProfileTableRelations on UserProfileTable {
   DwToManyRelation<SessionBookingRow, SessionBookingTable>
   get sessionBookings => DwToManyRelation(
     const SessionBookingTable(),
@@ -459,14 +753,162 @@ extension UserProfileRelations on UserProfileTable {
       );
 }
 
-final class UserProfileRelation<R extends UserProfileRow?>
-    extends UserProfileTable
-    implements DwToOneRelation<R> {
-  const UserProfileRelation(DwRelationPath path) : super(tablePath: path);
-  @override
-  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
-  DwRelationInclude include(
-    List<DwRelationInclude> Function(UserProfileTable t) select,
-  ) =>
-      DwIncludeSpec(this, tablePath!, nested: select(const UserProfileTable()));
+extension UserProfileRelationRelations on UserProfileRelation {
+  DwToManyRelation<SessionBookingRow, SessionBookingTable>
+  get sessionBookings => DwToManyRelation(
+    const SessionBookingTable(),
+    DwRelationPath(
+      'user_profile',
+      'session_booking',
+      'client_profile_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<ChatMessageRow, ChatMessageTable> get authoredMessages =>
+      DwToManyRelation(
+        const ChatMessageTable(),
+        DwRelationPath(
+          'user_profile',
+          'chat_message',
+          'author_profile_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ChatMessageRow, ChatMessageTable> get pinnedMessages =>
+      DwToManyRelation(
+        const ChatMessageTable(),
+        DwRelationPath(
+          'user_profile',
+          'chat_message',
+          'pinned_by_profile_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ChatMessageReactionRow, ChatMessageReactionTable>
+  get chatMessageReactions => DwToManyRelation(
+    const ChatMessageReactionTable(),
+    DwRelationPath(
+      'user_profile',
+      'chat_message_reaction',
+      'profile_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<ChatReadPositionRow, ChatReadPositionTable>
+  get chatReadPositions => DwToManyRelation(
+    const ChatReadPositionTable(),
+    DwRelationPath(
+      'user_profile',
+      'chat_read_position',
+      'profile_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<NewsPostRow, NewsPostTable> get newsPosts =>
+      DwToManyRelation(
+        const NewsPostTable(),
+        DwRelationPath(
+          'user_profile',
+          'news_post',
+          'author_profile_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ClubSessionRow, ClubSessionTable> get clubSessions =>
+      DwToManyRelation(
+        const ClubSessionTable(),
+        DwRelationPath(
+          'user_profile',
+          'club_session',
+          'coach_profile_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+}
+
+extension UserProfileNullableRelationRelations on UserProfileNullableRelation {
+  DwToManyRelation<SessionBookingRow, SessionBookingTable>
+  get sessionBookings => DwToManyRelation(
+    const SessionBookingTable(),
+    DwRelationPath(
+      'user_profile',
+      'session_booking',
+      'client_profile_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<ChatMessageRow, ChatMessageTable> get authoredMessages =>
+      DwToManyRelation(
+        const ChatMessageTable(),
+        DwRelationPath(
+          'user_profile',
+          'chat_message',
+          'author_profile_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ChatMessageRow, ChatMessageTable> get pinnedMessages =>
+      DwToManyRelation(
+        const ChatMessageTable(),
+        DwRelationPath(
+          'user_profile',
+          'chat_message',
+          'pinned_by_profile_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ChatMessageReactionRow, ChatMessageReactionTable>
+  get chatMessageReactions => DwToManyRelation(
+    const ChatMessageReactionTable(),
+    DwRelationPath(
+      'user_profile',
+      'chat_message_reaction',
+      'profile_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<ChatReadPositionRow, ChatReadPositionTable>
+  get chatReadPositions => DwToManyRelation(
+    const ChatReadPositionTable(),
+    DwRelationPath(
+      'user_profile',
+      'chat_read_position',
+      'profile_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+  DwToManyRelation<NewsPostRow, NewsPostTable> get newsPosts =>
+      DwToManyRelation(
+        const NewsPostTable(),
+        DwRelationPath(
+          'user_profile',
+          'news_post',
+          'author_profile_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<ClubSessionRow, ClubSessionTable> get clubSessions =>
+      DwToManyRelation(
+        const ClubSessionTable(),
+        DwRelationPath(
+          'user_profile',
+          'club_session',
+          'coach_profile_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
 }

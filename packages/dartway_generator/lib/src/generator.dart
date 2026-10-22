@@ -762,7 +762,15 @@ final class _Run {
   GeneratedFile _emitPart(_Library library) {
     final sections = <String>[
       for (final (_, dto, entity) in library.classes)
-        if (dto != null) DtoEmitter.emit(dto) else EntityEmitter.emit(entity!),
+        if (dto != null)
+          DtoEmitter.emit(dto)
+        else
+          EntityEmitter.emit(
+            entity!,
+            relationTarget: _relations.any(
+              (r) => r.target == entity && !r.many,
+            ),
+          ),
     ];
     if (sections.isNotEmpty) _checkFrameworkNames(library, sections.join());
     final source = StringBuffer()

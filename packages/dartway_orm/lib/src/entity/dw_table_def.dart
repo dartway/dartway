@@ -1,6 +1,5 @@
 import '../db/dw_result_row.dart';
 import '../query/dw_table_column.dart';
-import '../query/dw_table_relation.dart';
 import '../schema/dw_database_schema.dart';
 import 'dw_table_row.dart';
 

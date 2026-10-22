@@ -12,7 +12,9 @@ relation names colliding with fields, or FKs without a leading index.
 
 ## What to change
 
-Run `dartway generate`. For an ambiguous pair, name each FK's forward and reverse relation, e.g.
+Run `dartway generate`. Ambiguous pairs and relation names colliding with a field, `id` or a
+reserved word now warn and omit the relation in both directions; existing table generation
+continues. To adopt a skipped relation, name each FK's forward and reverse relation, e.g.
 `@DwForeignKey('user_profile', relation: 'authorProfile', reverse: 'authoredMessages')` and
 `@DwForeignKey('user_profile', relation: 'reviewerProfile', reverse: 'reviewedMessages')`.
 If a row field is named `tablePath`, or a referenced row has `include` / `includeSpec`, rename
@@ -26,6 +28,8 @@ FKs to framework, module or SQL-only tables without row classes remain valid and
 relations. Framework tables stay behind their services. Existing `findByIds`, raw SQL and reads
 retain their meaning; adopting relation filters and includes is optional. When adopted, explicitly
 bound each collection with `take(n)` or `unbounded(reason)` and keep includes separate from locks.
+`take(n)` defaults to child primary-key order when no nonempty `orderBy` is given. Nullable to-one
+paths expose nullable column types, so grouped keys may be null.
 
 ## How to check
 

@@ -148,3 +148,7 @@ Also `findById`, `findFirst`, `exists`, `count(distinct:)`, `maxBy`, `updateWher
 - **Raw SQL** (`ctx.db.query(sql, params: {…})`, `ctx.db.execute`) only for what the repository cannot
   say — a window function, a CTE — over the project's tables, values always bound, never interpolated.
   Never over `dw_*` tables ([accounts](accounts.md)).
+
+Ambiguous or colliding relation names warn and emit neither direction until `relation:` / `reverse:`
+resolves them. Nullable to-one paths expose nullable column types, including grouped keys.
+A collection `take(n)` without a nonempty order defaults to child primary-key order.

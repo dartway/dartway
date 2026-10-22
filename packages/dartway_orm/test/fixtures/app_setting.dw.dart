@@ -124,7 +124,7 @@ extension NewAppSettingRowWithId on NewAppSettingRow {
   );
 }
 
-class AppSettingTable extends DwTableDef<AppSettingRow> {
+final class AppSettingTable extends DwTableDef<AppSettingRow> {
   const AppSettingTable({super.tablePath}) : super('app_setting');
 
   DwTableColumn<String> get key => (const DwTableColumn<String>(

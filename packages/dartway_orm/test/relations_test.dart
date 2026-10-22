@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 import 'package:dartway_orm/dartway_orm.dart';
 import 'package:test/test.dart';
@@ -171,6 +172,256 @@ void main() {
     },
   );
 
+  test(
+    'findFirstPer decodes projected related keys, including shared names',
+    () async {
+      final byId = await db().relationParents.findFirstPer(
+        (t) => t.detail.id,
+        orderBy: (t) => [t.id.asc()],
+      );
+      expect(byId.keys.toSet(), {parents[0].detailId, parents[1].detailId});
+      expect(byId[parents[0].detailId]!.id, parents[0].id);
+      final byLabel = await db().relationParents.findFirstPer(
+        (t) => t.detail.label,
+        orderBy: (t) => [t.id.asc()],
+      );
+      expect(byLabel.map((k, v) => MapEntry(k, v.id)), {
+        'a': parents[0].id,
+        'b': parents[1].id,
+      });
+    },
+  );
+
+  test('findFirstPer projection cannot shadow a root dw_key column', () async {
+    await db().execute(
+      'ALTER TABLE relation_parent ADD COLUMN dw_key bigint NOT NULL DEFAULT 999',
+    );
+    addTearDown(
+      () => db().execute('ALTER TABLE relation_parent DROP COLUMN dw_key'),
+    );
+    final grouped = await db()
+        .repository<RelationParentRow, _ProjectionTable>(
+          const _ProjectionTable(),
+        )
+        .findFirstPer((t) => t.id, orderBy: (t) => [t.id.asc()]);
+    expect(grouped.keys.toSet(), parents.map((p) => p.id).toSet());
+    expect(grouped.values.map((p) => p.title), parents.map((p) => p.title));
+  });
+
+  test('related mutation conjunctions reuse a shared join', () async {
+    expect(
+      await db().relationParents.updateWhere(
+        where: (t) =>
+            t.detail.label.equals('a') &
+            t.detail.integerValue.gt(0) &
+            t.id.gt(0),
+        set: (t) => [t.score.set(5)],
+      ),
+      2,
+    );
+    final statements = await db().query(
+      "SELECT statement FROM pg_prepared_statements WHERE statement LIKE 'UPDATE \"relation_parent\" SET%' AND statement LIKE '%integer_value%'",
+    );
+    expect(statements, hasLength(1));
+    expect(
+      'LEFT JOIN "relation_detail"'.allMatches(
+        statements.single.get<String>('statement'),
+      ),
+      hasLength(1),
+    );
+  });
+
+  test(
+    'nullable related keys retain the NULL group in grouped reads',
+    () async {
+      expect(
+        await db().relationParents.countBy((t) => t.optionalDetail.label),
+        {null: 3, 'a': 1},
+      );
+      expect(
+        await db().relationParents.sumBy(
+          (t) => t.optionalDetail.label,
+          (t) => t.score,
+        ),
+        {null: 0, 'a': 0},
+      );
+      expect(
+        await db().relationParents.maxBy(
+          (t) => t.optionalDetail.label,
+          (t) => t.id,
+        ),
+        {null: parents[3].id, 'a': parents[1].id},
+      );
+      final first = await db().relationParents.findFirstPer(
+        (t) => t.optionalDetail.label,
+        orderBy: (t) => [t.id.asc()],
+      );
+      expect(first.map((k, v) => MapEntry(k, v.id)), {
+        null: parents[0].id,
+        'a': parents[1].id,
+      });
+      expect(
+        await db().relationParents.maxBy(
+          (t) => t.title,
+          (t) => t.optionalDetail.id,
+        ),
+        {'one': parents[1].optionalDetailId},
+      );
+    },
+  );
+
+  test(
+    'related mutations recheck root guards after waiting for a lock',
+    () async {
+      final other = await database().openAnother();
+      addTearDown(other.close);
+      for (final operation in ['transition', 'update', 'delete']) {
+        final row = await db().relationDetails.insert(
+          detailDraft(operation, ancestorId: 1),
+        );
+        final locked = Completer<void>();
+        final release = Completer<void>();
+        final first = db().transaction((tx) async {
+          await tx.relationDetails.transition(
+            row.id,
+            column: (t) => t.state,
+            to: DetailState.ready,
+          );
+          locked.complete();
+          await release.future;
+        });
+        await locked.future;
+        final pending = switch (operation) {
+          'transition' =>
+            other.db.relationDetails
+                .transitionWhere(
+                  where: (t) =>
+                      t.id.equals(row.id) & t.ancestor.label.equals('top'),
+                  column: (t) => t.state,
+                  to: DetailState.ready,
+                )
+                .then((rows) => rows.length),
+          'update' => other.db.relationDetails.updateWhere(
+            where: (t) =>
+                t.id.equals(row.id) &
+                t.state.equals(DetailState.fresh) &
+                t.ancestor.label.equals('top'),
+            set: (t) => [t.label.set('lost guard')],
+          ),
+          _ => other.db.relationDetails.deleteWhere(
+            where: (t) =>
+                t.id.equals(row.id) &
+                t.state.equals(DetailState.fresh) &
+                t.ancestor.label.equals('top'),
+          ),
+        };
+        try {
+          final deadline = DateTime.now().add(const Duration(seconds: 10));
+          while (true) {
+            final waiting = await other.db.query(
+              "SELECT 1 FROM pg_stat_activity WHERE datname = current_database() AND wait_event_type = 'Lock' AND query LIKE '%relation_detail%'",
+            );
+            if (waiting.isNotEmpty) break;
+            if (DateTime.now().isAfter(deadline)) {
+              fail('competing mutation did not wait for the row lock');
+            }
+          }
+        } finally {
+          release.complete();
+          await first;
+        }
+        expect(await pending, 0, reason: operation);
+        final stored = (await db().relationDetails.findById(row.id))!;
+        expect(stored.state, DetailState.ready);
+        expect(stored.label, operation);
+      }
+    },
+  );
+
+  test(
+    'take defaults to primary-key order and aggregates with explicit order',
+    () async {
+      final row = (await db().relationParents.findById(
+        parents.first.id,
+        include: (t) => [t.children.take(2)],
+      ))!;
+      expect(row.many(parentTable.children).map((c) => c.rank), [1, 2]);
+      final sql = await db().query(
+        "SELECT statement FROM pg_prepared_statements WHERE statement LIKE '%json_agg(\"dw_row\"%' AND statement NOT LIKE '%pg_prepared_statements%'",
+      );
+      expect(sql, isNotEmpty);
+      expect(
+        sql.any(
+          (r) => r
+              .get<String>('statement')
+              .contains('ORDER BY "dw_rel_1"."id" LIMIT'),
+        ),
+        isTrue,
+      );
+      for (final statement in sql) {
+        expect(
+          statement.get<String>('statement'),
+          contains('json_agg("dw_row" ORDER BY'),
+        );
+      }
+    },
+  );
+
+  test(
+    'pathless conflict targets refuse related columns before executing SQL',
+    () async {
+      await expectLater(
+        db().relationParents.upsert(
+          NewRelationParentRow(detailId: parents.first.detailId, title: 'bad'),
+          conflictOn: (t) => [t.detail.id],
+        ),
+        throwsArgumentError,
+      );
+      await expectLater(
+        db().relationParents.upsertAll([
+          NewRelationParentRow(detailId: parents.first.detailId, title: 'bad'),
+        ], conflictOn: (t) => [t.detail.id]),
+        throwsArgumentError,
+      );
+      await expectLater(
+        db().relationParents.tryInsert(
+          NewRelationParentRow(detailId: parents.first.detailId, title: 'bad'),
+          onConflict: DwOnConflict.doNothing((t) => [t.detail.id]),
+        ),
+        throwsArgumentError,
+      );
+    },
+  );
+
+  test(
+    'exceptional date carriers match plain reads or refuse with DwDecodeException',
+    () async {
+      for (final (column, value) in [
+        ('instant', 'infinity'),
+        ('instant', '-infinity'),
+        ('day', 'infinity'),
+        ('day', '-infinity'),
+        ('day', '0001-01-01 BC'),
+      ]) {
+        await db().execute(
+          "UPDATE relation_detail SET $column = '$value' WHERE id = ${parents.first.detailId}",
+        );
+        // PostgreSQL's binary driver cannot represent timestamp infinity;
+        // includes must refuse it at the ORM decode boundary instead.
+        await expectLater(
+          db().relationParents.findById(
+            parents.first.id,
+            include: (t) => [t.detail],
+          ),
+          throwsA(isA<DwDecodeException>()),
+        );
+        await db().execute(
+          "UPDATE relation_detail SET instant = '2026-10-22T00:00:00Z', day = '0001-01-01' WHERE id = ${parents.first.detailId}",
+        );
+      }
+    },
+  );
+
   final cases =
       <(String, DwWhereCondition Function(RelationParentTable), List<int>)>[
         ('any', (t) => t.children.any((c) => c.rank.gte(2)), [0, 2]),
@@ -204,6 +455,28 @@ void main() {
           [3],
         ),
         ('nullable to-one', (t) => t.optionalDetail.label.equals('a'), [1]),
+        (
+          'mixed OR',
+          (t) => t.title.equals('one') | t.detail.label.equals('a'),
+          [0, 1, 2],
+        ),
+        (
+          'negated mixed OR',
+          (t) => (t.optionalDetail.label.equals('a') | t.title.equals('three'))
+              .not(),
+          [0, 2],
+        ),
+        (
+          'related OR',
+          (t) =>
+              t.optionalDetail.label.equals('a') | t.detail.label.equals('a'),
+          [0, 1, 2],
+        ),
+        (
+          'negated related',
+          (t) => t.optionalDetail.label.equals('a').not(),
+          [0, 2, 3],
+        ),
       ];
   for (final (name, where, indexes) in cases) {
     test(
@@ -322,7 +595,9 @@ void main() {
   );
 
   test('JSON double carrier retains negative zero and NaN', () async {
-    final values = [-0.0, double.nan, double.negativeInfinity];
+    await db().execute('SET extra_float_digits = 0');
+    addTearDown(() => db().execute('RESET extra_float_digits'));
+    final values = [0.1 + 0.2, -0.0, double.nan, double.negativeInfinity];
     for (final value in values) {
       final detail = await db().relationDetails.insert(
         detailDraft('special').copyWith(doubleValue: value),
@@ -388,11 +663,13 @@ void main() {
     await db().pinned((pinned) async {
       await pinned.relationParents.find(
         where: (t) => t.id.equals(parents.first.id),
-        include: (t) => [t.children.take(3)],
+        include: (t) => [
+          t.children.take(3, orderBy: (c) => [c.rank.asc()]),
+        ],
         limit: 1,
       );
       final includes = await pinned.query(
-        "SELECT name FROM pg_prepared_statements WHERE statement LIKE 'SELECT %dw_include_0%' AND statement LIKE '%relation_child%' AND statement NOT LIKE '%pg_prepared_statements%' AND statement NOT LIKE '%dw_include_1%' AND statement LIKE '%LIMIT \$3'",
+        "SELECT name FROM pg_prepared_statements WHERE statement LIKE 'SELECT %dw_include_0%' AND statement LIKE '%relation_child%' AND statement NOT LIKE '%pg_prepared_statements%' AND statement NOT LIKE '%dw_include_1%' AND statement LIKE '%LIMIT \$3' AND statement LIKE '%\"rank\" AS \"dw_order_0\"%'",
       );
       final includeName = includes.single
           .get<String>('name')
@@ -421,4 +698,23 @@ void main() {
       expect(text, isNot(contains('Seq Scan on relation_child')));
     });
   });
+}
+
+// Exercise a legal SQL column name without changing the shared fixture schema.
+final class _ProjectionTable extends DwTableDef<RelationParentRow> {
+  const _ProjectionTable() : super('relation_parent');
+  @override
+  List<DwTableColumn<Object?>> get tableColumns => [
+    ...RelationParentRow.tableDef.tableColumns,
+    const DwTableColumn<int>('dw_key', DwColumnType.bigint),
+  ];
+  @override
+  RelationParentRow fromRow(DwResultRow row) =>
+      RelationParentRow.tableDef.fromRow(row);
+  @override
+  Map<String, Object?> toRow(RelationParentRow row) =>
+      RelationParentRow.tableDef.toRow(row);
+  @override
+  Map<String, Object?> toDraftRow(DwRowDraft<RelationParentRow> draft) =>
+      RelationParentRow.tableDef.toDraftRow(draft as NewRelationParentRow);
 }

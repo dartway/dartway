@@ -206,7 +206,9 @@ final class TempProject {
       DwCodeGenerator.run(root, check: check);
 
   /// Generates and fails the test on any diagnostic.
-  Future<DwGenerationReport> generateClean() async {
+  Future<DwGenerationReport> generateClean({
+    List<Object> warnings = const [],
+  }) async {
     final report = await generate();
     expect(
       report.diagnostics
@@ -215,6 +217,14 @@ final class TempProject {
           .toList(),
       isEmpty,
       reason: 'generation must succeed',
+    );
+    expect(
+      report.diagnostics
+          .where((d) => d.isWarning)
+          .map((d) => d.message)
+          .toList(),
+      warnings,
+      reason: 'generation warnings must match exactly',
     );
     return report;
   }

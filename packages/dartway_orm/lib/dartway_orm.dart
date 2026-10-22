@@ -36,10 +36,14 @@ export 'src/entity/dw_column_type.dart';
 export 'src/migrations/dw_database_migration.dart';
 export 'src/migrations/dw_migration_errors.dart';
 export 'src/migrations/dw_migration_runner.dart';
-export 'src/query/dw_table_column.dart' hide DwSqlWriter, dwQuoteIdentifier;
+export 'src/query/dw_table_column.dart'
+    hide
+        DwSqlWriter,
+        dwQuoteIdentifier,
+        dwDecodeIncludes,
+        dwIncludeProjection,
+        dwRememberIncludes;
 export 'src/query/dw_row_lock.dart';
-export 'src/query/dw_table_relation.dart'
-    hide dwDecodeIncludes, dwIncludeProjection, dwRememberIncludes;
 export 'src/query/dw_table_repository.dart';
 export 'src/schema/dw_database_schema.dart' hide dwCheckIdentifier;
 export 'src/migrations/dw_migration_cli.dart';

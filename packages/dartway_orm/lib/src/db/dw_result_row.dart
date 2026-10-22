@@ -34,9 +34,10 @@ final class DwResultRow extends MapBase<String, Object?> {
     );
   }
 
-  /// The value of [column], decoded through the column's type.
-  T decode<T>(DwTableColumn<T> column) {
-    final position = _index[column.name];
+  /// The value of [column], decoded through the column's type. [name] selects
+  /// an aliased projection instead of the column's SQL name.
+  T decode<T>(DwTableColumn<T> column, {String? name}) {
+    final position = _index[name ?? column.name];
     if (position == null) {
       throw DwDecodeException('the row has no column "${column.name}"');
     }

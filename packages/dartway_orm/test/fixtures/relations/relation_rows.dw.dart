@@ -272,7 +272,7 @@ extension NewRelationDetailRowWithId on NewRelationDetailRow {
   );
 }
 
-class RelationDetailTable extends DwTableDef<RelationDetailRow> {
+final class RelationDetailTable extends DwTableDef<RelationDetailRow> {
   const RelationDetailTable({super.tablePath}) : super('relation_detail');
 
   DwTableColumn<int?> get ancestorId => (const DwTableColumn<int?>(
@@ -473,6 +473,116 @@ class RelationDetailTable extends DwTableDef<RelationDetailRow> {
   };
 }
 
+final class RelationDetailRelation
+    implements DwToOneRelation<RelationDetailRow> {
+  const RelationDetailRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int> get id =>
+      (const RelationDetailTable()).id.atPath(tablePath);
+  DwTableColumn<int?> get ancestorId =>
+      (const RelationDetailTable()).ancestorId.atPath(tablePath);
+  DwTableColumn<String> get label =>
+      (const RelationDetailTable()).label.atPath(tablePath);
+  DwTableColumn<int> get integerValue =>
+      (const RelationDetailTable()).integerValue.atPath(tablePath);
+  DwTableColumn<double> get doubleValue =>
+      (const RelationDetailTable()).doubleValue.atPath(tablePath);
+  DwTableColumn<bool> get active =>
+      (const RelationDetailTable()).active.atPath(tablePath);
+  DwTableColumn<DateTime> get instant =>
+      (const RelationDetailTable()).instant.atPath(tablePath);
+  DwTableColumn<DwCalendarDay> get day =>
+      (const RelationDetailTable()).day.atPath(tablePath);
+  DwTableColumn<Duration> get elapsed =>
+      (const RelationDetailTable()).elapsed.atPath(tablePath);
+  DwTableColumn<Uint8List> get bytes =>
+      (const RelationDetailTable()).bytes.atPath(tablePath);
+  DwTableColumn<List<String>> get labels =>
+      (const RelationDetailTable()).labels.atPath(tablePath);
+  DwTableColumn<List<DetailState>> get states =>
+      (const RelationDetailTable()).states.atPath(tablePath);
+  DwTableColumn<Map<String, int>> get attributes =>
+      (const RelationDetailTable()).attributes.atPath(tablePath);
+  DwTableColumn<DetailState> get state =>
+      (const RelationDetailTable()).state.atPath(tablePath);
+  DwTableColumn<String?> get optionalText =>
+      (const RelationDetailTable()).optionalText.atPath(tablePath);
+  DwTableColumn<DwCalendarDay?> get optionalDay =>
+      (const RelationDetailTable()).optionalDay.atPath(tablePath);
+  DwTableColumn<DateTime?> get optionalInstant =>
+      (const RelationDetailTable()).optionalInstant.atPath(tablePath);
+  DwTableColumn<Uint8List?> get optionalBytes =>
+      (const RelationDetailTable()).optionalBytes.atPath(tablePath);
+  DwTableColumn<double?> get optionalDouble =>
+      (const RelationDetailTable()).optionalDouble.atPath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const RelationDetailTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(RelationDetailTable t) select,
+  ) => DwIncludeSpec(
+    const RelationDetailTable(),
+    tablePath,
+    nested: select(const RelationDetailTable()),
+  );
+}
+
+final class RelationDetailNullableRelation
+    implements DwToOneRelation<RelationDetailRow?> {
+  const RelationDetailNullableRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int?> get id =>
+      (const RelationDetailTable()).id.atNullablePath(tablePath);
+  DwTableColumn<int?> get ancestorId =>
+      (const RelationDetailTable()).ancestorId.atNullablePath(tablePath);
+  DwTableColumn<String?> get label =>
+      (const RelationDetailTable()).label.atNullablePath(tablePath);
+  DwTableColumn<int?> get integerValue =>
+      (const RelationDetailTable()).integerValue.atNullablePath(tablePath);
+  DwTableColumn<double?> get doubleValue =>
+      (const RelationDetailTable()).doubleValue.atNullablePath(tablePath);
+  DwTableColumn<bool?> get active =>
+      (const RelationDetailTable()).active.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get instant =>
+      (const RelationDetailTable()).instant.atNullablePath(tablePath);
+  DwTableColumn<DwCalendarDay?> get day =>
+      (const RelationDetailTable()).day.atNullablePath(tablePath);
+  DwTableColumn<Duration?> get elapsed =>
+      (const RelationDetailTable()).elapsed.atNullablePath(tablePath);
+  DwTableColumn<Uint8List?> get bytes =>
+      (const RelationDetailTable()).bytes.atNullablePath(tablePath);
+  DwTableColumn<List<String>?> get labels =>
+      (const RelationDetailTable()).labels.atNullablePath(tablePath);
+  DwTableColumn<List<DetailState>?> get states =>
+      (const RelationDetailTable()).states.atNullablePath(tablePath);
+  DwTableColumn<Map<String, int>?> get attributes =>
+      (const RelationDetailTable()).attributes.atNullablePath(tablePath);
+  DwTableColumn<DetailState?> get state =>
+      (const RelationDetailTable()).state.atNullablePath(tablePath);
+  DwTableColumn<String?> get optionalText =>
+      (const RelationDetailTable()).optionalText.atNullablePath(tablePath);
+  DwTableColumn<DwCalendarDay?> get optionalDay =>
+      (const RelationDetailTable()).optionalDay.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get optionalInstant =>
+      (const RelationDetailTable()).optionalInstant.atNullablePath(tablePath);
+  DwTableColumn<Uint8List?> get optionalBytes =>
+      (const RelationDetailTable()).optionalBytes.atNullablePath(tablePath);
+  DwTableColumn<double?> get optionalDouble =>
+      (const RelationDetailTable()).optionalDouble.atNullablePath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const RelationDetailTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(RelationDetailTable t) select,
+  ) => DwIncludeSpec(
+    const RelationDetailTable(),
+    tablePath,
+    nested: select(const RelationDetailTable()),
+  );
+}
+
 mixin _$RelationParentRow on DwTableRow {
   RelationParentRow get _self => this as RelationParentRow;
 
@@ -581,7 +691,7 @@ extension NewRelationParentRowWithId on NewRelationParentRow {
   );
 }
 
-class RelationParentTable extends DwTableDef<RelationParentRow> {
+final class RelationParentTable extends DwTableDef<RelationParentRow> {
   const RelationParentTable({super.tablePath}) : super('relation_parent');
 
   DwTableColumn<int> get detailId => (const DwTableColumn<int>(
@@ -647,6 +757,60 @@ class RelationParentTable extends DwTableDef<RelationParentRow> {
     'title': draft.title,
     'score': draft.score,
   };
+}
+
+final class RelationParentRelation
+    implements DwToOneRelation<RelationParentRow> {
+  const RelationParentRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int> get id =>
+      (const RelationParentTable()).id.atPath(tablePath);
+  DwTableColumn<int> get detailId =>
+      (const RelationParentTable()).detailId.atPath(tablePath);
+  DwTableColumn<int?> get optionalDetailId =>
+      (const RelationParentTable()).optionalDetailId.atPath(tablePath);
+  DwTableColumn<String> get title =>
+      (const RelationParentTable()).title.atPath(tablePath);
+  DwTableColumn<int> get score =>
+      (const RelationParentTable()).score.atPath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const RelationParentTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(RelationParentTable t) select,
+  ) => DwIncludeSpec(
+    const RelationParentTable(),
+    tablePath,
+    nested: select(const RelationParentTable()),
+  );
+}
+
+final class RelationParentNullableRelation
+    implements DwToOneRelation<RelationParentRow?> {
+  const RelationParentNullableRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int?> get id =>
+      (const RelationParentTable()).id.atNullablePath(tablePath);
+  DwTableColumn<int?> get detailId =>
+      (const RelationParentTable()).detailId.atNullablePath(tablePath);
+  DwTableColumn<int?> get optionalDetailId =>
+      (const RelationParentTable()).optionalDetailId.atNullablePath(tablePath);
+  DwTableColumn<String?> get title =>
+      (const RelationParentTable()).title.atNullablePath(tablePath);
+  DwTableColumn<int?> get score =>
+      (const RelationParentTable()).score.atNullablePath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const RelationParentTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(RelationParentTable t) select,
+  ) => DwIncludeSpec(
+    const RelationParentTable(),
+    tablePath,
+    nested: select(const RelationParentTable()),
+  );
 }
 
 mixin _$RelationChildRow on DwTableRow {
@@ -734,7 +898,7 @@ extension NewRelationChildRowWithId on NewRelationChildRow {
       RelationChildRow(id: id, parentId: parentId, rank: rank, note: note);
 }
 
-class RelationChildTable extends DwTableDef<RelationChildRow> {
+final class RelationChildTable extends DwTableDef<RelationChildRow> {
   const RelationChildTable({super.tablePath}) : super('relation_child');
 
   DwTableColumn<int> get parentId => (const DwTableColumn<int>(
@@ -850,7 +1014,7 @@ extension NewRelationNoteRowWithId on NewRelationNoteRow {
       RelationNoteRow(id: id, parentId: parentId, text: text);
 }
 
-class RelationNoteTable extends DwTableDef<RelationNoteRow> {
+final class RelationNoteTable extends DwTableDef<RelationNoteRow> {
   const RelationNoteTable({super.tablePath}) : super('relation_note');
 
   DwTableColumn<int> get parentId => (const DwTableColumn<int>(

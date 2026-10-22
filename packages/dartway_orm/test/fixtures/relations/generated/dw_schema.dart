@@ -24,28 +24,26 @@ extension FixtureDb on DwDatabaseHandle {
   get relationParents => repository(RelationParentRow.tableDef);
 }
 
-extension RelationChildRelations on RelationChildTable {
-  RelationParentRelation<RelationParentRow> get parent =>
-      RelationParentRelation(
-        DwRelationPath(
-          'relation_child',
-          'relation_parent',
-          'parent_id',
-          parent: tablePath,
-        ),
-      );
+extension RelationChildTableRelations on RelationChildTable {
+  RelationParentRelation get parent => RelationParentRelation(
+    DwRelationPath(
+      'relation_child',
+      'relation_parent',
+      'parent_id',
+      parent: tablePath,
+    ),
+  );
 }
 
-extension RelationDetailRelations on RelationDetailTable {
-  RelationDetailRelation<RelationDetailRow?> get ancestor =>
-      RelationDetailRelation(
-        DwRelationPath(
-          'relation_detail',
-          'relation_detail',
-          'ancestor_id',
-          parent: tablePath,
-        ),
-      );
+extension RelationDetailTableRelations on RelationDetailTable {
+  RelationDetailNullableRelation get ancestor => RelationDetailNullableRelation(
+    DwRelationPath(
+      'relation_detail',
+      'relation_detail',
+      'ancestor_id',
+      parent: tablePath,
+    ),
+  );
   DwToManyRelation<RelationDetailRow, RelationDetailTable> get descendants =>
       DwToManyRelation(
         const RelationDetailTable(),
@@ -81,45 +79,117 @@ extension RelationDetailRelations on RelationDetailTable {
   );
 }
 
-final class RelationDetailRelation<R extends RelationDetailRow?>
-    extends RelationDetailTable
-    implements DwToOneRelation<R> {
-  const RelationDetailRelation(DwRelationPath path) : super(tablePath: path);
-  @override
-  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
-  DwRelationInclude include(
-    List<DwRelationInclude> Function(RelationDetailTable t) select,
-  ) => DwIncludeSpec(
-    this,
-    tablePath!,
-    nested: select(const RelationDetailTable()),
+extension RelationDetailRelationRelations on RelationDetailRelation {
+  RelationDetailNullableRelation get ancestor => RelationDetailNullableRelation(
+    DwRelationPath(
+      'relation_detail',
+      'relation_detail',
+      'ancestor_id',
+      parent: tablePath,
+    ),
+  );
+  DwToManyRelation<RelationDetailRow, RelationDetailTable> get descendants =>
+      DwToManyRelation(
+        const RelationDetailTable(),
+        DwRelationPath(
+          'relation_detail',
+          'relation_detail',
+          'ancestor_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<RelationParentRow, RelationParentTable> get parents =>
+      DwToManyRelation(
+        const RelationParentTable(),
+        DwRelationPath(
+          'relation_detail',
+          'relation_parent',
+          'detail_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<RelationParentRow, RelationParentTable>
+  get optionalParents => DwToManyRelation(
+    const RelationParentTable(),
+    DwRelationPath(
+      'relation_detail',
+      'relation_parent',
+      'optional_detail_id',
+      parent: tablePath,
+      many: true,
+    ),
   );
 }
 
-extension RelationNoteRelations on RelationNoteTable {
-  RelationParentRelation<RelationParentRow> get parent =>
-      RelationParentRelation(
+extension RelationDetailNullableRelationRelations
+    on RelationDetailNullableRelation {
+  RelationDetailNullableRelation get ancestor => RelationDetailNullableRelation(
+    DwRelationPath(
+      'relation_detail',
+      'relation_detail',
+      'ancestor_id',
+      parent: tablePath,
+    ),
+  );
+  DwToManyRelation<RelationDetailRow, RelationDetailTable> get descendants =>
+      DwToManyRelation(
+        const RelationDetailTable(),
         DwRelationPath(
-          'relation_note',
-          'relation_parent',
-          'parent_id',
+          'relation_detail',
+          'relation_detail',
+          'ancestor_id',
           parent: tablePath,
+          many: true,
         ),
       );
-}
-
-extension RelationParentRelations on RelationParentTable {
-  RelationDetailRelation<RelationDetailRow> get detail =>
-      RelationDetailRelation(
+  DwToManyRelation<RelationParentRow, RelationParentTable> get parents =>
+      DwToManyRelation(
+        const RelationParentTable(),
         DwRelationPath(
-          'relation_parent',
           'relation_detail',
+          'relation_parent',
           'detail_id',
           parent: tablePath,
+          many: true,
         ),
       );
-  RelationDetailRelation<RelationDetailRow?> get optionalDetail =>
-      RelationDetailRelation(
+  DwToManyRelation<RelationParentRow, RelationParentTable>
+  get optionalParents => DwToManyRelation(
+    const RelationParentTable(),
+    DwRelationPath(
+      'relation_detail',
+      'relation_parent',
+      'optional_detail_id',
+      parent: tablePath,
+      many: true,
+    ),
+  );
+}
+
+extension RelationNoteTableRelations on RelationNoteTable {
+  RelationParentRelation get parent => RelationParentRelation(
+    DwRelationPath(
+      'relation_note',
+      'relation_parent',
+      'parent_id',
+      parent: tablePath,
+    ),
+  );
+}
+
+extension RelationParentTableRelations on RelationParentTable {
+  RelationDetailRelation get detail => RelationDetailRelation(
+    DwRelationPath(
+      'relation_parent',
+      'relation_detail',
+      'detail_id',
+      parent: tablePath,
+    ),
+  );
+  RelationDetailNullableRelation get optionalDetail =>
+      RelationDetailNullableRelation(
         DwRelationPath(
           'relation_parent',
           'relation_detail',
@@ -151,17 +221,87 @@ extension RelationParentRelations on RelationParentTable {
       );
 }
 
-final class RelationParentRelation<R extends RelationParentRow?>
-    extends RelationParentTable
-    implements DwToOneRelation<R> {
-  const RelationParentRelation(DwRelationPath path) : super(tablePath: path);
-  @override
-  DwIncludeSpec get includeSpec => DwIncludeSpec(this, tablePath!);
-  DwRelationInclude include(
-    List<DwRelationInclude> Function(RelationParentTable t) select,
-  ) => DwIncludeSpec(
-    this,
-    tablePath!,
-    nested: select(const RelationParentTable()),
+extension RelationParentRelationRelations on RelationParentRelation {
+  RelationDetailRelation get detail => RelationDetailRelation(
+    DwRelationPath(
+      'relation_parent',
+      'relation_detail',
+      'detail_id',
+      parent: tablePath,
+    ),
   );
+  RelationDetailNullableRelation get optionalDetail =>
+      RelationDetailNullableRelation(
+        DwRelationPath(
+          'relation_parent',
+          'relation_detail',
+          'optional_detail_id',
+          parent: tablePath,
+        ),
+      );
+  DwToManyRelation<RelationChildRow, RelationChildTable> get children =>
+      DwToManyRelation(
+        const RelationChildTable(),
+        DwRelationPath(
+          'relation_parent',
+          'relation_child',
+          'parent_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<RelationNoteRow, RelationNoteTable> get notes =>
+      DwToManyRelation(
+        const RelationNoteTable(),
+        DwRelationPath(
+          'relation_parent',
+          'relation_note',
+          'parent_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+}
+
+extension RelationParentNullableRelationRelations
+    on RelationParentNullableRelation {
+  RelationDetailNullableRelation get detail => RelationDetailNullableRelation(
+    DwRelationPath(
+      'relation_parent',
+      'relation_detail',
+      'detail_id',
+      parent: tablePath,
+    ),
+  );
+  RelationDetailNullableRelation get optionalDetail =>
+      RelationDetailNullableRelation(
+        DwRelationPath(
+          'relation_parent',
+          'relation_detail',
+          'optional_detail_id',
+          parent: tablePath,
+        ),
+      );
+  DwToManyRelation<RelationChildRow, RelationChildTable> get children =>
+      DwToManyRelation(
+        const RelationChildTable(),
+        DwRelationPath(
+          'relation_parent',
+          'relation_child',
+          'parent_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
+  DwToManyRelation<RelationNoteRow, RelationNoteTable> get notes =>
+      DwToManyRelation(
+        const RelationNoteTable(),
+        DwRelationPath(
+          'relation_parent',
+          'relation_note',
+          'parent_id',
+          parent: tablePath,
+          many: true,
+        ),
+      );
 }

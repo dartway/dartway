@@ -142,7 +142,7 @@ extension NewCatalogEntryRowWithId on NewCatalogEntryRow {
   );
 }
 
-class CatalogEntryTable extends DwTableDef<CatalogEntryRow> {
+final class CatalogEntryTable extends DwTableDef<CatalogEntryRow> {
   const CatalogEntryTable({super.tablePath}) : super('catalog_entry');
 
   DwTableColumn<String> get name => (const DwTableColumn<String>(

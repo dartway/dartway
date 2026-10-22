@@ -175,7 +175,7 @@ extension NewUserProfileRowWithId on NewUserProfileRow {
   );
 }
 
-class UserProfileTable extends DwTableDef<UserProfileRow> {
+final class UserProfileTable extends DwTableDef<UserProfileRow> {
   const UserProfileTable({super.tablePath}) : super('user_profile');
 
   DwTableColumn<int> get accountId => (const DwTableColumn<int>(

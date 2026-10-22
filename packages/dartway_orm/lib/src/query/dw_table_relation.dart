@@ -1,10 +1,4 @@
-import 'package:meta/meta.dart';
-import 'package:postgres/postgres.dart' as pg;
-
-import '../db/dw_result_row.dart';
-import '../entity/dw_table_def.dart';
-import '../entity/dw_table_row.dart';
-import 'dw_table_column.dart';
+part of 'dw_table_column.dart';
 
 /// A generated foreign-key path. Values never enter its SQL identifiers.
 final class DwRelationPath {
@@ -40,23 +34,23 @@ abstract interface class DwToOneRelation<R extends DwTableRow?>
 /// The reverse side of a foreign key. Quantifiers do not multiply root rows.
 final class DwToManyRelation<R extends DwTableRow, T extends DwTableDef<R>>
     implements DwRelationInclude {
-  const DwToManyRelation(this.table, this.path);
+  const DwToManyRelation(this._table, this.path);
 
-  final T table;
+  final T _table;
   final DwRelationPath path;
 
   DwWhereCondition any(DwWhereCondition Function(T t) where) =>
-      _DwRelationTest(table, path, where(table), _Quantifier.any);
+      _DwRelationTest(_table, path, where(_table), _Quantifier.any);
   DwWhereCondition none(DwWhereCondition Function(T t) where) =>
-      _DwRelationTest(table, path, where(table), _Quantifier.none);
+      _DwRelationTest(_table, path, where(_table), _Quantifier.none);
 
   /// True for no children, and when every child satisfies [where]. A null
   /// comparison is false, exactly as for ordinary ORM conditions.
   DwWhereCondition every(DwWhereCondition Function(T t) where) =>
-      _DwRelationTest(table, path, where(table), _Quantifier.every);
+      _DwRelationTest(_table, path, where(_table), _Quantifier.every);
 
   DwRelationCount count({DwWhereCondition Function(T t)? where}) =>
-      DwRelationCount._(table, path, where?.call(table));
+      DwRelationCount._(_table, path, where?.call(_table));
 
   DwRelationInclude take(
     int limit, {
@@ -66,12 +60,12 @@ final class DwToManyRelation<R extends DwTableRow, T extends DwTableDef<R>>
   }) {
     RangeError.checkNotNegative(limit, 'limit');
     return DwIncludeSpec(
-      table,
+      _table,
       path,
       limit: limit,
-      where: where?.call(table),
-      orderBy: orderBy?.call(table) ?? const [],
-      nested: include?.call(table) ?? const [],
+      where: where?.call(_table),
+      orderBy: orderBy?.call(_table) ?? const [],
+      nested: include?.call(_table) ?? const [],
     );
   }
 
@@ -83,12 +77,12 @@ final class DwToManyRelation<R extends DwTableRow, T extends DwTableDef<R>>
   }) {
     if (reason.trim().isEmpty) throw ArgumentError.value(reason, 'reason');
     return DwIncludeSpec(
-      table,
+      _table,
       path,
       unbounded: reason,
-      where: where?.call(table),
-      orderBy: orderBy?.call(table) ?? const [],
-      nested: include?.call(table) ?? const [],
+      where: where?.call(_table),
+      orderBy: orderBy?.call(_table) ?? const [],
+      nested: include?.call(_table) ?? const [],
     );
   }
 
@@ -101,8 +95,8 @@ final class DwToManyRelation<R extends DwTableRow, T extends DwTableDef<R>>
 
 /// A correlated count, comparable without exposing an order term.
 final class DwRelationCount {
-  const DwRelationCount._(this.table, this.path, this.where);
-  final DwTableDef<DwTableRow> table;
+  const DwRelationCount._(this._table, this.path, this.where);
+  final DwTableDef<DwTableRow> _table;
   final DwRelationPath path;
   final DwWhereCondition? where;
 
@@ -112,7 +106,7 @@ final class DwRelationCount {
   DwWhereCondition lt(int value) => _compare('<', value);
   DwWhereCondition lte(int value) => _compare('<=', value);
   DwWhereCondition _compare(String op, int value) => _DwRelationTest(
-    table,
+    _table,
     path,
     where,
     _Quantifier.count,
@@ -273,13 +267,16 @@ String dwIncludeProjection(
       : writer.relationAlias(spec.path.parent!);
   final alias = writer.nextAlias();
   final child = writer.scope(spec.table.tableName, alias);
+  final terms = spec.orderBy.isEmpty && spec.limit != null
+      ? [spec.table.id.asc()]
+      : spec.orderBy;
   final json = _rowJson(child, spec.table, spec.nested);
   if (grouped && spec.limit == null) {
     final fk =
         '${dwQuoteIdentifier(alias)}.${dwQuoteIdentifier(spec.path.foreignKey)}';
     final order = spec.orderBy.isEmpty
         ? ''
-        : ' ORDER BY ${spec.orderBy.map((t) => t.sqlIn(child)).join(', ')}';
+        : ' ORDER BY ${terms.map((t) => t.sqlIn(child)).join(', ')}';
     child.write(
       'SELECT $fk AS "dw_parent", json_agg($json$order) AS "dw_rows" '
       'FROM ${dwQuoteIdentifier(spec.table.tableName)} ${dwQuoteIdentifier(alias)}',
@@ -296,8 +293,12 @@ String dwIncludeProjection(
     );
     return "COALESCE(${dwQuoteIdentifier(groupedAlias)}.\"dw_rows\", '[]'::json)";
   }
+  final orderColumns = [
+    for (final (i, term) in terms.indexed)
+      '${term.column.sqlIn(child)} AS "dw_order_$i"',
+  ];
   child.write(
-    'SELECT $json AS "dw_row" '
+    'SELECT $json AS "dw_row"${orderColumns.isEmpty ? '' : ', ${orderColumns.join(', ')}'} '
     'FROM ${dwQuoteIdentifier(spec.table.tableName)} ${dwQuoteIdentifier(alias)} '
     'WHERE ${dwQuoteIdentifier(alias)}.${dwQuoteIdentifier(spec.path.foreignKey)} = '
     '${dwQuoteIdentifier(parent)}."id"',
@@ -307,18 +308,19 @@ String dwIncludeProjection(
     spec.where!.write(child);
     child.write(')');
   }
-  if (spec.orderBy.isNotEmpty) {
-    child.write(
-      ' ORDER BY ${spec.orderBy.map((t) => t.sqlIn(child)).join(', ')}',
-    );
+  if (terms.isNotEmpty && spec.limit != null) {
+    child.write(' ORDER BY ${terms.map((t) => t.sqlIn(child)).join(', ')}');
   }
   if (spec.limit != null) {
     child.write(' LIMIT ${writer.parameter(spec.limit, pg.Type.bigInteger)}');
   }
+  final aggregateOrder = terms.isEmpty
+      ? ''
+      : ' ORDER BY ${[for (final (i, term) in terms.indexed) '"dw_order_$i"${term.descending ? ' DESC' : ''}'].join(', ')}';
   final lateral = '${alias}_rows';
   writer.joins.add(
     'LEFT JOIN LATERAL (SELECT '
-    "COALESCE(json_agg(\"dw_row\"), '[]'::json) AS \"dw_rows\" "
+    "COALESCE(json_agg(\"dw_row\"$aggregateOrder), '[]'::json) AS \"dw_rows\" "
     'FROM (${child.sql}) ${dwQuoteIdentifier('${alias}_page')}) '
     '${dwQuoteIdentifier(lateral)} ON TRUE',
   );

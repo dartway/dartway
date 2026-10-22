@@ -71,7 +71,7 @@ extension NewWorkItemRowWithId on NewWorkItemRow {
       WorkItemRow(id: id, status: status, title: title);
 }
 
-class WorkItemTable extends DwTableDef<WorkItemRow> {
+final class WorkItemTable extends DwTableDef<WorkItemRow> {
   const WorkItemTable({super.tablePath}) : super('work_item');
 
   DwTableColumn<WorkStatus> get status => (const DwTableColumn<WorkStatus>(

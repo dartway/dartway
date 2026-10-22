@@ -1,12 +1,13 @@
 import '../emit/source_text.dart';
 import '../emit/value_class_writer.dart';
 import 'entity_model.dart';
+import 'relation_emitter.dart';
 
 /// Writes the generated code of one row class: the value mixin, `copyWith`,
 /// the draft (`New<Name>Row`) and the table definition (the shape of
 /// `packages/dartway_orm/test/fixtures`).
 abstract final class EntityEmitter {
-  static String emit(EntityClass entity) {
+  static String emit(EntityClass entity, {bool relationTarget = false}) {
     final values = _values(entity);
     return [
       _mixin(entity),
@@ -27,6 +28,7 @@ abstract final class EntityEmitter {
       ?ValueClassWriter.copyWith(entity.draftClass, values),
       _withId(entity, values),
       _table(entity),
+      if (relationTarget) emitRelationViews(entity),
     ].join('\n\n');
   }
 
@@ -113,7 +115,7 @@ abstract final class EntityEmitter {
       '@override\nMap<String, Object?> toDraftRow(${entity.draftClass} draft) => '
           '${_valueMap(columns, 'draft')};',
     ];
-    return 'class ${entity.tableClass} extends DwTableDef<$name> {\n'
+    return 'final class ${entity.tableClass} extends DwTableDef<$name> {\n'
         '${members.join('\n\n')}\n'
         '}';
   }

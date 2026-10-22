@@ -114,7 +114,7 @@ extension NewSessionBookingRowWithId on NewSessionBookingRow {
   );
 }
 
-class SessionBookingTable extends DwTableDef<SessionBookingRow> {
+final class SessionBookingTable extends DwTableDef<SessionBookingRow> {
   const SessionBookingTable({super.tablePath}) : super('session_booking');
 
   DwTableColumn<int> get sessionId => (const DwTableColumn<int>(
@@ -194,6 +194,60 @@ class SessionBookingTable extends DwTableDef<SessionBookingRow> {
     'status': draft.status,
     'created_at': draft.createdAt,
   };
+}
+
+final class SessionBookingRelation
+    implements DwToOneRelation<SessionBookingRow> {
+  const SessionBookingRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int> get id =>
+      (const SessionBookingTable()).id.atPath(tablePath);
+  DwTableColumn<int> get sessionId =>
+      (const SessionBookingTable()).sessionId.atPath(tablePath);
+  DwTableColumn<int> get clientProfileId =>
+      (const SessionBookingTable()).clientProfileId.atPath(tablePath);
+  DwTableColumn<BookingStatus> get status =>
+      (const SessionBookingTable()).status.atPath(tablePath);
+  DwTableColumn<DateTime> get createdAt =>
+      (const SessionBookingTable()).createdAt.atPath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const SessionBookingTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(SessionBookingTable t) select,
+  ) => DwIncludeSpec(
+    const SessionBookingTable(),
+    tablePath,
+    nested: select(const SessionBookingTable()),
+  );
+}
+
+final class SessionBookingNullableRelation
+    implements DwToOneRelation<SessionBookingRow?> {
+  const SessionBookingNullableRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int?> get id =>
+      (const SessionBookingTable()).id.atNullablePath(tablePath);
+  DwTableColumn<int?> get sessionId =>
+      (const SessionBookingTable()).sessionId.atNullablePath(tablePath);
+  DwTableColumn<int?> get clientProfileId =>
+      (const SessionBookingTable()).clientProfileId.atNullablePath(tablePath);
+  DwTableColumn<BookingStatus?> get status =>
+      (const SessionBookingTable()).status.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get createdAt =>
+      (const SessionBookingTable()).createdAt.atNullablePath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const SessionBookingTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(SessionBookingTable t) select,
+  ) => DwIncludeSpec(
+    const SessionBookingTable(),
+    tablePath,
+    nested: select(const SessionBookingTable()),
+  );
 }
 
 mixin _$SessionReviewRow on DwTableRow {
@@ -300,7 +354,7 @@ extension NewSessionReviewRowWithId on NewSessionReviewRow {
   );
 }
 
-class SessionReviewTable extends DwTableDef<SessionReviewRow> {
+final class SessionReviewTable extends DwTableDef<SessionReviewRow> {
   const SessionReviewTable({super.tablePath}) : super('session_review');
 
   DwTableColumn<int> get bookingId => (const DwTableColumn<int>(

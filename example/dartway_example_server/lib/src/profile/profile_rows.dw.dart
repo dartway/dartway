@@ -186,7 +186,7 @@ extension NewUserProfileRowWithId on NewUserProfileRow {
   );
 }
 
-class UserProfileTable extends DwTableDef<UserProfileRow> {
+final class UserProfileTable extends DwTableDef<UserProfileRow> {
   const UserProfileTable({super.tablePath}) : super('user_profile');
 
   DwTableColumn<int?> get accountId => (const DwTableColumn<int?>(
@@ -314,4 +314,84 @@ class UserProfileTable extends DwTableDef<UserProfileRow> {
     'test_verification_code': draft.testVerificationCode,
     'deleted_at': draft.deletedAt,
   };
+}
+
+final class UserProfileRelation implements DwToOneRelation<UserProfileRow> {
+  const UserProfileRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int> get id => (const UserProfileTable()).id.atPath(tablePath);
+  DwTableColumn<int?> get accountId =>
+      (const UserProfileTable()).accountId.atPath(tablePath);
+  DwTableColumn<String> get phone =>
+      (const UserProfileTable()).phone.atPath(tablePath);
+  DwTableColumn<String> get firstName =>
+      (const UserProfileTable()).firstName.atPath(tablePath);
+  DwTableColumn<String?> get lastName =>
+      (const UserProfileTable()).lastName.atPath(tablePath);
+  DwTableColumn<String?> get imageUrl =>
+      (const UserProfileTable()).imageUrl.atPath(tablePath);
+  DwTableColumn<UserGender?> get gender =>
+      (const UserProfileTable()).gender.atPath(tablePath);
+  DwTableColumn<UserRole> get role =>
+      (const UserProfileTable()).role.atPath(tablePath);
+  DwTableColumn<bool> get agreedForMarketing =>
+      (const UserProfileTable()).agreedForMarketing.atPath(tablePath);
+  DwTableColumn<DateTime> get conditionsAcceptedAt =>
+      (const UserProfileTable()).conditionsAcceptedAt.atPath(tablePath);
+  DwTableColumn<String?> get testVerificationCode =>
+      (const UserProfileTable()).testVerificationCode.atPath(tablePath);
+  DwTableColumn<DateTime?> get deletedAt =>
+      (const UserProfileTable()).deletedAt.atPath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const UserProfileTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(UserProfileTable t) select,
+  ) => DwIncludeSpec(
+    const UserProfileTable(),
+    tablePath,
+    nested: select(const UserProfileTable()),
+  );
+}
+
+final class UserProfileNullableRelation
+    implements DwToOneRelation<UserProfileRow?> {
+  const UserProfileNullableRelation(this.tablePath);
+  final DwRelationPath tablePath;
+
+  DwTableColumn<int?> get id =>
+      (const UserProfileTable()).id.atNullablePath(tablePath);
+  DwTableColumn<int?> get accountId =>
+      (const UserProfileTable()).accountId.atNullablePath(tablePath);
+  DwTableColumn<String?> get phone =>
+      (const UserProfileTable()).phone.atNullablePath(tablePath);
+  DwTableColumn<String?> get firstName =>
+      (const UserProfileTable()).firstName.atNullablePath(tablePath);
+  DwTableColumn<String?> get lastName =>
+      (const UserProfileTable()).lastName.atNullablePath(tablePath);
+  DwTableColumn<String?> get imageUrl =>
+      (const UserProfileTable()).imageUrl.atNullablePath(tablePath);
+  DwTableColumn<UserGender?> get gender =>
+      (const UserProfileTable()).gender.atNullablePath(tablePath);
+  DwTableColumn<UserRole?> get role =>
+      (const UserProfileTable()).role.atNullablePath(tablePath);
+  DwTableColumn<bool?> get agreedForMarketing =>
+      (const UserProfileTable()).agreedForMarketing.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get conditionsAcceptedAt =>
+      (const UserProfileTable()).conditionsAcceptedAt.atNullablePath(tablePath);
+  DwTableColumn<String?> get testVerificationCode =>
+      (const UserProfileTable()).testVerificationCode.atNullablePath(tablePath);
+  DwTableColumn<DateTime?> get deletedAt =>
+      (const UserProfileTable()).deletedAt.atNullablePath(tablePath);
+  @override
+  DwIncludeSpec get includeSpec =>
+      DwIncludeSpec(const UserProfileTable(), tablePath);
+  DwRelationInclude include(
+    List<DwRelationInclude> Function(UserProfileTable t) select,
+  ) => DwIncludeSpec(
+    const UserProfileTable(),
+    tablePath,
+    nested: select(const UserProfileTable()),
+  );
 }

@@ -3,9 +3,13 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:postgres/postgres.dart' as pg;
 
 import '../entity/dw_annotations.dart';
-import 'dw_table_relation.dart';
+import '../db/dw_result_row.dart';
+import '../entity/dw_table_def.dart';
+import '../entity/dw_table_row.dart';
 import '../entity/dw_column_type.dart';
 import '../schema/dw_database_schema.dart';
+
+part 'dw_table_relation.dart';
 
 /// A column of a table, typed by the Dart value it holds.
 ///
@@ -56,6 +60,10 @@ final class DwTableColumn<T> {
           relationPath: path,
         );
 
+  /// Generated nullable relation views widen both the decode and Dart type.
+  DwTableColumn<T?> atNullablePath(DwRelationPath path) =>
+      DwTableColumn<T?>(name, type, relationPath: path);
+
   final String name;
   final DwColumnType<T> type;
   final bool primaryKey;
@@ -104,7 +112,12 @@ final class DwTableColumn<T> {
   DwColumnAssignment<T> set(T value) => DwColumnAssignment._(this, value);
 
   @internal
-  String get sql => dwQuoteIdentifier(name);
+  String get sql {
+    if (relationPath != null) {
+      throw ArgumentError('a related column requires a query path');
+    }
+    return dwQuoteIdentifier(name);
+  }
 
   @internal
   String sqlIn(DwSqlWriter writer) => writer.column(name, relationPath);
@@ -212,7 +225,7 @@ final class _DwListOverlap<E> extends DwWhereCondition {
 /// Null follows Dart, not SQL three-valued logic: a comparison against a null
 /// cell is false, and [not] of it is true. `NOT` is therefore written as
 /// `IS NOT TRUE`, which is exactly that.
-abstract class DwWhereCondition {
+sealed class DwWhereCondition {
   const DwWhereCondition();
 
   DwWhereCondition operator &(DwWhereCondition other) =>
@@ -225,6 +238,45 @@ abstract class DwWhereCondition {
 
   @internal
   void write(DwSqlWriter writer);
+
+  bool get _onlyRelated => switch (this) {
+    _DwJunction(:final left, :final right) =>
+      left._onlyRelated && right._onlyRelated,
+    _DwNot(:final inner) => inner._onlyRelated,
+    _DwRelationTest(:final path) => path.parent != null,
+    _DwComparison(:final column) => column.relationPath != null,
+    _DwBetween(:final column) => column.relationPath != null,
+    _DwNullTest(:final column) => column.relationPath != null,
+    _DwMembership(:final column) => column.relationPath != null,
+    _DwListLength(:final column) => column.relationPath != null,
+    _DwListOverlap(:final column) => column.relationPath != null,
+  };
+
+  Iterable<DwWhereCondition> get _conjuncts sync* {
+    if (this case _DwJunction(operator: 'AND', :final left, :final right)) {
+      yield* left._conjuncts;
+      yield* right._conjuncts;
+    } else {
+      yield this;
+    }
+  }
+
+  // Keep root predicates in the outer mutation, where PostgreSQL rechecks
+  // them after a concurrent writer releases the row lock. Only related
+  // leaves need a join-bearing subquery; junctions preserve boolean shape.
+  @internal
+  void writeMutation(DwSqlWriter writer) {
+    final condition = writer.scope(writer.rootTable!, writer.rootAlias!);
+    final root = dwQuoteIdentifier(writer.rootTable!);
+    final prefix = 'SELECT $root."id" FROM $root WHERE ';
+    condition.write(prefix);
+    write(condition);
+    writer.write(
+      condition.joins.isEmpty
+          ? condition.sql.substring(prefix.length)
+          : '$root."id" IN (${condition.sql})',
+    );
+  }
 }
 
 final class _DwComparison<T> extends DwWhereCondition {
@@ -295,11 +347,41 @@ final class _DwJunction extends DwWhereCondition {
   final DwWhereCondition right;
 
   @override
-  void write(DwSqlWriter writer) {
+  void write(DwSqlWriter writer) => _write(writer, mutation: false);
+
+  @override
+  void writeMutation(DwSqlWriter writer) {
+    if (_onlyRelated) {
+      super.writeMutation(writer);
+      return;
+    }
+    if (operator != 'AND') {
+      _write(writer, mutation: true);
+      return;
+    }
+    final rootTerms = <DwWhereCondition>[];
+    DwWhereCondition? related;
+    for (final term in _conjuncts) {
+      if (term._onlyRelated) {
+        related = related == null ? term : related & term;
+      } else {
+        rootTerms.add(term);
+      }
+    }
+    if (related != null) rootTerms.add(related);
     writer.write('(');
-    left.write(writer);
+    for (final (i, term) in rootTerms.indexed) {
+      if (i != 0) writer.write(' AND ');
+      term.writeMutation(writer);
+    }
+    writer.write(')');
+  }
+
+  void _write(DwSqlWriter writer, {required bool mutation}) {
+    writer.write('(');
+    mutation ? left.writeMutation(writer) : left.write(writer);
     writer.write(' $operator ');
-    right.write(writer);
+    mutation ? right.writeMutation(writer) : right.write(writer);
     writer.write(')');
   }
 }
@@ -310,9 +392,14 @@ final class _DwNot extends DwWhereCondition {
   final DwWhereCondition inner;
 
   @override
-  void write(DwSqlWriter writer) {
+  void write(DwSqlWriter writer) => _write(writer, mutation: false);
+
+  @override
+  void writeMutation(DwSqlWriter writer) => _write(writer, mutation: true);
+
+  void _write(DwSqlWriter writer, {required bool mutation}) {
     writer.write('(');
-    inner.write(writer);
+    mutation ? inner.writeMutation(writer) : inner.write(writer);
     writer.write(') IS NOT TRUE');
   }
 }

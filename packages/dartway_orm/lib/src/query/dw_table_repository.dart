@@ -11,7 +11,6 @@ import '../entity/dw_table_row.dart';
 import '../entity/dw_annotations.dart';
 import '../entity/dw_table_def.dart';
 import 'dw_table_column.dart';
-import 'dw_table_relation.dart';
 import 'dw_row_lock.dart';
 
 /// Typed access to the table of one row class through a [DwDatabaseHandle].
@@ -262,12 +261,13 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     DwWhereCondition Function(T t)? where,
   }) async {
     final key = group(table);
+    final keyAlias = _sql.keyAlias;
     final terms = orderBy(table);
     final writer = DwSqlWriter(rootTable: table.tableName);
     writer.write(
       _sql.select.replaceFirst(
         'SELECT ',
-        'SELECT DISTINCT ON (${key.sqlIn(writer)}) ',
+        'SELECT DISTINCT ON (${key.sqlIn(writer)}) ${key.sqlIn(writer)} AS ${dwQuoteIdentifier(keyAlias)}, ',
       ),
     );
     _writeWhere(writer, where);
@@ -277,7 +277,7 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
     final result = await _run(writer);
     return {
       for (final row in dwResultRows(result))
-        row.decode(key): table.fromRow(row),
+        row.decode(key, name: keyAlias): table.fromRow(row),
     };
   }
 
@@ -628,13 +628,13 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   ) async {
     final writer = DwSqlWriter(rootTable: table.tableName);
     writer.write(
-      'SELECT ${group.sqlIn(writer)}, ${aggregate(writer)} AS "dw_value" FROM ${_sql.table}',
+      'SELECT ${group.sqlIn(writer)} AS "dw_key", ${aggregate(writer)} AS "dw_value" FROM ${_sql.table}',
     );
     _writeWhere(writer, where);
     writer.write(' GROUP BY ${group.sqlIn(writer)}');
     return {
       for (final row in dwResultRows(await _run(writer)))
-        row.decode(group): decode(row['dw_value']),
+        row.decode(group, name: 'dw_key'): decode(row['dw_value']),
     };
   }
 
@@ -692,15 +692,8 @@ final class DwTableRepository<R extends DwTableRow, T extends DwTableDef<R>> {
   void _writeWhere(DwSqlWriter writer, DwWhereCondition Function(T t)? where) {
     if (where == null) return;
     if (writer.sql.startsWith('UPDATE ') || writer.sql.startsWith('DELETE ')) {
-      final condition = writer.scope(table.tableName, table.tableName);
-      final prefix = 'SELECT ${_sql.table}."id" FROM ${_sql.table} WHERE ';
-      condition.write(prefix);
-      where(table).write(condition);
-      writer.write(
-        condition.joins.isEmpty
-            ? ' WHERE ${condition.sql.substring(prefix.length)}'
-            : ' WHERE ${_sql.table}."id" IN (${condition.sql})',
-      );
+      writer.write(' WHERE ');
+      where(table).writeMutation(writer);
     } else {
       writer.write(' WHERE ');
       where(table).write(writer);
@@ -760,6 +753,15 @@ final class _DwTableSql {
   final String table;
   final List<DwTableColumn<Object?>> columns;
   late final String returning;
+  late final String keyAlias = () {
+    final names = columns.map((c) => c.name).toSet();
+    var alias = 'dw_key';
+    while (names.contains(alias)) {
+      alias = '${alias}_';
+    }
+    return alias;
+  }();
+
   late final String select;
   late final String selectById;
   late final String selectByIds;
