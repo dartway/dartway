@@ -1,6 +1,6 @@
 name: dartway_cli
 description: "DartWay command-line tool: print the agent setup brief, check prerequisites, create projects from the canonical template, install the AI toolkit, run convention checks, deploy."
-version: 0.26.1
+version: 0.27.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -15,15 +15,13 @@ executables:
 
 dependencies:
   args: ^2.6.0
+  crypto: ^3.0.0
+  glob: ^2.1.3
   path: ^1.9.0
   pub_semver: ^2.1.4
   yaml: ^3.1.2
 
 dev_dependencies:
-  glob: ^2.1.3
-  # The local stack proof signs a presigned S3 upload the way the framework
-  # does, to prove the rendered storage host lets one through.
-  crypto: ^3.0.0
   # `dartway dev proxy` is proven against a real server's live-socket origin
   # check, not against a reading of it.
   dartway_core_server: ^0.24.0

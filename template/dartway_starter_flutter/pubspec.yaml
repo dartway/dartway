@@ -82,7 +82,7 @@ dev_dependencies:
   # one origin locally, as the deployment does (no CORS); `format` formats on
   # the Dart `.fvmrc` pins; `check` grades this package against the
   # conventions.
-  dartway_cli: ^0.26.1
+  dartway_cli: ^0.27.0
 
 # Inside the monorepo the template builds against the LOCAL framework packages.
 # `dartway create` removes this whole block when it copies the template.

@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.27.0
+
+### Breaking changes
+
+- **BREAKING (check):** opt into Studio resources with `.dartway/design.json`.
+  `designResourceCopied` rejects content-identical copies under app `assets/`;
+  use the design link in the one asset dictionary instead. `designResourcesInvalid`
+  checks configuration, symlink, pubspec and Docker context. `check --fix` creates
+  the relative link and wires template web images without copying resources into
+  the app. No config leaves these checks disabled. See the
+  [migration note](../../docs/migrations/2026-10-23-design-resources-link.md).
+
 ## 0.26.1
 
 - Install and reinstall the CLI from pub.dev; update plans name the exact target CLI version in the activation command.

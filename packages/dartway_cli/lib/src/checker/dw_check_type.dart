@@ -91,6 +91,12 @@ enum DwCheckType {
   /// the code compiles and the screen renders a blank where the image was.
   assetPathMissing,
 
+  /// Configured Studio publication, relative link or asset registration is invalid.
+  designResourcesInvalid,
+
+  /// An app-owned asset has the same content hash as a Studio resource.
+  designResourceCopied,
+
   /// A raw `assets/...` path outside `ui_kit/`. Asset paths live in one place
   /// in the kit — a path spelled out in a screen survives a renamed file only
   /// by accident, and cannot be found by search.
