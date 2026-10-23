@@ -72,6 +72,27 @@ Note the variant picking a real Material widget rather than repainting one: an o
 worn by an `OutlinedButton`, so focus, hover and disabled states come from Flutter instead of being
 re-derived.
 
+## Studio resources and app assets
+
+Studio-published resources are read-only in the design folder. Opt in at the
+project root with `.dartway/design.json`: `{"path":"dw_studio"}` (`{}` defaults
+to `dw_studio`). The path stays inside the project; nested paths use their final
+directory name as the Flutter link. Run `dartway check --fix` and commit the
+relative symlink and the template web Docker context edits it creates.
+
+List `dw_studio/ui_kit/resources/` under `flutter.assets`. The one dictionary,
+`lib/ui_kit/assets/app_icon.dart`, names both sources: `assets/...` for app-owned
+files and `dw_studio/ui_kit/resources/<key>.<ext>` for Studio resources. Identical
+copies under `assets/` fail `designResourceCopied`, which names the design key.
+`designResourcesInvalid` verifies config, link, pubspec and Docker context.
+Custom web Dockerfiles must copy the resources beside the Flutter package, preserving
+`<design path>/ui_kit/resources/`. No design config disables these rules.
+
+Android bundles use the normal `dw_studio/ui_kit/resources/...` key through the
+symlink. The framework repository's
+[`tool/prove_design_resources_android.sh`](https://github.com/dartway/dartway/blob/master/tool/prove_design_resources_android.sh)
+reproduces the release APK proof and compares its bundled resource bytes.
+
 ## Naming: whose symbol is this?
 
 `Dw*` is the framework — it arrives from outside, it gets updated, you do not edit it. The kit is

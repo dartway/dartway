@@ -30,6 +30,7 @@ import '../checker/dw_project_template.dart';
 import '../checker/dw_uniformity_rules.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
+import '../design_resources.dart';
 import '../checker/dw_check_tally.dart';
 
 /// Runs the built-in DartWay convention checks: the Flutter package's
@@ -67,7 +68,8 @@ class CheckCommand extends Command<int> {
             'Before checking, rewrite relative imports in lib/ to package: '
             '(relativeImport) and move root-level acceptance tests to the '
             'mirror of their lib/src/<feature>/ (testLayout); --type and '
-            '--dir narrow it.',
+            '--dir narrow it. Create the configured design resource symlink '
+            '(designResourcesInvalid).',
       );
   }
 
@@ -140,6 +142,22 @@ class CheckCommand extends Command<int> {
         ?layout?.serverPackageDir,
       ])) {
         stdout.writeln('🔧 moved to the mirror of lib/ — $line');
+      }
+    }
+
+    if (fixes(DwCheckType.designResourcesInvalid) && dir == null) {
+      try {
+        final design = DwDesignResources.read(flutterPackageDir);
+        if (design?.createLink() case final message?) {
+          stdout.writeln('🔧 $message');
+        }
+        for (final message in design?.prepareDocker() ?? <String>[]) {
+          stdout.writeln('🔧 $message');
+        }
+      } on FormatException {
+        // The inspector reports invalid configuration with its check type.
+      } on FileSystemException {
+        // Leave a failed creation to the inspector's link diagnostic.
       }
     }
 

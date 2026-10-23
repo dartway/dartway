@@ -107,8 +107,10 @@ one folder. `--type <check>` runs one check by name; `--level info|warning|error
 one severity. `--fix` first applies the mechanical fixes, then checks: every relative import in `lib/`
 of the three packages becomes its `package:` form and the import block is sorted (generated files are
 left to their generator), and an acceptance test lying at the root of `test/` moves to the mirror of
-the `lib/src/<feature>/` it is named after, its import of the harness rewritten. `--type` and `--dir`
-narrow the fixes as they narrow the checks; `--dir` leaves the tests.
+the `lib/src/<feature>/` it is named after, its import of the harness rewritten. With design config,
+it also creates the relative resource symlink and wires the template web Docker context
+(`designResourcesInvalid`). `--type` and `--dir` narrow the fixes as they narrow the checks;
+`--dir` leaves the tests and design wiring.
 
 **Exit codes.** `1` when any error-severity finding is reported (a Flutter package with no `lib/`
 counts as one), `0` otherwise — warnings and infos print and pass. An unknown `--type` is a usage
@@ -133,7 +135,7 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-five errors, fourteen warnings, one info — `DwCheckType` and its `severity` in
+Forty-seven errors, fourteen warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
@@ -146,7 +148,9 @@ Forty-five errors, fourteen warnings, one info — `DwCheckType` and its `severi
 | `invalidFeatureStructure` | error | A feature folder with more than one root file |
 | `forbiddenFeatureImport` | error | Reaching into another feature's `widgets/` or `logic/` |
 | `notAFeature` | error | A folder in a zone whose entry point declares no widget |
-| `assetPathMissing` | error | An `assets/...` string that names no file |
+| `assetPathMissing` | error | An app or configured design asset string that names no file |
+| `designResourcesInvalid` | error | Invalid `.dartway/design.json`, design symlink, pubspec registration or Docker context |
+| `designResourceCopied` | error | An app `assets/` file hashes identically to a Studio resource; names the design key |
 | `barrelFile` | error | A file that only re-exports |
 | `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone; in the server's `lib/src/`, a file, a layer-named folder (the list is in [project layout](../1-getting-started/project-layout.md)) or a feature folder without its `<feature>_feature.dart` |
@@ -185,7 +189,7 @@ Forty-five errors, fourteen warnings, one info — `DwCheckType` and its `severi
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines, in the Flutter package's zones and layers but `ui_kit/`, and in the server's and the shared package's `lib/` — generated code, migrations and seed data passed over |
 | `featureSpecMissing` | warning | A feature widget that declares no `DwFeatureSpec` |
-| `forbiddenAssetPath` | warning | A raw `assets/...` path outside `ui_kit/` |
+| `forbiddenAssetPath` | warning | A raw app or configured design asset path outside `ui_kit/` |
 | `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
@@ -544,9 +548,17 @@ same hole, smaller.
 
 DartWay projects run no asset code generator, so asset paths are written by hand — and a hand-written
 path, unlike a generated constant, can name a file that does not exist. `assetPathMissing` restores
-that guarantee, and `forbiddenAssetPath` keeps the paths in one place: a path spelled out in a screen
+that guarantee for app and configured design resources, and `forbiddenAssetPath` keeps the paths in
+one place: a path spelled out in a screen
 survives a renamed file only by accident and cannot be found by search. The screen should receive a
 widget, not a file name.
+
+Studio resources opt in through project-root `.dartway/design.json`:
+`{"path":"dw_studio"}` (`{}` uses that default). `dartway check --fix` creates
+the relative design symlink and adds the resources to template web Docker contexts.
+Both sources use `lib/ui_kit/assets/app_icon.dart`; list the linked resources folder
+in `flutter.assets`. Identical app-owned copies fail `designResourceCopied`.
+Without the config, the design rules are disabled. See [the UI kit](../3-flutter/ui-kit.md#studio-resources-and-app-assets).
 
 ## One way to write the ordinary things
 

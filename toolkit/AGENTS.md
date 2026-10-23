@@ -23,7 +23,7 @@ framework issues use English.
 ## Law and default
 
 The seven laws and checker errors are mandatory; project conventions may override defaults with
-a reason. The law list is therefore derived from `DwCheckType.severity`: forty-five errors,
+a reason. The law list is therefore derived from `DwCheckType.severity`: forty-seven errors,
 fourteen warnings and one info. Check messages name the correction; open the owner skill for how.
 Among the warnings, `unboundedRead` (`dartway-server`): a request handler's `find` names neither
 `limit:` nor `unbounded:` outside `request.readWhole` — what grows with use is a page, table or window (`dartway-contract`).
@@ -33,7 +33,7 @@ Among the warnings, `unboundedRead` (`dartway-server`): a request handler's `fin
 | Feature boundaries and entry points | `invalidFeatureStructure`, `notAFeature`, `forbiddenFeatureImport`, `barrelFile` | `dartway-feature-scaffold` |
 | Package layout | `invalidTopLevelLayout` | `dartway-feature-scaffold`, `dartway-server` |
 | Hooks and Notifier state | `forbiddenStateHolder` | `dartway-feature-scaffold` |
-| Kit owns styles, spacing, sizing and assets | `uiKitPartMissing`, `forbiddenUiUsage`, `forbiddenUiKitImport`, `rawSpacing`, `widgetSizesItself`, `assetPathMissing` | `dartway-ui-kit` |
+| Kit owns styles, spacing, sizing and assets | `uiKitPartMissing`, `forbiddenUiUsage`, `forbiddenUiKitImport`, `rawSpacing`, `widgetSizesItself`, `assetPathMissing`, `designResourcesInvalid`, `designResourceCopied` | `dartway-ui-kit` |
 | The app is localized | `l10nNotWired` | `dartway-ui-kit` |
 | Framework read widgets | `forbiddenRequestRead` | `dartway-data-layer` |
 | The one spinner is the kit's | `forbiddenProgressIndicator` | `dartway-ui-kit` |

@@ -44,7 +44,7 @@ lib/ui_kit/ui_kit.dart     imports, part directives, export of dartway_core_flut
 visible string as a parameter and never reads `context.l10n`; `fontFamily` strings are exempt);
 `uiKitConstStyle` — a `static const Color`/`TextStyle` outside `ui_kit/theme/`: colours and text styles
 come from the context, or a second theme rewrites the kit (geometry, like a radius, stays `const`);
-`forbiddenAssetPath` — an `assets/` path outside the kit.
+`forbiddenAssetPath` — an app or configured design asset path outside the kit.
 
 ## A kit widget takes no visual types
 
@@ -93,6 +93,17 @@ navigation on keyboard visibility. Focus and inset rules: `dartway-on-device`.
   `size`, not a width and a height: something filling an area by width is a cover with a widget of its
   own. No `flutter_gen`; a path to a missing file is `assetPathMissing`. Fonts come through text styles;
   sounds and video are not the kit's.
+  **Studio resources** stay in the published design folder, read-only. Opt in with
+  project-root `.dartway/design.json`: `{"path":"dw_studio"}` (`{}` defaults to it).
+  `dartway check --fix` creates the Flutter package's relative `dw_studio` symlink
+  and wires the template web Docker context. Commit those edits. For another path
+  inside the project, the link name is its final directory component. List
+  `dw_studio/ui_kit/resources/` in `flutter.assets`; use
+  `brandMark('dw_studio/ui_kit/resources/brand_mark.svg')` in the same dictionary.
+  App-owned files stay under `assets/`. Never copy published resources there:
+  `designResourceCopied` compares hashes and names the design key to use;
+  `designResourcesInvalid` checks config, link, pubspec and Docker wiring.
+  Without the config, the design rules are off.
 - **Text**: `AppText.title(…)`, `.body`, `.caption` — `const` constructors — in 99% of places;
   `AppTextStyle` is the token where Flutter demands a `TextStyle`. A new style is a value of
   `AppTextStyle` and a constructor of `AppText` (`theme/app_text.dart`), never a `TextStyle` on the spot.
