@@ -38,6 +38,7 @@ final class DwAuthConfig {
     this.attachDelivery = const {},
     this.allowedDeliveryHints = const {},
     this.onAccountCreated,
+    this.beforeCodeSignIn,
     this.onIdentifierChanged,
     this.onAccountDeleting,
     this.onExternalAccountCreated,
@@ -145,6 +146,24 @@ final class DwAuthConfig {
     DwAccountOrigin origin,
   )?
   onAccountCreated;
+
+  /// Checks project admission after a correct sign-in code and account lookup,
+  /// before a session key is issued, for existing and new accounts alike.
+  /// Runs in the verification transaction under account/identifier locks.
+  /// Refusing rolls back ticket consumption and any newly created account.
+  /// Lock the project admission row here; withdrawal changes that row first and
+  /// calls `ctx.accounts.revokeKeys` after it, in the same transaction
+  /// (`revokeKeys` takes no account lock, so the reverse order can leave a key
+  /// issued in between). Do not
+  /// perform outbound effects: the transaction may retry. This hook does not
+  /// handle external-provider sign-in or identifier attachment.
+  final Future<void> Function(
+    DwCallContext ctx,
+    int accountId,
+    DwIdentifierKind kind,
+    String identifier,
+  )?
+  beforeCodeSignIn;
 
   /// Runs in the transaction that changes an existing account's identifiers
   /// through the framework — `DwConfirmIdentifier`, `DwConfirmIdentifierLink`, and

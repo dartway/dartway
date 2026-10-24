@@ -2,23 +2,23 @@ import 'dart:async';
 
 import '../alerts/dw_server_logger.dart';
 import '../outbound/dw_outbound_http.dart';
+import 'dw_seam_cassette.dart';
 
-/// What a test server's `ctx.http` talks to instead of the network: it
-/// records every request and answers each from the rules the test gave it.
+/// What a test server's `ctx.http` talks to: records every request, asks
+/// explicit rules first, then an attached [DwSeamCassette]. Unmatched requests
+/// fail with [StateError]. Replay stays offline; only an explicitly attached
+/// cassette in record or verify mode reaches a real service.
 ///
-/// Every `DwTestServer` has one, `DwTestServer.http`, and with no rule it
-/// answers nothing — a request no rule matches fails the call that made it
-/// with a [StateError] naming the request, so a test never reaches the
-/// network by accident:
+/// Every `DwTestServer` has one, `DwTestServer.http`:
 ///
 /// ```dart
-/// server.http.when(
-///   (request) => request.url.host == 'sms.example.com',
-///   (request) => DwOutboundResponse(200, json: {'id': 7}),
-/// );
+/// server.http.useCassette(DwSeamCassette('test/cassettes/sms.json'));
 /// … // the command that sends the SMS
 /// expect(server.http.requests.single.form['phones'], '79990000001');
 /// ```
+///
+/// Handwritten rules are for exceptional outcomes, not coverage of a real
+/// provider's contract.
 ///
 /// A rule answers with a response, or throws — a [DwOutboundException] is
 /// how a test makes the provider unreachable; a rule whose future never
@@ -29,13 +29,18 @@ import '../outbound/dw_outbound_http.dart';
 /// [client], the same `DwOutboundHttp` a context hands it:
 ///
 /// ```dart
-/// final http = DwFakeOutboundHttp()..when((_) => true, (_) => DwOutboundResponse(200));
+/// final http = DwFakeOutboundHttp()
+///   ..useCassette(DwSeamCassette('test/cassettes/sms.json'));
 /// await SmsGateway(settings).send(http.client(), phone, text);
 /// ```
 final class DwFakeOutboundHttp implements DwOutboundTransport {
   final List<DwOutboundRequest> _requests = [];
   final List<_Rule> _rules = [];
   bool _closed = false;
+  DwSeamCassette? _cassette;
+
+  /// Uses recorded real answers; explicit rules take precedence.
+  void useCassette(DwSeamCassette cassette) => _cassette = cassette;
 
   /// A `DwOutboundHttp` over this fake, for code tested without a server:
   /// what `ctx.http` is under a `DwTestServer`, with [timeout] and
@@ -68,6 +73,7 @@ final class DwFakeOutboundHttp implements DwOutboundTransport {
   void reset() {
     _requests.clear();
     _rules.clear();
+    _cassette = null;
   }
 
   @override
@@ -80,6 +86,9 @@ final class DwFakeOutboundHttp implements DwOutboundTransport {
     _requests.add(request);
     for (final rule in _rules) {
       if (rule.matches(request)) return rule.respond(request);
+    }
+    if (_cassette case final cassette?) {
+      return cassette.http(request, timeout, maxResponseBytes);
     }
     throw StateError(
       'No DwFakeOutboundHttp rule answers ${request.method} ${request.origin}: '

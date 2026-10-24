@@ -95,7 +95,11 @@ void main() {
           File(p.join(ormFixtures, '$name.dart')).readAsStringSync(),
         );
       }
-      await project.generateClean();
+      await project.generateClean(
+        warnings: [
+          "foreign key ClubSessionRow.previousSessionId has no leading index; add DwTableIndex(['previousSessionId']) and generate a migration",
+        ],
+      );
     });
 
     for (final name in entities) {

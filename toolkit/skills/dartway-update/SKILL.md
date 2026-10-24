@@ -1,10 +1,6 @@
 ---
 name: dartway-update
-description: >-
-  Plan an exact DartWay target without project edits, preflight analyzer plugin resolution,
-  apply migration notes, move dependencies, and verify the project before recording each note
-  as applied or not applicable. Toolkit provenance and dependency locks never complete notes.
-  Use when the framework has released, the project is behind, or a needed framework fix landed.
+description: "Plan an exact framework update, resolve its plugin, apply migration notes and record verified dispositions."
 ---
 
 # DartWay — updating the project (`dartway-update`)
@@ -13,7 +9,7 @@ The update is: what moved, what the project owes because of it, and proof the re
 caret is the last step, not the task; the update is its own branch and PR, never folded into a feature.
 
 1. **A branch from a clean tree**: `git status`, then `git switch -c chore/dartway-update __BASE_BRANCH__`.
-2. **Update the CLI**: `dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable` — an old CLI installs an old toolkit.
+2. **Update the CLI**: `dart pub global activate dartway_cli` — an old CLI installs an old toolkit. If the update plan names an exact CLI version, use `dart pub global activate dartway_cli <version>` with that version.
 3. **Plan first:** `dartway update --plan` takes the recorded channel (or explicit `--channel` /
    `--local-repo`) and prints its exact commit, package gaps and unconfirmed migration notes,
    oldest first, with their instructions. It writes **no project files**, including migration state.

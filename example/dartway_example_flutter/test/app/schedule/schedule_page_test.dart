@@ -81,7 +81,7 @@ void main() {
     expect(find.text('Book'), findsNothing);
     expect(find.text('6 of 10 spots left'), findsOneWidget);
     expect(app.server.requestsOf<ListUpcomingSessions>(), hasLength(1));
-    expect(app.server.requestsOf<ListMyBookings>(), hasLength(1));
+    expect(app.server.requestsOf<ListMySessionBookings>(), hasLength(1));
     expect(
       app.server.sent.whereType<DwUpdateMessage>(),
       isEmpty,
@@ -104,8 +104,8 @@ void main() {
       reason: '${request.from} is not the start of the local day',
     );
     expect(
-      app.server.requestsOf<ListMyBookings>().single,
-      const ListMyBookings(),
+      app.server.requestsOf<ListMySessionBookings>().single,
+      const ListMySessionBookings(sessionIds: []),
     );
     expect(
       app.server.subscribeCount(club.bookingsChannel),

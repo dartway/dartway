@@ -1,10 +1,12 @@
 import '../emit/source_text.dart';
 import 'entity_model.dart';
+import 'relation_emitter.dart';
 
 /// Writes `lib/generated/dw_schema.dart` of the server package: the schema and
 /// the `DwDatabaseHandle` extension with one repository getter per row class.
 abstract final class SchemaEmitter {
   static String emit({
+    List<EntityRelation> relations = const [],
     required String baseName,
     required List<EntityClass> entities,
     required List<String> imports,
@@ -36,6 +38,7 @@ abstract final class SchemaEmitter {
           .join(),
     );
     out.writeln('}');
+    out.write(emitRelations(sorted, relations));
     return out.toString();
   }
 }

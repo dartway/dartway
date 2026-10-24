@@ -105,7 +105,7 @@ accident.
 Ownership is decided in the access rule, never in the handler's body after `signedIn` or a role
 rule: an inline check is written a little differently every time, and one project that did so
 answered one question — "is the caller in this chat" — four different ways.
-`dart run dartway_cli:dartway check` warns on the inline form (`inlineOwnershipCheck`). Each shape
+`dartway check` warns on the inline form (`inlineOwnershipCheck`). Each shape
 below has one form.
 
 **A row the caller owns** — a field of the row names the caller's profile. `load` reads the row,
@@ -167,7 +167,7 @@ that returns the caller's membership, or `null`**, in the `_access.dart` of the 
 the parent, as a context extension of its own. Every access point that asks the question calls it —
 each resource rule's `load`, the channel rule of the parent's channel, and `DwFileStorage.canRead`
 for files attached inside it — and another feature asking it imports that file, the owner's surface,
-rather than writing its own (`dart run dartway_cli:dartway check` fails an import of another feature's handlers or
+rather than writing its own (`dartway check` fails an import of another feature's handlers or
 `logic/`). A second definition, written inline somewhere, is how one of them ends up skipping the
 block check:
 
@@ -298,18 +298,21 @@ DwCallHandler.command<EditChatMessage, ChatMessage>(
 
 (`example/dartway_example_server/lib/src/chat/chat_messages_handlers.dart`)
 
-**The caller's rows, as a list** — there is no row to check, so there is no rule beyond `signedIn`:
+**The caller's rows, page by page** — there is no row to check, so there is no rule beyond `signedIn`:
 the query names the caller in its `where`, and the request names nothing about them (next
 section). A list under a parent — the messages of a conversation — takes the parent's membership
 rule and filters by the parent's id.
 
 ```dart
-DwCallHandler.list<ListMyBookings, SessionBooking>(
+DwCallHandler.page<ListMyBookings, SessionBooking>(
   access: DwAccessRule.signedIn,
-  handle: (ctx, request) async {
+  handle: (ctx, request, page) async {
     final me = await ctx.profile;
     final rows = await ctx.db.sessionBookings.find(
-      where: (t) => t.clientProfileId.equals(me.id!),
+      where: (t) => t.clientProfileId.equals(me.id),
+      orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
+      offset: page.offset,
+      limit: page.fetchLimit,
     );
     // …
   },

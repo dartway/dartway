@@ -55,7 +55,15 @@ final class EntityColumn {
     required this.unique,
     required this.defaultValue,
     required this.references,
+    this.transitions,
+    this.foreignTable,
+    this.relation,
+    this.reverse,
   });
+
+  final String? foreignTable;
+  final String? relation;
+  final String? reverse;
 
   final String sqlName;
 
@@ -69,6 +77,9 @@ final class EntityColumn {
 
   /// A const `DwForeignKey` expression, or `null`.
   final String? references;
+
+  /// The evaluated transition table as a const expression.
+  final String? transitions;
 }
 
 /// An index of the table.

@@ -119,6 +119,14 @@ class DwStack {
   static const String nginxImage = 'nginx:1.30.5-alpine';
   static const String certbotImage = 'certbot/certbot:v5.8.0';
 
+  /// The proxy's log, bounded: [proxyLogFiles] files of [proxyLogFileSize]
+  /// each, the oldest dropped. Every request is a line of it, so without a
+  /// bound it grows for as long as the container lives; at this size it holds
+  /// a few hundred thousand requests, which is the window `deploy stats` can
+  /// look back over on a busy server.
+  static const String proxyLogFileSize = '50m';
+  static const int proxyLogFiles = 10;
+
   /// Whether `registry_mirror` can serve [image]: an official Docker Hub image
   /// (`postgres`, `nginx`) — what `mirror.gcr.io` and a Hub library cache
   /// hold. An image of another registry or of a Hub organisation is pulled

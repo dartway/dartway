@@ -1,9 +1,15 @@
 import 'package:meta/meta.dart';
+import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:postgres/postgres.dart' as pg;
 
 import '../entity/dw_annotations.dart';
+import '../db/dw_result_row.dart';
+import '../entity/dw_table_def.dart';
+import '../entity/dw_table_row.dart';
 import '../entity/dw_column_type.dart';
 import '../schema/dw_database_schema.dart';
+
+part 'dw_table_relation.dart';
 
 /// A column of a table, typed by the Dart value it holds.
 ///
@@ -21,13 +27,17 @@ final class DwTableColumn<T> {
     this.unique = false,
     this.defaultValue,
     this.references,
+    this.transitions,
+    this.relationPath,
   }) : primaryKey = false;
 
   const DwTableColumn._primaryKey(this.name, this.type)
     : primaryKey = true,
       unique = false,
       defaultValue = null,
-      references = null;
+      references = null,
+      transitions = null,
+      relationPath = null;
 
   /// The `id bigserial primary key` every table has.
   static const DwTableColumn<int> id = DwTableColumn<int>._primaryKey(
@@ -35,12 +45,34 @@ final class DwTableColumn<T> {
     DwColumnType.bigint,
   );
 
+  final DwRelationPath? relationPath;
+
+  /// Used by generated table definitions; leaves schema and codecs unchanged.
+  DwTableColumn<T> atPath(DwRelationPath? path) => path == null
+      ? this
+      : DwTableColumn<T>(
+          name,
+          type,
+          unique: unique,
+          defaultValue: defaultValue,
+          references: references,
+          transitions: transitions,
+          relationPath: path,
+        );
+
+  /// Generated nullable relation views widen both the decode and Dart type.
+  DwTableColumn<T?> atNullablePath(DwRelationPath path) =>
+      DwTableColumn<T?>(name, type, relationPath: path);
+
   final String name;
   final DwColumnType<T> type;
   final bool primaryKey;
   final bool unique;
   final DwDefaultValue? defaultValue;
   final DwForeignKey? references;
+
+  /// Legal state writes, generated from `@DwStateColumn`.
+  final DwStateTransitions<T>? transitions;
 
   bool get nullable => null is T;
 
@@ -62,7 +94,11 @@ final class DwTableColumn<T> {
   /// Dart semantics: a null cell is not equal to any value, so it matches.
   DwWhereCondition notEquals(T value) => value == null
       ? _DwNullTest(this, isNull: false)
-      : _DwComparison(this, nullable ? 'IS DISTINCT FROM' : '<>', value);
+      : _DwComparison(
+          this,
+          nullable || relationPath != null ? 'IS DISTINCT FROM' : '<>',
+          value,
+        );
 
   DwWhereCondition isNull() => _DwNullTest(this, isNull: true);
 
@@ -76,7 +112,15 @@ final class DwTableColumn<T> {
   DwColumnAssignment<T> set(T value) => DwColumnAssignment._(this, value);
 
   @internal
-  String get sql => dwQuoteIdentifier(name);
+  String get sql {
+    if (relationPath != null) {
+      throw ArgumentError('a related column requires a query path');
+    }
+    return dwQuoteIdentifier(name);
+  }
+
+  @internal
+  String sqlIn(DwSqlWriter writer) => writer.column(name, relationPath);
 
   @internal
   String encodeParameter(DwSqlWriter writer, T value) => value == null
@@ -147,7 +191,7 @@ final class _DwListLength extends DwWhereCondition {
 
   @override
   void write(DwSqlWriter writer) => writer.write(
-    'jsonb_array_length(${column.sql}) ${empty ? '= 0' : '> 0'}',
+    'jsonb_array_length(${column.sqlIn(writer)}) ${empty ? '= 0' : '> 0'}',
   );
 }
 
@@ -166,7 +210,7 @@ final class _DwListOverlap<E> extends DwWhereCondition {
       pg.Type.jsonb,
     );
     writer.write(
-      'EXISTS (SELECT 1 FROM jsonb_array_elements(${column.sql}) AS dw_held '
+      'EXISTS (SELECT 1 FROM jsonb_array_elements(${column.sqlIn(writer)}) AS dw_held '
       'JOIN jsonb_array_elements($parameter) AS dw_wanted '
       'ON dw_held.value = dw_wanted.value)',
     );
@@ -194,6 +238,45 @@ sealed class DwWhereCondition {
 
   @internal
   void write(DwSqlWriter writer);
+
+  bool get _onlyRelated => switch (this) {
+    _DwJunction(:final left, :final right) =>
+      left._onlyRelated && right._onlyRelated,
+    _DwNot(:final inner) => inner._onlyRelated,
+    _DwRelationTest(:final path) => path.parent != null,
+    _DwComparison(:final column) => column.relationPath != null,
+    _DwBetween(:final column) => column.relationPath != null,
+    _DwNullTest(:final column) => column.relationPath != null,
+    _DwMembership(:final column) => column.relationPath != null,
+    _DwListLength(:final column) => column.relationPath != null,
+    _DwListOverlap(:final column) => column.relationPath != null,
+  };
+
+  Iterable<DwWhereCondition> get _conjuncts sync* {
+    if (this case _DwJunction(operator: 'AND', :final left, :final right)) {
+      yield* left._conjuncts;
+      yield* right._conjuncts;
+    } else {
+      yield this;
+    }
+  }
+
+  // Keep root predicates in the outer mutation, where PostgreSQL rechecks
+  // them after a concurrent writer releases the row lock. Only related
+  // leaves need a join-bearing subquery; junctions preserve boolean shape.
+  @internal
+  void writeMutation(DwSqlWriter writer) {
+    final condition = writer.scope(writer.rootTable!, writer.rootAlias!);
+    final root = dwQuoteIdentifier(writer.rootTable!);
+    final prefix = 'SELECT $root."id" FROM $root WHERE ';
+    condition.write(prefix);
+    write(condition);
+    writer.write(
+      condition.joins.isEmpty
+          ? condition.sql.substring(prefix.length)
+          : '$root."id" IN (${condition.sql})',
+    );
+  }
 }
 
 final class _DwComparison<T> extends DwWhereCondition {
@@ -205,7 +288,7 @@ final class _DwComparison<T> extends DwWhereCondition {
 
   @override
   void write(DwSqlWriter writer) => writer.write(
-    '${column.sql} $operator ${column.encodeParameter(writer, value)}',
+    '${column.sqlIn(writer)} $operator ${column.encodeParameter(writer, value)}',
   );
 }
 
@@ -220,7 +303,7 @@ final class _DwBetween<T> extends DwWhereCondition {
   void write(DwSqlWriter writer) {
     final low = column.encodeParameter(writer, this.low);
     final high = column.encodeParameter(writer, this.high);
-    writer.write('${column.sql} BETWEEN $low AND $high');
+    writer.write('${column.sqlIn(writer)} BETWEEN $low AND $high');
   }
 }
 
@@ -231,8 +314,9 @@ final class _DwNullTest extends DwWhereCondition {
   final bool isNull;
 
   @override
-  void write(DwSqlWriter writer) =>
-      writer.write('${column.sql} ${isNull ? 'IS NULL' : 'IS NOT NULL'}');
+  void write(DwSqlWriter writer) => writer.write(
+    '${column.sqlIn(writer)} ${isNull ? 'IS NULL' : 'IS NOT NULL'}',
+  );
 }
 
 final class _DwMembership<T extends Object> extends DwWhereCondition {
@@ -250,7 +334,7 @@ final class _DwMembership<T extends Object> extends DwWhereCondition {
     ], type.arrayParameterType);
     final cast = type.arrayElementCast;
     final array = cast == null ? parameter : 'CAST($parameter AS $cast[])';
-    final test = '${column.sql} = ANY($array)';
+    final test = '${column.sqlIn(writer)} = ANY($array)';
     writer.write(negated ? '($test) IS NOT TRUE' : test);
   }
 }
@@ -263,11 +347,41 @@ final class _DwJunction extends DwWhereCondition {
   final DwWhereCondition right;
 
   @override
-  void write(DwSqlWriter writer) {
+  void write(DwSqlWriter writer) => _write(writer, mutation: false);
+
+  @override
+  void writeMutation(DwSqlWriter writer) {
+    if (_onlyRelated) {
+      super.writeMutation(writer);
+      return;
+    }
+    if (operator != 'AND') {
+      _write(writer, mutation: true);
+      return;
+    }
+    final rootTerms = <DwWhereCondition>[];
+    DwWhereCondition? related;
+    for (final term in _conjuncts) {
+      if (term._onlyRelated) {
+        related = related == null ? term : related & term;
+      } else {
+        rootTerms.add(term);
+      }
+    }
+    if (related != null) rootTerms.add(related);
     writer.write('(');
-    left.write(writer);
+    for (final (i, term) in rootTerms.indexed) {
+      if (i != 0) writer.write(' AND ');
+      term.writeMutation(writer);
+    }
+    writer.write(')');
+  }
+
+  void _write(DwSqlWriter writer, {required bool mutation}) {
+    writer.write('(');
+    mutation ? left.writeMutation(writer) : left.write(writer);
     writer.write(' $operator ');
-    right.write(writer);
+    mutation ? right.writeMutation(writer) : right.write(writer);
     writer.write(')');
   }
 }
@@ -278,9 +392,14 @@ final class _DwNot extends DwWhereCondition {
   final DwWhereCondition inner;
 
   @override
-  void write(DwSqlWriter writer) {
+  void write(DwSqlWriter writer) => _write(writer, mutation: false);
+
+  @override
+  void writeMutation(DwSqlWriter writer) => _write(writer, mutation: true);
+
+  void _write(DwSqlWriter writer, {required bool mutation}) {
     writer.write('(');
-    inner.write(writer);
+    mutation ? inner.writeMutation(writer) : inner.write(writer);
     writer.write(') IS NOT TRUE');
   }
 }
@@ -293,7 +412,8 @@ final class DwOrderTerm {
   final bool descending;
 
   @internal
-  String get sql => descending ? '${column.sql} DESC' : column.sql;
+  String sqlIn(DwSqlWriter writer) =>
+      descending ? '${column.sqlIn(writer)} DESC' : column.sqlIn(writer);
 }
 
 /// One `SET` of `updateWhere`: a value ([DwTableColumn.set]) or an amount
@@ -358,20 +478,116 @@ extension DwNumberColumn<N extends num> on DwTableColumn<N> {
 /// prepared statement stays valid for every later value of the same shape.
 @internal
 final class DwSqlWriter {
+  DwSqlWriter({
+    this.rootTable,
+    String? rootAlias,
+    List<Object?>? values,
+    List<pg.Type<Object>>? types,
+    Set<String>? aliases,
+    DwSqlWriter? joinOwner,
+    DwRelationPath? basePath,
+  }) : rootAlias = rootAlias ?? rootTable,
+       values = values ?? [],
+       types = types ?? [],
+       _usedAliases = aliases ?? {?rootTable},
+       _joinOwner = joinOwner,
+       _basePath = basePath;
+
+  final Set<String> _usedAliases;
+  final DwSqlWriter? _joinOwner;
+  final DwRelationPath? _basePath;
+  final String? rootTable;
+  final String? rootAlias;
   final StringBuffer _sql = StringBuffer();
-  final List<Object?> values = [];
-  final List<pg.Type<Object>> types = [];
+  final List<Object?> values;
+  final List<pg.Type<Object>> types;
+  final Map<String, String> _aliases = {};
+  final List<String> joins = [];
 
   void write(String text) => _sql.write(text);
 
-  /// Registers a parameter and returns its placeholder.
+  DwSqlWriter scope(String table, String alias) => DwSqlWriter(
+    rootTable: table,
+    rootAlias: alias,
+    values: values,
+    types: types,
+    aliases: _usedAliases,
+  );
+
+  DwSqlWriter relatedScope(DwRelationPath path) => DwSqlWriter(
+    rootTable: path.targetTable,
+    rootAlias: relationAlias(path),
+    values: values,
+    types: types,
+    aliases: _usedAliases,
+    joinOwner: this,
+    basePath: path,
+  );
+
+  String nextAlias() {
+    var i = _usedAliases.length;
+    while (!_usedAliases.add('dw_rel_$i')) {
+      i++;
+    }
+    return 'dw_rel_$i';
+  }
+
+  String column(String name, DwRelationPath? path) {
+    final alias = path == null ? rootAlias : relationAlias(path);
+    return alias == null
+        ? dwQuoteIdentifier(name)
+        : '${dwQuoteIdentifier(alias)}.${dwQuoteIdentifier(name)}';
+  }
+
+  String relationAlias(DwRelationPath path) {
+    if (path.many) {
+      throw ArgumentError('a to-many path needs any/none/every/count');
+    }
+    final owner = _joinOwner;
+    if (owner != null) {
+      return owner.relationAlias(_prependPath(path, _basePath!));
+    }
+    return _aliases.putIfAbsent(path.key, () {
+      final parent = path.parent == null
+          ? rootAlias!
+          : relationAlias(path.parent!);
+      final alias = nextAlias();
+      joins.add(
+        'LEFT JOIN ${dwQuoteIdentifier(path.targetTable)} '
+        '${dwQuoteIdentifier(alias)} ON ${dwQuoteIdentifier(parent)}.'
+        '${dwQuoteIdentifier(path.foreignKey)} = ${dwQuoteIdentifier(alias)}."id"',
+      );
+      return alias;
+    });
+  }
+
+  static DwRelationPath _prependPath(
+    DwRelationPath path,
+    DwRelationPath base,
+  ) => DwRelationPath(
+    path.sourceTable,
+    path.targetTable,
+    path.foreignKey,
+    many: path.many,
+    parent: path.parent == null ? base : _prependPath(path.parent!, base),
+  );
+
   String parameter(Object? value, pg.Type<Object> type) {
     values.add(value);
     types.add(type);
     return '\$${values.length}';
   }
 
-  String get sql => _sql.toString();
+  String get sql {
+    var text = _sql.toString();
+    if (joins.isNotEmpty) {
+      final from =
+          'FROM ${dwQuoteIdentifier(rootTable!)}'
+          '${rootAlias == rootTable ? '' : ' ${dwQuoteIdentifier(rootAlias!)}'}';
+      text = text.replaceFirst(from, '$from ${joins.join(' ')}');
+    }
+    return text;
+  }
 }
 
 /// Quotes an SQL identifier. Every identifier the ORM writes is quoted, so a

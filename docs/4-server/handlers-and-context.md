@@ -72,6 +72,11 @@ DwCallHandler.list<Q extends DwListRequest<T>, T extends DwDataObject>({
 })
 ```
 
+Whole-list repository reads use `request.readWhole((limit) => repo.find(limit: limit))`.
+The nullable limit probes one row past `maxItems`; overflow throws in strict mode, while production
+re-reads once without a limit and warns with the whole answer's count and size. The callback must
+apply null as no limit and perform only reads. See [a list's bound](../2-core/requests-and-updates.md#a-lists-bound).
+
 ### `page` — an offset feed
 
 ```dart
@@ -212,6 +217,7 @@ One context per call. Everything a handler may touch is on it.
 | `files` | the `DwFileService` ([uploads](uploads.md#ctxfiles)) |
 | `settings` | the app's settings objects: `read<S>()`, `save(value)`, `update<S>(change)` ([database](database.md#settings)) |
 | `log` | a `DwServerLogger` scoped to the call (`command BookSession`) |
+| `process` | external commands through `DwProcessRunner`, bounded and replaced by the test server |
 | `http` | the `DwOutboundHttp`: requests to other services' HTTP APIs, [below](#outbound-http) |
 | `memo(key, create)` | a per-call cache: `create` runs at most once per key per call |
 
@@ -222,7 +228,7 @@ default — on every access, in UTC, the same way in a handler, a job, a route, 
 startup step. A test gives the server a `DwTestClock` and sets or moves it; the job queue decides due
 times by the same clock, so a job enqueued for tomorrow runs when the test moves the clock to
 tomorrow ([jobs](jobs.md#time-is-the-servers-clock)). `DateTime.now()` anywhere in a server's `lib/` is
-refused by `dart run dartway_cli:dartway check` (`forbiddenDateTimeNow`): a time no test can set, and one that disagrees
+refused by `dartway check` (`forbiddenDateTimeNow`): a time no test can set, and one that disagrees
 with the job queue the moment a test moves the clock.
 
 **The caller's offset travels with every call.** The app reads its device's UTC offset at each call
@@ -267,7 +273,7 @@ even when that transaction rolls back.
 ## Outbound HTTP
 
 A request to somebody else's API — an SMS gateway, a CRM, a model provider — is `ctx.http`, in a
-handler, a job, a route or a startup step alike. There is no second client: `dart run dartway_cli:dartway check` refuses
+handler, a job, a route or a startup step alike. There is no second client: `dartway check` refuses
 `HttpClient(`, `package:http` and `DwOutboundHttp.network` in `lib/` (`forbiddenHttpClient`).
 
 ```dart
@@ -302,7 +308,7 @@ if (!response.isSuccess) throw SmsException(response.statusCode);
   other side takes. Commit first — a `transactional: false` command or a job — then call out.
 
 **In a test**, every `DwTestServer` answers `ctx.http` from its `DwFakeOutboundHttp`, `server.http`,
-and refuses a request no rule answers with a `StateError` — no test reaches the network by accident,
+and refuses a request no rule or cassette answers with a `StateError` — no test reaches the network by accident,
 and nothing is threaded through the project's server factory to arrange it:
 
 ```dart
@@ -313,6 +319,12 @@ server.http.when(
 // … the command that sends the SMS
 expect(server.http.requests.single.json, {'phone': '79990000001', 'text': 'Code: 1234'});
 ```
+
+For coverage of the external seam, attach a recorded real answer with
+`server.http.useCassette(DwSeamCassette('test/cassettes/provider.json'))`. Handwritten rules
+are for exceptional cases; they do not prove the real provider's contract. Recordings replay
+offline unless explicitly recording or verifying live shapes; see
+[recorded external seams](../5-tooling/testing.md#recorded-external-seams).
 
 The rule added last is asked first, so a test overrides what its harness scripted; a rule that throws
 `DwOutboundException` makes the provider unreachable. A class that talks to a provider takes a
@@ -439,3 +451,19 @@ that changes a profile publishes the same set.
 - [Database](database.md) — the queries handlers make.
 - [Data objects and generation](../2-core/data-objects-and-generation.md) — the classes handlers answer.
 - [Alerts](alerts.md) — what happens when a handler throws.
+
+## External commands
+
+Use `await ctx.process.run('git', ['--version'])` for server commands. The arguments are
+passed directly, without shell expansion. Optional `workingDirectory`, `environment`,
+`timeout` and `maxOutputBytes` control the call. The default limits are 30 seconds and
+10 MiB across stdout and stderr. `DwProcessResult` carries `exitCode`, `stdout` and `stderr`;
+a nonzero exit is a result, while a failure to start, timeout or excessive output throws
+`DwProcessException`. Command errors never print arguments or output that could hold secrets.
+Keep external commands outside database transactions.
+
+`DwTestServer.process` is offline by default. Attach real recorded answers with
+`server.process.useCassette(DwSeamCassette('test/cassettes/command.json'))`, or add a `when`
+rule for an exceptional outcome. Direct `Process.run`, `Process.runSync` and `Process.start`
+in server `lib/` fail the `forbiddenProcessRun` check, including tear-offs.
+Imports/exports of `package:process` and `package:process_run` also fail it.

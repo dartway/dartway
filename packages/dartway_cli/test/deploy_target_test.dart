@@ -38,6 +38,29 @@ void main() {
       });
     }
   });
+  group('slow_query_ms', () {
+    test('defaults to 500 ms and reads a configured threshold', () {
+      expect(targetFrom().slowQueryMs, DwDeployTarget.defaultSlowQueryMs);
+      expect(targetFrom().slowQueryMs, 500);
+      expect(targetFrom(extra: '  slow_query_ms: 200\n').slowQueryMs, 200);
+      expect(targetFrom(extra: '  slow_query_ms: 0\n').slowQueryMs, 0);
+    });
+    for (final value in ['-1', '1.5', "'500'", 'fast', '[]']) {
+      test('rejects $value', () {
+        expect(
+          () => targetFrom(extra: '  slow_query_ms: $value\n'),
+          _refusal(['slow_query_ms', 'milliseconds']),
+        );
+      });
+    }
+    test('is refused for an external database, whose log is not ours', () {
+      expect(
+        () => targetFrom(extra: '  database: external\n  slow_query_ms: 200\n'),
+        _refusal(['slow_query_ms', 'database: bundled']),
+      );
+    });
+  });
+
   group('min_free_disk', () {
     test('defaults to 10GB and reads MB, GB and fractional sizes', () {
       expect(targetFrom().minFreeDiskBytes, 10 * 1024 * 1024 * 1024);

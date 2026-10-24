@@ -51,6 +51,7 @@ final class AppHarness {
           accountDeletion: DwAccountDeletion.byMember,
           attachDelivery: attachDelivery,
           normalize: AccountAuth.config.normalize,
+          beforeCodeSignIn: AccountAuth.config.beforeCodeSignIn,
           onAccountCreated: AccountAuth.config.onAccountCreated,
           onIdentifierChanged: AccountAuth.config.onIdentifierChanged,
           onAccountDeleting: AccountAuth.config.onAccountDeleting,
@@ -104,6 +105,21 @@ final class AppHarness {
       return await body(server);
     } finally {
       await server.stop();
+    }
+  }
+
+  /// Calls the diagnostic door as an authenticated member.
+  Future<DwTestAnswer> systemInfo() async {
+    final member = await signUp('+79990006381', firstName: 'Seam');
+    final caller = server.caller(token: member.session.token);
+    try {
+      return await caller.raw(
+        'GET',
+        '/system-info',
+        headers: {'authorization': 'Bearer ${member.session.token}'},
+      );
+    } finally {
+      caller.close();
     }
   }
 

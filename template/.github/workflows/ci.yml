@@ -95,6 +95,13 @@ jobs:
         working-directory: dartway_starter_flutter
         run: dart run dartway_cli:dartway generate --check --contract-base "$CONTRACT_BASE"
 
+      # Only the Dart files the pull request changed, on the Dart of the pinned
+      # Flutter; generated files and migrations are never formatted.
+      - name: format --check
+        if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
+        working-directory: dartway_starter_flutter
+        run: dart run dartway_cli:dartway format --check --base "$CONTRACT_BASE"
+
       - name: deploy kamal --check
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         working-directory: dartway_starter_flutter

@@ -12,15 +12,39 @@ import 'package:dartway_example_shared/dartway_example_shared.dart';
 final bookingsHandlers = <DwCallHandler>[
   /// The caller's bookings, newest first. "My" bookings name no account: the
   /// caller's are the only ones read.
-  DwCallHandler.list<ListMyBookings, SessionBooking>(
+  DwCallHandler.page<ListMyBookings, SessionBooking>(
+    access: DwAccessRule.signedIn,
+    handle: (ctx, request, page) async {
+      final me = await ctx.profile;
+      return BookingsObjects.bookings(
+        await ctx.db.sessionBookings.find(
+          include: (t) => BookingsObjects.includes(t, client: me),
+          where: (t) => t.clientProfileId.equals(me.id),
+          orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
+          limit: page.fetchLimit,
+          offset: page.offset,
+        ),
+        client: me,
+      );
+    },
+  ),
+
+  /// The caller's active bookings for the sessions displayed on the schedule.
+  DwCallHandler.list<ListMySessionBookings, SessionBooking>(
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async {
       final me = await ctx.profile;
       return BookingsObjects.bookings(
-        ctx.db,
-        await ctx.db.sessionBookings.find(
-          where: (t) => t.clientProfileId.equals(me.id),
-          orderBy: (t) => [t.createdAt.desc(), t.id.desc()],
+        await request.readWhole(
+          (limit) => ctx.db.sessionBookings.find(
+            include: (t) => BookingsObjects.includes(t, client: me),
+            where: (t) =>
+                t.clientProfileId.equals(me.id) &
+                t.status.equals(BookingStatus.booked) &
+                t.sessionId.inList(request.sessionIds),
+            orderBy: (t) => [t.id.asc()],
+            limit: limit,
+          ),
         ),
         client: me,
       );
@@ -92,9 +116,6 @@ final bookingsHandlers = <DwCallHandler>[
     handle: (ctx, command) async {
       final me = await ctx.profile;
       final booking = ctx.accessed<SessionBookingRow>();
-      if (booking.status != BookingStatus.booked) {
-        ctx.refuse(DartwayExampleRefusal.bookingNotActive);
-      }
       return BookingsChanges.cancel(ctx, booking, client: me);
     },
   ),
@@ -103,17 +124,19 @@ final bookingsHandlers = <DwCallHandler>[
   DwCallHandler.command<MarkAttended, SessionBooking>(
     access: ProfileAccess.staff,
     handle: (ctx, command) async {
-      final booking = await ctx.db.sessionBookings.findById(
+      final attended = await ctx.db.sessionBookings.transition(
         command.bookingId,
-        lock: DwRowLock.forUpdate,
+        column: (t) => t.status,
+        to: BookingStatus.attended,
       );
-      if (booking == null) ctx.refuse(DwCoreRefusal.notFound);
-      if (booking.status != BookingStatus.booked) {
+      if (attended == null) {
+        if (!await ctx.db.sessionBookings.exists(
+          where: (t) => t.id.equals(command.bookingId),
+        )) {
+          ctx.refuse(DwCoreRefusal.notFound);
+        }
         ctx.refuse(DartwayExampleRefusal.bookingNotActive);
       }
-      final attended = await ctx.db.sessionBookings.update(
-        booking.copyWith(status: BookingStatus.attended),
-      );
       return BookingsPublications.booking(ctx, attended);
     },
   ),

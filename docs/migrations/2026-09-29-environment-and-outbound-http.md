@@ -125,7 +125,7 @@ needs it. Prefer a per-call cap: the whole response is buffered in memory, and c
 multiply that cost. A response past the cap throws `DwOutboundException`.
 
 A command-line tool without a server context can use the same provider class. From
-`dartway_core_server` **0.22.0-dev.0**, create a real client through the public library:
+`dartway_core_server` **0.22.0**, create a real client through the public library:
 
     final http = DwOutboundHttp.network(
       settings: const DwServerSettings(outboundMaxResponseBytes: 64 << 20),

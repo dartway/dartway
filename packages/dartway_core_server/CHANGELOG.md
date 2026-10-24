@@ -1,29 +1,83 @@
 # Changelog
 
-## 0.22.0-dev.0
+## 0.24.1-dev.1
 
-- Add `DwOutboundHttp.network` for standalone tools using the same bounded,
-  safely logged HTTP client as server contexts. Tools close their owned client;
-  borrowed context and fake clients reject `close` (#444).
+- Add optional `DwAuthConfig.beforeCodeSignIn`: transactional admission before
+  every code-authenticated session, including existing accounts. Refusal rolls
+  back ticket consumption and new-account creation. No wire or schema change.
 
-- A zero auth `resendDelay` no longer refuses a repeated code request when
-  the previous ticket's timestamp is ahead of the current clock reading.
-  Positive resend delays and per-identifier request-window quotas still apply (#586).
+## 0.24.0
 
-- Outbound transport failure diagnostics discard arbitrary provider/client causes, which may
-  contain credentials or bearer links. Logs, exception strings and incident errors retain safe
-  categories; framework-owned timeout and response-size limits remain informative.
+- Advance with the core family for typed ORM relations.
 
-- Auth request transactions recheck canonical idempotency before ticket writes, including
-  duplicates arriving before commit. Cleanup retains tickets through stored expiry and rate history.
+## 0.23.0
 
-- Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,
-  latest-request-only across destinations, and anonymous confirmation without changing sessions.
-  Invalid/expired/used/occupied links share `dw.invalid` on `token`; success is not replayed.
+### Breaking changes
+
+- **BREAKING (source):** `DwCallContext.process` is a new abstract getter.
+  Custom context implementations must delegate it to the server context; use
+  `DwTestServer` for tests. See `docs/migrations/2026-10-21-external-process-seam.md`.
+
+- Custom `DwServerLogger` implementations now declare `isEnabled(DwLogLevel)`;
+  call timing checks the selected level before building its line (#645).
+  See the [migration note](../../docs/migrations/2026-10-21-deploy-side-by-side-and-stats.md).
+
+### Changes
+
+- `request.readWhole((limit) => repo.find(limit: limit))` keeps the normal
+  list read bounded at `maxItems + 1`. Overflow throws before a second read in
+  strict mode; production re-reads once without a limit and warns with the
+  whole answer's true count and size. Use this instead of passing `fetchLimit`
+  directly, which silently truncated production answers (#644).
+
+- A `list` handler answering more items than its request's `maxItems` is never
+  cut short. With `DwServerSettings.strictBounds` the call fails, naming the
+  request and the count; `DwTestServer` is always strict, and a development
+  server is through `DW_STRICT_BOUNDS=true` (`DwServerEnvironment.strictBounds`),
+  which the skeleton sets in `deploy/config.yaml > local`. Otherwise — production —
+  the whole list is served and a warning names the request, the count and the
+  response size, once per request per `boundWarningInterval` (an hour) (#644).
+- A call response above `DwServerSettings.largeResponseBytes` (256 KiB) is logged
+  as a warning with the call's name, once per call per `boundWarningInterval`.
+- A project test whose list handler answers past the bound now fails; see the
+  [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
+
+- Add recorded HTTP and external-command seams with offline replay, redaction and opt-in shape drift verification (#638). Redaction matches exact case-insensitive names, masks only strings and supports
+  cassette-specific additions and exemptions. Automatic substring removal uses only
+  request headers, query parameters and form fields with values of at least eight
+  characters; response identifiers, booleans and numbers remain intact.
+- Verify HTTP status, body shape and content-type without comparing other response
+  headers. HTTP 403/429 reports "could not verify" for runner access/rate limits.
+- Every HTTP call is timed: one line with its wire name, status, milliseconds
+  and answer size, at debug; a call slower than the new
+  `DwServerSettings.slowCallThreshold` (default 1 s) is the same line as a
+  warning when that level is enabled (#645).
+- Answer uncaught `DwStaleState` as `dw.conflict` (HTTP 409) without an incident (#639).
+- The family moves in lockstep with ORM state columns (#639).
+
+## 0.22.0
+
+### Breaking changes
 
 - **BREAKING (source):** `DwIdentifierChangeCause` adds `updated` for trusted
   edits; exhaustive identifier hooks must handle the new cause.
 
+### Changes
+
+- Add `DwOutboundHttp.network` for standalone tools using the same bounded,
+  safely logged HTTP client as server contexts. Tools close their owned client;
+  borrowed context and fake clients reject `close` (#444).
+- A zero auth `resendDelay` no longer refuses a repeated code request when
+  the previous ticket's timestamp is ahead of the current clock reading.
+  Positive resend delays and per-identifier request-window quotas still apply (#586).
+- Outbound transport failure diagnostics discard arbitrary provider/client causes, which may
+  contain credentials or bearer links. Logs, exception strings and incident errors retain safe
+  categories; framework-owned timeout and response-size limits remain informative.
+- Auth request transactions recheck canonical idempotency before ticket writes, including
+  duplicates arriving before commit. Cleanup retains tickets through stored expiry and rate history.
+- Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,
+  latest-request-only across destinations, and anonymous confirmation without changing sessions.
+  Invalid/expired/used/occupied links share `dw.invalid` on `token`; success is not replayed.
 - Add trusted `DwAccountService.updateIdentifiers` batch phone/e-mail edits with
   keep/set/clear, stable identities, unchanged sessions and a transactional
   `beforeChange` project callback. All identity writes precede `updated` hooks;
@@ -36,7 +90,6 @@
   locks across edits, confirmations, sign-in, moves, removals and deletion.
   Optimistic owner changes use the existing bounded serialization retry policy;
   bare-database services also retry top-level conflicts at most three times.
-
 - Add optional `DwCallRateLimit` per registered HTTP call type, bounded peer
   state, explicit trusted proxy CIDRs and pre-body 429/Retry-After refusals.
   Invalid declarations fail before migrations, including quotas behind an
@@ -45,12 +98,10 @@
 - `DwServerEnvironment` reads native ingress declarations and `KAMAL_VERSION`;
   wiring `DwServerSettings.deploymentVersion` adds no-store revision ETags to
   GET/HEAD health endpoints, without changing the app wire protocol.
-
 - `GET /dw/health` and `HEAD /dw/health` use the same database health check
   as `/health`, so the app host can forward only `/dw/`; `POST /dw/health`
   remains a DTO call (#576).
 - Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
-
 - `DwFileStorageSetup.provision` sets bucket policies, GET/PUT CORS for explicit
   `allowedOrigins`, and the visibility probe object in both buckets, so outside
   checks work with `verifyBuckets: false`. CORS writes carry `Content-MD5`;

@@ -18,6 +18,7 @@ import 'dw_environment_reader.dart';
 /// | `DW_MIGRATE_ONLY` | [migrateOnly], for `DwAppServer.start` |
 /// | `DW_TRUSTED_PROXY_NETWORKS` | [trustedProxyNetworks], comma-separated CIDRs |
 /// | `DW_HTTP_BEHIND_PROXY` | [httpBehindProxy], false by default |
+/// | `DW_STRICT_BOUNDS` | [strictBounds], false by default |
 /// | `KAMAL_VERSION` | [deploymentVersion], the immutable native revision |
 ///
 /// Read as a part of the project's own environment, so one start reports
@@ -41,6 +42,7 @@ final class DwServerEnvironment {
     this.trustedProxyNetworks = const [],
     this.httpBehindProxy = false,
     this.deploymentVersion,
+    this.strictBounds = false,
   });
 
   /// The framework's variables out of [read], problems recorded there.
@@ -85,6 +87,7 @@ final class DwServerEnvironment {
       trustedProxyNetworks: read.list('DW_TRUSTED_PROXY_NETWORKS'),
       httpBehindProxy: read.flag('DW_HTTP_BEHIND_PROXY'),
       deploymentVersion: read.optional('KAMAL_VERSION'),
+      strictBounds: read.flag(strictBoundsVariable),
     );
   }
 
@@ -97,6 +100,11 @@ final class DwServerEnvironment {
   /// ([migrateOnly]): how `dartway deploy` migrates between the old server
   /// and the new one.
   static const String migrateOnlyVariable = 'DW_MIGRATE_ONLY';
+
+  /// The variable that makes a list past its bound fail the call
+  /// ([strictBounds]): set in `deploy/config.yaml > local`, so a development
+  /// server is as strict as the tests and a deployed one is not.
+  static const String strictBoundsVariable = 'DW_STRICT_BOUNDS';
 
   static const String _endpoint = 'DW_STORAGE_ENDPOINT';
 
@@ -138,6 +146,11 @@ final class DwServerEnvironment {
 
   /// KAMAL_VERSION, provided by native Kamal to every application container.
   final String? deploymentVersion;
+
+  /// `DW_STRICT_BOUNDS=true`: a `list` handler answering past its request's
+  /// `maxItems` fails the call (`DwServerSettings.strictBounds`) instead of
+  /// being served with a warning.
+  final bool strictBounds;
 
   static DwDatabaseConfig _database(DwEnvironmentReader read) {
     try {

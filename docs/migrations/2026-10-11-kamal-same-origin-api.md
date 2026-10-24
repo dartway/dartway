@@ -1,7 +1,7 @@
 ---
 title: Proxy same-origin API paths through the Kamal web container
 affects:
-  dartway_cli: "0.25.0-dev.0"
+  dartway_cli: "0.25.0"
 ---
 
 ## Who is affected

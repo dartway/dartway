@@ -26,6 +26,7 @@ abstract final class ChatPublications {
   /// with it — its text, or that it is deleted.
   static Future<void> quoting(DwCallContext ctx, ChatMessageRow quoted) async {
     final replies = await ctx.db.chatMessages.find(
+      include: ChatObjects.includes,
       where: (t) => t.replyToMessageId.equals(quoted.id) & t.deletedAt.isNull(),
     );
     for (final reply in await ChatObjects.messages(ctx, replies)) {

@@ -37,7 +37,7 @@ class DwProbeResult {
 /// Asks a deployed stack the questions a browser and a mobile app would, over
 /// the network, and judges the answers — not whether something answered.
 ///
-/// Used by `deploy run` after the proxy restart, by `deploy check`, and by the
+/// Used by `deploy run` after the proxy reload, by `deploy check`, and by the
 /// local proof, which points [connectTo] at a loopback port so the very same
 /// requests, with the very same `Host` and `Origin`, reach a stack on this
 /// machine. That sameness is the point: the proof proves these probes.

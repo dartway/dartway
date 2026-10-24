@@ -1,7 +1,7 @@
 ---
 title: Media controls follow intent and the package confirms played spans
 affects:
-  dartway_media_flutter: "0.3.0-dev.0"
+  dartway_media_flutter: "0.3.0"
 ---
 
 ## Who is affected

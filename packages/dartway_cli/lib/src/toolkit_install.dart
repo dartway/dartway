@@ -18,6 +18,11 @@ void addToolkitInstallOptions(
   required String defaultChannel,
 }) {
   parser
+    ..addFlag(
+      'interactive',
+      defaultsTo: true,
+      help: 'Allow managed skills to wait for human confirmation.',
+    )
     ..addOption(
       'agent',
       allowed: ['codex', 'claude', 'both'],
@@ -75,6 +80,7 @@ void addToolkitInstallOptions(
 class ToolkitInstallChoice {
   ToolkitInstallChoice({
     this.agent = 'both',
+    this.interactive = true,
     required this.baseBranch,
     this.releaseBranch = '',
     required this.language,
@@ -111,6 +117,9 @@ class ToolkitInstallChoice {
         : (installed?.setting(settingKey) ?? args[flag] as String);
 
     return ToolkitInstallChoice(
+      interactive: args.wasParsed('interactive')
+          ? args.flag('interactive')
+          : installed?.interactive ?? true,
       agent: pick('agent', ToolkitProvenance.agentSetting),
       baseBranch: pick('base-branch', ToolkitProvenance.baseBranchSetting),
       releaseBranch: pick(
@@ -135,6 +144,7 @@ class ToolkitInstallChoice {
   }
 
   final String agent;
+  final bool interactive;
   final String baseBranch;
   final String releaseBranch;
   final String language;
@@ -161,6 +171,7 @@ class ToolkitInstallChoice {
 
   void describe(StringSink out) {
     out.writeln('Agent integrations: $agent');
+    out.writeln('Interactive workflows: $interactive');
     out.writeln('Base branch: $baseBranch');
     if (releaseBranch.isNotEmpty) out.writeln('Release branch: $releaseBranch');
     out.writeln('Project language: $language');
@@ -222,6 +233,7 @@ Future<ToolkitInstallResult?> installToolkitInto({
   final provenance = await source.provenance(
     monorepoDir,
     settings: choice.settings,
+    interactive: choice.interactive,
   );
 
   await ToolkitInstaller.install(

@@ -1,10 +1,9 @@
 # The database: how do rows, queries and transactions work?
 
 The server reads and writes PostgreSQL through `dartway_orm`, which `dartway_core_server`
-re-exports. It is small on purpose: typed single-table queries, raw SQL when that is not enough,
-transactions with savepoints, and locks. There are no joins and no lazy relations (D-011) — related
-rows load with `findByIds`, one query per relation for a whole list, so there is no N+1 to fall
-into and nothing an ORM hides behind a getter.
+re-exports. It provides typed queries and foreign-key relations, explicit includes, raw SQL,
+transactions with savepoints, and locks. Each repository call is one SQL statement; related rows
+never load lazily. Statement shapes are prepared once per connection, just as for plain reads.
 
 ## Row classes
 
@@ -50,7 +49,7 @@ final class SessionBookingRow extends DwTableRow with _$SessionBookingRow {
 }
 ```
 
-The rules, each enforced by `dart run dartway_cli:dartway generate`:
+The rules, each enforced by `dartway generate`:
 
 - the class is named `<Entity>Row` and extends `DwTableRow` — a row and the data object clients see
   (`SessionBooking`) never share a name, and a row never leaves the server;
@@ -91,7 +90,7 @@ value a new row gets in Dart comes from the constructor's default (`this.bookedC
 
 A data object is not a column type: a row holds ids, and the handler builds the object.
 
-### What `dartway generate` writes
+### What `dart run dartway_cli:dartway generate` writes
 
 - `<file>.dw.dart`: `==`, `hashCode`, `toString`, a `copyWith` (nullable fields take a
   `DwFieldPatch` — keep, set or clear; the id is kept, a copy of a stored row is the same row), the
@@ -187,7 +186,7 @@ once per connection and reused.
 
 | Method | Returns |
 |---|---|
-| `find({where, orderBy, limit, offset, lock})` | the matching rows; without `orderBy` the order is whatever the database returns, so paging needs one |
+| `find({where, orderBy, limit, offset, lock, unbounded})` | the matching rows; without `orderBy` the order is whatever the database returns, so paging needs one. `unbounded:` says why a read without `limit` stays small (`"a board's few columns"`); `dartway check` warns about a request handler's `find` with neither (`unboundedRead`), and the repository refuses it beside a `limit` or blank |
 | `findFirst({where, orderBy, lock})` | the first row or `null` |
 | `findById(id, {lock})` | the row or `null` |
 | `findByIds(ids)` | the rows with those ids, in one statement whatever their number; missing ids are absent, the order unspecified — index the result by id |
@@ -200,12 +199,14 @@ once per connection and reused.
 | `exists({where})` | whether any |
 | `insert(draft)` | the row as stored, with its id and every value read back |
 | `tryInsert(draft, onConflict: …)` | the stored row, or `null` when it conflicted |
-| `upsert(draft, conflictOn: (t) => [t.key])` | inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
-| `upsertAll(drafts, conflictOn: (t) => [t.slug])` | every row inserted, or written over the row with the same key — unless that row already holds exactly these values — in one statement; the count of rows inserted or changed, `0` for a second run with the same rows. What `DwSeedRows` runs |
+| `upsert(draft, conflictOn: (t) => [t.key])` | on tables without state columns: inserts, or writes every other column over the row with the same unique key; the stored row either way, in one statement with no race between "not there" and "insert" |
+| `upsertAll(drafts, conflictOn: (t) => [t.slug])` | on tables without state columns: every row inserted, or written over the row with the same key — unless that row already holds exactly these values — in one statement; the count of rows inserted or changed, `0` for a second run with the same rows. What `DwSeedRows` runs |
 | `insertAll(drafts)` | the rows as stored, in order, in one statement |
-| `update(row)` | writes every column by id; throws `DwRowNotFound` when no row has that id — an update that changed nothing is a failure, not a quiet success |
-| `updateWhere({where, set})` | sets columns on every matching row; returns the count |
+| `update(row)` | writes ordinary columns by id; retains and guards states. Throws `DwRowNotFound` for a missing id; `DwStaleState` for an existing row whose state no longer matches |
+| `updateWhere({where, set})` | sets ordinary columns on every matching row; returns the count; refuses state assignments |
 | `updateWhereReturning({where, set})` | the same, answering the rows as updated — what to publish, without a second read |
+| `transition(id, column: …, to: …)` | the changed row or null when missing/disallowed; one guarded state update |
+| `transitionWhere(where: …, column: …, to: …)` | only the rows that moved; compare returned ids with requested ids |
 | `delete(id)` | `1`, or `0` when there was none |
 | `deleteWhere({where})` | the count |
 
@@ -301,6 +302,87 @@ await db.chatUnreads.updateWhere(
 `increment` exists only on a non-null number column: on a nullable one `NULL + 1` is `NULL`, and
 treating null as zero is the project's decision to write, not the ORM's to hide.
 
+## Relations and includes
+
+Import the generated `dw_schema.dart` to use the relation extensions. The generator derives a
+to-one from an FK field (`sessionId` → `session`) and a reverse to-many from the referencing
+entity's plural name. When two FKs reference the same table, name both directions on each:
+`@DwForeignKey('user_profile', relation: 'authorProfile', reverse: 'authoredMessages')`.
+Ambiguous pairs and relation names colliding with fields, `id` or reserved words warn and emit
+no relation in either direction until named with `relation:` and `reverse:`. Generation continues.
+A referenced row field named `tablePath`, `include` or `includeSpec` remains a generation error;
+rename the Dart field and retain its SQL name with `@DwColumnName`.
+Only row classes in the project's generation input participate; FKs to framework, module or
+SQL-only tables remain valid and get no relation in either direction.
+
+```dart
+final rows = await ctx.db.sessionBookings.find(
+  where: (t) => t.session.startsAt.gte(day),
+  orderBy: (t) => [t.session.startsAt.asc(), t.id.asc()],
+  limit: page.fetchLimit,
+  include: (t) => [
+    t.session.include((s) => [s.service, s.coachProfile]),
+    t.clientProfile,
+    t.sessionReviews.take(1),
+  ],
+);
+const t = SessionBookingRow.tableDef;
+for (final row in rows) {
+  final ClubSessionRow session = row.one(t.session);
+  final List<SessionReviewRow> reviews = row.many(t.sessionReviews);
+  // Map the explicitly loaded rows to the project's DTOs.
+}
+```
+
+`find`, `findFirst` and `findById` keep returning ordinary generated rows. `row.one(token)`
+returns the relation's row type (`Row?` for a nullable FK); `row.many(token)` returns `List<Row>`.
+Both throw `StateError` when the relation was not included. An included empty collection is `[]`,
+an included missing nullable to-one is `null`. Inclusion belongs to that returned row instance;
+`copyWith`, drafts, later reads and writes do not inherit it. No casts or string keys are needed.
+Nested includes select their own relations explicitly and may extend beyond three levels.
+
+Each to-many include needs `.take(n, where: ..., orderBy: ..., include: ...)` or
+`.unbounded('<domain reason>', where: ..., orderBy: ..., include: ...)`. A bare to-many token
+is refused; `dartway check` also warns with `unboundedRead` at a handler's include site.
+A parent limit does not bound its children. Nonnegative child limits are bound parameters.
+Without a nonempty `orderBy`, `take(n)` orders children by their primary key.
+Columns reached through a nullable to-one have nullable Dart types, including grouping keys and
+aggregate values; grouped reads retain the NULL group.
+`lock:` together with `include:` is refused, even inside a transaction; keep locked reads separate.
+
+Related columns work in every repository `where` callback, including `count`, `exists`,
+`updateWhere` and aggregates. Chains such as `t.session.coachProfile.firstName` work in filters
+and orders. Reverse collections have no `asc`/`desc`: use `any`, `none`, `every`, or a filtered
+`count(where: ...)` with `equals`/`gt`/`gte`/`lt`/`lte`:
+
+```dart
+where: (t) => t.sessionBookings.any((b) => b.status.equals(BookingStatus.booked))
+where: (t) => t.sessionBookings.none((b) => b.status.equals(BookingStatus.cancelled))
+where: (t) => t.sessionBookings.every((b) => b.status.equals(BookingStatus.attended))
+where: (t) => t.sessionBookings.count(where: (b) => b.status.equals(BookingStatus.booked)).gte(2)
+```
+
+`any` is `EXISTS`, `none` is `NOT EXISTS`, and `every` is `NOT EXISTS` of a child whose
+predicate `IS NOT TRUE`: it includes parents without children and treats a null comparison as
+false. Counts are correlated subqueries. To-one paths use `LEFT JOIN`; mutations with such paths
+select matching parent ids within the same statement. Ordinary mutations keep their direct SQL.
+To-many includes aggregate each collection separately, avoiding row multiplication and cartesian
+products. Bounded or filtered parent reads use a lateral aggregate over a limited, ordered child
+subquery; reads with no parent limit, offset or filter group unbounded child collections once and
+join them by FK. Parent `limit`/`offset` counts parents. Related JSON rows pass through the same
+generated codec as ordinary reads, with exact timestamp microseconds, calendar dates, durations,
+bytes, doubles, enums, state columns, collections and nulls. The calendar-day-in-jsonb restriction
+for user-declared collection columns does not apply to included date columns.
+
+Postgres does not create an index on an FK column. Generation warns if no unique constraint or
+index starts with that column, including FKs to external tables. Add `DwTableIndex(['fieldId'])`
+to the row's `@DwSqlTable(indexes: [...])`, regenerate and create a migration. A composite index
+starting with the FK already satisfies the warning.
+
+Includes are reads, not an access path: the handler's `access:` / `DwAccessRule.resource` still
+owns authorization. `findByIds` remains useful when the caller already has the ids; raw SQL,
+transactions and locks keep their existing meanings.
+
 ## Transactions
 
 ```dart
@@ -372,7 +454,7 @@ once, for work where "someone else is doing it" is itself the answer.
 ## Settings
 
 **The app's settings are one data object, read and written through `ctx.settings`** — a table of
-string keys and values is refused by `dart run dartway_cli:dartway check` (`settingsKeyValueTable`). Every reader of such
+string keys and values is refused by `dartway check` (`settingsKeyValueTable`). Every reader of such
 a table parses text and supplies its own default (`== 'true'`), every first save of a key races
 another, and a value nobody reads is never noticed.
 
@@ -446,7 +528,7 @@ defaults.
 
 ## Raw SQL
 
-When a statement is not one table's — a `WITH`, a join the batch loaders cannot express, a
+When a statement is not one table's — a `WITH`, a join or aggregate outside the typed relation API, a
 `UNION` — write SQL. An aggregate over one table is not a reason: `countBy`, `sumBy`, `maxBy` and
 `findFirstPer` keep enum values typed, where a literal like `'accepted'` in SQL breaks silently on a
 rename.
@@ -518,3 +600,74 @@ the pool from `DwAppServer(database:)`; a script opens its own and closes it
 - [Migrations](migrations.md) — how a row class change reaches the database.
 - [Handlers and the call context](handlers-and-context.md) — `ctx.db` and `ctx.transaction`.
 - [Jobs](jobs.md) — `SKIP LOCKED` claims and `LISTEN`/`NOTIFY` in the framework's own queue.
+
+## State columns
+
+A lifecycle status is a state column. Declare its initial values and directed moves as const data
+beside the enum, and annotate the non-null enum field on its row:
+
+```dart
+enum WorkStatus { open, running, completed, cancelled }
+
+const workTransitions = DwStateTransitions<WorkStatus>(
+  initial: {WorkStatus.open},
+  moves: {
+    WorkStatus.open: {WorkStatus.running, WorkStatus.cancelled},
+    WorkStatus.running: {WorkStatus.completed, WorkStatus.cancelled},
+  },
+);
+
+// In WorkItemRow:
+@DwStateColumn(workTransitions)
+final WorkStatus status;
+```
+
+Run `dartway generate`. A missing source entry is terminal; a self move is allowed only if declared.
+The table is ordinary data: tests can read `initial`, `moves`, `allows` and `sourcesFor`.
+
+```dart
+final moved = await ctx.db.workItems.transition(
+  id,
+  column: (t) => t.status,
+  to: WorkStatus.running,
+);
+if (moved == null) ctx.refuse(AppRefusal.workNotOpen);
+
+final changed = await ctx.db.workItems.transitionWhere(
+  where: (t) => t.id.inList(requestedIds),
+  column: (t) => t.status,
+  to: WorkStatus.cancelled,
+);
+final unchangedIds = requestedIds.toSet().difference(changed.map((r) => r.id).toSet());
+```
+
+Each transition uses one guarded `UPDATE ... WHERE ... AND status IN (...) RETURNING ...`, with
+parameters for all values. A concurrent writer rechecks the guard against the stored row after
+waiting for its lock. `transition` returns null for a missing row or a disallowed move;
+`transitionWhere` returns only the rows that moved, leaving all other rows untouched. An empty
+predecessor set returns immediately. There is no preliminary read. Select the column explicitly,
+including on rows with multiple state fields.
+
+All insert paths validate the initial set before writing, including the whole batch of `insertAll`.
+`update(row)` writes ordinary fields only and guards every state against the supplied row: a stale
+state on an existing row throws the catchable `DwStaleState`. A missing id throws `DwRowNotFound`
+on every table. Catch `DwStaleState` and translate it into the feature's conflict, or let the server
+answer `dw.conflict` (HTTP 409) without reporting an incident. Re-read before deciding whether to
+retry. Generated stored-row `copyWith` refuses an intentional state change with
+`DwStateWriteException`; passing the same row's state unchanged is allowed. A reconstructed row
+has no original state to compare: the repository guards the supplied state and never writes it.
+A state-only row has no ordinary update and is refused. `updateWhere` and `updateWhereReturning`
+refuse assignments to state columns. `upsert` and `upsertAll` on state tables are refused; use
+insert/tryInsert and transitions instead. These refusals are programming errors, not domain
+refusals: commands translate a transition's null/unchanged result into their own refusal.
+
+`dartway check` reports `stateWrittenDirectly` for direct state writes through row `copyWith`,
+ordinary updates, upserts or raw SQL in server `lib/`. It reads formatted source rather than
+resolved types: typed rows and rows inferred from repository calls are recognized, including a
+local repository alias; arbitrary data flow or dynamically assembled SQL is outside this source
+check. The runtime guards still hold every repository write. Raw SQL is a privileged escape and
+must not be used to bypass state rules. A schema migration may rewrite stranded values through
+`m.backfill`; that is allowed only in `lib/src/migrations/`.
+
+The framework repository's booking feature demonstrates the full path: booked → cancelled or
+attended, through its commands, publications and acceptance tests.

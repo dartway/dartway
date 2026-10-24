@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:path/path.dart' as p;
-import 'package:yaml/yaml.dart';
 
 import '../project_refresh.dart';
 import '../toolkit_manifest.dart';
@@ -179,22 +178,7 @@ class _DerivedFiles {
 
   static const _registryHeader = '// Maintained by `migrate create`';
 
-  /// Localization outputs: `flutter gen-l10n` writes them next to the
-  /// templates unless `output-dir` says otherwise.
-  late final List<String> _l10nOutputs = [
-    for (final (directory, _) in projectPackages(root))
-      if (File(p.join(directory.path, 'l10n.yaml')) case final file
-          when file.existsSync())
-        if (loadYaml(file.readAsStringSync()) case final YamlMap config)
-          p.posix.join(
-            p.relative(directory.path, from: top).replaceAll(r'\', '/'),
-            (config['output-dir'] ?? config['arb-dir'] ?? 'lib/l10n') as String,
-            p.basenameWithoutExtension(
-              (config['output-localization-file'] ?? 'app_localizations.dart')
-                  as String,
-            ),
-          ),
-  ];
+  late final List<String> _l10nOutputs = localizationOutputs(root, top);
 
   bool isGenerated(String path) =>
       path.contains('/lib/generated/') ||

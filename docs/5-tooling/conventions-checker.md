@@ -1,6 +1,6 @@
 # Why a checker when you already have the analyzer?
 
-`dart run dartway_cli:dartway check` looks at the things the analyzer and the lints cannot see. The analyzer reads a
+`dartway check` looks at the things the analyzer and the lints cannot see. The analyzer reads a
 file; the checker reads the **project**: which folder is a feature, who imports whose internals,
 whether a screen styles itself, whether an asset path leads anywhere, whether the generated code
 still matches its sources and the migrations still produce the schema. All of that compiles. Some
@@ -27,7 +27,7 @@ is decidable without understanding what the code means**.
 | The answer is… | Where the rule goes | Example |
 |---|---|---|
 | decidable from the shape of an expression | `dartway_lints` (an analyzer plugin, live in the IDE and in `dart analyze`) | is this a raw `Color` outside `ui_kit/`? |
-| decidable from the shape of the project | `dart run dartway_cli:dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
+| decidable from the shape of the project | `dartway check` | does this folder in a zone declare a widget? is `data/` in the declared layout? |
 | **only decidable by reading the meaning** | `/dartway-checkup` | is this string something a *user* reads, or an identifier, a key, a date pattern? |
 
 The third row is the one worth defending. `'Issues'`, `'issues/board'` and `'dd.MM'` are the same
@@ -48,7 +48,7 @@ A rule that needs understanding is not a weaker rule. It is a rule for a reader.
 ```bash
 cd <project>_flutter
 dart analyze --fatal-infos                      # the analyzer, the lint set and DartWay's own rules
-dart run dartway_cli:dartway check              # the structural conventions
+dartway check              # the structural conventions
 ```
 
 **`flutter analyze` does not run analyzer plugins.** The skeleton enables `dartway_lints` under
@@ -107,15 +107,17 @@ one folder. `--type <check>` runs one check by name; `--level info|warning|error
 one severity. `--fix` first applies the mechanical fixes, then checks: every relative import in `lib/`
 of the three packages becomes its `package:` form and the import block is sorted (generated files are
 left to their generator), and an acceptance test lying at the root of `test/` moves to the mirror of
-the `lib/src/<feature>/` it is named after, its import of the harness rewritten. `--type` and `--dir`
-narrow the fixes as they narrow the checks; `--dir` leaves the tests.
+the `lib/src/<feature>/` it is named after, its import of the harness rewritten. With design config,
+it also creates the relative resource symlink and wires the template web Docker context
+(`designResourcesInvalid`). `--type` and `--dir` narrow the fixes as they narrow the checks;
+`--dir` leaves the tests and design wiring.
 
 **Exit codes.** `1` when any error-severity finding is reported (a Flutter package with no `lib/`
 counts as one), `0` otherwise — warnings and infos print and pass. An unknown `--type` is a usage
 error, `64`. Run outside a DartWay project, the command says so and exits `1`.
 
 **A check that could not run says so, and does not pass or fail.** When the generator does not run to
-a verdict — an unresolved package, a declaration it refuses — `dart run dartway_cli:dartway check` prints its first lines
+a verdict — an unresolved package, a declaration it refuses — `dartway check` prints its first lines
 under "Not checked". When `DW_DATABASE_HOST` is not set, the migrations are not replayed and the run
 says what to set. A finding invented from a probe that could not run is how a check earns a
 reputation for lying; a silent pass is worse.
@@ -133,11 +135,12 @@ error set. See [The agent toolkit](agent-toolkit.md).
 
 ## The checks
 
-Forty-three errors, twelve warnings, one info — `DwCheckType` and its `severity` in
+Forty-seven errors, fourteen warnings, one info — `DwCheckType` and its `severity` in
 `packages/dartway_cli/lib/src/checker/dw_check_type.dart`.
 
 | Check | Level | What it means |
 |---|---|---|
+| `instructionsDuplicated` | warning | Root `CLAUDE.md` contains project text beside `AGENTS.md`; move the text to `AGENTS.md` and leave `@AGENTS.md` in `CLAUDE.md`. |
 | `uiKitPartMissing` | error | A kit file without `part of '../ui_kit.dart'` (generated files exempt) |
 | `l10nNotWired` | error | The app has no localization wiring: `flutter_localizations`, `generate: true`, `l10n.yaml`, a `.arb` in `lib/l10n`. Names the missing pieces |
 | `forbiddenUiUsage` | error | Raw styles outside `ui_kit/` — the screen is styling itself |
@@ -145,7 +148,9 @@ Forty-three errors, twelve warnings, one info — `DwCheckType` and its `severit
 | `invalidFeatureStructure` | error | A feature folder with more than one root file |
 | `forbiddenFeatureImport` | error | Reaching into another feature's `widgets/` or `logic/` |
 | `notAFeature` | error | A folder in a zone whose entry point declares no widget |
-| `assetPathMissing` | error | An `assets/...` string that names no file |
+| `assetPathMissing` | error | An app or configured design asset string that names no file |
+| `designResourcesInvalid` | error | Invalid `.dartway/design.json`, design symlink, pubspec registration or Docker context |
+| `designResourceCopied` | error | An app `assets/` file hashes identically to a Studio resource; names the design key |
 | `barrelFile` | error | A file that only re-exports |
 | `widgetSizesItself` | error | `Expanded` or `SizedBox.expand` returned straight from `build` |
 | `invalidTopLevelLayout` | error | A folder or file the declared top level does not name, a fixed name that is missing, or a top-level name nested inside a zone; in the server's `lib/src/`, a file, a layer-named folder (the list is in [project layout](../1-getting-started/project-layout.md)) or a feature folder without its `<feature>_feature.dart` |
@@ -154,13 +159,14 @@ Forty-three errors, twelve warnings, one info — `DwCheckType` and its `severit
 | `featureImportCycle` | error | Server features importing one another in a cycle, by any import — within the surface or not. One finding per knot of features: a shortest cycle, the import behind each step, and the other features of the knot |
 | `coreImportsFeature` | error | A file of the server's `lib/src/core/` importing a feature. Every feature imports `core/`, so what `core/` needs from a feature belongs to the feature — who the caller is in `profile/profile_access.dart`, the sign-in hooks in a feature above the ones they touch |
 | `featureImportOutsideSurface` | error | A server feature importing another's file outside its surface: only `<feature>_rows`, `_access`, `_objects`, `_publications`, `_changes` (and their `<part>` files) may be imported — never `_feature`, `_handlers`, `_jobs`, `_routes` or `logic/`; nor may any file under `lib/src/` import the package's library. `import`, `export` and `part` count. `lib/<project>_server.dart`, `migrations/`, `bin/` and `test/` are not judged |
-| `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
-| `generatedCodeStale` | error | A generated file that `dart run dartway_cli:dartway generate` would write differently, or whose source is gone |
+| `foreignRowWrite` | error | `<handle>.<table>.insert`/`tryInsert`/`insertAll`/`transition`/`transitionWhere`/`update`/`updateWhere`/`updateWhereReturning`/`upsert`/`upsertAll`/`delete`/`deleteWhere` of a table whose row class another feature declares (the generated schema names the row class of each `db.<table>`), through any handle — `ctx.db`, a transaction's `tx`, a helper's `db` — from a feature or from `core/`: the owner's `_changes` is the way in. A repository held in a variable is not seen |
+| `stateWrittenDirectly` | error | A declared state column written through row `copyWith`, ordinary updates, upserts or raw SQL in server `lib/`; use guarded transitions. Migration `m.backfill` is allowed. |
+| `generatedCodeStale` | error | A generated file that `dartway generate` would write differently, or whose source is gone |
 | `projectContractVersion` | error | Generated project contract is incompatible at the same breaking line, or cannot be verified against its fixed committed Git baseline. `--contract-base <revision>` supplies a trusted baseline; see the wire/version guidance |
 | `routeNameDuplicated` | error | Two navigation zones declare a route of the same name — names are global in `DwAppRouter`, which otherwise refuses to build on the first frame |
 | `contractNameInvalid` | error | A DTO in the shared package named against the naming law: one word (`Dw` is not a word), a read not named `Get…`/`List…`, a command named like a read. Judged by the framework base a class extends directly |
 | `forbiddenDateTimeNow` | error | `DateTime.now` or `DateTime.timestamp` (called or torn off, interpolations included), or `package:clock`'s `clock.now()` where it is imported (prefixed or not), anywhere in the server's `lib/` — the factory file included — the time there is `ctx.now`, the server's clock, which tests set and the job queue runs by. Comments and strings are passed over; `bin/` and `test/` are not judged |
-| `migrationsDrift` | error | Migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
+| `migrationsDrift` | error | Required additions to existing tables without a default (checked offline), or migrations that do not produce the declared schema, edited after sealing, unregistered, or with a down that does not undo its up |
 | `redundantBangAllowed` | error | The server or the shared package's `analysis_options.yaml` (or a local file it includes) does not set `analyzer: errors: unnecessary_non_null_assertion: error` — a stored row's id is `int`, and `row.id!` hides the `!` that guards a real null (D-113) |
 | `migrationChangesData` | error | An `INSERT`, `UPDATE` or `DELETE` in a migration (`lib/src/migrations/m*.dart`) that is not an argument of `m.backfill(…)` — content is a seed step. Reads the SQL strings: adjacent literals as one string, `--` comments dropped, an interpolated table name still a table; only the dollar-quoted body of a function or procedure being defined passes. Migrations up to `deploy/config.yaml` > `migrations` > `dataChecksAfter` are not judged — and moving that key forward exempts whatever it passes, which no check can see: the agent's skills make a diff that moves it a stop for the human. A write into a `dw_*` table is refused even through `backfill`; `m.carrySettings` is the one way ([Migrations](../4-server/migrations.md#a-migration-changes-the-schema)) |
 | `workAfterServerStart` | error | `bin/server.dart` awaiting anything, or reaching `.db`, `.accounts` or `runInContext`, after the server's `start()` — the variable a `DwAppServer(…)` or `…Server.build(…)` was assigned to — in the same function; awaiting `stop()`/`close()` or a `ProcessSignal` passes ([Startup steps and seeds](../4-server/app-server.md#startup-steps-and-seeds)) |
@@ -183,16 +189,18 @@ Forty-three errors, twelve warnings, one info — `DwCheckType` and its `severit
 | `uiKitConstStyle` | warning | A `static const` colour or text style in the kit outside `ui_kit/theme/` — a token that will not follow a second theme |
 | `fileTooLong` | warning | Over 350 lines, in the Flutter package's zones and layers but `ui_kit/`, and in the server's and the shared package's `lib/` — generated code, migrations and seed data passed over |
 | `featureSpecMissing` | warning | A feature widget that declares no `DwFeatureSpec` |
-| `forbiddenAssetPath` | warning | A raw `assets/...` path outside `ui_kit/` |
+| `forbiddenAssetPath` | warning | A raw app or configured design asset path outside `ui_kit/` |
 | `unusedFeatureFile` | warning | A file in `widgets/`/`logic/` that its own feature never mentions |
 | `frameworkRefsDiverged` | warning | The project's `dartway_*` git dependencies are locked to more than one commit |
 | `frameworkOverrideOutlived` | warning | A `dependency_overrides` version pin on a `dartway_*` package that a resolved framework package already allows — the override outlived the framework's own raise (D-032) |
 | `forbiddenEnvironmentRead` | error | `Platform.environment` in the server's `lib/` outside `lib/src/core/environment.dart`, where `AppEnvironment` reads every variable at start; in `bin/`, `Platform.environment` outside `DwLocalEnvironment.overlay(…)` or a map read by a variable's name (`env['PORT']`) |
+| `forbiddenProcessRun` | error | `Process.run`, `Process.runSync` or `Process.start` in server `lib/`, including tear-offs, or imports/exports of `package:process` or `package:process_run` — external commands use `ctx.process` |
 | `forbiddenHttpClient` | error | `HttpClient(`, `DwOutboundHttp.network` (including a tear-off), or an import of `package:http/…` in the server's `lib/` — an outbound request is `ctx.http` |
 | `localSecretMissing` | warning | A secret under the hoisted `requires.secrets` of `deploy/config.yaml` with no value for `local`, in either half |
 | `docCommentLanguage` | warning | A doc comment in `lib/` written in a script other than the language `dartway setup-ai --language` recorded — a heuristic on Cyrillic against Latin letters, so it warns and never fails. A comment the skeleton wrote (the same text in the template the project came from) is not judged, nor a generated file |
 | `devComposeDrifted` | warning | The server package's `docker-compose.yaml` creates the development containers with credentials or a port that `deploy/config.yaml > local` does not name |
 | `inlineOwnershipCheck` | warning | A handler in a `*_handlers.dart` under any rule but a resource rule (`signedIn`, a role check) that compares a row's owner field with the caller and refuses `notFound`/`forbidden` (or answers `null` from a `single`), in its body or a helper of the file it calls — the check `DwAccessRule.resource` makes once |
+| `unboundedRead` | warning | A repository `find(…)` in a request handler (`single`, `maybe`, `list`, `page`, `table`, `window`) of a `*_handlers.dart` outside `request.readWhole`, naming neither `limit:` nor `unbounded:` — a read of every row its filter matches. Fix: a page, table or window request, `request.readWhole` for a whole list, `limit:` for paged reads, or `unbounded: '<reason>'` |
 | `fileLong` | info | Over 200 lines, where `fileTooLong` looks |
 
 "Raw styles" means `Color(`, `TextStyle(`, `BorderRadius.`/`BorderRadius(`, `Theme.of(`,
@@ -316,10 +324,13 @@ over every pass.
 **`generatedCodeStale`** runs the generator the server package resolved in check mode. The codecs are
 the wire, so this has no second reading: a request missing from the registry is refused as unknown by
 a server that has its handler, and a field missing from a codec simply does not travel. The fix it
-prints is `dart run dartway_cli:dartway generate`, and generated files are never edited by hand. See
+prints is `dartway generate`, and generated files are never edited by hand. See
 [Data objects and generation](../2-core/data-objects-and-generation.md).
 
-**`migrationsDrift`** runs the project's `bin/migrate.dart check`, which replays the migrations on
+**`migrationsDrift`** first checks migration sources offline: `ADD COLUMN … NOT NULL` on an
+existing table needs `DEFAULT`, or a nullable column with backfill and `NOT NULL` in a later release,
+so the previous server can still insert during deployment. General expand/contract compatibility
+remains a review obligation. It also runs the project's `bin/migrate.dart check`, which replays the migrations on
 throwaway databases next to the one `DW_DATABASE_*` — or `deploy/config.yaml > local`, which the
 check reads the same way the entry points do — names — so it needs a Postgres where databases can
 be created; the development one will do. It fails on migrations that do not produce the schema the
@@ -368,6 +379,18 @@ rather than its meaning; it stays quiet on a list filtered by the caller in its 
 canonical "my rows"), on handlers under a resource rule, and on a membership read from a table of its
 own. The one pattern per shape is in
 [Access and roles](../2-core/access-and-roles.md#whose-row-is-it-one-rule-per-shape).
+
+**`unboundedRead`** looks for a read that answers a screen and has no bound: a repository `find(…)`
+inside a request handler — `DwCallHandler.single`, `maybe`, `list`, `page`, `table`, `window` — of a
+`*_handlers.dart`, outside `request.readWhole`, naming neither `limit:` nor `unbounded:`. Such a read is ten rows in development
+and megabytes a year later, and nothing says when it crossed. The fix is one of three: the request
+becomes a page, table or window (what grows with use); a whole list uses `request.readWhole`
+to probe one past `maxItems` and retry without a limit in production on overflow
+(paged reads take `limit: page.fetchLimit`) ([Requests](../2-core/requests-and-updates.md)); or the read says why the domain keeps it small with
+`unbounded: 'a board has a handful of columns'`. `findById`, `findFirst` and `findByIds` are bounded
+by what they are asked for; commands, jobs and migrations are not looked at. A warning, because it
+reads the handler's own body and the shape of the call: a filter on a unique key looks like any
+other, and a read in a helper the handler calls is not seen.
 
 ## State and commands: one way each, and one visible way out
 
@@ -525,9 +548,17 @@ same hole, smaller.
 
 DartWay projects run no asset code generator, so asset paths are written by hand — and a hand-written
 path, unlike a generated constant, can name a file that does not exist. `assetPathMissing` restores
-that guarantee, and `forbiddenAssetPath` keeps the paths in one place: a path spelled out in a screen
+that guarantee for app and configured design resources, and `forbiddenAssetPath` keeps the paths in
+one place: a path spelled out in a screen
 survives a renamed file only by accident and cannot be found by search. The screen should receive a
 widget, not a file name.
+
+Studio resources opt in through project-root `.dartway/design.json`:
+`{"path":"dw_studio"}` (`{}` uses that default). `dartway check --fix` creates
+the relative design symlink and adds the resources to template web Docker contexts.
+Both sources use `lib/ui_kit/assets/app_icon.dart`; list the linked resources folder
+in `flutter.assets`. Identical app-owned copies fail `designResourceCopied`.
+Without the config, the design rules are disabled. See [the UI kit](../3-flutter/ui-kit.md#studio-resources-and-app-assets).
 
 ## One way to write the ordinary things
 

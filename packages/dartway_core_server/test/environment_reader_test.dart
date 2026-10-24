@@ -173,6 +173,15 @@ void main() {
       expect(local.deploymentVersion, isNull);
     });
 
+    test('a list past its bound fails calls only where DW_STRICT_BOUNDS '
+        'says so', () {
+      expect(
+        read({...database, 'DW_STRICT_BOUNDS': 'true'}).strictBounds,
+        isTrue,
+      );
+      expect(read(database).strictBounds, isFalse);
+    });
+
     test('defaults the port to 8080 and has no origins', () {
       final environment = read(database);
       expect(environment.port, 8080);

@@ -1,13 +1,6 @@
 ---
 name: dartway-data-layer
-description: >-
-  The Flutter data layer (__FLUTTER_PKG__): reads as Riverpod providers over the contract (dw.request,
-  dw.pages, dw.table, dw.window) keyed by the request value; showing them with DwReadBuilder,
-  DwPagedListView and DwWindowListView; chrome from logic/ providers; refresh with refetch;
-  commands from the feature's logic/ inside dw.action; refusal texts; form validation; the session,
-  live status and incompatibility; hand-written providers; persisted screen state through
-  dw.plugins.prefs; notifications. Use when a Flutter feature reads, changes or reacts to server
-  data, shows a refusal, or keeps local state.
+description: "Read requests on Flutter screens and send commands through feature logic and dw.action."
 ---
 
 # DartWay — the data layer (Flutter)
@@ -172,3 +165,7 @@ top-level `providerFamily<String, int>(keyFor: (id) => 'invoices.$id.sort', defa
 
 Notifications are `dw.notify.success / info / warning / error(text)`, the text localized
 (`dartway-ui-kit`) — never `ScaffoldMessenger` or a `SnackBar`.
+
+On the server, related filters and explicit `include` belong in the original repository read;
+the `dartway-server` rows-and-queries reference covers generated FK paths and bounded collections.
+Authorization remains the handler's responsibility.

@@ -33,6 +33,8 @@ const dwTableWriteMethods = [
   'insert',
   'tryInsert',
   'insertAll',
+  'transition',
+  'transitionWhere',
   'update',
   'updateWhere',
   'updateWhereReturning',

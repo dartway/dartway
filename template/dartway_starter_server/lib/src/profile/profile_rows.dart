@@ -12,6 +12,7 @@ part 'profile_rows.dw.dart';
 @DwSqlTable(
   'user_profile',
   indexes: [
+    DwTableIndex(['avatarFileId']),
     DwTableIndex(['createdAt']),
   ],
 )

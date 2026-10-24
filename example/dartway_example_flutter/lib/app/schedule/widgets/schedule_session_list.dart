@@ -1,35 +1,29 @@
-import 'package:dartway_example_flutter/app/schedule/logic/today_controller.dart';
+import 'package:dartway_example_flutter/app/schedule/logic/schedule_snapshot.dart';
 import 'package:dartway_example_flutter/app/schedule/widgets/session_card.dart';
 import 'package:dartway_example_flutter/core/app_l10n.dart';
-import 'package:dartway_example_flutter/core/dw_core.dart';
 import 'package:dartway_example_flutter/shared/placeholder_objects.dart';
 import 'package:dartway_example_flutter/ui_kit/ui_kit.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 import 'package:flutter/material.dart';
-import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 /// Upcoming sessions grouped by day, each card knowing whether you hold a
 /// place on it. Both reads are live: a place someone else takes changes the
 /// spots left on every screen, and your own booking or cancellation flips the
 /// card — with no refresh code here.
-class ScheduleSessionList extends ConsumerWidget {
+class ScheduleSessionList extends StatelessWidget {
   const ScheduleSessionList({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    // Two reads, one nested in the other: the list waits for both, and each
-    // fails, retries and follows the server on its own.
-    return DwReadBuilder(
-      dw.request(
-        ListUpcomingSessions(from: ref.watch(todayControllerProvider)),
+  Widget build(BuildContext context) {
+    return DwReadBuilder.derived(
+      scheduleSnapshotProvider,
+      retry: refetchSchedule,
+      placeholder: (
+        sessions: PlaceholderObjects.listOf(PlaceholderObjects.session, 5),
+        mine: const <SessionBooking>[],
       ),
-      placeholder: PlaceholderObjects.listOf(PlaceholderObjects.session, 5),
-      builder: (context, sessions) => DwReadBuilder(
-        dw.request(const ListMyBookings()),
-        placeholder: const <SessionBooking>[],
-        builder: (context, mine) =>
-            _ScheduleDays(sessions: sessions, mine: mine),
-      ),
+      builder: (context, snapshot) =>
+          _ScheduleDays(sessions: snapshot.sessions, mine: snapshot.mine),
     );
   }
 }
@@ -60,7 +54,12 @@ class _ScheduleDays extends StatelessWidget {
           if (index == 0 ||
               !session.startsAt.isSameDayAs(sessions[index - 1].startsAt))
             Padding(
-              padding: const EdgeInsets.fromLTRB(AppSpace.s4, AppSpace.s16, AppSpace.s4, AppSpace.s8),
+              padding: const EdgeInsets.fromLTRB(
+                AppSpace.s4,
+                AppSpace.s16,
+                AppSpace.s4,
+                AppSpace.s8,
+              ),
               child: AppText.caption(session.startsAt.dayLabel),
             ),
           SessionCard(

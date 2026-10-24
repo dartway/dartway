@@ -131,6 +131,9 @@ final class _Silent implements DwServerLogger {
   const _Silent();
 
   @override
+  bool isEnabled(DwLogLevel level) => false;
+
+  @override
   void log(
     DwLogLevel level,
     String message, {

@@ -1,12 +1,6 @@
 ---
 name: dartway-access
-description: >-
-  Who may do what in a DartWay project: the DwAccessRule of every handler (anonymous, signedIn,
-  check, resource — owned, through a parent, by membership), roles as the project's own, someone
-  else's row answering dw.notFound, channel rules and file rules as the second and third access
-  points, what a command's publications reveal, personal keys and revocation, identifiers attached
-  by code, and the tests that prove each rule. Use when adding a handler, a role, a channel, an
-  upload purpose or a key-issuing flow, or when reviewing whether a call leaks data.
+description: "Declare handler, channel and upload access rules; work with profiles, roles, accounts and identities."
 ---
 
 # DartWay — access (`dartway-access`)
@@ -34,7 +28,7 @@ makes the role a word handlers read.
 
 ## 2. Roles are the project's
 
-A role is a column of the profile row, created with the account (`dartway-server`, §8). Guard a role
+A role is a column of the profile row, created with the account (`dartway-server`, `references/accounts.md`). Guard a role
 change like any data: **nobody changes their own role** (a project refusal code — the skeleton's
 `ownRoleLocked`), and **the first admin is declared per environment** (`DW_ADMIN_IDENTIFIER`), never a
 default. A role taken away closes what it opened: `ctx.revoke` on its channels (`dartway-realtime`).
@@ -74,9 +68,10 @@ handle: (ctx, command) async {
 - **Visible but not yours to change** (a note on the team's board): `load` answers `null` outside the
   team before taking any lock, `allows` compares the author, `visible: (…) => true`.
 - **The caller's rows as a list** is `signedIn` and a `where` naming the caller; a list under a parent
-  takes the parent's membership rule.
+  takes the parent's membership rule. Review every filter for rows or fields it could leak to another
+  caller; the client's `matches` filter never grants access.
 
-"My" calls name nothing about the caller (`dartway-contract` §2). A staff screen acting on someone
+"My" calls name nothing about the caller (`dartway-contract`, `references/models.md`). A staff screen acting on someone
 else's data is a different call with its own rule, never the "my" call with an optional id.
 
 ## 4. Channels are the second access point
@@ -101,7 +96,7 @@ for any caller — the rule and why: `dartway-realtime` §1–2.
   through `DwConfirmIdentifierLink`, updating the ticket's account without changing the browser's
   session. Invalid, expired, used, superseded and occupied links all refuse `DwCoreRefusal.invalid`
   on `token`. **Never check "taken" earlier** — that is an account-existence oracle.
-- All of it through `DwAccountService` (`dartway-server` §8), which holds the locks sign-in takes and
+- All of it through `DwAccountService` (`dartway-server`, `references/accounts.md`), which holds the locks sign-in takes and
   closes live sessions.
 
 ## 6. Tests that prove access

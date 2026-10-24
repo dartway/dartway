@@ -4,11 +4,13 @@
 /// The rendered configuration and every snippet under `deploy/nginx.d/` name
 /// Compose services as upstreams —
 /// `proxy_pass http://storage:9000` — and nothing used to check that those
-/// services are in the stack that was actually applied. Nginx resolves an
-/// upstream once, at start, so the mismatch is not felt until something
-/// restarts the proxy, which is the deploy's own last step. A staging stand
-/// held a config naming a service it did not have for ten days, healthy the
-/// whole time, and died at a deploy that had nothing to do with it.
+/// services are in the stack that was actually applied. Nginx resolves a
+/// literal upstream when it reads its configuration, so the mismatch is not
+/// felt until something reloads or restarts the proxy, which is the deploy's
+/// own last step. A staging stand held a config naming a service it did not
+/// have for ten days, healthy the whole time, and died at a deploy that had
+/// nothing to do with it. (The rendered configuration names its own services
+/// through a variable, looked up per request, so only snippets are at risk.)
 ///
 /// One reading serves both sides of the guard: the local check reads the files
 /// in the working copy, the deploy reads what is on the server. The rule must
