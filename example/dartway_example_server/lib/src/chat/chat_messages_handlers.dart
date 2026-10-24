@@ -81,9 +81,7 @@ final chatMessagesHandlers = <DwCallHandler>[
       // Sending is having read up to one's own message.
       await ctx.moveChatReadForward(me.id, row);
 
-      final message = (await ChatObjects.messages(ctx, [
-        row,
-      ], author: me)).single;
+      final message = await ChatObjects.message(ctx, row, author: me);
       ctx.publish(AppChannels.chatOf(row.channelId), message);
       await ChatPublications.readStates(ctx, row.channelId);
       return message;
@@ -118,9 +116,7 @@ final chatMessagesHandlers = <DwCallHandler>[
       final edited = await ctx.db.chatMessages.update(
         row.copyWith(text: text, editedAt: DwFieldPatch.set(ctx.now)),
       );
-      final message = (await ChatObjects.messages(ctx, [
-        edited,
-      ], author: me)).single;
+      final message = await ChatObjects.message(ctx, edited, author: me);
       ctx.publish(AppChannels.chatOf(edited.channelId), message);
       await ChatPublications.quoting(ctx, edited);
       return message;
@@ -173,7 +169,7 @@ final chatMessagesHandlers = <DwCallHandler>[
                       pinnedByProfileId: const DwFieldPatch.clear(),
                     ),
             );
-      final message = (await ChatObjects.messages(ctx, [saved])).single;
+      final message = await ChatObjects.message(ctx, saved);
       ctx.publish(AppChannels.chatOf(saved.channelId), message);
       return message;
     },
@@ -203,7 +199,7 @@ final chatMessagesHandlers = <DwCallHandler>[
           ),
         );
       }
-      final message = (await ChatObjects.messages(ctx, [row])).single;
+      final message = await ChatObjects.message(ctx, row);
       ctx.publish(AppChannels.chatOf(row.channelId), message);
       return message;
     },

@@ -1,5 +1,3 @@
-import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_example_server/generated/dw_schema.dart';
 import 'package:dartway_example_server/src/profile/profile_rows.dart';
 import 'package:dartway_example_shared/dartway_example_shared.dart';
 
@@ -26,16 +24,4 @@ abstract final class ProfileObjects {
     agreedForMarketing: row.agreedForMarketing,
     isDeleted: row.deletedAt != null,
   );
-
-  /// The rows of [ids] by id, in one query; `null` ids are skipped.
-  static Future<Map<int, UserProfileRow>> rowsById(
-    DwDatabaseHandle db,
-    Iterable<int?> ids,
-  ) async {
-    final wanted = ids.whereType<int>().toSet();
-    if (wanted.isEmpty) return const {};
-    return {
-      for (final row in await db.userProfiles.findByIds(wanted)) row.id: row,
-    };
-  }
 }

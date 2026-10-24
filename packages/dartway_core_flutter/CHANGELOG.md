@@ -1,9 +1,29 @@
 # Changelog
 
-## 0.22.0-dev.0
+## 0.24.1-dev.1
+
+- Advance in lockstep with the core family; no API or wire changes in this package.
+
+## 0.24.0
+
+- Advance with the core family for typed ORM relations.
+
+## 0.23.0
+
+- Nothing changed here; the family moves in lockstep with the bounded lists of
+  `dartway_core_shared` and `dartway_core_server` (#644).
+- Move with the core family to support the server seam kit (#638).
+- The family moves in lockstep with ORM state columns (#639).
+
+## 0.22.0
+
+### Breaking changes
+
+- Requires `dartway_router` 4.0.0 for decision guards and pending navigation.
+
+### Changes
 
 - Correct the example and template `appVersion` comments and Flutter core docs: the build suffix is required (`+0` for an empty platform build), and app versions label sessions while contract and protocol versions decide compatibility (#567).
-- Requires `dartway_router` 4.0.0-dev.0 for decision guards and pending navigation.
 - Nothing changed here; the family moves in lockstep with `dartway_core_shared` (#521).
 - The family moves in lockstep with storage CORS and visibility-probe provisioning in `dartway_core_server` (#530).
 

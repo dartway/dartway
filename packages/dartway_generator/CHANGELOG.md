@@ -1,6 +1,28 @@
 # Changelog
 
-## 0.22.0-dev.0
+## 0.24.1-dev.1
+
+- Advance in lockstep with the core family; no API or wire changes in this package.
+
+## 0.24.0
+
+### Breaking changes
+
+- Row fields named `tablePath`, and referenced row fields named `include` or `includeSpec`, must be renamed in Dart (retain the SQL name with `@DwColumnName`). Ambiguous or colliding relation names warn and omit the relation without blocking generation.
+
+### Changes
+
+- Generate forward and reverse typed relations between project row classes; diagnose ambiguous names and warn on foreign keys without a leading index.
+
+## 0.23.0
+
+- Nothing changed here; the family moves in lockstep with the bounded lists of
+  `dartway_core_shared` and `dartway_core_server` (#644).
+- Move with the core family to support the server seam kit (#638).
+- Refuse intentional state changes in stored-row `copyWith`; allow unchanged state arguments (#639).
+- Generate typed state-column transition metadata; reject nullable or non-enum state fields (#639).
+
+## 0.22.0
 
 - With `releaseBranch` in the toolkit settings, a task's contract changes no
   longer require raising `version:`: generation reports the raise and

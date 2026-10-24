@@ -1,12 +1,6 @@
 ---
 name: dartway-run
-description: >-
-  Bring a DartWay project up locally and prove it is alive: dartway doctor, Postgres and RustFS from
-  docker compose (pg_isready polled), the environment from deploy/config.yaml > local
-  (DW_ADMIN_IDENTIFIER asked from the human), the server in the background, the dev seed, /health 200
-  reported as a fact, the sign-in code from the log, flutter run and dev web / dev proxy, and the
-  typical startup failures. Use for "bring the project up", "run it", "why does it not start", after
-  a fresh clone.
+description: "Bring up the local project or deploy it; verify services, ports, credentials and health."
 ---
 
 # DartWay — bring the project up locally (`dartway-run`)
@@ -34,7 +28,9 @@ coordinates — Postgres `127.0.0.1:8090` with `DW_DATABASE_SSL=false`, RustFS `
 exported variable wins over both. `dartway secret list --env local` shows what is set and missing
 (`localSecretMissing` warns on a declared secret with no local value; `devComposeDrifted` on compose
 credentials that no longer match); `dartway secret set <KEY> --env local` reads a value from stdin —
-ask the human before putting any real key anywhere.
+ask the human before putting any real key anywhere. With `interactive: false` in
+`.agents/dartway-toolkit.json`, report the required key/setup decision and stop that step.
+The same applies to an invalid identifier or Docker not running; continue independent checks.
 
 **`DW_ADMIN_IDENTIFIER` is asked from the human, never invented**: whoever receives codes on it becomes
 the administrator (`DwFirstAdministrator`, every start). Unset, the server starts and warns; a value
@@ -53,8 +49,8 @@ seeded accounts use the seed's fixed code.
 **The app**: desktop and iOS simulator call `http://localhost:8080`, an Android emulator
 `http://10.0.2.2:8080`; a phone needs `--dart-define=DW_BACKEND_URL=http://<LAN address>:8080`, and
 storage an address the device reaches (`dartway-uploads` §4). **In a browser** the app calls its own
-origin: `dart run dartway_cli:dartway dev web` (or a release build served by
-`dart run dartway_cli:dartway dev proxy --web-dir build/web`), opened at exactly `http://localhost:8000`;
+origin: `dartway dev web` (or a release build served by
+`dartway dev proxy --web-dir build/web`), opened at exactly `http://localhost:8000`;
 a `DwHttpRoute` the browser must reach goes through with `--api-path /that-path`. `DW_ALLOWED_ORIGINS`
 only for a socket from a genuinely different origin.
 
@@ -69,7 +65,7 @@ The server prints every problem at once — read the whole list.
 | `Connection refused` on start | `pg_isready` until it succeeds |
 | an SSL error against `127.0.0.1` | `DW_DATABASE_SSL=false` locally |
 | `X is a registered request without a handler` | write the handler (`dartway-server`) |
-| `answers X, which the protocol does not register` | `dart run dartway_cli:dartway generate` |
+| `answers X, which the protocol does not register` | `dartway generate` |
 | `X has more than one handler` | remove the duplicate |
 | `DwMigrationRefused` / `DwMigrationFailed` / `table "x" … missing` | `dartway-migrations`; never edit the ledger |
 | a bucket missing or wrongly readable; storage `could not be checked` | `dartway-uploads` §4 |
@@ -88,7 +84,7 @@ class or handler change: generate and restart; before calling it done: `dartway-
 
 For a project moving to Studio's Kamal deploy contract, configure `staging` and/or
 `production` in `deploy/config.yaml`, resolve `__FLUTTER_PKG__` and run
-`dart run dartway_cli:dartway deploy kamal` there. Commit the generated configs,
+`dartway deploy kamal` there. Commit the generated configs,
 Studio manifest and Images workflow; publication follows the configured
 deployments' `branch:` values after successful `CI` (PR builds do not push).
 Enable CI pushes on those branches. Install the workflow on the default branch
@@ -123,3 +119,18 @@ with the value and the `project:` key to configure. Web release builds without a
 release; debug/profile preview without the define stays open. Studio owns running
 Kamal, SSH keys, registry credentials and secrets. Existing Compose deployments
 continue using `deploy run` until their project's separate move.
+
+`deploy run` starts the new server and web app beside the serving ones and
+stops the old ones after their replacement is healthy, so a deploy answers no
+request with an error; migrations run first, while the previous version serves,
+so they only expand (`dartway-migrations`). An override never gives `server` or
+`web` a `container_name` or published `ports` (`override-side-by-side`). A
+`deploy/nginx.d` snippet proxying to a stack service names it through a
+variable so it follows the replacement too:
+`set $dw_upstream server:8080; proxy_pass http://$dw_upstream;`.
+How fast a deployed environment answers:
+`dartway deploy stats --env <environment> [--hours 24] [--top 10]`
+— p50/p95 per call from the proxy log,
+the costliest statements of `pg_stat_statements`, slow statements over
+`slow_query_ms` (`deploy/config.yaml`, 500 by default). A call slower than
+`DwServerSettings.slowCallThreshold` (1 s) is a server warning with its name.

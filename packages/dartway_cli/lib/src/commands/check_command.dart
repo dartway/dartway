@@ -8,6 +8,8 @@ import '../checker/dw_contract_names.dart';
 import '../checker/dw_data_lifecycle.dart';
 import '../checker/dw_feature_imports.dart';
 import '../checker/dw_check_type.dart';
+import '../checker/dw_state_columns.dart';
+import '../checker/dw_instructions.dart';
 import '../checker/dw_flutter_inspector.dart';
 import '../checker/dw_flutter_state_rules.dart';
 import '../checker/dw_flutter_ui_rules.dart';
@@ -23,10 +25,12 @@ import '../checker/dw_shared_layout.dart';
 import '../checker/dw_package_file_size.dart';
 import '../checker/dw_server_outside_world.dart';
 import '../checker/dw_inline_ownership.dart';
+import '../checker/dw_unbounded_read.dart';
 import '../checker/dw_project_template.dart';
 import '../checker/dw_uniformity_rules.dart';
 import '../deploy/local_environment.dart';
 import '../project_layout.dart';
+import '../design_resources.dart';
 import '../checker/dw_check_tally.dart';
 
 /// Runs the built-in DartWay convention checks: the Flutter package's
@@ -64,7 +68,8 @@ class CheckCommand extends Command<int> {
             'Before checking, rewrite relative imports in lib/ to package: '
             '(relativeImport) and move root-level acceptance tests to the '
             'mirror of their lib/src/<feature>/ (testLayout); --type and '
-            '--dir narrow it.',
+            '--dir narrow it. Create the configured design resource symlink '
+            '(designResourcesInvalid).',
       );
   }
 
@@ -137,6 +142,22 @@ class CheckCommand extends Command<int> {
         ?layout?.serverPackageDir,
       ])) {
         stdout.writeln('🔧 moved to the mirror of lib/ — $line');
+      }
+    }
+
+    if (fixes(DwCheckType.designResourcesInvalid) && dir == null) {
+      try {
+        final design = DwDesignResources.read(flutterPackageDir);
+        if (design?.createLink() case final message?) {
+          stdout.writeln('🔧 $message');
+        }
+        for (final message in design?.prepareDocker() ?? <String>[]) {
+          stdout.writeln('🔧 $message');
+        }
+      } on FormatException {
+        // The inspector reports invalid configuration with its check type.
+      } on FileSystemException {
+        // Leave a failed creation to the inspector's link diagnostic.
       }
     }
 
@@ -223,6 +244,11 @@ class CheckCommand extends Command<int> {
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);
+      errorCount += DwStateColumnsInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
       errorCount += DwDataLifecycleInspector(
         serverPackageDir: layout?.serverPackageDir,
         sharedPackageDir: layout?.sharedPackageDir,
@@ -249,6 +275,11 @@ class CheckCommand extends Command<int> {
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);
+      errorCount += DwInstructionsInspector(
+        projectRoot: layout?.root ?? flutterPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
       errorCount += DwFrameworkOverridesInspector(
         projectRoot: layout?.root ?? flutterPackageDir,
         filterType: filterType,
@@ -261,6 +292,11 @@ class CheckCommand extends Command<int> {
         filterSeverity: filterSeverity,
       ).run(tally: tally);
       errorCount += DwInlineOwnershipInspector(
+        serverPackageDir: layout?.serverPackageDir,
+        filterType: filterType,
+        filterSeverity: filterSeverity,
+      ).run(tally: tally);
+      errorCount += DwUnboundedReadInspector(
         serverPackageDir: layout?.serverPackageDir,
         filterType: filterType,
         filterSeverity: filterSeverity,

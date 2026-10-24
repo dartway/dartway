@@ -125,29 +125,37 @@ extension NewAppSettingRowWithId on NewAppSettingRow {
 }
 
 final class AppSettingTable extends DwTableDef<AppSettingRow> {
-  const AppSettingTable() : super('app_setting');
+  const AppSettingTable({super.tablePath}) : super('app_setting');
 
-  DwTableColumn<String> get key =>
-      const DwTableColumn('key', DwColumnType.text, unique: true);
+  DwTableColumn<String> get key => (const DwTableColumn<String>(
+    'key',
+    DwColumnType.text,
+    unique: true,
+  )).atPath(tablePath);
 
-  DwTableColumn<String> get value =>
-      const DwTableColumn('value', DwColumnType.text);
+  DwTableColumn<String> get value => (const DwTableColumn<String>(
+    'value',
+    DwColumnType.text,
+  )).atPath(tablePath);
 
   DwTableColumn<Map<String, int>> get limits =>
-      const DwTableColumn('limits', DwJsonMapType<int>());
+      (const DwTableColumn<Map<String, int>>(
+        'limits',
+        DwJsonMapType<int>(),
+      )).atPath(tablePath);
 
-  DwTableColumn<int?> get featuredServiceId => const DwTableColumn(
+  DwTableColumn<int?> get featuredServiceId => (const DwTableColumn<int?>(
     'featured_service_id',
     DwColumnType.bigint,
     unique: true,
     references: DwForeignKey('club_service', onDelete: DwOnDelete.setNull),
-  );
+  )).atPath(tablePath);
 
-  DwTableColumn<DateTime> get updatedAt => const DwTableColumn(
+  DwTableColumn<DateTime> get updatedAt => (const DwTableColumn<DateTime>(
     'updated_at',
     DwColumnType.timestamptz,
     defaultValue: DwDefaultValue.now(),
-  );
+  )).atPath(tablePath);
 
   @override
   List<DwTableColumn<Object?>> get tableColumns => [

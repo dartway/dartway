@@ -39,6 +39,56 @@ String _location(String block, String spec) {
 }
 
 void main() {
+  for (final (command, accepted) in <(Object?, bool)>[
+    (null, false),
+    (['postgres', '-c', 'max_connections=200'], false),
+    (['postgres', '-c', 'shared_preload_libraries=pg_stat_statements'], true),
+    (
+      ['postgres', '-c', 'shared_preload_libraries=other, pg_stat_statements'],
+      true,
+    ),
+    (
+      [
+        'postgres',
+        '-c',
+        'shared_preload_libraries=pg_stat_statements',
+        '-c',
+        'shared_preload_libraries=',
+      ],
+      false,
+    ),
+    ('postgres -c shared_preload_libraries="other,pg_stat_statements"', true),
+  ]) {
+    test('Postgres command override: $command', () {
+      final root = Directory.systemTemp.createTempSync('dw-pg-command-');
+      addTearDown(() => root.deleteSync(recursive: true));
+      File(p.join(root.path, 'deploy/compose.override.yml'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync(
+          jsonEncode({
+            'services': {
+              'postgres': {'command': command},
+            },
+          }),
+        );
+      final renderer = DwStackRenderer(stack: stackFrom(), projectRoot: root);
+      if (accepted) {
+        expect(renderer.composeFile, contains('pg_stat_statements'));
+      } else {
+        expect(
+          () => renderer.composeFile,
+          throwsA(
+            isA<StateError>().having(
+              (e) => e.message,
+              'fix',
+              contains('-c shared_preload_libraries=pg_stat_statements'),
+            ),
+          ),
+        );
+      }
+    });
+  }
+
   test('the front proxy selects BBR in its own network namespace', () {
     final sysctls =
         _service(stackFrom(), DwStack.nginxService)['sysctls'] as YamlMap;
@@ -239,6 +289,29 @@ void main() {
         'service_healthy',
       );
       expect(server['stop_grace_period'], isNotNull);
+    });
+
+    test('Postgres preloads pg_stat_statements; the threshold is not a '
+        'flag, so changing it restarts nothing', () {
+      final postgres = _service(stackFrom(), 'postgres');
+      expect(postgres['command'], [
+        'postgres',
+        '-c',
+        'shared_preload_libraries=pg_stat_statements',
+      ]);
+      expect(
+        DwStackRenderer(
+          stack: stackFrom(extra: '  slow_query_ms: 200\n'),
+        ).composeFile,
+        DwStackRenderer(stack: stackFrom()).composeFile,
+      );
+    });
+
+    test('the proxy log, a line per request, is bounded', () {
+      final logging = _service(stackFrom(), 'nginx')['logging'] as YamlMap;
+      expect(logging['driver'], 'json-file');
+      expect((logging['options'] as YamlMap)['max-size'], '50m');
+      expect((logging['options'] as YamlMap)['max-file'], '10');
     });
 
     test(
@@ -610,12 +683,73 @@ void main() {
       expect(app, isNot(contains('location = /health')));
     });
 
+    // A deploy runs the new server beside the old one before stopping it:
+    // the proxy has to follow the service's addresses as they change, and
+    // try the next one when a connection fails, or it answers 502 — and the
+    // addresses have to be the request's own, or a lookup that changes them
+    // while a connection is being tried leaves that request unretried (504).
+    test(
+      'every proxied request looks its service up through Docker\'s DNS',
+      () {
+        expect(
+          nginx,
+          contains(
+            'resolver 127.0.0.11 valid=${DwStackRenderer.resolveSeconds}s '
+            'ipv6=off;',
+          ),
+        );
+        expect(nginx, isNot(contains(RegExp(r'^upstream ', multiLine: true))));
+        final passes = RegExp(
+          r'proxy_pass ([^;]+);',
+        ).allMatches(nginx).toList();
+        expect(passes, isNotEmpty);
+        for (final pass in passes) {
+          expect(pass.group(1), r'http://$dw_upstream');
+          final before = nginx.substring(0, pass.start);
+          expect(
+            before.substring(before.lastIndexOf('location')),
+            contains(r'set $dw_upstream '),
+          );
+        }
+        expect(
+          RegExp(r'proxy_connect_timeout 1s;').allMatches(nginx).length,
+          passes.length,
+        );
+      },
+    );
+
+    test('every host logs each request with its call and its time', () {
+      expect(
+        nginx,
+        contains('log_format ${DwStackRenderer.accessLogFormat} escape=json'),
+      );
+      for (final field in [
+        r'"call":"$dw_call"',
+        r'"status":$status',
+        r'"request_time":$request_time',
+        r'"upstream_time":"$upstream_response_time"',
+      ]) {
+        expect(nginx, contains(field));
+      }
+      expect(nginx, contains(r'~^/dw/(?<dw_call_name>[A-Za-z0-9_.]+)$'));
+      for (final host in stack.target.servedDomains) {
+        expect(
+          _serverBlock(nginx, host),
+          contains(
+            'access_log /var/log/nginx/access.log '
+            '${DwStackRenderer.accessLogFormat};',
+          ),
+          reason: host,
+        );
+      }
+    });
+
     test('app: files from the web image, only /dw/ to the server', () {
       final app = _serverBlock(nginx, 'app.example.com');
-      expect(_location(app, '/'), contains('proxy_pass http://web:80;'));
+      expect(_location(app, '/'), contains(r'set $dw_upstream dw-web:80;'));
       expect(
         _location(app, '/dw/'),
-        contains('proxy_pass http://server:8080;'),
+        contains(r'set $dw_upstream dw-server:8080;'),
       );
       expect(app, isNot(contains('location = /health')));
     });
@@ -623,7 +757,11 @@ void main() {
     test('app and api: /dw/live upgrades and stays open', () {
       for (final host in ['app.example.com', 'api.example.com']) {
         final live = _location(_serverBlock(nginx, host), '= /dw/live');
-        expect(live, contains('proxy_pass http://server:8080;'), reason: host);
+        expect(
+          live,
+          contains(r'set $dw_upstream dw-server:8080;'),
+          reason: host,
+        );
         expect(live, contains(r'proxy_set_header Upgrade $http_upgrade;'));
         expect(
           live,
@@ -646,7 +784,10 @@ void main() {
 
     test('api: everything to the server', () {
       final api = _serverBlock(nginx, 'api.example.com');
-      expect(_location(api, '/'), contains('proxy_pass http://server:8080;'));
+      expect(
+        _location(api, '/'),
+        contains(r'set $dw_upstream dw-server:8080;'),
+      );
     });
 
     test('the proxy lets the server refuse an oversized call itself', () {
@@ -668,7 +809,7 @@ void main() {
     test('storage: streamed to the bundled storage with the signed host '
         'intact', () {
       final storage = _serverBlock(nginx, 'files.example.com');
-      expect(storage, contains('proxy_pass http://storage:9000;'));
+      expect(storage, contains(r'set $dw_upstream storage:9000;'));
       expect(storage, contains('client_max_body_size 0;'));
       expect(storage, contains(r'proxy_set_header Host $http_host;'));
     });

@@ -45,7 +45,12 @@ abstract final class AccountAuth {
     Map<DwIdentifierKind, DwIdentifierLinkPolicy> attachDelivery = const {},
     Set<String> allowedDeliveryHints = const {},
     Duration resendDelay = const Duration(seconds: 60),
+    Future<void> Function(DwCallContext, int, DwIdentifierKind, String)?
+    beforeCodeSignIn,
   }) => DwAuthConfig(
+    // Closed projects check current admission here for every verified code,
+    // including existing accounts. Delivery filtering alone is insufficient.
+    beforeCodeSignIn: beforeCodeSignIn,
     accountDeletion: DwAccountDeletion.byMember,
     attachDelivery: attachDelivery,
     allowedDeliveryHints: allowedDeliveryHints,

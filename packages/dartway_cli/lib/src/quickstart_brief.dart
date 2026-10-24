@@ -113,10 +113,10 @@ In a browser the app calls its server **on its own origin**, as the deployment s
 — there is no CORS to configure. Serve both through the development proxy:
 
     cd my_app/my_app_flutter
-    dart run dartway_cli:dartway dev web            # flutter's web server + the API on http://localhost:8000
+    dartway dev web            # flutter's web server + the API on http://localhost:8000
     # or a release build:
     flutter build web
-    dart run dartway_cli:dartway dev proxy --web-dir build/web
+    dartway dev proxy --web-dir build/web
 
 Open `http://localhost:8000` exactly — to a browser `127.0.0.1` is another origin.
 
@@ -165,6 +165,7 @@ the server from starting, deliberately.
 Before reporting a change done:
 
     dartway generate --check
+    dartway format --check         # the changed files, on the pinned Dart
     dartway test                   # server acceptance: a Postgres and a storage of its own
     (cd my_app_shared && dart test)
     (cd my_app_flutter && flutter test)

@@ -53,6 +53,17 @@ final class DwPostgresDatabase {
     return counter.count;
   }
 
+  /// SQL commands completed on the pool's connections (CommandComplete),
+  /// excluding Parse, Bind and portal close messages. Enabled by
+  /// `countRoundTrips`, so preparation never looks like a second statement.
+  int get completedStatements {
+    final counter = _counter;
+    if (counter == null) {
+      throw StateError('open the database with countRoundTrips: true');
+    }
+    return counter.statements;
+  }
+
   /// Notifications on [channel], received on a dedicated connection.
   ///
   /// Pooled connections cannot listen: a `LISTEN` belongs to one session.

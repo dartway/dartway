@@ -38,17 +38,10 @@ void main() {
         .where((name) => name.startsWith('dartway-'))
         .toSet();
 
-    // The line that lists them: a run of `dartway-*` in backticks on the
-    // "Skills (`.agents/skills/`" bullet.
-    final line = File(p.join(toolkit.path, 'AGENTS.md'))
-        .readAsLinesSync()
-        .firstWhere(
-          (line) => line.contains('Skills (`.agents/skills/`'),
-          orElse: () => throw StateError('no skills line in toolkit/AGENTS.md'),
-        );
+    final index = File(p.join(toolkit.path, 'AGENTS.md')).readAsStringSync();
     final named = RegExp(
       r'`(dartway-[a-z-]+)`',
-    ).allMatches(line).map((match) => match.group(1)!).toSet();
+    ).allMatches(index).map((match) => match.group(1)!).toSet();
 
     expect(
       named.difference(onDisk),

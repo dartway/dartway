@@ -1,13 +1,6 @@
 ---
 name: dartway-migrations
-description: >-
-  Changing the database schema: row class → generate → `dart run bin/migrate.dart create <name>` →
-  review the draft and resolve every decisionRequired (a drop that may be a rename, a NOT NULL
-  column on rows, a type change) → rehash → apply / status / rollback → check. Expand, then contract
-  across releases. Never edit an applied migration, never import row classes into one, rows change
-  only through m.backfill, dataChecksAfter is the human's. What the server says when it refuses to
-  start over the ledger.
-  Use when a row class, column, index or foreign key changes, or a migration refuses.
+description: "Review, check and apply schema migrations, backfills and expand/contract changes across releases."
 ---
 
 # DartWay — migrations (`dartway-migrations`)
@@ -61,7 +54,7 @@ column **no released code reads**, typically one added in the same unreleased br
 A schema change always starts from `create`; a migration written by hand from scratch drifts from the
 diff `check` compares against.
 
-1. **Change the row class, then `dart run dartway_cli:dartway generate`** (from `__FLUTTER_PKG__`) —
+1. **Change the row class, then `dartway generate`** —
    always first: `create` diffs against the generated schema, and before `generate` it sees no change.
 2. **`dart run bin/migrate.dart create add_invoice_due_date`** — replays every migration on a scratch
    database, diffs it against the row classes, writes `m<timestamp>_<name>.dart` with `up` and `down`,
@@ -100,7 +93,7 @@ diff `check` compares against.
    migrations produce exactly the declared schema, and each rolls back and re-applies. `note:` lines
    (what a row class cannot declare) are informational, `FAIL` fails. `check`'s `migrationsDrift` runs
    the same when a database is named — `DW_DATABASE_*` or `deploy/config.yaml > local` — and says "Not
-   checked" otherwise.
+   checked" otherwise for schema replay. Its required-column source check runs offline.
 
 ## The body of a migration
 
@@ -116,6 +109,9 @@ diff `check` compares against.
 - Transactional by default; `bool get transactional => false` only for what Postgres refuses inside one
   (`CREATE INDEX CONCURRENTLY`) — a crash leaves it `dirty`, repaired by hand.
 - One concern per migration, named after the change; `dependsOn` only across namespaces.
+
+With `interactive: false` in `.agents/dartway-toolkit.json`, report any required backfill,
+`dataChecksAfter`, repair or destructive decision and stop that step; never invent approval.
 
 ## Never, without the human
 
@@ -145,3 +141,8 @@ It prints every problem at once (`DwMigrationRefused`):
 | `registered twice` / `dependency cycle` | fix `migrations.dart` or `dependsOn` |
 | `up of app/… failed: <postgres error>` | read the SQL error: a NOT NULL without backfill, a unique index over duplicates, a missing cast |
 | `table "x" is declared in the schema and missing` | a row class changed without `create`, or the file is not registered |
+
+`dartway check` rejects `ADD COLUMN … NOT NULL` without `DEFAULT` on an existing table:
+the previous server still inserts during a side-by-side deploy. Add a default, or add the column
+nullable, backfill it, then set `NOT NULL` in a later release. This narrow check does not prove
+general expand/contract compatibility; review the previous release against the new schema.

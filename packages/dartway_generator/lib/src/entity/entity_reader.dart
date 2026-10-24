@@ -111,6 +111,16 @@ final class EntityReader {
           : element;
 
       if (fieldName == 'id') {
+        if (_annotation(fieldElement.metadata.annotations, 'DwStateColumn') !=
+            null) {
+          diagnostics.add(
+            DwGenerationDiagnostic.at(
+              location,
+              'the id is a primary key, not a state column',
+            ),
+          );
+          valid = false;
+        }
         hasId = true;
         final type = fieldElement.type;
         if (!type.isDartCoreInt ||
@@ -282,6 +292,52 @@ final class EntityReader {
         }
       }
 
+      String? transitions;
+      final state = _annotation(annotations, 'DwStateColumn');
+      if (state != null) {
+        final table = state.getField('transitions');
+        final initial = table?.getField('initial')?.toSetValue();
+        final moves = table?.getField('moves')?.toMapValue();
+        if (type is! EnumWire ||
+            type.nullable ||
+            initial == null ||
+            initial.isEmpty ||
+            moves == null) {
+          diagnostics.add(
+            DwGenerationDiagnostic.at(
+              location,
+              'a state column must be a non-null enum with a nonempty initial set',
+            ),
+          );
+          valid = false;
+          continue;
+        }
+        String enumValue(DartObject value) {
+          if (names.spell(value.type!) != spelling) {
+            throw const FormatException('state table must use the field enum');
+          }
+          return '$spelling.${_enumName(value)}';
+        }
+
+        try {
+          String values(Iterable<DartObject> values) =>
+              '{${values.map(enumValue).join(', ')}}';
+          final entries = <String>[];
+          for (final entry in moves.entries) {
+            entries.add(
+              '${enumValue(entry.key!)}: ${values(entry.value!.toSetValue()!)}',
+            );
+          }
+          transitions =
+              'DwStateTransitions<$spelling>('
+              'initial: ${values(initial)}, moves: {${entries.join(', ')}})';
+        } on FormatException catch (error) {
+          diagnostics.add(DwGenerationDiagnostic.at(location, error.message));
+          valid = false;
+          continue;
+        }
+      }
+
       final defaultValue = _annotation(annotations, 'DwDefaultValue');
       final defaultSql = defaultValue?.getField('sql')?.toStringValue();
 
@@ -300,6 +356,12 @@ final class EntityReader {
                 ? 'DwDefaultValue.now()'
                 : 'DwDefaultValue(${dartString(defaultSql)})',
             references: references,
+            foreignTable: referencesValue
+                ?.getField('tableName')
+                ?.toStringValue(),
+            relation: referencesValue?.getField('relation')?.toStringValue(),
+            reverse: referencesValue?.getField('reverse')?.toStringValue(),
+            transitions: transitions,
           ),
           constructor: constructor,
         ),

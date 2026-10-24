@@ -143,7 +143,7 @@ and refuses to start on any mismatch:
 A private file behind a public bucket is already leaked; a public bucket that does not read means
 no photo opens. Both are configurations a server must not serve on. Turn the probe off
 (`DW_STORAGE_VERIFY_BUCKETS=false`) only where the server cannot reach storage while it starts —
-the `dart run dartway_cli:dartway deploy` bundled storage, which verifies from outside once the stack is up.
+the `dartway deploy` bundled storage, which verifies from outside once the stack is up.
 
 ### `DwFileStorageSetup.provision`
 

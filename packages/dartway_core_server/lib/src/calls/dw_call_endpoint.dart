@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 import 'package:meta/meta.dart';
+import 'package:dartway_orm/dartway_orm.dart' show DwStaleState;
 
 import '../alerts/dw_alert_sink.dart';
 import '../alerts/dw_server_logger.dart';
@@ -13,6 +14,7 @@ import '../http/dw_request_body.dart';
 import '../http/dw_peer_rate_limits.dart';
 import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
+import 'dw_bound_watch.dart';
 import 'dw_idempotency_ledger.dart';
 
 /// Answers `POST /dw/<WireName>`: the call contract of
@@ -48,7 +50,14 @@ final class DwCallEndpoint {
     required this.authService,
     required this.settings,
     required this.handlers,
-  }) : _rateLimits = DwPeerRateLimits(settings);
+    bool? strictBounds,
+  }) : _rateLimits = DwPeerRateLimits(settings),
+       bounds = DwBoundWatch(
+         settings: settings,
+         log: runtime.log,
+         clock: runtime.clock,
+         strict: strictBounds,
+       );
 
   final DwRuntime runtime;
   final DwAuthService authService;
@@ -58,6 +67,9 @@ final class DwCallEndpoint {
   final Map<Type, DwCallHandler> handlers;
 
   final DwPeerRateLimits _rateLimits;
+
+  /// A list's `maxItems` and the size of a response, held for every call.
+  final DwBoundWatch bounds;
 
   static const int maxIdempotencyKeyLength = 128;
 
@@ -356,7 +368,13 @@ final class DwCallEndpoint {
       _requireSignIn(handler.access, ctx);
       _validate(request);
       await _check(handler.access, ctx, request);
-      return DwApiResponse.ok(await handler.run(ctx, request, prepared));
+      final result = await bounds.run(
+        () => handler.run(ctx, request, prepared),
+      );
+      if (request is DwListRequest<DwDataObject> && result is List<Object?>) {
+        bounds.checkList(name, request, result);
+      }
+      return DwApiResponse.ok(result);
     } catch (error, stackTrace) {
       return _answerError(where, error, stackTrace, ctx);
     }
@@ -611,6 +629,7 @@ final class DwCallEndpoint {
   ) => switch (error) {
     DwRefusalException(:final refusal) => _refused(refusal),
     DwNotAuthenticatedException() => const DwApiResponse.unauthenticated(),
+    DwStaleState() => _refused(DwCallRefusal(DwCoreRefusal.conflict)),
     // The call carried the `unknown` of an open enum and the handler took it
     // to a write. Stopping the write is right — no build overwrites a value
     // it did not know (D-071) — but the outcome is an answer, not an

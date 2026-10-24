@@ -1,12 +1,6 @@
 ---
 name: dartway-media
-description: >-
-  Video and audio: the plugin DwMedia (dartway_media_flutter, dw.plugins.media) with DwMediaConfig and
-  DwMediaOpenOptions, DwMediaItem and DwMediaSource (a URL or a resolver re-called on retry), the
-  session the plugin owns (play, seek, queue, autoplay, fullscreen, minimize/restore),
-  DwMediaFullscreenHost, DwMiniPlayerHost, and the test fakes. The package ships no controls: they
-  are copied from the framework's example into the kit. Use when a feature plays video or audio,
-  needs a queue, resume, a mini-player or fullscreen, or when a player's behaviour needs tuning.
+description: "Use the media plugin for playback sessions, queue, resume, fullscreen and mini-player controls."
 ---
 
 # DartWay — video and audio (`dartway-media`)

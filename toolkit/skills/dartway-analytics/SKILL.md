@@ -1,11 +1,6 @@
 ---
 name: dartway-analytics
-description: >-
-  Product analytics in the project's own Postgres: DwAnalyticsModule with readAccess, the protocol
-  composed with dwAnalyticsProtocolEntries, the event enum in the shared package, the app plugin
-  DwAnalytics (dw.plugins.analytics.track), server-side ctx.analytics.track, reports
-  (DwGetAnalyticsReport), dashboards and the admin viewer, and SQL. Use when a feature must be
-  measured, when the team needs a dashboard, or when numbers look wrong.
+description: "Track and query product analytics through the DartWay analytics plugin."
 ---
 
 # DartWay — analytics (`dartway-analytics`)

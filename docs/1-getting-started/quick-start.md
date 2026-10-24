@@ -9,7 +9,7 @@ Working with an AI assistant instead? It runs this same path for you — see
 ## 1. Install the CLI and check the machine
 
 ```bash
-dart pub global activate --source git https://github.com/dartway/dartway --git-path packages/dartway_cli --git-ref stable
+dart pub global activate dartway_cli
 dartway doctor
 ```
 
@@ -55,7 +55,7 @@ dart pub get
 ```
 
 `docker compose up -d` starts Postgres on host port `8090` and RustFS — the object storage for uploads
-— on `8100` (its web console on `8101`). There is no test database among them: `dart run dartway_cli:dartway test` starts
+— on `8100` (its web console on `8101`). There is no test database among them: `dartway test` starts
 its own for each run. The first run pulls images and can take minutes.
 
 The server is configured by its environment alone; there is no configuration file it reads. **There
@@ -145,23 +145,23 @@ behind one origin:
 
 ```bash
 cd my_app/my_app_flutter
-dart run dartway_cli:dartway dev web        # open http://localhost:8000
+dartway dev web        # open http://localhost:8000
 ```
 
 `dev web` starts `flutter run -d web-server` compiled against the proxy's origin and forwards `/dw/*`
 (the live socket included) and `/health` to the server on `8080`. Open `http://localhost:8000`
 exactly: to a browser, `127.0.0.1` is another origin.
 
-The skeleton's Flutter package lists `dartway_cli` as a dev dependency, so `dart run dartway_cli:dartway`
-runs the CLI version the project pinned. A globally activated `dartway` runs the project's commands
-only when it is that version, and otherwise refuses and names the form above.
+The skeleton's Flutter package lists `dartway_cli` as a dev dependency, and the project's commands run
+that version: a globally activated `dartway` of another version hands them to it, on the Dart of the
+Flutter `.fvmrc` pins, and says so in one line.
 
 For a release build behind the same proxy:
 
 ```bash
 cd my_app_flutter
 flutter build web
-dart run dartway_cli:dartway dev proxy --web-dir build/web
+dartway dev proxy --web-dir build/web
 ```
 
 ## 5. Sign in
@@ -192,7 +192,7 @@ whole stack — Postgres, a handler, a channel, a widget — the write end inclu
    channels they live on, the commands that change it.
 2. **Server**, in `my_app_server/lib/src/`: a row class, and one handler per request and command with
    its access rule, publishing what a command changed.
-3. `dart run dartway_cli:dartway generate` — codecs, the protocol registry, tables and the schema.
+3. `dartway generate` — codecs, the protocol registry, tables and the schema.
 4. `dart run bin/migrate.dart create <name>` in the server package, with `DW_DATABASE_*` set — a
    migration drafted from the row classes. Review it: it is yours.
 5. **App**: a widget reading `ref.watch(dw.request(MyRequest()))`, the command sent from the
@@ -210,26 +210,30 @@ CI runs these as `ci`, one step each, on every pull request (`.github/workflows/
 project's README, "Continuous integration"). From the project root:
 
 ```bash
-(cd my_app_flutter && dart run dartway_cli:dartway generate --check) # generated code matches its sources
+dartway generate --check                                  # generated code matches its sources
+dartway format --check                                    # the changed files, on the pinned Dart
 (cd my_app_server && dart run bin/migrate.dart check)     # migrations produce the schema (DW_DATABASE_*)
-(cd my_app_flutter && dart run dartway_cli:dartway test)  # server tests on a real Postgres and storage
+dartway test                                              # server tests on a real Postgres and storage
 (cd my_app_shared && dart test)                           # the contract
 (cd my_app_flutter && flutter test)                       # the app, on an in-memory server
-(cd my_app_flutter && dart run dartway_cli:dartway check) # the conventions
+dartway check                                             # the conventions
 ```
 
 - **`generate --check`** writes nothing and fails when a generated file is out of date. It runs the
   `dartway_generator` the server package resolved as a dev dependency, so the generator always
   matches the framework the project builds against.
+- **`format --check`** fails on a Dart file the branch changed that the Dart of the pinned Flutter
+  (`.fvmrc`) would format differently; `dartway format` formats them. Generated files and migrations
+  are never formatted.
 - **`migrate.dart check`** replays the migrations into throwaway databases next to the one in
   `DW_DATABASE_*`, compares the result with the schema the row classes declare, and rolls them down
   and up again.
-- **`dart run dartway_cli:dartway test`** starts a Postgres and a storage for the run, on ports Docker picks, passes them to
+- **`dartway test`** starts a Postgres and a storage for the run, on ports Docker picks, passes them to
   the suite as `DW_DATABASE_*` and `DW_STORAGE_*`, and removes them when the run ends. Each test file
   creates its own database and buckets. Nothing is shared with the development containers or with
   another project — a fixed test port is how a suite ends up green against a neighbour's database.
   `--keep` leaves the containers up to inspect a failing run; arguments after `--` go to `dart test`.
-- **`dart run dartway_cli:dartway check`** fails on error-level findings — the layout, features, the UI kit, stale
+- **`dartway check`** fails on error-level findings — the layout, features, the UI kit, stale
   generated code and, with `DW_DATABASE_*` set, the migrations check above. Warnings do not fail it.
 
 ## When it goes sideways

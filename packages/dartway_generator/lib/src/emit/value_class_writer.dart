@@ -105,6 +105,7 @@ abstract final class ValueClassWriter {
     String className,
     List<ValueField> fields, {
     List<String> kept = const [],
+    List<String> checks = const [],
   }) {
     if (fields.isEmpty) return null;
     final parameters = <String>[];
@@ -124,9 +125,12 @@ abstract final class ValueClassWriter {
         arguments.add('$name: $name ?? this.$name');
       }
     }
+    final construct = '$className(${arguments.join(', ')})';
+    final body = checks.isEmpty
+        ? '=> $construct;'
+        : '{${checks.join('\n')}\nreturn $construct;\n}';
     return 'extension ${className}CopyWith on $className {\n'
-        '$className copyWith({${parameters.join(', ')}}) => '
-        '$className(${arguments.join(', ')});\n'
+        '$className copyWith({${parameters.join(', ')}}) $body\n'
         '}';
   }
 }

@@ -1,6 +1,18 @@
 # Changelog
 
-## 0.25.0-dev.0
+## 0.27.0
+
+### Breaking changes
+
+- **BREAKING (check):** opt into Studio resources with `.dartway/design.json`.
+  `designResourceCopied` rejects content-identical copies under app `assets/`;
+  use the design link in the one asset dictionary instead. `designResourcesInvalid`
+  checks configuration, symlink, pubspec and Docker context. `check --fix` creates
+  the relative link and wires template web images without copying resources into
+  the app. No config leaves these checks disabled. See the
+  [migration note](../../docs/migrations/2026-10-23-design-resources-link.md).
+
+### Changes
 
 - Fix: recognize local final command callbacks used only as `dw.action` work,
   detect parenthesized watched-read bindings, and accept feature-wide
@@ -8,55 +20,162 @@
   presentation, shared helpers, hosted views, inline command outcomes, checker
   limits and script-test CI discovery in the docs and toolkit (#446).
 
+## 0.26.1
+
+- Install and reinstall the CLI from pub.dev; update plans name the exact target CLI version in the activation command.
+
+- Warn with `unboundedRead` when a handler includes a to-many relation without `take(n)` or `unbounded(reason)`.
+
+## 0.26.0
+
+### Breaking changes
+
+- **BREAKING (check):** reject direct `Process.run`, `Process.runSync` and
+  `Process.start`, plus `package:process` and `package:process_run` imports/exports,
+  in server `lib/` with `forbiddenProcessRun`; use `ctx.process`.
+  Ship a weekly/manual seam drift workflow in the template; keep the diagnostic
+  demo and its git runtime dependency in the example only (#638).
+
+- Remove `dartway-requirements` and `dartway-plan`: requirements analysis and approach
+  selection belong to the developer or executor. Update removes their managed copies;
+  projects wanting the old flow keep their own copy under a project skill name.
+  Contract choices, layer order, risks and ADR guidance remain in the owning skills
+  and the agent index.
+
+- Install skills once in `.agents/skills/`; Claude discovers them through the
+  relative `.claude/skills` symlink. Existing Claude-only custom skills are moved;
+  conflicting custom copies stop installation before any project file changes.
+  Commit the symlink and move root Claude prose into `AGENTS.md` manually; see
+  the [migration note](../../docs/migrations/2026-10-21-toolkit-one-copy.md).
+
+### Changes
+
+- Allow unchanged state arguments from the same row through `copyWith` and enclosing `update` checks (#639).
+
+- A new warning in `dartway check`: `unboundedRead` — a repository `find(…)` in a
+  request handler of a `*_handlers.dart` naming neither `limit:` nor `unbounded:`.
+  The message names the fix: a page, table or window request, `limit:` for
+  paged reads, `request.readWhole` for a whole list, or `unbounded: '<reason>'`.
+  Reads inside `readWhole` are accepted (#644); see the
+  [migration note](../../docs/migrations/2026-10-21-bounded-lists.md).
+- Tests: own creation fixture process groups and disable background Git
+  maintenance so Linux teardown cannot race a remaining fixture writer (#638).
+- Add the `stateWrittenDirectly` checker error for direct state writes and recognize transitions as feature-owned writes (#639).
+
+- A `dartway` of another version no longer refuses a project command
+  (`generate`, `check`, `test`, `deploy`, `dev`, `stats`, `format`): it runs the
+  `dartway_cli` the project pins — in the directory it was typed in, on the
+  package configuration of the package that declares it and the Dart of the
+  Flutter `.fvmrc` pins — passing the arguments, stdio and exit code through
+  (128 plus the signal for a child it ended), and says so in one line on
+  stderr; a refusal names the subcommand and nothing of its arguments.
+  `dartway format` batches its paths under 8000 characters a command line, and
+  neither it nor the hand-over goes through a shell on Windows. Only a pin whose packages are not resolved is refused, with the
+  `pub get` that resolves it. The toolkit, the skeleton's README and the docs
+  teach `dartway <command>` again; `toolkit_pinned_commands_test.dart` now
+  holds them to it. See the
+  [migration note](../../docs/migrations/2026-10-21-pinned-cli-and-format.md).
+- New `dartway format`: `dart format` on the Dart of the pinned Flutter
+  (`.fvmrc`), over the Dart files changed against the merge base with the base
+  branch plus the untracked ones (`--all` for the whole project, `--base <ref>`
+  for another baseline, `--check` for CI). Generated files and migrations are
+  never formatted. The skeleton's CI runs `format --check` on the files a pull
+  request changed, and `dartway-finish` formats with it.
+- `deploy run` no longer answers requests with 502 while it deploys: it
+  migrates while the previous server serves, starts the new server and web app
+  beside the serving ones, waits for their healthchecks before attaching their routed aliases and stops the old ones
+  after; the rendered nginx resolves every service per request through
+  Docker's DNS and retries a refused or vanished address, and is reloaded
+  instead of restarted. A failure leaves the previous version serving.
+  Replaces D-070 (D-166, #645). Existing servers: see the
+  [migration note](../../docs/migrations/2026-10-21-deploy-side-by-side-and-stats.md).
+- The rendered nginx logs each request as one JSON line (`dw_timed`: the call's
+  wire name, status, request and upstream time) into bounded files; the bundled
+  Postgres preloads `pg_stat_statements` and logs statements slower than the new
+  `slow_query_ms` key of `deploy/config.yaml` (default 500), set by every deploy
+  without a restart.
+- Protect slow and error logs from bind parameters with both parameter log limits
+  set to zero; bound Postgres Docker logs to ten files of 50 MB. Refuse a
+  Postgres command override that drops `-c shared_preload_libraries=pg_stat_statements`.
+- `migrationsDrift` rejects required column additions without a default on existing
+  tables; suggests a default or nullable/backfill/later NOT NULL. General D-143
+  compatibility remains a review obligation.
+- Warn in deploy preflight when available host memory is below the configured
+  limits for two server containers plus the migration container. Bound nginx
+  retiring workers, including WebSockets, to 30 s after reload.
+- `dartway deploy stats --env <environment> [--hours 24] [--top 10]` prints
+  p50/p95 per call from the proxy log and the costliest statements of
+  `pg_stat_statements` on a deployed environment. Read-only.
+- `deploy check` fails `override-side-by-side` when `deploy/compose.override.yml`
+  gives `server` or `web` a `container_name` or published `ports`, which would
+  stop the new container from starting beside the old.
+- Load the managed Claude policy by import and warn with `instructionsDuplicated`
+  when root instruction texts need consolidation. Fresh projects use `@AGENTS.md`.
+- Make the first read an index with topic references and concise skill discovery
+  descriptions. Load only the procedures needed for the current step.
+- Record `interactive` (default true) in the toolkit manifest. `--no-interactive`
+  on create/setup-ai/update makes managed confirmation steps report and stop
+  that step without waiting or treating silence as approval; updates retain the choice.
+
+## 0.25.0
+
+### Breaking changes
+
+- **BREAKING (`dartway create` dependency source):** new projects pin every
+  reached `dartway_*` package and the analyzer plugin to the full git commit
+  that supplied the template. `dartway update --target <sha>` moves those refs;
+  `--framework-path` continues to write local path overrides. Creation no
+  longer depends on unpublished pub.dev versions.
+- **BREAKING (native check contract):** the outside-only check image requires
+  `--version <full SHA>` and verifies it on API `/health` and app `/dw/health`.
+  Generated manifests now include `{version}`. Regenerate and wire server health
+  metadata; see the native-check migration note.
+- **BREAKING (deploy):** the app host forwards only `/dw/`. Kamal web
+  destinations no longer carry route prefixes or depend on server routes;
+  compose and `dartway dev` leave `/health` and project routes to the app.
+  Outside checks use `/dw/health` on the app host (#576). See the
+  [migration note](../../docs/migrations/2026-10-12-app-host-dw-only.md).
+
+### Changes
+
 - Keep standalone `DwOutboundHttp.network` construction and tear-offs out of
   server `lib/` with `forbiddenHttpClient`; server code uses the bounded,
   test-faked `ctx.http` (#444).
-
 - Fix: the template maps user cards in a batch, loading identities and avatar
   URLs once and sharing them with the nested profiles. A single card uses a
   batch of one (#418).
-
 - Tests: prepare external-service workers before timed CLI assertions and own
   fixture subprocess groups through timeout and teardown, so CLI and native
   analyzer children stop before their temporary directories are removed. Limit
   concurrent CLI test files to two to bound nested compiler load (#609).
-
 - Tests: synchronize the deployment busy-refusal check with the real detached
   process's startup and release, avoiding its fixed sleep window (#613).
-
 - Fix: `AppKeyboardInset` in the template and example follows native iOS engine
   frames directly, avoiding a second tween and its trailing animation. Web and
   other platforms retain step smoothing. The `dartway-on-device` skill now
   distinguishes these paths (#578); existing copies can follow the
   [migration note](../../docs/migrations/2026-10-18-native-ios-keyboard-insets.md).
-
 - Fix: native `deploy check` verifies secret-file mounts on the target before
   masking output, so a path stored in `FCM_SERVICE_ACCOUNT_FILE` no longer
   hides a correct per-file read-only bind from the checker (#587).
-
 - Fix: `create --framework-path` accepts a framework export without Git
   metadata when the dependencies and lints plugin resolve by local paths
   (#600). A full commit remains required for Git pinning.
-
 - Fix: `dartway create` initializes Git on the recorded base branch (`master`),
   even when Git defaults to `main`, so the new project's contract baseline is
   available. `create .` preserves an existing repository's branch (#599).
-
 - Fix: Compose deployments pin both serving images as
   `<project>-<service>:dw-previous` before building moves `:latest`. Retries
   keep the original journal entries, restore missing or moved pins, and
   refuse a missing rollback image before building or replacing a service
   (#602, #589).
-
 - Fix: template and example Docker contexts exclude native app signing files
   (`key.properties`, `*.jks`, `*.keystore`, `*.p8`) at every depth (#588).
   Existing projects must update their copied `.dockerignore`; see the
   [migration note](../../docs/migrations/2026-10-18-docker-context-signing-files.md).
-
 - Fix: the installed `dartway-finish` gate block omits `CONTRACT_BASE` and
   `--contract-base` when the project has a release branch, so task checks do not
   demand contract version bumps reserved for `generate --release` (#607).
-
 - `dartway sync [<ref>]` merges the base branch in and resolves derived files
   itself: generated code, locks and l10n outputs are regenerated, the
   migrations registry is rebuilt from its directory, `.arb` files merge by key;
@@ -64,35 +183,17 @@
   --release` raises the contract version once at the release and resolves the
   packages; `--release-branch` records `releaseBranch` in the toolkit settings
   (D-158).
-
-- **BREAKING (`dartway create` dependency source):** new projects pin every
-  reached `dartway_*` package and the analyzer plugin to the full git commit
-  that supplied the template. `dartway update --target <sha>` moves those refs;
-  `--framework-path` continues to write local path overrides. Creation no
-  longer depends on unpublished pub.dev versions.
-
 - Native `deploy check` selects Kamal from the Studio manifest and verifies the
   selected SHA, actual TLS routing, native data/secret mounts, BBR and explicit
   ingress trust, without inspecting secret environments. Compose `deploy run`
   retains its own checks. Native generation refuses nginx snippets rather than
   silently dropping policies.
-- **BREAKING (native check contract):** the outside-only check image requires
-  `--version <full SHA>` and verifies it on API `/health` and app `/dw/health`.
-  Generated manifests now include `{version}`. Regenerate and wire server health
-  metadata; see the native-check migration note.
-
 - Kamal destinations support `requires.files`: individual read-only API mounts
   and an executable pre-app-boot hook that checks file metadata over Kamal's
   configured SSH transport, without reading contents. Existing `secret put-file`
   delivery uses a private upload directory and atomically replaces the file;
   rotation reaches the next container boot. Delivery remains a prerequisite,
   including for Studio runners.
-
-- **BREAKING (deploy):** the app host forwards only `/dw/`. Kamal web
-  destinations no longer carry route prefixes or depend on server routes;
-  compose and `dartway dev` leave `/health` and project routes to the app.
-  Outside checks use `/dw/health` on the app host (#576). See the
-  [migration note](../../docs/migrations/2026-10-12-app-host-dw-only.md).
 - Fix: the web API proxy emits a Flutter fallback for a trailing-slash route
   only when no API prefix covers its slashless path, keeping overlapping routes
   and `/health` on the API (#571).
@@ -135,7 +236,6 @@
 - Template and example web releases call `Uri.base.origin` and build without a
   backend address, so one image serves every destination. Deploy checks require
   the backend build argument only when the Dockerfile declares it (#530).
-
 - Fix: generated Studio manifests declare the actual server migration and lock
   paths. Images pass the workflow run number into web builds, preserving SHA
   image identities and build-once behavior (#566). Existing projects must

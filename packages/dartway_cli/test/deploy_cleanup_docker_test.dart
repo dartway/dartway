@@ -31,6 +31,10 @@ services:
       retries: 1
   web:
     build: .
+    healthcheck:
+      test: [CMD, test, -f, /payload]
+      interval: 1s
+      retries: 1
 YAML
 cat >/stack/Dockerfile <<'DOCKER'
 FROM busybox:1.37
@@ -84,6 +88,10 @@ services:
       retries: 1
   web:
     build: .
+    healthcheck:
+      test: [CMD-SHELL, 'test "$$(cat /health)" = ok']
+      interval: 1s
+      retries: 1
 YAML
 cat >/stack/Dockerfile <<'DOCKER'
 FROM busybox:1.37
@@ -136,7 +144,7 @@ echo ok >/stack/health
         expect(recorded.stdout.trim(), isNot(moved.stdout.trim()));
         final failed = await runner.replaceServer();
         expect(failed.ok, isFalse);
-        expect(failed.stderr, contains('the previous server is running again'));
+        expect(failed.stderr, contains('the previous server keeps serving'));
         final recovered = await shell.run(
           "docker inspect -f '{{.Image}}' \"\$(cd /stack && docker compose ps -q server)\"",
         );
@@ -180,6 +188,11 @@ services:
       retries: 1
   web:
     build: .
+    healthcheck:
+      test: [CMD-SHELL, 'test "$$(cat /health)" = ok']
+      interval: 1s
+      timeout: 1s
+      retries: 1
 YAML
 cat >/stack/Dockerfile <<'DOCKER'
 FROM busybox:1.37
@@ -225,7 +238,7 @@ docker tag nginx:fixture shop-web:accessory
             expect(failed.ok, isFalse);
             expect(
               failed.stderr,
-              contains('the previous server is running again'),
+              contains('the previous server keeps serving'),
             );
             final rolledBack = await shell.run(
               "docker image inspect -f '{{.Id}}' shop-server:latest",
@@ -478,7 +491,7 @@ cd /stack && docker compose exec -T postgres psql -U postgres -Atc "SELECT to_re
         isNot(contains('could not be started again')),
         reason: output,
       );
-      expect(output, contains('the previous server is running again'));
+      expect(output, contains('the previous server keeps serving'));
       final healthy = await shell.run(
         '${DwDeployRunner.waitHealthyFunction(timeoutSeconds: 30)}\n'
         'dw_wait_healthy "\$(cd /stack && docker compose ps -q server)" rollback',

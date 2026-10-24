@@ -104,13 +104,15 @@ one object and sees everything:
 
 ```dart
 abstract interface class DwServerLogger {
+  bool isEnabled(DwLogLevel level);
   void log(DwLogLevel level, String message, {Object? error, StackTrace? stackTrace});
   DwServerLogger scoped(String scope);
 }
 ```
 
 `debug`, `info`, `warning` and `error` are extension methods over `log` (`DwLoggerLevels`).
-`DwLogLevel` has those four values.
+`DwLogLevel` has those four values. `isEnabled` reports the effective filter, including on
+scoped loggers, so a caller can skip constructing a disabled line.
 
 `DwConsoleLogger({minLevel: DwLogLevel.info, scope})` is the default: one line per entry with a UTC
 timestamp, level and scope, to stdout below warning and to stderr from warning up, plus the stack

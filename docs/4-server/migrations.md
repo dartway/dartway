@@ -37,6 +37,11 @@ A type change uses the same sequence through a new column. A direct `renameColum
 added in the same unreleased branch. A drop and an add in one table are usually a rename; that
 does not make a direct rename safe for released readers.
 
+`dartway check` rejects `ADD COLUMN … NOT NULL` without `DEFAULT` on an existing table.
+A default, or a nullable column with backfill and `NOT NULL` in a later release, keeps the previous
+server's inserts working during a side-by-side deployment. This narrow offline check does not
+prove general expand/contract compatibility.
+
 ## `DwDatabaseMigration`
 
 A migration adding an `invoice` table, as `create` would draft it:
@@ -107,8 +112,9 @@ months against the schema of its own day. It describes tables with schema litera
 `dropForeignKey`, `addUnique`, `dropUnique`, `createIndex`, `dropIndex`, and `sql` / `query` for
 everything else. A `backfill` is an SQL expression computed for each existing row: the column is
 added nullable, filled and then made `NOT NULL`, in the migration's transaction.
-Adding a `NOT NULL` column with only `backfill:` is an expansion only if the previous code does
-not insert into that table; otherwise the column needs a default so its inserts still work.
+A `backfill:` fills existing rows. A new required column on an existing table also needs
+`defaultSql` so the previous server can still insert during deployment; the checker rejects a
+required `addColumn` with only a backfill. Alternatively keep it nullable until a later release.
 
 `DwCalendarDay` maps to PostgreSQL `date`. Adopting it for a new field is optional and needs no
 framework migration. If a project chooses to convert an existing `timestamptz` field, the project
@@ -180,7 +186,7 @@ Future<void> up(DwMigrationContext m) async {
 This addition with only `backfill:` assumes the previous code does not insert into `project_issue`;
 otherwise `stage` needs a default, as described [above](#expand-then-contract-across-releases).
 
-`backfill` runs like `sql`; what it adds is the statement's purpose, and `dart run dartway_cli:dartway check` holds it:
+`backfill` runs like `sql`; what it adds is the statement's purpose, and `dartway check` holds it:
 an `INSERT`, `UPDATE` or `DELETE` anywhere else in a project migration fails the build
 (`migrationChangesData`). The check reads the migration's string literals — adjacent literals as
 one string — and passes function, procedure and trigger bodies, which are definitions rather than
@@ -284,7 +290,7 @@ transaction: an irreversible migration in the middle leaves the database as it w
    order.
 4. Drops the throwaway database.
 
-Run `dart run dartway_cli:dartway generate` first: `create` reads the generated schema, not the row class sources.
+Run `dartway generate` first: `create` reads the generated schema, not the row class sources.
 
 No schema difference writes an empty migration, for data work. A change the diff cannot decide is
 written as a call to `decisionRequired('…')`, with a comment naming the options:
@@ -310,7 +316,8 @@ anywhere is expected; then run `rehash <id>`, or `check` reports the file as cha
 Editing it after it is applied somewhere is what the checksum refuses — reformatting included: an
 applied migration that `check` reports as changed is restored as it was sealed, not rehashed.
 Migrations created before `// dart format off` was written have no such line, and adding it is an
-edit too; those are kept out of `dart format` by hand.
+edit too. `dartway format` never hands any migration to the formatter; a bare `dart format` has to
+be kept away from those by hand.
 
 A pending migration edited and not yet rehashed is also refused where it would be applied, as long
 as its source is on disk: `migrate apply`, and a server run from its sources with
@@ -321,7 +328,7 @@ check.
 
 ## `check`
 
-`check` is what CI runs, and what `dart run dartway_cli:dartway check` runs as `migrationsDrift`:
+`check` is what CI runs, and what `dartway check` runs as `migrationsDrift`:
 
 1. **Files** — every migration's declared checksum matches its source; every file is registered in
    `migrations.dart`, and every registered migration has a file.
@@ -336,7 +343,7 @@ check.
 It needs `DW_DATABASE_*` pointing at a Postgres where throwaway databases can be created — the
 development one will do.
 
-`dart run dartway_cli:dartway check` runs `dart run bin/migrate.dart check` in the server package when
+`dartway check` runs `dart run bin/migrate.dart check` in the server package when
 `DW_DATABASE_HOST` is set. Findings are `migrationsDrift` errors: a schema the migrations do not
 produce is a server that refuses to start in the next environment. Without a database it prints
 that the check did not run — never that the migrations are fine. See
@@ -355,5 +362,5 @@ So a deploy needs no separate migration step. `bin/migrate.dart` is for developm
 
 ## Related
 
-- [Database](database.md) — row classes and what `dart run dartway_cli:dartway generate` writes.
+- [Database](database.md) — row classes and what `dartway generate` writes.
 - [Migration notes](../migrations/README.md) — the edits a project owes when the framework changes; not database migrations.

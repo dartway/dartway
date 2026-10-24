@@ -1,12 +1,6 @@
 ---
 name: dartway-on-device
-description: >-
-  Phone keyboard, focus, scroll and viewport behaviour on iOS and iOS web
-  that desktop testing can miss — each with its mechanism
-  and the known workaround. Use for "the keyboard does not come up", "the screen jumped or went blank
-  when I tapped the field", "it blinks and reopens", "works in the simulator, not on my phone" — and
-  before writing anything that focuses a field, opens a sheet over the keyboard, or will be opened
-  from a phone browser.
+description: "Diagnose phone keyboard, focus, scrolling and viewport differences on native iOS and iOS web."
 ---
 
 # DartWay — keyboard, focus and viewport on phones (`dartway-on-device`)

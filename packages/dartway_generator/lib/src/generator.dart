@@ -25,6 +25,7 @@ import 'emit/source_text.dart';
 import 'entity/entity_emitter.dart';
 import 'entity/entity_model.dart';
 import 'entity/entity_reader.dart';
+import 'entity/relation_emitter.dart';
 import 'entity/schema_emitter.dart';
 import 'project.dart';
 import 'sdk.dart';
@@ -60,7 +61,7 @@ final class DwGenerationReport {
   /// Stale generated parts (in check mode: that would be removed).
   final List<String> removed;
 
-  /// Problems that stopped generation. When not empty, nothing was written.
+  /// Diagnostics from generation. Warnings do not prevent writing.
   final List<DwGenerationDiagnostic> diagnostics;
   final Duration elapsed;
   final bool check;
@@ -75,7 +76,7 @@ final class DwGenerationReport {
   /// waits for the release (D-158). Null when nothing waits.
   final String? contractRaise;
 
-  bool get hasErrors => diagnostics.isNotEmpty;
+  bool get hasErrors => diagnostics.any((d) => !d.isWarning);
 
   /// Whether the generated files on disk are exactly what the sources produce.
   bool get isUpToDate => !hasErrors && written.isEmpty && removed.isEmpty;
@@ -83,7 +84,7 @@ final class DwGenerationReport {
   String get summary {
     final seconds = (elapsed.inMilliseconds / 1000).toStringAsFixed(2);
     if (hasErrors) {
-      final count = diagnostics.length;
+      final count = diagnostics.where((d) => !d.isWarning).length;
       return 'dartway generate: $count error${count == 1 ? '' : 's'}, '
           'nothing written ($seconds s)';
     }
@@ -175,7 +176,7 @@ abstract final class DwCodeGenerator {
       diagnostics,
       skipped: check ? null : skipped,
     );
-    if (diagnostics.isNotEmpty) return finish();
+    if (diagnostics.any((d) => !d.isWarning)) return finish();
     // Ordinary generation also needs trusted introduction metadata, but keeps
     // its existing non-verifying mode for new projects and unsupported codecs.
     // The check gate must still prove a baseline before accepting the output.
@@ -211,7 +212,7 @@ abstract final class DwCodeGenerator {
       }
       var files = run.emit();
       var introductions = <String, String>{};
-      if (diagnostics.isNotEmpty) {
+      if (diagnostics.any((d) => !d.isWarning)) {
         // Collect registry diagnostics too; failed runs still report every
         // problem, and none of these provisional files will be written.
         run.completeContracts(files, const {});
@@ -314,10 +315,10 @@ abstract final class DwCodeGenerator {
             );
           }
         }
-        if (diagnostics.isNotEmpty) return finish();
+        if (diagnostics.any((d) => !d.isWarning)) return finish();
       }
       files = run.completeContracts(files, introductions);
-      if (diagnostics.isNotEmpty) return finish();
+      if (diagnostics.any((d) => !d.isWarning)) return finish();
       final plan = planOutput(files, packages);
       if (!check) plan.apply();
       return finish(plan: plan);
@@ -498,9 +499,16 @@ final class _Run {
   /// a registry ambiguity.
   final Set<String> _collidingNames = {};
 
+  List<EntityRelation> _relations = [];
+
   List<GeneratedFile> emit() {
     _checkWireNames();
     _checkEntities();
+    _relations = resolveRelations([
+      for (final l in libraries)
+        for (final c in l.classes)
+          if (c.$3 != null) c.$3!,
+    ], diagnostics);
     final files = <GeneratedFile>[];
     for (final library in libraries) {
       files.add(_emitPart(library));
@@ -754,7 +762,15 @@ final class _Run {
   GeneratedFile _emitPart(_Library library) {
     final sections = <String>[
       for (final (_, dto, entity) in library.classes)
-        if (dto != null) DtoEmitter.emit(dto) else EntityEmitter.emit(entity!),
+        if (dto != null)
+          DtoEmitter.emit(dto)
+        else
+          EntityEmitter.emit(
+            entity!,
+            relationTarget: _relations.any(
+              (r) => r.target == entity && !r.many,
+            ),
+          ),
     ];
     if (sections.isNotEmpty) _checkFrameworkNames(library, sections.join());
     final source = StringBuffer()
@@ -966,6 +982,7 @@ final class _Run {
       path,
       formatDart(
         SchemaEmitter.emit(
+          relations: _relations,
           baseName: package.baseName,
           entities: entities,
           imports: importUris.toList()..sort(),

@@ -1,12 +1,6 @@
 ---
 name: dartway-uploads
-description: >-
-  File uploads: a purpose in the shared enum, its DwUploadRule (visibility → public or private bucket,
-  maxBytes, contentTypes, canUpload), canRead for private files, a row storing the file id checked
-  with ctx.files.requireOwned, URLs in batch with publicUrls, private links with dw.files.getLink,
-  deletion, server-side reads and writes, dw.uploader() in the app, local storage and DW_STORAGE_*,
-  and the tests on DwTestStorage and DwFakeStorage. Use when a feature needs a photo, a document or
-  an attachment, when an upload is refused or fails, or when a file does not open.
+description: "Declare upload purposes and access; upload, validate ownership, serve and delete files in both buckets."
 ---
 
 # DartWay — file uploads (`dartway-uploads`)

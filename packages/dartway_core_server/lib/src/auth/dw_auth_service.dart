@@ -480,6 +480,7 @@ final class DwAuthService {
         identifier,
         DwAccountOrigin.signIn(command.registration),
       );
+      await auth.beforeCodeSignIn?.call(ctx, accountId, kind, identifier);
       final issued = (await DwAuthStore.insertKey(
         tx,
         accountId: accountId,

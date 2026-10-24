@@ -1,15 +1,27 @@
 # Changelog
 
-## 0.4.0-dev.0
+## 0.6.0
 
-- Requires `dartway_router` 4.0.0-dev.0 for decision guards and pending navigation.
+- Targets DartWay 0.24
+
+## 0.5.0
+
+- Targets DartWay 0.23
+
+## 0.4.0
+
+### Breaking changes
+
+- Requires `dartway_router` 4.0.0 for decision guards and pending navigation.
+
+### Changes
 
 - `DwStudioBinding` validates Studio tokens for `STUDIO_APP_ORIGIN` when defined,
   otherwise for the current web release origin, so one image can serve stage and
   prod. Debug/profile builds without the define allow local preview; an explicit
   `validateAccessToken` supplies the project's own policy (#530).
 
-- Targets DartWay 0.22 and Studio bridge 0.12; dependency carets follow the new development lines.
+- Targets DartWay 0.22 and Studio bridge 0.12; dependency carets follow the release versions.
 
 ## 0.3.0
 

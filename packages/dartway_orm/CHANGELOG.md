@@ -1,6 +1,31 @@
 # Changelog
 
-## 0.22.0-dev.0
+## 0.24.1-dev.1
+
+- Advance in lockstep with the core family; no API or wire changes in this package.
+
+## 0.24.0
+
+### Breaking changes
+
+- Row fields named `tablePath`, and referenced row fields named `include` or `includeSpec`, must be renamed in Dart (retain the SQL name with `@DwColumnName`). Ambiguous or colliding relation names warn and omit the relation without blocking generation.
+
+### Changes
+
+- Typed foreign-key relations, chained filters/order, any/none/every/count, and explicit typed includes in one SQL statement. Includes preserve column codecs, enforce child bounds and refuse row locks.
+
+- Preserve nullable related key types and projected group keys; recheck root mutation guards after lock waits. Includes retain exact double bits, refuse unrepresentable dates with `DwDecodeException`, and explicitly aggregate ordered child pages. `take(n)` defaults to child primary-key order. Related columns are refused in pathless write targets.
+
+## 0.23.0
+
+- `find(unbounded: '<reason>')` says why a read without `limit` stays small, for
+  `dartway check`'s `unboundedRead`; the database never sees it, and it is refused
+  beside a `limit` or blank (#644).
+- Move with the core family to support the server seam kit (#638).
+- Distinguish a stale ordinary edit (`DwStaleState`) from a missing state-table row (`DwRowNotFound`); retain the atomic state guard (#639).
+- Add `DwStateTransitions`, `@DwStateColumn` and atomic `transition` / `transitionWhere`. Refuse noninitial inserts, direct state updates and upserts on state tables (#639).
+
+## 0.22.0
 
 - Fix migration drafts' rename advice: every rename option explains that a released table needs
   the new name added and copied, reads switched, and the old name dropped one release later (#542).

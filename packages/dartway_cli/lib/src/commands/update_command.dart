@@ -235,10 +235,9 @@ class UpdateCommand extends Command<int> {
       );
       final pubspecs = <File>[
         File(p.join(projectRoot.path, 'pubspec.yaml')),
-        ...projectRoot
-            .listSync()
-            .whereType<Directory>()
-            .map((directory) => File(p.join(directory.path, 'pubspec.yaml'))),
+        ...projectRoot.listSync().whereType<Directory>().map(
+          (directory) => File(p.join(directory.path, 'pubspec.yaml')),
+        ),
       ].where((file) => file.existsSync()).toList();
       final movedPubspecs = <File, String>{};
       final frameworkGitUrls = {
@@ -290,6 +289,7 @@ class UpdateCommand extends Command<int> {
           cliVersion: dartwayCliVersion,
           installedAt: DateTime.now().toUtc().toIso8601String(),
           settings: choice.settings,
+          interactive: choice.interactive,
         ),
       );
       for (final MapEntry(key: file, value: contents)
@@ -319,8 +319,7 @@ class UpdateCommand extends Command<int> {
       '\n⚠️  This CLI is $dartwayCliVersion, the target has $channelVersion.\n'
       '   Update it first and run this again — an older CLI installs an older '
       'idea of what a project needs:\n'
-      '   dart pub global activate --source git https://github.com/dartway/dartway '
-          '--git-path packages/dartway_cli --git-ref stable',
+      '   dart pub global activate dartway_cli $channelVersion',
     );
   }
 

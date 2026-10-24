@@ -596,7 +596,12 @@ void main() {
         '${replaced.stdout}${replaced.stderr}',
         contains('password authentication failed'),
       );
-      expect(replaced.stderr, contains('previous server is running again'));
+      expect(replaced.stderr, contains('the previous server keeps serving'));
+      expect(
+        (await probe.health(stack.apiOrigin)).passed,
+        isTrue,
+        reason: 'it was never stopped',
+      );
       // One-off migration runs leave nothing behind.
       final leftovers = await compose('ps -aq --status exited');
       expect(leftovers.ok, isTrue);

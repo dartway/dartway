@@ -1,7 +1,7 @@
 ---
 title: Apply the identifier confirmation ticket migration
 affects:
-  dartway_core_server: "0.22.0-dev.0"
+  dartway_core_server: "0.22.0"
 ---
 
 ## Who is affected

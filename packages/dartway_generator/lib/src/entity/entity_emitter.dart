@@ -1,21 +1,34 @@
 import '../emit/source_text.dart';
 import '../emit/value_class_writer.dart';
 import 'entity_model.dart';
+import 'relation_emitter.dart';
 
 /// Writes the generated code of one row class: the value mixin, `copyWith`,
 /// the draft (`New<Name>Row`) and the table definition (the shape of
 /// `packages/dartway_orm/test/fixtures`).
 abstract final class EntityEmitter {
-  static String emit(EntityClass entity) {
+  static String emit(EntityClass entity, {bool relationTarget = false}) {
     final values = _values(entity);
     return [
       _mixin(entity),
       // A copy of a stored row is the same row: its id is kept.
-      ?ValueClassWriter.copyWith(entity.name, values, kept: const ['id']),
+      ?ValueClassWriter.copyWith(
+        entity.name,
+        values,
+        kept: const ['id'],
+        checks: [
+          for (final field in values)
+            if (field.column!.transitions != null)
+              'if (${field.name} != null && ${field.name} != this.${field.name}) '
+                  '{throw DwStateWriteException(${dartString(entity.tableName)}, '
+                  "'copyWith: ${field.name}');}",
+        ],
+      ),
       _draft(entity, values),
       ?ValueClassWriter.copyWith(entity.draftClass, values),
       _withId(entity, values),
       _table(entity),
+      if (relationTarget) emitRelationViews(entity),
     ].join('\n\n');
   }
 
@@ -88,7 +101,7 @@ abstract final class EntityEmitter {
     final name = entity.name;
     final columns = _values(entity);
     final members = <String>[
-      'const ${entity.tableClass}() : super(${dartString(entity.tableName)});',
+      'const ${entity.tableClass}({super.tablePath}) : super(${dartString(entity.tableName)});',
       for (final field in columns) _columnGetter(field),
       '@override\nList<DwTableColumn<Object?>> get tableColumns => '
           '[id, ${columns.map((field) => field.name).join(', ')}];',
@@ -124,9 +137,10 @@ abstract final class EntityEmitter {
       if (column.unique) 'unique: true',
       if (column.defaultValue != null) 'defaultValue: ${column.defaultValue}',
       if (column.references != null) 'references: ${column.references}',
+      if (column.transitions != null) 'transitions: ${column.transitions}',
     ];
     return 'DwTableColumn<${field.spelling}> get ${field.name} => '
-        'const DwTableColumn(${arguments.join(', ')});';
+        '(const DwTableColumn<${field.spelling}>(${arguments.join(', ')})).atPath(tablePath);';
   }
 
   static String _index(EntityIndex index) =>

@@ -12,6 +12,7 @@ export 'package:dartway_core_shared/dartway_core_shared.dart'
         DwSetField,
         DwTextFieldPatch,
         DwCalendarDay,
+        DwStateTransitions,
         dwListEquals,
         dwMapEquals;
 
@@ -23,6 +24,7 @@ export 'src/db/dw_errors.dart'
         DwDatabaseException,
         DwDecodeException,
         DwRowNotFound,
+        DwStaleState,
         DwForeignKeyViolation,
         DwSerializationFailure,
         DwUniqueViolation;
@@ -34,7 +36,13 @@ export 'src/entity/dw_column_type.dart';
 export 'src/migrations/dw_database_migration.dart';
 export 'src/migrations/dw_migration_errors.dart';
 export 'src/migrations/dw_migration_runner.dart';
-export 'src/query/dw_table_column.dart' hide DwSqlWriter, dwQuoteIdentifier;
+export 'src/query/dw_table_column.dart'
+    hide
+        DwSqlWriter,
+        dwQuoteIdentifier,
+        dwDecodeIncludes,
+        dwIncludeProjection,
+        dwRememberIncludes;
 export 'src/query/dw_row_lock.dart';
 export 'src/query/dw_table_repository.dart';
 export 'src/schema/dw_database_schema.dart' hide dwCheckIdentifier;

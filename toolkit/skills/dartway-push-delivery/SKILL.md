@@ -1,12 +1,6 @@
 ---
 name: dartway-push-delivery
-description: >-
-  Push notifications, both halves: DwPushModule (dartway_push_server) with FCM / RuStore providers,
-  the protocol composed with dwPushProtocolEntries, a category enum and a typed payload,
-  ctx.push.send in the command's transaction with a dedupKey, the eligibility rule (send / skip /
-  delayUntil), the app plugin DwPush (dw.plugins.push: permission, pause/resume, opened), and the
-  fakes for tests. Use when a feature must notify someone not looking at the app, or when a push
-  does not arrive, arrives twice or opens the wrong screen.
+description: "Configure server push delivery, tokens, vendor adapters and the app push plugin."
 ---
 
 # DartWay — push notifications (`dartway-push-delivery`)
