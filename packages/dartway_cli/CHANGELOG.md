@@ -12,6 +12,14 @@
   the app. No config leaves these checks disabled. See the
   [migration note](../../docs/migrations/2026-10-23-design-resources-link.md).
 
+### Changes
+
+- Fix: recognize local final command callbacks used only as `dw.action` work,
+  detect parenthesized watched-read bindings, and accept feature-wide
+  `<feature>[_<scenario>]_contract_test.dart` files. Clarify Flutter migration
+  presentation, shared helpers, hosted views, inline command outcomes, checker
+  limits and script-test CI discovery in the docs and toolkit (#446).
+
 ## 0.26.1
 
 - Install and reinstall the CLI from pub.dev; update plans name the exact target CLI version in the activation command.

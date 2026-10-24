@@ -285,7 +285,9 @@ class DwFlutterUiInspector {
         continue;
       }
       final binding = _binding.firstMatch(
-        code.substring(match.start < 200 ? 0 : match.start - 200, match.start),
+        code
+            .substring(match.start < 200 ? 0 : match.start - 200, match.start)
+            .replaceFirst(RegExp(r'(?:\(\s*)+$'), ''),
       );
       if (binding != null) values.add((binding.group(1)!, match.start));
     }

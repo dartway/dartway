@@ -31,7 +31,15 @@ per side, extended and never replaced.
 is tested in `test/admin/users/admin_users_page_test.dart`, `lib/src/core/files.dart` in
 `test/src/core/files_test.dart`. A test of a whole folder — a server feature through its calls — is
 named after the folder at its mirror: `lib/src/chat/` → `test/src/chat/chat_acceptance_test.dart`;
-extend that feature's table for a new case.
+extend that feature's table for a new case. A scenario keeps the owner prefix:
+`test/src/chat/chat_attachments_acceptance_test.dart`, not `attachments_acceptance_test.dart`.
+A shared feature's contract spanning several files uses `test/src/chat/chat_contract_test.dart`
+(or `chat_updates_contract_test.dart`) for `lib/src/chat/`; the whole-package contract can stay at
+`test/<project>_shared_test.dart`.
+
+Tests of `tool/` scripts go in `tool/test/`, outside `testLayout`'s package `test/` scan. Run
+`dart test tool/test` explicitly from that package and add it to CI; the default test command does
+not discover them. Script-test helpers may live in `tool/test/support/`.
 Helpers live in `test/support/` and are imported relatively, and a test builds no server and no
 `ProviderScope` of its own. `dartway check` holds all three (`testLayout`,
 `testHarnessBypassed`).

@@ -1,4 +1,18 @@
-# How does a guard wait for facts it does not know yet?
+# Which views own a route?
+
+A navigable full page owns a zone route and can be reconstructed from its address. Opening inputs
+such as focus or scroll targets are path/query parameters, not a provider set before navigation;
+this is a manual review rule, not a complete checker guarantee.
+
+Embedded steps, cards, dialogs and sheets are built by their host and need no independent route.
+An old "no route of its own" feature note is correct for those components; a destination opened by
+navigation needs a route and a corrected note. A widget's `Page` suffix does not decide this.
+
+Guest gates and hosted views above the router belong to the app shell in `core/`. Put their visual
+wrapper in the UI kit; use the same read builders, loading and failed views as routed pages, without
+requiring a router ancestor merely to render them.
+
+## How does a guard wait for facts it does not know yet?
 
 Signing in can finish before the profile arrives. A guard that reads an unknown
 role as permission to proceed builds the destination, then redirects once the

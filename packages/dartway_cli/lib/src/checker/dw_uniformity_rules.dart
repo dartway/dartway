@@ -249,7 +249,7 @@ class DwUniformityInspector {
         'strings stay English',
     DwCheckType.testLayout:
         'a test mirrors lib/ (test/<path>_test.dart for lib/<path>.dart, '
-        'test/<path>/<folder>/<folder>[_<scenario>]_acceptance_test.dart for '
+        'test/<path>/<folder>/<folder>[_<scenario>]_{acceptance,contract}_test.dart for '
         'lib/<path>/<folder>/); helpers live in test/support/; `dartway check '
         '--fix` moves root-level acceptance tests',
     DwCheckType.testHarnessBypassed:
@@ -322,8 +322,9 @@ class DwUniformityInspector {
   /// Why [rel] — a path under `test/` — breaks the test layout, or null.
   ///
   /// A test mirrors what it tests: `test/<p>_test.dart` for `lib/<p>.dart`.
-  /// A test of a whole folder — a server feature through its calls — is
-  /// `<folder>[_<scenario>]_acceptance_test.dart` at the mirror of that
+  /// A test of a whole folder — a server feature through its calls, or a
+  /// shared feature's contract — is named after its folder, ending in
+  /// `_acceptance_test.dart` or `_contract_test.dart`, at the mirror of that
   /// folder: `test/src/chat/chat_acceptance_test.dart` or
   /// `chat_attachments_acceptance_test.dart` for `lib/src/chat/`, the
   /// `<feature>_*` naming the files of a feature follow. Everything else a
@@ -344,13 +345,21 @@ class DwUniformityInspector {
       return 'a helper outside test/support/ — move it there, beside the '
           'harness, and import it relatively';
     }
-    if (rel.endsWith('_acceptance_test.dart')) {
+    final mirrored =
+        '${rel.substring(0, rel.length - '_test.dart'.length)}.dart';
+    if (!rel.endsWith('_acceptance_test.dart') && libFileExists(mirrored)) {
+      return null;
+    }
+    final folderTest = RegExp(
+      r'_(acceptance|contract)_test\.dart$',
+    ).firstMatch(rel);
+    if (folderTest != null) {
       final folder = p.posix.dirname(rel);
       final name = p.posix
           .basename(rel)
           .substring(
             0,
-            p.posix.basename(rel).length - '_acceptance_test.dart'.length,
+            p.posix.basename(rel).length - folderTest.group(0)!.length,
           );
       final owner = p.posix.basename(folder);
       if (folder != '.' &&
@@ -358,15 +367,13 @@ class DwUniformityInspector {
           libDirectoryExists(folder)) {
         return null;
       }
-      return 'an acceptance test sits at the mirror of the folder it tests and '
+      final kind = folderTest.group(1)!;
+      return '${kind == 'acceptance' ? 'an' : 'a'} $kind test sits at the mirror of the folder it tests and '
           'is named after it: test/<path>/<folder>/<folder>[_<scenario>]'
-          '_acceptance_test.dart for lib/<path>/<folder>/ (a scenario across '
+          '_${kind}_test.dart for lib/<path>/<folder>/ (a scenario across '
           'features names the feature that owns it)'
-          '${folder == '.' ? ' — `dartway check --fix` moves one whose lib/src/<folder>/ exists' : ''}';
+          '${folder == '.' && kind == 'acceptance' ? ' — `dartway check --fix` moves one whose lib/src/<folder>/ exists' : ''}';
     }
-    final mirrored =
-        '${rel.substring(0, rel.length - '_test.dart'.length)}.dart';
-    if (libFileExists(mirrored)) return null;
     return 'mirrors nothing: no lib/$mirrored';
   }
 

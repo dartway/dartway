@@ -83,6 +83,32 @@ a `uiAction` — so a command that timed out never ends in silence.
 refused command shows the catalogue's text with no follow-up, and a not-authenticated answer signs out
 with no notification.
 
+## When the outcome is the screen
+
+A command that opens a flow or advances onboarding can have its outcome rendered as the whole
+screen. Choose one owner of that presentation. Returning a refusal to `dw.action` after storing it
+for an error view produces both the view and the catalogue toast. `onError` observes the failure;
+it does not consume it, and there is no per-action option to suppress refusal notifications.
+
+Put that flow in a `Notifier` controller in the feature's `logic/`. Its `Future<void>` operation
+captures the outcome into state (for example with `AsyncValue.guard` around the command and
+`valueOrThrow`) and completes normally for outcomes the screen owns. A button can still run that
+operation through `dw.action` and `DwActionBuilder` for confirmation and the in-flight guard. It
+must have no success notification or success follow-up: completing the operation means the state
+was updated, not that the command succeeded. Navigate from the controller's success state.
+
+Render the captured refusal with the same refusal catalogue. Preserve session handling for
+`DwNotAuthenticatedException` by signing out. Report unexpected captured failures through
+`dw.handleError` with `DwErrorSource.manual` and a label; the app's error policy must leave their
+presentation to the screen while still recording the incident. If a `DwReadBuilder.derived` renders
+the controller's async state, it already reports failures with `DwErrorSource.asyncBuild`; do not
+also report the same error manually. Do not return or rethrow a handled refusal to the action.
+Unexpected errors outside the captured operation still reach the action's usual error pipeline.
+
+Use a read for state the server already holds, shown through `DwReadBuilder`. An operation that
+changes server state stays a command; changing its DTO kind to avoid a toast would change its
+semantics.
+
 ## Confirmation
 
 ```dart

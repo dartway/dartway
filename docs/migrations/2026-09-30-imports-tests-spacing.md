@@ -82,7 +82,18 @@ through its calls) → `test/<path>/<folder>/<folder>_acceptance_test.dart`, and
 `<folder>_<scenario>_acceptance_test.dart` beside it; a scenario across features goes with the
 feature that owns it; a rule of `core/` at its file (`lib/src/core/auth.dart` →
 `test/src/core/auth_test.dart`); the contract test at the mirror of the shared package's library
-(`test/contract_test.dart` → `test/<project>_shared_test.dart`). Helper files beside tests
+(`test/contract_test.dart` → `test/<project>_shared_test.dart`). With CLI `0.25.0-dev.0` or later,
+a feature-wide shared contract spanning several files can live at
+`test/src/<feature>/<feature>_contract_test.dart`, with a scenario named
+`<feature>_<scenario>_contract_test.dart`, for `lib/src/<feature>/`. Both acceptance and folder-wide
+contract tests must start with the owning folder's name, not an individual DTO's name.
+
+Tests of scripts under `tool/` live in `tool/test/`, outside the package's `test/` mirror rule.
+Run them explicitly with `dart test tool/test` from that package and add that command to the
+project's CI: the default `dart test` discovers `test/` only. Helpers for those script tests can
+live in `tool/test/support/`.
+
+Helper files beside tests
 (`test/helpers.dart`, `test/src/chat/chat_fixtures.dart`) move to `test/support/`.
 
 **The harness — one per side.** A widget test that pumps its own `ProviderScope` (with overrides) or
