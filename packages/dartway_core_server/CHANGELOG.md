@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.24.1-dev.1
+
+- Add optional `DwAuthConfig.beforeCodeSignIn`: transactional admission before
+  every code-authenticated session, including existing accounts. Refusal rolls
+  back ticket consumption and new-account creation. No wire or schema change.
+
 ## 0.24.0
 
 - Advance with the core family for typed ORM relations.

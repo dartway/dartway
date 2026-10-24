@@ -250,7 +250,10 @@ final class TestApp {
     DwAccountDeletion accountDeletion = DwAccountDeletion.byMember,
     bool linkByVerifiedEmail = false,
     Map<DwIdentifierKind, DwIdentifierLinkPolicy> attachDelivery = const {},
+    Future<void> Function(DwCallContext, int, DwIdentifierKind, String)?
+    beforeCodeSignIn,
   }) => DwAuthConfig(
+    beforeCodeSignIn: beforeCodeSignIn,
     accountDeletion: accountDeletion,
     attachDelivery: attachDelivery,
     linkByVerifiedEmail: linkByVerifiedEmail,

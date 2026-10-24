@@ -51,6 +51,7 @@ final class AppHarness {
           accountDeletion: DwAccountDeletion.byMember,
           attachDelivery: attachDelivery,
           normalize: AccountAuth.config.normalize,
+          beforeCodeSignIn: AccountAuth.config.beforeCodeSignIn,
           onAccountCreated: AccountAuth.config.onAccountCreated,
           onIdentifierChanged: AccountAuth.config.onIdentifierChanged,
           onAccountDeleting: AccountAuth.config.onAccountDeleting,
