@@ -151,8 +151,10 @@ final class DwAuthConfig {
   /// before a session key is issued, for existing and new accounts alike.
   /// Runs in the verification transaction under account/identifier locks.
   /// Refusing rolls back ticket consumption and any newly created account.
-  /// Lock project admission rows here; changes to admission must acquire account
-  /// locks first too (for example through `ctx.accounts.revokeKeys`). Do not
+  /// Lock the project admission row here; withdrawal changes that row first and
+  /// calls `ctx.accounts.revokeKeys` after it, in the same transaction
+  /// (`revokeKeys` takes no account lock, so the reverse order can leave a key
+  /// issued in between). Do not
   /// perform outbound effects: the transaction may retry. This hook does not
   /// handle external-provider sign-in or identifier attachment.
   final Future<void> Function(

@@ -4,8 +4,10 @@ For a closed application, `beforeCodeSignIn(ctx, accountId, kind, identifier)`
 checks current project admission for every correct sign-in code, including an
 existing account. It runs inside verification's transaction before key issuance;
 refusal rolls back ticket consumption and new-account creation. Lock the project
-admission row here. Withdrawal acquires account locks first (through
-`ctx.accounts.revokeKeys`) and changes that row in the same transaction. Never
+admission row here (`SELECT … FOR UPDATE`). Withdrawal changes that row first,
+then calls `ctx.accounts.revokeKeys` in the same transaction; `revokeKeys` takes
+no account lock, so revoking before the row change leaves a key issued in
+between. Never
 rely on delivery filtering or `onAccountCreated` alone: a previously delivered
 code and an existing account bypass those checks. The hook is not invoked for
 external-provider authentication or identifier attachment. No outbound effects

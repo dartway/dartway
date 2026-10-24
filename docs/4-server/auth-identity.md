@@ -34,11 +34,14 @@ new accounts in the verification transaction. A refusal rolls back the new
 account, key issuance and ticket consumption. `onAccountCreated` alone cannot
 enforce a closed application: an existing account does not call that hook.
 
-Read and lock the project's admission row in `beforeCodeSignIn`. An operation
-that withdraws admission must acquire the same account lock first (through
-`ctx.accounts.revokeKeys`, for example), then change the admission row in the
-same transaction. This order makes a concurrent verification either precede
-revocation or observe the withdrawn admission. Avoid outbound effects in the
+Read and lock the project's admission row in `beforeCodeSignIn`
+(`SELECT … FOR UPDATE`). An operation that withdraws admission changes that row
+first and calls `ctx.accounts.revokeKeys` after it, in the same transaction.
+A concurrent verification then either waits on the row and observes the
+withdrawn admission, or commits first and loses its new key to the following
+`revokeKeys`. The reverse order is unsafe: `revokeKeys` takes no account lock,
+so a verification between it and the row change keeps a live key after
+admission ends. Avoid outbound effects in the
 hook: transactions may retry. The hook is for email/phone code sign-in only;
 external-provider policies and identifier attachment have separate hooks.
 
