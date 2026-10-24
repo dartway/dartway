@@ -171,6 +171,136 @@ void main() {
   tearDown(() => sandbox.deleteSync(recursive: true));
 
   test(
+    'older CLI reports the exact pub.dev activation for its target',
+    () async {
+      final source = Directory(p.join(sandbox.path, 'newer-framework'));
+      succeeds(
+        await Process.run('git', [
+          'clone',
+          '--shared',
+          '--quiet',
+          '--no-checkout',
+          repository.path,
+          source.path,
+        ]),
+      );
+      Future<ProcessResult> git(List<String> args) =>
+          Process.run('git', args, workingDirectory: source.path);
+      succeeds(await git(['checkout', '--quiet', target]));
+      final pubspec = File(
+        p.join(source.path, 'packages/dartway_cli/pubspec.yaml'),
+      );
+      pubspec.writeAsStringSync(
+        pubspec.readAsStringSync().replaceFirst(
+          RegExp(r'^version: .*$', multiLine: true),
+          'version: 99.0.0',
+        ),
+      );
+      succeeds(await git(['add', 'packages/dartway_cli/pubspec.yaml']));
+      succeeds(
+        await git([
+          '-c',
+          'user.name=Fixture',
+          '-c',
+          'user.email=fixture@example.com',
+          'commit',
+          '--quiet',
+          '--message',
+          'Newer target CLI',
+        ]),
+      );
+      final revision = await git(['rev-parse', 'HEAD']);
+      succeeds(revision);
+      final result = await update([
+        '--plan',
+        '--local-repo',
+        source.path,
+        '--target',
+        (revision.stdout as String).trim(),
+      ]);
+      succeeds(result);
+      expect(
+        output(result),
+        contains('dart pub global activate dartway_cli 99.0.0'),
+      );
+    },
+  );
+
+  test(
+    'update migrates physical Claude skills and retains unattended mode',
+    () async {
+      Link(p.join(project.path, '.claude/skills')).deleteSync();
+      final custom = file('.claude/skills/project-local/SKILL.md');
+      custom.parent.createSync(recursive: true);
+      custom.writeAsStringSync('owner procedure');
+      file('CLAUDE.md').writeAsStringSync('Owner Claude rules\n');
+      succeeds(await update(['--no-interactive']));
+      expect(
+        Link(p.join(project.path, '.claude/skills')).targetSync(),
+        '../.agents/skills',
+      );
+      expect(
+        file('.agents/skills/project-local/SKILL.md').readAsStringSync(),
+        'owner procedure',
+      );
+      expect(
+        file('CLAUDE.md').readAsStringSync(),
+        startsWith('Owner Claude rules'),
+      );
+      expect(
+        jsonDecode(
+          file('.agents/dartway-toolkit.json').readAsStringSync(),
+        )['interactive'],
+        isFalse,
+      );
+      succeeds(await update([]));
+      expect(
+        jsonDecode(
+          file('.agents/dartway-toolkit.json').readAsStringSync(),
+        )['interactive'],
+        isFalse,
+      );
+    },
+  );
+
+  for (final layout in ['shared', 'legacy Claude']) {
+    test('update removes retired managed skills from $layout layout', () async {
+      if (layout == 'legacy Claude') {
+        Link(p.join(project.path, '.claude/skills')).deleteSync();
+      }
+      final roots = layout == 'shared' ? ['agents'] : ['agents', 'claude'];
+      const retired = ['dartway-retired-analysis', 'dartway-retired-design'];
+      for (final root in roots) {
+        for (final name in [...retired, 'project-planning']) {
+          final skill = file('.$root/skills/$name/SKILL.md');
+          skill.parent.createSync(recursive: true);
+          skill.writeAsStringSync('Project procedure: $name');
+        }
+      }
+
+      succeeds(await update([]));
+
+      for (final root in ['agents', 'claude']) {
+        for (final name in retired) {
+          expect(
+            Directory(p.join(project.path, '.$root/skills/$name')).existsSync(),
+            isFalse,
+            reason: 'Retired managed skill must disappear from both agents',
+          );
+        }
+        expect(
+          file('.$root/skills/project-planning/SKILL.md').readAsStringSync(),
+          'Project procedure: project-planning',
+        );
+        expect(
+          file('.$root/skills/dartway-contract/SKILL.md').existsSync(),
+          isTrue,
+        );
+      }
+    });
+  }
+
+  test(
     'target lock and toolkit install leave notes unconfirmed; plan is read-only',
     () async {
       final before = files();
@@ -189,35 +319,35 @@ void main() {
     },
   );
 
-  test('target moves framework git refs and changes no other pubspec text', () async {
-    const old = '1111111111111111111111111111111111111111';
-    final pubspec = file('shop_shared/pubspec.yaml');
-    final original = pubspec.readAsStringSync();
-    final clean = withoutDependencyOverrides(original.split('\n'));
-    final pinned = withFrameworkGitOverrides(
-      clean,
-      ['dartway_core_shared'],
-      url: repository.path,
-      commit: old,
-    ).join('\n');
-    pubspec.writeAsStringSync('$pinned\n');
-    final options = file('shop_flutter/analysis_options.yaml');
-    options.writeAsStringSync(
-      options.readAsStringSync().replaceFirst(
-        RegExp(r'  dartway_lints:\n    path: [^\n]+'),
-        '  dartway_lints:\n    git:\n'
-            '      url: ${repository.path}\n'
-            '      path: packages/dartway_lints\n'
-            "      ref: '$old'",
-      ),
-    );
-    succeeds(await update([]));
-    expect(
-      pubspec.readAsStringSync(),
-      pinned.replaceAll(old, target) + '\n',
-    );
-    expect(options.readAsStringSync(), contains("ref: '$target'"));
-  });
+  test(
+    'target moves framework git refs and changes no other pubspec text',
+    () async {
+      const old = '1111111111111111111111111111111111111111';
+      final pubspec = file('shop_shared/pubspec.yaml');
+      final original = pubspec.readAsStringSync();
+      final clean = withoutDependencyOverrides(original.split('\n'));
+      final pinned = withFrameworkGitOverrides(
+        clean,
+        ['dartway_core_shared'],
+        url: repository.path,
+        commit: old,
+      ).join('\n');
+      pubspec.writeAsStringSync('$pinned\n');
+      final options = file('shop_flutter/analysis_options.yaml');
+      options.writeAsStringSync(
+        options.readAsStringSync().replaceFirst(
+          RegExp(r'  dartway_lints:\n    path: [^\n]+'),
+          '  dartway_lints:\n    git:\n'
+          '      url: ${repository.path}\n'
+          '      path: packages/dartway_lints\n'
+          "      ref: '$old'",
+        ),
+      );
+      succeeds(await update([]));
+      expect(pubspec.readAsStringSync(), pinned.replaceAll(old, target) + '\n');
+      expect(options.readAsStringSync(), contains("ref: '$target'"));
+    },
+  );
 
   test('target moves branch, tag, and quoted framework git refs', () async {
     final pubspec = file('shop_shared/pubspec.yaml');
@@ -238,9 +368,9 @@ void main() {
       options.readAsStringSync().replaceFirst(
         RegExp(r'  dartway_lints:\n    path: [^\n]+'),
         '  dartway_lints:\n    git:\n'
-            '      url: ${repository.path}\n'
-            '      ref: "stable"\n'
-            '      path: packages/dartway_lints',
+        '      url: ${repository.path}\n'
+        '      ref: "stable"\n'
+        '      path: packages/dartway_lints',
       ),
     );
     final beforePlan = files();
@@ -311,7 +441,8 @@ dependency_overrides:
 
   test('commented override headers are edited in place', () async {
     final rootPubspec = file('pubspec.yaml');
-    final original = '''
+    final original =
+        '''
 name: shop_workspace
 dependency_overrides: # framework pins
   dartway_core_shared:
@@ -397,11 +528,13 @@ plugins:
         url: repository.path,
         commit: 'stable',
       ).join('\n');
-      final otherRef = (Process.runSync(
-        'git',
-        ['rev-parse', 'HEAD~1'],
-        workingDirectory: repository.path,
-      ).stdout as String).trim();
+      final otherRef =
+          (Process.runSync('git', [
+                    'rev-parse',
+                    'HEAD~1',
+                  ], workingDirectory: repository.path).stdout
+                  as String)
+              .trim();
       final otherOverride =
           '  dartway_router:\n'
           '    git:\n'
@@ -720,71 +853,62 @@ plugins:
     );
   }, timeout: const Timeout(Duration(minutes: 5)));
 
-  test(
-    'git-installed CLI moves the canonical framework plugin URL',
-    () async {
-      final mirror = Directory(p.join(sandbox.path, 'framework-mirror.git'));
-      succeeds(
-        await Process.run('git', [
-          'clone',
-          '--bare',
-          repository.path,
-          mirror.path,
-        ]),
-      );
-      final home = Directory(p.join(sandbox.path, 'home'))..createSync();
-      succeeds(
-        await Process.run('git', [
-          'config',
-          '--file',
-          p.join(home.path, '.gitconfig'),
-          'url.file://${mirror.path}.insteadOf',
-          'https://github.com/dartway/dartway.git',
-        ]),
-      );
-      file('shop_flutter/analysis_options.yaml').writeAsStringSync(
-        'plugins:\n  dartway_lints:\n    git:\n'
-        '      url: https://github.com/dartway/dartway.git\n'
-        '      ref: stable\n'
-        '      path: packages/dartway_lints\n',
-      );
-      final sharedPubspec = file('shop_shared/pubspec.yaml');
-      sharedPubspec.writeAsStringSync(
-        withFrameworkGitOverrides(
-          withoutDependencyOverrides(
-            sharedPubspec.readAsStringSync().split('\n'),
-          ),
-          ['dartway_core_shared'],
-          url: 'https://github.com/dartway/dartway.git',
-          commit: 'stable',
-        ).join('\n'),
-      );
-
-      final result = await invoke(
-        ['update', '--target', target],
-        project,
-        environment: {'HOME': home.path},
-      );
-
-      succeeds(result);
-      expect(
-        file('shop_flutter/analysis_options.yaml').readAsStringSync(),
-        contains('ref: $target'),
-      );
-      expect(sharedPubspec.readAsStringSync(), contains('ref: $target'));
-    },
-    timeout: const Timeout(Duration(minutes: 5)),
-  );
-
-  test('DARTWAY_REPO_URL moves the matching fork plugin ref', () async {
-    final fork = Directory(p.join(sandbox.path, 'framework-fork.git'));
+  test('git-installed CLI moves the canonical framework plugin URL', () async {
+    final mirror = Directory(p.join(sandbox.path, 'framework-mirror.git'));
     succeeds(
       await Process.run('git', [
         'clone',
         '--bare',
         repository.path,
-        fork.path,
+        mirror.path,
       ]),
+    );
+    final home = Directory(p.join(sandbox.path, 'home'))..createSync();
+    succeeds(
+      await Process.run('git', [
+        'config',
+        '--file',
+        p.join(home.path, '.gitconfig'),
+        'url.file://${mirror.path}.insteadOf',
+        'https://github.com/dartway/dartway.git',
+      ]),
+    );
+    file('shop_flutter/analysis_options.yaml').writeAsStringSync(
+      'plugins:\n  dartway_lints:\n    git:\n'
+      '      url: https://github.com/dartway/dartway.git\n'
+      '      ref: stable\n'
+      '      path: packages/dartway_lints\n',
+    );
+    final sharedPubspec = file('shop_shared/pubspec.yaml');
+    sharedPubspec.writeAsStringSync(
+      withFrameworkGitOverrides(
+        withoutDependencyOverrides(
+          sharedPubspec.readAsStringSync().split('\n'),
+        ),
+        ['dartway_core_shared'],
+        url: 'https://github.com/dartway/dartway.git',
+        commit: 'stable',
+      ).join('\n'),
+    );
+
+    final result = await invoke(
+      ['update', '--target', target],
+      project,
+      environment: {'HOME': home.path},
+    );
+
+    succeeds(result);
+    expect(
+      file('shop_flutter/analysis_options.yaml').readAsStringSync(),
+      contains('ref: $target'),
+    );
+    expect(sharedPubspec.readAsStringSync(), contains('ref: $target'));
+  }, timeout: const Timeout(Duration(minutes: 5)));
+
+  test('DARTWAY_REPO_URL moves the matching fork plugin ref', () async {
+    final fork = Directory(p.join(sandbox.path, 'framework-fork.git'));
+    succeeds(
+      await Process.run('git', ['clone', '--bare', repository.path, fork.path]),
     );
     file('shop_flutter/analysis_options.yaml').writeAsStringSync(
       'plugins:\n  dartway_lints:\n    git:\n'
@@ -805,29 +929,33 @@ plugins:
     );
   }, timeout: const Timeout(Duration(minutes: 5)));
 
-  test('native YAML git ref coercion is replaced by the exact target', () async {
-    final plugin = repository;
-    // This branch exists and JSON pub preflight resolves it. The native
-    // analyzer emits ref: true into YAML, which pub rejects as a boolean.
-    final options =
-        'plugins:\n  dartway_lints:\n    git:\n'
-        '      url: ${plugin.path}\n'
-        '      path: packages/dartway_lints\n'
-        '      ref: "true"\n';
-    file('shop_flutter/analysis_options.yaml').writeAsStringSync(options);
-    final native = await nativeAnalyze(options);
-    expect(native.exitCode, isNot(0), reason: output(native));
-    expect(output(native), contains("The 'ref' field"));
-    expect(output(native), contains('must be a string'));
-    final before = files();
-    succeeds(await update(['--plan']));
-    expect(files(), before);
-    succeeds(await update([]));
-    expect(
-      file('shop_flutter/analysis_options.yaml').readAsStringSync(),
-      contains('ref: "$target"'),
-    );
-  }, timeout: const Timeout(Duration(minutes: 5)));
+  test(
+    'native YAML git ref coercion is replaced by the exact target',
+    () async {
+      final plugin = repository;
+      // This branch exists and JSON pub preflight resolves it. The native
+      // analyzer emits ref: true into YAML, which pub rejects as a boolean.
+      final options =
+          'plugins:\n  dartway_lints:\n    git:\n'
+          '      url: ${plugin.path}\n'
+          '      path: packages/dartway_lints\n'
+          '      ref: "true"\n';
+      file('shop_flutter/analysis_options.yaml').writeAsStringSync(options);
+      final native = await nativeAnalyze(options);
+      expect(native.exitCode, isNot(0), reason: output(native));
+      expect(output(native), contains("The 'ref' field"));
+      expect(output(native), contains('must be a string'));
+      final before = files();
+      succeeds(await update(['--plan']));
+      expect(files(), before);
+      succeeds(await update([]));
+      expect(
+        file('shop_flutter/analysis_options.yaml').readAsStringSync(),
+        contains('ref: "$target"'),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 5)),
+  );
 
   test('missing path explicitly fails without edits', () async {
     file('shop_flutter/analysis_options.yaml').writeAsStringSync(
@@ -836,7 +964,10 @@ plugins:
     final before = files();
     final result = await update([]);
     expect(result.exitCode, 1, reason: output(result));
-    expect(output(result), contains('Analyzer plugin source is not resolvable'));
+    expect(
+      output(result),
+      contains('Analyzer plugin source is not resolvable'),
+    );
     expect(files(), before);
   });
 

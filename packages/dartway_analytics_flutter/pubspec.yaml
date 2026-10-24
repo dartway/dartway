@@ -1,6 +1,6 @@
 name: dartway_analytics_flutter
 description: "Analytics for a DartWay app, reached as dw.plugins.analytics: events tracked by name, kept on the device until sent, and sent in batches to the project's own server."
-version: 0.3.0-dev.0
+version: 0.5.0
 repository: https://github.com/dartway/dartway
 homepage: https://dartway.dev
 issue_tracker: https://github.com/dartway/dartway/issues
@@ -16,13 +16,13 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_analytics_shared: ^0.3.0-dev.0
-  dartway_core_flutter: ^0.22.0-dev.0
+  dartway_analytics_shared: ^0.5.0
+  dartway_core_flutter: ^0.24.1-dev.1
   shared_preferences: ^2.3.0
 
 dev_dependencies:
   # `DwFakeServer`: the plugin sends through a real client against it.
-  dartway_client: ^0.22.0-dev.0
+  dartway_client: ^0.24.1-dev.1
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

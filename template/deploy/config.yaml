@@ -59,6 +59,10 @@ local:
   # its codes is the admin, so it has no default.
   # DW_ADMIN_IDENTIFIER: you@example.com
 
+  # A list answered past its request's `maxItems` fails the call here, as it
+  # does in tests; a deployed server serves it whole and logs a warning.
+  DW_STRICT_BOUNDS: true
+
 # A deployment. Uncomment, fill in, and `dartway deploy setup --env staging`.
 #
 # staging:
@@ -174,6 +178,11 @@ local:
 #   # previous server and web images for rollback) and trim the daemon's cache.
 #   # Cleanup failures warn without failing the successful deploy. MB or GB.
 #   build_cache_keep: 10GB
+#
+#   # Optional, with `database: bundled`. Postgres logs every statement slower
+#   # than this many milliseconds (`docker compose logs postgres`), read back
+#   # by `dartway deploy stats`. Defaults to 500; 0 logs every statement.
+#   slow_query_ms: 500
 #
 #   # Optional. Ports to open beyond SSH, 80 and 443.
 #   firewall_ports: [5432]

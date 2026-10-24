@@ -1,17 +1,17 @@
 name: dartway_example_shared
 description: The contract between the example server and app — data objects, requests, commands, channels, refusal codes.
-version: 1.0.0
+version: 2.0.0
 publish_to: none
 
 environment:
   sdk: ^3.11.0
 
 dependencies:
-  dartway_core_shared: ^0.22.0-dev.0
+  dartway_core_shared: ^0.24.1-dev.1
   # Push categories and the token registration calls the app and server share.
-  dartway_push_shared: ^0.7.0-dev.0
+  dartway_push_shared: ^0.9.0
   # Events, reports and dashboards: the analytics calls both sides speak.
-  dartway_analytics_shared: ^0.3.0-dev.0
+  dartway_analytics_shared: ^0.5.0
 
 dev_dependencies:
   lints: ^6.0.0

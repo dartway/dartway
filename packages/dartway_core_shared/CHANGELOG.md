@@ -1,6 +1,30 @@
 # Changelog
 
-## 0.22.0-dev.0
+## 0.24.1-dev.1
+
+- Advance in lockstep with the core family; no API or wire changes in this package.
+
+## 0.24.0
+
+- Advance with the core family for typed ORM relations.
+
+## 0.23.0
+
+### Breaking changes
+
+- `DwListRequest` has a bound, `maxItems`: 200 (`DwListRequest.defaultMaxItems`)
+  unless the class passes another to its super constructor, with the reason in its
+  doc comment. A constant of the class, never serialised — the wire is unchanged.
+  `fetchLimit` is one past it, the probe size used by the server's
+  `request.readWhole` helper (#644). Rename any project DTO field already named
+  `maxItems` (for example to `resultLimit`) and regenerate; see the migration note.
+
+### Changes
+
+- Move with the core family to support the server seam kit (#638).
+- Add pure-Dart `DwStateTransitions`, so lifecycle tables can live beside shared enums and be read by commands, clients and tests (#639).
+
+## 0.22.0
 
 - Identifier attach links: project-configured per kind, 128-bit hash-only single-use tickets,
   latest-request-only across destinations, and anonymous confirmation without changing sessions.

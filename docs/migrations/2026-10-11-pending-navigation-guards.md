@@ -1,7 +1,7 @@
 ---
 title: Navigation guards wait for unknown facts
 affects:
-  dartway_router: "4.0.0-dev.0"
+  dartway_router: "4.0.0"
 ---
 
 ## Who is affected

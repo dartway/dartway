@@ -6,6 +6,7 @@ import '../generator_invocation.dart';
 
 import 'dw_check_type.dart';
 import 'dw_check_tally.dart';
+import 'dw_migration_columns.dart';
 
 /// How a check runs a Dart command in a package: `dart <arguments>` in
 /// [workingDirectory]. Injected so the tests can drive the reporting without
@@ -162,7 +163,7 @@ class DwGeneratedCodeInspector {
     if (_findings.isNotEmpty) {
       print(
         '\n  Fix — in the Flutter package of ${serverDir.parent.path}:\n'
-        '    dart run dartway_cli:dartway generate\n'
+        '    dartway generate\n'
         '  and commit what it writes. Generated files are never edited by '
         'hand.',
       );
@@ -222,6 +223,24 @@ class DwMigrationsInspector {
     final serverDir = serverPackageDir;
     if (!_enabled || serverDir == null) return 0;
     if (!File(p.join(serverDir.path, migrateScript)).existsSync()) return 0;
+
+    final migrations = Directory(p.join(serverDir.path, 'lib/src/migrations'));
+    if (migrations.existsSync()) {
+      for (final file in migrations.listSync().whereType<File>().where(
+        (f) => f.path.endsWith('.dart'),
+      )) {
+        for (final (line, column) in dwUnsafeMigrationColumns(
+          file.readAsStringSync(),
+        )) {
+          _findings.add(
+            '${p.relative(file.path, from: serverDir.path)}:$line: '
+            '$column adds NOT NULL without DEFAULT on an existing table; '
+            'the previous server still inserts during deployment. Add a DEFAULT, '
+            'or use a nullable column, backfill, then SET NOT NULL in a later release.',
+          );
+        }
+      }
+    }
 
     if ((_environment['DW_DATABASE_HOST'] ?? '').isEmpty) {
       _notes.add(

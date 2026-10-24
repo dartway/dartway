@@ -7,6 +7,13 @@ part 'bookings.dw.dart';
 
 enum BookingStatus { booked, cancelled, attended }
 
+const bookingTransitions = DwStateTransitions<BookingStatus>(
+  initial: {BookingStatus.booked},
+  moves: {
+    BookingStatus.booked: {BookingStatus.cancelled, BookingStatus.attended},
+  },
+);
+
 /// A member's review of a visit.
 final class SessionReview extends DwDataObject with _$SessionReview {
   const SessionReview({
@@ -53,9 +60,9 @@ final class SessionBooking extends DwDataObject with _$SessionBooking {
 /// a staff member marking someone's visit attended publishes to that
 /// member's channel, which this request on the staff member's device does not
 /// declare — so every booking on it belongs in the list.
-final class ListMyBookings extends DwListRequest<SessionBooking>
+final class ListMyBookings extends DwPageRequest<SessionBooking>
     with _$ListMyBookings {
-  const ListMyBookings();
+  const ListMyBookings() : super(pageSize: 20);
 
   @override
   List<DwLiveChannel> get channels => const [
@@ -63,8 +70,30 @@ final class ListMyBookings extends DwListRequest<SessionBooking>
   ];
 
   @override
-  int Function(SessionBooking a, SessionBooking b) get sort =>
-      (a, b) => b.createdAt.compareTo(a.createdAt);
+  int Function(SessionBooking a, SessionBooking b) get sort => (a, b) {
+    final time = b.createdAt.compareTo(a.createdAt);
+    return time != 0 ? time : b.id.compareTo(a.id);
+  };
+}
+
+/// Active bookings of the displayed sessions, live on the caller's channel.
+/// At most 500: one active booking per session in the club's three-week schedule.
+final class ListMySessionBookings extends DwListRequest<SessionBooking>
+    with _$ListMySessionBookings {
+  const ListMySessionBookings({required this.sessionIds})
+    : super(maxItems: 500);
+
+  final List<int> sessionIds;
+
+  @override
+  List<DwLiveChannel> get channels => const [
+    DwLiveChannel.ofCaller(DartwayExampleChannel.bookings),
+  ];
+
+  @override
+  bool matches(SessionBooking item) =>
+      item.status == BookingStatus.booked &&
+      sessionIds.contains(item.session.id);
 }
 
 /// Books a spot on a session for the caller.

@@ -91,6 +91,12 @@ enum DwCheckType {
   /// the code compiles and the screen renders a blank where the image was.
   assetPathMissing,
 
+  /// Configured Studio publication, relative link or asset registration is invalid.
+  designResourcesInvalid,
+
+  /// An app-owned asset has the same content hash as a Studio resource.
+  designResourceCopied,
+
   /// A raw `assets/...` path outside `ui_kit/`. Asset paths live in one place
   /// in the kit — a path spelled out in a screen survives a renamed file only
   /// by accident, and cannot be found by search.
@@ -173,6 +179,8 @@ enum DwCheckType {
   /// it creates and drops throwaway databases); without one the check says it
   /// did not run rather than passing. An error: a schema the migrations do not
   /// produce is a server that refuses to start in the next environment.
+  /// Also rejects ADD COLUMN NOT NULL without DEFAULT on existing tables,
+  /// without requiring a database.
   migrationsDrift,
 
   /// The project's `dartway_*` git dependencies are locked to more than one
@@ -245,6 +253,9 @@ enum DwCheckType {
   /// threaded through the server's factory.
   forbiddenHttpClient,
 
+  /// External commands in server lib/ must use ctx.process.
+  forbiddenProcessRun,
+
   /// A handler in a `*_handlers.dart` under any rule but a resource rule
   /// (`signedIn`, a role check, …) that compares a row's owner field with the
   /// caller and refuses `notFound`/`forbidden` — in its body or in a helper of
@@ -255,6 +266,18 @@ enum DwCheckType {
   /// A warning: it reads the shape of the code, not its meaning, and a
   /// comparison it matches may be something else.
   inlineOwnershipCheck,
+
+  /// A repository `find(…)` in a request handler of a `*_handlers.dart` —
+  /// `single`, `maybe`, `list`, `page`, `table`, `window` — naming neither
+  /// `limit:` nor `unbounded:` (dartway/dartway#644). It reads every row its
+  /// filter matches, and what was ten rows in development is megabytes in a
+  /// year. The fix is a page, table or window request, a `limit:`
+  /// (`page.fetchLimit` for a page), `request.readWhole` for a list, or
+  /// `unbounded: '<reason>'` where the domain bounds the read.
+  ///
+  /// A warning: it reads the handler's own body and the shape of the call,
+  /// and a filter on a unique key looks like any other.
+  unboundedRead,
 
   /// The server or the shared package's `analysis_options.yaml` does not raise
   /// `unnecessary_non_null_assertion` to an error (D-113). A stored row's id is
@@ -464,7 +487,14 @@ enum DwCheckType {
   /// its invariants, and every other writer goes through that feature's
   /// `_changes`: a second writer is a second definition of what a valid row
   /// is, and the first to drift.
-  foreignRowWrite;
+  foreignRowWrite,
+
+  /// A declared state column written through copyWith, an ordinary repository
+  /// write or raw SQL in server lib/. Migration backfills are allowed.
+  stateWrittenDirectly,
+
+  /// Root CLAUDE.md duplicates project instructions beside AGENTS.md.
+  instructionsDuplicated;
 
   /// Which severity a check carries, and the answer is read elsewhere.
   ///
@@ -478,6 +508,7 @@ enum DwCheckType {
   /// `toolkit_law_list_test.dart` holds the two together.
   DwCheckSeverity get severity => switch (this) {
     DwCheckType.fileLong => DwCheckSeverity.info,
+    DwCheckType.instructionsDuplicated ||
     DwCheckType.uiKitContainsText ||
     DwCheckType.uiKitConstStyle ||
     DwCheckType.featureSpecMissing ||
@@ -488,6 +519,7 @@ enum DwCheckType {
     DwCheckType.localSecretMissing ||
     DwCheckType.devComposeDrifted ||
     DwCheckType.inlineOwnershipCheck ||
+    DwCheckType.unboundedRead ||
     DwCheckType.docCommentLanguage ||
     DwCheckType.fileTooLong => DwCheckSeverity.warning,
     _ => DwCheckSeverity.error,

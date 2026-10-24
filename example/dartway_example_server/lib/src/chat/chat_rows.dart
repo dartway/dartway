@@ -43,6 +43,9 @@ const staffChannels = [
 @DwSqlTable(
   'chat_message',
   indexes: [
+    DwTableIndex(['authorProfileId']),
+    DwTableIndex(['pinnedByProfileId']),
+    DwTableIndex(['replyToMessageId']),
     DwTableIndex(['channelId', 'sentAt', 'id']),
   ],
 )
@@ -66,7 +69,12 @@ final class ChatMessageRow extends DwTableRow with _$ChatMessageRow {
   @DwForeignKey('chat_channel', onDelete: DwOnDelete.cascade)
   final int channelId;
 
-  @DwForeignKey('user_profile', onDelete: DwOnDelete.cascade)
+  @DwForeignKey(
+    'user_profile',
+    onDelete: DwOnDelete.cascade,
+    relation: 'authorProfile',
+    reverse: 'authoredMessages',
+  )
   final int authorProfileId;
 
   /// Stays in the row after a deletion, but no client is sent it again: a
@@ -81,7 +89,12 @@ final class ChatMessageRow extends DwTableRow with _$ChatMessageRow {
 
   final DateTime? pinnedAt;
 
-  @DwForeignKey('user_profile', onDelete: DwOnDelete.setNull)
+  @DwForeignKey(
+    'user_profile',
+    onDelete: DwOnDelete.setNull,
+    relation: 'pinnedByProfile',
+    reverse: 'pinnedMessages',
+  )
   final int? pinnedByProfileId;
 
   /// Messages are only ever soft-deleted, so the link survives a deletion;
@@ -139,6 +152,7 @@ final class ChatMessageAttachmentRow extends DwTableRow
 @DwSqlTable(
   'chat_message_reaction',
   indexes: [
+    DwTableIndex(['profileId']),
     DwTableIndex(['messageId', 'profileId'], unique: true),
   ],
 )
@@ -171,6 +185,8 @@ final class ChatMessageReactionRow extends DwTableRow
 @DwSqlTable(
   'chat_read_position',
   indexes: [
+    DwTableIndex(['channelId']),
+    DwTableIndex(['messageId']),
     DwTableIndex(['profileId', 'channelId'], unique: true),
   ],
 )

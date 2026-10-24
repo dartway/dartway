@@ -1,0 +1,3 @@
+tags:
+  seam:
+    # Only live drift tests carry this tag; ordinary acceptance replays offline.

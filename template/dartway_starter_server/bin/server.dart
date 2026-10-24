@@ -37,7 +37,10 @@ import 'package:dartway_starter_server/dartway_starter_server.dart';
 ///   none;
 /// - `DW_ADMIN_IDENTIFIER` — the phone or e-mail of the first administrator,
 ///   made one on every start by the framework's `DwFirstAdministrator` step
-///   (declared in `DartwayStarterServer.build`); unset for none.
+///   (declared in `DartwayStarterServer.build`); unset for none;
+/// - `DW_STRICT_BOUNDS=true` — a list answered past its request's `maxItems`
+///   fails the call instead of being served whole with a warning: on for this
+///   machine in `deploy/config.yaml > local`, off in a deployment.
 Future<void> main() async {
   final env = AppEnvironment.read(
     DwLocalEnvironment.overlay(Platform.environment),
@@ -58,6 +61,7 @@ Future<void> main() async {
       trustedProxyNetworks: env.server.trustedProxyNetworks,
       behindProxy: env.server.httpBehindProxy,
       deploymentVersion: env.server.deploymentVersion,
+      strictBounds: env.server.strictBounds,
       // The project chooses which calls need peer quotas. With an ingress,
       // declare its actual network before adding entries here.
       callRateLimits: const <Type, DwCallRateLimit>{},

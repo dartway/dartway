@@ -1,6 +1,6 @@
 ---
 name: dartway-commit
-description: Commit the current branch's changes as one conventional-commit line, in English
+description: "Commit current changes with an English conventional-commit message and project conventions."
 ---
 
 

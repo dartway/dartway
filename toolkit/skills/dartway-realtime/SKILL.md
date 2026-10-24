@@ -1,12 +1,6 @@
 ---
 name: dartway-realtime
-description: >-
-  Live updates in a DartWay project: channel kinds, the channels a request declares (keyed, ofCaller
-  for "my" requests), the server's DwChannelRule per kind, publishing from commands, jobs and hooks
-  after commit to every channel that shows the object (forAccount for someone's "my" channel),
-  deletions, exceptAccounts, ctx.revoke, dw.listen, what an update does to each request kind, and how
-  to test it. Use when a screen must follow changes made elsewhere, when adding a channel, when a
-  command changes what others see, or when a screen stays stale or shows someone else's data.
+description: "Declare channels and request matching; publish data and apply live updates."
 ---
 
 # DartWay — realtime (`dartway-realtime`)
@@ -17,6 +11,10 @@ command's response, everyone else's over the socket. No refetch code in the app.
 a missing one fails silently:** the request's channels (`__SHARED_PKG__`), the kind's rule (server),
 the publication (every command that changes the object).
 
+For each change, name every screen that must follow it and verify that its watched request hears
+the publication's channel. Include derived and embedded objects; the publishing screen alone does
+not establish that other screens stay current.
+
 ## 1. A channel is an audience
 
 Access is checked once, at subscription; nothing re-checks each object. **A channel's audience is
@@ -26,7 +24,7 @@ exactly the accounts allowed to read every object published to it** — never on
 |---|---|---|
 | every signed-in member | `DwLiveChannel(AcmeChannel.news)` | `DwChannelRule.single(kind, canSubscribe: (ctx) async => true)` |
 | one group | `DwLiveChannel(AcmeChannel.board, boardId)` (not `const`) | `DwChannelRule.keyed<int>(kind, parseKey: int.parse, canSubscribe: (ctx, boardId) …)` |
-| one person — "my …" (`dartway-contract` §2) | `DwLiveChannel.ofCaller(AcmeChannel.invoices)` | `DwChannelRule.ofCaller(kind)` |
+| one person — "my …" (`dartway-contract`, `references/models.md`) | `DwLiveChannel.ofCaller(AcmeChannel.invoices)` | `DwChannelRule.ofCaller(kind)` |
 | a role | `DwLiveChannel(AcmeChannel.billing)` | `DwChannelRule.single(kind, canSubscribe: (ctx) => ctx.isAdmin)` |
 
 - Every subscription needs a signed-in connection; signed out, the request is fetched and not live.

@@ -68,6 +68,7 @@ class DwDeployTarget {
     this.registryMirror,
     this.minFreeDisk = '10GB',
     this.buildCacheKeep = '10GB',
+    this.slowQueryMs = defaultSlowQueryMs,
     this.firewallPorts = const [],
     this.requiredSecrets = const [],
     this.requiredSecretFiles = const [],
@@ -143,6 +144,14 @@ class DwDeployTarget {
     }
     return bytes.ceil();
   }
+
+  /// The bundled Postgres logs every statement that runs longer than this
+  /// many milliseconds (`log_min_duration_statement`); 0 logs every one.
+  /// Applied by every deploy without restarting the database.
+  final int slowQueryMs;
+
+  /// [slowQueryMs] when `slow_query_ms` is absent.
+  static const int defaultSlowQueryMs = 500;
 
   /// Extra TCP ports to open beyond SSH, 80 and 443.
   final List<int> firewallPorts;
@@ -408,6 +417,25 @@ class DwDeployTarget {
         '10GB';
     guarded(() => _diskBytes(buildCacheKeep, 'build_cache_keep'));
 
+    var slowQueryMs = defaultSlowQueryMs;
+    final slowQueryValue = section['slow_query_ms'];
+    if (slowQueryValue != null) {
+      if (slowQueryValue is int && slowQueryValue >= 0) {
+        slowQueryMs = slowQueryValue;
+      } else {
+        problems.add(
+          '$source: "slow_query_ms" must be a whole number of milliseconds, '
+          '0 or more, got "$slowQueryValue"',
+        );
+      }
+      if (database == DwDatabaseMode.external) {
+        problems.add(
+          '$source: "slow_query_ms" is only read with "database: bundled"; '
+          "an external database's slow-query log is its provider's setting",
+        );
+      }
+    }
+
     final trustedProxyNetworks =
         guarded(() => reader.optionalStringList('trusted_proxy_networks')) ??
         const <String>[];
@@ -432,6 +460,7 @@ class DwDeployTarget {
         registryMirror: registryMirror,
         minFreeDisk: minFreeDisk,
         buildCacheKeep: buildCacheKeep,
+        slowQueryMs: slowQueryMs,
         firewallPorts: firewallPorts,
         requiredSecrets: requiredSecrets,
         requiredSecretFiles: requiredSecretFiles,
@@ -544,6 +573,7 @@ class DwDeployTarget {
     'registry_mirror',
     'min_free_disk',
     'build_cache_keep',
+    'slow_query_ms',
     'firewall_ports',
     'requires',
     'trusted_proxy_networks',

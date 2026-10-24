@@ -1,13 +1,6 @@
 ---
 name: dartway-finish
-description: >-
-  The definition of done for a DartWay task, run before the commit or PR: runs the gates
-  (generate --check, migrate check, analyzers with dartway_lints, dartway check) and tests in
-  two modes: targeted locally when pull-request CI carries the full suite, otherwise full locally.
-  Reviews the diff against the skills of the layers it touches and the code-shape rules owned here,
-  reconciles the descriptions in the code (DwFeatureSpec, doc comments) and the tests,
-  compares TODO(dartway, checked: …) markers with pubspec.lock, then shows suggestions and applies
-  only what was confirmed. Runs as /dartway-finish.
+description: "Finish a task: run gates and tests, audit changed layers, report findings and apply confirmed suggestions."
 ---
 
 # DartWay — finishing a task (`dartway-finish`)
@@ -26,8 +19,8 @@ did not change means `generate` ran over another tree, or not at all.
 
 In this order; report each as run with its result, or not run and why. This is the one list of gates
 every other skill refers to. Fast gates always run locally, whatever CI does: strict dependency
-resolution, generation, the migration check when row classes or migrations changed, all three
-analyzers, and `check`.
+resolution, generation, formatting, the migration check when row classes or migrations changed, all
+three analyzers, and `check`.
 
 First, resolve the dependencies in each package without permitting lockfile changes:
 
@@ -67,7 +60,7 @@ runs in full locally. With no CI workflow, run all three suites locally and repo
 
 Before running the block, set Bash arrays `SHARED_TEST_FILES`, `SERVER_TEST_FILES`, and
 `FLUTTER_TEST_FILES` to the selected paths relative to their suite's package (`__SERVER_PKG__` for
-server acceptance even though the CLI runs from `__FLUTTER_PKG__`). Flutter accepts mirrored test
+server acceptance: the CLI hands them to `dart test` there). Flutter accepts mirrored test
 directories as well as files. An empty array means the full local suite. Set `RUN_SHARED_TESTS`,
 `RUN_SERVER_TESTS`, and `RUN_FLUTTER_TESTS` to `true` for selected tests or a full fallback, `false`
 only for an unaffected suite CI carries. Set `RUN_MIGRATE_CHECK` to `true` when row classes or
@@ -75,6 +68,7 @@ migrations changed, otherwise `false`.
 
 ```bash
 __FINISH_GENERATE_CHECK__
+dartway format --check                                       # the pinned Dart, the changed files
 if "$RUN_MIGRATE_CHECK"; then
   (cd __SERVER_PKG__ && dart run bin/migrate.dart check)  # needs a database
 fi
@@ -85,7 +79,7 @@ fi
 (cd __SERVER_PKG__ && dart analyze)
 (cd __FLUTTER_PKG__ && dart analyze --fatal-infos)          # not flutter analyze: it skips the dartway_lints plugin
 if "$RUN_SERVER_TESTS"; then
-  (cd __FLUTTER_PKG__ && dart run dartway_cli:dartway test -- "${SERVER_TEST_FILES[@]}")  # real Postgres and storage
+  dartway test -- "${SERVER_TEST_FILES[@]}"  # real Postgres and storage
 fi
 if "$RUN_FLUTTER_TESTS"; then
   (cd __FLUTTER_PKG__ && flutter test "${FLUTTER_TEST_FILES[@]}")
@@ -156,8 +150,8 @@ through the public kit widget.
   `dartway-documentation`. So is a statement in the root instruction file (`AGENTS.md` or `CLAUDE.md`) or a skill that the changed code now
   contradicts, either way; a managed file is a framework finding.
 - A risk in any of the six must-test classes without an owner test is flagged (`dartway-testing`
-  §4). Check the plan's **Risks to guard** against those classes and its expected outcomes; a
-  reasoned **"No must-test risk"** is valid. Flag a new test that fails the gate — a question it
+  §4). Check **Risks to guard** (the specification's **Risks under protection** in Studio) against
+  those classes and expected outcomes; a reasoned **"No must-test risk"** is valid. Flag a new test that fails the gate — a question it
   cannot answer, a junk shape it matches. Review assertion changes against the agent rules there.
   **For a bugfix, ask for the red its test showed before the fix** (§5).
 - When a Flutter harness changes, check the real error boundary as well as fake-server calls: an
@@ -190,14 +184,18 @@ say nothing.** Different: one line, and a decision — still needed (refresh `ch
 
 ## Phase C — apply
 
-Only what was confirmed, in batches the author names. Format only the files of the diff, excluding
-sealed migrations: formatting can change their checksum and cause `DwMigrationRefused`. Keep their
-`// dart format off` marker. The migrations index can be formatted normally:
+With `interactive: false` in `.agents/dartway-toolkit.json`, put the proposed edits and any
+framework issue/comment text in the final report and stop their confirmation steps. Do not apply
+unconfirmed suggestions or publish them. Continue gates and work already authorized by the task.
+
+Only what was confirmed, in batches the author names. Then format with `dartway format`: the Dart
+of the Flutter `.fvmrc` pins, over the Dart files changed against `__BASE_BRANCH__` and the untracked
+ones — never a bare `dart format`, whose Dart may be another and whose reach is every file. It leaves
+generated files and migrations alone: a migration is sealed by its checksum, and reformatting one
+causes `DwMigrationRefused`. `dartway format --check` is the CI gate.
 
 ```bash
-git diff --name-only -z origin/__BASE_BRANCH__...HEAD -- '*.dart' \
-  ':(exclude,glob)**/lib/src/migrations/m[0-9]*.dart' | \
-  xargs -0 sh -c 'if [ "$#" -gt 0 ]; then dart format "$@"; fi' sh
+dartway format
 ```
 
 Re-run the gates and targeted tests the applied edits reach, using the same per-suite CI and mirror

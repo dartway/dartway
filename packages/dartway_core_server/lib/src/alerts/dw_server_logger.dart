@@ -9,6 +9,9 @@ enum DwLogLevel { debug, info, warning, error }
 /// Never pass codes, tokens or DTO contents: the framework itself logs type
 /// names and ids only, and a handler that logs a secret has leaked it.
 abstract interface class DwServerLogger {
+  /// Whether a line at [level] will be written; check before building it.
+  bool isEnabled(DwLogLevel level);
+
   void log(
     DwLogLevel level,
     String message, {
@@ -39,13 +42,16 @@ final class DwConsoleLogger implements DwServerLogger {
   final String? scope;
 
   @override
+  bool isEnabled(DwLogLevel level) => level.index >= minLevel.index;
+
+  @override
   void log(
     DwLogLevel level,
     String message, {
     Object? error,
     StackTrace? stackTrace,
   }) {
-    if (level.index < minLevel.index) return;
+    if (!isEnabled(level)) return;
     final buffer = StringBuffer()
       ..write(DateTime.now().toUtc().toIso8601String())
       ..write(' ')

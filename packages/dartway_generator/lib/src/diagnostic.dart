@@ -14,6 +14,7 @@ final class DwGenerationDiagnostic
     this.line,
     this.column,
     this.code,
+    this.isWarning = false,
   });
 
   /// A diagnostic pointing at the name of [element] (or at [offset] in its
@@ -22,6 +23,7 @@ final class DwGenerationDiagnostic
     Element element,
     String message, {
     int? offset,
+    bool isWarning = false,
   }) {
     final fragment = element.firstFragment;
     final libraryFragment = fragment.libraryFragment!;
@@ -30,6 +32,7 @@ final class DwGenerationDiagnostic
     );
     return DwGenerationDiagnostic(
       message,
+      isWarning: isWarning,
       path: libraryFragment.source.fullName,
       line: location.lineNumber,
       column: location.columnNumber,
@@ -51,6 +54,7 @@ final class DwGenerationDiagnostic
     );
   }
 
+  final bool isWarning;
   final String message;
 
   /// Stable error category for command/check boundaries.
@@ -64,7 +68,7 @@ final class DwGenerationDiagnostic
     final path = this.path;
     if (path == null) return message;
     final shown = p.isWithin(root, path) ? p.relative(path, from: root) : path;
-    return '$shown:$line:$column: $message';
+    return '$shown:$line:$column: ${isWarning ? 'warning: ' : ''}$message';
   }
 
   @override

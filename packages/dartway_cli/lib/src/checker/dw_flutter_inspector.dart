@@ -1,6 +1,9 @@
 import 'dart:io';
 
 import 'package:path/path.dart' as p;
+import 'package:yaml/yaml.dart';
+
+import '../design_resources.dart';
 
 import 'dw_check_type.dart';
 import 'dw_dart_source.dart';
@@ -81,6 +84,7 @@ class DwFlutterInspector {
 
   final _findings = <_Finding>[];
   final _stats = <DwCheckType, int>{};
+  DwDesignResources? _design;
 
   /// The kinds of finding this run made. Exposed for the tests, the same way
   /// [DwLayoutInspector] exposes its findings: the report is printed, but what
@@ -118,6 +122,37 @@ class DwFlutterInspector {
     if (scope != null && !Directory(_resolve(targetDirPath!)).existsSync()) {
       print('❌ Selected folder not found: $targetDirPath');
       return 1;
+    }
+
+    try {
+      _design = DwDesignResources.read(packageDir);
+      final design = _design;
+      if (scope == null && design != null) {
+        if (design.linkProblem case final problem?) {
+          _add(DwCheckType.designResourcesInvalid, problem, 'ui_kit');
+        }
+        if (activeTypes.contains(DwCheckType.designResourceCopied)) {
+          for (final problem in await design.copiedAssets()) {
+            _add(DwCheckType.designResourceCopied, problem, 'ui_kit');
+          }
+        }
+        _checkDesignPubspec(design);
+        for (final problem in design.dockerProblems()) {
+          _add(DwCheckType.designResourcesInvalid, problem, 'ui_kit');
+        }
+      }
+    } on FormatException catch (error) {
+      _add(
+        DwCheckType.designResourcesInvalid,
+        '.dartway/design.json: ${error.message}',
+        'ui_kit',
+      );
+    } on FileSystemException catch (error) {
+      _add(
+        DwCheckType.designResourcesInvalid,
+        'Cannot read design resources: ${error.message} (${error.path})',
+        'ui_kit',
+      );
     }
 
     if (scope == null) await _checkUiKit();
@@ -433,9 +468,12 @@ class DwFlutterInspector {
   /// the guarantee a code generator used to give: a generated constant could
   /// not name a file that does not exist, a hand-written one can.
   void _checkAssetPaths(String rel, String content, String owner) {
-    final assetLiteral = RegExp(r"'(assets/[^']+)'");
-    for (final match in assetLiteral.allMatches(content)) {
-      final assetPath = match.group(1)!;
+    for (final literal in DwDartSource(content).literals) {
+      if (!literal.closed || literal.interpolations.isNotEmpty) continue;
+      final assetPath = literal.text;
+      if (!assetPath.startsWith('assets/') &&
+          !(_design != null && assetPath.startsWith(_design!.assetRoot)))
+        continue;
 
       if (!File(p.join(packageDir.path, assetPath)).existsSync()) {
         _add(
@@ -454,6 +492,31 @@ class DwFlutterInspector {
         );
       }
     }
+  }
+
+  void _checkDesignPubspec(DwDesignResources design) {
+    final dictionary = File(p.join(_libPath, 'ui_kit/assets/app_icon.dart'));
+    if (!dictionary.existsSync() ||
+        !DwDartSource(
+          dictionary.readAsStringSync(),
+        ).literals.any((literal) => literal.text.startsWith(design.assetRoot)))
+      return;
+    final pubspec = File(p.join(packageDir.path, 'pubspec.yaml'));
+    try {
+      final yaml = pubspec.existsSync()
+          ? loadYaml(pubspec.readAsStringSync())
+          : null;
+      final flutter = yaml is YamlMap ? yaml['flutter'] : null;
+      final assets = flutter is YamlMap ? flutter['assets'] : null;
+      if (assets is YamlList && assets.contains(design.assetRoot)) return;
+    } on YamlException {
+      // Report the required entry even when Flutter cannot parse the file.
+    }
+    _add(
+      DwCheckType.designResourcesInvalid,
+      'pubspec.yaml must list ${design.assetRoot} under flutter.assets',
+      'ui_kit',
+    );
   }
 
   void _checkImports(String rel, String content, String owner) {

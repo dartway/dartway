@@ -6,6 +6,7 @@ import 'package:dartway_cli/src/commands/create_command.dart';
 import 'package:dartway_cli/src/commands/deploy_command.dart';
 import 'package:dartway_cli/src/commands/dev_command.dart';
 import 'package:dartway_cli/src/commands/doctor_command.dart';
+import 'package:dartway_cli/src/commands/format_command.dart';
 import 'package:dartway_cli/src/commands/generate_command.dart';
 import 'package:dartway_cli/src/commands/quickstart_command.dart';
 import 'package:dartway_cli/src/commands/secret_commands.dart';
@@ -19,12 +20,21 @@ import 'package:dartway_cli/src/project_layout.dart';
 
 Future<void> main(List<String> args) async {
   if (args.isNotEmpty && DwPinnedCli.projectCommands.contains(args.first)) {
-    final pinned = DwPinnedCli.of(findProjectRoot());
-    if (!pinned.isPinnedOne) {
-      stderr.writeln(
-        pinned.complaintFor(args.first == 'test' ? 'test' : args.join(' ')),
-      );
+    final pinned = DwPinnedCli.of(
+      findPackageProjectRoot(Directory.current) ?? findProjectRoot(),
+    );
+    if (pinned.isUnresolved) {
+      stderr.writeln(pinned.unresolvedComplaint());
       exitCode = 1;
+      return;
+    }
+    if (!pinned.isPinnedOne) {
+      try {
+        exitCode = await pinned.runPinned(args);
+      } on StateError catch (exception) {
+        stderr.writeln('Error: ${exception.message}');
+        exitCode = 1;
+      }
       return;
     }
   }
@@ -40,6 +50,7 @@ Future<void> main(List<String> args) async {
         ..addCommand(SetupAiCommand())
         ..addCommand(UpdateCommand())
         ..addCommand(GenerateCommand())
+        ..addCommand(FormatCommand())
         ..addCommand(SyncCommand())
         ..addCommand(CheckCommand())
         ..addCommand(DevCommand())

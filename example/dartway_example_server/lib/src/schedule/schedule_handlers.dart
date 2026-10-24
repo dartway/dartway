@@ -12,8 +12,11 @@ final scheduleHandlers = <DwCallHandler>[
   DwCallHandler.list<ListClubServices, ClubService>(
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async => [
-      for (final row in await ctx.db.clubServices.find(
-        orderBy: (t) => [t.title.asc(), t.id.asc()],
+      for (final row in await request.readWhole(
+        (limit) => ctx.db.clubServices.find(
+          orderBy: (t) => [t.title.asc(), t.id.asc()],
+          limit: limit,
+        ),
       ))
         ScheduleObjects.service(row),
     ],
@@ -23,10 +26,15 @@ final scheduleHandlers = <DwCallHandler>[
   DwCallHandler.list<ListUpcomingSessions, ClubSession>(
     access: DwAccessRule.signedIn,
     handle: (ctx, request) async => ScheduleObjects.sessions(
-      ctx.db,
-      await ctx.db.clubSessions.find(
-        where: (t) => t.startsAt.gte(request.from),
-        orderBy: (t) => [t.startsAt.asc(), t.id.asc()],
+      await request.readWhole(
+        (limit) => ctx.db.clubSessions.find(
+          include: ScheduleObjects.includes,
+          where: (t) =>
+              t.startsAt.gte(request.from) &
+              t.startsAt.lt(request.from.add(const Duration(days: 21))),
+          orderBy: (t) => [t.startsAt.asc(), t.id.asc()],
+          limit: limit,
+        ),
       ),
     ),
   ),
@@ -98,13 +106,8 @@ final scheduleHandlers = <DwCallHandler>[
       if (session == null) ctx.refuse(DwCoreRefusal.notFound);
       final affected = await ctx.db.sessionBookings.find(
         where: (t) => t.sessionId.equals(command.sessionId),
+        include: (t) => [t.clientProfile],
       );
-      final clients = {
-        for (final profile in await ctx.db.userProfiles.findByIds(
-          affected.map((b) => b.clientProfileId).toSet(),
-        ))
-          profile.id: profile.accountId,
-      };
       // The bookings go with the session (ON DELETE CASCADE).
       await ctx.db.clubSessions.delete(command.sessionId);
       ctx.publish(
@@ -113,7 +116,9 @@ final scheduleHandlers = <DwCallHandler>[
       );
       for (final booking in affected) {
         ctx.publish(
-          AppChannels.bookingsOf(clients[booking.clientProfileId]!),
+          AppChannels.bookingsOf(
+            booking.one(ctx.db.sessionBookings.table.clientProfile).accountId!,
+          ),
           DwDeletedObject.of<SessionBooking>(booking.id, ctx.protocol),
         );
       }

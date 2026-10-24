@@ -384,6 +384,26 @@ dependencies:
       },
     );
 
+    test('override-side-by-side: a fixed name or a host port on server or web '
+        'fails, because the new container starts beside the old', () async {
+      expect((await evaluate('override-side-by-side')).skipped, isTrue);
+      write(
+        'deploy/compose.override.yml',
+        'services:\n  server:\n    container_name: api\n'
+            '  web:\n    ports: ["8081:80"]\n  redis:\n    ports: ["6379"]\n',
+      );
+      final verdict = await evaluate('override-side-by-side');
+      expect(verdict.passed, isFalse);
+      expect(verdict.detail, contains('server.container_name, web.ports'));
+      expect(verdict.detail, isNot(contains('redis')));
+      expect(_local('override-side-by-side').severity, DwCheckSeverity.error);
+      write(
+        'deploy/compose.override.yml',
+        'services:\n  server:\n    labels: [a]\n',
+      );
+      expect((await evaluate('override-side-by-side')).passed, isTrue);
+    });
+
     test('local-secrets-cover-environment names what is missing', () async {
       write('deploy/secrets.yaml', "staging:\n  DW_DATABASE_PASSWORD: 'x'\n");
       final stack = stackFrom(

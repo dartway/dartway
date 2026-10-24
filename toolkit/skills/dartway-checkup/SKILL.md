@@ -1,6 +1,6 @@
 ---
 name: dartway-checkup
-description: A checkup of the whole project — the state it is in, and what is worth taking into work next
+description: "Audit the whole project: run gates, compare CI, inspect features and report prioritized findings."
 ---
 
 
@@ -41,7 +41,7 @@ code-shape rules no layer skill owns.
 
 ## Phase 1 — the sweep
 
-`dart run dartway_cli:dartway check` is the sweep for everything in the law table and its warnings:
+`dartway check` is the sweep for everything in the law table and its warnings:
 group its findings by check and by feature. Then grep only what it cannot see — the code-shape list in
 `dartway-finish` (A.3), plus:
 
@@ -53,7 +53,7 @@ group its findings by check and by feature. Then grep only what it cannot see �
   `DwAccessRule.check` reading an id from the call without asking whose it is (`dartway-access` §3);
 - a caller's mistake answered with `throw` instead of `ctx.refuse`; a command that publishes nothing;
   a refusal code nothing on the server raises;
-- a deployment-owned value with a default (`dartway-server` §9);
+- a deployment-owned value with a default (`dartway-server`, `references/startup-and-services.md`);
 - `deploy/secrets.yaml` tracked by git; one `dartway_*` package behind its siblings; a deploy domain
   written in more than one place.
 

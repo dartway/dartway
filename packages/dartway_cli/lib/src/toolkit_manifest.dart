@@ -9,7 +9,7 @@ import 'package:path/path.dart' as p;
 /// executable has no reliable way back to its own pubspec. It is a checked
 /// copy: `toolkit_manifest_test.dart` compares the two and goes red when they
 /// part.
-const dartwayCliVersion = '0.25.0-dev.0';
+const dartwayCliVersion = '0.27.0';
 
 /// Where an installed harness came from.
 ///
@@ -31,6 +31,7 @@ class ToolkitProvenance {
     required this.cliVersion,
     required this.installedAt,
     this.settings = const {},
+    this.interactive = true,
   });
 
   /// The install settings worth remembering: the three that come from a flag
@@ -87,6 +88,7 @@ class ToolkitProvenance {
         commit: decoded['commit'] as String?,
         cliVersion: decoded['cliVersion'] as String? ?? '?',
         installedAt: decoded['installedAt'] as String? ?? '?',
+        interactive: decoded['interactive'] as bool? ?? true,
         settings: settings is Map
             ? {
                 for (final entry in settings.entries)
@@ -126,6 +128,9 @@ class ToolkitProvenance {
   /// decision is worse than no update command at all.
   final Map<String, String> settings;
 
+  /// Whether managed workflows may wait for a human reply.
+  final bool interactive;
+
   String? setting(String key) {
     final value = settings[key];
     return (value == null || value.isEmpty) ? null : value;
@@ -137,7 +142,7 @@ class ToolkitProvenance {
   void write(Directory projectRoot) {
     _fileIn(projectRoot).parent.createSync(recursive: true);
     _fileIn(projectRoot).writeAsStringSync(
-      '${const JsonEncoder.withIndent('  ').convert({'source': source, if (channel != null) 'channel': channel, if (commit != null) 'commit': commit, 'cliVersion': cliVersion, 'installedAt': installedAt, if (settings.isNotEmpty) 'settings': settings})}\n',
+      '${const JsonEncoder.withIndent('  ').convert({'source': source, 'interactive': interactive, if (channel != null) 'channel': channel, if (commit != null) 'commit': commit, 'cliVersion': cliVersion, 'installedAt': installedAt, if (settings.isNotEmpty) 'settings': settings})}\n',
     );
   }
 

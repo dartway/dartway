@@ -13,7 +13,7 @@ tier. The project's test surfaces are:
 | Tier | Runs with | Proves | Needs |
 |---|---|---|---|
 | Contract | `dart test` in `<project>_shared` | every data object, request and command survives the wire and comes back equal | nothing |
-| Server acceptance | `dart run dartway_cli:dartway test` in the Flutter package | server rules and stored outcomes — on a real Postgres and a real S3 storage, through real clients; one file per feature, new cases as rows in its table | Docker or explicit test servers |
+| Server acceptance | `dartway test` in the Flutter package | server rules and stored outcomes — on a real Postgres and a real S3 storage, through real clients; one file per feature, new cases as rows in its table | Docker or explicit test servers |
 | Widgets | `flutter test` in `<project>_flutter` | a screen's own logic, only where it has some | nothing: an in-memory server |
 | Unit | the package's runner | complex pure logic (class 6), with table-driven cases | nothing |
 
@@ -33,7 +33,7 @@ is tested in `test/admin/users/admin_users_page_test.dart`, `lib/src/core/files.
 named after the folder at its mirror: `lib/src/chat/` → `test/src/chat/chat_acceptance_test.dart`;
 extend that feature's table for a new case.
 Helpers live in `test/support/` and are imported relatively, and a test builds no server and no
-`ProviderScope` of its own. `dart run dartway_cli:dartway check` holds all three (`testLayout`,
+`ProviderScope` of its own. `dartway check` holds all three (`testLayout`,
 `testHarnessBypassed`).
 
 **Why the split is not negotiable.** A rule the server enforces — who may read a row, what a command
@@ -58,10 +58,10 @@ one that left it.
 
 ```bash
 cd <project>_flutter
-dart run dartway_cli:dartway test                        # finds the project from here
-dart run dartway_cli:dartway test -- --name 'sign-in'    # arguments after -- go to `dart test`
-dart run dartway_cli:dartway test --keep                 # leave the containers up after the run
-dart run dartway_cli:dartway test --no-storage           # a server without uploads
+dartway test                        # finds the project from here
+dartway test -- --name 'sign-in'    # arguments after -- go to `dart test`
+dartway test --keep                 # leave the containers up after the run
+dartway test --no-storage           # a server without uploads
 ```
 
 By default the command starts `postgres:17-alpine` and `rustfs/rustfs:1.0.0` —
@@ -93,7 +93,7 @@ No Docker is needed when the environment already runs a Postgres and, for upload
 S3-compatible server. Supply them explicitly:
 
 ```bash
-dart run dartway_cli:dartway test \
+dartway test \
   --database-url postgres://test_user:test_password@127.0.0.1:5432/postgres \
   --storage-url http://test_key:test_secret@127.0.0.1:9000
 ```
@@ -103,7 +103,7 @@ Cloud setup scripts can supply the same URLs as test-only environment defaults:
 ```bash
 export DW_TEST_DATABASE_URL=postgres://test_user:test_password@127.0.0.1:5432/postgres
 export DW_TEST_STORAGE_URL=http://test_key:test_secret@127.0.0.1:9000
-dart run dartway_cli:dartway test
+dartway test
 ```
 
 Each flag overrides its environment variable; `--no-storage` ignores `DW_TEST_STORAGE_URL`, but
@@ -273,16 +273,17 @@ screen, so settling by frames waits out the timeout instead of the traffic.
 
 ## Before calling a change done
 
-`dartway-plan` selects **Risks to guard** from its risk survey and the spec: each item names a class
-(1–6) and the expected outcome from the spec. **`No must-test risk: <why>`** is a valid plan; a
-bugfix starts with its failing test. The feature scaffold extends the contract list for new DTOs
+Whoever plans the work selects **Risks to guard** from the risk survey and specification
+(**Risks under protection** in Studio): each item names a class (1–6) and the specification's
+expected outcome. Use the accepted risk list without repeating planning.
+**`No must-test risk: <why>`** is valid; a bugfix starts with its failing test. The feature scaffold extends the contract list for new DTOs
 (class 5) and starts a new acceptance file with an access refusal (class 1). A restricted channel also
 needs an outsider receiving nothing. Other tests follow the feature's risk classes; a second client
 hearing a publication must earn its place through the gate. It creates no test file for behaviour
 outside the six classes.
 
 `dartway-testing` §4 also owns the agent rules for expected values, assertion-change declarations and
-reds caused by intended changes. `dartway-finish` checks those rules and the plan's guarded risks.
+reds caused by intended changes. `dartway-finish` checks those rules and the accepted guarded risks.
 
 `dartway-finish` owns the gate list and runs fast gates locally: generation, the migration check
 when row classes or migrations changed, all three analyzers, and the conventions checker. It reads
@@ -297,14 +298,15 @@ tests to re-run. `dartway-checkup` is a project audit and always runs every suit
 The setup brief (`dartway quickstart`) lists the full-suite commands, from the project root:
 
 ```bash
-(cd <project>_flutter && dart run dartway_cli:dartway generate --check --contract-base <trusted-SHA>)
-(cd <project>_flutter && dart run dartway_cli:dartway test)
+dartway generate --check --contract-base <trusted-SHA>
+dartway format --check
+dartway test
 (cd my_app_shared && dart test)
 (cd my_app_flutter && flutter test)
-(cd <project>_flutter && dart run dartway_cli:dartway check)
+dartway check
 ```
 
-`dart run dartway_cli:dartway check` also reports `migrationsDrift` when `DW_DATABASE_*` names a Postgres it may create
+`dartway check` also reports `migrationsDrift` when `DW_DATABASE_*` names a Postgres it may create
 throwaway databases on; see [The conventions checker](conventions-checker.md).
 
 CI runs these as `ci`: each is a step of the project's `.github/workflows/ci.yml`, on every pull
@@ -323,7 +325,7 @@ and `services` (the CLI's external test servers apart) over the suites that can 
 dependency graph, and the few test files that take minutes (`narrowTests` in
 `tool/lib/src/affected_suites.dart`) off the code they run, and hands them to the script as
 `DW_CHECKS_ONLY`; a push to `master` runs everything. Inside a job the checks run side by side. Before a PR, run `dart analyze` over touched resolution roots,
-`dart run dartway_cli:dartway check` when `template/` or `example/` changed, and the touched packages'
+`dartway check` when `template/` or `example/` changed, and the touched packages'
 suites (`dart test`
 or `flutter test` in each package, or `tool/checks.sh services` for a services package). A completed
 run means those suites are green locally and `checks.yml` is green on the PR. The full script
@@ -337,7 +339,7 @@ resolves the workspace and every package outside it, then:
   violate the rules on purpose, and `dartway_lints`' own `test/example_test.dart` runs `dart analyze`
   over it and compares the diagnostics with the ones it marks. A package is left out only by being named in the script, with its reason:
   `example/dartway_example_server` and `template/dartway_starter_server` (project servers, run by
-  `dart run dartway_cli:dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
+  `dartway test`), the lints example, and the packages of `services`. Anything new with a `test/`
   directory runs — the direction that fails loudly;
 - **services**: the suites of `packages/dartway_analytics_server`,
   `packages/dartway_auth_providers_server`, `packages/dartway_orm`, `packages/dartway_core_server`
@@ -348,9 +350,9 @@ resolves the workspace and every package outside it, then:
   variable set, or with nothing answering on the database's or the storage's port, it stops before
   running anything and names what is missing — it never skips.
 
-**The database suites of `example/` and `template/`** run through `dart run dartway_cli:dartway test`, exactly as a
+**The database suites of `example/` and `template/`** run through `dartway test`, exactly as a
 project runs them: `.github/workflows/database.yml` installs the CLI from the commit, resolves
-`example/` and runs `dart run dartway_cli:dartway test` from its root. The template is proved as
+`example/` and runs `dartway test` from its root. The template is proved as
 `dartway create` hands it out: a project created from the commit, its packages vendored in and
 committed, runs its own `.github/workflows/ci.yml` through `tool/run_project_ci.dart`, which runs
 the steps in order and refuses a construct it does not know rather than skip a gate. It runs on a daily schedule, by
@@ -394,3 +396,61 @@ base SHA to `generate --check`/`check --contract-base`; regeneration cannot sile
 DTO edit. Fixture tests exercise old/new generated codecs and real CLI/Git baselines, including
 read-only project byte identity and pin-move adoption, changed-source rejection and blocking unsupported contracts. Tooling metadata alone
 does not trigger a core wire bump or runtime interoperability tier.
+
+## Recorded external seams
+
+Server integrations use `ctx.http` and `ctx.process`. A handwritten fake of an external system
+is not coverage of its seam: replay recorded real responses, or run against the real system.
+The signed-in `system_info` feature in the example calls GitHub's public Zen API
+and `git --version`. Its two committed cassettes replay with no external network or commands.
+
+```dart
+final cassette = DwSeamCassette('test/cassettes/provider.json',
+  redactNames: ['private_field'], redactValues: [providerKey]);
+server.http.useCassette(cassette); // or server.process.useCassette(cassette)
+// Call the feature through the harness.
+cassette.verifyComplete();
+```
+
+`DwSeamCassette` is exported from `package:dartway_core_server/testing.dart`. The file must
+live under the current package's `test/`. Matching includes method, URL, headers, body and
+redirect policy for HTTP; executable, arguments, directory and explicit environment for
+commands. Repeated requests replay in recorded order. Unmatched requests fail with the
+redacted request; unused answers fail `verifyComplete()`. Use one file per test to avoid
+concurrent writers. `rewind()` resets replay consumption. `when` rules take precedence and
+remain useful for edge cases a service cannot produce on demand.
+
+Run a feature's test with `DW_RECORD_SEAMS=1` to call the real services and replace its
+recordings. Redaction replaces only string values under exact, case-insensitive names:
+`authorization`, `cookie`, `set-cookie`, `x-api-key`, `x-auth-key`, `api_key`, `apikey`,
+`key`, `token`, `access_token`, `refresh_token`, `client_secret`, `password`, `private_key`
+and `secret`. It applies to headers, query parameters, JSON, forms, explicit environment
+and named command arguments. Numbers, booleans and container structure retain their values;
+`credentials_valid`, token usage counts and a `secrets` list of names remain intact.
+Add exact provider-specific names with `redactNames`; remove names for that cassette with
+`exemptNames`. Only credentials from sensitive request headers, query parameters and form
+fields supply automatic substring redactions across the cassette, and only when at least
+eight characters long. Response fields never supply them: a returned secret name may be
+needed in a subsequent request path. Use explicit `redactValues` for secrets in URL paths,
+positional arguments, command output or other text; these explicit values have no minimum
+length. Exemptions affect name matching, not explicit or discovered substring redactions.
+Review every recording before committing; no tool can identify arbitrary secret text. Never record a destructive command or request unless
+you intend to execute it. JSON bodies are stored structurally; replay encodes them again,
+so tests requiring byte-exact JSON formatting should use a real service.
+
+`ctx.process.run(executable, arguments)` uses no shell expansion. Optional
+`workingDirectory`, `environment`, `timeout` (30 seconds) and `maxOutputBytes` (10 MiB across
+stdout and stderr) bound a command. `DwProcessResult` includes exit code and UTF-8 stdout
+and stderr. Nonzero exits are results; startup failure, timeout and excess output throw
+`DwProcessException`. Avoid running commands while holding a transaction. Commands inherit
+the server's environment; only explicit overrides enter a cassette.
+
+Live drift tests carry the `seam` tag and run with `DW_VERIFY_SEAMS=1`. They compare keys,
+JSON types, HTTP status codes, response `content-type` and process exit codes, ignoring
+other response headers, scalar body values and array lengths. A live HTTP 403 or 429
+reports "could not verify": check runner access and rate limits before retrying, rather
+than treating an unavailable provider as contract drift. They never modify the committed
+file. The skeleton's `seam-drift.yml` runs weekly or manually, outside ordinary CI, and skips live work without `DW_SEAM_CREDENTIALS`.
+The template ships the workflow without demo routes or recordings. Add the project's
+recorded integration tests with the `seam` tag before enabling it; configure the actual
+required credentials and adapt the workflow's readiness condition.

@@ -34,7 +34,7 @@ The core family moves in lockstep (one version across all six); every other pack
 | `packages/dartway_lints` | Satellite. Convention rules as an analyzer plugin (`plugins:` in a project's `analysis_options.yaml`). Not a workspace member — it pins the analyzer the plugin API is written against; its `example/` is the fixture its tests analyze |
 | `packages/dartway_studio_bridge` | Satellite. The open bridge between an app and DartWay Studio: screen-spec models and the runtime `postMessage` protocol |
 | `packages/dartway_studio_binding` | Satellite. The app half of the Studio wiring: one widget that attaches the bridge and executes what Studio asks |
-| `packages/dartway_cli` | Satellite. `dartway quickstart` · `doctor` · `create` · `setup-ai` · `update` · `generate` · `check` · `dev` · `test` · `deploy` · `secret` · `stats` |
+| `packages/dartway_cli` | Satellite. `dartway quickstart` · `doctor` · `create` · `setup-ai` · `update` · `generate` · `format` · `check` · `dev` · `test` · `deploy` · `secret` · `stats` |
 | `packages/dartway_push_*` | Satellites. Push notifications: `_shared` contract, `_server` (tokens, messages queued in the caller's transaction, delivery by the job queue), `_flutter` (`dw.plugins.push`), vendor SDKs in `_firebase` and `_rustore` |
 | `packages/dartway_auth_*` | Satellites. Sign-in with Google and Apple: `_providers_shared` contract, `_providers_server` (tokens checked against the providers' keys), app wrappers `_google` and `_apple` |
 | `packages/dartway_analytics_*` | Satellites. Product analytics in the project's own Postgres: `_shared` contract, `_server` (batches, sessions, retention, reports, dashboards, the project's read rule), `_flutter` (`dw.plugins.analytics`) |

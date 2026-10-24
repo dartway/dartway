@@ -23,7 +23,7 @@ Every call carries two headers the client sets itself:
 
 - `Dw-Protocol` — the framework's protocol version (`dwProtocolVersion`);
 - `Dw-Contract-Version` — the version of the project's contract the app was compiled with: the
-  shared package's `version:`, which `dart run dartway_cli:dartway generate` writes into the protocol both sides use.
+  shared package's `version:`, which `dartway generate` writes into the protocol both sides use.
 
 The server answers `426` with status `incompatible` when the protocol differs, or when the app's
 contract belongs to an older **breaking line** than the server's — the major version, or the minor one
