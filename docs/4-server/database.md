@@ -129,6 +129,13 @@ booking.id; // an int, assigned by the database
 A draft is a value like the row: it compares, hashes and prints by its columns, and has a
 `copyWith` of its own. `withId(id)` turns it into the row stored under an id already known.
 
+For edits or derived values shared before and after insertion, use the draft as a value snapshot.
+A project-written `toDraft()` extension copies every column from the stored row; shared logic takes
+`New<Entity>Row`. Update with the edited snapshot's `withId(current.id)` after reading the current
+row under a transaction lock, preserving columns the command does not own. A read-only extension
+on the draft is also available through `stored.toDraft()`. See the
+[complete shared-edit example](../migrations/2026-09-30-persisted-row-id.md#sharing-code-before-and-after-insert).
+
 "Create or save" by an optional id takes one of two shapes, decided by what the command carries:
 
 - **The command carries every column of the row** — an admin form over the whole of a table with no
@@ -145,7 +152,8 @@ A draft is a value like the row: it compares, hashes and prints by its columns, 
 
 - **Otherwise — the usual case** — the row has columns the command does not own: its owner, when it
   was created, what other commands set. Read the stored row, by its id *and* its owner, and change
-  what the command owns; `withId` would overwrite the rest with the draft's defaults:
+  what the command owns; `withId` on a draft built only from the command would overwrite the rest
+  with the draft's defaults:
 
   ```dart
   final current = await ctx.db.invoices.findFirst(
@@ -159,7 +167,9 @@ A draft is a value like the row: it compares, hashes and prints by its columns, 
   ```
 
   A row keyed by a unique column rather than an id (one settings row per member) is
-  `upsert(draft, conflictOn: (t) => [t.profileId])`.
+  `upsert(draft, conflictOn: (t) => [t.profileId])` when the draft carries every value to write.
+  For a partial edit, read the row and preserve its other columns; upsert replaces every non-key
+  column.
 
 Ids are always the database's: there is no insert with an id of one's own, which would also leave
 the `bigserial` sequence behind the rows and fail the next insert.
