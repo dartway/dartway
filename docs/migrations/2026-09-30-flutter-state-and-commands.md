@@ -11,7 +11,7 @@ Every project whose Flutter package's `lib/` — `core/`, `shared/` and `ui_kit/
 `StatefulWidget` (or `ConsumerStatefulWidget`, `StatefulHookWidget`, `StatefulHookConsumerWidget`),
 a `setState`, a `StatefulBuilder`, or a `ChangeNotifier`/`ValueNotifier` it keeps state in:
 `dart run dartway_cli:dartway check` fails on it now (`forbiddenStateHolder`). And every project
-that sends `dw.command` from `widgets/`, `shared/` or `core/`, wraps a command in `try`/`catch`,
+that sends `dw.command` from `widgets/` or `shared/`, wraps a command in `try`/`catch`,
 runs a `<Feature>Commands` method from a widget outside `dw.action`, or reads `DwCallOk`,
 `DwCallRefused`, `DwCallFailed` or `valueOrThrow` in a widget (`forbiddenCommandCall`).
 
@@ -105,6 +105,18 @@ into the flow's controller, and wrap the call on the button:
     - onTap: () async { try { await dw.command(PayInvoice(invoiceId: id)); } catch (_) { … } },
     + onTap: dw.action((_) => InvoiceCardCommands.pay(invoice)),
 
+A shared visual component that sends a command is a feature in `common/`, with its sender in
+`common/<feature>/logic/`; a passive kit component takes a `DwUiAction` from the owning feature.
+`shared/` is for pure helpers and has no `logic/` escape hatch. A helper several features need that
+uses the framework without owning UI (for example, resolving a private file URL) belongs in
+`core/storage/`; it may read `valueOrThrow` there.
+
+A callback need not become flags on the receiving widget. Build the `DwUiAction` where the command
+is known and pass it to the kit component, which runs it through `DwActionBuilder`. A local
+`final onDone = (_) => InvoiceCommands.pay(invoice);` followed by `dw.action(onDone)` is recognized
+by CLI `0.25.0-dev.0` or later when every use of that closure is in the first argument of `dw.action`.
+The checker cannot trace a raw callback through another file's widget into its action; use the action value at that boundary.
+
 A pure helper that sat on a `<Feature>Commands` class (building a patch from a draft) moves to a
 file of its own in `logic/` — a call to `<Feature>Commands` from a widget outside `dw.action` fails.
 
@@ -131,6 +143,12 @@ built from a refusal code from any other string — search your `logic/` for `re
 plugin's method or `dw.files` are not seen by the checker either; move them to `logic/` the same
 way. `dw.files.getLink` and
 `dw.files.upload` results are read in `logic/` the same way.
+
+**When the command outcome is the screen's state**, use a flow controller in `logic/` to own
+loading, success, refusal and failure. See [inline command outcomes](../3-flutter/actions-and-refusal-texts.md#when-the-outcome-is-the-screen)
+for how to keep one message and retain incident reporting. Returning the same refused result to
+`dw.action` after storing it for an error view displays it twice; `onError` does not suppress the
+action's notification. A state-owning operation remains a command if it changes server state.
 
 ## How to check
 

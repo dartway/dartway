@@ -267,6 +267,43 @@ Future<void> tap() async {
       );
     });
 
+    test('a local callback used only as action work passes (#446)', () {
+      for (final work in [
+        '(_) => InvoiceCommands.pay(invoice)',
+        '(_) async { await InvoiceCommands.pay(invoice); }',
+      ]) {
+        expect(
+          judge('app/invoices/invoice_page.dart', '''
+Widget build(BuildContext context) {
+  final onDone = $work;
+  return AppButton.primary('Pay', onTap: dw.action(onDone));
+}
+'''),
+          isEmpty,
+        );
+      }
+    });
+
+    test('a callback also used without an action still fails (#446)', () {
+      for (final otherUse in [
+        'onDone(context);',
+        'Child(onDone: onDone);',
+        'dw.action((_) {}, followUpIfMountedAction: onDone);',
+      ]) {
+        expect(
+          judge('app/invoices/invoice_page.dart', '''
+Widget build(BuildContext context) {
+  final onDone = (_) => InvoiceCommands.pay(invoice);
+  $otherUse
+  return AppButton.primary('Pay', onTap: dw.action(onDone));
+}
+'''),
+          [(command, 2)],
+          reason: otherUse,
+        );
+      }
+    });
+
     test('a widget runs <Feature>Commands inside dw.action only', () {
       expect(
         judge('app/a/a_page.dart', '''

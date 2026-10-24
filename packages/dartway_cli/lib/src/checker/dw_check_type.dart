@@ -417,8 +417,9 @@ enum DwCheckType {
   /// A test that mirrors no `lib/` path, a helper outside `test/support/`,
   /// or a test inside it (#391). A test sits at the path of what it tests —
   /// `test/<path>_test.dart` for `lib/<path>.dart` — or, testing a whole
-  /// folder (a server feature through its calls), is
-  /// `test/<path>/<folder>/<folder>[_<scenario>]_acceptance_test.dart` for
+  /// folder (a server feature through its calls or a shared feature's
+  /// contract), is `<folder>[_<scenario>]_acceptance_test.dart` or
+  /// `<folder>[_<scenario>]_contract_test.dart` under `test/<path>/<folder>/` for
   /// `lib/<path>/<folder>/`.
   testLayout,
 

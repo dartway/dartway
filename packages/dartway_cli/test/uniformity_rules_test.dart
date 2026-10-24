@@ -318,6 +318,32 @@ class B {}
       );
     });
 
+    test('a feature contract spans its shared files (#446)', () {
+      expect(
+        problem('src/chat/chat_contract_test.dart', folders: {'src/chat'}),
+        isNull,
+      );
+      expect(
+        problem(
+          'src/chat/chat_updates_contract_test.dart',
+          folders: {'src/chat'},
+        ),
+        isNull,
+      );
+      expect(
+        problem('src/chat/messages_contract_test.dart', folders: {'src/chat'}),
+        contains('contract test'),
+      );
+      expect(
+        problem(
+          'src/chat/messages_contract_test.dart',
+          files: {'src/chat/messages_contract.dart'},
+        ),
+        isNull,
+        reason: 'a single-file contract still mirrors its source file',
+      );
+    });
+
     test('helpers live in test/support/, and only helpers do', () {
       expect(problem('support/app_harness.dart'), isNull);
       expect(problem('support/deep/fixtures.dart'), isNull);

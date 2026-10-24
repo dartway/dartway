@@ -102,6 +102,12 @@ A sheet or dialog that is a feature shows itself through a static method taking 
 context.showAppBottomSheet(child: InvoiceEditSheet(invoiceId: invoiceId));` — never an extension on
 `BuildContext`.
 
+Navigable full pages own routes. Embedded steps, cards, dialogs and sheets use their host's
+navigation and need no independent route, regardless of a `Page` suffix. A "no route of its own"
+note applies to an embedded component; update it when the component becomes a destination.
+Guest gates and hosted views above the router are app-shell composition in `core/`, using a kit
+wrapper and the same read builders; rendering them must not require a router ancestor.
+
 ### Build it
 
 The route (`dartway-navigation`) → the public widget `implements DwFeatureWidget` with its spec → reads

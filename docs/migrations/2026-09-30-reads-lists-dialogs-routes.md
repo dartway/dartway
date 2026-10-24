@@ -20,6 +20,15 @@ Every project with a Flutter package:
   and `core/router/`, or `Navigator.pop`, `GoRouter.pop`, `context.pop`) and `sentinelId` (a route
   parameter set to `0`/`-1`).
 
+## Product acceptance before the edit
+
+This migration changes visible loading and error states: removing per-screen `loadingWidget`,
+`errorWidget` or `errorBuilder` also removes their skeletons, titles and icons. The app-wide loading
+and failed views replace them. Review those states with the product owner before accepting the
+migration; it is not a promise of pixel-identical output. Preserve a data-shaped skeleton with
+`placeholder`, and a refusal-specific view with `onRefused`; arbitrary per-screen failure builders
+are no longer available.
+
 ## What to change
 
 **1. Hand the kit's views to the core, once** (`lib/core/dw_core.dart`). The kit gets one spinner if it
@@ -130,6 +139,12 @@ The project's `AsyncSection`/`section(...)` extension is deleted with the file i
 step 2. If the derived value is only chrome (a flag, a count), make the provider answer a plain
 value instead (step 4) — then there is nothing to build.
 
+The detector is a source scan, not data-flow analysis. It recognizes direct `dw.request`/`pages`/
+`table`/`window` reads and local bindings, including a parenthesized watched value. Reads hidden
+behind project helpers, aliases or derived providers can escape it. Zero `forbiddenRequestRead`
+findings does not prove the migration complete: review the old read-rendering helpers and their
+call sites, plus `.value`, `.when`, `.hasError`, `.select` and pattern matches over async state.
+
 **5. A feed's hand-written load-more trigger becomes `DwPagedListView`** — a scroll listener with a
 pixel threshold, a `NotificationListener` on `extentAfter`, a "more" button:
 
@@ -168,6 +183,14 @@ refusal with a screen of its own is `onRefused:`), and pass `emptyBuilder:` if y
   button;
 - closing a dialog or a sheet — `Navigator.pop(context)` → `Navigator.of(context).pop(value)`,
   with the context the dialog's or the sheet's builder was given.
+
+A full page reached through navigation owns a route. An embedded step, card, or dialog does not
+need an independent route merely because its name ends in `Page` or its feature spec calls it a
+screen: its host owns navigation, and it receives identifiers or data. An existing "no route of its
+own" note is valid for such a component; for a navigable destination, add a route and update that
+note. Guest gates and hosted screens above the router are app-shell composition in `core/`, not
+extra routes. Their layout belongs to a reusable kit wrapper; they still use the same read builders
+and app-wide loading/failed views. Do not require a router ancestor just to render a hosted view.
 
 **8. What a screen opens on is its address** — not checked, and the one to look for by hand: a
 provider set just before `goNamed` and cleared by the page once read ("focus this item", "scroll to
