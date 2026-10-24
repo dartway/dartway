@@ -18,8 +18,22 @@ did not change means `generate` ran over another tree, or not at all.
 ## A.2 The gates — run them, do not assume them
 
 In this order; report each as run with its result, or not run and why. This is the one list of gates
-every other skill refers to. Fast gates always run locally, whatever CI does: generation, formatting, the
-migration check when row classes or migrations changed, all three analyzers, and `check`.
+every other skill refers to. Fast gates always run locally, whatever CI does: strict dependency
+resolution, generation, formatting, the migration check when row classes or migrations changed, all
+three analyzers, and `check`.
+
+First, resolve the dependencies in each package without permitting lockfile changes:
+
+```bash
+set -e
+(cd __SHARED_PKG__ && dart pub get --enforce-lockfile)
+(cd __SERVER_PKG__ && dart pub get --enforce-lockfile)
+(cd __FLUTTER_PKG__ && flutter pub get --enforce-lockfile)
+```
+
+If any command fails because the lockfile does not match its package, stop and report the package;
+resolve the mismatch deliberately, then rerun all three commands before continuing. Do not let a
+later gate hide dependency drift.
 
 **Choose per suite, by reading the repository's `.github/workflows/*.yml` and `*.yaml`.** A workflow
 must run on `pull_request` and execute the suite's command in the right package: `dart test` in
