@@ -79,7 +79,8 @@ rather than a rename:
       + };
 
   Otherwise — the usual case — read the stored row by its id and its owner, and change what the
-  command owns; `withId` would overwrite the rest with the draft's defaults:
+  command owns; `withId` on a draft built only from the command would overwrite the rest with the
+  draft's defaults:
 
       final current = await ctx.db.invoices.findFirst(
         where: (t) => t.id.equals(id) & t.ownerProfileId.equals(me.id),
@@ -88,14 +89,17 @@ rather than a rename:
       if (current == null) ctx.refuse(DwCoreRefusal.notFound);
       await ctx.db.invoices.update(current.copyWith(note: DwFieldPatch.set(command.note)));
 
-  A row keyed by a unique column (`(current ?? defaults).copyWith(…)`, then insert or update) is
-  `upsert(draft, conflictOn: (t) => [t.profileId])`, one statement.
+  A row keyed by a unique column can use `upsert(draft, conflictOn: (t) => [t.profileId])`
+  only when the draft carries every value to write: upsert replaces every non-key column.
+  If the command changes only some columns, read the current row and preserve the rest, as above
+  or with the shared-edit pattern below.
 - **A function that takes a row and is called only before the insert** (a notice, a check, a
   helper building the candidate) takes the draft.
 - **A function called both before and after the insert** — an extension computing from the
   columns, a policy reading stored settings or their defaults (`row ?? const New…Row(…)`) — needs
-  one type for both: give it the draft when it only reads values (build one from a stored row where
-  needed), or split the two call paths.
+  one value shape for both. Use the draft for shared reads and edits, and project a stored row's
+  columns into it once. [The example below](#sharing-code-before-and-after-insert) keeps one edit
+  function and one derived-value extension, including when the edit reads stored state.
 - **A test that builds a row in memory** to feed a mapper or a policy gives it an id:
   `InvoiceRow(id: 1, …)`.
 - **An insert with an explicit id** (seeding fixed ids) inserts drafts and reads the ids back:
@@ -104,6 +108,100 @@ rather than a rename:
   point at them; delete the branch.
 - `row.copyWith(id: …)` is gone. A new row with the same values is a draft, built from the fields
   it needs.
+
+## Sharing code before and after insert
+
+The row and its draft have no common field interface. A project can use the draft as its value
+snapshot: write one `toDraft()` extension on the stored row that copies **every column**, then put
+shared edits and derived values on the draft. `toDraft()` here is project code, not generated API;
+keep its field list with the row declaration when adding columns. The command's `applyTo` method
+can take `NewInvoiceRow` and delegate to a helper like `applyInvoiceEdit` below. The field changes
+are written once; no `applyToDraft` counterpart is needed.
+
+In this example, the amount can change until the owner confirms it; the note remains editable.
+In `invoice_rows.dart` (the row declaration and helpers are shown together here):
+
+```dart
+import 'package:dartway_core_server/dartway_core_server.dart';
+
+part 'invoice_rows.dw.dart';
+
+@DwSqlTable('invoice')
+final class InvoiceRow extends DwTableRow with _$InvoiceRow {
+  const InvoiceRow({
+    required this.id,
+    required this.ownerProfileId,
+    this.amountCents = 0,
+    this.ownerConfirmedAt,
+    this.note,
+  });
+
+  @override
+  final int id;
+  final int ownerProfileId;
+  final int amountCents;
+  final DateTime? ownerConfirmedAt;
+  final String? note;
+
+  static const tableDef = InvoiceTable();
+}
+
+extension InvoiceDraftSnapshot on InvoiceRow {
+  NewInvoiceRow toDraft() => NewInvoiceRow(
+    ownerProfileId: ownerProfileId,
+    amountCents: amountCents,
+    ownerConfirmedAt: ownerConfirmedAt,
+    note: note,
+  );
+}
+
+NewInvoiceRow applyInvoiceEdit(
+  NewInvoiceRow row, {
+  required int amountCents,
+  DwFieldPatch<String> note = const DwFieldPatch.keep(),
+}) => row.copyWith(
+  amountCents: row.ownerConfirmedAt == null ? amountCents : row.amountCents,
+  note: note,
+);
+
+extension InvoiceDerivedValues on NewInvoiceRow {
+  bool get needsOwnerConfirmation => amountCents > 0 && ownerConfirmedAt == null;
+}
+```
+
+On creation, pass the defaults to the edit once, then insert the result:
+
+```dart
+final draft = applyInvoiceEdit(
+  NewInvoiceRow(ownerProfileId: me.id),
+  amountCents: command.amountCents,
+  note: DwFieldPatch.set(command.note),
+);
+final saved = await ctx.db.invoices.insert(draft);
+```
+
+On an update, read the row by id and owner under the transaction's lock as in step 5. A requested
+id that was not found is a refusal, not a reason to insert. Pass **that row's snapshot**, rather
+than fresh defaults, to the same edit, and retain its id:
+
+```dart
+final edited = applyInvoiceEdit(
+  current.toDraft(),
+  amountCents: command.amountCents,
+  note: DwFieldPatch.set(command.note),
+);
+final saved = await ctx.db.invoices.update(edited.withId(current.id));
+```
+
+The edit can read `ownerConfirmedAt` in either path; the snapshot preserves it and the owner even
+though the command carries neither. A nullable field still uses `DwFieldPatch.keep()` to preserve
+it and `DwFieldPatch.clear()` to clear it. Keep the read, edit and update in the same transaction
+so a concurrent writer cannot change a column between the snapshot and the write.
+
+Derived values use the same extension before insertion (`draft.needsOwnerConfirmation`) and after
+it (`saved.toDraft().needsOwnerConfirmation`). If a derived value needs an id, it belongs on the
+stored row instead. Upsert is suitable only for a complete replacement of non-key columns; it does
+not merge a partial command with the stored values.
 
 ## How to check
 

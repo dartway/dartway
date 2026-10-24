@@ -68,6 +68,7 @@ const readsOutside = {
   'packages/dartway_generator': [
     'example/dartway_example_shared/',
     'example/dartway_example_server/',
+    'docs/migrations/2026-09-30-persisted-row-id.md',
   ],
   'packages/dartway_lints': ['packages/dartway_lints/example/'],
   'tool': [
