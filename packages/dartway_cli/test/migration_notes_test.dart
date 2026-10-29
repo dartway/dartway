@@ -230,6 +230,34 @@ void main() {
   });
 
   group('the notes this repository ships', () {
+    test(
+      'CLI versions promised in migration instructions have release entries',
+      () {
+        final root = monorepoRoot();
+        final changelog = File(
+          p.join(root.path, 'packages', 'dartway_cli', 'CHANGELOG.md'),
+        ).readAsStringSync();
+        final releases = RegExp(
+          r'^## (\S+)$',
+          multiLine: true,
+        ).allMatches(changelog).map((match) => match[1]).toSet();
+
+        for (final note in readMigrationNotes(root).notes) {
+          for (final mention in RegExp(
+            r'CLI `([^`]+)`',
+          ).allMatches(note.body)) {
+            expect(
+              releases,
+              contains(mention[1]),
+              reason:
+                  '${note.path} promises CLI ${mention[1]}, which has no '
+                  'release entry; name the version delivering the change',
+            );
+          }
+        }
+      },
+    );
+
     test('ships the CI lock gate to projects updating the CLI', () {
       final read = readMigrationNotes(monorepoRoot());
       final lockNotes = read.notes.where(

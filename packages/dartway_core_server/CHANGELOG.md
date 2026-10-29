@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.24.1-dev.1
+## 0.24.1
 
 - Add optional `DwAuthConfig.beforeCodeSignIn`: transactional admission before
   every code-authenticated session, including existing accounts. Refusal rolls
