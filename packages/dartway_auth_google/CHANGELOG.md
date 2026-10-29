@@ -1,3 +1,8 @@
+## Unreleased (studio-0.21 backport)
+
+- **Web sign-in.** `DwGoogleSignInButton` and `DwGoogleAuth.signInCommands()` — the backport of #681 for
+  DartWay Studio, pinned to this line (#680).
+
 ## 0.3.0-dev.0
 
 - Dependency carets follow DartWay 0.22 and its satellites on their next

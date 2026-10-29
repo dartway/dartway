@@ -24,6 +24,24 @@ one and remembers it; the server checks it against the token. Both client ids mu
 the server is configured with — Android, iOS and the web each have their own, and a token issued for
 one the server does not know is refused.
 
+**On the web the sign-in starts from Google's own button.** The browser SDK cannot `authenticate()`:
+Google Identity Services signs a person in only from a button it draws. `DwGoogleSignInButton` is
+that button on the web and the app's own (`builder`) elsewhere; its sign-ins arrive in
+`DwGoogleAuth.signInCommands()` — the same command `signInCommand` makes, on every platform:
+
+```dart
+DwGoogleAuth.signInCommands(introduce: introduce).listen((signIn) async {
+  final result = await dw.command(signIn);
+  if (result case DwCallOk(value: final session)) await dw.signIn(session);
+}, onError: showError); // GoogleSignInException — cancelled or refused
+
+// once initialize has completed
+const DwGoogleSignInButton(width: 360)
+```
+
+An app that listens there does not also call `signInCommand`: the SDK reports that sign-in in the same
+stream, and it would be sent twice. On the web `initialize` takes the web client id as `clientId`.
+
 **A refused sign-up is finished without Google.** When the project's `onExternalAccountCreated`
 refuses — the terms not accepted yet — the app keeps `signIn` in its state, shows its consent step,
 and sends `signIn.withRegistration({...consents})`: the same token and nonce. The token lives about an

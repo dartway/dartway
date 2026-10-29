@@ -1,5 +1,8 @@
 /// Sign in with Google for a DartWay app: `DwGoogleAuth.signInCommand()`
-/// makes the sign-in command, which the app sends with `dw.command`.
+/// makes the sign-in command, which the app sends with `dw.command`; on the
+/// web, and on any platform that would rather not differ, the person signs in
+/// with `DwGoogleSignInButton` and the commands arrive in
+/// `DwGoogleAuth.signInCommands()`.
 ///
 /// The server half is `dartway_auth_providers_server`, which verifies the
 /// token; see `docs/4-server/auth-identity.md`.
@@ -9,3 +12,5 @@ export 'package:google_sign_in/google_sign_in.dart'
     show GoogleSignInAccount, GoogleSignInException, GoogleSignInExceptionCode;
 
 export 'src/dw_google_sign_in.dart';
+export 'src/dw_google_sign_in_button.dart'
+    show DwGoogleButtonTheme, DwGoogleSignInButton;

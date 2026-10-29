@@ -18,6 +18,8 @@ dependencies:
 
   dartway_auth_providers_shared: ^0.3.0-dev.0
   google_sign_in: ^7.2.0
+  # The button Google draws on the web: the only way a web sign-in starts.
+  google_sign_in_web: ^1.1.0
 
 dev_dependencies:
   # `DwFakeServer`: the command is sent through a real client against it.
