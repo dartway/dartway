@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -29,6 +30,10 @@ final class DwGoogleAccount {
 /// Signs in with the Google SDK. Replaced in tests.
 typedef DwGoogleAuthentication = Future<DwGoogleAccount> Function();
 
+/// Every sign-in the Google SDK reports, whoever started it. Replaced in
+/// tests.
+typedef DwGoogleSignIns = Stream<DwGoogleAccount> Function();
+
 /// Sign in with Google, as the app sets it up.
 ///
 /// The SDK is initialised **once per run**, and the nonce it carries is fixed
@@ -49,6 +54,23 @@ abstract final class DwGoogleAuth {
       photoUrl: account.photoUrl,
     );
   }
+
+  /// The sign-ins the SDK reports. A test replaces it.
+  static DwGoogleSignIns signIns = _googleSignIns;
+
+  static Stream<DwGoogleAccount> _googleSignIns() => GoogleSignIn
+      .instance
+      .authenticationEvents
+      .where((event) => event is GoogleSignInAuthenticationEventSignIn)
+      .map((event) {
+        final account = (event as GoogleSignInAuthenticationEventSignIn).user;
+        return DwGoogleAccount(
+          idToken: account.authentication.idToken,
+          email: account.email,
+          displayName: account.displayName,
+          photoUrl: account.photoUrl,
+        );
+      });
 
   static String? _nonce;
 
@@ -118,15 +140,55 @@ abstract final class DwGoogleAuth {
     Map<String, String> registration = const {},
     Map<String, String> Function(DwGoogleAccount account)? introduce,
   }) async {
+    if (_nonce == null) throw _notInitialized();
+    return _command(
+      await authenticate(),
+      registration: registration,
+      introduce: introduce,
+    );
+  }
+
+  /// The sign-in commands, one per sign-in Google reports, on every
+  /// platform — the way an app signs in when the sign-in does not start from
+  /// its own call.
+  ///
+  /// On the web it never does: Google signs a person in only from the button
+  /// it draws itself ([DwGoogleSignInButton]), and `authenticate()` — so
+  /// [signInCommand] — is not supported there. Everywhere else the SDK
+  /// reports here the sign-ins [DwGoogleSignInButton] starts, so an app that
+  /// listens here and shows that button needs nothing per platform. Such an
+  /// app does not also call [signInCommand]: the SDK reports that sign-in
+  /// here as well, and it would be sent twice.
+  ///
+  /// The listener:
+  ///
+  /// ```dart
+  /// DwGoogleAuth.signInCommands(introduce: …).listen((signIn) async {
+  ///   final result = await dw.command(signIn);
+  ///   if (result case DwCallOk(value: final session)) await dw.signIn(session);
+  /// }, onError: showError);
+  /// ```
+  ///
+  /// [registration] and [introduce] are those of [signInCommand]. Errors
+  /// come as events: [GoogleSignInException] when the SDK refuses or the
+  /// person cancels (`GoogleSignInExceptionCode.canceled`), [StateError]
+  /// for a sign-in made before [initialize] or without an ID token — the
+  /// stream goes on after each.
+  static Stream<DwSignInWithProvider> signInCommands({
+    Map<String, String> registration = const {},
+    Map<String, String> Function(DwGoogleAccount account)? introduce,
+  }) => signIns().map(
+    (account) =>
+        _command(account, registration: registration, introduce: introduce),
+  );
+
+  static DwSignInWithProvider _command(
+    DwGoogleAccount account, {
+    required Map<String, String> registration,
+    required Map<String, String> Function(DwGoogleAccount account)? introduce,
+  }) {
     final nonce = _nonce;
-    if (nonce == null) {
-      throw StateError(
-        'DwGoogleAuth.initialize() has not run: the Google SDK takes its '
-        'nonce at initialisation, and the server refuses a token whose nonce '
-        'the app cannot name',
-      );
-    }
-    final account = await authenticate();
+    if (nonce == null) throw _notInitialized();
     final idToken = account.idToken;
     if (idToken == null) {
       // Without an ID token there is nothing the server can verify. It
@@ -146,6 +208,12 @@ abstract final class DwGoogleAuth {
       },
     );
   }
+
+  static StateError _notInitialized() => StateError(
+    'DwGoogleAuth.initialize() has not run: the Google SDK takes its '
+    'nonce at initialisation, and the server refuses a token whose nonce '
+    'the app cannot name',
+  );
 
   static String _newNonce() {
     final random = Random.secure();
