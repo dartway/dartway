@@ -438,6 +438,13 @@ final result = await dw.command(signIn);
 if (result case DwCallOk(value: final session)) await dw.signIn(session);
 ```
 
+**On the web a Google sign-in starts from Google's button, not from a call.** The browser SDK has no
+`authenticate()`: Google Identity Services signs a person in only from a button it draws. So
+`dartway_auth_google` also has `DwGoogleSignInButton` — Google's button on the web, the app's own
+elsewhere — and `DwGoogleAuth.signInCommands()`, which answers the same command for every sign-in the
+SDK reports, whoever started it. An app that listens there needs nothing per platform, and does not
+also call `signInCommand`, whose sign-in the SDK reports there too (#680).
+
 **A provider sign-up the project refuses is finished with the same command.** A project whose
 `onExternalAccountCreated` refuses until the terms are accepted (`consentsRequired`) answers the
 first sign-in of a new person with that refusal; nothing is created, and Apple's code is not

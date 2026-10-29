@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:dartway_auth_google/dartway_auth_google.dart';
 import 'package:dartway_auth_providers_shared/dartway_auth_providers_shared.dart';
 import 'package:dartway_client/testing.dart';
@@ -65,6 +67,89 @@ void main() {
         ),
       ),
     );
+  });
+
+  group('signInCommands — the sign-ins Google reports, the web\'s only '
+      'path (#680)', () {
+    late StreamController<DwGoogleAccount> google;
+
+    setUp(() {
+      google = StreamController<DwGoogleAccount>();
+      addTearDown(google.close);
+      DwGoogleAuth.signIns = () => google.stream;
+    });
+
+    DwGoogleAccount ada({String? idToken = 'google-id-token'}) =>
+        DwGoogleAccount(
+          idToken: idToken,
+          email: 'ada@example.com',
+          displayName: 'Ada Lovelace',
+        );
+
+    test('each sign-in becomes the same command signInCommand makes, without '
+        'asking Google from here', () async {
+      final commands = DwGoogleAuth.signInCommands(
+        registration: {'marketing': 'false'},
+        introduce: (account) => {'firstName': ?account.displayName},
+      );
+      google.add(ada());
+
+      final command = await commands.first;
+      expect(command.provider, DwAuthProvider.google);
+      expect(command.idToken, 'google-id-token');
+      expect(command.nonce, 'nonce-of-this-run');
+      expect(command.registration, {
+        'marketing': 'false',
+        'firstName': 'Ada Lovelace',
+      });
+      expect(asked, 0, reason: 'the button started it, not the app');
+    });
+
+    test('a sign-in without a token, before initialize, or the SDK\'s own '
+        'refusal arrives as an error, and the next sign-in still makes a '
+        'command', () async {
+      final events = <Object>[];
+      final done = Completer<void>();
+      final sub = DwGoogleAuth.signInCommands().listen(
+        (command) {
+          events.add(command);
+          if (events.length == 4) done.complete();
+        },
+        onError: (Object error) {
+          events.add(error);
+          if (events.length == 4) done.complete();
+        },
+      );
+      addTearDown(sub.cancel);
+
+      google
+        ..add(ada(idToken: null))
+        ..addError(
+          const GoogleSignInException(code: GoogleSignInExceptionCode.canceled),
+        );
+      await Future<void>.delayed(Duration.zero);
+      DwGoogleAuth.reset();
+      google.add(ada());
+      await Future<void>.delayed(Duration.zero);
+      DwGoogleAuth.rememberNonce('nonce-of-this-run');
+      google.add(ada());
+      await done.future;
+
+      expect(events, [
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('serverClientId'),
+        ),
+        isA<GoogleSignInException>(),
+        isA<StateError>().having(
+          (e) => e.message,
+          'message',
+          contains('initialize'),
+        ),
+        isA<DwSignInWithProvider>(),
+      ]);
+    });
   });
 
   group('sent through dw', () {
