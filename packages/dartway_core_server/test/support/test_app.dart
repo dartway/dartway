@@ -30,11 +30,11 @@ DwDatabaseConfig adminConfig() {
 final class RecordingAlerts implements DwAlertSink, DwAlertEnqueueRecorder {
   final List<DwServerIncident> incidents = [];
   final List<String?> notes = [];
-  final Set<DwServerIncident> _recorded = {};
+  final Set<String> _recordedIds = {};
 
   @override
   void recordEnqueued(DwServerIncident incident) {
-    if (_recorded.add(incident)) incidents.add(incident);
+    if (_recordedIds.add(incident.id)) incidents.add(incident);
   }
 
   @override
@@ -42,7 +42,7 @@ final class RecordingAlerts implements DwAlertSink, DwAlertEnqueueRecorder {
     // A direct gate has no outbox enqueue at which to observe the incident.
     // Record its delivery instead, without duplicating durable incidents that
     // were already observed by [recordEnqueued].
-    if (_recorded.add(incident)) incidents.add(incident);
+    if (_recordedIds.add(incident.id)) incidents.add(incident);
     notes.add(suppressedNote);
   }
 }
