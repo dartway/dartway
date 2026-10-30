@@ -51,6 +51,7 @@ abstract final class AppDwCore {
       updateRequiredScreen: (context, refusal) =>
           UpdateRequiredPage(refusal: refusal),
       onErrorReport: onErrorReport,
+      uiActionFailedText: appL10n.actionFailed,
       readLoadingBuilder: (context) =>
           const Center(child: AppProgressIndicator()),
       readFailedBuilder: (context, error, retry) => LoadFailedMessage(

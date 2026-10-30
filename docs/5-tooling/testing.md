@@ -264,8 +264,7 @@ testWidgets('the app name comes from the server settings, and a name saved '
 
 (`template/dartway_starter_flutter/test/app/home/home_page_test.dart`.) `stop` waits out notifications,
 unmounts the app, disposes the core and asserts both `server.errors` and unaccounted application
-error reports are empty. The app factory routes the existing `DwFlutterConfig.onErrorReport` hook
-to the harness while preserving its normal reporting behavior. The harness also captures Flutter
+error reports are empty. The app factory replaces `DwFlutterConfig.onErrorReport` with the harness capture; production leaves it unset and uses the framework's persistent server reporter. The harness also captures Flutter
 errors through `FlutterError.onError` and `PlatformDispatcher.onError` until cleanup finishes, then
 restores both hooks even if teardown assertions fail. `DwRefusalException` and
 `DwNotAuthenticatedException` reports are normal outcomes and are excluded from incident checks.

@@ -2,9 +2,7 @@
 
 ## 0.25.0-dev.1
 
-- Flutter errors now use the built-in persistent device queue and guarded server ingestion endpoint, feeding the existing durable alert outbox by default (#683).
-
-- Advance in lockstep with the core family; no API or wire changes in this package.
+- Add the client-error framework path constant used by the guarded reporting endpoint (#683).
 
 ## 0.24.0
 

@@ -491,7 +491,7 @@ final class DwAppServer {
           authService: authService,
           settings: settings,
         ),
-        routes: [...routes, DwClientErrorEndpoint(runtime).route],
+        routes: [...routes, DwClientErrorEndpoint(runtime, settings).route],
       );
       await front.bind(address, port);
       final running = _DwRunning(

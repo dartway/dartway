@@ -2,9 +2,7 @@
 
 ## 0.25.0-dev.1
 
-- Flutter errors now use the built-in persistent device queue and guarded server ingestion endpoint, feeding the existing durable alert outbox by default (#683).
-
-- Advance in lockstep with the core family; no API or wire changes in this package.
+- Add public `DwAppClient.postFrameworkJson`, the authenticated framework side-channel sender used by Flutter error delivery without exposing the bearer token itself (#683).
 
 ## 0.24.0
 

@@ -138,14 +138,23 @@ final class DwAppClient {
   /// Called after a server answer has been decoded successfully.
   final void Function()? onSuccessfulCall;
 
-  /// Authorization value for framework-owned side channels.
-  String? get frameworkAuthorization => switch (_session?.token) {
-    final token? => '${DwHttpContract.bearerPrefix}$token',
-    null => null,
-  };
+  /// Sends JSON to a framework-owned side channel without exposing the
+  /// session bearer token to application code.
+  Future<DwHttpReply> postFrameworkJson(String path, String body) =>
+      httpTransport.post(
+        DwHttpPost(
+          url: _frameworkUrl(path),
+          headers: {
+            DwHttpContract.contentTypeHeader: DwHttpContract.jsonContentType,
+            if (_session?.token case final token?)
+              DwHttpContract.authorizationHeader:
+                  '${DwHttpContract.bearerPrefix}$token',
+          },
+          body: body,
+        ),
+      );
 
-  /// Resolves a framework path without discarding a proxied base path.
-  Uri frameworkUrl(String path) {
+  Uri _frameworkUrl(String path) {
     final base = baseUrl.path.endsWith('/')
         ? baseUrl.path.substring(0, baseUrl.path.length - 1)
         : baseUrl.path;

@@ -744,6 +744,51 @@ void main() {
     expect(sent.single['appVersion'], '1.0.0+1');
     await core.dispose();
   });
+
+  test(
+    'default reporter caps fields and a rejected item does not block the queue',
+    () async {
+      final world = World();
+      final store = _MemoryStore();
+      final statuses = [400, 204];
+      final sent = <Map<String, Object?>>[];
+      final transport = DwMemoryHttpTransport((post) {
+        sent.add((jsonDecode(post.body) as Map).cast<String, Object?>());
+        return DwHttpReply(status: statuses.removeAt(0), body: '');
+      });
+      final core = DwFlutterCore(
+        config: DwFlutterConfig(
+          appVersion: '1.0.0+1',
+          refusalText: (refusal) => refusal.code,
+          readLoadingBuilder: (_) => const SizedBox(),
+          readFailedBuilder: (_, _, _) => const SizedBox(),
+        ),
+        protocol: roomsProtocol,
+        baseUrl: world.server.baseUrl,
+        httpTransport: transport,
+        liveConnector: world.server.liveConnector,
+        plugins: [store],
+      );
+      await core.init();
+      core
+        ..handleError(
+          StateError(List.filled(6000, 'x').join()),
+          StackTrace.fromString('#0 app/one.dart:1'),
+        )
+        ..handleError(
+          ArgumentError('second'),
+          StackTrace.fromString('#0 app/two.dart:2'),
+        );
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      expect(sent, hasLength(2));
+      expect(utf8.encode(sent.first['error']! as String).length, 4096);
+      expect(
+        utf8.encode(jsonEncode(sent.first)).length,
+        lessThanOrEqualTo(32 << 10),
+      );
+      await core.dispose();
+    },
+  );
 }
 
 class _TableScreen extends ConsumerStatefulWidget {

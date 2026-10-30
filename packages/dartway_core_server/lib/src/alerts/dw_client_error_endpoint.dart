@@ -5,14 +5,18 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 import '../context/dw_call_context.dart';
 import '../http/dw_http_request.dart';
 import '../http/dw_http_response.dart';
+import '../http/dw_peer_rate_limits.dart';
 import '../routes/dw_http_route.dart';
 import '../server/dw_runtime.dart';
+import '../server/dw_server_settings.dart';
 
 /// The guarded public door used by the built-in Flutter reporter.
 final class DwClientErrorEndpoint {
-  DwClientErrorEndpoint(this.runtime);
+  DwClientErrorEndpoint(this.runtime, DwServerSettings settings)
+    : _peersResolver = DwPeerRateLimits(settings);
 
   final DwRuntime runtime;
+  final DwPeerRateLimits _peersResolver;
   final Map<String, List<DateTime>> _devices = {};
   final Map<String, List<DateTime>> _peers = {};
 
@@ -31,7 +35,12 @@ final class DwClientErrorEndpoint {
     final device = _field(value, 'deviceId', 128, required: true);
     if (device == null) return _bad();
     final now = DateTime.now().toUtc();
-    if (!_charge(_peers, request.peerKey, now, 60) ||
+    if (!_charge(
+          _peers,
+          _peersResolver.peerKey(request.rawRequest) ?? '-',
+          now,
+          60,
+        ) ||
         !_charge(_devices, device, now, 30)) {
       return DwHttpResponse.empty(status: 429, headers: {'retry-after': '60'});
     }
@@ -39,7 +48,6 @@ final class DwClientErrorEndpoint {
     final route = _field(value, 'route', 512) ?? '-';
     final error = _field(value, 'error', 4096, required: true);
     final stack = _field(value, 'stackTrace', 16 << 10, required: true);
-    final signature = _field(value, 'signature', 1024, required: true);
     final appVersion = _field(value, 'appVersion', 64);
     final features = value['featureIds'];
     final entries = value['entries'];
@@ -47,7 +55,6 @@ final class DwClientErrorEndpoint {
     if (platform == null ||
         error == null ||
         stack == null ||
-        signature == null ||
         count is! int ||
         count < 1 ||
         count > 1000000 ||
@@ -69,7 +76,8 @@ final class DwClientErrorEndpoint {
       error,
       if (appVersion != null) 'app version: $appVersion',
       if (features.isNotEmpty) 'features: ${features.join(', ')}',
-      for (final item in entries.entries) '${item.key}: ${item.value}',
+      for (final item in entries.entries)
+        if (item.key != 'account') '${item.key}: ${item.value}',
       if (count > 1) 'device occurrences: $count',
     ].join('\n');
     runtime.alerts.report(
@@ -77,9 +85,29 @@ final class DwClientErrorEndpoint {
       error: context,
       stackTrace: StackTrace.fromString(stack),
       accountId: ctx.accountId,
-      signature: signature,
+      signature: _signature(platform, error, stack),
     );
     return DwHttpResponse.empty();
+  }
+
+  static String _signature(String platform, String error, String stack) {
+    final type = error.split(RegExp(r'[:\n]')).first.trim();
+    return 'client|$platform|$type|${_firstAppFrame(stack)}';
+  }
+
+  static String _firstAppFrame(String stack) {
+    for (final line in const LineSplitter().convert(stack)) {
+      final frame = line.trim();
+      if (frame.isEmpty ||
+          frame.contains('dart:') ||
+          frame.contains('package:flutter/') ||
+          frame.contains('package:dartway_') ||
+          frame.contains('<asynchronous suspension>')) {
+        continue;
+      }
+      return frame.replaceFirst(RegExp(r'^#\d+\s+'), '');
+    }
+    return '';
   }
 
   static String? _field(

@@ -14,6 +14,8 @@ final class DwHttpRequest {
     : headers = _headersOf(_request.headers);
 
   final HttpRequest _request;
+  @internal
+  HttpRequest get rawRequest => _request;
   final DwRequestBody _body;
 
   /// The server's body limit, used when a read names none.
@@ -24,10 +26,6 @@ final class DwHttpRequest {
 
   /// The path, without the query.
   String get path => _request.uri.path;
-
-  /// Stable transport peer key for framework ingress quotas.
-  @internal
-  String get peerKey => _request.connectionInfo?.remoteAddress.address ?? '-';
 
   /// Header values by lower-case name; repeated headers are joined with `,`.
   final Map<String, String> headers;

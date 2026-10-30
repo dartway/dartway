@@ -46,9 +46,16 @@ final class DwPeerRateLimits {
   Duration? check(Type callType, HttpRequest request, DateTime now) {
     final quota = _quotas[callType];
     if (quota == null) return null;
+    final peer = peerKey(request);
+    if (peer == null) return const Duration(seconds: 1);
+    return quota.charge(peer, now);
+  }
+
+  /// Resolves the caller through the same trusted-proxy boundary as quotas.
+  String? peerKey(HttpRequest request) {
     final transport = request.connectionInfo?.remoteAddress;
     // Missing transport metadata must not open a quota bypass.
-    if (transport == null) return const Duration(seconds: 1);
+    if (transport == null) return null;
     var peer = _bytes(transport);
     if (_trusted(peer)) {
       final chain = request.headers['x-forwarded-for']?.join(',').split(',');
@@ -66,7 +73,7 @@ final class DwPeerRateLimits {
       }
     }
     if (_trusted(peer)) peer = _bytes(transport);
-    return quota.charge('${peer.length}:${peer.join(',')}', now);
+    return '${peer.length}:${peer.join(',')}';
   }
 
   bool _trusted(List<int> address) =>

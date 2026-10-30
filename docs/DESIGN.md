@@ -101,9 +101,7 @@ itself, and says at `init` when neither is there. This is the same seam as a ven
 
 An error carries a snapshot of the app state at the moment it broke — the route, the mounted
 features, the action, the platform, the app version, the signed-in account — not a bare stack trace.
-The framework collects and routes the error (`DwErrorReport`); *delivery* — a log, an alert channel,
-a message to the user — is the app's, plugged in through `DwFlutterConfig.onErrorReport`. A package
-collects; it does not decide where reports are sent.
+The framework collects an error (`DwErrorReport`) and, by default, persists it on the device and delivers it to the server's guarded alert path. Refusals and signed-out answers are expected outcomes and are not reported. `DwFlutterConfig.onErrorReport` replaces delivery when an app needs another sink; `uiActionFailedText` keeps a failed button action visible to the user.
 
 ## 7. Every public symbol is justified — checked against battle, and against its origin
 

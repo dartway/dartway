@@ -19,9 +19,11 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
   String? _deviceId;
   bool _loaded = false;
   Timer? _sendTimer;
+  bool _stopped = false;
+  WidgetsBinding? _binding;
 
   Future<void> start() async {
-    WidgetsBinding.instance.addObserver(this);
+    _binding = WidgetsFlutterBinding.ensureInitialized()..addObserver(this);
     await _run(() async {
       await _load();
       await _flush();
@@ -29,55 +31,76 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
   }
 
   Future<void> stop() async {
-    WidgetsBinding.instance.removeObserver(this);
+    _stopped = true;
+    _binding?.removeObserver(this);
+    _binding = null;
     _sendTimer?.cancel();
-    await _serial;
-    _sendTimer?.cancel();
+    // Let queued persistence finish, but never make core teardown wait for an
+    // in-flight network transport owned by a server that is already gone.
+    await _serial.timeout(const Duration(milliseconds: 100), onTimeout: () {});
   }
 
-  void report(DwErrorReport report) => unawaited(
-    _run(() async {
-      await _load();
-      final stack = '${report.stackTrace}';
-      final frame = stack
-          .split('\n')
-          .map((line) => line.trim())
-          .firstWhere(
-            (line) =>
-                line.isNotEmpty &&
-                !line.contains('dartway_core_flutter') &&
-                !line.contains('dart:async') &&
-                !line.contains('<asynchronous'),
-            orElse: () => '',
-          )
-          .replaceFirst(RegExp(r'^#\d+\s+'), '');
-      final signature = '${report.error.runtimeType}|$frame';
-      Map<String, Object?>? existing;
-      for (final item in _queue) {
-        if (item['signature'] == signature) existing = item;
-      }
-      if (existing != null) {
-        existing['count'] = (existing['count']! as int) + 1;
-      } else {
-        if (_queue.length == 50) _queue.removeAt(0);
-        _queue.add({
-          'deviceId': _deviceId,
-          'signature': signature,
-          'error': '${report.error}',
-          'stackTrace': stack,
-          'platform': report.context.platform,
-          'appVersion': report.context.appVersion,
-          'route': report.context.route,
-          'featureIds': report.context.featureIds,
-          'entries': report.context.entries,
-          'count': 1,
-        });
-      }
-      await _save();
-      _sendTimer?.cancel();
-      _sendTimer = Timer(const Duration(milliseconds: 500), serverReached);
-    }),
-  );
+  void report(DwErrorReport report) {
+    if (_stopped) return;
+    unawaited(
+      _run(() async {
+        if (report.error is DwRefusalException ||
+            report.error is DwNotAuthenticatedException) {
+          return;
+        }
+        await _load();
+        final stack = _truncate('${report.stackTrace}', 16 << 10);
+        final frame = stack
+            .split('\n')
+            .map((line) => line.trim())
+            .firstWhere(
+              (line) =>
+                  line.isNotEmpty &&
+                  !line.contains('dart:') &&
+                  !line.contains('package:flutter/') &&
+                  !line.contains('package:dartway_') &&
+                  !line.contains('<asynchronous suspension>'),
+              orElse: () => '',
+            )
+            .replaceFirst(RegExp(r'^#\d+\s+'), '');
+        final signature = '${report.error.runtimeType}|$frame';
+        Map<String, Object?>? existing;
+        for (final item in _queue) {
+          if (item['signature'] == signature) existing = item;
+        }
+        if (existing != null) {
+          existing['count'] = (existing['count']! as int) + 1;
+        } else {
+          if (_queue.length == 50) _queue.removeAt(0);
+          final item = <String, Object?>{
+            'deviceId': _deviceId,
+            'signature': signature,
+            'error': _truncate('${report.error}', 4096),
+            'stackTrace': stack,
+            'platform': _truncate(report.context.platform, 32),
+            'appVersion': _nullableTruncate(report.context.appVersion, 64),
+            'route': _nullableTruncate(report.context.route, 512),
+            'featureIds': report.context.featureIds
+                .take(50)
+                .map((value) => _truncate(value, 128))
+                .toList(),
+            'entries': {
+              for (final entry in report.context.entries.entries.take(25))
+                _truncate(entry.key, 64): _truncate(entry.value, 512),
+            },
+            'count': 1,
+          };
+          _fitBody(item);
+          _queue.add(item);
+        }
+        await _save();
+        if (!_stopped) {
+          _sendTimer?.cancel();
+          _sendTimer = Timer(const Duration(milliseconds: 500), serverReached);
+        }
+      }),
+    );
+  }
 
   void serverReached() => unawaited(_run(_flush));
   @override
@@ -122,29 +145,63 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
   }
 
   Future<void> _flush() async {
-    while (_queue.isNotEmpty) {
+    while (!_stopped && _queue.isNotEmpty) {
       try {
-        final reply = await client.httpTransport
-            .post(
-              DwHttpPost(
-                url: client.frameworkUrl(DwHttpContract.clientErrorPath),
-                headers: {
-                  DwHttpContract.contentTypeHeader:
-                      DwHttpContract.jsonContentType,
-                  if (client.frameworkAuthorization case final authorization?)
-                    DwHttpContract.authorizationHeader: authorization,
-                },
-                body: jsonEncode(_queue.first),
-              ),
+        // The method is intentionally public on the internal family client,
+        // but the analyzer treats that re-export as internal across packages.
+        // ignore: invalid_use_of_internal_member
+        final reply = await client
+            .postFrameworkJson(
+              DwHttpContract.clientErrorPath,
+              jsonEncode(_queue.first),
             )
             .timeout(const Duration(seconds: 10));
-        if (reply.status < 200 || reply.status >= 300) return;
+        if (reply.status == 404) {
+          _stopped = true;
+          _queue.clear();
+          await _save();
+          return;
+        }
+        if (reply.status == 429 || reply.status >= 500) return;
+        if (reply.status < 200 || reply.status >= 300) {
+          _queue.removeAt(0);
+          await _save();
+          continue;
+        }
       } catch (_) {
         return;
       }
       _queue.removeAt(0);
       await _save();
     }
+  }
+
+  static String? _nullableTruncate(String? value, int bytes) =>
+      value == null ? null : _truncate(value, bytes);
+
+  static String _truncate(String value, int bytes) {
+    if (utf8.encode(value).length <= bytes) return value;
+    final out = StringBuffer();
+    var used = 0;
+    for (final rune in value.runes) {
+      final character = String.fromCharCode(rune);
+      final size = utf8.encode(character).length;
+      if (used + size > bytes) break;
+      out.write(character);
+      used += size;
+    }
+    return out.toString();
+  }
+
+  static void _fitBody(Map<String, Object?> item) {
+    const limit = 32 << 10;
+    var encoded = utf8.encode(jsonEncode(item)).length;
+    if (encoded <= limit) return;
+    final stack = item['stackTrace']! as String;
+    item['stackTrace'] = _truncate(
+      stack,
+      (utf8.encode(stack).length - encoded + limit).clamp(0, 16 << 10),
+    );
   }
 
   Future<void> _run(Future<void> Function() operation) {

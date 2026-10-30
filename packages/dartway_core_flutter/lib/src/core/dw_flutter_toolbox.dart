@@ -68,6 +68,13 @@ class DwFlutterToolbox {
   /// Dispatch point for every reported error: runs the configured
   /// [DwFlutterConfig.onErrorReport] hook, or the core's built-in reporter.
   void dispatchReport(DwErrorReport report) {
+    final actionFailedText = _config.uiActionFailedText;
+    if (report.source == DwErrorSource.uiAction &&
+        report.error is! DwRefusalException &&
+        report.error is! DwNotAuthenticatedException &&
+        actionFailedText != null) {
+      notify.error(actionFailedText);
+    }
     final onReport = _config.onErrorReport;
     if (onReport != null) return onReport(report);
     if (this case final DwFlutterCore core) {

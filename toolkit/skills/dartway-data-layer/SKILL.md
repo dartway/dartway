@@ -140,8 +140,8 @@ exhaustive `switch` per enum — `<Package>Refusal`, `DwCoreRefusal`, `DwAuthRef
 `DwUploadRefusal`, and each module's the app uses (`DwAnalyticsRefusal`, `DwPushRefusal`,
 `DwProviderRefusal`) — plus a generic sentence for an unknown code. **A new refusal code** is a string
 (`dartway-ui-kit`, "Localization") and a case there (it does not compile without one), with `refusal.params` and
-`refusal.field` where they matter. `onErrorReport` skips `DwRefusalException` and
-`DwNotAuthenticatedException` by type. A client-only rule throws
+`refusal.field` where they matter. The framework's default reporter skips `DwRefusalException` and
+`DwNotAuthenticatedException` by type; a replacement `onErrorReport` owns its own policy. A client-only rule throws
 `DwRefusalException(DwCallRefusal(code, field: …))`, rendered the same way.
 
 ## 6. Forms
