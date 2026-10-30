@@ -45,24 +45,30 @@ as a `DwUniqueViolation` ([database](database.md#errors)).
 | `at` | UTC |
 | `signature` | `where`, the error's type and the first stack frame outside the SDK: identical failures share it |
 
-## The ceiling per signature
+## Durable outbox and coalescing
 
-Every incident is logged at error level (`incident <id> in <where>`), always. The alert sink gets at
-most `DwServerSettings.alertsPerSignature` incidents of one signature (5) per `alertWindow` (one
-hour). The last alert before the ceiling carries a note — "further alerts like this are muted until
-…" — so the silence that follows is announced, not mysterious.
+Every incident is logged at error level (`incident <id> in <where>`), always. It is then written to
+`dw_alert_outbox` using the database pool, not the failed call's transaction. A rollback therefore
+cannot roll back its alert. If Postgres is temporarily unavailable, up to 1,000 incidents wait in a
+bounded process buffer; shutdown tries to flush that buffer before closing the database.
 
-A failure repeating a thousand times is one problem; a channel flooded with it hides the next one.
-The ceiling is in the process's memory, and it resets with a restart.
+The first incident of a signature in `DwServerSettings.alertWindow` (one hour) is eligible for
+delivery immediately. Further incidents update the persisted row's `repeat_count`. At the end of
+the window the outbox sends one follow-up — `repeated N times since …` — when `N` is non-zero. Thus
+1,000 identical failures produce the original and one follow-up for 999 repeats, including across
+restarts and across server instances.
+
+Workers claim rows with a two-minute database lease. A failed delivery is retried with exponential
+backoff capped at one hour. Rows older than seven days are discarded; the receiver must use the
+incident id as its deduplication key because a process can stop after the receiver accepts a request
+but before the acknowledgement is recorded.
 
 A second ceiling holds across signatures: at most `DwServerSettings.alertsPerMinute` (10) alerts a
 minute. Many different failures at once — a dependency down under every command — would otherwise
 exhaust the channel's own limit (Telegram's is 20 a minute per group) and lose the rest, including
-the one that mattered, to its refusals. An incident past it is only logged, and the next alert that
-goes out says how many were held back.
+the one that mattered, to its refusals. Rows beyond the ceiling remain queued for a later minute.
 
-A sink that fails to deliver is logged as a warning and does not fail the call, nor create another
-incident: an alert channel that is down must not turn into an incident loop.
+A sink failure stays in the outbox and does not fail the call or create another incident.
 
 ## Sinks
 
@@ -78,24 +84,51 @@ abstract interface class DwAlertSink {
   level. Enough when logs are watched; nothing reaches a person otherwise.
 - **`DwTelegramAlertSink(botToken:, chatId:, logger:, title: 'DartWay', apiBase:)`** — a message to
   a Telegram chat through a bot: the title, the incident id, `where`, the error text (cut at 1500
-  characters) and the first stack frame. Never a payload. A delivery failure is logged with its
-  status or error type only, since the request URL holds the bot token.
+  characters) and the first stack frame. `proxyUrl` routes Telegram through an HTTP proxy.
+- **`DwHttpAlertSink(url:, token:)`** — JSON over HTTP with `Authorization: Bearer <token>`. Every
+  2xx response acknowledges delivery; every other response or transport failure is retried.
 
-```dart
-// bin/server.dart; `env.alerts` is read in lib/src/core/environment.dart
-// (`read.required('ALERTS_BOT_TOKEN')`, `read.required('ALERTS_CHAT_ID')`)
-final logger = const DwConsoleLogger();
-final alerts = DwTelegramAlertSink(
-  botToken: env.alerts.botToken,
-  chatId: env.alerts.chatId,
-  logger: logger,
-  title: 'Invoices',
-);
-// DwAppServer(…, logger: logger, alerts: alerts)
+### HTTP payload contract (STD-E11)
+
+The request body is one JSON object. The contract fields are:
+
+| Field | JSON type | Meaning |
+|---|---|---|
+| `id` | string | Stable incident id and the receiver's **deduplication key**. Retries keep it unchanged. |
+| `where` | string | Framework location, without request payloads. |
+| `error` | string | Exception text; for a follow-up, `repeated N times since …`. |
+| `stackTrace` | string | Recorded Dart stack trace. |
+| `accountId` | integer or null | Authenticated framework account, if any. |
+| `at` | string | Original incident time, UTC ISO 8601. |
+| `signature` | string | Location, error type and first useful frame. |
+| `repeatCount` | integer | `0` for the first delivery; number of repeats for the follow-up. |
+| `project` | string or null | Configured project name. |
+| `environment` | string or null | Configured deployment environment. |
+| `version` | string or null | Immutable deployment version. |
+
+### Queue observation
+
+An external probe can read both backlog facts in one query (delivered rows are excluded):
+
+```sql
+SELECT count(*) AS undelivered,
+       EXTRACT(EPOCH FROM (now() - min(created_at)))::bigint AS oldest_seconds
+FROM dw_alert_outbox
+WHERE initial_delivered_at IS NULL
+   OR (repeat_count > 0 AND repeat_delivered_at IS NULL);
 ```
 
-A sink of the project's — a pager, an error tracker — implements `send`. It receives the incident
-after it is logged, and only within the ceiling.
+### Configuration
+
+No project alert code is required. The template passes `DwServerEnvironment.alerts` to the server.
+Set either `DW_ALERT_HTTP_URL` plus the secret `DW_ALERT_HTTP_TOKEN`, or
+`DW_TELEGRAM_ALERTS_BOT_TOKEN` plus `DW_TELEGRAM_ALERTS_CHAT_ID`. A Russian-host deployment can
+also set `DW_TELEGRAM_ALERTS_PROXY_URL`. Declare secret names under the destination's
+`requires.secrets` in `deploy/config.yaml` and store their values with `dartway secret set`; never
+commit the token.
+
+A custom pager or error tracker can still implement `DwAlertSink`; it receives leased outbox
+deliveries and must throw when the delivery was not accepted so that the row is retried.
 
 ## `DwServerLogger`
 

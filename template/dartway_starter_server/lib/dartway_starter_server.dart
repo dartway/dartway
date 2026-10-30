@@ -44,6 +44,7 @@ abstract final class DartwayStarterServer {
     DwFileStorageConfig? storage,
     int port = 8080,
     DwAuthConfig? auth,
+    DwAlertSink? alerts,
     DwServerSettings settings = const DwServerSettings(),
     required String? adminIdentifier,
     DwServerClock clock = DwServerClock.system,
@@ -54,6 +55,7 @@ abstract final class DartwayStarterServer {
     migrationsDirectory: 'lib/src/migrations',
     database: database,
     auth: auth ?? AccountAuth.config(),
+    alerts: alerts,
     features: [
       profileFeature,
       adminFeature,

@@ -28,6 +28,7 @@
 #
 # requires:
 #   secrets:
+#     - DW_ALERT_HTTP_TOKEN
 #     - SMS_API_TOKEN
 #   files:
 #     - fcm-service-account.json

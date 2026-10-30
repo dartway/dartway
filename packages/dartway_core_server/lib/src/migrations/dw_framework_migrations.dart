@@ -55,7 +55,41 @@ final List<DwDatabaseMigration> dwFrameworkMigrations = List.unmodifiable([
     _identifierLinksUp,
     _identifierLinksDown,
   ),
+  const _DwSqlMigration(
+    '20261030_000000_dw_alert_outbox',
+    _alertOutboxUp,
+    _alertOutboxDown,
+  ),
 ]);
+
+const List<String> _alertOutboxUp = [
+  '''
+CREATE TABLE dw_alert_outbox (
+  id text PRIMARY KEY,
+  signature text NOT NULL,
+  where_text text NOT NULL,
+  error_text text NOT NULL,
+  stack_trace text NOT NULL,
+  account_id bigint,
+  happened_at timestamptz NOT NULL,
+  window_started_at timestamptz NOT NULL,
+  window_ends_at timestamptz NOT NULL,
+  repeat_count integer NOT NULL DEFAULT 0,
+  initial_delivered_at timestamptz,
+  repeat_delivered_at timestamptz,
+  attempts integer NOT NULL DEFAULT 0,
+  next_attempt_at timestamptz NOT NULL DEFAULT now(),
+  last_error text,
+  locked_until timestamptz,
+  project text,
+  environment text,
+  version text,
+  created_at timestamptz NOT NULL DEFAULT now()
+)''',
+  'CREATE INDEX dw_alert_outbox_signature ON dw_alert_outbox (signature, window_ends_at)',
+  'CREATE INDEX dw_alert_outbox_delivery ON dw_alert_outbox (created_at, locked_until)',
+];
+const List<String> _alertOutboxDown = ['DROP TABLE dw_alert_outbox'];
 
 /// A framework migration written as SQL statements. Its checksum is the hash
 /// of those statements, so editing an applied one is caught by the ledger.

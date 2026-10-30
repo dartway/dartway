@@ -112,6 +112,29 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
     });
+
+    test(
+      'durable mode persists every repeat instead of process-muting it',
+      () async {
+        final persisted = <DwServerIncident>[];
+        final durable = DwAlertGate(
+          sink: sink,
+          logger: RecordingLogger(),
+          maxPerWindow: 1,
+          enqueue: (incident) async => persisted.add(incident),
+        );
+        for (var i = 0; i < 1000; i++) {
+          durable.report(
+            where: 'command X',
+            error: StateError('boom'),
+            stackTrace: StackTrace.fromString('#0 same (x.dart:1)'),
+          );
+        }
+        await Future<void>.delayed(Duration.zero);
+        expect(persisted, hasLength(1000));
+        expect(persisted.map((i) => i.signature).toSet(), hasLength(1));
+      },
+    );
   });
 
   test('Telegram alerts post the incident without payloads', () async {
@@ -150,6 +173,59 @@ void main() {
     expect(text, contains('seats table locked'));
     expect(text, contains('muted'));
   });
+
+  test(
+    'HTTP alerts send the documented JSON contract and bearer token',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      late Map<String, Object?> body;
+      late String? authorization;
+      server.listen((request) async {
+        authorization = request.headers.value(HttpHeaders.authorizationHeader);
+        body =
+            jsonDecode(await utf8.decodeStream(request))
+                as Map<String, Object?>;
+        request.response.statusCode = HttpStatus.noContent;
+        await request.response.close();
+      });
+      final sink = DwHttpAlertSink(
+        url: Uri.parse('http://127.0.0.1:${server.port}/alerts'),
+        token: 'secret',
+      );
+      await sink.send(
+        DwServerIncident(
+          id: 'incident-1',
+          where: 'command SaveOrder',
+          error: StateError('down'),
+          stackTrace: StackTrace.fromString('#0 save (orders.dart:1)'),
+          accountId: 42,
+          at: DateTime.utc(2026, 10, 30),
+          repeatCount: 999,
+          project: 'shop',
+          environment: 'production',
+          version: 'abc',
+        ),
+      );
+      await server.close();
+      expect(authorization, 'Bearer secret');
+      expect(body, containsPair('id', 'incident-1'));
+      expect(body, containsPair('repeatCount', 999));
+      expect(body, containsPair('project', 'shop'));
+      expect(
+        body.keys,
+        containsAll([
+          'where',
+          'error',
+          'stackTrace',
+          'accountId',
+          'at',
+          'signature',
+          'environment',
+          'version',
+        ]),
+      );
+    },
+  );
 }
 
 final class _ThrowingAlerts implements DwAlertSink {

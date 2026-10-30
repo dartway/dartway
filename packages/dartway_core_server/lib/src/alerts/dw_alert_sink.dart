@@ -16,8 +16,14 @@ final class DwServerIncident {
     required this.error,
     required this.stackTrace,
     this.accountId,
+    this.repeatCount = 0,
+    this.project,
+    this.environment,
+    this.version,
+    String? signature,
     DateTime? at,
-  }) : at = at ?? DateTime.now().toUtc();
+  }) : at = at ?? DateTime.now().toUtc(),
+       _signature = signature;
 
   /// What the client received as the `incidentId` of a failed answer.
   final String id;
@@ -27,12 +33,19 @@ final class DwServerIncident {
   final Object error;
   final StackTrace stackTrace;
   final int? accountId;
+
+  /// Repetitions represented by a coalesced follow-up delivery.
+  final int repeatCount;
+  final String? project;
+  final String? environment;
+  final String? version;
   final DateTime at;
 
   /// Identical failures share a signature: the place, the error type and the
   /// first frame of the stack. The ceiling counts by it.
+  final String? _signature;
   String get signature =>
-      '$where|${error.runtimeType}|${dwFirstFrame(stackTrace)}';
+      _signature ?? '$where|${error.runtimeType}|${dwFirstFrame(stackTrace)}';
 
   static final Random _random = Random.secure();
 
@@ -65,6 +78,49 @@ abstract interface class DwAlertSink {
   Future<void> send(DwServerIncident incident, {String? suppressedNote});
 }
 
+/// Posts the stable DartWay alert contract to an HTTP receiver.
+final class DwHttpAlertSink implements DwAlertSink {
+  DwHttpAlertSink({required this.url, required this.token});
+
+  final Uri url;
+  final String token;
+  static const _timeout = Duration(seconds: 10);
+
+  @override
+  Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
+    final client = HttpClient()..connectionTimeout = _timeout;
+    try {
+      final request = await client.postUrl(url).timeout(_timeout);
+      request.headers.contentType = ContentType.json;
+      request.headers.set(HttpHeaders.authorizationHeader, 'Bearer $token');
+      request.write(
+        jsonEncode({
+          'id': incident.id,
+          'where': incident.where,
+          'error': '${incident.error}',
+          'stackTrace': '${incident.stackTrace}',
+          'accountId': incident.accountId,
+          'at': incident.at.toUtc().toIso8601String(),
+          'signature': incident.signature,
+          'repeatCount': incident.repeatCount,
+          'project': incident.project,
+          'environment': incident.environment,
+          'version': incident.version,
+        }),
+      );
+      final response = await request.close().timeout(_timeout);
+      await response.drain<void>();
+      if (response.statusCode < 200 || response.statusCode >= 300) {
+        throw HttpException(
+          'alert endpoint returned HTTP ${response.statusCode}',
+        );
+      }
+    } finally {
+      client.close(force: true);
+    }
+  }
+}
+
 /// The default sink: the log, at error level.
 final class DwLogAlertSink implements DwAlertSink {
   const DwLogAlertSink(this.logger);
@@ -85,8 +141,8 @@ final class DwLogAlertSink implements DwAlertSink {
 /// Sends incidents to a Telegram chat through a bot.
 ///
 /// The message carries the incident id, where it happened and the error text
-/// (truncated) — never payloads. A delivery failure is logged, not thrown: an
-/// alert channel that is down must not turn into a second incident loop.
+/// (truncated) — never payloads. Delivery failures throw so the durable
+/// outbox can retry them.
 ///
 /// Speaks `dart:io`'s `HttpClient` directly: one POST does not justify an HTTP
 /// package dependency in every server.
@@ -97,12 +153,14 @@ final class DwTelegramAlertSink implements DwAlertSink {
     required this.logger,
     this.title = 'DartWay',
     Uri? apiBase,
+    this.proxyUrl,
   }) : _apiBase = apiBase ?? Uri.parse('https://api.telegram.org');
 
   final String botToken;
   final String chatId;
   final String title;
   final DwServerLogger logger;
+  final Uri? proxyUrl;
   final Uri _apiBase;
 
   static const Duration _timeout = Duration(seconds: 10);
@@ -118,6 +176,9 @@ final class DwTelegramAlertSink implements DwAlertSink {
       ..writeln(dwFirstFrame(incident.stackTrace));
     if (suppressedNote != null) text.writeln(suppressedNote);
     final client = HttpClient()..connectionTimeout = _timeout;
+    if (proxyUrl case final proxy?) {
+      client.findProxy = (_) => 'PROXY ${proxy.host}:${proxy.port}';
+    }
     try {
       final request = await client
           .postUrl(_apiBase.replace(path: '/bot$botToken/sendMessage'))
@@ -128,17 +189,8 @@ final class DwTelegramAlertSink implements DwAlertSink {
       await response.drain<void>();
       if (response.statusCode != 200) {
         // The URL holds the token: report the status only.
-        logger.warning(
-          'Telegram alert for incident ${incident.id} was not delivered: '
-          'HTTP ${response.statusCode}',
-        );
+        throw HttpException('Telegram returned HTTP ${response.statusCode}');
       }
-    } catch (error) {
-      // The error text may carry the URL, and the URL holds the token.
-      logger.warning(
-        'Telegram alert for incident ${incident.id} was not delivered: '
-        '${error.runtimeType}',
-      );
     } finally {
       client.close(force: true);
     }
@@ -162,6 +214,7 @@ final class DwAlertGate {
     this.window = const Duration(hours: 1),
     this.maxPerMinute = 10,
     DateTime Function()? clock,
+    this.enqueue,
   }) : _clock = clock ?? DateTime.now;
 
   final DwAlertSink sink;
@@ -170,6 +223,7 @@ final class DwAlertGate {
   final Duration window;
   final int maxPerMinute;
   final DateTime Function() _clock;
+  final Future<void> Function(DwServerIncident incident)? enqueue;
   final Map<String, _SignatureWindow> _windows = {};
 
   /// When the alerts of the last minute went out.
@@ -197,6 +251,16 @@ final class DwAlertGate {
       error: error,
       stackTrace: stackTrace,
     );
+    // Persistence owns signature windows. Do not let the legacy in-process
+    // gate discard repeats before their durable counter sees them.
+    if (enqueue case final persist?) {
+      unawaited(
+        persist(incident).catchError((Object e) {
+          logger.warning('alert outbox failed for ${incident.id}', error: e);
+        }),
+      );
+      return incident.id;
+    }
     final now = _clock();
     _windows.removeWhere((_, w) => now.difference(w.start) >= window);
     final state = _windows.putIfAbsent(
@@ -224,9 +288,10 @@ final class DwAlertGate {
     _heldBack = 0;
     final note = notes.isEmpty ? null : notes.join('; ');
     unawaited(
-      sink.send(incident, suppressedNote: note).catchError((Object e) {
-        logger.warning('alert sink failed for ${incident.id}', error: e);
-      }),
+      (enqueue?.call(incident) ?? sink.send(incident, suppressedNote: note))
+          .catchError((Object e) {
+            logger.warning('alert sink failed for ${incident.id}', error: e);
+          }),
     );
     return incident.id;
   }

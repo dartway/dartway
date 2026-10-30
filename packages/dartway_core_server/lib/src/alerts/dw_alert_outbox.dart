@@ -1,0 +1,209 @@
+import 'dart:async';
+
+import 'package:dartway_orm/dartway_orm.dart';
+import 'package:meta/meta.dart';
+
+import 'dw_alert_sink.dart';
+import 'dw_server_logger.dart';
+
+/// Durable, leased delivery of incidents, with database-backed coalescing.
+@internal
+final class DwAlertOutbox {
+  DwAlertOutbox({
+    required this.db,
+    required this.sink,
+    required this.logger,
+    required this.window,
+    required this.pollInterval,
+    this.project,
+    this.environment,
+    this.version,
+  });
+
+  final DwDatabaseHandle db;
+  final DwAlertSink sink;
+  final DwServerLogger logger;
+  final Duration window;
+  final Duration pollInterval;
+  final String? project;
+  final String? environment;
+  final String? version;
+  final List<DwServerIncident> _buffer = [];
+  bool _running = false;
+  Future<void>? _loop;
+  static const _bufferLimit = 1000;
+
+  void start() {
+    _running = true;
+    _loop = _work();
+  }
+
+  Future<void> enqueue(DwServerIncident incident) async {
+    try {
+      await _write(incident);
+    } catch (error) {
+      if (_buffer.length == _bufferLimit) _buffer.removeAt(0);
+      _buffer.add(incident);
+      logger.warning(
+        'alert ${incident.id} waits for the database',
+        error: error,
+      );
+    }
+  }
+
+  Future<void> stop() async {
+    _running = false;
+    // Persist memory before allowing the database to close.
+    await _flush();
+    await _loop;
+  }
+
+  Future<void> _write(DwServerIncident i) => db.transaction((tx) async {
+    await tx.query(
+      'SELECT pg_advisory_xact_lock(hashtext(@signature))',
+      params: {'signature': i.signature},
+    );
+    final updated = await tx.query(
+      '''
+UPDATE dw_alert_outbox SET repeat_count = repeat_count + 1
+WHERE signature = @signature AND repeat_delivered_at IS NULL
+  AND window_ends_at > @at::timestamptz RETURNING id
+''',
+      params: {'signature': i.signature, 'at': i.at},
+    );
+    if (updated.isNotEmpty) return;
+    await tx.execute(
+      '''
+INSERT INTO dw_alert_outbox
+ (id, signature, where_text, error_text, stack_trace, account_id, happened_at,
+  window_started_at, window_ends_at, project, environment, version)
+VALUES (@id, @signature, @where, @error, @stack, @account, @at,
+        @at, @at::timestamptz + @window::int8 * interval '1 microsecond',
+        @project, @environment, @version)
+''',
+      params: {
+        'id': i.id,
+        'signature': i.signature,
+        'where': i.where,
+        'error': '${i.error}',
+        'stack': '${i.stackTrace}',
+        'account': i.accountId,
+        'at': i.at,
+        'window': window.inMicroseconds,
+        'project': project,
+        'environment': environment,
+        'version': version,
+      },
+    );
+  });
+
+  Future<void> _flush() async {
+    while (_buffer.isNotEmpty) {
+      final incident = _buffer.first;
+      try {
+        await _write(incident);
+        _buffer.removeAt(0);
+      } catch (_) {
+        return;
+      }
+    }
+  }
+
+  Future<void> _work() async {
+    while (_running) {
+      try {
+        await _flush();
+        final claimed = await db.transaction((tx) async {
+          final rows = await tx.query(
+            '''
+SELECT * FROM dw_alert_outbox
+WHERE created_at >= @expiry::timestamptz
+  AND next_attempt_at <= @now::timestamptz
+  AND (locked_until IS NULL OR locked_until < @now::timestamptz)
+  AND ((initial_delivered_at IS NULL AND next_attempt_at <= @now::timestamptz)
+    OR (initial_delivered_at IS NOT NULL AND repeat_count > 0
+      AND repeat_delivered_at IS NULL AND window_ends_at <= @now::timestamptz
+      AND next_attempt_at <= @now::timestamptz))
+ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+''',
+            params: {
+              'now': DateTime.now().toUtc(),
+              'expiry': DateTime.now().toUtc().subtract(
+                const Duration(days: 7),
+              ),
+            },
+          );
+          if (rows.isEmpty) return null;
+          final row = rows.single;
+          await tx.execute(
+            "UPDATE dw_alert_outbox SET locked_until = @lease WHERE id = @id",
+            params: {
+              'lease': DateTime.now().toUtc().add(const Duration(minutes: 2)),
+              'id': row['id'],
+            },
+          );
+          return row;
+        });
+        if (claimed != null) await _deliver(claimed);
+        final expired = await db.execute(
+          'DELETE FROM dw_alert_outbox WHERE created_at < @expiry::timestamptz',
+          params: {
+            'expiry': DateTime.now().toUtc().subtract(const Duration(days: 7)),
+          },
+        );
+        if (expired > 0) {
+          logger.warning(
+            '$expired alert outbox row(s) expired after seven days',
+          );
+        }
+      } catch (error) {
+        logger.warning('alert outbox worker failed', error: error);
+      }
+      await Future<void>.delayed(pollInterval);
+    }
+  }
+
+  Future<void> _deliver(DwResultRow row) async {
+    final repeats = row.get<int>('repeat_count');
+    final followUp = row['initial_delivered_at'] != null;
+    final incident = DwServerIncident(
+      id: row.get<String>('id'),
+      where: row.get<String>('where_text'),
+      error: followUp
+          ? 'repeated $repeats times since ${row.get<DateTime>('window_started_at').toUtc().toIso8601String()}'
+          : row.get<String>('error_text'),
+      stackTrace: StackTrace.fromString(row.get<String>('stack_trace')),
+      accountId: row['account_id'] as int?,
+      at: row.get<DateTime>('happened_at'),
+      repeatCount: followUp ? repeats : 0,
+      project: row['project'] as String?,
+      environment: row['environment'] as String?,
+      version: row['version'] as String?,
+      signature: row.get<String>('signature'),
+    );
+    try {
+      await sink.send(incident);
+      await db.execute(
+        followUp
+            ? 'UPDATE dw_alert_outbox SET repeat_delivered_at = @now, locked_until = NULL WHERE id = @id'
+            : 'UPDATE dw_alert_outbox SET initial_delivered_at = @now, locked_until = NULL WHERE id = @id',
+        params: {'now': DateTime.now().toUtc(), 'id': incident.id},
+      );
+    } catch (error) {
+      final attempts = row.get<int>('attempts') + 1;
+      final seconds = (1 << attempts.clamp(0, 12)).clamp(1, 3600);
+      await db.execute(
+        '''
+UPDATE dw_alert_outbox SET attempts = @attempts,
+ next_attempt_at = @next, locked_until = NULL, last_error = @error WHERE id = @id
+''',
+        params: {
+          'attempts': attempts,
+          'next': DateTime.now().toUtc().add(Duration(seconds: seconds)),
+          'error': '$error',
+          'id': incident.id,
+        },
+      );
+    }
+  }
+}

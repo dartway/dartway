@@ -56,6 +56,7 @@ Future<void> main() async {
     database: env.server.database,
     storage: storage,
     port: env.server.port,
+    alerts: env.server.alerts,
     settings: DwServerSettings(
       allowedOrigins: env.server.allowedOrigins,
       trustedProxyNetworks: env.server.trustedProxyNetworks,
