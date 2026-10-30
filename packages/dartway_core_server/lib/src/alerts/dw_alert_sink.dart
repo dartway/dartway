@@ -17,6 +17,7 @@ final class DwServerIncident {
     required this.stackTrace,
     this.accountId,
     this.repeatCount = 0,
+    this.occurrences = 1,
     this.project,
     this.environment,
     this.version,
@@ -36,6 +37,7 @@ final class DwServerIncident {
 
   /// Repetitions represented by a coalesced follow-up delivery.
   final int repeatCount;
+  final int occurrences;
 
   /// Whether this is the first delivery or its coalesced follow-up.
   String get kind => repeatCount == 0 ? 'incident' : 'repeat';
@@ -326,6 +328,8 @@ final class DwAlertGate {
     required Object error,
     required StackTrace stackTrace,
     int? accountId,
+    String? signature,
+    int occurrences = 1,
   }) {
     final incident = DwServerIncident(
       id: DwServerIncident.newId(),
@@ -333,14 +337,14 @@ final class DwAlertGate {
       error: error,
       stackTrace: stackTrace,
       accountId: accountId,
+      signature: signature,
+      occurrences: occurrences,
     );
     logger.error(
       'incident ${incident.id} in $where',
       error: error,
       stackTrace: stackTrace,
     );
-    // Persistence owns signature windows. Do not let the legacy in-process
-    // gate discard repeats before their durable counter sees them.
     if (enqueue case final persist?) {
       unawaited(
         persist(incident).catchError((Object e) {

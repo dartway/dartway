@@ -2,7 +2,8 @@
 
 ## 0.25.0-dev.1
 
-- Advance in lockstep with the core family; no API or wire changes in this package.
+- Add the internal framework side-channel used by Flutter error delivery,
+  including anonymous retry after an expired session (#683).
 
 ## 0.24.0
 

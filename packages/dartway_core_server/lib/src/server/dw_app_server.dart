@@ -8,6 +8,7 @@ import 'package:meta/meta.dart';
 import '../process/dw_process_runner.dart';
 import '../alerts/dw_alert_sink.dart';
 import '../alerts/dw_alert_outbox.dart';
+import '../alerts/dw_client_error_endpoint.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_cascades.dart';
 import '../auth/dw_account_service.dart';
@@ -401,6 +402,10 @@ final class DwAppServer {
               : const Duration(minutes: 1).inMicroseconds ~/
                     settings.alertsPerMinute,
         ),
+        maxClientDeliveriesPerMinute: (settings.alertsPerMinute ~/ 2).clamp(
+          1,
+          settings.alertsPerMinute,
+        ),
         project: settings.alertProject,
         environment: settings.alertEnvironment,
         version: settings.deploymentVersion,
@@ -490,7 +495,7 @@ final class DwAppServer {
           authService: authService,
           settings: settings,
         ),
-        routes: routes,
+        routes: [...routes, DwClientErrorEndpoint(runtime, settings).route],
       );
       await front.bind(address, port);
       final running = _DwRunning(

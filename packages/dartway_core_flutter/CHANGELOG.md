@@ -2,7 +2,15 @@
 
 ## 0.25.0-dev.1
 
-- Advance in lockstep with the core family; no API or wire changes in this package.
+- Flutter errors now use the built-in persistent device queue and guarded
+  server ingestion endpoint, feeding the existing durable alert outbox by
+  default (#683). HTTP retry windows are honoured, persistence is debounced,
+  and a delayed repeat does not block another signature. Sustained report
+  streams now hit bounded persistence and delivery waits, and every outgoing
+  field is fitted to the shared wire contract.
+
+- Add `DwFlutterConfig.uiActionFailedText` for visible feedback when a UI action
+  throws while the built-in reporter delivers the incident (#683).
 
 ## 0.24.0
 

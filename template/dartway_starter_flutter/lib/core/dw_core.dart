@@ -29,8 +29,8 @@ abstract final class AppDwCore {
   /// no storage plugin at all. It passes an in-memory [analyticsStore] too:
   /// the events the app records wait there instead of on the device.
   ///
-  /// [onErrorReport] observes reports after the app's normal error policy has
-  /// run; the widget-test harness uses this existing hook to assert reports.
+  /// [onErrorReport] is a test override; production leaves it unset so the
+  /// framework's persistent reporter delivers failures to the server.
   static DwFlutterCore create({
     required Uri baseUrl,
     required String appVersion,
@@ -47,10 +47,8 @@ abstract final class AppDwCore {
       refusalText: (refusal) => appL10n.refusalText(refusal),
       updateRequiredScreen: (context, refusal) =>
           UpdateRequiredPage(refusal: refusal),
-      onErrorReport: (report) {
-        _onErrorReport(report);
-        onErrorReport?.call(report);
-      },
+      onErrorReport: onErrorReport,
+      uiActionFailedText: appL10n.actionFailed,
       readLoadingBuilder: (context) =>
           const Center(child: AppProgressIndicator()),
       readFailedBuilder: (context, error, retry) => LoadFailedMessage(
@@ -76,27 +74,4 @@ abstract final class AppDwCore {
       DwAnalytics(store: analyticsStore),
     ],
   );
-
-  /// What the app does with an error the framework intercepted.
-  ///
-  /// A refusal is an answer, already rendered through [refusalText] where it
-  /// was asked for; a not-authenticated answer ends the session, and the
-  /// sign-in screen is the message. Neither is an incident. Everything else is
-  /// logged — and when it broke something the user pressed, they are told it
-  /// did not work: a command that timed out or failed on the server would
-  /// otherwise end in silence.
-  static void _onErrorReport(DwErrorReport report) {
-    if (report.error
-        case DwRefusalException() || DwNotAuthenticatedException()) {
-      return;
-    }
-    if (report.source == DwErrorSource.uiAction) {
-      dw.notify.error(appL10n.actionFailed);
-    }
-    debugPrint(
-      '[${report.source.name}] ${report.error} '
-      '(route: ${report.context.route}, ${report.context.entries})\n'
-      '${report.stackTrace}',
-    );
-  }
 }

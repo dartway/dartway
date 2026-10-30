@@ -19,6 +19,7 @@ class _MemoryStore extends DwKeyValueStorePlugin {
   _MemoryStore([Map<String, Object>? values]) : values = values ?? {};
 
   final Map<String, Object> values;
+  final Map<String, int> stringWrites = {};
 
   @override
   Future<void> init(DwFlutterToolbox core) async {}
@@ -27,7 +28,10 @@ class _MemoryStore extends DwKeyValueStorePlugin {
   Future<String?> getString(String key) async => values[key] as String?;
 
   @override
-  Future<void> setString(String key, String value) async => values[key] = value;
+  Future<void> setString(String key, String value) async {
+    values[key] = value;
+    stringWrites.update(key, (count) => count + 1, ifAbsent: () => 1);
+  }
 
   @override
   Future<int?> getInt(String key) async => values[key] as int?;
@@ -701,6 +705,400 @@ void main() {
       ),
     );
     await dw.dispose();
+  });
+
+  test('default error reporter persists and coalesces while offline', () async {
+    final world = World();
+    final store = _MemoryStore();
+    DwFlutterCore build(DwHttpTransport transport) => DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.0.0+1',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: transport,
+      liveConnector: world.server.liveConnector,
+      plugins: [store],
+    );
+
+    final offline = DwMemoryHttpTransport((_) => throw Exception('offline'));
+    var core = build(offline);
+    await core.init();
+    for (var i = 0; i < 100; i++) {
+      core.handleError(
+        StateError('boom'),
+        StackTrace.fromString('#0 app.dart:1'),
+      );
+    }
+    await core.dispose();
+    expect(store.values['dw.error-reports'], isNotNull);
+
+    final sent = <Map<String, Object?>>[];
+    final online = DwMemoryHttpTransport((post) {
+      sent.add((jsonDecode(post.body) as Map).cast<String, Object?>());
+      return const DwHttpReply(status: 204, body: '');
+    });
+    core = build(online);
+    await core.init();
+    expect(sent, hasLength(1));
+    expect(sent.single['count'], 100);
+    expect(sent.single['appVersion'], '1.0.0+1');
+    await core.dispose();
+  });
+
+  test(
+    'default reporter caps fields and a rejected item does not block the queue',
+    () async {
+      final world = World();
+      final store = _MemoryStore();
+      final statuses = [400, 204];
+      final sent = <Map<String, Object?>>[];
+      final transport = DwMemoryHttpTransport((post) {
+        sent.add((jsonDecode(post.body) as Map).cast<String, Object?>());
+        return DwHttpReply(status: statuses.removeAt(0), body: '');
+      });
+      final core = DwFlutterCore(
+        config: DwFlutterConfig(
+          appVersion: '1.0.0+1',
+          refusalText: (refusal) => refusal.code,
+          readLoadingBuilder: (_) => const SizedBox(),
+          readFailedBuilder: (_, _, _) => const SizedBox(),
+        ),
+        protocol: roomsProtocol,
+        baseUrl: world.server.baseUrl,
+        httpTransport: transport,
+        liveConnector: world.server.liveConnector,
+        plugins: [store],
+      );
+      await core.init();
+      core
+        ..handleError(
+          StateError(List.filled(6000, 'x').join()),
+          StackTrace.fromString('#0 app/one.dart:1'),
+        )
+        ..handleError(
+          ArgumentError('second'),
+          StackTrace.fromString('#0 app/two.dart:2'),
+        );
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      expect(sent, hasLength(2));
+      expect(utf8.encode(sent.first['error']! as String).length, 4096);
+      expect(
+        utf8.encode(jsonEncode(sent.first)).length,
+        lessThanOrEqualTo(32 << 10),
+      );
+      await core.dispose();
+    },
+  );
+
+  test(
+    'default reporter retries 401 anonymously and keeps a 404 backlog',
+    () async {
+      final world = World();
+      final store = _MemoryStore();
+      final requests = <DwHttpPost>[];
+      final statuses = [401, 204, 404];
+      final transport = DwMemoryHttpTransport((post) {
+        requests.add(post);
+        return DwHttpReply(status: statuses.removeAt(0), body: '');
+      });
+      final core = DwFlutterCore(
+        config: DwFlutterConfig(
+          appVersion: '1.0.0+1',
+          refusalText: (refusal) => refusal.code,
+          readLoadingBuilder: (_) => const SizedBox(),
+          readFailedBuilder: (_, _, _) => const SizedBox(),
+        ),
+        protocol: roomsProtocol,
+        baseUrl: world.server.baseUrl,
+        tokenStore: DwMemoryTokenStore(alice),
+        httpTransport: transport,
+        liveConnector: world.server.liveConnector,
+        plugins: [store],
+      );
+      await core.init();
+      core.handleError(
+        StateError('one'),
+        StackTrace.fromString('#0 app/one.dart:1'),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      expect(requests, hasLength(2));
+      expect(
+        requests.first.headers[DwHttpContract.authorizationHeader],
+        isNotNull,
+      );
+      expect(requests[1].headers[DwHttpContract.authorizationHeader], isNull);
+
+      core.handleError(
+        StateError('two'),
+        StackTrace.fromString('#0 app/two.dart:2'),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      expect(store.values['dw.error-reports'], isNotNull);
+      await core.dispose();
+    },
+  );
+
+  test(
+    'three distinct pre-init errors survive and are delivered once',
+    () async {
+      final world = World();
+      final store = _MemoryStore();
+      final sent = <Map<String, Object?>>[];
+      final transport = DwMemoryHttpTransport((post) {
+        sent.add((jsonDecode(post.body) as Map).cast<String, Object?>());
+        return const DwHttpReply(status: 204, body: '');
+      });
+      final core = DwFlutterCore(
+        config: DwFlutterConfig(
+          appVersion: '1.0.0+1',
+          refusalText: (refusal) => refusal.code,
+          readLoadingBuilder: (_) => const SizedBox(),
+          readFailedBuilder: (_, _, _) => const SizedBox(),
+        ),
+        protocol: roomsProtocol,
+        baseUrl: world.server.baseUrl,
+        httpTransport: transport,
+        liveConnector: world.server.liveConnector,
+        plugins: [store],
+      );
+      core
+        ..handleError(
+          StateError('one'),
+          StackTrace.fromString('#0 app/one.dart:1'),
+        )
+        ..handleError(
+          ArgumentError('two'),
+          StackTrace.fromString('#0 app/two.dart:2'),
+        )
+        ..handleError(
+          FormatException('three'),
+          StackTrace.fromString('#0 app/three.dart:3'),
+        );
+      await core.init();
+      expect(sent, hasLength(3));
+      expect(sent.map((item) => item['deviceId']).toSet(), hasLength(1));
+      expect(sent.every((item) => !item.containsKey('signature')), isTrue);
+      await core.dispose();
+    },
+  );
+
+  test(
+    '429 retry-after is not bypassed by reports or successful calls',
+    () async {
+      final world = World();
+      final sent = <DwHttpPost>[];
+      final core = DwFlutterCore(
+        config: DwFlutterConfig(
+          appVersion: '1.0.0+1',
+          refusalText: (refusal) => refusal.code,
+          readLoadingBuilder: (_) => const SizedBox(),
+          readFailedBuilder: (_, _, _) => const SizedBox(),
+        ),
+        protocol: roomsProtocol,
+        baseUrl: world.server.baseUrl,
+        httpTransport: DwMemoryHttpTransport((post) {
+          sent.add(post);
+          return sent.length == 1
+              ? const DwHttpReply(
+                  status: 429,
+                  body: '',
+                  headers: {'retry-after': '1'},
+                )
+              : const DwHttpReply(status: 204, body: '');
+        }),
+        liveConnector: world.server.liveConnector,
+        plugins: [_MemoryStore()],
+      );
+      await core.init();
+      core.handleError(
+        StateError('one'),
+        StackTrace.fromString('#0 app.dart:1'),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      expect(sent, hasLength(1));
+      for (var i = 0; i < 5; i++) {
+        core.defaultErrorReporter!.serverReached();
+        core.handleError(
+          ArgumentError('other'),
+          StackTrace.fromString('#0 other.dart:2'),
+        );
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(sent, hasLength(1));
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      expect(sent.length, greaterThan(1));
+      await core.dispose();
+    },
+  );
+
+  test('a waiting repeat does not block a different signature', () async {
+    final world = World();
+    final store = _MemoryStore({
+      'dw.error-device': 'device',
+      'dw.error-reports': jsonEncode([
+        {
+          'deviceId': 'device',
+          'errorType': 'StateError',
+          'error': 'old',
+          'stackTrace': '#0 old.dart:1',
+          'platform': 'test',
+          'featureIds': <String>[],
+          'entries': <String, String>{},
+          'count': 1,
+          '_sendAfter': DateTime.now()
+              .toUtc()
+              .add(const Duration(minutes: 1))
+              .toIso8601String(),
+        },
+      ]),
+    });
+    final sent = <Map<String, Object?>>[];
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.0.0+1',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: DwMemoryHttpTransport((post) {
+        sent.add((jsonDecode(post.body) as Map).cast<String, Object?>());
+        return const DwHttpReply(status: 204, body: '');
+      }),
+      liveConnector: world.server.liveConnector,
+      plugins: [store],
+    );
+    await core.init();
+    core.handleError(
+      ArgumentError('new'),
+      StackTrace.fromString('#0 new.dart:2'),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    expect(sent, hasLength(1));
+    expect(sent.single['errorType'], 'ArgumentError');
+    await core.dispose();
+  });
+
+  test('a burst of reports debounces queue persistence', () async {
+    final world = World();
+    final store = _MemoryStore();
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.0.0+1',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: DwMemoryHttpTransport((_) => throw Exception('offline')),
+      liveConnector: world.server.liveConnector,
+      plugins: [store],
+    );
+    await core.init();
+    for (var i = 0; i < 100; i++) {
+      core.handleError(
+        StateError('frame $i'),
+        StackTrace.fromString('#0 app/frame_$i.dart:1'),
+      );
+    }
+    for (
+      var i = 0;
+      i < 30 && store.stringWrites['dw.error-reports'] == null;
+      i++
+    ) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    expect(store.stringWrites['dw.error-reports'], 1);
+    await core.dispose();
+  });
+
+  testWidgets('sustained reports hit persistence and send max waits', (
+    tester,
+  ) async {
+    final world = World();
+    final store = _MemoryStore();
+    var sends = 0;
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.0.0+1',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: DwMemoryHttpTransport((_) {
+        sends++;
+        return const DwHttpReply(status: 204, body: '');
+      }),
+      liveConnector: world.server.liveConnector,
+      plugins: [store],
+    );
+    await core.init();
+    final initialWrites = store.stringWrites['dw.error-reports'] ?? 0;
+    for (var i = 0; i < 16; i++) {
+      core.handleError(
+        StateError('stream $i'),
+        StackTrace.fromString('#0 app/stream_$i.dart:1'),
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      if (i == 6) {
+        expect(
+          store.stringWrites['dw.error-reports'] ?? 0,
+          greaterThan(initialWrites),
+        );
+      }
+      if (i == 13) expect(sends, greaterThan(0));
+    }
+    await core.dispose();
+  });
+
+  testWidgets('a throwing button handler delivers route and app version', (
+    tester,
+  ) async {
+    final world = World();
+    final sent = <Map<String, Object?>>[];
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.2.3+4',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: DwMemoryHttpTransport((post) {
+        sent.add((jsonDecode(post.body) as Map).cast<String, Object?>());
+        return const DwHttpReply(status: 204, body: '');
+      }),
+      liveConnector: world.server.liveConnector,
+      plugins: [_MemoryStore()],
+    );
+    core.errorContext.registerRouteSource(() => '/checkout');
+    await core.init();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Builder(
+          builder: (context) => TextButton(
+            onPressed: () =>
+                core.action<void>((_) => throw StateError('boom'))(context),
+            child: const Text('buy'),
+          ),
+        ),
+      ),
+    );
+    await tester.tap(find.text('buy'));
+    await tester.pump(const Duration(milliseconds: 600));
+    expect(sent, hasLength(1));
+    expect(sent.single['route'], '/checkout');
+    expect(sent.single['appVersion'], '1.2.3+4');
+    await core.dispose();
   });
 }
 

@@ -7,6 +7,7 @@ import '../../ui/confirmation/dw_ui_confirmation.dart';
 class DwFlutterConfig {
   const DwFlutterConfig({
     this.onErrorReport,
+    this.uiActionFailedText,
     this.appVersion,
     this.confirmDialogBuilder,
     this.refusalText,
@@ -66,9 +67,14 @@ class DwFlutterConfig {
 
   /// Called for every reported error with its full [DwErrorReport] — the error
   /// itself plus the app-state context snapshot (route, mounted features,
-  /// action, platform, version, user). When unset, the error is logged via
-  /// `debugPrint` and nothing else happens — set this to alert on it.
+  /// action, platform, version, user). When unset on [DwFlutterCore], the
+  /// built-in persistent reporter sends it to the app server. Set a callback
+  /// (including a no-op callback to opt out) to replace that default.
   final void Function(DwErrorReport report)? onErrorReport;
+
+  /// Localized message shown when an unexpected `dw.action` failure is
+  /// reported. Refusals and a signed-out session already have their own UI.
+  final String? uiActionFailedText;
 
   /// This build as the platform reports it, `<semver>+<build>`.
   final String? appVersion;

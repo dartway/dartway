@@ -258,6 +258,7 @@ extension on DwAppClient {
         switch (_read(call, reply)) {
           case final DwApiResponse response:
             _absorb(call, response);
+            onSuccessfulCall?.call();
             return _Answered(response);
           case final DwProtocolException exception:
             return _Unreadable(exception, StackTrace.current);

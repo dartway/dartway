@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:dartway_core_shared/dartway_core_shared.dart';
+import 'package:meta/meta.dart';
 
 import '../dw_client_exceptions.dart';
 import '../dw_client_options.dart';
@@ -100,6 +101,7 @@ final class DwAppClient {
     DwStorageTransport? storageTransport,
     this.options = const DwClientOptions(),
     void Function(Object error, StackTrace stackTrace)? onError,
+    this.onSuccessfulCall,
     Random? random,
     this.utcOffset,
   }) : baseUrl = _checkBaseUrl(baseUrl),
@@ -133,6 +135,38 @@ final class DwAppClient {
   final DwStorageTransport storageTransport;
 
   final DwClientOptions options;
+
+  /// Called after a server answer has been decoded successfully.
+  @internal
+  final void Function()? onSuccessfulCall;
+
+  /// Sends JSON to a framework-owned side channel without exposing the
+  /// session bearer token to application code.
+  @internal
+  Future<DwHttpReply> postFrameworkJson(
+    String path,
+    String body, {
+    bool authorize = true,
+  }) => httpTransport.post(
+    DwHttpPost(
+      url: _frameworkUrl(path),
+      headers: {
+        DwHttpContract.contentTypeHeader: DwHttpContract.jsonContentType,
+        if (authorize)
+          if (_session?.token case final token?)
+            DwHttpContract.authorizationHeader:
+                '${DwHttpContract.bearerPrefix}$token',
+      },
+      body: body,
+    ),
+  );
+
+  Uri _frameworkUrl(String path) {
+    final base = baseUrl.path.endsWith('/')
+        ? baseUrl.path.substring(0, baseUrl.path.length - 1)
+        : baseUrl.path;
+    return baseUrl.replace(path: '$base$path');
+  }
 
   /// The UTC offset every call reports (`Dw-Utc-Offset`, the server's
   /// `ctx.callerUtcOffset`) instead of the device's. `null`, the default,

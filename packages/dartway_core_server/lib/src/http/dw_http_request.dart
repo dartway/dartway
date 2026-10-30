@@ -14,6 +14,8 @@ final class DwHttpRequest {
     : headers = _headersOf(_request.headers);
 
   final HttpRequest _request;
+  @internal
+  HttpRequest get rawRequest => _request;
   final DwRequestBody _body;
 
   /// The server's body limit, used when a read names none.

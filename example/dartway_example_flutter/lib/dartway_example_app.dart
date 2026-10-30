@@ -41,8 +41,7 @@ class DartwayExampleApp {
     );
 
     DwAppRunner(
-      // No onError: uncaught errors flow into the dw pipeline, where the app's
-      // `onErrorReport` sorts them out.
+      // No onError: uncaught errors flow into the persistent dw reporter.
       appInitializers: [dw.init],
       supportedLocales: AppLocalizations.supportedLocales,
       child: const AppRoot(),

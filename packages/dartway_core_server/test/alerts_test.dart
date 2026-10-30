@@ -114,7 +114,7 @@ void main() {
     });
 
     test(
-      'durable mode persists every repeat instead of process-muting it',
+      'durable mode persists every occurrence before the delivery ceiling',
       () async {
         final persisted = <DwServerIncident>[];
         final durable = DwAlertGate(
