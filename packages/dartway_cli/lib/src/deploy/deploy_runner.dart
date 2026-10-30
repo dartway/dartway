@@ -903,11 +903,13 @@ echo "nginx reloaded its configuration and is running"
 
   List<DwDeployStep> steps({
     required bool skipGitUpdate,
+    bool skipBackup = false,
     String? revision,
     Future<DwSshResult> Function()? verifyOutside,
   }) => [
     for (final step in _plannedSteps(
       skipGitUpdate: skipGitUpdate,
+      skipBackup: skipBackup,
       revision: revision,
       verifyOutside: verifyOutside,
     ))
@@ -931,6 +933,7 @@ echo "nginx reloaded its configuration and is running"
 
   List<DwDeployStep> _plannedSteps({
     required bool skipGitUpdate,
+    bool skipBackup = false,
     String? revision,
     Future<DwSshResult> Function()? verifyOutside,
   }) => [
@@ -1016,6 +1019,20 @@ echo "nginx reloaded its configuration and is running"
         id: 'database',
         title: 'Start the database',
         run: startDatabase,
+      ),
+    if (target.environment == 'production' &&
+        (target.backup != null || skipBackup))
+      DwDeployStep(
+        id: skipBackup ? 'backup-skipped' : 'pre-deploy-backup',
+        title: skipBackup
+            ? 'Record explicit pre-deploy backup skip'
+            : 'Dump, encrypt and upload the database before migrations',
+        run: () => _as(
+          skipBackup
+              ? "echo 'PRE-DEPLOY BACKUP SKIPPED BY --skip-backup'"
+              : "'${target.runtimeConfigDir}/backup' pre-deploy \$(git -C '$appDir' rev-parse --short HEAD)",
+        ),
+        showOutput: true,
       ),
     DwDeployStep(
       id: 'server',

@@ -28,6 +28,27 @@ enum DwDatabaseMode {
   external,
 }
 
+/// Off-host encrypted database backup policy for a deployment.
+class DwBackupConfig {
+  const DwBackupConfig({
+    required this.bucket,
+    required this.endpoint,
+    required this.recipient,
+    this.region = 'ru-1',
+    this.schedule = '03:00',
+    this.dailyRetention = 7,
+    this.weeklyRetention = 4,
+  });
+
+  final String bucket;
+  final String endpoint;
+  final String recipient;
+  final String region;
+  final String schedule;
+  final int dailyRetention;
+  final int weeklyRetention;
+}
+
 /// The optional marketing or landing site of an environment.
 class DwSiteConfig {
   const DwSiteConfig({required this.domain, required this.source});
@@ -73,6 +94,7 @@ class DwDeployTarget {
     this.requiredSecrets = const [],
     this.requiredSecretFiles = const [],
     this.trustedProxyNetworks = const [],
+    this.backup,
   });
 
   /// Environment name — the top-level key in `deploy/config.yaml`.
@@ -161,6 +183,7 @@ class DwDeployTarget {
 
   /// Secret files (service account JSON and similar) mounted into the server.
   final List<String> requiredSecretFiles;
+  final DwBackupConfig? backup;
 
   static const configRelativePath = 'deploy/config.yaml';
 
@@ -440,6 +463,87 @@ class DwDeployTarget {
         guarded(() => reader.optionalStringList('trusted_proxy_networks')) ??
         const <String>[];
 
+    DwBackupConfig? backup;
+    final backupMap = guarded(() => reader.optionalMap('backup'));
+    if (backupMap != null) {
+      const keys = {
+        'bucket',
+        'endpoint',
+        'region',
+        'recipient',
+        'schedule',
+        'daily',
+        'weekly',
+      };
+      _unknownKeys(backupMap, keys, '$source > backup', problems);
+      final backupReader = DwYamlReader(backupMap, source: '$source > backup');
+      final bucket = guarded(() => backupReader.requiredString('bucket'));
+      final endpoint = guarded(() => backupReader.requiredString('endpoint'));
+      final region = guarded(
+        () => backupMap.containsKey('region')
+            ? backupReader.requiredString('region')
+            : 'ru-1',
+      );
+      final recipient = guarded(() => backupReader.requiredString('recipient'));
+      final schedule = guarded(
+        () => backupMap.containsKey('schedule')
+            ? backupReader.requiredString('schedule')
+            : '03:00',
+      );
+      final daily = backupMap['daily'] ?? 7;
+      final weekly = backupMap['weekly'] ?? 4;
+      if (endpoint != null) {
+        final uri = Uri.tryParse(endpoint);
+        if (uri == null ||
+            uri.scheme != 'https' ||
+            uri.host.isEmpty ||
+            uri.userInfo.isNotEmpty ||
+            (uri.path.isNotEmpty && uri.path != '/') ||
+            uri.query.isNotEmpty ||
+            uri.fragment.isNotEmpty) {
+          problems.add(
+            '$source > backup: "endpoint" must be an HTTPS URL without '
+            'credentials, query, or fragment',
+          );
+        }
+      }
+      if (region != null && !RegExp(r'^[A-Za-z0-9-]+$').hasMatch(region)) {
+        problems.add(
+          '$source > backup: "region" must contain only letters, numbers, '
+          'and hyphens',
+        );
+      }
+      if (schedule != null &&
+          !RegExp(r'^(?:[01]\d|2[0-3]):[0-5]\d$').hasMatch(schedule)) {
+        problems.add(
+          '$source > backup: "schedule" must be HH:MM UTC, got "$schedule"',
+        );
+      }
+      if (daily is! int || daily < 1)
+        problems.add('$source > backup: "daily" must be a positive integer');
+      if (weekly is! int || weekly < 1)
+        problems.add('$source > backup: "weekly" must be a positive integer');
+      if (bucket != null &&
+          endpoint != null &&
+          region != null &&
+          recipient != null &&
+          schedule != null &&
+          daily is int &&
+          daily > 0 &&
+          weekly is int &&
+          weekly > 0) {
+        backup = DwBackupConfig(
+          bucket: bucket,
+          endpoint: endpoint,
+          region: region,
+          recipient: recipient,
+          schedule: schedule,
+          dailyRetention: daily,
+          weeklyRetention: weekly,
+        );
+      }
+    }
+
     if (problems.isEmpty) {
       final target = DwDeployTarget(
         environment: environment,
@@ -465,6 +569,7 @@ class DwDeployTarget {
         requiredSecrets: requiredSecrets,
         requiredSecretFiles: requiredSecretFiles,
         trustedProxyNetworks: trustedProxyNetworks,
+        backup: backup,
       );
       problems.addAll(target._domainProblems(source));
       if (problems.isEmpty) return target;
@@ -577,6 +682,7 @@ class DwDeployTarget {
     'firewall_ports',
     'requires',
     'trusted_proxy_networks',
+    'backup',
   };
 
   static void _unknownKeys(
