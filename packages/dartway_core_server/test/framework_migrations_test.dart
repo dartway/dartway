@@ -218,6 +218,7 @@ void main() {
       fromConfig.id,
       lastUsed.id,
       '20261014_000000_dw_identifier_links',
+      '20261030_000000_dw_alert_outbox',
     ]);
     expect(
       (await runner(framework).status()).map((status) => status.state),
@@ -353,6 +354,7 @@ void main() {
     expect(run.migrations.map((ref) => ref.id), [
       lastUsed.id,
       '20261014_000000_dw_identifier_links',
+      '20261030_000000_dw_alert_outbox',
     ]);
     expect(await lastUsedAt(), {1: null, 2: touched});
 

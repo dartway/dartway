@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
+import 'package:dartway_core_server/src/alerts/dw_alert_outbox.dart';
 import 'package:dartway_core_server/src/context/dw_call_context.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:test/test.dart';
@@ -26,13 +27,17 @@ DwDatabaseConfig adminConfig() {
 }
 
 /// Alerts recorded for assertions.
-final class RecordingAlerts implements DwAlertSink {
+final class RecordingAlerts implements DwAlertSink, DwAlertEnqueueRecorder {
   final List<DwServerIncident> incidents = [];
   final List<String?> notes = [];
 
   @override
-  Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
+  void recordEnqueued(DwServerIncident incident) {
     incidents.add(incident);
+  }
+
+  @override
+  Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
     notes.add(suppressedNote);
   }
 }

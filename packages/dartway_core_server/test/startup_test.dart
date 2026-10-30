@@ -378,6 +378,7 @@ void main() {
         'dw/20261009_000002_dw_stored_file_bucket_from_config',
         'dw/20261009_000003_dw_auth_key_last_used',
         'dw/20261014_000000_dw_identifier_links',
+        'dw/20261030_000000_dw_alert_outbox',
         'app/20260913_120000_test_app',
       ]);
       await server.stop();
@@ -432,6 +433,7 @@ void main() {
         ];
         expect(await tables(), [
           'dw_account',
+          'dw_alert_outbox',
           'dw_auth_key',
           'dw_code_ticket',
           'dw_command_outcome',
@@ -444,7 +446,7 @@ void main() {
         await runner.rollback(batch: 1);
         expect(await tables(), isEmpty);
         await runner.apply();
-        expect(await tables(), hasLength(9));
+        expect(await tables(), hasLength(10));
       } finally {
         await opened.close();
       }

@@ -27,6 +27,9 @@ void main() {
       final incidents = harness().app.alerts.incidents.length;
       harness().app.boundReadLimits.clear();
       final answer = await caller.call(const BoundedNotes(8));
+      await eventually(() async {
+        return harness().app.alerts.incidents.length > incidents;
+      });
       expect(harness().app.boundReadLimits, [
         4,
       ], reason: 'strict never re-reads');

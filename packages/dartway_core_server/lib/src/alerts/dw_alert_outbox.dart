@@ -6,6 +6,12 @@ import 'package:meta/meta.dart';
 import 'dw_alert_sink.dart';
 import 'dw_server_logger.dart';
 
+/// A test sink that observes the original incident when it is enqueued.
+@internal
+abstract interface class DwAlertEnqueueRecorder {
+  void recordEnqueued(DwServerIncident incident);
+}
+
 /// Durable, leased delivery of incidents, with database-backed coalescing.
 @internal
 final class DwAlertOutbox {
@@ -18,7 +24,8 @@ final class DwAlertOutbox {
     this.project,
     this.environment,
     this.version,
-  });
+    DateTime Function()? clock,
+  }) : _clock = clock ?? _systemClock;
 
   final DwDatabaseHandle db;
   final DwAlertSink sink;
@@ -28,6 +35,9 @@ final class DwAlertOutbox {
   final String? project;
   final String? environment;
   final String? version;
+  final DateTime Function() _clock;
+
+  static DateTime _systemClock() => DateTime.now().toUtc();
   final List<DwServerIncident> _buffer = [];
   bool _running = false;
   Future<void>? _loop;
@@ -39,6 +49,9 @@ final class DwAlertOutbox {
   }
 
   Future<void> enqueue(DwServerIncident incident) async {
+    if (sink case final DwAlertEnqueueRecorder recorder) {
+      recorder.recordEnqueued(incident);
+    }
     try {
       await _write(incident);
     } catch (error) {
@@ -127,10 +140,8 @@ WHERE created_at >= @expiry::timestamptz
 ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
 ''',
             params: {
-              'now': DateTime.now().toUtc(),
-              'expiry': DateTime.now().toUtc().subtract(
-                const Duration(days: 7),
-              ),
+              'now': _clock(),
+              'expiry': _clock().subtract(const Duration(days: 7)),
             },
           );
           if (rows.isEmpty) return null;
@@ -138,7 +149,7 @@ ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
           await tx.execute(
             "UPDATE dw_alert_outbox SET locked_until = @lease WHERE id = @id",
             params: {
-              'lease': DateTime.now().toUtc().add(const Duration(minutes: 2)),
+              'lease': _clock().add(const Duration(minutes: 2)),
               'id': row['id'],
             },
           );
@@ -147,9 +158,7 @@ ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
         if (claimed != null) await _deliver(claimed);
         final expired = await db.execute(
           'DELETE FROM dw_alert_outbox WHERE created_at < @expiry::timestamptz',
-          params: {
-            'expiry': DateTime.now().toUtc().subtract(const Duration(days: 7)),
-          },
+          params: {'expiry': _clock().subtract(const Duration(days: 7))},
         );
         if (expired > 0) {
           logger.warning(
@@ -187,7 +196,7 @@ ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
         followUp
             ? 'UPDATE dw_alert_outbox SET repeat_delivered_at = @now, locked_until = NULL WHERE id = @id'
             : 'UPDATE dw_alert_outbox SET initial_delivered_at = @now, attempts = 0, locked_until = NULL WHERE id = @id',
-        params: {'now': DateTime.now().toUtc(), 'id': incident.id},
+        params: {'now': _clock(), 'id': incident.id},
       );
     } catch (error) {
       final attempts = row.get<int>('attempts') + 1;
@@ -199,7 +208,7 @@ UPDATE dw_alert_outbox SET attempts = @attempts,
 ''',
         params: {
           'attempts': attempts,
-          'next': DateTime.now().toUtc().add(Duration(seconds: seconds)),
+          'next': _clock().add(Duration(seconds: seconds)),
           'error': '$error',
           'id': incident.id,
         },

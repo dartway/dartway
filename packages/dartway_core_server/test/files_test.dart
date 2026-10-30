@@ -944,6 +944,9 @@ void main() {
 
       final answer = await caller.call(DwGetFileLink(fileId: private.id));
       expect(answer.status, 500);
+      await eventually(() async {
+        return moved().app.alerts.incidents.length == 1;
+      });
       expect(moved().app.alerts.incidents, hasLength(1));
       expect(
         '${moved().app.alerts.incidents.single.error}',

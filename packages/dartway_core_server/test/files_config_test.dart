@@ -320,6 +320,9 @@ void main() {
       expect(resolved.status, 200);
       expect(resolved.value(none).urls, isEmpty);
       expect((await caller.call(const ResolveUrls([1]))).status, 500);
+      await eventually(() async {
+        return harness().app.alerts.incidents.length == 5;
+      });
       final incidents = harness().app.alerts.incidents;
       expect(incidents, hasLength(5));
       expect(

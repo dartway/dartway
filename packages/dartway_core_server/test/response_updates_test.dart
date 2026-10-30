@@ -126,11 +126,11 @@ void main() {
 
     final answer = await member.call(const Ping());
     expect(updatesOf(answer).keys, ['notes']);
-    await eventually(
-      () => harness().app.alerts.incidents.any(
+    await eventually(() async {
+      return harness().app.alerts.incidents.any(
         (i) => i.where.contains('broken') && i.error is StateError,
-      ),
-    );
+      );
+    });
   });
 
   test(

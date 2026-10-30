@@ -27,13 +27,14 @@ void main() {
     await database.drop();
   });
 
-  DwServerIncident incident([String id = 'incident-1']) => DwServerIncident(
-    id: id,
-    where: 'command SaveOrder',
-    error: StateError('database unavailable'),
-    stackTrace: StackTrace.fromString('#0 save (orders.dart:1)'),
-    at: DateTime.now().toUtc(),
-  );
+  DwServerIncident incident([String id = 'incident-1', DateTime? at]) =>
+      DwServerIncident(
+        id: id,
+        where: 'command SaveOrder',
+        error: StateError('database unavailable'),
+        stackTrace: StackTrace.fromString('#0 save (orders.dart:1)'),
+        at: at ?? DateTime.now().toUtc(),
+      );
 
   DwAlertOutbox outbox(DwAlertSink sink, {Duration? window}) => DwAlertOutbox(
     db: opened.db,
@@ -119,11 +120,22 @@ void main() {
     '1000 identical incidents become one incident and repeated 999',
     () async {
       final sink = _SwitchableSink();
-      final worker = outbox(sink);
+      final at = DateTime.utc(2026, 10, 30, 12);
+      var now = at;
+      final worker = DwAlertOutbox(
+        db: opened.db,
+        sink: sink,
+        logger: RecordingLogger(),
+        window: const Duration(hours: 1),
+        pollInterval: const Duration(milliseconds: 10),
+        clock: () => now,
+      );
       for (var i = 0; i < 1000; i++) {
-        await worker.enqueue(incident('incident-$i'));
+        await worker.enqueue(incident('incident-$i', at));
       }
       worker.start();
+      await waitFor(() => sink.delivered.length == 1);
+      now = at.add(const Duration(hours: 1, microseconds: 1));
       await waitFor(() => sink.delivered.length == 2);
       await worker.stop();
       expect(sink.delivered, ['incident-0:incident', 'incident-0:repeat']);
