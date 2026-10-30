@@ -17,6 +17,8 @@ In `bin/server.dart`, pass the sink read by the framework environment to the ser
 final server = AppServer.build(
   database: env.server.database,
   alerts: env.server.alerts,
+  alertProject: env.server.project,
+  alertEnvironment: env.server.environment,
   // ...
 );
 ```

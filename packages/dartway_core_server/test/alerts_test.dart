@@ -248,6 +248,41 @@ void main() {
     },
   );
 
+  test('Telegram 429 with a non-JSON body uses normal backoff', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      await request.drain<void>();
+      request.response
+        ..statusCode = HttpStatus.tooManyRequests
+        ..write('rate limited');
+      await request.response.close();
+    });
+    final alerts = DwTelegramAlertSink(
+      botToken: 'TOKEN',
+      chatId: '42',
+      logger: RecordingLogger(),
+      apiBase: Uri.parse('http://127.0.0.1:${server.port}'),
+    );
+    await expectLater(
+      alerts.send(
+        DwServerIncident(
+          id: 'rate-limited',
+          where: 'job cleanup',
+          error: StateError('failed'),
+          stackTrace: StackTrace.current,
+        ),
+      ),
+      throwsA(
+        isA<DwTelegramAlertException>().having(
+          (error) => error.retryAfter,
+          'retryAfter',
+          isNull,
+        ),
+      ),
+    );
+    await server.close();
+  });
+
   test(
     'HTTP alerts send the documented JSON contract and bearer token',
     () async {

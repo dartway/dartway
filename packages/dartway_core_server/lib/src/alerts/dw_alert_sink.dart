@@ -231,11 +231,17 @@ final class DwTelegramAlertSink implements DwAlertSink {
       if (response.statusCode != 200) {
         Duration? retryAfter;
         if (response.statusCode == HttpStatus.tooManyRequests) {
-          final decoded = jsonDecode(responseBody);
-          final parameters = decoded is Map ? decoded['parameters'] : null;
-          final seconds = parameters is Map ? parameters['retry_after'] : null;
-          if (seconds is int && seconds >= 0) {
-            retryAfter = Duration(seconds: seconds);
+          try {
+            final decoded = jsonDecode(responseBody);
+            final parameters = decoded is Map ? decoded['parameters'] : null;
+            final seconds = parameters is Map
+                ? parameters['retry_after']
+                : null;
+            if (seconds is int && seconds >= 0) {
+              retryAfter = Duration(seconds: seconds);
+            }
+          } on FormatException {
+            // Telegram and its proxies can return a non-JSON rate-limit body.
           }
         }
         throw DwTelegramAlertException(

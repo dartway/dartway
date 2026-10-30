@@ -230,6 +230,71 @@ void main() {
       );
     },
   );
+
+  test('an incident buffered during a flush survives that flush', () async {
+    final config = database.config;
+    final singleConnection = await DwPostgresDatabase.open(
+      DwDatabaseConfig(
+        host: config.host,
+        port: config.port,
+        name: config.name,
+        user: config.user,
+        password: config.password,
+        ssl: config.ssl,
+        caFile: config.caFile,
+        maxConnections: 1,
+        connectTimeout: const Duration(milliseconds: 500),
+      ),
+    );
+    addTearDown(singleConnection.close);
+    await opened.db.execute(
+      'ALTER TABLE dw_alert_outbox RENAME TO dw_alert_outbox_down',
+    );
+    final worker = DwAlertOutbox(
+      db: singleConnection.db,
+      sink: _SwitchableSink(),
+      logger: RecordingLogger(),
+      window: const Duration(hours: 1),
+      pollInterval: const Duration(milliseconds: 10),
+    );
+    await worker.enqueue(incident('before-flush'));
+    await opened.db.execute(
+      'ALTER TABLE dw_alert_outbox_down RENAME TO dw_alert_outbox',
+    );
+    await opened.db.execute('''
+CREATE FUNCTION dw_slow_alert_insert() RETURNS trigger LANGUAGE plpgsql AS \$\$
+BEGIN
+  PERFORM pg_sleep(1);
+  RETURN NEW;
+END
+\$\$;
+CREATE TRIGGER dw_slow_alert_insert BEFORE INSERT ON dw_alert_outbox
+FOR EACH ROW EXECUTE FUNCTION dw_slow_alert_insert();
+''');
+
+    worker.start();
+    await Future<void>.delayed(const Duration(milliseconds: 100));
+    await worker.enqueue(incident('during-flush'));
+    await waitFor(
+      () => RecordingLogger.lines.any(
+        (line) => line.contains('during-flush waits for the database'),
+      ),
+    );
+    var persisted = false;
+    final limit = DateTime.now().add(const Duration(seconds: 5));
+    while (!persisted && DateTime.now().isBefore(limit)) {
+      final count = (await opened.db.query(
+        'SELECT coalesce(sum(repeat_count + 1), 0)::int AS count '
+        'FROM dw_alert_outbox',
+      )).single.get<int>('count');
+      persisted = count == 2;
+      if (!persisted) {
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+    }
+    await worker.stop();
+    expect(persisted, isTrue);
+  });
 }
 
 final class _RetryAfterSink implements DwAlertSink {

@@ -111,6 +111,13 @@ The request body is one JSON object. The contract fields are:
 | `environment` | string or null | Configured deployment environment. |
 | `version` | string or null | Immutable deployment version. |
 
+The deployment environment supplies the optional payload fields:
+
+| Environment variable | Payload field | Value |
+|---|---|---|
+| `DW_PROJECT` | `project` | rendered by `dartway deploy`; null locally |
+| `DW_ENVIRONMENT` | `environment` | rendered by `dartway deploy`; null locally |
+
 ### Queue observation
 
 An external probe can read both backlog facts in one query (delivered rows are excluded):

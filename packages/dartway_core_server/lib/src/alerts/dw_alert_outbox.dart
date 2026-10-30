@@ -126,6 +126,7 @@ VALUES (@id, @signature, @where, @error, @stack, @account, @at,
   Future<void> _flush() async {
     if (_buffer.isEmpty) return;
     final pending = List<DwServerIncident>.of(_buffer);
+    final flushed = Set<DwServerIncident>.identity()..addAll(pending);
     try {
       // One transaction is important here: after an outage, committing every
       // incident separately can take minutes for the bounded 1000-item buffer.
@@ -149,7 +150,7 @@ VALUES (@id, @signature, @where, @error, @stack, @account, @at,
           }
         }
       });
-      _buffer.clear();
+      _buffer.removeWhere(flushed.contains);
     } catch (_) {
       return;
     }
