@@ -33,7 +33,11 @@ void main() {
           .raw(
             'POST',
             DwHttpContract.clientErrorPath,
-            headers: {'content-type': 'application/json'},
+            headers: {
+              'content-type': 'application/json',
+              if (token != null)
+                'authorization': '${DwHttpContract.bearerPrefix}$token',
+            },
             body: utf8.encode(jsonEncode(value)),
           );
 
@@ -63,6 +67,18 @@ void main() {
       expect((await send(report(device: 'limited'))).status, 204);
     }
     expect((await send(report(device: 'limited'))).status, 429);
+  });
+
+  test('dart2js types and an empty or missing stack are accepted', () async {
+    final web = report(device: 'web')
+      ..['errorType'] = 'minified:Xy<Foo>'
+      ..remove('stackTrace');
+    expect((await send(web)).status, 204);
+    await eventually(
+      () => harness().app.alerts.incidents.any(
+        (incident) => incident.signature == 'client|android|minified:Xy<Foo>|',
+      ),
+    );
   });
 
   test('authenticated reports use the server account', () async {

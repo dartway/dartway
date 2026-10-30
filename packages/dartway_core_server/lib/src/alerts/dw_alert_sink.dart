@@ -341,7 +341,6 @@ final class DwAlertGate {
       error: error,
       stackTrace: stackTrace,
     );
-    final now = _clock();
     if (enqueue case final persist?) {
       unawaited(
         persist(incident).catchError((Object e) {
@@ -350,6 +349,7 @@ final class DwAlertGate {
       );
       return incident.id;
     }
+    final now = _clock();
     _windows.removeWhere((_, w) => now.difference(w.start) >= window);
     final state = _windows.putIfAbsent(
       incident.signature,

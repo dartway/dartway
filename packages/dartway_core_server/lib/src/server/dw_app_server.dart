@@ -402,6 +402,10 @@ final class DwAppServer {
               : const Duration(minutes: 1).inMicroseconds ~/
                     settings.alertsPerMinute,
         ),
+        maxClientDeliveriesPerMinute: (settings.alertsPerMinute ~/ 2).clamp(
+          1,
+          settings.alertsPerMinute,
+        ),
         project: settings.alertProject,
         environment: settings.alertEnvironment,
         version: settings.deploymentVersion,

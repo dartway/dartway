@@ -9,9 +9,14 @@ import '../../core/logic/dw_key_value_store.dart';
 import 'dw_error_report.dart';
 
 final class DwDefaultErrorReporter with WidgetsBindingObserver {
-  DwDefaultErrorReporter({required this.client, required this.store});
+  DwDefaultErrorReporter({
+    required this.client,
+    required this.store,
+    this.repeatWindow = const Duration(minutes: 1),
+  });
   final DwAppClient client;
   final DwKeyValueStorePlugin? Function() store;
+  final Duration repeatWindow;
   static const _key = 'dw.error-reports';
   static const _deviceKey = 'dw.error-device';
   final List<Map<String, Object?>> _queue = [];
@@ -19,6 +24,8 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
   String? _deviceId;
   bool _loaded = false;
   Timer? _sendTimer;
+  Timer? _retryTimer;
+  final Map<String, ({DateTime until, Map<String, Object?> item})> _recent = {};
   bool _stopped = false;
   bool _deliveryStopped = false;
   WidgetsBinding? _binding;
@@ -37,6 +44,7 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
     _binding?.removeObserver(this);
     _binding = null;
     _sendTimer?.cancel();
+    _retryTimer?.cancel();
     // Let queued persistence finish, but never make core teardown wait for an
     // in-flight network transport owned by a server that is already gone.
     await _serial.timeout(const Duration(milliseconds: 100), onTimeout: () {});
@@ -52,18 +60,29 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
         }
         final stack = _truncate('${report.stackTrace}', 16 << 10);
         final errorType = '${report.error.runtimeType}';
-        final signature = '$errorType|${_firstAppFrame(stack)}';
+        final signature = '$errorType|${dwFirstAppFrame(stack)}';
+        final now = DateTime.now().toUtc();
+        _recent.removeWhere((_, value) => !now.isBefore(value.until));
         Map<String, Object?>? existing;
         for (final item in _queue) {
-          if ('${item['errorType']}|${_firstAppFrame(item['stackTrace']! as String)}' ==
+          if ('${item['errorType']}|${dwFirstAppFrame(item['stackTrace'] as String? ?? '')}' ==
               signature) {
             existing = item;
           }
         }
+        final recent = _recent[signature];
+        if (existing == null && recent != null) {
+          existing = Map<String, Object?>.of(recent.item)
+            ..['count'] = 0
+            ..['_sendAfter'] = recent.until.toIso8601String();
+          _queue.add(existing);
+        }
         if (existing != null) {
           existing['count'] = (existing['count']! as int) + 1;
         } else {
-          if (_queue.length == 50) _queue.removeAt(0);
+          while (_queue.length >= 50) {
+            _queue.removeAt(0);
+          }
           final item = <String, Object?>{
             if (_deviceId != null) 'deviceId': _deviceId,
             'errorType': errorType,
@@ -87,17 +106,21 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
           };
           _fitBody(item);
           _queue.add(item);
+          _recent[signature] = (until: now.add(repeatWindow), item: item);
         }
         if (_loaded) await _save();
         if (_loaded && !_stopped && !_deliveryStopped) {
           _sendTimer?.cancel();
-          _sendTimer = Timer(const Duration(milliseconds: 500), serverReached);
+          _schedule(const Duration(milliseconds: 500));
         }
       }),
     );
   }
 
-  void serverReached() => unawaited(_run(_flush));
+  void serverReached() {
+    unawaited(_run(_flush));
+  }
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) serverReached();
@@ -119,12 +142,21 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
     final persisted = <Map<String, Object?>>[];
     if (encoded != null) {
       try {
-        persisted.addAll(
-          (jsonDecode(encoded) as List).cast<Map>().map(
-            (item) => item.cast<String, Object?>(),
-          ),
-        );
-      } catch (_) {
+        final decoded = jsonDecode(encoded);
+        if (decoded is List) {
+          for (final raw in decoded) {
+            if (raw is! Map) continue;
+            final item = <String, Object?>{};
+            for (final entry in raw.entries) {
+              if (entry.key is String) item[entry.key as String] = entry.value;
+            }
+            if (item['errorType'] is String && item['count'] is int) {
+              persisted.add(item);
+            }
+          }
+        }
+      } catch (error) {
+        debugPrint('DartWay skipped malformed persisted error reports: $error');
         await storage?.remove(_key);
       }
     }
@@ -133,6 +165,9 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
       item['deviceId'] = deviceId;
     }
     _queue.insertAll(0, persisted);
+    while (_queue.length > 50) {
+      _queue.removeAt(0);
+    }
     _loaded = true;
     await _save();
   }
@@ -149,6 +184,13 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
 
   Future<void> _flush() async {
     while (!_stopped && !_deliveryStopped && _queue.isNotEmpty) {
+      final sendAfter = DateTime.tryParse(
+        '${_queue.first['_sendAfter'] ?? ''}',
+      );
+      if (sendAfter != null && DateTime.now().toUtc().isBefore(sendAfter)) {
+        _schedule(sendAfter.difference(DateTime.now().toUtc()));
+        return;
+      }
       try {
         // dartway_core_flutter and dartway_client are one framework family;
         // application code must not use this bearer-carrying side channel.
@@ -156,7 +198,7 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
             // ignore: invalid_use_of_internal_member
             .postFrameworkJson(
               DwHttpContract.clientErrorPath,
-              jsonEncode(_queue.first),
+              jsonEncode(_wireItem(_queue.first)),
             )
             .timeout(const Duration(seconds: 10));
         if (reply.status == 401) {
@@ -164,22 +206,28 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
               // ignore: invalid_use_of_internal_member
               .postFrameworkJson(
                 DwHttpContract.clientErrorPath,
-                jsonEncode(_queue.first),
+                jsonEncode(_wireItem(_queue.first)),
                 authorize: false,
               )
               .timeout(const Duration(seconds: 10));
         }
         if (reply.status == 404) {
-          _deliveryStopped = true;
+          _scheduleRetry(const Duration(minutes: 1));
           return;
         }
-        if (reply.status == 429 || reply.status >= 500) return;
+        if (reply.status == 429 || reply.status >= 500) {
+          _scheduleRetry(const Duration(seconds: 30));
+          return;
+        }
         if (reply.status < 200 || reply.status >= 300) {
+          debugPrint('DartWay error report dropped: HTTP ${reply.status}');
           _queue.removeAt(0);
           await _save();
           continue;
         }
-      } catch (_) {
+      } catch (error) {
+        debugPrint('DartWay error report delivery failed: $error');
+        _scheduleRetry(const Duration(seconds: 10));
         return;
       }
       _queue.removeAt(0);
@@ -189,25 +237,6 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
 
   static String? _nullableTruncate(String? value, int bytes) =>
       value == null ? null : _truncate(value, bytes);
-
-  static String _firstAppFrame(String stack) {
-    for (final line in const LineSplitter().convert(stack)) {
-      final frame = line.trim();
-      if (frame.isEmpty ||
-          frame.contains('<asynchronous suspension>') ||
-          frame.contains('dart:') ||
-          frame.contains('package:flutter/') ||
-          _frameworkPackageFrame.hasMatch(frame)) {
-        continue;
-      }
-      return frame.replaceFirst(RegExp(r'^#\d+\s+'), '');
-    }
-    return '';
-  }
-
-  static final _frameworkPackageFrame = RegExp(
-    r'package:dartway_(?:core_(?:shared|server|flutter)|client|orm|generator|router|shared_preferences|telegram|auth_[a-z_]+|analytics_[a-z_]+|push_[a-z_]+|media_flutter|studio_(?:bridge|binding)|lints|cli)/',
-  );
 
   static String _truncate(String value, int bytes) {
     if (utf8.encode(value).length <= bytes) return value;
@@ -230,13 +259,34 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
     final stack = item['stackTrace']! as String;
     item['stackTrace'] = _truncate(
       stack,
-      (utf8.encode(stack).length - encoded + limit).clamp(0, 16 << 10),
+      (utf8.encode(stack).length - encoded + limit).clamp(1, 16 << 10),
     );
   }
 
   Future<void> _run(Future<void> Function() operation) {
-    final next = _serial.then((_) => operation());
-    _serial = next.catchError((_) {});
+    final next = _serial.then((_) async {
+      try {
+        await operation();
+      } catch (error, stack) {
+        debugPrint('DartWay error reporter failed: $error\n$stack');
+      }
+    });
+    _serial = next;
     return next;
   }
+
+  void _schedule(Duration delay) {
+    _sendTimer?.cancel();
+    _sendTimer = Timer(delay, serverReached);
+  }
+
+  void _scheduleRetry(Duration delay) {
+    _retryTimer?.cancel();
+    _retryTimer = Timer(delay, serverReached);
+  }
+
+  static Map<String, Object?> _wireItem(Map<String, Object?> item) => {
+    for (final entry in item.entries)
+      if (!entry.key.startsWith('_')) entry.key: entry.value,
+  };
 }

@@ -15,6 +15,7 @@ final class DwAlertOutbox {
     required this.logger,
     required this.window,
     required this.pollInterval,
+    this.maxClientDeliveriesPerMinute = 5,
     this.project,
     this.environment,
     this.version,
@@ -26,6 +27,7 @@ final class DwAlertOutbox {
   final DwServerLogger logger;
   final Duration window;
   final Duration pollInterval;
+  final int maxClientDeliveriesPerMinute;
   final String? project;
   final String? environment;
   final String? version;
@@ -37,6 +39,7 @@ final class DwAlertOutbox {
   bool _running = false;
   Future<void>? _loop;
   static const _bufferLimit = 1000;
+  final List<DateTime> _clientDeliveries = [];
 
   void start() {
     _running = true;
@@ -160,6 +163,12 @@ VALUES (@id, @signature, @where, @error, @stack, @account, @at,
     while (_running) {
       try {
         await _flush();
+        final now = _clock();
+        _clientDeliveries.removeWhere(
+          (sent) => now.difference(sent) >= const Duration(minutes: 1),
+        );
+        final allowClient =
+            _clientDeliveries.length < maxClientDeliveriesPerMinute;
         final claimed = await db.transaction((tx) async {
           final rows = await tx.query(
             '''
@@ -167,15 +176,17 @@ SELECT * FROM dw_alert_outbox
 WHERE created_at >= @expiry::timestamptz
   AND next_attempt_at <= @now::timestamptz
   AND (locked_until IS NULL OR locked_until < @now::timestamptz)
+  AND (@allow_client::boolean OR signature NOT LIKE 'client|%')
   AND ((initial_delivered_at IS NULL AND next_attempt_at <= @now::timestamptz)
     OR (initial_delivered_at IS NOT NULL AND repeat_count > 0
       AND repeat_delivered_at IS NULL AND window_ends_at <= @now::timestamptz
       AND next_attempt_at <= @now::timestamptz))
-ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
+ORDER BY (signature LIKE 'client|%'), created_at LIMIT 1 FOR UPDATE SKIP LOCKED
 ''',
             params: {
               'now': _clock(),
               'expiry': _clock().subtract(const Duration(days: 7)),
+              'allow_client': allowClient,
             },
           );
           if (rows.isEmpty) return null;
@@ -189,7 +200,12 @@ ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
           );
           return row;
         });
-        if (claimed != null) await _deliver(claimed);
+        if (claimed != null) {
+          if (claimed.get<String>('signature').startsWith('client|')) {
+            _clientDeliveries.add(now);
+          }
+          await _deliver(claimed);
+        }
         final expired = await db.query(
           '''
 WITH expired AS (

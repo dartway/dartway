@@ -80,6 +80,7 @@ class DwFlutterToolbox {
     if (this case final DwFlutterCore core) {
       final reporter = core.defaultErrorReporter;
       if (reporter != null) {
+        debugPrint('${report.error}\n${report.stackTrace}');
         reporter.report(report);
         return;
       }

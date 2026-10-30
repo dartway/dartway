@@ -53,7 +53,7 @@ final class DwClientErrorEndpoint {
     final route = _field(value, 'route', 512);
     final error = _field(value, 'error', 4096, required: true);
     final errorType = _field(value, 'errorType', 128, required: true);
-    final stack = _field(value, 'stackTrace', 16 << 10, required: true);
+    final stack = _field(value, 'stackTrace', 16 << 10) ?? '';
     final appVersion = _field(value, 'appVersion', 64);
     final features = value['featureIds'];
     final entries = value['entries'];
@@ -62,8 +62,6 @@ final class DwClientErrorEndpoint {
         (value.containsKey('route') && route == null) ||
         error == null ||
         errorType == null ||
-        !_errorType.hasMatch(errorType) ||
-        stack == null ||
         count is! int ||
         count < 1 ||
         count > 1000000 ||
@@ -116,34 +114,24 @@ final class DwClientErrorEndpoint {
       error: context,
       stackTrace: StackTrace.fromString(stack),
       accountId: ctx.accountId,
-      signature: _signature(platform, errorType, stack),
+      signature: _signature(platform, errorType, stack, ctx.accountId),
     );
     return DwHttpResponse.empty();
   }
 
-  static String _signature(String platform, String errorType, String stack) {
-    return 'client|$platform|$errorType|${_firstAppFrame(stack)}';
+  static String _signature(
+    String platform,
+    String errorType,
+    String stack,
+    int? accountId,
+  ) {
+    final normalizedType = errorType.replaceAll(
+      RegExp(r'[\r\n\u0000-\u001f]'),
+      ' ',
+    );
+    return 'client|$platform|$normalizedType|${dwFirstAppFrame(stack)}'
+        '${accountId == null ? '' : '|account:$accountId'}';
   }
-
-  static String _firstAppFrame(String stack) {
-    for (final line in const LineSplitter().convert(stack)) {
-      final frame = line.trim();
-      if (frame.isEmpty ||
-          frame.contains('dart:') ||
-          frame.contains('package:flutter/') ||
-          _frameworkPackageFrame.hasMatch(frame) ||
-          frame.contains('<asynchronous suspension>')) {
-        continue;
-      }
-      return frame.replaceFirst(RegExp(r'^#\d+\s+'), '');
-    }
-    return '';
-  }
-
-  static final _errorType = RegExp(r'^[A-Za-z_$][A-Za-z0-9_$]{0,127}$');
-  static final _frameworkPackageFrame = RegExp(
-    r'package:dartway_(?:core_(?:shared|server|flutter)|client|orm|generator|router|shared_preferences|telegram|auth_[a-z_]+|analytics_[a-z_]+|push_[a-z_]+|media_flutter|studio_(?:bridge|binding)|lints|cli)/',
-  );
 
   static String? _field(
     Map<String, Object?> json,
@@ -154,7 +142,7 @@ final class DwClientErrorEndpoint {
     final value = json[name];
     if (value == null && !required) return null;
     return value is String &&
-            value.isNotEmpty &&
+            (!required || value.isNotEmpty) &&
             utf8.encode(value).length <= max
         ? value
         : null;

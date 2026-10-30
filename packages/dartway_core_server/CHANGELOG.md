@@ -3,8 +3,9 @@
 ## 0.25.0-dev.1
 
 - Flutter errors now use a guarded ingestion endpoint with server-derived
-  signatures, peer/device limits, and a client-only enqueue budget. Server
-  incidents enter the durable outbox before its delivery ceiling (#683).
+  signatures, peer/device limits, a client-only enqueue budget, and delivery
+  priority that reserves at least half of the ceiling for server incidents
+  (#683).
 
 - Alerts now use a leased PostgreSQL outbox with retry and persisted signature
   coalescing. Add the JSON-contract `DwHttpAlertSink`, Telegram proxy support,

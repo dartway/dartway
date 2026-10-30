@@ -137,6 +137,7 @@ final class DwAppClient {
   final DwClientOptions options;
 
   /// Called after a server answer has been decoded successfully.
+  @internal
   final void Function()? onSuccessfulCall;
 
   /// Sends JSON to a framework-owned side channel without exposing the
