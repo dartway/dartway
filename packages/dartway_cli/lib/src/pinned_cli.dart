@@ -51,7 +51,8 @@ class DwPinnedCli {
 
   /// Set in the environment of the pinned CLI this one starts, so that a
   /// pin which still disagrees once running is refused instead of started
-  /// again.
+  /// again. A deploy runner that has already activated the project's pinned
+  /// CLI sets it too; that CLI may run from an unresolved checkout.
   static const reentryVariable = 'DW_PINNED_CLI';
 
   /// The project the pin was looked for in.
@@ -75,14 +76,21 @@ class DwPinnedCli {
   final String runningVersion;
 
   /// Whether the running CLI is the one this project pins. True when the
-  /// project pins nothing: there is nothing to disagree with.
+  /// project pins nothing, or when a caller identifies this as the pinned CLI
+  /// and the checkout is unresolved: there is nothing available to disagree
+  /// with.
   bool get isPinnedOne =>
       owner == null ||
-      (pinnedVersion != null && pinnedVersion == runningVersion);
+      (pinnedVersion != null && pinnedVersion == runningVersion) ||
+      (pinnedVersion == null && Platform.environment[reentryVariable] != null);
 
-  /// Whether the project pins a CLI that cannot be found: [owner]'s packages
-  /// are not resolved.
-  bool get isUnresolved => owner != null && pinnedVersion == null;
+  /// Whether the project pins a CLI that cannot be found and no caller has
+  /// identified this process as the already-pinned CLI. [owner]'s packages
+  /// need not be resolved when a deploy runner sets [reentryVariable].
+  bool get isUnresolved =>
+      owner != null &&
+      pinnedVersion == null &&
+      Platform.environment[reentryVariable] == null;
 
   /// What to say when the pin cannot be found, ending with the command that
   /// resolves it.
