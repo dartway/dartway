@@ -114,7 +114,7 @@ uses the framework without owning UI (for example, resolving a private file URL)
 A callback need not become flags on the receiving widget. Build the `DwUiAction` where the command
 is known and pass it to the kit component, which runs it through `DwActionBuilder`. A local
 `final onDone = (_) => InvoiceCommands.pay(invoice);` followed by `dw.action(onDone)` is recognized
-by CLI `0.25.0-dev.0` or later when every use of that closure is in the first argument of `dw.action`.
+by CLI `0.27.0` or later when every use of that closure is in the first argument of `dw.action`.
 The checker cannot trace a raw callback through another file's widget into its action; use the action value at that boundary.
 
 A pure helper that sat on a `<Feature>Commands` class (building a patch from a draft) moves to a
