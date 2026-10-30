@@ -4,6 +4,14 @@
 
 ### Breaking changes
 
+- **BREAKING (deploy):** production `deploy run` requires a `backup:` policy.
+  Configure daily and pre-deploy encrypted database backups, off-host upload,
+  host retention, freshness monitoring, and temporary restore verification;
+  every object-store operation uses the policy's required HTTPS endpoint and
+  region. Deliver the store credentials and rerun production `deploy setup`; see
+  the [migration note](../../docs/migrations/2026-10-30-production-deploy-backups.md)
+  (#686).
+
 - **BREAKING (check):** opt into Studio resources with `.dartway/design.json`.
   `designResourceCopied` rejects content-identical copies under app `assets/`;
   use the design link in the one asset dictionary instead. `designResourcesInvalid`

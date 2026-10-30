@@ -13,6 +13,68 @@ Matcher _refusal(List<String> fragments) => throwsA(
 );
 
 void main() {
+  group('backup', () {
+    test('reads the encrypted off-host policy and defaults retention', () {
+      final target = targetFrom(
+        extra: '''  backup:
+    bucket: private-backups
+    endpoint: https://s3.twcstorage.ru
+    recipient: age1recipient
+    schedule: 04:25
+''',
+      );
+      expect(target.backup?.bucket, 'private-backups');
+      expect(target.backup?.endpoint, 'https://s3.twcstorage.ru');
+      expect(target.backup?.region, 'ru-1');
+      expect(target.backup?.recipient, 'age1recipient');
+      expect(target.backup?.schedule, '04:25');
+      expect(target.backup?.dailyRetention, 7);
+      expect(target.backup?.weeklyRetention, 4);
+    });
+
+    test('rejects an invalid schedule and retention together', () {
+      expect(
+        () => targetFrom(
+          extra: '''  backup:
+    bucket: private-backups
+    endpoint: https://s3.twcstorage.ru
+    recipient: age1recipient
+    schedule: 25:00
+    daily: 0
+''',
+        ),
+        _refusal(['schedule', 'daily']),
+      );
+    });
+
+    test('requires an HTTPS endpoint', () {
+      expect(
+        () => targetFrom(
+          extra: '''  backup:
+    bucket: private-backups
+    endpoint: http://s3.example.com
+    recipient: age1recipient
+''',
+        ),
+        _refusal(['endpoint', 'HTTPS']),
+      );
+    });
+
+    test('rejects a region that cannot be passed safely to awscli', () {
+      expect(
+        () => targetFrom(
+          extra: '''  backup:
+    bucket: private-backups
+    endpoint: https://s3.example.com
+    region: ru-1;env
+    recipient: age1recipient
+''',
+        ),
+        _refusal(['region', 'letters, numbers']),
+      );
+    });
+  });
+
   group('build_cache_keep', () {
     test('defaults to 10GB and accepts a configured limit', () {
       expect(targetFrom().buildCacheKeep, '10GB');

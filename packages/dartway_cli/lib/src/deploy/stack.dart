@@ -359,6 +359,10 @@ class DwStack {
       storageAccessKey,
       storageSecretKey,
     ],
+    if (target.backup != null) ...[
+      'AWS_ACCESS_KEY_ID',
+      'AWS_SECRET_ACCESS_KEY',
+    ],
     ...target.requiredSecrets,
   }.toList();
 }
