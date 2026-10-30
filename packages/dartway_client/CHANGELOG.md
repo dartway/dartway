@@ -2,7 +2,8 @@
 
 ## 0.25.0-dev.1
 
-- Add public `DwAppClient.postFrameworkJson`, the authenticated framework side-channel sender used by Flutter error delivery without exposing the bearer token itself (#683).
+- Add the internal framework side-channel used by Flutter error delivery,
+  including anonymous retry after an expired session (#683).
 
 ## 0.24.0
 

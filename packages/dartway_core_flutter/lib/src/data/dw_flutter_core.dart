@@ -8,6 +8,7 @@ import '../core/logic/dw_flutter_config.dart';
 import '../core/logic/dw_key_value_store.dart';
 import '../diagnostics/error_reporting/logic/dw_error_source.dart';
 import '../diagnostics/error_reporting/dw_default_error_reporter.dart';
+import 'package:meta/meta.dart';
 import '../private/dw_singleton.dart';
 import 'dw_key_value_token_store.dart';
 import 'dw_request_notifiers.dart';
@@ -105,6 +106,7 @@ class DwFlutterCore extends DwFlutterToolbox {
   DwDefaultErrorReporter? _reporter;
 
   /// Framework-owned reporter used when the app did not override reporting.
+  @internal
   DwDefaultErrorReporter? get defaultErrorReporter => _reporter;
 
   final bool _ownStore;

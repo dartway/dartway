@@ -1,15 +1,21 @@
 import 'dart:convert';
 
+import 'package:dartway_core_server/dartway_core_server.dart';
 import 'package:test/test.dart';
 
 import 'support/test_app.dart';
 
 void main() {
-  final harness = useHarness(build: (app, config) => app.server(config));
+  final harness = useHarness(
+    build: (app, config) => app.server(
+      config,
+      settings: const DwServerSettings(alertsPerMinute: 100),
+    ),
+  );
 
   Map<String, Object?> report({String device = 'device-1'}) => {
     'deviceId': device,
-    'signature': 'server-controlled|must-not-win',
+    'errorType': 'StateError',
     'error': 'StateError: broken',
     'stackTrace':
         '#0 dart:core-patch/noise\n#1 package:flutter/noise\n#2 package:dartway_core_flutter/noise\n#3 package:app/feature.dart:42',
@@ -57,5 +63,31 @@ void main() {
       expect((await send(report(device: 'limited'))).status, 204);
     }
     expect((await send(report(device: 'limited'))).status, 429);
+  });
+
+  test('authenticated reports use the server account', () async {
+    final (_, session) = await harness().signedIn('reporter@example.com');
+    final answer = await send(
+      report(device: 'authenticated'),
+      token: session.token,
+    );
+    expect(answer.status, 204);
+    await eventually(
+      () => harness().app.alerts.incidents.any(
+        (incident) => incident.accountId == session.id,
+      ),
+    );
+  });
+
+  test('rotating device ids cannot bypass the peer limit', () async {
+    var rejected = false;
+    for (var i = 0; i < 100; i++) {
+      final answer = await send(report(device: 'rotated-$i'));
+      if (answer.status == 429) {
+        rejected = true;
+        break;
+      }
+    }
+    expect(rejected, isTrue);
   });
 }

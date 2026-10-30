@@ -27,6 +27,9 @@ context snapshot and dispatches a `DwErrorReport`. `DwErrorSource` names where i
 
 A report is dispatched to **`DwFlutterConfig.onErrorReport`** when it is set. Without an override, `DwFlutterCore` uses its built-in persistent reporter and sends the report to the app server. A no-op callback explicitly opts out.
 
+Set `DwFlutterConfig.uiActionFailedText` to the localized message shown when a
+`uiAction` throws, so the person who pressed the button is not left without feedback.
+
 ## What a report carries
 
 `DwErrorReport`:

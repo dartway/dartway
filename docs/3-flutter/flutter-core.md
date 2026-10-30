@@ -35,7 +35,7 @@ dw = DwFlutterCore(
     refusalText: (refusal) => refusalText(appL10n, refusal),
     updateRequiredScreen: (context, refusal) =>
         UpdateRequiredPage(refusal: refusal),
-    onErrorReport: _onErrorReport,
+    uiActionFailedText: appL10n.actionFailed,
     readLoadingBuilder: (context) =>
         const Center(child: AppProgressIndicator()),
     readFailedBuilder: (context, error, retry) => LoadFailedMessage(
@@ -76,6 +76,7 @@ dw = DwFlutterCore(
 | `readFailedBuilder` | yes | What a read shows when it was refused with no `onRefused` branch, failed, or could not reach the server: the kit's view, given a `retry`. |
 | `updateRequiredScreen` | no | The page put over the whole app once this build can no longer talk to its server. See [update required](update-required.md). |
 | `onErrorReport` | no | Replaces the built-in persistent reporter; use a no-op to opt out. See [error reporting](error-reporting.md). |
+| `uiActionFailedText` | no | Localized feedback shown when a `uiAction` throws unexpectedly, while the incident is reported. |
 | `confirmDialogBuilder` | no | Replaces the built-in `DwConfirmDialog` for `dw.action(confirmation: ...)`. |
 
 **Why four fields are required.** A server answers "no" with a code, and an app that cannot render

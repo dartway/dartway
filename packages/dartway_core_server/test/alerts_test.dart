@@ -114,7 +114,7 @@ void main() {
     });
 
     test(
-      'durable mode applies the global ceiling before enqueue',
+      'durable mode persists every occurrence before the delivery ceiling',
       () async {
         final persisted = <DwServerIncident>[];
         final durable = DwAlertGate(
@@ -131,7 +131,7 @@ void main() {
           );
         }
         await Future<void>.delayed(Duration.zero);
-        expect(persisted, hasLength(10));
+        expect(persisted, hasLength(1000));
         expect(persisted.map((i) => i.signature).toSet(), hasLength(1));
       },
     );

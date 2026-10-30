@@ -22,8 +22,8 @@ part without which a DartWay app doesn't exist — must be boring and stable; a 
 them makes the boring thing version at the speed of the moving thing. What lives here is the stable
 contract.
 
-**It collects, it does not deliver.** The error pipeline gathers an error and its context snapshot
-and routes it (`dw.handleError` → `dw.dispatchReport` → the configured hook). It does not deliver:
+**It collects and has a default delivery path.** The error pipeline gathers an error and its context snapshot
+and routes it (`dw.handleError` → `dw.dispatchReport` → the configured hook):
 without an override, `DwFlutterCore` persists reports and sends them to the guarded server alert path; `DwFlutterConfig.onErrorReport` replaces that delivery. The
 package has no business knowing the channels an error is sent to.
 

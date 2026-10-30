@@ -74,6 +74,22 @@ refusals. Rows beyond the ceiling remain queued for a later minute.
 
 A sink failure stays in the outbox and does not fail the call or create another incident.
 
+## Flutter client incidents
+
+The built-in Flutter reporter posts its bounded, persisted queue to
+`POST /dw/client-error`. Anonymous reports are accepted; authenticated reports
+are attributed from the validated session, never a client field. The endpoint
+caps the 32 KiB body and each field, derives the signature from the validated
+runtime error type and first non-SDK/non-framework frame, and permits 30 reports
+per device and 60 per resolved peer address each minute. Peer resolution honors
+`trustedProxyNetworks`, so rotating the client-chosen device id cannot evade the
+network boundary.
+
+Client incidents have a separate pre-enqueue budget of
+`DwServerSettings.alertsPerMinute` per process. Exhausting it returns 429 and is
+logged; it never consumes or drops the budget for server incidents. The ordinary
+alert ceiling remains a delivery limit, and durable rows beyond it stay queued.
+
 ## Sinks
 
 `DwAppServer(alerts: …)` takes a `DwAlertSink`:

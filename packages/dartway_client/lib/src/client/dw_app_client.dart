@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:dartway_core_shared/dartway_core_shared.dart';
+import 'package:meta/meta.dart';
 
 import '../dw_client_exceptions.dart';
 import '../dw_client_options.dart';
@@ -140,19 +141,24 @@ final class DwAppClient {
 
   /// Sends JSON to a framework-owned side channel without exposing the
   /// session bearer token to application code.
-  Future<DwHttpReply> postFrameworkJson(String path, String body) =>
-      httpTransport.post(
-        DwHttpPost(
-          url: _frameworkUrl(path),
-          headers: {
-            DwHttpContract.contentTypeHeader: DwHttpContract.jsonContentType,
-            if (_session?.token case final token?)
-              DwHttpContract.authorizationHeader:
-                  '${DwHttpContract.bearerPrefix}$token',
-          },
-          body: body,
-        ),
-      );
+  @internal
+  Future<DwHttpReply> postFrameworkJson(
+    String path,
+    String body, {
+    bool authorize = true,
+  }) => httpTransport.post(
+    DwHttpPost(
+      url: _frameworkUrl(path),
+      headers: {
+        DwHttpContract.contentTypeHeader: DwHttpContract.jsonContentType,
+        if (authorize)
+          if (_session?.token case final token?)
+            DwHttpContract.authorizationHeader:
+                '${DwHttpContract.bearerPrefix}$token',
+      },
+      body: body,
+    ),
+  );
 
   Uri _frameworkUrl(String path) {
     final base = baseUrl.path.endsWith('/')

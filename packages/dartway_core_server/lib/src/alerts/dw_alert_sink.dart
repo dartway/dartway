@@ -342,17 +342,7 @@ final class DwAlertGate {
       stackTrace: stackTrace,
     );
     final now = _clock();
-    // Persistence owns signature windows, but the process-wide ceiling still
-    // applies before enqueue so fresh signatures cannot fill the channel.
     if (enqueue case final persist?) {
-      _recent.removeWhere(
-        (sent) => now.difference(sent) >= const Duration(minutes: 1),
-      );
-      if (_recent.length >= maxPerMinute) {
-        _heldBack++;
-        return incident.id;
-      }
-      _recent.add(now);
       unawaited(
         persist(incident).catchError((Object e) {
           logger.warning('alert outbox failed for ${incident.id}', error: e);

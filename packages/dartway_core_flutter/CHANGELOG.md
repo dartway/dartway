@@ -4,7 +4,8 @@
 
 - Flutter errors now use the built-in persistent device queue and guarded server ingestion endpoint, feeding the existing durable alert outbox by default (#683).
 
-- Advance in lockstep with the core family; no API or wire changes in this package.
+- Add `DwFlutterConfig.uiActionFailedText` for visible feedback when a UI action
+  throws while the built-in reporter delivers the incident (#683).
 
 ## 0.24.0
 
