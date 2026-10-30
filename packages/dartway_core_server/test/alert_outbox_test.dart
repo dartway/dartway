@@ -120,7 +120,7 @@ void main() {
     '1000 identical incidents become one incident and repeated 999',
     () async {
       final sink = _SwitchableSink();
-      final at = DateTime.utc(2026, 10, 30, 12);
+      final at = DateTime.now().toUtc();
       var now = at;
       final worker = DwAlertOutbox(
         db: opened.db,
@@ -133,6 +133,7 @@ void main() {
       for (var i = 0; i < 1000; i++) {
         await worker.enqueue(incident('incident-$i', at));
       }
+      now = DateTime.now().toUtc();
       worker.start();
       await waitFor(() => sink.delivered.length == 1);
       now = at.add(const Duration(hours: 1, microseconds: 1));
@@ -176,7 +177,7 @@ void main() {
   });
 
   test('Telegram retry_after is the earliest next attempt', () async {
-    final now = DateTime.utc(2026, 10, 30, 12);
+    late final DateTime now;
     final worker = DwAlertOutbox(
       db: opened.db,
       sink: _RetryAfterSink(const Duration(minutes: 3)),
@@ -185,7 +186,8 @@ void main() {
       pollInterval: const Duration(milliseconds: 10),
       clock: () => now,
     );
-    await worker.enqueue(incident('rate-limited', now));
+    await worker.enqueue(incident('rate-limited'));
+    now = DateTime.now().toUtc();
     worker.start();
     await waitFor(() => _RetryAfterSink.attempted);
     await worker.stop();
