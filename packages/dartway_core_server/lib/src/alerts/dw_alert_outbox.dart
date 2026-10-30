@@ -6,12 +6,6 @@ import 'package:meta/meta.dart';
 import 'dw_alert_sink.dart';
 import 'dw_server_logger.dart';
 
-/// A test sink that observes the original incident when it is enqueued.
-@internal
-abstract interface class DwAlertEnqueueRecorder {
-  void recordEnqueued(DwServerIncident incident);
-}
-
 /// Durable, leased delivery of incidents, with database-backed coalescing.
 @internal
 final class DwAlertOutbox {
@@ -39,6 +33,7 @@ final class DwAlertOutbox {
 
   static DateTime _systemClock() => DateTime.now().toUtc();
   final List<DwServerIncident> _buffer = [];
+  final Set<Future<void>> _inFlight = {};
   bool _running = false;
   Future<void>? _loop;
   static const _bufferLimit = 1000;
@@ -48,10 +43,14 @@ final class DwAlertOutbox {
     _loop = _work();
   }
 
-  Future<void> enqueue(DwServerIncident incident) async {
-    if (sink case final DwAlertEnqueueRecorder recorder) {
-      recorder.recordEnqueued(incident);
-    }
+  Future<void> enqueue(DwServerIncident incident) {
+    late final Future<void> pending;
+    pending = _persist(incident).whenComplete(() => _inFlight.remove(pending));
+    _inFlight.add(pending);
+    return pending;
+  }
+
+  Future<void> _persist(DwServerIncident incident) async {
     try {
       await _write(incident);
     } catch (error) {
@@ -66,6 +65,7 @@ final class DwAlertOutbox {
 
   Future<void> stop() async {
     _running = false;
+    await Future.wait(_inFlight.toList());
     // Persist memory before allowing the database to close.
     await _flush();
     await _loop;
@@ -156,13 +156,22 @@ ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
           return row;
         });
         if (claimed != null) await _deliver(claimed);
-        final expired = await db.execute(
-          'DELETE FROM dw_alert_outbox WHERE created_at < @expiry::timestamptz',
+        final expired = await db.query(
+          '''
+WITH expired AS (
+  DELETE FROM dw_alert_outbox WHERE created_at < @expiry::timestamptz
+  RETURNING initial_delivered_at, repeat_count, repeat_delivered_at
+)
+SELECT count(*)::int AS undelivered FROM expired
+WHERE initial_delivered_at IS NULL
+   OR (repeat_count > 0 AND repeat_delivered_at IS NULL)
+''',
           params: {'expiry': _clock().subtract(const Duration(days: 7))},
         );
-        if (expired > 0) {
+        final undelivered = expired.single.get<int>('undelivered');
+        if (undelivered > 0) {
           logger.warning(
-            '$expired alert outbox row(s) expired after seven days',
+            '$undelivered undelivered alert outbox row(s) expired after seven days',
           );
         }
       } catch (error) {
@@ -201,6 +210,12 @@ ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
     } catch (error) {
       final attempts = row.get<int>('attempts') + 1;
       final seconds = (1 << attempts.clamp(0, 12)).clamp(1, 3600);
+      final retryDelay = error is DwTelegramAlertException
+          ? error.retryAfter
+          : null;
+      final delay = retryDelay != null && retryDelay.inSeconds > seconds
+          ? retryDelay
+          : Duration(seconds: seconds);
       await db.execute(
         '''
 UPDATE dw_alert_outbox SET attempts = @attempts,
@@ -208,7 +223,7 @@ UPDATE dw_alert_outbox SET attempts = @attempts,
 ''',
         params: {
           'attempts': attempts,
-          'next': _clock().add(Duration(seconds: seconds)),
+          'next': _clock().add(delay),
           'error': '$error',
           'id': incident.id,
         },

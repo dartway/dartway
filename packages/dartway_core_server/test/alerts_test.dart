@@ -210,6 +210,45 @@ void main() {
   });
 
   test(
+    'Telegram 429 exposes retry_after without exposing credentials',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response
+          ..statusCode = HttpStatus.tooManyRequests
+          ..headers.contentType = ContentType.json
+          ..write('{"parameters":{"retry_after":37}}');
+        await request.response.close();
+      });
+      final alerts = DwTelegramAlertSink(
+        botToken: 'TOKEN',
+        chatId: '42',
+        logger: RecordingLogger(),
+        apiBase: Uri.parse('http://127.0.0.1:${server.port}'),
+      );
+      await expectLater(
+        alerts.send(
+          DwServerIncident(
+            id: 'rate-limited',
+            where: 'job cleanup',
+            error: StateError('failed'),
+            stackTrace: StackTrace.current,
+          ),
+        ),
+        throwsA(
+          isA<DwTelegramAlertException>().having(
+            (error) => error.retryAfter,
+            'retryAfter',
+            const Duration(seconds: 37),
+          ),
+        ),
+      );
+      await server.close();
+    },
+  );
+
+  test(
     'HTTP alerts send the documented JSON contract and bearer token',
     () async {
       final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);

@@ -227,17 +227,29 @@ final class DwTelegramAlertSink implements DwAlertSink {
       request.write(jsonEncode({'chat_id': chatId, 'text': text.toString()}));
       final response = await request.close().timeout(_timeout);
       status = response.statusCode;
-      await response.drain<void>().timeout(_timeout);
+      final responseBody = await utf8.decodeStream(response).timeout(_timeout);
       if (response.statusCode != 200) {
-        throw const HttpException('Telegram returned a non-200 response');
+        Duration? retryAfter;
+        if (response.statusCode == HttpStatus.tooManyRequests) {
+          final decoded = jsonDecode(responseBody);
+          final parameters = decoded is Map ? decoded['parameters'] : null;
+          final seconds = parameters is Map ? parameters['retry_after'] : null;
+          if (seconds is int && seconds >= 0) {
+            retryAfter = Duration(seconds: seconds);
+          }
+        }
+        throw DwTelegramAlertException(
+          'HttpException',
+          response.statusCode,
+          retryAfter: retryAfter,
+        );
       }
     } catch (error) {
       // dart:io exceptions can include the request URI, whose path contains
       // the bot token. Only the type and status cross the sink boundary.
-      final sanitized = DwTelegramAlertException(
-        error.runtimeType.toString(),
-        status,
-      );
+      final sanitized = error is DwTelegramAlertException
+          ? error
+          : DwTelegramAlertException(error.runtimeType.toString(), status);
       logger.warning(
         'Telegram alert for incident ${incident.id} was not delivered',
         error: sanitized,
@@ -251,10 +263,15 @@ final class DwTelegramAlertSink implements DwAlertSink {
 
 /// A Telegram delivery failure that never carries the bot URL or token.
 final class DwTelegramAlertException implements Exception {
-  const DwTelegramAlertException(this.errorType, this.statusCode);
+  const DwTelegramAlertException(
+    this.errorType,
+    this.statusCode, {
+    this.retryAfter,
+  });
 
   final String errorType;
   final int? statusCode;
+  final Duration? retryAfter;
 
   @override
   String toString() =>

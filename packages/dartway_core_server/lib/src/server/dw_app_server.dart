@@ -541,15 +541,15 @@ final class DwAppServer {
         settings.stopTimeout,
         onTimeout: () => logger.warning('jobs still running at stop timeout'),
       );
+      await running.front.close();
+      for (final module in modules) {
+        await module.close();
+      }
       await running.alertOutbox.stop().timeout(
         settings.stopTimeout,
         onTimeout: () =>
             logger.warning('alert outbox still stopping at timeout'),
       );
-      await running.front.close();
-      for (final module in modules) {
-        await module.close();
-      }
       await running.database.close();
       running.files?.close();
       running.outbound.close();

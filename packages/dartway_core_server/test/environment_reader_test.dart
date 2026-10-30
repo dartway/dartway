@@ -163,10 +163,14 @@ void main() {
         'DW_TRUSTED_PROXY_NETWORKS': '172.18.0.0/16, fd00::/64',
         'DW_HTTP_BEHIND_PROXY': 'true',
         'KAMAL_VERSION': revision,
+        'DW_PROJECT': 'shop',
+        'DW_ENVIRONMENT': 'production',
       });
       expect(environment.trustedProxyNetworks, ['172.18.0.0/16', 'fd00::/64']);
       expect(environment.httpBehindProxy, true);
       expect(environment.deploymentVersion, revision);
+      expect(environment.project, 'shop');
+      expect(environment.environment, 'production');
       final local = read(database);
       expect(local.trustedProxyNetworks, isEmpty);
       expect(local.httpBehindProxy, false);
@@ -327,6 +331,18 @@ local:
           'DW_ALERT_HTTP_TOKEN': 'secret',
         }).alerts,
         isA<DwHttpAlertSink>(),
+      );
+    });
+
+    test('reports an invalid Telegram proxy URL', () {
+      expect(
+        problemsReading({
+          ...database,
+          'DW_TELEGRAM_ALERTS_BOT_TOKEN': 'token',
+          'DW_TELEGRAM_ALERTS_CHAT_ID': '42',
+          'DW_TELEGRAM_ALERTS_PROXY_URL': 'not a URL',
+        }, (read) => DwServerEnvironment.read(read)),
+        [contains('DW_TELEGRAM_ALERTS_PROXY_URL')],
       );
     });
   });

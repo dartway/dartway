@@ -22,6 +22,8 @@ import 'dw_environment_reader.dart';
 /// | `DW_HTTP_BEHIND_PROXY` | [httpBehindProxy], false by default |
 /// | `DW_STRICT_BOUNDS` | [strictBounds], false by default |
 /// | `KAMAL_VERSION` | [deploymentVersion], the immutable native revision |
+/// | `DW_PROJECT` | [project], the deployed project name |
+/// | `DW_ENVIRONMENT` | [environment], the deployment destination name |
 ///
 /// Read as a part of the project's own environment, so one start reports
 /// every missing variable of both:
@@ -44,6 +46,8 @@ final class DwServerEnvironment {
     this.trustedProxyNetworks = const [],
     this.httpBehindProxy = false,
     this.deploymentVersion,
+    this.project,
+    this.environment,
     this.strictBounds = false,
     this.alerts,
   });
@@ -90,6 +94,8 @@ final class DwServerEnvironment {
       trustedProxyNetworks: read.list('DW_TRUSTED_PROXY_NETWORKS'),
       httpBehindProxy: read.flag('DW_HTTP_BEHIND_PROXY'),
       deploymentVersion: read.optional('KAMAL_VERSION'),
+      project: read.optional('DW_PROJECT'),
+      environment: read.optional('DW_ENVIRONMENT'),
       strictBounds: read.flag(strictBoundsVariable),
       alerts: _alerts(read),
     );
@@ -151,6 +157,12 @@ final class DwServerEnvironment {
   /// KAMAL_VERSION, provided by native Kamal to every application container.
   final String? deploymentVersion;
 
+  /// `DW_PROJECT`, the project name rendered by `dartway deploy`.
+  final String? project;
+
+  /// `DW_ENVIRONMENT`, the destination name rendered by `dartway deploy`.
+  final String? environment;
+
   /// `DW_STRICT_BOUNDS=true`: a `list` handler answering past its request's
   /// `maxItems` fails the call (`DwServerSettings.strictBounds`) instead of
   /// being served with a warning.
@@ -197,11 +209,20 @@ final class DwServerEnvironment {
         return null;
       }
       final proxy = read.optional('DW_TELEGRAM_ALERTS_PROXY_URL');
+      final proxyUrl = proxy == null ? null : Uri.tryParse(proxy);
+      if (proxyUrl != null &&
+          (!proxyUrl.hasAuthority ||
+              (proxyUrl.scheme != 'http' && proxyUrl.scheme != 'https'))) {
+        read.report(
+          'DW_TELEGRAM_ALERTS_PROXY_URL must be an absolute HTTP URL',
+        );
+        return null;
+      }
       return DwTelegramAlertSink(
         botToken: telegramToken,
         chatId: telegramChat,
         logger: const DwConsoleLogger(),
-        proxyUrl: proxy == null ? null : Uri.parse(proxy),
+        proxyUrl: proxyUrl,
       );
     }
     return null;

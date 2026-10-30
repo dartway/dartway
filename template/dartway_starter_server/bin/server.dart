@@ -62,6 +62,8 @@ Future<void> main() async {
       trustedProxyNetworks: env.server.trustedProxyNetworks,
       behindProxy: env.server.httpBehindProxy,
       deploymentVersion: env.server.deploymentVersion,
+      alertProject: env.server.project,
+      alertEnvironment: env.server.environment,
       strictBounds: env.server.strictBounds,
       // The project chooses which calls need peer quotas. With an ingress,
       // declare its actual network before adding entries here.

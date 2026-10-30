@@ -174,6 +174,77 @@ void main() {
     await second.stop();
     expect(sink.delivered, ['incident-1:incident']);
   });
+
+  test('Telegram retry_after is the earliest next attempt', () async {
+    final now = DateTime.utc(2026, 10, 30, 12);
+    final worker = DwAlertOutbox(
+      db: opened.db,
+      sink: _RetryAfterSink(const Duration(minutes: 3)),
+      logger: RecordingLogger(),
+      window: const Duration(hours: 1),
+      pollInterval: const Duration(milliseconds: 10),
+      clock: () => now,
+    );
+    await worker.enqueue(incident('rate-limited', now));
+    worker.start();
+    await waitFor(() => _RetryAfterSink.attempted);
+    await worker.stop();
+    final row = (await opened.db.query(
+      "SELECT next_attempt_at FROM dw_alert_outbox WHERE id = 'rate-limited'",
+    )).single;
+    expect(
+      row.get<DateTime>('next_attempt_at'),
+      greaterThanOrEqualTo(now.add(const Duration(minutes: 3))),
+    );
+  });
+
+  test(
+    'database outage buffers incidents, restores them, and caps at 1000',
+    () async {
+      await opened.db.execute(
+        'ALTER TABLE dw_alert_outbox RENAME TO dw_alert_outbox_down',
+      );
+      final worker = outbox(_SwitchableSink());
+      for (var i = 0; i < 1001; i++) {
+        await worker.enqueue(incident('buffered-$i'));
+      }
+      await opened.db.execute(
+        'ALTER TABLE dw_alert_outbox_down RENAME TO dw_alert_outbox',
+      );
+      worker.start();
+      final limit = DateTime.now().add(const Duration(seconds: 15));
+      var count = 0;
+      while (count < 1000 && DateTime.now().isBefore(limit)) {
+        count = (await opened.db.query(
+          "SELECT count(*)::int AS count FROM dw_alert_outbox WHERE id LIKE 'buffered-%'",
+        )).single.get<int>('count');
+        await Future<void>.delayed(const Duration(milliseconds: 10));
+      }
+      await worker.stop();
+      expect(count, 1000);
+      expect(
+        await opened.db.query(
+          "SELECT 1 FROM dw_alert_outbox WHERE id = 'buffered-0'",
+        ),
+        isEmpty,
+      );
+    },
+  );
+}
+
+final class _RetryAfterSink implements DwAlertSink {
+  _RetryAfterSink(this.delay) {
+    attempted = false;
+  }
+
+  final Duration delay;
+  static bool attempted = false;
+
+  @override
+  Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
+    attempted = true;
+    throw DwTelegramAlertException('rate limited', 429, retryAfter: delay);
+  }
 }
 
 final class _SwitchableSink implements DwAlertSink {

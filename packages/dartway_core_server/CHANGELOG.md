@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.24.1-dev.1
+## 0.25.0-dev.1
 
 - Alerts now use a leased PostgreSQL outbox with retry and persisted signature
   coalescing. Add the JSON-contract `DwHttpAlertSink`, Telegram proxy support,

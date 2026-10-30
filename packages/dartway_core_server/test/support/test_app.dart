@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:io';
 
 import 'package:dartway_core_server/dartway_core_server.dart';
-import 'package:dartway_core_server/src/alerts/dw_alert_outbox.dart';
 import 'package:dartway_core_server/src/context/dw_call_context.dart';
 import 'package:dartway_core_server/testing.dart';
 import 'package:test/test.dart';
@@ -27,21 +26,14 @@ DwDatabaseConfig adminConfig() {
 }
 
 /// Alerts recorded for assertions.
-final class RecordingAlerts implements DwAlertSink, DwAlertEnqueueRecorder {
+final class RecordingAlerts implements DwAlertSink {
   final List<DwServerIncident> incidents = [];
   final List<String?> notes = [];
   final Set<String> _recordedIds = {};
 
   @override
-  void recordEnqueued(DwServerIncident incident) {
-    if (_recordedIds.add(incident.id)) incidents.add(incident);
-  }
-
-  @override
   Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
-    // A direct gate has no outbox enqueue at which to observe the incident.
-    // Record its delivery instead, without duplicating durable incidents that
-    // were already observed by [recordEnqueued].
+    // Retries and durable observations can reach this sink more than once.
     if (_recordedIds.add(incident.id)) incidents.add(incident);
     notes.add(suppressedNote);
   }
