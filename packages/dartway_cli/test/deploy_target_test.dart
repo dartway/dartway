@@ -30,6 +30,19 @@ void main() {
       expect(target.backup?.schedule, '04:25');
       expect(target.backup?.dailyRetention, 7);
       expect(target.backup?.weeklyRetention, 4);
+      expect(target.backup?.preDeployRetention, 5);
+    });
+
+    test('reads pre-deploy retention', () {
+      final target = targetFrom(
+        extra: '''  backup:
+    bucket: private-backups
+    endpoint: https://s3.twcstorage.ru
+    recipient: age1recipient
+    pre_deploy: 9
+''',
+      );
+      expect(target.backup?.preDeployRetention, 9);
     });
 
     test('rejects an invalid schedule and retention together', () {
@@ -41,9 +54,10 @@ void main() {
     recipient: age1recipient
     schedule: 25:00
     daily: 0
+    pre_deploy: 0
 ''',
         ),
-        _refusal(['schedule', 'daily']),
+        _refusal(['schedule', 'daily', 'pre_deploy']),
       );
     });
 

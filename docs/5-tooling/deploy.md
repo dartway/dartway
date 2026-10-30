@@ -219,7 +219,7 @@ reads it.
 | `app_domain` | yes | The Flutter web app |
 | `site` | no | `domain` and `source`: a directory of the repository served as static files, or `none` for a site that lives elsewhere |
 | `database` | no | `bundled` or `external`; absent means `bundled` — a Postgres container in the stack |
-| `backup` | no | Encrypted database backups: `bucket`, public age `recipient`, UTC `schedule` (`HH:MM`), and local `daily`/`weekly` retention counts |
+| `backup` | no | Encrypted database backups: `bucket`, public age `recipient`, UTC `schedule` (`HH:MM`), and local `daily`/`weekly`/`pre_deploy` retention counts |
 | `storage` | no | `bundled` or `external`; absent means no file storage |
 | `storage_domain` | with `bundled` | The public host of the bundled storage; refused without `storage: bundled` |
 | `min_free_disk` | no | Minimum free space on Docker's data root before building; defaults to `10GB`. Positive sizes in `MB` or `GB` (1024-based), for example `512MB` or `10GB` |
@@ -272,15 +272,18 @@ backup:
   schedule: 03:00       # UTC
   daily: 7
   weekly: 4
+  pre_deploy: 5
 ```
 
 Deliver `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with `dartway secret
 set`, then rerun `dartway deploy setup`. Setup installs a persistent systemd
 timer. Each run makes a custom-format `pg_dump`, encrypts it with age, uploads
-it below `backups/daily/`, and prunes the host copies to the configured daily
-and weekly counts. The bucket is private; encryption means the bucket operator
-still cannot read a dump. Configure the bucket's lifecycle rule to delete old
-off-host copies; for example, expire objects under `backups/` after 30 days.
+it below `backups/daily/`, and prunes the host copies to the configured daily,
+weekly, and pre-deploy counts. The three local sets default to 7 daily dumps, 4
+weekly dumps, and 5 pre-deploy dumps. The bucket is private; encryption means
+the bucket operator still cannot read a dump. Configure the bucket's lifecycle
+rule to delete old off-host copies; for example, expire objects under `backups/`
+after 30 days.
 The backup script prunes host copies only and does not delete bucket objects.
 
 A configured production deploy runs the same operation below
@@ -289,6 +292,9 @@ and therefore before its migrations. A dump, encryption, or upload failure
 stops the deploy with the serving version untouched. `--skip-backup` is the
 explicit emergency exception; the deployment journal records a
 `backup-skipped` step and its output.
+
+Only a Sunday daily backup is copied into the local weekly set; pre-deploy
+backups are never weekly candidates.
 
 On a non-production verification stand, put the age identity file path in the
 stand's secret store as `BACKUP_AGE_IDENTITY`, then run:

@@ -1,4 +1,7 @@
+import 'dart:io';
+
 import 'package:dartway_cli/src/deploy/database_backup.dart';
+import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 
 import 'support/deploy_fixtures.dart';
@@ -56,4 +59,61 @@ void main() {
     expect(script, contains('rm -f "\$plain" "\$pg_env"'));
     expect(script, isNot(contains('-e PGPASSWORD=')));
   });
+
+  test(
+    'rendered script prunes pre-deploy dumps and never copies them weekly',
+    () {
+      final sandbox = Directory.systemTemp.createTempSync('dw-backup-test-');
+      addTearDown(() => sandbox.deleteSync(recursive: true));
+      final root = p.join(sandbox.path, 'backups');
+      final rendered = dwDatabaseBackupScript(
+        stackFrom(
+          extra: '''  backup:
+    bucket: private-backups
+    endpoint: https://s3.twcstorage.ru
+    recipient: age1recipient
+    pre_deploy: 5
+''',
+        ),
+      );
+      final script = rendered
+          .split('\n')
+          .map((line) {
+            if (line.startsWith('source ')) return ':';
+            if (line.startsWith("root='")) return "root='$root'";
+            if (line.endsWith(' > "\$plain"')) {
+              return "printf 'dump' > \"\$plain\"";
+            }
+            if (line.startsWith('age -r ')) {
+              return 'cp "\$plain" "\$encrypted"';
+            }
+            if (line.startsWith('aws ') && line.contains(' s3 cp ')) return ':';
+            return line.replaceAll('"\$(date -u +%u)" = 7', '"7" = 7');
+          })
+          .join('\n');
+      final scriptFile = File(p.join(sandbox.path, 'backup.sh'))
+        ..writeAsStringSync(script);
+
+      for (var run = 1; run <= 7; run++) {
+        final result = Process.runSync('bash', [
+          scriptFile.path,
+          'pre-deploy',
+          'version-$run',
+        ]);
+        expect(
+          result.exitCode,
+          0,
+          reason: '${result.stdout}\n${result.stderr}',
+        );
+      }
+
+      expect(
+        Directory(
+          p.join(root, 'pre-deploy'),
+        ).listSync().whereType<File>().length,
+        5,
+      );
+      expect(Directory(p.join(root, 'weekly')).listSync(), isEmpty);
+    },
+  );
 }

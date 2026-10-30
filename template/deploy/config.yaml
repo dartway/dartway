@@ -140,6 +140,7 @@ local:
 #     schedule: 03:00
 #     daily: 7
 #     weekly: 4
+#     pre_deploy: 5
 #
 #   # Optional. File storage for uploads (presigned direct uploads, D-034), in
 #   # two buckets: public files (a rule with visibility public — avatars) are
