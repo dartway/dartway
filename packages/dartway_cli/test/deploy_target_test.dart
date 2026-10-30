@@ -13,6 +13,37 @@ Matcher _refusal(List<String> fragments) => throwsA(
 );
 
 void main() {
+  group('backup', () {
+    test('reads the encrypted off-host policy and defaults retention', () {
+      final target = targetFrom(
+        extra: '''  backup:
+    bucket: private-backups
+    recipient: age1recipient
+    schedule: 04:25
+''',
+      );
+      expect(target.backup?.bucket, 'private-backups');
+      expect(target.backup?.recipient, 'age1recipient');
+      expect(target.backup?.schedule, '04:25');
+      expect(target.backup?.dailyRetention, 7);
+      expect(target.backup?.weeklyRetention, 4);
+    });
+
+    test('rejects an invalid schedule and retention together', () {
+      expect(
+        () => targetFrom(
+          extra: '''  backup:
+    bucket: private-backups
+    recipient: age1recipient
+    schedule: 25:00
+    daily: 0
+''',
+        ),
+        _refusal(['schedule', 'daily']),
+      );
+    });
+  });
+
   group('build_cache_keep', () {
     test('defaults to 10GB and accepts a configured limit', () {
       expect(targetFrom().buildCacheKeep, '10GB');

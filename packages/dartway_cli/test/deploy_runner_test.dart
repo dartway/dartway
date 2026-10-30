@@ -21,6 +21,45 @@ List<String> _ids(DwDeployRunner runner) =>
     runner.steps(skipGitUpdate: false).map((step) => step.id).toList();
 
 void main() {
+  test(
+    'production backup is before migrations and an explicit skip is journalled',
+    () {
+      final target = DwDeployTarget.parse(
+        configYaml(
+          environment: 'production',
+          extra: '''  backup:
+    bucket: private-backups
+    recipient: age1recipient
+''',
+        ),
+        environment: 'production',
+      );
+      final runner = DwDeployRunner(
+        ssh: RecordingSsh(),
+        stack: DwStack(
+          target: target,
+          projectRoot: Directory.systemTemp,
+          serverPackage: 'shop_server',
+          flutterPackage: 'shop_flutter',
+        ),
+      );
+      final normal = runner
+          .steps(skipGitUpdate: false)
+          .map((step) => step.id)
+          .toList();
+      expect(
+        normal.indexOf('pre-deploy-backup'),
+        lessThan(normal.indexOf('server')),
+      );
+      expect(
+        runner
+            .steps(skipGitUpdate: false, skipBackup: true)
+            .map((step) => step.id),
+        contains('backup-skipped'),
+      );
+    },
+  );
+
   for (final field in ['mem_limit', 'deploy']) {
     test('low host memory warns using $field and does not fail', () async {
       final server = field == 'mem_limit'

@@ -14,6 +14,9 @@
 
 ### Changes
 
+- Configure daily and pre-deploy encrypted database backups, off-host upload,
+  host retention, freshness monitoring, and temporary restore verification.
+
 - Fix: recognize local final command callbacks used only as `dw.action` work,
   detect parenthesized watched-read bindings, and accept feature-wide
   `<feature>[_<scenario>]_contract_test.dart` files. Clarify Flutter migration

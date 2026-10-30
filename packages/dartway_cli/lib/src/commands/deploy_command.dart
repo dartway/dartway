@@ -24,6 +24,7 @@ class DeployCommand extends Command<int> {
     addSubcommand(DeployRunCommand());
     addSubcommand(DeployCheckCommand());
     addSubcommand(DeployStatsCommand());
+    addSubcommand(DeployBackupCommand());
   }
 
   @override
@@ -31,6 +32,66 @@ class DeployCommand extends Command<int> {
 
   @override
   String get description => 'Deploy the project to a configured server.';
+}
+
+class DeployBackupCommand extends Command<int> {
+  DeployBackupCommand() {
+    addSubcommand(DeployBackupVerifyCommand());
+  }
+  @override
+  String get name => 'backup';
+  @override
+  String get description => 'Operate configured encrypted database backups.';
+}
+
+class DeployBackupVerifyCommand extends Command<int> {
+  DeployBackupVerifyCommand({DwStack? stack, DwSshRunner? connection})
+    : _stack = stack,
+      _connection = connection {
+    argParser
+      ..addOption(
+        'env',
+        help: 'Verification target declared in deploy/config.yaml.',
+      )
+      ..addOption(
+        'as',
+        help: 'SSH login. Defaults to ssh_user from the config.',
+      )
+      ..addOption('identity', help: 'SSH private key file.');
+  }
+  final DwStack? _stack;
+  final DwSshRunner? _connection;
+  @override
+  String get name => 'verify';
+  @override
+  String get description =>
+      'Restore the latest off-host backup temporarily and report table row counts.';
+  @override
+  Future<int> run() async {
+    final stack =
+        _stack ?? resolveDeployStack(this, argResults!, deployProjectRoot());
+    if (stack.target.backup == null)
+      usageException('The target has no backup: configuration.');
+    if (stack.target.database != DwDatabaseMode.bundled) {
+      usageException(
+        'Backup verification currently requires a bundled database target.',
+      );
+    }
+    final ssh =
+        _connection ??
+        DwSshRunner(
+          host: stack.target.host,
+          user: argResults!.option('as') ?? stack.target.sshUser,
+          identityFile: argResults!.option('identity'),
+        );
+    final result = await ssh.runAs(
+      stack.target.deployUser,
+      "'${stack.target.runtimeConfigDir}/backup' verify",
+    );
+    stdout.write(result.stdout);
+    stderr.write(result.stderr);
+    return result.exitCode;
+  }
 }
 
 /// The environment named by `--env`, read and validated, with the project's
@@ -148,6 +209,11 @@ class DeployRunCommand extends Command<int> {
         help:
             'Allow this deploy when the running image cannot be resolved. '
             'A failure leaves the service down until the next deploy.',
+      )
+      ..addFlag(
+        'skip-backup',
+        negatable: false,
+        help: 'Explicitly skip the mandatory production pre-deploy backup.',
       )
       ..addFlag(
         'resume',

@@ -219,6 +219,7 @@ reads it.
 | `app_domain` | yes | The Flutter web app |
 | `site` | no | `domain` and `source`: a directory of the repository served as static files, or `none` for a site that lives elsewhere |
 | `database` | no | `bundled` or `external`; absent means `bundled` — a Postgres container in the stack |
+| `backup` | no | Encrypted database backups: `bucket`, public age `recipient`, UTC `schedule` (`HH:MM`), and local `daily`/`weekly` retention counts |
 | `storage` | no | `bundled` or `external`; absent means no file storage |
 | `storage_domain` | with `bundled` | The public host of the bundled storage; refused without `storage: bundled` |
 | `min_free_disk` | no | Minimum free space on Docker's data root before building; defaults to `10GB`. Positive sizes in `MB` or `GB` (1024-based), for example `512MB` or `10GB` |
@@ -255,6 +256,54 @@ this refusal on a host whose stock `admin` group exists — that guard is not wh
 does is the default: `dw_admin` is fixed rather than derived from the project, because no stock
 image or package ships a group under the `dw_` prefix, so an operator who does not set
 `deploy_user` never meets this collision at all.
+
+### Database backups
+
+Declare the policy in the deployment environment; keep only the public age
+recipient in Git. The matching private identity must never be stored on the
+production host.
+
+```yaml
+backup:
+  bucket: private-project-backups
+  recipient: age1example...
+  schedule: 03:00       # UTC
+  daily: 7
+  weekly: 4
+```
+
+Deliver `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with `dartway secret
+set`, then rerun `dartway deploy setup`. Setup installs a persistent systemd
+timer. Each run makes a custom-format `pg_dump`, encrypts it with age, uploads
+it below `backups/daily/`, and prunes the host copies to the configured daily
+and weekly counts. The bucket is private; encryption means the bucket operator
+still cannot read a dump.
+
+A configured production deploy runs the same operation below
+`backups/pre-deploy/<version>-<UTC timestamp>.dump.age` before the server starts
+and therefore before its migrations. A dump, encryption, or upload failure
+stops the deploy with the serving version untouched. `--skip-backup` is the
+explicit emergency exception; the deployment journal records a
+`backup-skipped` step and its output.
+
+On a non-production verification stand, put the age identity file path in the
+stand's secret store as `BACKUP_AGE_IDENTITY`, then run:
+
+```bash
+dartway deploy backup verify --env backup-verify
+```
+
+The command downloads the latest off-host object, restores it into a uniquely
+named temporary database, prints its object timestamp and every project-table
+row count, and drops the database even when restore or reporting fails.
+Run it weekly. The documented freshness read for an external probe is:
+
+```bash
+ssh <host> 'cat /home/<deploy_user>/.config/<project>/backups/last-off-host-success'
+```
+
+That RFC 3339 UTC value is written only after a successful upload; alert when
+it is older than 26 hours.
 
 ### Moving the repository
 

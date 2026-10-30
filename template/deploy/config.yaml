@@ -128,6 +128,16 @@ local:
 #   # droplet's address as a trusted source in the database's firewall.
 #   database: bundled
 #
+#   # Optional encrypted, off-host database backups. The age private key never
+#   # lives on this production host. AWS_ACCESS_KEY_ID and
+#   # AWS_SECRET_ACCESS_KEY belong in the secret store.
+#   backup:
+#     bucket: private-project-backups
+#     recipient: age1example...
+#     schedule: 03:00
+#     daily: 7
+#     weekly: 4
+#
 #   # Optional. File storage for uploads (presigned direct uploads, D-034), in
 #   # two buckets: public files (a rule with visibility public — avatars) are
 #   # read by anyone at DW_STORAGE_PUBLIC_BASE_URL/<key>; private ones only

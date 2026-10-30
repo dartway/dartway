@@ -4,6 +4,7 @@ import 'package:args/args.dart';
 
 import '../deploy/compose_files.dart';
 import '../deploy/data_volumes.dart';
+import '../deploy/database_backup.dart';
 import '../deploy/output_mask.dart';
 import '../deploy/renderer.dart';
 import '../deploy/secret_store.dart';
@@ -455,6 +456,43 @@ ufw status | grep -q "Status: active"
 '''),
   )) {
     return 1;
+  }
+
+  if (target.backup != null) {
+    final unit = 'dartway-backup-${target.projectName}';
+    if (!await step(
+      'Backup tools',
+      () => ssh.runPrivileged('''
+set -e
+export DEBIAN_FRONTEND=noninteractive
+apt-get update -qq
+apt-get install -y -qq age awscli
+'''),
+    ))
+      return 1;
+    if (!await step(
+      'Backup program',
+      () => ssh.runAsWithInput(
+        target.deployUser,
+        "umask 077; cat > '${target.runtimeConfigDir}/backup' && chmod 700 '${target.runtimeConfigDir}/backup'",
+        dwDatabaseBackupScript(stack),
+      ),
+    ))
+      return 1;
+    if (!await step('Backup schedule', () async {
+      final service = await ssh.runPrivileged(
+        "printf '%s' ${DwSshRunner.quote(dwBackupService(target))} > '/etc/systemd/system/$unit.service'",
+      );
+      if (!service.ok) return service;
+      final timer = await ssh.runPrivileged(
+        "printf '%s' ${DwSshRunner.quote(dwBackupTimer(target))} > '/etc/systemd/system/$unit.timer'",
+      );
+      if (!timer.ok) return timer;
+      return ssh.runPrivileged(
+        'systemctl daemon-reload && systemctl enable --now $unit.timer',
+      );
+    }, report: true))
+      return 1;
   }
 
   // Nginx will not start without a certificate file, and certbot cannot issue

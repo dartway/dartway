@@ -50,6 +50,17 @@ Future<int> runDeploy(
     return code;
   }
 
+  if (environment == 'production' && target.backup == null) {
+    report.problems.writeln(
+      'Refusing to deploy production without a backup: policy in '
+      'deploy/config.yaml. Configure encrypted off-host backups, or use '
+      '--skip-backup to record the explicit emergency exception.',
+    );
+    if (!results.flag('skip-backup')) {
+      return finish(1, reason: 'backup-missing');
+    }
+  }
+
   final sshUser = results.option('as') ?? target.sshUser;
   final ssh =
       connection ??
@@ -76,6 +87,7 @@ Future<int> runDeploy(
   );
   var steps = runner.steps(
     skipGitUpdate: results.flag('skip-git-update'),
+    skipBackup: results.flag('skip-backup'),
     revision: revision,
     verifyOutside: () async {
       out.writeln('\nServices');
