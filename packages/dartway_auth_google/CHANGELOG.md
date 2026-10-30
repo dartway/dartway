@@ -1,4 +1,4 @@
-## Unreleased
+## 0.5.1
 
 - **Web sign-in.** `DwGoogleSignInButton` is the button a person signs in with: on the web it is the one Google
   draws (`google_sign_in_web` `renderButton`), the only way a web sign-in starts; elsewhere it is the app's own

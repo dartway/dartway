@@ -14,6 +14,9 @@
 
 ### Changes
 
+- The `dartway-finish` skill fails early on stale dependency locks before running
+  expensive finish gates (#633).
+
 - Fix: recognize local final command callbacks used only as `dw.action` work,
   detect parenthesized watched-read bindings, and accept feature-wide
   `<feature>[_<scenario>]_contract_test.dart` files. Clarify Flutter migration

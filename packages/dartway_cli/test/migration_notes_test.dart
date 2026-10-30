@@ -229,6 +229,44 @@ void main() {
     });
   });
 
+  group('CLI release references in migration instructions', () {
+    final cases =
+        <({String name, String body, String changelog, List<String> missing})>[
+          (
+            name: 'commands after CLI are not versions',
+            body: 'Run CLI `dartway update` and CLI `dartway check --fix`.',
+            changelog: '## 0.27.0\n',
+            missing: [],
+          ),
+          (
+            name: 'release headings may include a date or description',
+            body: 'Use CLI `0.27.0`.',
+            changelog: '## 0.27.0 - 2026-10-29\n',
+            missing: [],
+          ),
+          (
+            name: 'unreleased versions including prereleases are reported',
+            body: 'Use CLI `0.27.0-dev.1` or CLI `0.28.0`.',
+            changelog: '## 0.27.0\n',
+            missing: ['0.27.0-dev.1', '0.28.0'],
+          ),
+          (
+            name: 'released prereleases are accepted',
+            body: 'Use CLI `0.27.0-dev.1`.',
+            changelog: '## 0.27.0-dev.1\n',
+            missing: [],
+          ),
+        ];
+    for (final row in cases) {
+      test(row.name, () {
+        expect(
+          _cliVersionsWithoutReleaseEntries(row.body, row.changelog),
+          row.missing,
+        );
+      });
+    }
+  });
+
   group('the notes this repository ships', () {
     test(
       'CLI versions promised in migration instructions have release entries',
@@ -237,23 +275,14 @@ void main() {
         final changelog = File(
           p.join(root.path, 'packages', 'dartway_cli', 'CHANGELOG.md'),
         ).readAsStringSync();
-        final releases = RegExp(
-          r'^## (\S+)$',
-          multiLine: true,
-        ).allMatches(changelog).map((match) => match[1]).toSet();
-
         for (final note in readMigrationNotes(root).notes) {
-          for (final mention in RegExp(
-            r'CLI `([^`]+)`',
-          ).allMatches(note.body)) {
-            expect(
-              releases,
-              contains(mention[1]),
-              reason:
-                  '${note.path} promises CLI ${mention[1]}, which has no '
-                  'release entry; name the version delivering the change',
-            );
-          }
+          expect(
+            _cliVersionsWithoutReleaseEntries(note.body, changelog),
+            isEmpty,
+            reason:
+                '${note.path} promises a CLI version with no release entry; '
+                'name the version delivering the change',
+          );
         }
       },
     );
@@ -335,4 +364,18 @@ void main() {
       }
     });
   });
+}
+
+Iterable<String> _cliVersionsWithoutReleaseEntries(
+  String body,
+  String changelog,
+) {
+  final releases = RegExp(
+    r'^##\s+(\S+)',
+    multiLine: true,
+  ).allMatches(changelog).map((match) => match[1]).toSet();
+  return RegExp(r'CLI `(\d+\.\d+\.\d+(?:-[\w.]+)?)`')
+      .allMatches(body)
+      .map((match) => match[1]!)
+      .where((version) => !releases.contains(version));
 }
