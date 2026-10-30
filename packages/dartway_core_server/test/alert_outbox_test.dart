@@ -216,7 +216,7 @@ void main() {
       var count = 0;
       while (count < 1000 && DateTime.now().isBefore(limit)) {
         count = (await opened.db.query(
-          "SELECT count(*)::int AS count FROM dw_alert_outbox WHERE id LIKE 'buffered-%'",
+          "SELECT coalesce(sum(repeat_count + 1), 0)::int AS count FROM dw_alert_outbox WHERE id LIKE 'buffered-%'",
         )).single.get<int>('count');
         await Future<void>.delayed(const Duration(milliseconds: 10));
       }

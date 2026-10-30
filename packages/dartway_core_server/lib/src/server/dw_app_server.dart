@@ -190,6 +190,12 @@ final class DwAppServer {
   final int port;
   final InternetAddress address;
   final DwAlertSink alerts;
+
+  /// Observes incidents before their durable representation loses the
+  /// original error object. Test servers use this instead of treating outbox
+  /// delivery as the moment an incident was raised.
+  @visibleForTesting
+  final List<void Function(DwServerIncident incident)> incidentObservers = [];
   final DwServerLogger logger;
   final DwServerSettings settings;
 
@@ -417,7 +423,12 @@ final class DwAppServer {
           maxPerWindow: settings.alertsPerSignature,
           window: settings.alertWindow,
           maxPerMinute: settings.alertsPerMinute,
-          enqueue: alertOutbox.enqueue,
+          enqueue: (incident) {
+            for (final observer in incidentObservers) {
+              observer(incident);
+            }
+            return alertOutbox!.enqueue(incident);
+          },
         ),
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),

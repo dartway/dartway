@@ -72,6 +72,13 @@ final class DwAlertOutbox {
   }
 
   Future<void> _write(DwServerIncident i) => db.transaction((tx) async {
+    await _writeIn(tx, i);
+  });
+
+  Future<({String id, DateTime windowEndsAt})> _writeIn(
+    DwDatabaseHandle tx,
+    DwServerIncident i,
+  ) async {
     await tx.query(
       'SELECT pg_advisory_xact_lock(hashtext(@signature))',
       params: {'signature': i.signature},
@@ -80,11 +87,16 @@ final class DwAlertOutbox {
       '''
 UPDATE dw_alert_outbox SET repeat_count = repeat_count + 1
 WHERE signature = @signature AND repeat_delivered_at IS NULL
-  AND window_ends_at > @at::timestamptz RETURNING id
+  AND window_ends_at > @at::timestamptz RETURNING id, window_ends_at
 ''',
       params: {'signature': i.signature, 'at': i.at},
     );
-    if (updated.isNotEmpty) return;
+    if (updated.isNotEmpty) {
+      return (
+        id: updated.single.get<String>('id'),
+        windowEndsAt: updated.single.get<DateTime>('window_ends_at'),
+      );
+    }
     await tx.execute(
       '''
 INSERT INTO dw_alert_outbox
@@ -108,17 +120,38 @@ VALUES (@id, @signature, @where, @error, @stack, @account, @at,
         'version': version,
       },
     );
-  });
+    return (id: i.id, windowEndsAt: i.at.add(window));
+  }
 
   Future<void> _flush() async {
-    while (_buffer.isNotEmpty) {
-      final incident = _buffer.first;
-      try {
-        await _write(incident);
-        _buffer.removeAt(0);
-      } catch (_) {
-        return;
-      }
+    if (_buffer.isEmpty) return;
+    final pending = List<DwServerIncident>.of(_buffer);
+    try {
+      // One transaction is important here: after an outage, committing every
+      // incident separately can take minutes for the bounded 1000-item buffer.
+      await db.transaction((tx) async {
+        while (pending.isNotEmpty) {
+          final incident = pending.removeAt(0);
+          final target = await _writeIn(tx, incident);
+          var repeats = 0;
+          pending.removeWhere((candidate) {
+            final coalesces =
+                candidate.signature == incident.signature &&
+                candidate.at.isBefore(target.windowEndsAt);
+            if (coalesces) repeats++;
+            return coalesces;
+          });
+          if (repeats > 0) {
+            await tx.execute(
+              'UPDATE dw_alert_outbox SET repeat_count = repeat_count + @repeats WHERE id = @id',
+              params: {'repeats': repeats, 'id': target.id},
+            );
+          }
+        }
+      });
+      _buffer.clear();
+    } catch (_) {
+      return;
     }
   }
 
