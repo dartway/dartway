@@ -93,8 +93,9 @@ to generation whenever a Studio manifest is present. The template ships no
 pre-generated deployment files or Images workflow. The manifest declares
 `__SERVER_PKG__/lib/src/migrations/**` and `__SERVER_PKG__/pubspec.lock` as migration
 paths relative to the repository root. Images supplies the workflow run number
-as Docker's `BUILD_NUMBER` argument; the web Dockerfile passes it to Flutter's
-`--build-number` and defaults to `0` for local builds. Existing SHA images are
+as Docker's `BUILD_NUMBER` argument; Compose deploys use their UTC epoch second.
+The web Dockerfile passes it to Flutter's `--build-number` and defaults to `0`
+only for direct local Docker builds. Existing SHA images are
 skipped and keep their first build number. For an existing project, regenerate
 the deployment files and add the argument to its project-owned web Dockerfile
 as described in the framework repository's

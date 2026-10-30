@@ -131,6 +131,10 @@
 
 ## 0.25.0
 
+- Fix: Compose deploys pass their UTC epoch second as the web `BUILD_NUMBER`,
+  so deployed web images no longer all override the pubspec build number with
+  the Dockerfile's local-build `+0` default (#694).
+
 ### Breaking changes
 
 - **BREAKING (`dartway create` dependency source):** new projects pin every

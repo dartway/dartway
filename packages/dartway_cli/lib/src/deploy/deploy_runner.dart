@@ -329,7 +329,10 @@ cd '$appDir'
 ${DwComposeFiles.selectFiles}
 ${_rememberImage(DwStack.serverService)}
 ${_rememberImage(DwStack.webService)}
-${DwComposeFiles.invoke} build
+# A Compose deploy has no CI run number. Its UTC epoch second is nevertheless
+# monotonic enough for a release label and, unlike the Dockerfile's local-build
+# default, distinguishes successive deployed web images.
+${DwComposeFiles.invoke} build --build-arg BUILD_NUMBER="\$(date -u +%s)"
 ''');
   }
 
