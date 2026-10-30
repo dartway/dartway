@@ -215,25 +215,56 @@ void main() {
         isTrue,
       );
     });
-    test('passes a distinct web build number to Compose', () async {
-      final ssh = RecordingSsh([
-        (
-          'df -Pk',
-          const DwSshResult(
-            exitCode: 0,
-            stdout: '/docker\t31457280\t20971520\n',
-            stderr: '',
+    test(
+      'passes the checked-out commit time as the web build number',
+      () async {
+        final ssh = RecordingSsh([
+          (
+            'df -Pk',
+            const DwSshResult(
+              exitCode: 0,
+              stdout: '/docker\t31457280\t20971520\n',
+              stderr: '',
+            ),
           ),
-        ),
+        ]);
+
+        final result = await DwDeployRunner(
+          ssh: ssh,
+          stack: stackFrom(),
+        ).build();
+
+        expect(result.ok, isTrue);
+        expect(
+          ssh.issued.singleWhere((command) => command.contains(' build ')),
+          contains(
+            r'build --build-arg BUILD_NUMBER="$(git log -1 --format=%ct HEAD)"',
+          ),
+        );
+      },
+    );
+    test('redeploys of one revision pass the same web build number', () async {
+      final ssh = RecordingSsh([
+        for (var i = 0; i < 2; i++)
+          (
+            'df -Pk',
+            const DwSshResult(
+              exitCode: 0,
+              stdout: '/docker\t31457280\t20971520\n',
+              stderr: '',
+            ),
+          ),
       ]);
+      final runner = DwDeployRunner(ssh: ssh, stack: stackFrom());
 
-      final result = await DwDeployRunner(ssh: ssh, stack: stackFrom()).build();
+      expect((await runner.build()).ok, isTrue);
+      expect((await runner.build()).ok, isTrue);
 
-      expect(result.ok, isTrue);
-      expect(
-        ssh.issued.singleWhere((command) => command.contains(' build ')),
-        contains(r'build --build-arg BUILD_NUMBER="$(date -u +%s)"'),
-      );
+      final builds = ssh.issued
+          .where((command) => command.contains(' build '))
+          .toList();
+      expect(builds, hasLength(2));
+      expect(builds.toSet(), hasLength(1));
     });
     test('unreadable disk space refuses a build', () async {
       final ssh = RecordingSsh();

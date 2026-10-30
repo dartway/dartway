@@ -30,9 +30,10 @@ RUN flutter build web --release --build-number=$BUILD_NUMBER --no-web-resources-
 
 Keep the argument after dependency resolution so changing the number does not
 invalidate dependency layers. The `0` default is only for direct local Docker
-builds. Kamal passes the GitHub Actions run number, while `dartway deploy run`
-passes the deployment's UTC epoch second; both deployed web-image paths
-therefore override the default. No server or storage Dockerfile edit is needed.
+builds. Kamal passes the GitHub Actions run number. From dartway_cli 0.27.0,
+`dartway deploy run` passes the checked-out commit's Unix timestamp, fixed per
+revision; both deployed web-image paths therefore override the default. No
+server or storage Dockerfile edit is needed.
 
 ## How to check
 
