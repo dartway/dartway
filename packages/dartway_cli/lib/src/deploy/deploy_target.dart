@@ -737,7 +737,8 @@ class DwDeployTarget {
 
   /// Top-level keys of `deploy/config.yaml` that are not deployments: the
   /// hoisted `requires`, `local`, and `migrations` — where `dartway check`
-  /// reads which migrations predate a rule (`dataChecksAfter`).
+  /// reads which migrations predate the data-change and offline NOT NULL
+  /// deploy-safety rules (`dataChecksAfter`).
   static const _projectKeys = {'requires', localSection, 'migrations'};
 
   /// The section holding the environment a developer's machine starts a server

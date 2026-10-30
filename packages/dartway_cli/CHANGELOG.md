@@ -14,6 +14,10 @@
 
 ### Changes
 
+- Fix: apply `migrations > dataChecksAfter` to the offline `migrationsDrift`
+  NOT NULL deploy-safety scan, and report malformed or missing boundaries when
+  that check runs alone (#691).
+
 - Prune local pre-deploy database dumps to the configured retention and copy
   only Sunday daily dumps into the weekly set (#688).
 

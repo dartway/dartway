@@ -68,21 +68,15 @@ class DwDataLifecycleInspector {
                 case final match?)
               match.group(1)!: file,
         };
-        final (after, problem) = dataChecksAfter(Directory(root));
+        final (judged, problem) = migrationsAfterDataChecksBoundary(
+          Directory(root),
+          migrations.keys,
+        );
         if (problem != null) {
           _add(DwCheckType.migrationChangesData, problem);
-        } else if (after != null && !migrations.containsKey(after)) {
-          _add(
-            DwCheckType.migrationChangesData,
-            '`$configKey: $after` in deploy/config.yaml names no migration '
-            'in ${p.relative(folder.path, from: root)}',
-          );
         }
-        final judged = migrations.keys.toList()..sort();
-        for (final id in judged) {
-          // Migrations up to the cutoff were applied before the project
-          // adopted this rule: an applied migration is never edited.
-          if (after != null && id.compareTo(after) <= 0) continue;
+        final sortedJudged = judged.toList()..sort();
+        for (final id in sortedJudged) {
           final file = migrations[id]!;
           for (final (line, statement) in dataChangesIn(
             file.readAsStringSync(),
@@ -173,35 +167,52 @@ class DwDataLifecycleInspector {
   void _add(DwCheckType type, String finding) => _findings.add((type, finding));
 
   /// The key in `deploy/config.yaml` naming the last migration that is not
-  /// judged by [DwCheckType.migrationChangesData].
+  /// judged by [DwCheckType.migrationChangesData] or the offline NOT NULL scan
+  /// of [DwCheckType.migrationsDrift].
   static const configKey = 'migrations > dataChecksAfter';
 
-  /// The migration id `deploy/config.yaml` > `migrations` >
-  /// `dataChecksAfter` names, or `null` when it names none; and a problem when
-  /// the key is there but is not a migration id.
+  /// The migration ids after the `dataChecksAfter` boundary, and a problem
+  /// when the configured boundary is malformed or names no migration.
   ///
   /// A project that adopts the rule has migrations that already ran
   /// everywhere, and an applied migration is never edited. It names its
   /// latest migration here once, and only the migrations after it are judged;
   /// a project that never set it — every new one — has all of them judged.
-  static (String?, String?) dataChecksAfter(Directory projectRoot) {
+  static (Set<String>, String?) migrationsAfterDataChecksBoundary(
+    Directory projectRoot,
+    Iterable<String> migrationIds,
+  ) {
+    final ids = migrationIds.toSet();
     final file = File(p.join(projectRoot.path, 'deploy', 'config.yaml'));
-    if (!file.existsSync()) return (null, null);
+    if (!file.existsSync()) return (ids, null);
     final Object? document;
     try {
       document = loadYaml(file.readAsStringSync());
     } on YamlException {
-      return (null, null);
+      return (ids, null);
     }
-    if (document is! YamlMap) return (null, null);
+    if (document is! YamlMap) return (ids, null);
     final migrations = document['migrations'];
-    if (migrations == null) return (null, null);
+    if (migrations == null) return (ids, null);
     final value = migrations is YamlMap ? migrations['dataChecksAfter'] : null;
     if (value is String && RegExp(r'^\d{8}_\d{6}_\w+$').hasMatch(value)) {
-      return (value, null);
+      if (!ids.contains(value)) {
+        return (
+          ids,
+          '`$configKey: $value` in deploy/config.yaml names no migration '
+              'in the server migration directory',
+        );
+      }
+      return (
+        {
+          for (final id in ids)
+            if (id.compareTo(value) > 0) id,
+        },
+        null,
+      );
     }
     return (
-      null,
+      ids,
       'deploy/config.yaml: `$configKey` must be a migration id '
           '(`20260930_120000_name`), got `${value ?? migrations}`',
     );

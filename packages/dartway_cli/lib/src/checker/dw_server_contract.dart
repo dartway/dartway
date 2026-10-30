@@ -227,20 +227,27 @@ class DwMigrationsInspector {
 
     final migrations = Directory(p.join(serverDir.path, 'lib/src/migrations'));
     if (migrations.existsSync()) {
-      final (dataChecksAfter, _) = DwDataLifecycleInspector.dataChecksAfter(
-        serverDir.parent,
-      );
-      for (final file in migrations.listSync().whereType<File>().where(
+      final files = migrations.listSync().whereType<File>().where(
         (f) => f.path.endsWith('.dart'),
-      )) {
-        final migration = RegExp(
-          r'^m(\d.*)\.dart$',
-        ).firstMatch(p.basename(file.path));
-        if (dataChecksAfter != null &&
-            migration != null &&
-            migration.group(1)!.compareTo(dataChecksAfter) <= 0) {
-          continue;
-        }
+      );
+      final migrationFiles = {
+        for (final file in files)
+          RegExp(
+                    r'^m(\d.*)\.dart$',
+                  ).firstMatch(p.basename(file.path))?.group(1) ??
+                  p.basename(file.path):
+              file,
+      };
+      final (
+        judged,
+        problem,
+      ) = DwDataLifecycleInspector.migrationsAfterDataChecksBoundary(
+        serverDir.parent,
+        migrationFiles.keys,
+      );
+      if (problem != null) _findings.add(problem);
+      for (final id in judged) {
+        final file = migrationFiles[id]!;
         for (final (line, column) in dwUnsafeMigrationColumns(
           file.readAsStringSync(),
         )) {
@@ -248,7 +255,9 @@ class DwMigrationsInspector {
             '${p.relative(file.path, from: serverDir.path)}:$line: '
             '$column adds NOT NULL without DEFAULT on an existing table; '
             'the previous server still inserts during deployment. Add a DEFAULT, '
-            'or use a nullable column, backfill, then SET NOT NULL in a later release.',
+            'or use a nullable column, backfill, then SET NOT NULL in a later release. '
+            'If this migration is already applied everywhere, a human moves '
+            '`migrations > dataChecksAfter` past it; never edit an applied migration.',
           );
         }
       }
