@@ -304,6 +304,66 @@ void main() {
     });
   });
 
+  group('first administrator', () {
+    late DwTestDatabase database;
+
+    setUp(() async {
+      RecordingLogger.lines.clear();
+      database = await DwTestDatabase.create(
+        admin: adminConfig(),
+        prefix: 'server_test',
+      );
+    });
+    tearDown(() => database.drop());
+
+    test(
+      'the declared identifier is absent from the log and refusal',
+      () async {
+        const declared = 'private-administrator@example.com';
+        final step = DwFirstAdministrator(
+          identifier: declared,
+          grant: (ctx, accountId) async {},
+        );
+        final refusal = step.problems(
+          DwAuthConfig(
+            accountDeletion: DwAccountDeletion.byMember,
+            normalize: (kind, identifier) => null,
+            deliverCode: (ctx, kind, identifier, code, accountId) async {},
+          ),
+        );
+
+        final base = app.server(database.config);
+        final server = await DwTestServer.start(
+          DwAppServer(
+            protocol: base.protocol,
+            migrations: base.migrations,
+            database: database.config,
+            auth: base.auth,
+            startup: [step],
+            features: base.features,
+            alerts: base.alerts,
+            logger: base.logger,
+            settings: base.settings,
+          ),
+        );
+        await server.stop();
+
+        expect(refusal, [
+          'DW_ADMIN_IDENTIFIER is not an identifier this project accepts '
+              '(read as email)',
+        ]);
+        expect(
+          RecordingLogger.lines,
+          contains(contains('administrator: account 1 (email, created)')),
+        );
+        expect(
+          [...refusal, ...RecordingLogger.lines].join('\n'),
+          isNot(contains(declared)),
+        );
+      },
+    );
+  });
+
   group('migrations', () {
     late DwTestDatabase database;
     setUp(() async {
