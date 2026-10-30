@@ -24,7 +24,7 @@ contract.
 
 **It collects, it does not deliver.** The error pipeline gathers an error and its context snapshot
 and routes it (`dw.handleError` → `dw.dispatchReport` → the configured hook). It does not deliver:
-where a report goes is the app's `DwFlutterConfig.onErrorReport`, and without one it is only printed. The
+where a report goes is the app's `DwFlutterConfig.onErrorReport`; without an override, `DwFlutterCore` persists and sends it to the server alert path. The
 package has no business knowing the channels an error is sent to.
 
 **The core is minimal; optional things are plugins.** This package does not depend on

@@ -7,6 +7,7 @@ import '../core/dw_flutter_toolbox.dart';
 import '../core/logic/dw_flutter_config.dart';
 import '../core/logic/dw_key_value_store.dart';
 import '../diagnostics/error_reporting/logic/dw_error_source.dart';
+import '../diagnostics/error_reporting/dw_default_error_reporter.dart';
 import '../private/dw_singleton.dart';
 import 'dw_key_value_token_store.dart';
 import 'dw_request_notifiers.dart';
@@ -78,6 +79,7 @@ class DwFlutterCore extends DwFlutterToolbox {
         options: clientOptions,
         onError: (error, stackTrace) =>
             handleError(error, stackTrace, source: DwErrorSource.client),
+        onSuccessfulCall: () => _reporter?.serverReached(),
       );
     } catch (_) {
       // The toolbox constructor has already claimed the live slot; a core
@@ -88,11 +90,22 @@ class DwFlutterCore extends DwFlutterToolbox {
     // Every error report says who was signed in: the id is what an operator
     // looks the person up by.
     errorContext.register('account', () => client.accountId?.toString());
+    if (config.onErrorReport == null) {
+      _reporter = DwDefaultErrorReporter(
+        client: client,
+        store: () => plugins.maybeOf<DwKeyValueStorePlugin>(),
+      );
+    }
   }
 
   /// The client itself — for what the bindings do not cover, such as a
   /// one-off `fetch` outside any widget.
   late final DwAppClient client;
+
+  DwDefaultErrorReporter? _reporter;
+
+  /// Framework-owned reporter used when the app did not override reporting.
+  DwDefaultErrorReporter? get defaultErrorReporter => _reporter;
 
   final bool _ownStore;
 
@@ -111,12 +124,14 @@ class DwFlutterCore extends DwFlutterToolbox {
       );
     }
     await client.start();
+    await _reporter?.start();
   }
 
   /// Stops the client — closing every watch and the live socket — and
   /// releases the core.
   @override
   Future<void> dispose() async {
+    await _reporter?.stop();
     await client.stop();
     _providers.clear();
     await super.dispose();

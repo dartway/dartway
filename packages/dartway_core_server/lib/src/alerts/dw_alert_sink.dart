@@ -326,6 +326,7 @@ final class DwAlertGate {
     required Object error,
     required StackTrace stackTrace,
     int? accountId,
+    String? signature,
   }) {
     final incident = DwServerIncident(
       id: DwServerIncident.newId(),
@@ -333,6 +334,7 @@ final class DwAlertGate {
       error: error,
       stackTrace: stackTrace,
       accountId: accountId,
+      signature: signature,
     );
     logger.error(
       'incident ${incident.id} in $where',

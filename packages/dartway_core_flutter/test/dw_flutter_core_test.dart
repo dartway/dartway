@@ -702,6 +702,48 @@ void main() {
     );
     await dw.dispose();
   });
+
+  test('default error reporter persists and coalesces while offline', () async {
+    final world = World();
+    final store = _MemoryStore();
+    DwFlutterCore build(DwHttpTransport transport) => DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.0.0+1',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: transport,
+      liveConnector: world.server.liveConnector,
+      plugins: [store],
+    );
+
+    final offline = DwMemoryHttpTransport((_) => throw Exception('offline'));
+    var core = build(offline);
+    await core.init();
+    for (var i = 0; i < 100; i++) {
+      core.handleError(
+        StateError('boom'),
+        StackTrace.fromString('#0 app.dart:1'),
+      );
+    }
+    await core.dispose();
+    expect(store.values['dw.error-reports'], isNotNull);
+
+    final sent = <Map<String, Object?>>[];
+    final online = DwMemoryHttpTransport((post) {
+      sent.add((jsonDecode(post.body) as Map).cast<String, Object?>());
+      return const DwHttpReply(status: 204, body: '');
+    });
+    core = build(online);
+    await core.init();
+    expect(sent, hasLength(1));
+    expect(sent.single['count'], 100);
+    expect(sent.single['appVersion'], '1.0.0+1');
+    await core.dispose();
+  });
 }
 
 class _TableScreen extends ConsumerStatefulWidget {

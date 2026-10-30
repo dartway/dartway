@@ -100,6 +100,7 @@ final class DwAppClient {
     DwStorageTransport? storageTransport,
     this.options = const DwClientOptions(),
     void Function(Object error, StackTrace stackTrace)? onError,
+    this.onSuccessfulCall,
     Random? random,
     this.utcOffset,
   }) : baseUrl = _checkBaseUrl(baseUrl),
@@ -133,6 +134,23 @@ final class DwAppClient {
   final DwStorageTransport storageTransport;
 
   final DwClientOptions options;
+
+  /// Called after a server answer has been decoded successfully.
+  final void Function()? onSuccessfulCall;
+
+  /// Authorization value for framework-owned side channels.
+  String? get frameworkAuthorization => switch (_session?.token) {
+    final token? => '${DwHttpContract.bearerPrefix}$token',
+    null => null,
+  };
+
+  /// Resolves a framework path without discarding a proxied base path.
+  Uri frameworkUrl(String path) {
+    final base = baseUrl.path.endsWith('/')
+        ? baseUrl.path.substring(0, baseUrl.path.length - 1)
+        : baseUrl.path;
+    return baseUrl.replace(path: '$base$path');
+  }
 
   /// The UTC offset every call reports (`Dw-Utc-Offset`, the server's
   /// `ctx.callerUtcOffset`) instead of the device's. `null`, the default,

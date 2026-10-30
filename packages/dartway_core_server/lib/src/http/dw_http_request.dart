@@ -25,6 +25,10 @@ final class DwHttpRequest {
   /// The path, without the query.
   String get path => _request.uri.path;
 
+  /// Stable transport peer key for framework ingress quotas.
+  @internal
+  String get peerKey => _request.connectionInfo?.remoteAddress.address ?? '-';
+
   /// Header values by lower-case name; repeated headers are joined with `,`.
   final Map<String, String> headers;
 

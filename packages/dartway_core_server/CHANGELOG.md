@@ -2,6 +2,8 @@
 
 ## 0.25.0-dev.1
 
+- Flutter errors now use the built-in persistent device queue and guarded server ingestion endpoint, feeding the existing durable alert outbox by default (#683).
+
 - Alerts now use a leased PostgreSQL outbox with retry and persisted signature
   coalescing. Add the JSON-contract `DwHttpAlertSink`, Telegram proxy support,
   and environment-only sink configuration (#682). HTTP deliveries distinguish

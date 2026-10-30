@@ -123,6 +123,7 @@ final class DwHttpFront {
         DwHttpContract.appHealthPath
             when request.method == 'GET' || request.method == 'HEAD' =>
           await _health(request),
+        DwHttpContract.clientErrorPath => await _route(request, body),
         _ when path.startsWith(DwHttpContract.pathPrefix) => await _call(
           request,
           body,

@@ -27,6 +27,9 @@ abstract final class DwHttpContract {
   /// The WebSocket of live updates.
   static const String livePath = '$pathPrefix$liveSegment';
 
+  /// Public ingestion point for the Flutter error reporter.
+  static const String clientErrorPath = '${pathPrefix}client-error';
+
   static const String healthPath = '/health';
 
   /// Health through an app host, whose only server prefix is `/dw/`.

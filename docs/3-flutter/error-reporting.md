@@ -25,8 +25,7 @@ context snapshot and dispatches a `DwErrorReport`. `DwErrorSource` names where i
 | `manual` | an explicit `dw.handleError(...)` from app code — and a plugin whose `init` failed with `blocksStartup` false. |
 | `failedCall` | declared, and not used by the framework's own interception points today. |
 
-A report is dispatched to **`DwFlutterConfig.onErrorReport`** when it is set. Without it, the report is printed
-with `debugPrint` and goes nowhere else — an app that ships without a policy has no error reporting.
+A report is dispatched to **`DwFlutterConfig.onErrorReport`** when it is set. Without an override, `DwFlutterCore` uses its built-in persistent reporter and sends the report to the app server. A no-op callback explicitly opts out.
 
 ## What a report carries
 
@@ -65,39 +64,29 @@ Custom entries join every report: `dw.errorContext.set('tenant', 'acme')` for a 
 it out). Every source runs guarded: a provider that throws is skipped, and can never break error
 reporting itself.
 
-## The policy is the app's
+## Delivery, offline queue and opt-out
 
-`onErrorReport` decides what an error *is*. The skeleton's, in `lib/core/dw_core.dart` (the example has
-the same):
+The default reporter persists reports through the app's `DwKeyValueStorePlugin` before sending them.
+At most 50 different reports are retained and the oldest drops first. Repetitions with the same error
+type and first stack frame are one entry with a count. The queue survives a restart and is retried at
+startup, after a successful server call, and when the app resumes.
+
+The public ingestion endpoint accepts anonymous startup failures. It caps the body and every field and
+rate-limits both device id and peer IP. An authenticated request derives its account from the session;
+report content is untrusted and remains plain text. Accepted reports become `DwServerIncident`s and use
+the server's existing alert ceilings, durable outbox, and coalescing.
+
+Set `onErrorReport` to replace the built-in reporter. For example, a no-op explicitly opts out:
 
 ```dart
-void _onErrorReport(DwErrorReport report) {
-  if (report.error case DwRefusalException() || DwNotAuthenticatedException()) {
-    return;
-  }
-  if (report.source == DwErrorSource.uiAction) {
-    dw.notify.error(appL10n.actionFailed);
-  }
-  debugPrint(
-    '[${report.source.name}] ${report.error} '
-    '(route: ${report.context.route}, ${report.context.entries})\n'
-    '${report.stackTrace}',
-  );
-}
+DwFlutterConfig(
+  onErrorReport: (_) {},
+  // ...
+)
 ```
 
-Three decisions, each worth keeping when the `debugPrint` is replaced by a real sink:
-
-- **A refusal is not an incident.** The server said no to this user, and the user has already been told
-  in words through `refusalText`. Sent to an alert channel, refusals drown it: a rule doing its job twenty
-  times a day is how a channel stops being read.
-- **Not authenticated is not an incident.** The session ended — the key was revoked, the account is gone —
-  and the sign-in screen is the message. Inside `dw.action` the app has already signed out.
-- **A failed action is told to the user.** A command that timed out or failed on the server would
-  otherwise end in silence: `dw.action` shows `onErrorNotification` only when the call site wrote one.
-
-Both skipped cases still *reach* the hook — the framework reports everything, and the policy sorts it by
-type, never by message. An app that wants to count refusals can.
+A custom callback owns the complete policy. Refusals and expired authentication still reach it, so a
+callback should normally ignore those expected answers rather than alerting on them.
 
 ## Related
 
