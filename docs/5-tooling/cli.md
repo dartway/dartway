@@ -33,7 +33,9 @@ dartway 0.25.0: running the dartway_cli 0.26.0 this project pins, on the Dart of
 ```
 
 The only refusal is a pin that cannot be found — the Flutter package declares `dartway_cli`, and its
-packages are not resolved yet. It names the `pub get` that fixes it. `create` and `quickstart`
+packages are not resolved yet. It names the `pub get` that fixes it. A deploy runner that has already
+activated the exact CLI pin sets `DW_PINNED_CLI`; that CLI runs even when the fresh checkout is
+unresolved, while a resolved checkout that names another version is still refused. `create` and `quickstart`
 (there is no project yet), `update` and `setup-ai` (they repair the pins) and `doctor` (it touches
 nothing) run on whichever CLI started them. Without a `dartway` on `PATH` — a CI runner —
 `dart run dartway_cli:dartway <command>` from the Flutter package is the same command.

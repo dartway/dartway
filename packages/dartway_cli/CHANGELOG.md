@@ -14,6 +14,9 @@
 
 ### Changes
 
+- Fix: let a deploy runner identified by `DW_PINNED_CLI` run the pinned CLI
+  from a fresh checkout whose app packages are not resolved (#696).
+
 - Fix: Compose deploys use the checked-out commit time as the web
   `BUILD_NUMBER`, so redeploying one revision reuses the Flutter web-build
   layer while different revisions retain ordered version labels (#694).

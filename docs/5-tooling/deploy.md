@@ -160,7 +160,9 @@ stops the boot. Do not use `--skip_hooks` for deployments requiring files.
 Delivery to a new host remains a prerequisite: generating config does not
 upload files, and the generated Images workflow handles no secret contents.
 Studio's deploy runner must preserve the generated hooks and deliver files
-before invoking Kamal. No Studio file-upload interface is supplied by this CLI.
+before invoking Kamal. It activates the project's exact `dartway_cli` pin and
+sets `DW_PINNED_CLI` when running it, so a fresh deploy checkout does not need
+the app packages resolved. No Studio file-upload interface is supplied by this CLI.
 
 The Studio check image reads a checkout mounted read-only at `/project`, with
 `--project /project --env stage --version <full-commit-sha>` (or `prod`).

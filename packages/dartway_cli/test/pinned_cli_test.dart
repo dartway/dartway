@@ -235,6 +235,22 @@ void main(List<String> args) {
       expect(result.stderr, contains('(cd shop_flutter && dart pub get)'));
     });
 
+    test(
+      'an already-pinned deployer runs from an unresolved checkout',
+      () async {
+        cliPackage('pinned_cli', dartwayCliVersion);
+        final root = project('pinned_cli', resolved: false);
+        final result = await dartway(
+          ['check', '--help'],
+          root,
+          environment: {DwPinnedCli.reentryVariable: dartwayCliVersion},
+        );
+        expect(result.exitCode, 0, reason: '${result.stdout}${result.stderr}');
+        expect(result.stdout, contains('Run DartWay convention checks'));
+        expect(result.stderr, isNot(contains('packages are not resolved')));
+      },
+    );
+
     test('a pinned CLI that still disagrees once running is refused, not '
         'started again', () async {
       cliPackage('pinned_cli', '0.1.0-pinned');
