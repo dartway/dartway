@@ -14,6 +14,9 @@
 
 ### Changes
 
+- Prune local pre-deploy database dumps to the configured retention and copy
+  only Sunday daily dumps into the weekly set (#688).
+
 - Configure daily and pre-deploy encrypted database backups, off-host upload,
   host retention, freshness monitoring, and temporary restore verification;
   every object-store operation uses the policy's required HTTPS endpoint and

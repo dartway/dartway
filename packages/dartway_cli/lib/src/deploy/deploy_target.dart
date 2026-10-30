@@ -38,6 +38,7 @@ class DwBackupConfig {
     this.schedule = '03:00',
     this.dailyRetention = 7,
     this.weeklyRetention = 4,
+    this.preDeployRetention = 5,
   });
 
   final String bucket;
@@ -47,6 +48,7 @@ class DwBackupConfig {
   final String schedule;
   final int dailyRetention;
   final int weeklyRetention;
+  final int preDeployRetention;
 }
 
 /// The optional marketing or landing site of an environment.
@@ -474,6 +476,7 @@ class DwDeployTarget {
         'schedule',
         'daily',
         'weekly',
+        'pre_deploy',
       };
       _unknownKeys(backupMap, keys, '$source > backup', problems);
       final backupReader = DwYamlReader(backupMap, source: '$source > backup');
@@ -492,6 +495,7 @@ class DwDeployTarget {
       );
       final daily = backupMap['daily'] ?? 7;
       final weekly = backupMap['weekly'] ?? 4;
+      final preDeploy = backupMap['pre_deploy'] ?? 5;
       if (endpoint != null) {
         final uri = Uri.tryParse(endpoint);
         if (uri == null ||
@@ -523,6 +527,11 @@ class DwDeployTarget {
         problems.add('$source > backup: "daily" must be a positive integer');
       if (weekly is! int || weekly < 1)
         problems.add('$source > backup: "weekly" must be a positive integer');
+      if (preDeploy is! int || preDeploy < 1) {
+        problems.add(
+          '$source > backup: "pre_deploy" must be a positive integer',
+        );
+      }
       if (bucket != null &&
           endpoint != null &&
           region != null &&
@@ -531,7 +540,9 @@ class DwDeployTarget {
           daily is int &&
           daily > 0 &&
           weekly is int &&
-          weekly > 0) {
+          weekly > 0 &&
+          preDeploy is int &&
+          preDeploy > 0) {
         backup = DwBackupConfig(
           bucket: bucket,
           endpoint: endpoint,
@@ -540,6 +551,7 @@ class DwDeployTarget {
           schedule: schedule,
           dailyRetention: daily,
           weeklyRetention: weekly,
+          preDeployRetention: preDeploy,
         );
       }
     }

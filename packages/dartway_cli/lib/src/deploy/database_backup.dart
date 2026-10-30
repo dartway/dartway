@@ -68,7 +68,8 @@ keep_encrypted=true
 date -u +%FT%TZ > "\$root/last-off-host-success"
 rm -f "\$plain"
 find "\$root/daily" -type f -name '*.age' -printf '%T@ %p\n' | sort -nr | tail -n +${backup.dailyRetention + 1} | cut -d' ' -f2- | xargs -r rm -f
-if [ "\$(date -u +%u)" = 7 ]; then cp "\$encrypted" "\$root/weekly/\$name.dump.age"; fi
+find "\$root/pre-deploy" -type f -name '*.age' -printf '%T@ %p\n' | sort -nr | tail -n +${backup.preDeployRetention + 1} | cut -d' ' -f2- | xargs -r rm -f
+if [ "\$mode" = daily ] && [ "\$(date -u +%u)" = 7 ]; then cp "\$encrypted" "\$root/weekly/\$name.dump.age"; fi
 find "\$root/weekly" -type f -name '*.age' -printf '%T@ %p\n' | sort -nr | tail -n +${backup.weeklyRetention + 1} | cut -d' ' -f2- | xargs -r rm -f
 echo "Uploaded backups/\$prefix/\$name.dump.age"
 ''';
