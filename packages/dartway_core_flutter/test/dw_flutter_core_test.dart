@@ -1018,6 +1018,47 @@ void main() {
     await core.dispose();
   });
 
+  testWidgets('sustained reports hit persistence and send max waits', (
+    tester,
+  ) async {
+    final world = World();
+    final store = _MemoryStore();
+    var sends = 0;
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.0.0+1',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: DwMemoryHttpTransport((_) {
+        sends++;
+        return const DwHttpReply(status: 204, body: '');
+      }),
+      liveConnector: world.server.liveConnector,
+      plugins: [store],
+    );
+    await core.init();
+    final initialWrites = store.stringWrites['dw.error-reports'] ?? 0;
+    for (var i = 0; i < 16; i++) {
+      core.handleError(
+        StateError('stream $i'),
+        StackTrace.fromString('#0 app/stream_$i.dart:1'),
+      );
+      await tester.pump(const Duration(milliseconds: 400));
+      if (i == 6) {
+        expect(
+          store.stringWrites['dw.error-reports'] ?? 0,
+          greaterThan(initialWrites),
+        );
+      }
+      if (i == 13) expect(sends, greaterThan(0));
+    }
+    await core.dispose();
+  });
+
   testWidgets('a throwing button handler delivers route and app version', (
     tester,
   ) async {

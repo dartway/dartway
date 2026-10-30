@@ -1,9 +1,4 @@
-import 'dart:convert';
-
 import 'package:dartway_core_shared/dartway_core_shared.dart';
-// The signature helper is framework-internal, not shared application API.
-// ignore: implementation_imports
-import 'package:dartway_core_shared/src/diagnostics/dw_error_signature.dart';
 
 import '../context/dw_call_context.dart';
 import 'dw_server_logger.dart';
@@ -38,51 +33,22 @@ final class DwClientErrorEndpoint {
     DwCallContext ctx,
     DwHttpRequest request,
   ) async {
-    final value = await request.json(maxBytes: 32 << 10);
-    if (value is! Map<String, Object?>) return _bad();
-    final device = _field(value, 'deviceId', 128, required: true);
-    if (device == null) return _bad();
     final now = DateTime.now().toUtc();
     if (!_charge(
-          _peers,
-          _peersResolver.peerKey(request.rawRequest) ?? '-',
-          now,
-          60,
-        ) ||
-        !_charge(_devices, device, now, 30)) {
+      _peers,
+      _peersResolver.peerKey(request.rawRequest) ?? '-',
+      now,
+      60,
+    )) {
       return DwHttpResponse.empty(status: 429, headers: {'retry-after': '60'});
     }
-    final platform = _field(value, 'platform', 32, required: true);
-    final route = _field(value, 'route', 512);
-    final error = _field(value, 'error', 4096, required: true);
-    final errorType = _field(value, 'errorType', 128, required: true);
-    final stack = _field(value, 'stackTrace', 16 << 10) ?? '';
-    final appVersion = _field(value, 'appVersion', 64);
-    final features = value['featureIds'];
-    final entries = value['entries'];
-    final count = value['count'];
-    if (platform == null ||
-        (value.containsKey('route') && route == null) ||
-        error == null ||
-        errorType == null ||
-        count is! int ||
-        count < 1 ||
-        count > 1000000 ||
-        features is! List ||
-        features.length > 50 ||
-        features.any(
-          (item) => item is! String || utf8.encode(item).length > 128,
-        ) ||
-        entries is! Map ||
-        entries.length > 25 ||
-        entries.entries.any(
-          (item) =>
-              item.key is! String ||
-              item.value is! String ||
-              utf8.encode(item.key as String).length > 64 ||
-              utf8.encode(item.value as String).length > 512,
-        )) {
-      return _bad();
+    final value = await request.json(
+      maxBytes: DwClientErrorReport.maxBodyBytes,
+    );
+    final report = DwClientErrorReport.fromJson(value);
+    if (report == null) return _bad();
+    if (!_charge(_devices, report.deviceId, now, 30)) {
+      return DwHttpResponse.empty(status: 429, headers: {'retry-after': '60'});
     }
     _recentClients.removeWhere(
       (sent) => now.difference(sent) >= const Duration(minutes: 1),
@@ -105,20 +71,30 @@ final class DwClientErrorEndpoint {
     }
     _recentClients.add(now);
     final context = <String>[
-      error,
-      if (appVersion != null) 'app version: $appVersion',
-      if (features.isNotEmpty) 'features: ${features.join(', ')}',
-      for (final item in entries.entries)
+      report.error,
+      if (report.appVersion != null) 'app version: ${report.appVersion}',
+      if (report.featureIds.isNotEmpty)
+        'features: ${report.featureIds.join(', ')}',
+      for (final item in report.entries.entries)
         if (item.key != 'account') '${item.key}: ${item.value}',
-      if (count > 1) 'device occurrences: $count',
+      if (report.count > 1) 'device occurrences: ${report.count}',
     ].join('\n');
+    final platform = dwNormalizeClientErrorLabel(report.platform);
+    final route = report.route == null
+        ? null
+        : dwNormalizeClientErrorLabel(report.route!);
     runtime.alerts.report(
       where: 'client $platform ${route ?? '-'}',
       error: context,
-      stackTrace: StackTrace.fromString(stack),
+      stackTrace: StackTrace.fromString(report.stackTrace),
       accountId: ctx.accountId,
-      signature: _signature(platform, errorType, stack, ctx.accountId),
-      occurrences: count,
+      signature: _signature(
+        platform,
+        report.errorType,
+        report.stackTrace,
+        ctx.accountId,
+      ),
+      occurrences: report.count,
     );
     return DwHttpResponse.empty();
   }
@@ -129,27 +105,9 @@ final class DwClientErrorEndpoint {
     String stack,
     int? accountId,
   ) {
-    final normalizedType = errorType.replaceAll(
-      RegExp(r'[\r\n\u0000-\u001f]'),
-      ' ',
-    );
+    final normalizedType = dwNormalizeClientErrorLabel(errorType);
     return 'client|$platform|$normalizedType|${dwFirstAppFrame(stack)}'
         '|${accountId == null ? 'anon' : 'auth'}';
-  }
-
-  static String? _field(
-    Map<String, Object?> json,
-    String name,
-    int max, {
-    bool required = false,
-  }) {
-    final value = json[name];
-    if (value == null && !required) return null;
-    return value is String &&
-            (!required || value.isNotEmpty) &&
-            utf8.encode(value).length <= max
-        ? value
-        : null;
   }
 
   static bool _charge(

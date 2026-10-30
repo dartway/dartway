@@ -7,7 +7,8 @@
   priority that reserves at least half of the ceiling for server incidents
   (#683). Client signatures coalesce across accounts in authenticated and
   anonymous namespaces, and device occurrence counts survive outbox
-  coalescing.
+  coalescing. Malformed bodies consume the peer quota before parsing, incident
+  locations are control-character safe, and signatures remain index-safe.
 
 - Alerts now use a leased PostgreSQL outbox with retry and persisted signature
   coalescing. Add the JSON-contract `DwHttpAlertSink`, Telegram proxy support,

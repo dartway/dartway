@@ -5,6 +5,8 @@
 - Add the client-error framework path constant and an internal shared
   application-frame selector used to derive matching client/server incident
   signatures (#683).
+- Define the bounded client-error report codec once for Flutter and the server,
+  including a body ceiling and index-safe application-frame signatures (#683).
 
 ## 0.24.0
 

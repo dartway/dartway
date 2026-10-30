@@ -18,4 +18,9 @@ void main() {
       'main.dart.js 4:8',
     );
   });
+
+  test('caps an untrusted application frame for indexed signatures', () {
+    final frame = 'package:app/${List.filled(16 << 10, 'x').join()}';
+    expect(dwFirstAppFrame('#0 $frame').length, lessThanOrEqualTo(512));
+  });
 }

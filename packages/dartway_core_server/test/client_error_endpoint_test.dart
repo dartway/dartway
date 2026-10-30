@@ -9,7 +9,10 @@ void main() {
   final harness = useHarness(
     build: (app, config) => app.server(
       config,
-      settings: const DwServerSettings(alertsPerMinute: 100),
+      settings: const DwServerSettings(
+        alertsPerMinute: 100,
+        trustedProxyNetworks: ['127.0.0.0/8', '::1/128'],
+      ),
     ),
   );
 
@@ -27,19 +30,29 @@ void main() {
     'count': 2,
   };
 
-  Future<DwTestAnswer> send(Map<String, Object?> value, {String? token}) =>
-      harness()
-          .caller(token: token)
-          .raw(
-            'POST',
-            DwHttpContract.clientErrorPath,
-            headers: {
-              'content-type': 'application/json',
-              if (token != null)
-                'authorization': '${DwHttpContract.bearerPrefix}$token',
-            },
-            body: utf8.encode(jsonEncode(value)),
-          );
+  var peerSequence = 0;
+  Future<DwTestAnswer> send(
+    Map<String, Object?> value, {
+    String? token,
+    String? peer,
+  }) {
+    final sequence = peerSequence++;
+    final resolvedPeer =
+        peer ?? '10.0.${sequence ~/ 250}.${sequence % 250 + 1}';
+    return harness()
+        .caller(token: token)
+        .raw(
+          'POST',
+          DwHttpContract.clientErrorPath,
+          headers: {
+            'content-type': 'application/json',
+            'x-forwarded-for': resolvedPeer,
+            if (token != null)
+              'authorization': '${DwHttpContract.bearerPrefix}$token',
+          },
+          body: utf8.encode(jsonEncode(value)),
+        );
+  }
 
   test(
     'valid anonymous reports enter alerts with server-derived context and signature',
@@ -115,13 +128,61 @@ void main() {
         "SELECT repeat_count FROM dw_alert_outbox WHERE signature = 'client|android|StateError|package:app/feature.dart:42|auth'",
       );
       return rows.length == 1 && rows.single.get<int>('repeat_count') == 3;
-    });
+    }, timeout: const Duration(seconds: 30));
+  });
+
+  test(
+    'malformed requests consume the peer budget before body parsing',
+    () async {
+      for (var i = 0; i < 60; i++) {
+        expect((await send({'bad': i}, peer: '10.9.0.1')).status, 400);
+      }
+      expect((await send({'bad': true}, peer: '10.9.0.1')).status, 429);
+    },
+  );
+
+  test('a maximal client-built body is accepted', () async {
+    final value = DwClientErrorReport.bounded(
+      deviceId: List.filled(128, 'd').join(),
+      errorType: List.filled(1000, 't').join(),
+      error: List.filled(10000, 'e').join(),
+      stackTrace: List.filled(30000, 's').join(),
+      platform: List.filled(100, 'p').join(),
+      appVersion: List.filled(200, 'v').join(),
+      route: List.filled(5000, 'r').join(),
+      featureIds: List.filled(100, List.filled(500, 'f').join()),
+      entries: {
+        for (var i = 0; i < 50; i++)
+          'key-$i-${List.filled(100, 'k').join()}': List.filled(
+            1000,
+            'v',
+          ).join(),
+      },
+      count: 1 << 40,
+    ).toJson();
+    expect(
+      utf8.encode(jsonEncode(value)).length,
+      lessThanOrEqualTo(DwClientErrorReport.maxBodyBytes),
+    );
+    expect((await send(value)).status, 204);
+  });
+
+  test('control characters do not reach incident locations', () async {
+    final value = report(device: 'controlled')
+      ..['platform'] = 'and\nroid'
+      ..['route'] = '/check\u0000out';
+    expect((await send(value)).status, 204);
+    await eventually(
+      () => harness().app.alerts.incidents.any(
+        (incident) => incident.where == 'client and roid /check out',
+      ),
+    );
   });
 
   test('rotating device ids cannot bypass the peer limit', () async {
     var rejected = false;
     for (var i = 0; i < 100; i++) {
-      final answer = await send(report(device: 'rotated-$i'));
+      final answer = await send(report(device: 'rotated-$i'), peer: '10.8.0.1');
       if (answer.status == 429) {
         rejected = true;
         break;

@@ -9,6 +9,22 @@ const String wireGolden = r'''
 {
   "protocolVersion": 3,
   "shapes": {
+    "clientError.report": {
+      "deviceId": "device-1",
+      "errorType": "StateError",
+      "error": "bad state",
+      "stackTrace": "#0 package:app/main.dart:7",
+      "platform": "android",
+      "appVersion": "1.2.3+4",
+      "route": "/home",
+      "featureIds": [
+        "home"
+      ],
+      "entries": {
+        "tenant": "north"
+      },
+      "count": 2
+    },
     "http.contract": {
       "callPath": "/dw/RenameBooking",
       "livePath": "/dw/live",

@@ -3,9 +3,6 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:dartway_client/dartway_client.dart';
-// The signature helper is framework-internal, not shared application API.
-// ignore: implementation_imports
-import 'package:dartway_core_shared/src/diagnostics/dw_error_signature.dart';
 import 'package:flutter/widgets.dart';
 import 'package:intl/intl.dart';
 
@@ -30,6 +27,8 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
   Timer? _sendTimer;
   Timer? _retryTimer;
   Timer? _saveTimer;
+  Timer? _sendMaxTimer;
+  Timer? _saveMaxTimer;
   DateTime? _retryUntil;
   bool _retryWasTransportFailure = false;
   final Map<String, ({DateTime until, Map<String, Object?> item})> _recent = {};
@@ -53,6 +52,8 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
     _sendTimer?.cancel();
     _retryTimer?.cancel();
     _saveTimer?.cancel();
+    _sendMaxTimer?.cancel();
+    _saveMaxTimer?.cancel();
     await _run(_save);
     // Let queued persistence finish, but never make core teardown wait for an
     // in-flight network transport owned by a server that is already gone.
@@ -68,14 +69,16 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
           return;
         }
         final stack = _truncate('${report.stackTrace}', 16 << 10);
-        final errorType = '${report.error.runtimeType}';
+        final errorType = _truncate(
+          '${report.error.runtimeType}',
+          DwClientErrorReport.maxErrorTypeBytes,
+        );
         final signature = '$errorType|${dwFirstAppFrame(stack)}';
         final now = DateTime.now().toUtc();
         _recent.removeWhere((_, value) => !now.isBefore(value.until));
         Map<String, Object?>? existing;
         for (final item in _queue) {
-          if ('${item['errorType']}|${dwFirstAppFrame(item['stackTrace'] as String? ?? '')}' ==
-              signature) {
+          if (item['_signature'] == signature) {
             existing = item;
           }
         }
@@ -83,6 +86,7 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
         if (existing == null && recent != null) {
           existing = Map<String, Object?>.of(recent.item)
             ..['count'] = 0
+            ..['_signature'] = signature
             ..['_sendAfter'] = recent.until.toIso8601String();
           _queue.add(existing);
         }
@@ -112,6 +116,7 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
                 _truncate(entry.key, 64): _truncate(entry.value, 512),
             },
             'count': 1,
+            '_signature': signature,
           };
           _fitBody(item);
           _queue.add(item);
@@ -119,7 +124,6 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
         }
         if (_loaded) _scheduleSave();
         if (_loaded && !_stopped && !_deliveryStopped) {
-          _sendTimer?.cancel();
           _schedule(const Duration(milliseconds: 500));
         }
       }),
@@ -166,6 +170,8 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
               if (entry.key is String) item[entry.key as String] = entry.value;
             }
             if (item['errorType'] is String && item['count'] is int) {
+              item['_signature'] =
+                  '${item['errorType']}|${dwFirstAppFrame(item['stackTrace'] as String? ?? '')}';
               persisted.add(item);
             }
           }
@@ -279,14 +285,26 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
   }
 
   static void _fitBody(Map<String, Object?> item) {
-    const limit = 32 << 10;
-    var encoded = utf8.encode(jsonEncode(item)).length;
-    if (encoded <= limit) return;
-    final stack = item['stackTrace']! as String;
-    item['stackTrace'] = _truncate(
-      stack,
-      (utf8.encode(stack).length - encoded + limit).clamp(1, 16 << 10),
+    final bounded = DwClientErrorReport.bounded(
+      deviceId: item['deviceId'] as String? ?? '',
+      errorType: item['errorType']! as String,
+      error: item['error']! as String,
+      stackTrace: item['stackTrace'] as String? ?? '',
+      platform: item['platform']! as String,
+      appVersion: item['appVersion'] as String?,
+      route: item['route'] as String?,
+      featureIds: (item['featureIds']! as List).cast<String>(),
+      entries: (item['entries']! as Map).cast<String, String>(),
+      count: item['count']! as int,
     );
+    final private = {
+      for (final entry in item.entries)
+        if (entry.key.startsWith('_')) entry.key: entry.value,
+    };
+    item
+      ..clear()
+      ..addAll(bounded.toJson())
+      ..addAll(private);
   }
 
   Future<void> _run(Future<void> Function() operation) {
@@ -303,15 +321,30 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
 
   void _schedule(Duration delay) {
     _sendTimer?.cancel();
-    _sendTimer = Timer(delay, () => unawaited(_run(_flush)));
+    void send() {
+      _sendTimer?.cancel();
+      _sendMaxTimer?.cancel();
+      _sendTimer = null;
+      _sendMaxTimer = null;
+      unawaited(_run(_flush));
+    }
+
+    _sendTimer = Timer(delay.isNegative ? Duration.zero : delay, send);
+    _sendMaxTimer ??= Timer(const Duration(seconds: 5), send);
   }
 
   void _scheduleSave() {
     _saveTimer?.cancel();
-    _saveTimer = Timer(
-      const Duration(milliseconds: 500),
-      () => unawaited(_run(_save)),
-    );
+    void save() {
+      _saveTimer?.cancel();
+      _saveMaxTimer?.cancel();
+      _saveTimer = null;
+      _saveMaxTimer = null;
+      unawaited(_run(_save));
+    }
+
+    _saveTimer = Timer(const Duration(milliseconds: 500), save);
+    _saveMaxTimer ??= Timer(const Duration(seconds: 2), save);
   }
 
   void _scheduleRetry(Duration delay, {bool transportFailure = false}) {
@@ -342,8 +375,11 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
     }
   }
 
-  static Map<String, Object?> _wireItem(Map<String, Object?> item) => {
-    for (final entry in item.entries)
-      if (!entry.key.startsWith('_')) entry.key: entry.value,
-  };
+  static Map<String, Object?> _wireItem(Map<String, Object?> item) {
+    _fitBody(item);
+    return {
+      for (final entry in item.entries)
+        if (!entry.key.startsWith('_')) entry.key: entry.value,
+    };
+  }
 }

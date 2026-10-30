@@ -272,6 +272,22 @@ List<_WireShape> _wireShapes() {
   return [
     // The HTTP contract.
     _WireShape(
+      'clientError.report',
+      () => DwClientErrorReport.bounded(
+        deviceId: 'device-1',
+        errorType: 'StateError',
+        error: 'bad state',
+        stackTrace: '#0 package:app/main.dart:7',
+        platform: 'android',
+        appVersion: '1.2.3+4',
+        route: '/home',
+        featureIds: const ['home'],
+        entries: const {'tenant': 'north'},
+        count: 2,
+      ).toJson(),
+      readBack: (json) => DwClientErrorReport.fromJson(json)!.toJson(),
+    ),
+    _WireShape(
       'http.contract',
       () => {
         'callPath': DwHttpContract.callPath('RenameBooking'),
