@@ -460,11 +460,11 @@ void main() {
       final answer = await anonymous.call(const PublishingRequest());
       expect(answer.status, 500);
       final incident = (answer.response as DwApiFailed).incidentId;
-      await eventually(
-        () => harness().app.alerts.incidents.any(
+      await eventually(() async {
+        return harness().app.alerts.incidents.any(
           (i) => i.id == incident && i.error is StateError,
-        ),
-      );
+        );
+      });
     });
   });
 

@@ -29,10 +29,16 @@ DwDatabaseConfig adminConfig() {
 final class RecordingAlerts implements DwAlertSink {
   final List<DwServerIncident> incidents = [];
   final List<String?> notes = [];
+  final Set<String> _recordedIds = {};
+
+  void record(DwServerIncident incident) {
+    if (_recordedIds.add(incident.id)) incidents.add(incident);
+  }
 
   @override
   Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
-    incidents.add(incident);
+    // Retries and durable observations can reach this sink more than once.
+    record(incident);
     notes.add(suppressedNote);
   }
 }
@@ -1079,7 +1085,7 @@ final class TestApp {
     logger: logger,
     settings: settings,
     clock: clock,
-  );
+  )..incidentObservers.add(alerts.record);
 
   /// Signs [identifier] in over HTTP and returns the session.
   Future<DwAuthSession> signIn(

@@ -1,5 +1,7 @@
 import 'package:dartway_orm/dartway_orm.dart';
 
+import '../alerts/dw_alert_sink.dart';
+import '../alerts/dw_server_logger.dart';
 import '../files/dw_file_storage.dart';
 import 'dw_environment_reader.dart';
 
@@ -20,6 +22,8 @@ import 'dw_environment_reader.dart';
 /// | `DW_HTTP_BEHIND_PROXY` | [httpBehindProxy], false by default |
 /// | `DW_STRICT_BOUNDS` | [strictBounds], false by default |
 /// | `KAMAL_VERSION` | [deploymentVersion], the immutable native revision |
+/// | `DW_PROJECT` | [project], the deployed project name |
+/// | `DW_ENVIRONMENT` | [environment], the deployment destination name |
 ///
 /// Read as a part of the project's own environment, so one start reports
 /// every missing variable of both:
@@ -42,7 +46,10 @@ final class DwServerEnvironment {
     this.trustedProxyNetworks = const [],
     this.httpBehindProxy = false,
     this.deploymentVersion,
+    this.project,
+    this.environment,
     this.strictBounds = false,
+    this.alerts,
   });
 
   /// The framework's variables out of [read], problems recorded there.
@@ -87,7 +94,10 @@ final class DwServerEnvironment {
       trustedProxyNetworks: read.list('DW_TRUSTED_PROXY_NETWORKS'),
       httpBehindProxy: read.flag('DW_HTTP_BEHIND_PROXY'),
       deploymentVersion: read.optional('KAMAL_VERSION'),
+      project: read.optional('DW_PROJECT'),
+      environment: read.optional('DW_ENVIRONMENT'),
       strictBounds: read.flag(strictBoundsVariable),
+      alerts: _alerts(read),
     );
   }
 
@@ -147,10 +157,76 @@ final class DwServerEnvironment {
   /// KAMAL_VERSION, provided by native Kamal to every application container.
   final String? deploymentVersion;
 
+  /// `DW_PROJECT`, the project name rendered by `dartway deploy`.
+  final String? project;
+
+  /// `DW_ENVIRONMENT`, the destination name rendered by `dartway deploy`.
+  final String? environment;
+
   /// `DW_STRICT_BOUNDS=true`: a `list` handler answering past its request's
   /// `maxItems` fails the call (`DwServerSettings.strictBounds`) instead of
   /// being served with a warning.
   final bool strictBounds;
+
+  /// Sink selected entirely by `DW_ALERT_*` variables, or `null` for logs.
+  final DwAlertSink? alerts;
+
+  static DwAlertSink? _alerts(DwEnvironmentReader read) {
+    final httpUrl = read.optional('DW_ALERT_HTTP_URL');
+    final httpToken = read.optional('DW_ALERT_HTTP_TOKEN');
+    final telegramToken = read.optional('DW_TELEGRAM_ALERTS_BOT_TOKEN');
+    final telegramChat = read.optional('DW_TELEGRAM_ALERTS_CHAT_ID');
+    if (httpUrl != null || httpToken != null) {
+      if (httpUrl == null || httpToken == null) {
+        read.report(
+          'DW_ALERT_HTTP_URL and DW_ALERT_HTTP_TOKEN must be set together',
+        );
+        return null;
+      }
+      if (telegramToken != null || telegramChat != null) {
+        read.report('configure either HTTP or Telegram alerts, not both');
+      }
+      final url = Uri.tryParse(httpUrl);
+      if (url == null || !url.hasAuthority) {
+        read.report('DW_ALERT_HTTP_URL must be an absolute URL');
+        return null;
+      }
+      final local =
+          url.host == 'localhost' ||
+          url.host == '127.0.0.1' ||
+          url.host == '::1';
+      if (url.scheme != 'https' && !(url.scheme == 'http' && local)) {
+        read.report('DW_ALERT_HTTP_URL must use https except for a local host');
+        return null;
+      }
+      return DwHttpAlertSink(url: url, token: httpToken);
+    }
+    if (telegramToken != null || telegramChat != null) {
+      if (telegramToken == null || telegramChat == null) {
+        read.report(
+          'DW_TELEGRAM_ALERTS_BOT_TOKEN and DW_TELEGRAM_ALERTS_CHAT_ID must be set together',
+        );
+        return null;
+      }
+      final proxy = read.optional('DW_TELEGRAM_ALERTS_PROXY_URL');
+      final proxyUrl = proxy == null ? null : Uri.tryParse(proxy);
+      if (proxyUrl != null &&
+          (!proxyUrl.hasAuthority ||
+              (proxyUrl.scheme != 'http' && proxyUrl.scheme != 'https'))) {
+        read.report(
+          'DW_TELEGRAM_ALERTS_PROXY_URL must be an absolute HTTP URL',
+        );
+        return null;
+      }
+      return DwTelegramAlertSink(
+        botToken: telegramToken,
+        chatId: telegramChat,
+        logger: const DwConsoleLogger(),
+        proxyUrl: proxyUrl,
+      );
+    }
+    return null;
+  }
 
   static DwDatabaseConfig _database(DwEnvironmentReader read) {
     try {

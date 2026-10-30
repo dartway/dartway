@@ -130,6 +130,9 @@ void main() {
       final (sender, _) = await harness().signedIn('inbox-x@example.com');
       final answer = await sender.call(const SendToInbox('whose?'));
       expect(answer.status, 500);
+      await eventually(() async {
+        return harness().app.alerts.incidents.isNotEmpty;
+      });
       final incident = harness().app.alerts.incidents.last;
       expect(incident.id, (answer.response as DwApiFailed).incidentId);
       expect(
@@ -152,9 +155,9 @@ void main() {
       expect(answer.refusal, isNull);
       final incident = answer.incidentId;
       expect(incident, isNotNull);
-      await eventually(
-        () => harness().app.alerts.incidents.any((i) => i.id == incident),
-      );
+      await eventually(() async {
+        return harness().app.alerts.incidents.any((i) => i.id == incident);
+      });
     },
   );
 

@@ -39,6 +39,13 @@ String _location(String block, String spec) {
 }
 
 void main() {
+  test('server receives the project and destination identity', () {
+    final environment =
+        _service(stackFrom(), DwStack.serverService)['environment'] as YamlMap;
+    expect(environment['DW_PROJECT'], 'shop');
+    expect(environment['DW_ENVIRONMENT'], 'staging');
+  });
+
   for (final (command, accepted) in <(Object?, bool)>[
     (null, false),
     (['postgres', '-c', 'max_connections=200'], false),
@@ -264,6 +271,8 @@ void main() {
       expect(server['env_file'], ['.env']);
       expect(Map.of(server['environment'] as YamlMap), {
         'PORT': '8080',
+        'DW_PROJECT': 'shop',
+        'DW_ENVIRONMENT': 'staging',
         'DW_HTTP_BEHIND_PROXY': 'true',
         'DW_DATABASE_HOST': 'postgres',
         'DW_DATABASE_PORT': '5432',

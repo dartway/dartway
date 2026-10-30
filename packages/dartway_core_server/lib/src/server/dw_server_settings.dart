@@ -22,6 +22,9 @@ final class DwServerSettings {
     this.alertsPerSignature = 5,
     this.alertWindow = const Duration(hours: 1),
     this.alertsPerMinute = 10,
+    this.alertPollInterval = const Duration(seconds: 5),
+    this.alertProject,
+    this.alertEnvironment,
     this.outboundTimeout = const Duration(seconds: 30),
     this.outboundMaxResponseBytes = 10 << 20,
     this.callRateLimits = const {},
@@ -37,7 +40,8 @@ final class DwServerSettings {
        assert(outboundLimitBytes > 0),
        assert(maxLiveMessageBytes > 0),
        assert(tokenCacheSize >= 0),
-       assert(jobWorkers >= 0);
+       assert(jobWorkers >= 0),
+       assert(alertsPerMinute > 0);
 
   /// The largest call body, in bytes. A handler may declare its own
   /// (`DwCallHandler`'s `maxBodyBytes`); project routes pass theirs to
@@ -167,6 +171,9 @@ final class DwServerSettings {
   /// and the next alert says how many were held back. Below the channel's own
   /// limit (Telegram: 20 a minute per group), so its refusals never drop one.
   final int alertsPerMinute;
+  final Duration alertPollInterval;
+  final String? alertProject;
+  final String? alertEnvironment;
 
   /// How long one outbound request (`ctx.http`) may take, from connecting to
   /// the answer's last byte, unless the call names its own. A provider that

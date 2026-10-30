@@ -7,6 +7,7 @@ import 'package:meta/meta.dart';
 
 import '../process/dw_process_runner.dart';
 import '../alerts/dw_alert_sink.dart';
+import '../alerts/dw_alert_outbox.dart';
 import '../alerts/dw_server_logger.dart';
 import '../auth/dw_account_cascades.dart';
 import '../auth/dw_account_service.dart';
@@ -189,6 +190,12 @@ final class DwAppServer {
   final int port;
   final InternetAddress address;
   final DwAlertSink alerts;
+
+  /// Observes incidents before their durable representation loses the
+  /// original error object. Test servers use this instead of treating outbox
+  /// delivery as the moment an incident was raised.
+  @visibleForTesting
+  final List<void Function(DwServerIncident incident)> incidentObservers = [];
   final DwServerLogger logger;
   final DwServerSettings settings;
 
@@ -350,6 +357,7 @@ final class DwAppServer {
 
     DwPostgresDatabase? openedDatabase;
     DwJobRunner? jobRunner;
+    DwAlertOutbox? alertOutbox;
     StreamSubscription<void>? clockJumps;
     DwHttpFront? front;
     final transport =
@@ -373,8 +381,31 @@ final class DwAppServer {
         );
       }
       openedDatabase = await DwPostgresDatabase.open(database);
+      if (alerts case final DwTelegramAlertSink telegram) {
+        telegram.useLogger(logger);
+      }
       fileStore?.attach(openedDatabase.db);
       await _applyMigrations(openedDatabase);
+
+      alertOutbox = DwAlertOutbox(
+        db: openedDatabase.db,
+        sink: alerts,
+        logger: logger,
+        window: settings.alertWindow,
+        pollInterval: Duration(
+          microseconds:
+              settings.alertPollInterval.inMicroseconds >
+                  const Duration(minutes: 1).inMicroseconds ~/
+                      settings.alertsPerMinute
+              ? settings.alertPollInterval.inMicroseconds
+              : const Duration(minutes: 1).inMicroseconds ~/
+                    settings.alertsPerMinute,
+        ),
+        project: settings.alertProject,
+        environment: settings.alertEnvironment,
+        version: settings.deploymentVersion,
+      );
+      alertOutbox.start();
 
       late final DwJobRunner runner;
       final runtime = DwRuntime(
@@ -392,6 +423,12 @@ final class DwAppServer {
           maxPerWindow: settings.alertsPerSignature,
           window: settings.alertWindow,
           maxPerMinute: settings.alertsPerMinute,
+          enqueue: (incident) {
+            for (final observer in incidentObservers) {
+              observer(incident);
+            }
+            return alertOutbox!.enqueue(incident);
+          },
         ),
         log: logger,
         jobsFor: (ctx) => runner.jobsFor(ctx),
@@ -464,6 +501,7 @@ final class DwAppServer {
         files: fileStore,
         outbound: transport,
         clockJumps: clockJumps,
+        alertOutbox: alertOutbox,
       );
       _running = running;
       if (handleSignals) {
@@ -480,6 +518,7 @@ final class DwAppServer {
       await clockJumps?.cancel();
       await front?.close();
       await jobRunner?.stop();
+      await alertOutbox?.stop();
       await openedDatabase?.close();
       fileStore?.close();
       transport.close();
@@ -517,6 +556,11 @@ final class DwAppServer {
       for (final module in modules) {
         await module.close();
       }
+      await running.alertOutbox.stop().timeout(
+        settings.stopTimeout,
+        onTimeout: () =>
+            logger.warning('alert outbox still stopping at timeout'),
+      );
       await running.database.close();
       running.files?.close();
       running.outbound.close();
@@ -817,6 +861,7 @@ final class _DwRunning {
     required this.files,
     required this.outbound,
     required this.clockJumps,
+    required this.alertOutbox,
   });
 
   final DwPostgresDatabase database;
@@ -825,6 +870,7 @@ final class _DwRunning {
   final DwHttpFront front;
   final DwFileStore? files;
   final DwOutboundTransport outbound;
+  final DwAlertOutbox alertOutbox;
 
   /// The job executor's wake on every jump of the server's clock.
   final StreamSubscription<void> clockJumps;

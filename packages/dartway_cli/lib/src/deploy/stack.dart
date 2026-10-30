@@ -252,6 +252,8 @@ class DwStack {
   /// role, so there is nothing here to derive them from.
   Map<String, String> get serverEnvironment => {
     'PORT': '$serverPort',
+    'DW_PROJECT': target.projectName,
+    'DW_ENVIRONMENT': target.environment,
     'DW_HTTP_BEHIND_PROXY': 'true',
     if (target.trustedProxyNetworks.isNotEmpty)
       'DW_TRUSTED_PROXY_NETWORKS': target.trustedProxyNetworks.join(','),

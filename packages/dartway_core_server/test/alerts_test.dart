@@ -112,6 +112,29 @@ void main() {
       );
       await Future<void>.delayed(Duration.zero);
     });
+
+    test(
+      'durable mode persists every repeat instead of process-muting it',
+      () async {
+        final persisted = <DwServerIncident>[];
+        final durable = DwAlertGate(
+          sink: sink,
+          logger: RecordingLogger(),
+          maxPerWindow: 1,
+          enqueue: (incident) async => persisted.add(incident),
+        );
+        for (var i = 0; i < 1000; i++) {
+          durable.report(
+            where: 'command X',
+            error: StateError('boom'),
+            stackTrace: StackTrace.fromString('#0 same (x.dart:1)'),
+          );
+        }
+        await Future<void>.delayed(Duration.zero);
+        expect(persisted, hasLength(1000));
+        expect(persisted.map((i) => i.signature).toSet(), hasLength(1));
+      },
+    );
   });
 
   test('Telegram alerts post the incident without payloads', () async {
@@ -150,6 +173,186 @@ void main() {
     expect(text, contains('seats table locked'));
     expect(text, contains('muted'));
   });
+
+  test('Telegram failures never expose the bot token', () async {
+    const token = 'super-secret-bot-token';
+    final logger = RecordingLogger();
+    final alerts = DwTelegramAlertSink(
+      botToken: token,
+      chatId: '42',
+      logger: logger,
+      apiBase: Uri.parse('http://127.0.0.1:1'),
+    );
+    Object? failure;
+    try {
+      await alerts.send(
+        DwServerIncident(
+          id: 'abc123',
+          where: 'command SaveOrder',
+          error: StateError('down'),
+          stackTrace: StackTrace.current,
+        ),
+      );
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure, isA<DwTelegramAlertException>());
+    expect('$failure', isNot(contains(token)));
+
+    final gate = DwAlertGate(sink: alerts, logger: logger);
+    gate.report(
+      where: 'command SaveOrder',
+      error: StateError('down'),
+      stackTrace: StackTrace.current,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(RecordingLogger.lines.last, isNot(contains(token)));
+  });
+
+  test(
+    'Telegram 429 exposes retry_after without exposing credentials',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      server.listen((request) async {
+        await request.drain<void>();
+        request.response
+          ..statusCode = HttpStatus.tooManyRequests
+          ..headers.contentType = ContentType.json
+          ..write('{"parameters":{"retry_after":37}}');
+        await request.response.close();
+      });
+      final alerts = DwTelegramAlertSink(
+        botToken: 'TOKEN',
+        chatId: '42',
+        logger: RecordingLogger(),
+        apiBase: Uri.parse('http://127.0.0.1:${server.port}'),
+      );
+      await expectLater(
+        alerts.send(
+          DwServerIncident(
+            id: 'rate-limited',
+            where: 'job cleanup',
+            error: StateError('failed'),
+            stackTrace: StackTrace.current,
+          ),
+        ),
+        throwsA(
+          isA<DwTelegramAlertException>().having(
+            (error) => error.retryAfter,
+            'retryAfter',
+            const Duration(seconds: 37),
+          ),
+        ),
+      );
+      await server.close();
+    },
+  );
+
+  test('Telegram 429 with a non-JSON body uses normal backoff', () async {
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      await request.drain<void>();
+      request.response
+        ..statusCode = HttpStatus.tooManyRequests
+        ..write('rate limited');
+      await request.response.close();
+    });
+    final alerts = DwTelegramAlertSink(
+      botToken: 'TOKEN',
+      chatId: '42',
+      logger: RecordingLogger(),
+      apiBase: Uri.parse('http://127.0.0.1:${server.port}'),
+    );
+    await expectLater(
+      alerts.send(
+        DwServerIncident(
+          id: 'rate-limited',
+          where: 'job cleanup',
+          error: StateError('failed'),
+          stackTrace: StackTrace.current,
+        ),
+      ),
+      throwsA(
+        isA<DwTelegramAlertException>().having(
+          (error) => error.retryAfter,
+          'retryAfter',
+          isNull,
+        ),
+      ),
+    );
+    await server.close();
+  });
+
+  test(
+    'HTTP alerts send the documented JSON contract and bearer token',
+    () async {
+      final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+      late Map<String, Object?> body;
+      late String? authorization;
+      server.listen((request) async {
+        authorization = request.headers.value(HttpHeaders.authorizationHeader);
+        body =
+            jsonDecode(await utf8.decodeStream(request))
+                as Map<String, Object?>;
+        request.response.statusCode = HttpStatus.noContent;
+        await request.response.close();
+      });
+      final sink = DwHttpAlertSink(
+        url: Uri.parse('http://127.0.0.1:${server.port}/alerts'),
+        token: 'secret',
+      );
+      final first = DwServerIncident(
+        id: 'incident-1',
+        where: 'command SaveOrder',
+        error: StateError(List.filled(5000, 'é').join()),
+        stackTrace: StackTrace.fromString(List.filled(20000, 's').join()),
+        accountId: 42,
+        at: DateTime.utc(2026, 10, 30),
+        project: 'shop',
+        environment: 'production',
+        version: 'abc',
+      );
+      await sink.send(first);
+      expect(body, containsPair('kind', 'incident'));
+      expect(
+        utf8.encode(body['error']! as String).length,
+        inInclusiveRange(4000, 4 * 1024),
+      );
+      expect(utf8.encode(body['stackTrace']! as String), hasLength(16 * 1024));
+      await sink.send(
+        DwServerIncident(
+          id: first.id,
+          where: first.where,
+          error: 'repeated 999 times',
+          stackTrace: first.stackTrace,
+          at: first.at,
+          repeatCount: 999,
+          project: first.project,
+          environment: first.environment,
+          version: first.version,
+        ),
+      );
+      await server.close();
+      expect(authorization, 'Bearer secret');
+      expect(body, containsPair('id', 'incident-1'));
+      expect(body, containsPair('kind', 'repeat'));
+      expect(body, containsPair('repeatCount', 999));
+      expect(body, containsPair('project', 'shop'));
+      expect(
+        body.keys,
+        containsAll([
+          'where',
+          'error',
+          'stackTrace',
+          'accountId',
+          'at',
+          'signature',
+          'environment',
+          'version',
+        ]),
+      );
+    },
+  );
 }
 
 final class _ThrowingAlerts implements DwAlertSink {

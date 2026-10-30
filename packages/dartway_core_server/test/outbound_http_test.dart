@@ -508,6 +508,9 @@ void main() {
           body: utf8.encode('$token $email $key'),
         );
         expect(answer.status, 500);
+        await eventually(() async {
+          return harness().app.alerts.incidents.length > incidentsStart;
+        });
         final incidents = harness().app.alerts.incidents
             .skip(incidentsStart)
             .toList();

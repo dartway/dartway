@@ -10,7 +10,13 @@ export 'package:dartway_core_shared/dartway_core_shared.dart';
 export 'package:dartway_orm/dartway_orm.dart';
 
 export 'src/alerts/dw_alert_sink.dart'
-    show DwAlertSink, DwLogAlertSink, DwServerIncident, DwTelegramAlertSink;
+    show
+        DwAlertSink,
+        DwHttpAlertSink,
+        DwLogAlertSink,
+        DwServerIncident,
+        DwTelegramAlertException,
+        DwTelegramAlertSink;
 export 'src/alerts/dw_server_logger.dart';
 export 'src/auth/dw_account_service.dart'
     show DwAccountService, DwEnsuredAccount, DwIssuedKey;
