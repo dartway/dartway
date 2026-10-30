@@ -329,7 +329,10 @@ cd '$appDir'
 ${DwComposeFiles.selectFiles}
 ${_rememberImage(DwStack.serverService)}
 ${_rememberImage(DwStack.webService)}
-${DwComposeFiles.invoke} build
+# A Compose deploy has no CI run number. Use the checked-out commit's timestamp:
+# it orders revisions while keeping redeploys of one revision on the same build
+# number, so Flutter's web-build layer remains reusable.
+${DwComposeFiles.invoke} build --build-arg BUILD_NUMBER="\$(git log -1 --format=%ct HEAD)"
 ''');
   }
 

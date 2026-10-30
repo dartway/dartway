@@ -14,6 +14,10 @@
 
 ### Changes
 
+- Fix: Compose deploys use the checked-out commit time as the web
+  `BUILD_NUMBER`, so redeploying one revision reuses the Flutter web-build
+  layer while different revisions retain ordered version labels (#694).
+
 - Fix: apply `migrations > dataChecksAfter` to the offline `migrationsDrift`
   NOT NULL deploy-safety scan, and report malformed or missing boundaries when
   that check runs alone (#691).

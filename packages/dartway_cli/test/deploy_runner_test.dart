@@ -215,6 +215,57 @@ void main() {
         isTrue,
       );
     });
+    test(
+      'passes the checked-out commit time as the web build number',
+      () async {
+        final ssh = RecordingSsh([
+          (
+            'df -Pk',
+            const DwSshResult(
+              exitCode: 0,
+              stdout: '/docker\t31457280\t20971520\n',
+              stderr: '',
+            ),
+          ),
+        ]);
+
+        final result = await DwDeployRunner(
+          ssh: ssh,
+          stack: stackFrom(),
+        ).build();
+
+        expect(result.ok, isTrue);
+        expect(
+          ssh.issued.singleWhere((command) => command.contains(' build ')),
+          contains(
+            r'build --build-arg BUILD_NUMBER="$(git log -1 --format=%ct HEAD)"',
+          ),
+        );
+      },
+    );
+    test('redeploys of one revision pass the same web build number', () async {
+      final ssh = RecordingSsh([
+        for (var i = 0; i < 2; i++)
+          (
+            'df -Pk',
+            const DwSshResult(
+              exitCode: 0,
+              stdout: '/docker\t31457280\t20971520\n',
+              stderr: '',
+            ),
+          ),
+      ]);
+      final runner = DwDeployRunner(ssh: ssh, stack: stackFrom());
+
+      expect((await runner.build()).ok, isTrue);
+      expect((await runner.build()).ok, isTrue);
+
+      final builds = ssh.issued
+          .where((command) => command.contains(' build '))
+          .toList();
+      expect(builds, hasLength(2));
+      expect(builds.toSet(), hasLength(1));
+    });
     test('unreadable disk space refuses a build', () async {
       final ssh = RecordingSsh();
       expect(
@@ -271,7 +322,7 @@ case "\$*" in
     printf '%s' "\$3" > "\${4#shop-}" ;;
   "ps -aq --no-trunc --filter ancestor="*)
     echo "\${5#ancestor=sha256:old-}-container" ;;
-  *" build")
+  *" build --build-arg BUILD_NUMBER="*)
     for service in server web; do
       # Model containerd dropping the old exported image when latest moves,
       # even though the old container remains running.
@@ -2156,7 +2207,7 @@ class _IdentityServer extends RecordingSsh {
     started.add((command: command, script: input));
     final execute = input.contains('docker builder prune')
         ? cleanupRun
-        : input.contains(' build\n')
+        : input.contains(' build --build-arg BUILD_NUMBER=')
         ? buildRun
         : null;
     if (execute != null) {

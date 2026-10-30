@@ -69,7 +69,9 @@ pushes `<commit sha>` tags to GHCR with `GITHUB_TOKEN` on those two branches.
 Every service receives `BUILD_NUMBER=${{ github.run_number }}` as a Docker build
 argument. The web Dockerfile declares `ARG BUILD_NUMBER=0` after dependency
 resolution and passes it to `flutter build web --build-number=$BUILD_NUMBER`;
-Flutter writes it into `version.json`. Local builds default to zero.
+Flutter writes it into `version.json`. Compose deploys pass the checked-out
+commit's Unix timestamp, so the number is fixed per revision and an older
+`--revision` retains its commit ordering. Direct local builds default to zero.
 Existing manifests are skipped and keep their first build number; registry
 failures fail the job. PR runs build without pushing. The OCI source label links the packages to their repository.
 
@@ -382,7 +384,7 @@ The rendered Nginx:
 |---|---|
 | `postgres` | With `database: bundled`: `postgres:17-alpine`, on the volume `postgres_data`, with a `pg_isready` healthcheck, started with `pg_stat_statements` preloaded. Absent with `database: external` — no service, no volume, no `depends_on` on it |
 | `server` | Built from `<project>_server/Dockerfile` with the project root as context. Secrets through `env_file: .env`; `PORT=8080` always, and with `database: bundled` (and, with the bundled storage, `DW_STORAGE_*`) `DW_DATABASE_*` in the compose file too — with `database: external` none of `DW_DATABASE_*` is rendered at all, all five (`HOST`, `PORT`, `NAME`, `USER`, `PASSWORD`) come from `.env` like any other secret. Exposed to the network only. `stop_grace_period: 45s`; healthcheck `GET /health` with a 600-second start period, because migrations run before the port opens |
-| `web` | Built from `<project>_flutter/Dockerfile`; `deploy run` passes `DW_BACKEND_URL` from `app_domain` as a build argument. The template's web release calls `Uri.base.origin` |
+| `web` | Built from `<project>_flutter/Dockerfile`; `deploy run` passes `DW_BACKEND_URL` from `app_domain` and the checked-out commit's Unix timestamp as `BUILD_NUMBER` (fixed per revision) as build arguments. The template's web release calls `Uri.base.origin` |
 | `storage`, `storage-init` | With `storage: bundled`: RustFS, and a one-shot job (a generic S3 client) that creates and configures both buckets on every deploy |
 | `nginx` | `nginx:1.30.5-alpine` (pinned, raised with the framework) on 80 and 443. Every host logs each request as one JSON line ([Speed](#speed--what-a-deployment-records)), into bounded files: ten of 50 MB |
 | `certbot` | Renews the certificate every 12 hours |

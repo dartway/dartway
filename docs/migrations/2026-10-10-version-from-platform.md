@@ -57,13 +57,16 @@ are template behaviour.
    ```
 
 4. Keep the marketing version in `pubspec.yaml`; its `+N` is only a fallback for
-   local builds. Pass `--build-number=N` in release builds and use `--build-name`
-   only when overriding the marketing version. N will come from Studio's
-   per-project counter. Do not commit release build-number bumps.
+   builds that do not use the deployment Dockerfile. Pass `--build-number=N` in
+   release builds and use `--build-name` only when overriding the marketing
+   version. Kamal uses the GitHub Actions run number; from dartway_cli 0.27.0,
+   `dartway deploy run` uses the checked-out commit's Unix timestamp, fixed per
+   revision. Do not commit release build-number bumps.
 
 On web, `PackageInfo` reads the `version.json` that `flutter build web` writes.
-The web Dockerfile and deploy flow are unchanged; until the release counter is
-wired, that web build uses pubspec's fallback build number. `Dw-App-Version` labels sessions
+The web Dockerfile defaults its build argument to `0` only for a direct local
+Docker build. Both supported deployment paths override it, so deployed web
+images have distinguishable version labels. `Dw-App-Version` labels sessions
 and decides nothing about compatibility.
 
 ## How to check
