@@ -200,7 +200,8 @@ move. After the first framework image push, the owner must make the
 project rather than to one of its machines: `requires` (below); `local`, which is what a
 developer's own machine starts a server with and is not a deployment at all — see
 [Secrets](#secrets); and `migrations`, whose `dataChecksAfter` names the last migration
-`dartway check` leaves out of `migrationChangesData`
+`dartway check` leaves out of `migrationChangesData` and the offline NOT NULL deploy-safety scan of
+`migrationsDrift`
 ([Migrations](../4-server/migrations.md#a-migration-changes-the-schema)). **The server has no configuration file of its own** — it is configured by its
 environment, which the deploy derives from this file (database coordinates, storage, port) and from
 the secret store on the server (passwords, keys). Nothing writes `config.yaml`; the deploy only

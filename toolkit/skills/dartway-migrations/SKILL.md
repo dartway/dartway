@@ -118,7 +118,8 @@ With `interactive: false` in `.agents/dartway-toolkit.json`, report any required
 - **Edit, rename or delete an applied migration** — applied anywhere: a teammate, staging, production.
   A fix is a new migration. (`supersededChecksums` is for a migration that failed on some databases.)
 - **Move `deploy/config.yaml > migrations > dataChecksAfter`** — it exempts migrations from
-  `migrationChangesData`.
+  `migrationChangesData` and silences the offline `migrationsDrift` NOT NULL deploy-safety check
+  for migrations at or before it.
 - **Rehash a migration applied somewhere, or delete the development volume** (`docker compose down -v`).
 
 ## When the server refuses to start

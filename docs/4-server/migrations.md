@@ -202,17 +202,18 @@ day, forever; written through today's row classes it silently changes meaning th
 field is renamed, while its checksum says nothing happened. That is why `DwMigrationContext`
 offers `sql`, `query` and `backfill` and no typed tables.
 
-**Migrations written before a project adopted the rule stay as they are** — an applied migration is
+**Migrations written before a project adopted the rules stay as they are** — an applied migration is
 never edited. The project names its latest migration once, in `deploy/config.yaml`, and only the
-migrations after it are judged:
+migrations after it are judged for data changes and by the offline `migrationsDrift` scan for
+`ADD COLUMN … NOT NULL` without `DEFAULT`:
 
 ```yaml
 migrations:
   dataChecksAfter: 20260918_062959_member_tombstone
 ```
 
-A project that never set it — every new one — has all its migrations judged. A value that is not a
-migration id, or names none in `lib/src/migrations/`, is a finding of its own.
+A project that never set it — every new one — has all its migrations judged by both checks. A value
+that is not a migration id, or names none in `lib/src/migrations/`, is a finding of its own.
 
 ## Namespaces
 

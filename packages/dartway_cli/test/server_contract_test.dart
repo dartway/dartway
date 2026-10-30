@@ -120,6 +120,60 @@ void main() {
   });
 
   group('migrationsDrift', () {
+    test('judges only migrations after dataChecksAfter', () {
+      final migrations = Directory(p.join(server.path, 'lib/src/migrations'))
+        ..createSync(recursive: true);
+      for (final name in [
+        'm20260901_100000_old.dart',
+        'm20260930_100000_new.dart',
+      ]) {
+        File(p.join(migrations.path, name)).writeAsStringSync(
+          "void up(m) { m.execute('ALTER TABLE orders ADD COLUMN label text NOT NULL'); }",
+        );
+      }
+      File(p.join(sandbox.path, 'deploy/config.yaml'))
+        ..parent.createSync(recursive: true)
+        ..writeAsStringSync(
+          'migrations:\n  dataChecksAfter: 20260901_100000_old\n',
+        );
+
+      final inspector = DwMigrationsInspector(
+        serverPackageDir: server,
+        environment: const {},
+      );
+
+      expect(inspector.run(), 1);
+      expect(inspector.findings.single, contains('m20260930_100000_new.dart'));
+    });
+
+    for (final boundary in ['latest', '20260101_000000_gone']) {
+      test('reports invalid dataChecksAfter boundary $boundary', () {
+        final migration = File(
+          p.join(server.path, 'lib/src/migrations/m20260930_100000_new.dart'),
+        );
+        migration.parent.createSync(recursive: true);
+        migration.writeAsStringSync('void up(m) {}');
+        File(p.join(sandbox.path, 'deploy/config.yaml'))
+          ..parent.createSync(recursive: true)
+          ..writeAsStringSync('migrations:\n  dataChecksAfter: $boundary\n');
+
+        final inspector = DwMigrationsInspector(
+          serverPackageDir: server,
+          environment: const {},
+        );
+
+        expect(inspector.run(), 1);
+        expect(
+          inspector.findings.single,
+          contains(
+            boundary == 'latest'
+                ? 'must be a migration id'
+                : 'names no migration',
+          ),
+        );
+      });
+    }
+
     test('refuses a required addColumn with only a backfill', () {
       final file = File(p.join(server.path, 'lib/src/migrations/m_added.dart'));
       file.parent.createSync(recursive: true);
