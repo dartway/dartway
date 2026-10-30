@@ -250,6 +250,18 @@ void main() {
     await opened.db.execute(
       'ALTER TABLE dw_alert_outbox RENAME TO dw_alert_outbox_down',
     );
+    addTearDown(() async {
+      await opened.db.execute(r'''
+DO $$
+BEGIN
+  IF to_regclass('dw_alert_outbox_down') IS NOT NULL
+      AND to_regclass('dw_alert_outbox') IS NULL THEN
+    ALTER TABLE dw_alert_outbox_down RENAME TO dw_alert_outbox;
+  END IF;
+END
+$$;
+''');
+    });
     final worker = DwAlertOutbox(
       db: singleConnection.db,
       sink: _SwitchableSink(),
@@ -271,8 +283,15 @@ END
 CREATE TRIGGER dw_slow_alert_insert BEFORE INSERT ON dw_alert_outbox
 FOR EACH ROW EXECUTE FUNCTION dw_slow_alert_insert();
 ''');
+    addTearDown(() async {
+      await opened.db.execute('''
+DROP TRIGGER IF EXISTS dw_slow_alert_insert ON dw_alert_outbox;
+DROP FUNCTION IF EXISTS dw_slow_alert_insert();
+''');
+    });
 
     worker.start();
+    addTearDown(worker.stop);
     await Future<void>.delayed(const Duration(milliseconds: 100));
     await worker.enqueue(incident('during-flush'));
     await waitFor(
