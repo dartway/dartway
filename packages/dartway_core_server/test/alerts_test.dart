@@ -174,6 +174,41 @@ void main() {
     expect(text, contains('muted'));
   });
 
+  test('Telegram failures never expose the bot token', () async {
+    const token = 'super-secret-bot-token';
+    final logger = RecordingLogger();
+    final alerts = DwTelegramAlertSink(
+      botToken: token,
+      chatId: '42',
+      logger: logger,
+      apiBase: Uri.parse('http://127.0.0.1:1'),
+    );
+    Object? failure;
+    try {
+      await alerts.send(
+        DwServerIncident(
+          id: 'abc123',
+          where: 'command SaveOrder',
+          error: StateError('down'),
+          stackTrace: StackTrace.current,
+        ),
+      );
+    } catch (error) {
+      failure = error;
+    }
+    expect(failure, isA<DwTelegramAlertException>());
+    expect('$failure', isNot(contains(token)));
+
+    final gate = DwAlertGate(sink: alerts, logger: logger);
+    gate.report(
+      where: 'command SaveOrder',
+      error: StateError('down'),
+      stackTrace: StackTrace.current,
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 50));
+    expect(RecordingLogger.lines.last, isNot(contains(token)));
+  });
+
   test(
     'HTTP alerts send the documented JSON contract and bearer token',
     () async {
@@ -192,23 +227,41 @@ void main() {
         url: Uri.parse('http://127.0.0.1:${server.port}/alerts'),
         token: 'secret',
       );
+      final first = DwServerIncident(
+        id: 'incident-1',
+        where: 'command SaveOrder',
+        error: StateError(List.filled(5000, 'é').join()),
+        stackTrace: StackTrace.fromString(List.filled(20000, 's').join()),
+        accountId: 42,
+        at: DateTime.utc(2026, 10, 30),
+        project: 'shop',
+        environment: 'production',
+        version: 'abc',
+      );
+      await sink.send(first);
+      expect(body, containsPair('kind', 'incident'));
+      expect(
+        utf8.encode(body['error']! as String).length,
+        inInclusiveRange(4000, 4 * 1024),
+      );
+      expect(utf8.encode(body['stackTrace']! as String), hasLength(16 * 1024));
       await sink.send(
         DwServerIncident(
-          id: 'incident-1',
-          where: 'command SaveOrder',
-          error: StateError('down'),
-          stackTrace: StackTrace.fromString('#0 save (orders.dart:1)'),
-          accountId: 42,
-          at: DateTime.utc(2026, 10, 30),
+          id: first.id,
+          where: first.where,
+          error: 'repeated 999 times',
+          stackTrace: first.stackTrace,
+          at: first.at,
           repeatCount: 999,
-          project: 'shop',
-          environment: 'production',
-          version: 'abc',
+          project: first.project,
+          environment: first.environment,
+          version: first.version,
         ),
       );
       await server.close();
       expect(authorization, 'Bearer secret');
       expect(body, containsPair('id', 'incident-1'));
+      expect(body, containsPair('kind', 'repeat'));
       expect(body, containsPair('repeatCount', 999));
       expect(body, containsPair('project', 'shop'));
       expect(

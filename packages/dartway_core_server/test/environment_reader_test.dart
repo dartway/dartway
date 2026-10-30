@@ -310,5 +310,24 @@ local:
         [contains('PORT must be a port number')],
       );
     });
+
+    test('requires HTTPS for a non-local HTTP alert receiver', () {
+      expect(
+        problemsReading({
+          ...database,
+          'DW_ALERT_HTTP_URL': 'http://alerts.example.com/intake',
+          'DW_ALERT_HTTP_TOKEN': 'secret',
+        }, (read) => DwServerEnvironment.read(read)),
+        [contains('must use https except for a local host')],
+      );
+      expect(
+        read({
+          ...database,
+          'DW_ALERT_HTTP_URL': 'http://127.0.0.1:9000/intake',
+          'DW_ALERT_HTTP_TOKEN': 'secret',
+        }).alerts,
+        isA<DwHttpAlertSink>(),
+      );
+    });
   });
 }

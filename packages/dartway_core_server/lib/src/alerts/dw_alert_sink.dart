@@ -36,6 +36,9 @@ final class DwServerIncident {
 
   /// Repetitions represented by a coalesced follow-up delivery.
   final int repeatCount;
+
+  /// Whether this is the first delivery or its coalesced follow-up.
+  String get kind => repeatCount == 0 ? 'incident' : 'repeat';
   final String? project;
   final String? environment;
   final String? version;
@@ -96,9 +99,10 @@ final class DwHttpAlertSink implements DwAlertSink {
       request.write(
         jsonEncode({
           'id': incident.id,
+          'kind': incident.kind,
           'where': incident.where,
-          'error': '${incident.error}',
-          'stackTrace': '${incident.stackTrace}',
+          'error': _truncate('${incident.error}', 4 * 1024),
+          'stackTrace': _truncate('${incident.stackTrace}', 16 * 1024),
           'accountId': incident.accountId,
           'at': incident.at.toUtc().toIso8601String(),
           'signature': incident.signature,
@@ -109,7 +113,7 @@ final class DwHttpAlertSink implements DwAlertSink {
         }),
       );
       final response = await request.close().timeout(_timeout);
-      await response.drain<void>();
+      await response.drain<void>().timeout(_timeout);
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw HttpException(
           'alert endpoint returned HTTP ${response.statusCode}',
@@ -118,6 +122,20 @@ final class DwHttpAlertSink implements DwAlertSink {
     } finally {
       client.close(force: true);
     }
+  }
+
+  static String _truncate(String value, int byteLimit) {
+    if (utf8.encode(value).length <= byteLimit) return value;
+    final result = StringBuffer();
+    var bytes = 0;
+    for (final rune in value.runes) {
+      final character = String.fromCharCode(rune);
+      final size = utf8.encode(character).length;
+      if (bytes + size > byteLimit) break;
+      result.write(character);
+      bytes += size;
+    }
+    return result.toString();
   }
 }
 
@@ -159,11 +177,14 @@ final class DwTelegramAlertSink implements DwAlertSink {
   final String botToken;
   final String chatId;
   final String title;
-  final DwServerLogger logger;
+  DwServerLogger logger;
   final Uri? proxyUrl;
   final Uri _apiBase;
 
   static const Duration _timeout = Duration(seconds: 10);
+
+  @internal
+  void useLogger(DwServerLogger value) => logger = value;
 
   @override
   Future<void> send(DwServerIncident incident, {String? suppressedNote}) async {
@@ -178,7 +199,26 @@ final class DwTelegramAlertSink implements DwAlertSink {
     final client = HttpClient()..connectionTimeout = _timeout;
     if (proxyUrl case final proxy?) {
       client.findProxy = (_) => 'PROXY ${proxy.host}:${proxy.port}';
+      if (proxy.userInfo.isNotEmpty) {
+        final separator = proxy.userInfo.indexOf(':');
+        final user = separator < 0
+            ? proxy.userInfo
+            : proxy.userInfo.substring(0, separator);
+        final password = separator < 0
+            ? ''
+            : proxy.userInfo.substring(separator + 1);
+        client.addProxyCredentials(
+          proxy.host,
+          proxy.port,
+          '',
+          HttpClientBasicCredentials(
+            Uri.decodeComponent(user),
+            Uri.decodeComponent(password),
+          ),
+        );
+      }
     }
+    int? status;
     try {
       final request = await client
           .postUrl(_apiBase.replace(path: '/bot$botToken/sendMessage'))
@@ -186,15 +226,40 @@ final class DwTelegramAlertSink implements DwAlertSink {
       request.headers.contentType = ContentType.json;
       request.write(jsonEncode({'chat_id': chatId, 'text': text.toString()}));
       final response = await request.close().timeout(_timeout);
-      await response.drain<void>();
+      status = response.statusCode;
+      await response.drain<void>().timeout(_timeout);
       if (response.statusCode != 200) {
-        // The URL holds the token: report the status only.
-        throw HttpException('Telegram returned HTTP ${response.statusCode}');
+        throw const HttpException('Telegram returned a non-200 response');
       }
+    } catch (error) {
+      // dart:io exceptions can include the request URI, whose path contains
+      // the bot token. Only the type and status cross the sink boundary.
+      final sanitized = DwTelegramAlertException(
+        error.runtimeType.toString(),
+        status,
+      );
+      logger.warning(
+        'Telegram alert for incident ${incident.id} was not delivered',
+        error: sanitized,
+      );
+      throw sanitized;
     } finally {
       client.close(force: true);
     }
   }
+}
+
+/// A Telegram delivery failure that never carries the bot URL or token.
+final class DwTelegramAlertException implements Exception {
+  const DwTelegramAlertException(this.errorType, this.statusCode);
+
+  final String errorType;
+  final int? statusCode;
+
+  @override
+  String toString() =>
+      'Telegram alert failed: $errorType'
+      '${statusCode == null ? '' : ', HTTP $statusCode'}';
 }
 
 /// Logs every incident and forwards it to [sink] under two ceilings: at most

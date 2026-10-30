@@ -174,7 +174,20 @@ final class DwServerEnvironment {
       if (telegramToken != null || telegramChat != null) {
         read.report('configure either HTTP or Telegram alerts, not both');
       }
-      return DwHttpAlertSink(url: Uri.parse(httpUrl), token: httpToken);
+      final url = Uri.tryParse(httpUrl);
+      if (url == null || !url.hasAuthority) {
+        read.report('DW_ALERT_HTTP_URL must be an absolute URL');
+        return null;
+      }
+      final local =
+          url.host == 'localhost' ||
+          url.host == '127.0.0.1' ||
+          url.host == '::1';
+      if (url.scheme != 'https' && !(url.scheme == 'http' && local)) {
+        read.report('DW_ALERT_HTTP_URL must use https except for a local host');
+        return null;
+      }
+      return DwHttpAlertSink(url: url, token: httpToken);
     }
     if (telegramToken != null || telegramChat != null) {
       if (telegramToken == null || telegramChat == null) {

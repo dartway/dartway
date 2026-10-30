@@ -15,6 +15,7 @@ export 'src/alerts/dw_alert_sink.dart'
         DwHttpAlertSink,
         DwLogAlertSink,
         DwServerIncident,
+        DwTelegramAlertException,
         DwTelegramAlertSink;
 export 'src/alerts/dw_server_logger.dart';
 export 'src/auth/dw_account_service.dart'

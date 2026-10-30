@@ -375,6 +375,9 @@ final class DwAppServer {
         );
       }
       openedDatabase = await DwPostgresDatabase.open(database);
+      if (alerts case final DwTelegramAlertSink telegram) {
+        telegram.useLogger(logger);
+      }
       fileStore?.attach(openedDatabase.db);
       await _applyMigrations(openedDatabase);
 

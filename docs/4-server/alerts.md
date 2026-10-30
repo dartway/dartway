@@ -60,13 +60,17 @@ restarts and across server instances.
 
 Workers claim rows with a two-minute database lease. A failed delivery is retried with exponential
 backoff capped at one hour. Rows older than seven days are discarded; the receiver must use the
-incident id as its deduplication key because a process can stop after the receiver accepts a request
-but before the acknowledgement is recorded.
+`(id, kind)` pair as its deduplication key because a process can stop after the receiver accepts a
+request but before the acknowledgement is recorded.
 
-A second ceiling holds across signatures: at most `DwServerSettings.alertsPerMinute` (10) alerts a
-minute. Many different failures at once — a dependency down under every command — would otherwise
-exhaust the channel's own limit (Telegram's is 20 a minute per group) and lose the rest, including
-the one that mattered, to its refusals. Rows beyond the ceiling remain queued for a later minute.
+A database outage itself cannot be delivered through an outbox stored in that database. `/health`
+checks the database and must be watched by an external probe.
+
+A second ceiling holds across signatures per server instance: at most
+`DwServerSettings.alertsPerMinute` (10) alerts a minute per instance. Many different failures at
+once — a dependency down under every command — would otherwise exhaust the channel's own limit
+(Telegram's is 20 a minute per group) and lose the rest, including the one that mattered, to its
+refusals. Rows beyond the ceiling remain queued for a later minute.
 
 A sink failure stays in the outbox and does not fail the call or create another incident.
 
@@ -94,7 +98,8 @@ The request body is one JSON object. The contract fields are:
 
 | Field | JSON type | Meaning |
 |---|---|---|
-| `id` | string | Stable incident id and the receiver's **deduplication key**. Retries keep it unchanged. |
+| `id` | string | Stable incident id. Retries and its repeat follow-up keep it unchanged. |
+| `kind` | string | `incident` for the first delivery or `repeat` for its follow-up. The receiver's **deduplication key is `(id, kind)`**. |
 | `where` | string | Framework location, without request payloads. |
 | `error` | string | Exception text; for a follow-up, `repeated N times since …`. |
 | `stackTrace` | string | Recorded Dart stack trace. |
@@ -112,10 +117,14 @@ An external probe can read both backlog facts in one query (delivered rows are e
 
 ```sql
 SELECT count(*) AS undelivered,
-       EXTRACT(EPOCH FROM (now() - min(created_at)))::bigint AS oldest_seconds
+       EXTRACT(EPOCH FROM (now() - min(
+         CASE WHEN initial_delivered_at IS NULL
+              THEN created_at ELSE window_ends_at END
+       )))::bigint AS oldest_seconds
 FROM dw_alert_outbox
 WHERE initial_delivered_at IS NULL
-   OR (repeat_count > 0 AND repeat_delivered_at IS NULL);
+   OR (repeat_count > 0 AND repeat_delivered_at IS NULL
+       AND window_ends_at <= now());
 ```
 
 ### Configuration

@@ -182,11 +182,11 @@ ORDER BY created_at LIMIT 1 FOR UPDATE SKIP LOCKED
       signature: row.get<String>('signature'),
     );
     try {
-      await sink.send(incident);
+      await sink.send(incident).timeout(const Duration(seconds: 60));
       await db.execute(
         followUp
             ? 'UPDATE dw_alert_outbox SET repeat_delivered_at = @now, locked_until = NULL WHERE id = @id'
-            : 'UPDATE dw_alert_outbox SET initial_delivered_at = @now, locked_until = NULL WHERE id = @id',
+            : 'UPDATE dw_alert_outbox SET initial_delivered_at = @now, attempts = 0, locked_until = NULL WHERE id = @id',
         params: {'now': DateTime.now().toUtc(), 'id': incident.id},
       );
     } catch (error) {

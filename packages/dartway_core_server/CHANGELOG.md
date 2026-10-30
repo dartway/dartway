@@ -4,7 +4,10 @@
 
 - Alerts now use a leased PostgreSQL outbox with retry and persisted signature
   coalescing. Add the JSON-contract `DwHttpAlertSink`, Telegram proxy support,
-  and environment-only sink configuration (#682).
+  and environment-only sink configuration (#682). HTTP deliveries distinguish
+  incidents from repeat follow-ups, bound diagnostic text, and require TLS off
+  the local host; Telegram failures keep bot and proxy credentials out of logs
+  and persisted retry errors.
 - Add optional `DwAuthConfig.beforeCodeSignIn`: transactional admission before
   every code-authenticated session, including existing accounts. Refusal rolls
   back ticket consumption and new-account creation. No wire or schema change.
