@@ -29,6 +29,7 @@ void main() {
           environment: 'production',
           extra: '''  backup:
     bucket: private-backups
+    endpoint: https://s3.twcstorage.ru
     recipient: age1recipient
 ''',
         ),

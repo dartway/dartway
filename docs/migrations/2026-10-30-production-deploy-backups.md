@@ -10,7 +10,9 @@ Projects using the Compose `dartway deploy run --env production` workflow.
 
 ## What to change
 
-Add `backup:` to the production environment in `deploy/config.yaml`, deliver
+Add `backup:` to the production environment in `deploy/config.yaml`, including
+the S3-compatible store's HTTPS `endpoint` (and its `region`, which defaults to
+`ru-1`), deliver
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with `dartway secret set`, and
 run `dartway deploy setup --env production`. See
 [Database backups](../5-tooling/deploy.md#database-backups) for the complete

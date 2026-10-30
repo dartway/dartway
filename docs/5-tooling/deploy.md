@@ -266,6 +266,8 @@ production host.
 ```yaml
 backup:
   bucket: private-project-backups
+  endpoint: https://s3.twcstorage.ru
+  region: ru-1
   recipient: age1example...
   schedule: 03:00       # UTC
   daily: 7
@@ -277,7 +279,9 @@ set`, then rerun `dartway deploy setup`. Setup installs a persistent systemd
 timer. Each run makes a custom-format `pg_dump`, encrypts it with age, uploads
 it below `backups/daily/`, and prunes the host copies to the configured daily
 and weekly counts. The bucket is private; encryption means the bucket operator
-still cannot read a dump.
+still cannot read a dump. Configure the bucket's lifecycle rule to delete old
+off-host copies; for example, expire objects under `backups/` after 30 days.
+The backup script prunes host copies only and does not delete bucket objects.
 
 A configured production deploy runs the same operation below
 `backups/pre-deploy/<version>-<UTC timestamp>.dump.age` before the server starts

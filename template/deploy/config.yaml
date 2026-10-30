@@ -133,6 +133,8 @@ local:
 #   # AWS_SECRET_ACCESS_KEY belong in the secret store.
 #   backup:
 #     bucket: private-project-backups
+#     endpoint: https://s3.twcstorage.ru
+#     region: ru-1
 #     recipient: age1example...
 #     schedule: 03:00
 #     daily: 7

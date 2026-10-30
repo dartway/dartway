@@ -18,11 +18,14 @@ void main() {
       final target = targetFrom(
         extra: '''  backup:
     bucket: private-backups
+    endpoint: https://s3.twcstorage.ru
     recipient: age1recipient
     schedule: 04:25
 ''',
       );
       expect(target.backup?.bucket, 'private-backups');
+      expect(target.backup?.endpoint, 'https://s3.twcstorage.ru');
+      expect(target.backup?.region, 'ru-1');
       expect(target.backup?.recipient, 'age1recipient');
       expect(target.backup?.schedule, '04:25');
       expect(target.backup?.dailyRetention, 7);
@@ -34,12 +37,40 @@ void main() {
         () => targetFrom(
           extra: '''  backup:
     bucket: private-backups
+    endpoint: https://s3.twcstorage.ru
     recipient: age1recipient
     schedule: 25:00
     daily: 0
 ''',
         ),
         _refusal(['schedule', 'daily']),
+      );
+    });
+
+    test('requires an HTTPS endpoint', () {
+      expect(
+        () => targetFrom(
+          extra: '''  backup:
+    bucket: private-backups
+    endpoint: http://s3.example.com
+    recipient: age1recipient
+''',
+        ),
+        _refusal(['endpoint', 'HTTPS']),
+      );
+    });
+
+    test('rejects a region that cannot be passed safely to awscli', () {
+      expect(
+        () => targetFrom(
+          extra: '''  backup:
+    bucket: private-backups
+    endpoint: https://s3.example.com
+    region: ru-1;env
+    recipient: age1recipient
+''',
+        ),
+        _refusal(['region', 'letters, numbers']),
       );
     });
   });
