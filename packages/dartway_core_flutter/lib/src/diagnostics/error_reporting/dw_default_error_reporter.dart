@@ -3,7 +3,11 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:dartway_client/dartway_client.dart';
+// The signature helper is framework-internal, not shared application API.
+// ignore: implementation_imports
+import 'package:dartway_core_shared/src/diagnostics/dw_error_signature.dart';
 import 'package:flutter/widgets.dart';
+import 'package:intl/intl.dart';
 
 import '../../core/logic/dw_key_value_store.dart';
 import 'dw_error_report.dart';
@@ -25,6 +29,9 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
   bool _loaded = false;
   Timer? _sendTimer;
   Timer? _retryTimer;
+  Timer? _saveTimer;
+  DateTime? _retryUntil;
+  bool _retryWasTransportFailure = false;
   final Map<String, ({DateTime until, Map<String, Object?> item})> _recent = {};
   bool _stopped = false;
   bool _deliveryStopped = false;
@@ -45,6 +52,8 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
     _binding = null;
     _sendTimer?.cancel();
     _retryTimer?.cancel();
+    _saveTimer?.cancel();
+    await _run(_save);
     // Let queued persistence finish, but never make core teardown wait for an
     // in-flight network transport owned by a server that is already gone.
     await _serial.timeout(const Duration(milliseconds: 100), onTimeout: () {});
@@ -108,7 +117,7 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
           _queue.add(item);
           _recent[signature] = (until: now.add(repeatWindow), item: item);
         }
-        if (_loaded) await _save();
+        if (_loaded) _scheduleSave();
         if (_loaded && !_stopped && !_deliveryStopped) {
           _sendTimer?.cancel();
           _schedule(const Duration(milliseconds: 500));
@@ -118,12 +127,18 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
   }
 
   void serverReached() {
+    if (_retryWasTransportFailure) {
+      _retryTimer?.cancel();
+      _retryTimer = null;
+      _retryUntil = null;
+      _retryWasTransportFailure = false;
+    }
     unawaited(_run(_flush));
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) serverReached();
+    if (state == AppLifecycleState.resumed) unawaited(_run(_flush));
   }
 
   Future<void> _load() async {
@@ -184,13 +199,24 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
 
   Future<void> _flush() async {
     while (!_stopped && !_deliveryStopped && _queue.isNotEmpty) {
-      final sendAfter = DateTime.tryParse(
-        '${_queue.first['_sendAfter'] ?? ''}',
-      );
-      if (sendAfter != null && DateTime.now().toUtc().isBefore(sendAfter)) {
-        _schedule(sendAfter.difference(DateTime.now().toUtc()));
+      final retryUntil = _retryUntil;
+      if (retryUntil != null && DateTime.now().toUtc().isBefore(retryUntil)) {
         return;
       }
+      final now = DateTime.now().toUtc();
+      final sendIndex = _queue.indexWhere((item) {
+        final at = DateTime.tryParse('${item['_sendAfter'] ?? ''}');
+        return at == null || !now.isBefore(at);
+      });
+      if (sendIndex < 0) {
+        final first = _queue
+            .map((item) => DateTime.tryParse('${item['_sendAfter'] ?? ''}'))
+            .whereType<DateTime>()
+            .reduce((a, b) => a.isBefore(b) ? a : b);
+        _schedule(first.difference(now));
+        return;
+      }
+      final item = _queue[sendIndex];
       try {
         // dartway_core_flutter and dartway_client are one framework family;
         // application code must not use this bearer-carrying side channel.
@@ -198,7 +224,7 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
             // ignore: invalid_use_of_internal_member
             .postFrameworkJson(
               DwHttpContract.clientErrorPath,
-              jsonEncode(_wireItem(_queue.first)),
+              jsonEncode(_wireItem(item)),
             )
             .timeout(const Duration(seconds: 10));
         if (reply.status == 401) {
@@ -206,32 +232,32 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
               // ignore: invalid_use_of_internal_member
               .postFrameworkJson(
                 DwHttpContract.clientErrorPath,
-                jsonEncode(_wireItem(_queue.first)),
+                jsonEncode(_wireItem(item)),
                 authorize: false,
               )
               .timeout(const Duration(seconds: 10));
         }
         if (reply.status == 404) {
-          _scheduleRetry(const Duration(minutes: 1));
+          _scheduleRetry(_retryDelay(reply, const Duration(minutes: 1)));
           return;
         }
         if (reply.status == 429 || reply.status >= 500) {
-          _scheduleRetry(const Duration(seconds: 30));
+          _scheduleRetry(_retryDelay(reply, const Duration(seconds: 30)));
           return;
         }
         if (reply.status < 200 || reply.status >= 300) {
           debugPrint('DartWay error report dropped: HTTP ${reply.status}');
-          _queue.removeAt(0);
-          await _save();
+          _queue.removeAt(sendIndex);
+          _scheduleSave();
           continue;
         }
       } catch (error) {
         debugPrint('DartWay error report delivery failed: $error');
-        _scheduleRetry(const Duration(seconds: 10));
+        _scheduleRetry(const Duration(seconds: 10), transportFailure: true);
         return;
       }
-      _queue.removeAt(0);
-      await _save();
+      _queue.removeAt(sendIndex);
+      _scheduleSave();
     }
   }
 
@@ -277,12 +303,43 @@ final class DwDefaultErrorReporter with WidgetsBindingObserver {
 
   void _schedule(Duration delay) {
     _sendTimer?.cancel();
-    _sendTimer = Timer(delay, serverReached);
+    _sendTimer = Timer(delay, () => unawaited(_run(_flush)));
   }
 
-  void _scheduleRetry(Duration delay) {
+  void _scheduleSave() {
+    _saveTimer?.cancel();
+    _saveTimer = Timer(
+      const Duration(milliseconds: 500),
+      () => unawaited(_run(_save)),
+    );
+  }
+
+  void _scheduleRetry(Duration delay, {bool transportFailure = false}) {
     _retryTimer?.cancel();
-    _retryTimer = Timer(delay, serverReached);
+    _retryUntil = DateTime.now().toUtc().add(delay);
+    _retryWasTransportFailure = transportFailure;
+    _retryTimer = Timer(delay, () {
+      _retryUntil = null;
+      _retryWasTransportFailure = false;
+      unawaited(_run(_flush));
+    });
+  }
+
+  static Duration _retryDelay(DwHttpReply reply, Duration fallback) {
+    final value = reply.headers['retry-after'];
+    if (value == null) return fallback;
+    final seconds = int.tryParse(value.trim());
+    if (seconds != null && seconds >= 0) return Duration(seconds: seconds);
+    try {
+      final at = DateFormat(
+        'EEE, dd MMM yyyy HH:mm:ss',
+        'en_US',
+      ).parseUtc(value.replaceFirst(RegExp(r'\s+GMT$'), ''));
+      final delay = at.difference(DateTime.now().toUtc());
+      return delay.isNegative ? Duration.zero : delay;
+    } on FormatException {
+      return fallback;
+    }
   }
 
   static Map<String, Object?> _wireItem(Map<String, Object?> item) => {

@@ -2,7 +2,6 @@
 /// clients, and how.
 library;
 
-export 'src/diagnostics/dw_error_signature.dart';
 export 'src/auth/dw_auth_wire_objects.dart';
 export 'src/channels/dw_live_channel.dart';
 export 'src/files/dw_file_wire_objects.dart';

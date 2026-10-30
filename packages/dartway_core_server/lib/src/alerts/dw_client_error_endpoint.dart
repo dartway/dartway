@@ -1,6 +1,9 @@
 import 'dart:convert';
 
 import 'package:dartway_core_shared/dartway_core_shared.dart';
+// The signature helper is framework-internal, not shared application API.
+// ignore: implementation_imports
+import 'package:dartway_core_shared/src/diagnostics/dw_error_signature.dart';
 
 import '../context/dw_call_context.dart';
 import 'dw_server_logger.dart';
@@ -115,6 +118,7 @@ final class DwClientErrorEndpoint {
       stackTrace: StackTrace.fromString(stack),
       accountId: ctx.accountId,
       signature: _signature(platform, errorType, stack, ctx.accountId),
+      occurrences: count,
     );
     return DwHttpResponse.empty();
   }
@@ -130,7 +134,7 @@ final class DwClientErrorEndpoint {
       ' ',
     );
     return 'client|$platform|$normalizedType|${dwFirstAppFrame(stack)}'
-        '${accountId == null ? '' : '|account:$accountId'}';
+        '|${accountId == null ? 'anon' : 'auth'}';
   }
 
   static String? _field(

@@ -54,7 +54,7 @@ void main() {
       expect('${incident.error}', isNot(contains('account: forged')));
       expect(
         incident.signature,
-        'client|android|StateError|package:app/feature.dart:42',
+        'client|android|StateError|package:app/feature.dart:42|anon',
       );
       expect(incident.signature, isNot(startsWith('command ')));
     },
@@ -76,7 +76,8 @@ void main() {
     expect((await send(web)).status, 204);
     await eventually(
       () => harness().app.alerts.incidents.any(
-        (incident) => incident.signature == 'client|android|minified:Xy<Foo>|',
+        (incident) =>
+            incident.signature == 'client|android|minified:Xy<Foo>||anon',
       ),
     );
   });
@@ -93,6 +94,28 @@ void main() {
         (incident) => incident.accountId == session.id,
       ),
     );
+  });
+
+  test('two signed-in accounts coalesce into one outbox row', () async {
+    final (_, first) = await harness().signedIn('first-report@example.com');
+    final (_, second) = await harness().signedIn('second-report@example.com');
+    expect(
+      (await send(report(device: 'first-account'), token: first.token)).status,
+      204,
+    );
+    expect(
+      (await send(
+        report(device: 'second-account'),
+        token: second.token,
+      )).status,
+      204,
+    );
+    await eventually(() async {
+      final rows = await harness().db.query(
+        "SELECT repeat_count FROM dw_alert_outbox WHERE signature = 'client|android|StateError|package:app/feature.dart:42|auth'",
+      );
+      return rows.length == 1 && rows.single.get<int>('repeat_count') == 3;
+    });
   });
 
   test('rotating device ids cannot bypass the peer limit', () async {

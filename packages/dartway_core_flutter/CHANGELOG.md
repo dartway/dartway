@@ -2,7 +2,10 @@
 
 ## 0.25.0-dev.1
 
-- Flutter errors now use the built-in persistent device queue and guarded server ingestion endpoint, feeding the existing durable alert outbox by default (#683).
+- Flutter errors now use the built-in persistent device queue and guarded
+  server ingestion endpoint, feeding the existing durable alert outbox by
+  default (#683). HTTP retry windows are honoured, persistence is debounced,
+  and a delayed repeat does not block another signature.
 
 - Add `DwFlutterConfig.uiActionFailedText` for visible feedback when a UI action
   throws while the built-in reporter delivers the incident (#683).

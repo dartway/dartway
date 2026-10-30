@@ -74,6 +74,9 @@ At most 50 different reports are retained and the oldest drops first. Repetition
 type and first stack frame are one entry with a count. The queue survives a restart and is retried at
 startup, after a successful server call, and when the app resumes.
 
+There is not yet a direct “connectivity back” trigger. Bounded retry timers cover an offline queue;
+network reachability notifications are tracked separately in [dartway#692](https://github.com/dartway/dartway/issues/692).
+
 The public ingestion endpoint accepts anonymous startup failures. It caps the body and every field and
 rate-limits both device id and peer IP. An authenticated request derives its account from the session;
 report content is untrusted and remains plain text. Accepted reports become `DwServerIncident`s and use

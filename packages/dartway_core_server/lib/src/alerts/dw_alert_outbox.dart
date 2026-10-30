@@ -88,11 +88,15 @@ final class DwAlertOutbox {
     );
     final updated = await tx.query(
       '''
-UPDATE dw_alert_outbox SET repeat_count = repeat_count + 1
+UPDATE dw_alert_outbox SET repeat_count = repeat_count + @occurrences
 WHERE signature = @signature AND repeat_delivered_at IS NULL
   AND window_ends_at > @at::timestamptz RETURNING id, window_ends_at
 ''',
-      params: {'signature': i.signature, 'at': i.at},
+      params: {
+        'signature': i.signature,
+        'at': i.at,
+        'occurrences': i.occurrences,
+      },
     );
     if (updated.isNotEmpty) {
       return (
@@ -103,9 +107,9 @@ WHERE signature = @signature AND repeat_delivered_at IS NULL
     await tx.execute(
       '''
 INSERT INTO dw_alert_outbox
- (id, signature, where_text, error_text, stack_trace, account_id, happened_at,
+ (id, signature, where_text, error_text, stack_trace, account_id, happened_at, repeat_count,
   window_started_at, window_ends_at, project, environment, version)
-VALUES (@id, @signature, @where, @error, @stack, @account, @at,
+VALUES (@id, @signature, @where, @error, @stack, @account, @at, @initialRepeats,
         @at, @at::timestamptz + @window::int8 * interval '1 microsecond',
         @project, @environment, @version)
 ''',
@@ -117,6 +121,7 @@ VALUES (@id, @signature, @where, @error, @stack, @account, @at,
         'stack': '${i.stackTrace}',
         'account': i.accountId,
         'at': i.at,
+        'initialRepeats': i.occurrences - 1,
         'window': window.inMicroseconds,
         'project': project,
         'environment': environment,
@@ -142,7 +147,7 @@ VALUES (@id, @signature, @where, @error, @stack, @account, @at,
             final coalesces =
                 candidate.signature == incident.signature &&
                 candidate.at.isBefore(target.windowEndsAt);
-            if (coalesces) repeats++;
+            if (coalesces) repeats += candidate.occurrences;
             return coalesces;
           });
           if (repeats > 0) {

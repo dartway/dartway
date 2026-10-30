@@ -19,6 +19,7 @@ class _MemoryStore extends DwKeyValueStorePlugin {
   _MemoryStore([Map<String, Object>? values]) : values = values ?? {};
 
   final Map<String, Object> values;
+  final Map<String, int> stringWrites = {};
 
   @override
   Future<void> init(DwFlutterToolbox core) async {}
@@ -27,7 +28,10 @@ class _MemoryStore extends DwKeyValueStorePlugin {
   Future<String?> getString(String key) async => values[key] as String?;
 
   @override
-  Future<void> setString(String key, String value) async => values[key] = value;
+  Future<void> setString(String key, String value) async {
+    values[key] = value;
+    stringWrites.update(key, (count) => count + 1, ifAbsent: () => 1);
+  }
 
   @override
   Future<int?> getInt(String key) async => values[key] as int?;
@@ -881,6 +885,138 @@ void main() {
       await core.dispose();
     },
   );
+
+  test(
+    '429 retry-after is not bypassed by reports or successful calls',
+    () async {
+      final world = World();
+      final sent = <DwHttpPost>[];
+      final core = DwFlutterCore(
+        config: DwFlutterConfig(
+          appVersion: '1.0.0+1',
+          refusalText: (refusal) => refusal.code,
+          readLoadingBuilder: (_) => const SizedBox(),
+          readFailedBuilder: (_, _, _) => const SizedBox(),
+        ),
+        protocol: roomsProtocol,
+        baseUrl: world.server.baseUrl,
+        httpTransport: DwMemoryHttpTransport((post) {
+          sent.add(post);
+          return sent.length == 1
+              ? const DwHttpReply(
+                  status: 429,
+                  body: '',
+                  headers: {'retry-after': '1'},
+                )
+              : const DwHttpReply(status: 204, body: '');
+        }),
+        liveConnector: world.server.liveConnector,
+        plugins: [_MemoryStore()],
+      );
+      await core.init();
+      core.handleError(
+        StateError('one'),
+        StackTrace.fromString('#0 app.dart:1'),
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      expect(sent, hasLength(1));
+      for (var i = 0; i < 5; i++) {
+        core.defaultErrorReporter!.serverReached();
+        core.handleError(
+          ArgumentError('other'),
+          StackTrace.fromString('#0 other.dart:2'),
+        );
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      expect(sent, hasLength(1));
+      await Future<void>.delayed(const Duration(milliseconds: 800));
+      expect(sent.length, greaterThan(1));
+      await core.dispose();
+    },
+  );
+
+  test('a waiting repeat does not block a different signature', () async {
+    final world = World();
+    final store = _MemoryStore({
+      'dw.error-device': 'device',
+      'dw.error-reports': jsonEncode([
+        {
+          'deviceId': 'device',
+          'errorType': 'StateError',
+          'error': 'old',
+          'stackTrace': '#0 old.dart:1',
+          'platform': 'test',
+          'featureIds': <String>[],
+          'entries': <String, String>{},
+          'count': 1,
+          '_sendAfter': DateTime.now()
+              .toUtc()
+              .add(const Duration(minutes: 1))
+              .toIso8601String(),
+        },
+      ]),
+    });
+    final sent = <Map<String, Object?>>[];
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.0.0+1',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: DwMemoryHttpTransport((post) {
+        sent.add((jsonDecode(post.body) as Map).cast<String, Object?>());
+        return const DwHttpReply(status: 204, body: '');
+      }),
+      liveConnector: world.server.liveConnector,
+      plugins: [store],
+    );
+    await core.init();
+    core.handleError(
+      ArgumentError('new'),
+      StackTrace.fromString('#0 new.dart:2'),
+    );
+    await Future<void>.delayed(const Duration(milliseconds: 600));
+    expect(sent, hasLength(1));
+    expect(sent.single['errorType'], 'ArgumentError');
+    await core.dispose();
+  });
+
+  test('a burst of reports debounces queue persistence', () async {
+    final world = World();
+    final store = _MemoryStore();
+    final core = DwFlutterCore(
+      config: DwFlutterConfig(
+        appVersion: '1.0.0+1',
+        refusalText: (refusal) => refusal.code,
+        readLoadingBuilder: (_) => const SizedBox(),
+        readFailedBuilder: (_, _, _) => const SizedBox(),
+      ),
+      protocol: roomsProtocol,
+      baseUrl: world.server.baseUrl,
+      httpTransport: DwMemoryHttpTransport((_) => throw Exception('offline')),
+      liveConnector: world.server.liveConnector,
+      plugins: [store],
+    );
+    await core.init();
+    for (var i = 0; i < 100; i++) {
+      core.handleError(
+        StateError('frame $i'),
+        StackTrace.fromString('#0 app/frame_$i.dart:1'),
+      );
+    }
+    for (
+      var i = 0;
+      i < 30 && store.stringWrites['dw.error-reports'] == null;
+      i++
+    ) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    expect(store.stringWrites['dw.error-reports'], 1);
+    await core.dispose();
+  });
 
   testWidgets('a throwing button handler delivers route and app version', (
     tester,

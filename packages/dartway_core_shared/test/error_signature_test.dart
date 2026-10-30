@@ -1,4 +1,4 @@
-import 'package:dartway_core_shared/dartway_core_shared.dart';
+import 'package:dartway_core_shared/src/diagnostics/dw_error_signature.dart';
 import 'package:test/test.dart';
 
 void main() {
