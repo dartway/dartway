@@ -6,6 +6,7 @@ import '../generator_invocation.dart';
 
 import 'dw_check_type.dart';
 import 'dw_check_tally.dart';
+import 'dw_data_lifecycle.dart';
 import 'dw_migration_columns.dart';
 
 /// How a check runs a Dart command in a package: `dart <arguments>` in
@@ -226,9 +227,20 @@ class DwMigrationsInspector {
 
     final migrations = Directory(p.join(serverDir.path, 'lib/src/migrations'));
     if (migrations.existsSync()) {
+      final (dataChecksAfter, _) = DwDataLifecycleInspector.dataChecksAfter(
+        serverDir.parent,
+      );
       for (final file in migrations.listSync().whereType<File>().where(
         (f) => f.path.endsWith('.dart'),
       )) {
+        final migration = RegExp(
+          r'^m(\d.*)\.dart$',
+        ).firstMatch(p.basename(file.path));
+        if (dataChecksAfter != null &&
+            migration != null &&
+            migration.group(1)!.compareTo(dataChecksAfter) <= 0) {
+          continue;
+        }
         for (final (line, column) in dwUnsafeMigrationColumns(
           file.readAsStringSync(),
         )) {
