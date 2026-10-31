@@ -101,6 +101,7 @@ build it on a free port against their own database.
    ```
    POST /dw/<WireName>   requests and commands
    GET  /dw/live         the live update socket
+   GET  /dw/server-counters  Studio counters (configured read token required)
    GET  /health          liveness and database reachability
    *                     the project's routes, by exact path
    ```
@@ -177,6 +178,8 @@ app on one server process.
 | `strictBounds` | `false` | A `list` handler answering more items than its request's `maxItems`: `true` fails the call naming the request and the count (`DwTestServer` always; a development server through `DW_STRICT_BOUNDS`), `false` serves the whole list and logs a warning with the request, the count and the response size. Never cut short ([a list's bound](../2-core/requests-and-updates.md#a-lists-bound)). |
 | `largeResponseBytes` | 256 KiB | A call response above it is logged as a warning naming the call: a read that grew into megabytes is otherwise noticed by its users first. |
 | `boundWarningInterval` | 1 h | How often one request's bound breach, or one call's large response, is logged again. |
+| `studioReadToken` | `null` | Secret bearer token enabling the [Studio server-counters endpoint](server-counters.md); without one it refuses every read. |
+| `keyActions` | `{}` | Registered call classes Studio treats as product-liveness actions in the [server counters](server-counters.md). |
 
 ### Per-peer call quotas
 

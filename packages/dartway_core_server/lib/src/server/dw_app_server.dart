@@ -616,6 +616,19 @@ final class DwAppServer {
         when !RegExp(r'^[0-9a-f]{40}$').hasMatch(version)) {
       problems.add('deploymentVersion must be an immutable full commit SHA');
     }
+    if (settings.studioReadToken case final token? when token.isEmpty) {
+      problems.add('studioReadToken must not be empty');
+    }
+    for (final type in settings.keyActions) {
+      if (!protocol.entries.any(
+        (entry) =>
+            entry.type == type &&
+            (entry.kind == DwWireObjectKind.request ||
+                entry.kind == DwWireObjectKind.command),
+      )) {
+        problems.add('key action $type does not name a registered call');
+      }
+    }
     for (final type in settings.callRateLimits.keys) {
       if (!protocol.entries.any(
         (entry) =>
