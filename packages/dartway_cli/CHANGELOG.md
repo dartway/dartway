@@ -14,6 +14,10 @@
 
 ### Changes
 
+- Fix: Kamal's pre-app-boot secret-file hook checks readable files as the
+  non-root deploy user and requires passwordless sudo only when that user
+  cannot read the secret directory (#700).
+
 - Fix: let a deploy runner identified by `DW_PINNED_CLI` run the pinned CLI
   from a fresh checkout whose app packages are not resolved (#696).
 

@@ -82,7 +82,6 @@ for user in root deployer; do
   chmod 600 "$directory/authorized_keys"
   chown -R "$user:$user" "$directory"
 done
-echo 'deployer ALL=(ALL) NOPASSWD: ALL' >/etc/sudoers.d/deployer
 ssh-keygen -A >/dev/null
 dockerd-entrypoint.sh >/tmp/docker.log 2>&1 &
 exec /usr/sbin/sshd -D -e -o PermitRootLogin=prohibit-password -o PasswordAuthentication=no
@@ -288,6 +287,19 @@ exec /usr/sbin/sshd -D -e -o PermitRootLogin=prohibit-password -o PasswordAuthen
     api.writeAsStringSync(jsonEncode(config));
     final ordinaryUser = await hook();
     expect(ordinaryUser.exitCode, 0, reason: '${ordinaryUser.stderr}');
+
+    expect(
+      (await ssh.run('chown root:root /home/deployer/.config/shop')).ok,
+      true,
+    );
+    final inaccessible = await hook();
+    expect(inaccessible.exitCode, isNot(0));
+    expect(
+      inaccessible.stderr,
+      contains(
+        'Secret file directory /home/deployer/.config/shop is not readable by the deploy user',
+      ),
+    );
     expect(ssh.uploadDirectoryModes, isNotEmpty);
     expect(ssh.uploadDirectoryModes, everyElement('700'));
   });
