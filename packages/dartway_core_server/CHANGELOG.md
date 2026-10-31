@@ -2,6 +2,10 @@
 
 ## 0.25.0-dev.1
 
+- Keep the first administrator's phone or e-mail out of startup logs and
+  configuration refusals; the success line now identifies only the account
+  and identifier kind (#698).
+
 - Flutter errors now use a guarded ingestion endpoint with server-derived
   signatures, peer/device limits, a client-only enqueue budget, and delivery
   priority that reserves at least half of the ceiling for server incidents

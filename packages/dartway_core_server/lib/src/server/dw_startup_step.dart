@@ -110,8 +110,8 @@ final class DwFirstAdministrator extends DwStartupStep {
     final kind = kindOf(declared);
     if (auth.normalize(kind, declared) != null) return const [];
     return [
-      '$_variable is not an identifier this project accepts: "$declared" '
-          '(read as a ${kind.name})',
+      '$_variable is not an identifier this project accepts '
+          '(read as ${kind.name})',
     ];
   }
 
@@ -127,13 +127,11 @@ final class DwFirstAdministrator extends DwStartupStep {
     // Created the way a sign-in creates one, so the account, its identifier
     // and the project's profile appear together (`onAccountCreated` runs with
     // a tool origin).
-    final (:accountId, :created) = await ctx.accounts.ensure(
-      kindOf(declared),
-      declared,
-    );
+    final kind = kindOf(declared);
+    final (:accountId, :created) = await ctx.accounts.ensure(kind, declared);
     await grant(ctx, accountId);
     ctx.log.info(
-      'administrator: $declared (account $accountId'
+      'administrator: account $accountId (${kind.name}'
       '${created ? ', created' : ''})',
     );
   }
