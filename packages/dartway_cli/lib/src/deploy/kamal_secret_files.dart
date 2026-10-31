@@ -75,8 +75,20 @@ begin
       fi
     SH
   end
+  directories = mounts.map { |source| File.dirname(source) }.uniq
+  readable = directories.map do |directory|
+    "[ -r #{Shellwords.escape(directory)} ]"
+  end.join(" && ")
+  missing_access = directories.map do |directory|
+    quoted = Shellwords.escape(directory)
+    message = Shellwords.escape(
+      "Secret file directory #{directory} is not readable by the deploy user; passwordless sudo is required."
+    )
+    "[ -r #{quoted} ] || echo #{message} >&2"
+  end.join("; ")
   command = "if [ \"$(id -u)\" = 0 ]; then sh -c #{Shellwords.escape(script)}; " \
-    "else sudo -n sh -c #{Shellwords.escape(script)}; fi"
+    "elif #{readable}; then sh -c #{Shellwords.escape(script)}; " \
+    "else #{missing_access}; sudo -n sh -c #{Shellwords.escape(script)}; fi"
   hosts.each do |host|
     Net::SSH.start(host, config.ssh.user, **config.ssh.options.except(:user)) do |ssh|
       status = nil
