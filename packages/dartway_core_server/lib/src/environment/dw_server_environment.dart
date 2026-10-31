@@ -24,6 +24,7 @@ import 'dw_environment_reader.dart';
 /// | `KAMAL_VERSION` | [deploymentVersion], the immutable native revision |
 /// | `DW_PROJECT` | [project], the deployed project name |
 /// | `DW_ENVIRONMENT` | [environment], the deployment destination name |
+/// | `DW_STUDIO_READ_TOKEN` | [studioReadToken], the counters read token |
 ///
 /// Read as a part of the project's own environment, so one start reports
 /// every missing variable of both:
@@ -50,6 +51,7 @@ final class DwServerEnvironment {
     this.environment,
     this.strictBounds = false,
     this.alerts,
+    this.studioReadToken,
   });
 
   /// The framework's variables out of [read], problems recorded there.
@@ -98,6 +100,7 @@ final class DwServerEnvironment {
       environment: read.optional('DW_ENVIRONMENT'),
       strictBounds: read.flag(strictBoundsVariable),
       alerts: _alerts(read),
+      studioReadToken: read.optional('DW_STUDIO_READ_TOKEN'),
     );
   }
 
@@ -170,6 +173,10 @@ final class DwServerEnvironment {
 
   /// Sink selected entirely by `DW_ALERT_*` variables, or `null` for logs.
   final DwAlertSink? alerts;
+
+  /// `DW_STUDIO_READ_TOKEN`, used only to authenticate the server-counters
+  /// endpoint. Keep it in deploy secrets, never in deploy configuration.
+  final String? studioReadToken;
 
   static DwAlertSink? _alerts(DwEnvironmentReader read) {
     final httpUrl = read.optional('DW_ALERT_HTTP_URL');
