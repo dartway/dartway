@@ -45,11 +45,15 @@ after persisting the response.
     }
   ],
   "cursor": "2026-10-31T12:04:00.000Z",
+  "coveredSince": "2026-10-31T11:05:00.000Z",
+  "keyActions": ["CreateOrder", "CompleteCheckout"],
   "jobQueue": {"waiting": 7, "failed": 2}
 }
 ```
 
-An error is a call answered with a `5xx` status. Response times are milliseconds from request arrival
+`coveredSince` is the earliest minute the process can vouch for: the later of its startup minute and the retention boundary. Minutes before it are unknown, not zero. `keyActions` lists every configured call wire name, including actions with zero calls.
+
+Only a call answered with a `5xx` status is an error; refusals and other `4xx` responses are calls but never errors. Response times are milliseconds from request arrival
 through encoding the answer; p50 and p95 use nearest-rank percentiles. `jobQueue` is the current
 database-backed queue snapshot: waiting rows have not exhausted their attempts, while failed rows
 have. Empty minutes are omitted. The cursor still advances across them, so polling after ten minutes

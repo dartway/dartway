@@ -30,6 +30,9 @@ abstract final class DwHttpContract {
   /// Public ingestion point for the Flutter error reporter.
   static const String clientErrorPath = '${pathPrefix}client-error';
 
+  /// Studio's authenticated snapshot of server counters.
+  static const String serverCountersPath = '${pathPrefix}server-counters';
+
   static const String healthPath = '/health';
 
   /// Health through an app host, whose only server prefix is `/dw/`.

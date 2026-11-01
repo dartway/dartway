@@ -129,7 +129,7 @@ final class DwHttpFront {
             when request.method == 'GET' || request.method == 'HEAD' =>
           await _health(request),
         DwHttpContract.clientErrorPath => await _route(request, body),
-        '/dw/server-counters' => await _serverCounters(request),
+        DwHttpContract.serverCountersPath => await _serverCounters(request),
         _ when path.startsWith(DwHttpContract.pathPrefix) => await _call(
           request,
           body,
@@ -231,14 +231,16 @@ final class DwHttpFront {
       bytes.length,
     );
     final status = dwHttpStatusFor(answer);
-    final name = DwHttpContract.wireNameOf(request.uri.path);
+    final candidate = DwHttpContract.wireNameOf(request.uri.path);
+    final entry = candidate == null
+        ? null
+        : runtime.protocol.entryNamed(candidate);
+    final name = entry?.name ?? 'unknown';
     _counters.record(
-      name ?? request.uri.path,
+      name,
       status,
       clock.elapsed,
-      keyAction:
-          name != null &&
-          settings.keyActions.contains(runtime.protocol.entryNamed(name)?.type),
+      keyAction: entry != null && settings.keyActions.contains(entry.type),
     );
     _timed(request.uri.path, status, clock.elapsed, bytes.length);
     return (status, {..._callHeaders, ...dwHttpHeadersFor(answer)}, bytes);
@@ -263,20 +265,26 @@ final class DwHttpFront {
       cursor = DateTime.tryParse(raw);
       if (cursor == null) return _text(400, 'invalid cursor');
     }
+    final now = runtime.clock.now();
     final queue = (await runtime.db.query(
       'SELECT count(*) FILTER (WHERE failed_at IS NULL)::int AS waiting, '
       'count(*) FILTER (WHERE failed_at IS NOT NULL)::int AS failed FROM dw_job',
     )).single;
     final bytes = _jsonUtf8.convert({
-      'minutes': _counters.read(cursor),
-      'cursor': _closedMinuteCursor(),
+      'minutes': _counters.read(cursor, now: now),
+      'cursor': _closedMinuteCursor(now),
+      'coveredSince': _counters.coveredSince(now).toIso8601String(),
+      'keyActions': [
+        for (final entry in runtime.protocol.entries)
+          if (settings.keyActions.contains(entry.type)) entry.name,
+      ],
       'jobQueue': {'waiting': queue['waiting'], 'failed': queue['failed']},
     });
     return (200, _callHeaders, bytes);
   }
 
-  String _closedMinuteCursor() {
-    final now = runtime.clock.now().toUtc();
+  String _closedMinuteCursor(DateTime value) {
+    final now = value.toUtc();
     return DateTime.utc(
       now.year,
       now.month,

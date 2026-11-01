@@ -2,6 +2,8 @@
 
 ## 0.25.0-dev.1
 
+- Name the authenticated Studio server-counters path in `DwHttpContract` (#685).
+
 - Add the client-error framework path constant and an internal shared
   application-frame selector used to derive matching client/server incident
   signatures (#683).
