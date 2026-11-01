@@ -44,6 +44,11 @@ Its doc comment in the skeleton is the sample. `bin/server.dart` reads
 `AppEnvironment.read(DwLocalEnvironment.overlay(Platform.environment))` and hands the sub-configs to
 the server factory; `bin/` parses nothing itself — no `env['NAME']`.
 
+Studio server counters are closed by default. Put `DW_STUDIO_READ_TOKEN` in the destination's
+`requires.secrets`, read it through `DwServerEnvironment`, and pass it as
+`DwServerSettings.studioReadToken`. Declare product-liveness calls as registered DTO types in
+`DwServerSettings.keyActions`; Studio receives their wire names even when their call count is zero.
+
 **Another service's HTTP API is `ctx.http`**: `get`/`post`/`put`/`patch`/`delete`/`send`, `json:` or
 `body:`; any status is a `DwOutboundResponse`, no answer throws `DwOutboundException`; bounded by
 `DwServerSettings.outboundTimeout` and `outboundMaxResponseBytes`; logged without path, query, headers
@@ -51,10 +56,6 @@ or body; `followRedirects: false` when a header carries a credential. Not inside
 A service class takes `ctx.http` per call — tests replay recorded real answers (`dartway-testing`), nothing is threaded
 through the server factory for them. A standalone `bin/` or `tool/` script creates
 `DwOutboundHttp.network()` and closes it in `finally`; server code uses its context's client.
-Studio server counters are closed by default. Put `DW_STUDIO_READ_TOKEN` in the destination's
-`requires.secrets`, read it through `DwServerEnvironment`, and pass it as
-`DwServerSettings.studioReadToken`. Declare product-liveness calls as registered DTO types in
-`DwServerSettings.keyActions`; Studio receives their wire names even when their call count is zero.
 
 The default response cap is 10 MiB including base64/JSON; for image APIs, raise `maxResponseBytes:`
 on that call (for example `64 << 20`), accounting for the whole body being held in memory.

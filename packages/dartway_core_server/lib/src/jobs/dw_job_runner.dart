@@ -9,6 +9,12 @@ import '../context/dw_call_context.dart';
 import '../server/dw_runtime.dart';
 import 'dw_job_queue.dart';
 
+/// The due-and-unclaimed predicate shared by the runner and queue counters.
+@internal
+const dwRunnableJobPredicate =
+    'failed_at IS NULL AND run_at <= @now::timestamptz '
+    'AND (locked_until IS NULL OR locked_until <= @now::timestamptz)';
+
 /// Enqueues through the context's current database (its transaction, when
 /// there is one).
 @internal
@@ -87,7 +93,8 @@ final class DwJobRunner {
     required this.workers,
     required this.pollInterval,
   }) : queued = {
-         for (final d in definitions.whereType<DwQueuedJob<Object?>>()) d.name: d,
+         for (final d in definitions.whereType<DwQueuedJob<Object?>>())
+           d.name: d,
        },
        recurring = {
          for (final d in definitions.whereType<DwRecurringJob>()) d.name: d,
@@ -314,8 +321,7 @@ final class DwJobRunner {
     final claimed = await _db.transaction((tx) async {
       final rows = await tx.query(
         'SELECT id, name, payload, attempts FROM dw_job '
-        'WHERE failed_at IS NULL AND run_at <= @now::timestamptz '
-        'AND (locked_until IS NULL OR locked_until <= @now::timestamptz) '
+        'WHERE $dwRunnableJobPredicate '
         'AND name = ANY(@queued::text[]) '
         'ORDER BY run_at, id LIMIT 1 FOR UPDATE SKIP LOCKED',
         params: {'queued': _queuedNames, 'now': now},

@@ -38,7 +38,6 @@ after persisting the response.
         "CreateOrder": {
           "calls": 100,
           "errors": 3,
-          "keyAction": true,
           "responseTimeMs": {"p50": 18.25, "p95": 61.7, "max": 109.4}
         }
       }
@@ -51,11 +50,13 @@ after persisting the response.
 }
 ```
 
-`coveredSince` is the earliest minute the process can vouch for: the later of its startup minute and the retention boundary. Minutes before it are unknown, not zero. `keyActions` lists every configured call wire name, including actions with zero calls.
+`coveredSince` is the earliest minute the process can vouch for: the later of the first whole minute after counting started and the retention boundary. The partial startup minute and minutes before it are unknown, not zero. `keyActions` lists every configured call wire name, including actions with zero calls.
 
 Only a call answered with a `5xx` status is an error; refusals and other `4xx` responses are calls but never errors. Response times are milliseconds from request arrival
-through encoding the answer; p50 and p95 use nearest-rank percentiles. `jobQueue` is the current
-database-backed queue snapshot: waiting rows have not exhausted their attempts, while failed rows
-have. Empty minutes are omitted. The cursor still advances across them, so polling after ten minutes
+through encoding the answer. Max is exact; p50 and p95 use nearest-rank percentiles over a uniform
+reservoir of at most 1,024 calls per endpoint-minute, so they are approximate above that volume.
+`jobQueue` is the current database-backed queue snapshot: waiting rows are due and not taken
+(`failed_at IS NULL`, `run_at <= now`, and no live lock), while failed rows have. Empty minutes are
+omitted. The cursor still advances across them, so polling after ten minutes
 returns every non-empty closed bucket among those ten and does not replay an already acknowledged
 minute.

@@ -1,4 +1,5 @@
 import 'dart:collection';
+import 'dart:math';
 
 import '../server/dw_server_clock.dart';
 
@@ -12,24 +13,21 @@ final class DwServerCounters {
   final DateTime _startedAt;
   final SplayTreeMap<DateTime, Map<String, _CallBucket>> _minutes =
       SplayTreeMap();
+  DateTime? _openMinute;
 
-  void record(
-    String endpoint,
-    int status,
-    Duration elapsed, {
-    required bool keyAction,
-  }) {
+  void record(String endpoint, int status, Duration elapsed) {
     final minute = _minute(_clock.now());
-    _closeBefore(minute);
+    _closeOpenBefore(minute);
     final endpoints = _minutes.putIfAbsent(minute, () => {});
-    (endpoints[endpoint] ??= _CallBucket(keyAction)).add(status, elapsed);
+    (endpoints[endpoint] ??= _CallBucket()).add(status, elapsed);
+    _openMinute = minute;
     _discardOld(minute);
   }
 
   /// Closed minutes strictly after [cursor], oldest first.
   List<Map<String, Object?>> read(DateTime? cursor, {DateTime? now}) {
     final current = _minute(now ?? _clock.now());
-    _closeBefore(current);
+    _closeOpenBefore(current);
     _discardOld(current);
     return [
       for (final entry in _minutes.entries)
@@ -48,7 +46,10 @@ final class DwServerCounters {
   /// Earliest minute whose zero or non-zero count this process can vouch for.
   DateTime coveredSince(DateTime now) {
     final retentionStart = _minute(now).subtract(const Duration(hours: 1));
-    return _startedAt.isAfter(retentionStart) ? _startedAt : retentionStart;
+    final firstWholeMinute = _startedAt.add(const Duration(minutes: 1));
+    return firstWholeMinute.isAfter(retentionStart)
+        ? firstWholeMinute
+        : retentionStart;
   }
 
   static bool acceptsToken(String? expected, String? sent) {
@@ -62,13 +63,13 @@ final class DwServerCounters {
     return difference == 0;
   }
 
-  void _closeBefore(DateTime current) {
-    for (final entry in _minutes.entries) {
-      if (!entry.key.isBefore(current)) break;
-      for (final bucket in entry.value.values) {
-        bucket.close();
-      }
+  void _closeOpenBefore(DateTime current) {
+    final open = _openMinute;
+    if (open == null || !open.isBefore(current)) return;
+    for (final bucket in _minutes[open]?.values ?? const <_CallBucket>[]) {
+      bucket.close();
     }
+    _openMinute = null;
   }
 
   void _discardOld(DateTime current) {
@@ -85,18 +86,27 @@ final class DwServerCounters {
 }
 
 final class _CallBucket {
-  _CallBucket(this.keyAction);
+  static const _sampleLimit = 1024;
 
-  final bool keyAction;
   int calls = 0;
   int errors = 0;
   List<int>? _micros = [];
+  final Random _random = Random();
+  int _maxMicros = 0;
   Map<String, num>? _responseTimeMs;
 
   void add(int status, Duration elapsed) {
     calls++;
     if (status >= 500) errors++;
-    _micros!.add(elapsed.inMicroseconds);
+    final micros = elapsed.inMicroseconds;
+    if (micros > _maxMicros) _maxMicros = micros;
+    final samples = _micros!;
+    if (samples.length < _sampleLimit) {
+      samples.add(micros);
+    } else {
+      final candidate = _random.nextInt(calls);
+      if (candidate < _sampleLimit) samples[candidate] = micros;
+    }
   }
 
   void close() {
@@ -104,11 +114,11 @@ final class _CallBucket {
     if (samples == null) return;
     samples.sort();
     int percentile(double value) =>
-        samples[(calls * value).ceil().clamp(1, calls) - 1];
+        samples[(samples.length * value).ceil().clamp(1, samples.length) - 1];
     _responseTimeMs = {
       'p50': percentile(0.50) / 1000,
       'p95': percentile(0.95) / 1000,
-      'max': samples.last / 1000,
+      'max': _maxMicros / 1000,
     };
     _micros = null;
   }
@@ -118,7 +128,6 @@ final class _CallBucket {
     return {
       'calls': calls,
       'errors': errors,
-      'keyAction': keyAction,
       'responseTimeMs': _responseTimeMs!,
     };
   }

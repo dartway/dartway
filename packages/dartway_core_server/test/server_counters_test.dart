@@ -23,7 +23,6 @@ void main() {
         'CreateOrder',
         i <= 3 ? 500 : 200,
         Duration(milliseconds: i),
-        keyAction: true,
       );
     }
     expect(counters.read(null), isEmpty, reason: 'the current minute is open');
@@ -36,7 +35,6 @@ void main() {
           'CreateOrder': {
             'calls': 100,
             'errors': 3,
-            'keyAction': true,
             'responseTimeMs': {'p50': 50.0, 'p95': 95.0, 'max': 100.0},
           },
         },
@@ -48,12 +46,7 @@ void main() {
     final clock = DwTestClock(DateTime.utc(2026, 10, 31, 12));
     final counters = DwServerCounters(clock: clock);
     for (var i = 0; i < 11; i++) {
-      counters.record(
-        'Heartbeat',
-        200,
-        const Duration(milliseconds: 1),
-        keyAction: false,
-      );
+      counters.record('Heartbeat', 200, const Duration(milliseconds: 1));
       clock.advance(const Duration(minutes: 1));
     }
 
@@ -61,6 +54,25 @@ void main() {
     expect(minutes, hasLength(10));
     expect(minutes.first['minute'], '2026-10-31T12:01:00.000Z');
     expect(minutes.last['minute'], '2026-10-31T12:10:00.000Z');
+  });
+
+  test('coverage starts after the partial startup minute', () {
+    final clock = DwTestClock(DateTime.utc(2026, 10, 31, 12, 0, 30));
+    final counters = DwServerCounters(clock: clock);
+
+    clock.advance(const Duration(minutes: 7));
+
+    expect(
+      counters.coveredSince(clock.now()),
+      DateTime.utc(2026, 10, 31, 12, 1),
+    );
+    expect(
+      counters
+          .coveredSince(clock.now())
+          .isAfter(DateTime.utc(2026, 10, 31, 12)),
+      isTrue,
+      reason: 'the partial minute in which counting started is not covered',
+    );
   });
 
   group('GET /dw/server-counters', () {
@@ -84,12 +96,18 @@ void main() {
       );
       await server.db.execute(
         "INSERT INTO dw_job (name, payload, run_at) VALUES "
-        "('waiting', '{}'::jsonb, now()), "
-        "('failed', '{}'::jsonb, now())",
+        "('waiting', '{}'::jsonb, '2026-10-31 11:00Z'), "
+        "('failed', '{}'::jsonb, '2026-10-31 11:00Z'), "
+        "('scheduled', '{}'::jsonb, '2026-10-31 13:00Z'), "
+        "('taken', '{}'::jsonb, '2026-10-31 11:00Z')",
       );
       await server.db.execute(
         "UPDATE dw_job SET failed_at = now(), last_error = 'failed' "
         "WHERE name = 'failed'",
+      );
+      await server.db.execute(
+        "UPDATE dw_job SET locked_until = '2026-10-31 13:00Z' "
+        "WHERE name = 'taken'",
       );
     });
 
@@ -154,7 +172,7 @@ void main() {
         final json = jsonDecode(answer.text) as Map<String, Object?>;
         expect(json['jobQueue'], {'waiting': 1, 'failed': 1});
         expect(json['keyActions'], ['GetMyNote']);
-        expect(json['coveredSince'], '2026-10-31T12:00:00.000Z');
+        expect(json['coveredSince'], '2026-10-31T12:01:00.000Z');
         final minutes = json['minutes']! as List<Object?>;
         final endpoints =
             (minutes.single as Map<String, Object?>)['endpoints']!
@@ -162,10 +180,70 @@ void main() {
         expect(endpoints.keys, containsAll(<String>['unknown', 'GetMyNote']));
         expect(endpoints.keys, hasLength(2));
         expect((endpoints['unknown']! as Map<String, Object?>)['calls'], 30);
-        expect(
-          (endpoints['GetMyNote']! as Map<String, Object?>)['keyAction'],
-          isTrue,
+      },
+    );
+
+    test(
+      'answers 503 when the queue snapshot cannot query the database',
+      () async {
+        final caller = server.caller();
+        addTearDown(caller.close);
+        await server.db.execute(
+          'ALTER TABLE dw_job RENAME TO dw_job_unavailable',
         );
+        try {
+          expect(
+            (await caller.raw(
+              'GET',
+              DwHttpContract.serverCountersPath,
+              headers: {'Authorization': 'Bearer studio-secret'},
+            )).status,
+            503,
+          );
+        } finally {
+          await server.db.execute(
+            'ALTER TABLE dw_job_unavailable RENAME TO dw_job',
+          );
+        }
+      },
+    );
+
+    test(
+      'counts handler failures but not refusals or 429 answers as errors',
+      () async {
+        final caller = server.caller();
+        addTearDown(caller.close);
+        expect(
+          (await caller.call(const ExplodingRequest('counter-test'))).status,
+          500,
+        );
+        expect(
+          (await caller.call(
+            const Count('counter-refusal', mode: 'refuse'),
+          )).status,
+          409,
+        );
+        const limited = DwRequestCode(
+          kind: DwIdentifierKind.email,
+          identifier: 'counter-limit@example.com',
+        );
+        expect((await caller.call(limited)).status, 200);
+        expect((await caller.call(limited)).status, 429);
+
+        clock.advance(const Duration(minutes: 1));
+        final answer = await caller.raw(
+          'GET',
+          DwHttpContract.serverCountersPath,
+          headers: {'Authorization': 'Bearer studio-secret'},
+        );
+        final json = jsonDecode(answer.text) as Map<String, Object?>;
+        final minutes = json['minutes']! as List<Object?>;
+        final endpoints =
+            (minutes.last as Map<String, Object?>)['endpoints']!
+                as Map<String, Object?>;
+        expect(endpoints['ExplodingRequest'], containsPair('errors', 1));
+        expect(endpoints['Count'], containsPair('errors', 0));
+        expect(endpoints['DwRequestCode'], containsPair('errors', 0));
       },
     );
 

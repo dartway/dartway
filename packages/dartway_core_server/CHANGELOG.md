@@ -3,8 +3,8 @@
 ## 0.25.0-dev.1
 
 - Add authenticated, one-hour in-memory endpoint counters for Studio, with
-  minute calls, errors and response-time percentiles, key-action markers, and
-  a current waiting/failed job-queue snapshot, explicit retained coverage and
+  minute calls, errors and bounded-sample response-time percentiles, a current
+  due-and-unclaimed/failed job-queue snapshot, exact retained coverage and
   configured key-action names (#685).
 
 - Keep the first administrator's phone or e-mail out of startup logs and
