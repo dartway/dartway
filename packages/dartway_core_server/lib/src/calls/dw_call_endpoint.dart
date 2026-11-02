@@ -77,18 +77,26 @@ final class DwCallEndpoint {
   DwServerLogger get _log => runtime.log;
 
   /// Answers one call. Never throws: every outcome is a response.
-  Future<DwApiResponse> answer(HttpRequest http, DwRequestBody body) async {
+  Future<({DwApiResponse response, DwProtocolEntry? entry})> answer(
+    HttpRequest http,
+    DwRequestBody body,
+  ) async {
+    final name = DwHttpContract.wireNameOf(http.uri.path);
+    final entry = name == null ? null : _protocol.entryNamed(name);
     try {
-      return await _answer(http, body);
+      return (response: await _answer(http, body, entry), entry: entry);
     } on _Rejected catch (rejection) {
-      return rejection.response;
+      return (response: rejection.response, entry: entry);
     } catch (error, stackTrace) {
-      return DwApiResponse.failed(
-        runtime.alerts.report(
-          where: 'call ${http.uri.path}',
-          error: error,
-          stackTrace: stackTrace,
+      return (
+        response: DwApiResponse.failed(
+          runtime.alerts.report(
+            where: 'call ${http.uri.path}',
+            error: error,
+            stackTrace: stackTrace,
+          ),
         ),
+        entry: entry,
       );
     }
   }
@@ -167,7 +175,11 @@ final class DwCallEndpoint {
     };
   }
 
-  Future<DwApiResponse> _answer(HttpRequest http, DwRequestBody body) async {
+  Future<DwApiResponse> _answer(
+    HttpRequest http,
+    DwRequestBody body,
+    DwProtocolEntry? entry,
+  ) async {
     final path = http.uri.path;
 
     // 1. Compatibility.
@@ -245,8 +257,7 @@ final class DwCallEndpoint {
         'a call is ${DwHttpContract.callMethod}, not ${http.method}',
       );
     }
-    final name = DwHttpContract.wireNameOf(path);
-    final entry = name == null ? null : _protocol.entryNamed(name);
+    final name = entry?.name;
     final handler = entry == null ? null : handlers[entry.type];
     if (name == null || handler == null) {
       final incident = DwServerIncident.newId();

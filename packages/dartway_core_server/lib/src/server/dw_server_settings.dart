@@ -35,6 +35,8 @@ final class DwServerSettings {
     this.strictBounds = false,
     this.largeResponseBytes = 256 << 10,
     this.boundWarningInterval = const Duration(hours: 1),
+    this.studioReadToken,
+    this.keyActions = const {},
   }) : assert(maxBodyBytes > 0),
        assert(largeResponseBytes > 0),
        assert(outboundLimitBytes > 0),
@@ -92,6 +94,14 @@ final class DwServerSettings {
   /// How often one request's bound breach, or one call's large response, is
   /// logged again.
   final Duration boundWarningInterval;
+
+  /// Secret bearer token that allows Studio to read `/dw/server-counters`.
+  /// With no token configured the endpoint is unavailable.
+  final String? studioReadToken;
+
+  /// Call classes whose successful use represents product liveness. Studio
+  /// applies this marker while interpreting the counters; it changes no call.
+  final Set<Type> keyActions;
 
   /// How long a whole body may take to arrive. A client dripping a body a
   /// byte at a time holds a connection and a buffer; this bounds both.

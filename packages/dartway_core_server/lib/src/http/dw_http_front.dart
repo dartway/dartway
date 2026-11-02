@@ -9,6 +9,8 @@ import '../alerts/dw_server_logger.dart';
 import '../calls/dw_call_endpoint.dart';
 import '../context/dw_call_context.dart';
 import '../live/dw_live_endpoint.dart';
+import '../metrics/dw_server_counters.dart';
+import '../jobs/dw_job_runner.dart';
 import '../routes/dw_http_route.dart';
 import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
@@ -28,6 +30,8 @@ final class DwHttpFront {
     required this.live,
     required List<DwHttpRoute> routes,
   }) : _routes = _indexRoutes(routes);
+
+  late final DwServerCounters _counters;
 
   final DwRuntime runtime;
   final DwServerSettings settings;
@@ -70,6 +74,7 @@ final class DwHttpFront {
     final server = await HttpServer.bind(address, port);
     server.idleTimeout = const Duration(seconds: 120);
     _server = server;
+    _counters = DwServerCounters(clock: runtime.clock);
     server.listen(
       (request) => unawaited(_serve(request)),
       onError: (Object error) => _log.warning('HTTP listener', error: error),
@@ -124,6 +129,7 @@ final class DwHttpFront {
             when request.method == 'GET' || request.method == 'HEAD' =>
           await _health(request),
         DwHttpContract.clientErrorPath => await _route(request, body),
+        DwHttpContract.serverCountersPath => await _serverCounters(request),
         _ when path.startsWith(DwHttpContract.pathPrefix) => await _call(
           request,
           body,
@@ -203,7 +209,8 @@ final class DwHttpFront {
     DwRequestBody body,
   ) async {
     final clock = Stopwatch()..start();
-    var answer = await calls.answer(request, body);
+    var (:response, :entry) = await calls.answer(request, body);
+    var answer = response;
     List<int> bytes;
     try {
       // Straight to UTF-8 bytes, without an intermediate string.
@@ -220,13 +227,67 @@ final class DwHttpFront {
       );
       bytes = _jsonUtf8.convert(answer.toJson());
     }
-    calls.bounds.checkSize(
-      DwHttpContract.wireNameOf(request.uri.path) ?? request.uri.path,
-      bytes.length,
-    );
+    calls.bounds.checkSize(entry?.name ?? 'unknown', bytes.length);
     final status = dwHttpStatusFor(answer);
+    final name = entry?.name ?? 'unknown';
+    _counters.record(name, status, clock.elapsed);
     _timed(request.uri.path, status, clock.elapsed, bytes.length);
     return (status, {..._callHeaders, ...dwHttpHeadersFor(answer)}, bytes);
+  }
+
+  Future<(int, Map<String, String>, List<int>)> _serverCounters(
+    HttpRequest request,
+  ) async {
+    if (request.method != 'GET') {
+      return _text(405, 'method not allowed', {'allow': 'GET'});
+    }
+    final expected = settings.studioReadToken;
+    final values = request.headers[HttpHeaders.authorizationHeader];
+    final sent = values?.length == 1 && values!.single.startsWith('Bearer ')
+        ? values.single.substring(7)
+        : null;
+    if (!DwServerCounters.acceptsToken(expected, sent)) {
+      return _text(401, 'unauthorized', {'www-authenticate': 'Bearer'});
+    }
+    DateTime? cursor;
+    if (request.uri.queryParameters['cursor'] case final raw?) {
+      cursor = DateTime.tryParse(raw);
+      if (cursor == null) return _text(400, 'invalid cursor');
+    }
+    final now = runtime.clock.now();
+    late final Map<String, Object?> queue;
+    try {
+      queue = (await runtime.db.query(
+        'SELECT count(*) FILTER (WHERE $dwRunnableJobPredicate)::int AS waiting, '
+        'count(*) FILTER (WHERE failed_at IS NOT NULL)::int AS failed FROM dw_job',
+        params: {'now': now},
+      )).single;
+    } catch (error) {
+      _log.warning('server counters: database unavailable', error: error);
+      return _text(503, 'database unavailable');
+    }
+    final bytes = _jsonUtf8.convert({
+      'minutes': _counters.read(cursor, now: now),
+      'cursor': _closedMinuteCursor(now),
+      'coveredSince': _counters.coveredSince(now).toIso8601String(),
+      'keyActions': [
+        for (final entry in runtime.protocol.entries)
+          if (settings.keyActions.contains(entry.type)) entry.name,
+      ],
+      'jobQueue': {'waiting': queue['waiting'], 'failed': queue['failed']},
+    });
+    return (200, _callHeaders, bytes);
+  }
+
+  String _closedMinuteCursor(DateTime value) {
+    final now = value.toUtc();
+    return DateTime.utc(
+      now.year,
+      now.month,
+      now.day,
+      now.hour,
+      now.minute,
+    ).subtract(const Duration(minutes: 1)).toIso8601String();
   }
 
   /// One line per call: its wire name, status, time and answer size — from

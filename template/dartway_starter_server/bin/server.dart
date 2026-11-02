@@ -65,6 +65,7 @@ Future<void> main() async {
       alertProject: env.server.project,
       alertEnvironment: env.server.environment,
       strictBounds: env.server.strictBounds,
+      studioReadToken: env.server.studioReadToken,
       // The project chooses which calls need peer quotas. With an ingress,
       // declare its actual network before adding entries here.
       callRateLimits: const <Type, DwCallRateLimit>{},
