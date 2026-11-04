@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.0-dev.1
+
+- Add day-stable `DwFileService.readLink` URLs with a 48-hour signature and
+  private, immutable one-day browser caching (#704).
+
 ## 0.25.0
 
 - Alerts now use a leased PostgreSQL outbox with retry and persisted signature

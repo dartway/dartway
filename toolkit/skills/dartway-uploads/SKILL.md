@@ -61,6 +61,9 @@ Public files are never asked.
 - The server works on a file itself with `ctx.files.read`, `readLink` and `store(purpose, accountId:,
   bytes:, contentType:, fileName:)` — no rule asked. Never make a file public so server code can reach it,
   and never pass what `read` or `readLink` answer to a caller who may not read the file.
+  Use `readLink(fileId, stable: true)` for authorized browser-cached `<img>`, `@font-face`, and
+  CSS `url()` resources: it is stable for one UTC day, signed for 48 hours, and returned with
+  `Cache-Control: private, max-age=86400, immutable`; never combine `stable` with `expires`.
 
 ## 3. The app
 

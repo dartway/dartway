@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.0-dev.1
+
+- Nothing changed here; the family moves in lockstep with stable `readLink`
+  links in `dartway_core_server` (#710).
+
 ## 0.25.0
 
 - Advance in lockstep with the core family; no API or wire changes in this package.

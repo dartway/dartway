@@ -508,6 +508,7 @@ Harness Function() useFilesHarness(
   DwServerSettings settings = const DwServerSettings(
     jobPollInterval: Duration(seconds: 30),
   ),
+  DwServerClock clock = DwServerClock.system,
 }) => useHarness(
   build: (app, config) => app.server(
     config,
@@ -515,6 +516,7 @@ Harness Function() useFilesHarness(
     handlers: [...app.handlers(), ...fileHandlers()],
     files: (declaration ?? testStorage)(storage().config),
     settings: settings,
+    clock: clock,
   ),
 );
 
