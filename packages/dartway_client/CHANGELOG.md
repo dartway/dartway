@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.0-dev.1
+## 0.25.0
 
 - Add the internal framework side-channel used by Flutter error delivery,
   including anonymous retry after an expired session (#683).

@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.0-dev.1
+## 0.25.0
 
 - Name the authenticated Studio server-counters path in `DwHttpContract` (#685).
 

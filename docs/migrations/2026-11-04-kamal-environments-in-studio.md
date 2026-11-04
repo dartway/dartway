@@ -1,7 +1,7 @@
 ---
 title: Move Kamal environments out of the repository and into Studio
 affects:
-  dartway_cli: "0.27.0"
+  dartway_cli: "0.28.0"
 ---
 
 ## Who is affected
