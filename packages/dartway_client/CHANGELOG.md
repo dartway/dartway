@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.0-dev.1
+
+- Nothing changed here; the family moves in lockstep with stable `readLink`
+  links in `dartway_core_server` (#710).
+
 ## 0.25.0
 
 - Add the internal framework side-channel used by Flutter error delivery,

@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.26.0-dev.1
+
+- Nothing changed here; the family moves in lockstep with stable `readLink`
+  links in `dartway_core_server` (#710).
+
 ## 0.25.0
 
 - Flutter errors now use the built-in persistent device queue and guarded
