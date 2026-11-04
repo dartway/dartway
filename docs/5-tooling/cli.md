@@ -480,10 +480,13 @@ dartway deploy stats --env staging --hours 24
 dartway secret set SMS_API_TOKEN --env staging
 ```
 
-`kamal` generates stage/prod Kamal configs, the Studio manifest and a CI image
-workflow from `deploy/config.yaml`, literal project routes and the resolved CLI
-lock. `kamal --check` rejects stale output without writing; web release builds
-call `Uri.base.origin`, so one image serves both destinations. See
+`kamal` generates one environment-free Kamal config per service, the Studio
+manifest and a CI image workflow from `deploy/config.yaml > kamal` and the
+resolved CLI lock; Studio supplies each environment's host, domains and modes
+through `STUDIO_*` variables at deploy time. `kamal --check` rejects stale
+output without writing; web release builds call `Uri.base.origin`, so one image
+serves every environment. `deploy check --env <name>` reads a Kamal
+environment from the same variables. See
 [Kamal and GHCR](deploy.md#kamal-and-ghcr).
 
 `setup` provisions a server and renders its Compose and Nginx configuration, `run` deploys — the

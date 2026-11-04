@@ -24,9 +24,22 @@ environments `deploy/config.yaml` declares. Every one that connects takes `--as 
 ## Kamal and GHCR
 
 `dartway deploy kamal` generates the Studio deployment contract from
-`deploy/config.yaml` and the Flutter package's resolved CLI lock. Configure
-`staging` (destination `stage`) and/or `production` (destination `prod`);
-`local` is never a destination. Resolve the packages first.
+`deploy/config.yaml > kamal` and the Flutter package's resolved CLI lock. The
+contract names no environment: the repository says what to deploy, Studio says
+where. Resolve the packages first.
+
+```yaml
+# deploy/config.yaml
+kamal:
+  repo: git@github.com:your-org/your-project.git
+  # project: your-project  # the identity on servers; defaults to the repo name
+  # deploy_user: dw_admin  # owner of /home/<deploy_user>/.config/<project>
+  storage: true            # the project stores files
+```
+
+A Kamal project keeps no deployment sections (`staging:`, `production:`, …):
+generation refuses them, because a server list in the repository is a second
+copy of Studio's. `local:`, `requires:` and `migrations:` stay.
 
 ```bash
 cd <project>_flutter
@@ -35,6 +48,37 @@ dartway deploy kamal --check
 ```
 
 Commit `deploy/kamal/`, `deploy/studio.yml` and `.github/workflows/images.yml`.
+
+Each service has one configuration, `deploy/kamal/<service>.yml`. Kamal renders
+it as ERB, and its first block reads and validates the variables Studio sets
+for the environment it deploys; a missing or malformed one stops Kamal with its
+name:
+
+| Variable | What |
+|---|---|
+| `STUDIO_ENVIRONMENT` | the environment's name; Kamal runs with `-d` set to it |
+| `STUDIO_HOST`, `STUDIO_SSH_USER` | where it runs |
+| `STUDIO_DOMAIN_API`, `STUDIO_DOMAIN_APP`, `STUDIO_DOMAIN_FILES` | the ingress points; `FILES` only where storage is bundled |
+| `STUDIO_BUNDLED_DATABASE`, `STUDIO_BUNDLED_STORAGE` | `true` or `false`: whether the environment runs Postgres and RustFS itself |
+| `DW_TRUSTED_PROXY_NETWORKS` | the actual `kamal` network subnets, comma-separated |
+| `DW_STORAGE_ENDPOINT`, `DW_STORAGE_PUBLIC_BUCKET`, … | an external storage's non-secret values; only the endpoint is required |
+
+Secrets are named in `env.secret`, as before, and their values are Studio's.
+Kamal derives app directories (`.kamal/apps/<project>-<service>-<env>`),
+containers and routes (`<project>-<service>-web-<env>`) and the `destination`
+label from the destination, and refuses `-d` without a
+`<service>.<env>.yml` beside the configuration. The runner writes that file as
+`{}` (`deploy/studio.yml > kamal > destination_config`); it is never committed
+and `deploy kamal` leaves it alone. A new environment is therefore a new set of
+variables in Studio and no commit.
+
+`deploy/studio.yml` lists, without naming an environment: `services` in
+deploy order, the variables above, `ingress` points, `components` (`database`
+provided by the API's `postgres` accessory, `storage` by the `storage` service)
+with what each needs where bundled and where external, `values` and `secrets`
+every environment gives, `secret_files`, the API env file to import secret
+values from (`secrets_import`, `{env}` substituted, relative to the SSH user's
+home), migrations, health and the check image.
 The Studio manifest's `migrations` globs name the server package's
 `lib/src/migrations/**` and `pubspec.lock`, relative to the repository root.
 Studio treats changes matching either path as carrying migrations, including
@@ -54,10 +98,11 @@ with `net.ipv4.tcp_congestion_control=bbr`; provision BBR on the Linux host befo
 booting it.
 
 The generated Images workflow runs after the project's `CI` workflow completes
-successfully. Image publication follows the `branch:` values of the configured
-deployments: a CI run on one of those branches publishes when it was started by a push or
-by hand (`workflow_dispatch`, write access only); enable one of the two there. The template enables `master`
-and `release` by default. `workflow_run` loads workflows from the default branch, so the initial
+successfully. A CI run publishes when it was started by a push or by hand
+(`workflow_dispatch`, write access only), on any branch: which branch an
+environment deploys is Studio's, so the branches CI's own `push:` trigger names
+are the ones that get images. The template enables `master` and `release` by
+default. `workflow_run` loads workflows from the default branch, so the initial
 installation must be merged there before this trigger can run. PR CI successes
 build without pushing or writing shared caches. Fork PRs skip this privileged
 workflow. The template ships no Images workflow or generated deployment files;
@@ -75,15 +120,19 @@ commit's Unix timestamp, so the number is fixed per revision and an older
 Existing manifests are skipped and keep their first build number; registry
 failures fail the job. PR runs build without pushing. The OCI source label links the packages to their repository.
 
-Bundled storage is a service built from `rustfs/rustfs:1.0.0` with a TLS host;
-external storage has no service and receives its environment through secrets.
-Bundled Postgres is an API accessory on `postgres:17-alpine`, with no host port.
+Bundled storage is a service built from `rustfs/rustfs:1.0.0` with a TLS host,
+deployed only where `STUDIO_BUNDLED_STORAGE` is `true`; its configuration
+refuses to load elsewhere. External storage has no service: its endpoint and
+buckets are values, its keys secrets. Bundled Postgres is an API accessory on
+`postgres:17-alpine`, with no host port, present only where
+`STUDIO_BUNDLED_DATABASE` is `true`; an external database's coordinates are
+secrets.
 Project names start with a lower case letter or digit and contain only lower case
 letters, digits, `_` and `-`. Invalid repository-derived names are refused with
 their value and the `project:` key to set explicitly. Kamal and
 Images use the same project identity without lowercasing it. Configs list secret
 names only, including required project secrets; Studio supplies their values,
-SSH credentials and `KAMAL_REGISTRY_PASSWORD`. `ssh_user` comes from the target.
+SSH credentials and `KAMAL_REGISTRY_PASSWORD`.
 
 ### Native checks and ingress policy
 
@@ -93,9 +142,16 @@ selects Kamal; projects without one retain Compose. `--engine kamal` or
 operator and always checks Compose. Generating a manifest does not deploy it.
 
 ```bash
-dartway deploy check --env staging --local
-dartway deploy check --env staging --version <full-commit-sha>
+dartway deploy check --env stage --local
+dartway deploy check --env stage --version <full-commit-sha>
 ```
+
+For a Kamal project `--env` is the environment's name in Studio. The check reads
+what that environment must give from `deploy/studio.yml` and its values from the
+same variables Kamal reads (above), refusing by name what is missing; no
+`deploy/config.yaml` section is read. `kamal-secrets` checks that every secret
+name the environment needs is set or named in `.kamal/secrets-common` or
+`.kamal/secrets.<env>`, without reading values.
 
 Without `--version`, native operator checks use the checkout's HEAD. A branch
 name or abbreviated SHA is refused. Native checks verify generated files, the
@@ -108,8 +164,8 @@ mount metadata and network addresses; it never reads container environments or
 health logs. These checks do not prove stored data: prove a backup restore before
 changing engines.
 
-Declare the actual `kamal` network subnets under `trusted_proxy_networks` for each
-destination, then wire `DwServerEnvironment.trustedProxyNetworks`,
+Give the actual `kamal` network subnets as each environment's
+`DW_TRUSTED_PROXY_NETWORKS`, then wire `DwServerEnvironment.trustedProxyNetworks`,
 `httpBehindProxy` and `deploymentVersion` into `DwServerSettings` as described in
 [server configuration](../4-server/app-server.md#per-peer-call-quotas). Native
 checks require this explicit trust and compare it with the actual Docker network.
@@ -126,14 +182,16 @@ them. Compose remains available for a deployment that needs those policies.
 
 ### File secrets
 
-Declare file names under the project's or destination's `requires.files`.
-The API destination mounts each file from
+Declare file names under the project's `requires.files`.
+The API mounts each file from
 `/home/<deploy_user>/.config/<project>/<name>` to `/run/secrets/<name>`,
 read-only. Web and storage receive no such mounts; the secret store's
 `secrets.env` is never mounted. Files are not copied into images or converted
 to environment variables.
 
-Deliver them before the first boot, and again when rotating a credential:
+Deliver them to that directory on every host before the first boot, and again
+when rotating a credential. Studio delivers them for a Kamal environment; a
+Compose deployment uses:
 
 ```bash
 dartway secret put-file /private/path/fcm.json --name fcm.json --env staging
@@ -165,7 +223,9 @@ sets `DW_PINNED_CLI` when running it, so a fresh deploy checkout does not need
 the app packages resolved. No Studio file-upload interface is supplied by this CLI.
 
 The Studio check image reads a checkout mounted read-only at `/project`, with
-`--project /project --env stage --version <full-commit-sha>` (or `prod`).
+`--project /project --env <environment> --version <full-commit-sha>` and the
+variables `deploy/studio.yml > check > environment` names (the domains and
+`STUDIO_BUNDLED_STORAGE`) passed into the container.
 The generated manifest supplies `{version}` as an argument placeholder: the
 runner must substitute the selected deployment SHA, not the framework image tag.
 This image is an outside-only checker and requires no SSH, Docker socket or Git.

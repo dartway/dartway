@@ -1,13 +1,13 @@
 import 'dart:io';
 
 import 'package:args/args.dart';
-import 'package:dartway_cli/src/deploy/deploy_target.dart';
+import 'package:dartway_cli/src/deploy/kamal_contract.dart';
 import 'package:dartway_cli/src/deploy/outside_probe.dart';
-import 'package:dartway_cli/src/deploy/stack.dart';
-import 'package:dartway_cli/src/project_layout.dart';
 
-/// The Studio check image's entry point. Reads only the mounted checkout;
-/// neither SSH credentials nor a writable package cache are needed.
+/// The Studio check image's entry point. Reads only the mounted checkout's
+/// `deploy/studio.yml` and the environment's domains and storage mode from
+/// the variables the manifest's `check.environment` names; neither SSH
+/// credentials nor a writable package cache are needed.
 Future<void> main(List<String> arguments) async {
   final parser = ArgParser()
     ..addOption(
@@ -15,7 +15,7 @@ Future<void> main(List<String> arguments) async {
       defaultsTo: '/project',
       help: 'Read-only project checkout.',
     )
-    ..addOption('env', help: 'Kamal destination: stage or prod.')
+    ..addOption('env', help: "The environment's name in Studio.")
     ..addOption('version', help: 'Required immutable deployment SHA.')
     ..addFlag('help', abbr: 'h', negatable: false);
   try {
@@ -24,26 +24,21 @@ Future<void> main(List<String> arguments) async {
       stdout.writeln(parser.usage);
       return;
     }
-    final environment = switch (args.option('env')) {
-      'stage' => 'staging',
-      'prod' => 'production',
-      _ => throw ArgumentError('Specify --env stage or --env prod.'),
-    };
+    final environment = args.option('env');
+    if (environment == null) {
+      throw ArgumentError('Specify --env <environment>.');
+    }
     final root = Directory(args.option('project')!);
     final version = args.option('version');
     if (version == null || !RegExp(r'^[0-9a-f]{40}$').hasMatch(version)) {
       throw ArgumentError('Specify --version <full deployment SHA>.');
     }
-    final layout = ProjectLayout.detect(root);
-    final target = DwDeployTarget.load(
+    final stack = DwKamalEnvironment.stack(
       projectRoot: root,
-      environment: environment,
-    );
-    final stack = DwStack(
-      projectRoot: root,
-      target: target,
-      serverPackage: layout.serverPackage,
-      flutterPackage: layout.flutterPackage,
+      manifest: DwKamalManifest.load(root),
+      name: environment,
+      variables: Platform.environment,
+      check: true,
     );
     final probe = DwOutsideProbe();
     final checks = [

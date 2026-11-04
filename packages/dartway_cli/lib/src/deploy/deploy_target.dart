@@ -736,10 +736,50 @@ class DwDeployTarget {
   ];
 
   /// Top-level keys of `deploy/config.yaml` that are not deployments: the
-  /// hoisted `requires`, `local`, and `migrations` — where `dartway check`
+  /// hoisted `requires`, `local`, `migrations` — where `dartway check`
   /// reads which migrations predate the data-change and offline NOT NULL
-  /// deploy-safety rules (`dataChecksAfter`).
-  static const _projectKeys = {'requires', localSection, 'migrations'};
+  /// deploy-safety rules (`dataChecksAfter`) — and `kamal`, the project half
+  /// of a Kamal contract, whose environments live in Studio
+  /// (`DwKamalProject`).
+  static const _projectKeys = {
+    'requires',
+    localSection,
+    'migrations',
+    kamalSection,
+  };
+
+  /// The section a Kamal project declares itself in (`DwKamalProject`).
+  static const String kamalSection = 'kamal';
+
+  /// The project's own `requires:` — the top-level block every environment
+  /// inherits — validated as [parse] validates it, every problem at once.
+  static ({List<String> secrets, List<String> files}) projectRequiresIn(
+    YamlMap document,
+  ) {
+    final problems = <String>[];
+    T? guarded<T>(T Function() read) {
+      try {
+        return read();
+      } on StateError catch (error) {
+        problems.add(error.message);
+        return null;
+      }
+    }
+
+    final requires = _requiresOf(
+      document,
+      source: configRelativePath,
+      problems: problems,
+      guarded: guarded,
+    );
+    if (problems.isNotEmpty) {
+      throw StateError(
+        '$configRelativePath is not deployable:\n'
+        '${problems.map((problem) => '  - $problem').join('\n')}',
+      );
+    }
+    return (secrets: requires.secrets, files: requires.files);
+  }
 
   /// The section holding the environment a developer's machine starts a server
   /// with, in this file and in `deploy/secrets.yaml`.

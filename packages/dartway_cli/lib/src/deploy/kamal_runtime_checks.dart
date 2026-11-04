@@ -1,7 +1,5 @@
 import 'dart:io';
 
-import 'package:yaml/yaml.dart';
-
 import '../checker/dw_check_type.dart';
 import 'deploy_check.dart';
 import 'deploy_target.dart';
@@ -13,7 +11,13 @@ import 'stack.dart';
 
 final List<DwDeployCheck> dwKamalLocalDeployChecks = [
   for (final check in dwLocalDeployChecks)
-    if (check.id != 'nginx-upstreams' && check.id != 'override-web-build')
+    if (!const {
+      'nginx-upstreams',
+      'override-web-build',
+      // deploy/secrets.yaml sections are Compose environments; a Kamal
+      // environment's secrets are Studio's (kamal-secrets).
+      'local-secrets-cover-environment',
+    }.contains(check.id))
       check,
   DwDeployCheck(
     id: 'kamal-generated',
@@ -36,7 +40,55 @@ final List<DwDeployCheck> dwKamalLocalDeployChecks = [
       }
     },
   ),
+  DwDeployCheck(
+    id: 'kamal-secrets',
+    title: 'Every secret the environment needs is given to Kamal',
+    stage: DwDeployCheckStage.local,
+    severity: DwCheckSeverity.error,
+    evaluate: (context) async =>
+        kamalSecretsVerdict(context, Platform.environment),
+  ),
 ];
+
+/// Whether every secret name `deploy/studio.yml` asks of the environment is
+/// set in [variables] or named in Kamal's secrets files
+/// (`.kamal/secrets-common`, `.kamal/secrets.<env>`). Names only: a value in
+/// those files may be a command Kamal runs, and is never read here.
+DwDeployVerdict kamalSecretsVerdict(
+  DwDeployContext context,
+  Map<String, String> variables,
+) {
+  final environment = context.kamalEnvironment;
+  if (environment == null) {
+    return const DwDeployVerdict.skip('not a Kamal environment');
+  }
+  final declared = <String>{
+    for (final name in ['secrets-common', 'secrets.${environment.name}'])
+      if (File('${context.projectRoot.path}/.kamal/$name') case final file
+          when file.existsSync())
+        for (final line in file.readAsLinesSync())
+          if (RegExp(
+                r'^\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=',
+              ).firstMatch(line)
+              case final match?)
+            match[1]!,
+  };
+  final missing = [
+    for (final name in environment.needs.secrets)
+      if ((variables[name] ?? '').isEmpty && !declared.contains(name)) name,
+  ];
+  return missing.isEmpty
+      ? DwDeployVerdict.pass(
+          '${environment.needs.secrets.length} named: '
+          '${environment.needs.secrets.join(', ')}',
+        )
+      : DwDeployVerdict.fail(
+          'not given: ${missing.join(', ')}',
+          fix:
+              'Set them in Studio for ${environment.name}, or name them in '
+              '.kamal/secrets-common or .kamal/secrets.${environment.name}.',
+        );
+}
 
 final List<DwDeployCheck> dwKamalRemoteDeployChecks = [
   for (final check in dwRemoteDeployChecks)
@@ -54,7 +106,7 @@ final List<DwDeployCheck> dwKamalRemoteDeployChecks = [
     stage: DwDeployCheckStage.remote,
     severity: DwCheckSeverity.error,
     evaluate: (context) => evaluateImagesResolve([
-      ('native proxy', 'basecamp/kamal-proxy:v0.10.2'),
+      ('native proxy', 'basecamp/kamal-proxy:${DwKamalContract.proxyVersion}'),
       if (context.target.database == DwDatabaseMode.bundled)
         ('native database', DwStack.postgresImage),
       if (context.target.storage == DwStorageMode.bundled)
@@ -134,25 +186,31 @@ DwDeployCheck _nativeCheck(
 final class DwKamalRuntime {
   DwKamalRuntime(this.context);
   final DwDeployContext context;
-  late final Map<String, String> _files = DwKamalGenerator(
+  late final DwKamalGenerator _generator = DwKamalGenerator(
     context.projectRoot,
-  ).render();
+  );
+  late final DwKamalContract _contract = DwKamalContract(
+    _generator.project.projectName,
+  );
+  late final String _owner = DwKamalGenerator.githubOwner(
+    _generator.project.repo,
+  );
   late final Future<String> version = _version();
   late final Future<DwKamalRuntimeState> _state = _read();
-  late final String _destination =
-      DwKamalGenerator.destinations[context.target.environment]!;
-  Map get _manifest => loadYaml(_files['deploy/studio.yml']!) as Map;
-  List<String> get _services => (_manifest['services'] as List).cast<String>();
-  Map _base(String service) =>
-      loadYaml(_files['deploy/kamal/$service.yml']!) as Map;
-  Map _target(String service) =>
-      loadYaml(_files['deploy/kamal/$service.$_destination.yml']!) as Map;
-  String _identity(String service) => _base(service)['service'] as String;
-  String _role(String service) =>
-      (_target(service)['servers'] as Map).keys.single as String;
-  String get _postgres =>
-      ((_target('api')['accessories'] as Map)['postgres'] as Map)['service']
-          as String;
+  String get _destination => context.target.environment;
+  List<String> get _services =>
+      _contract.servicesOf(context.target, storage: _generator.project.storage);
+  String _image(String service) => '$_owner/${_identity(service)}';
+  String _identity(String service) => _contract.identity(service);
+  String _role(String service) => DwKamalContract.role;
+  List<String> _hosts(String service) => [
+    switch (service) {
+      'api' => context.target.apiDomain,
+      'web' => context.target.appDomain,
+      _ => context.target.storageDomain!,
+    },
+  ];
+  String get _postgres => _contract.postgres(_destination);
 
   Future<String> _version() async {
     var selected = context.version;
@@ -209,7 +267,7 @@ final class DwKamalRuntime {
     DwKamalRuntimeState state,
     String service,
   ) async {
-    final expected = 'ghcr.io/${_base(service)['image']}:${await version}';
+    final expected = 'ghcr.io/${_image(service)}:${await version}';
     final matching = _running(state, _identity(service))
         .where(
           (container) =>
@@ -242,8 +300,8 @@ final class DwKamalRuntime {
       final container = await _selected(state, service);
       final route =
           state.routes['${_identity(service)}-${_role(service)}-$_destination'];
-      final port = (_base(service)['proxy'] as Map)['app_port'] as int;
-      final hosts = (_target(service)['proxy'] as Map)['hosts'] as List;
+      final port = DwKamalContract.appPort(service);
+      final hosts = _hosts(service);
       final routeName = '${_identity(service)}-${_role(service)}-$_destination';
       if (state.routes.entries.any(
         (entry) =>
@@ -318,9 +376,7 @@ final class DwKamalRuntime {
   Future<DwDeployVerdict> checkData() async {
     final state = await _state;
     if (_services.contains('storage')) {
-      final volume = ((_target('storage')['volumes'] as List).single as String)
-          .split(':')
-          .first;
+      final volume = _contract.storageVolume(_destination).split(':').first;
       final storage = await _selected(state, 'storage');
       if (storage == null ||
           !storage.mounts.any(
@@ -339,7 +395,7 @@ final class DwKamalRuntime {
       final database = _running(state, _postgres, accessory: true);
       if (database.length != 1 ||
           !database.single.healthy ||
-          database.single.image != 'postgres:17-alpine' ||
+          database.single.image != DwStack.postgresImage ||
           !database.single.mounts.any(
             (mount) =>
                 mount.type == 'bind' &&

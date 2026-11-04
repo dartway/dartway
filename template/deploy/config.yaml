@@ -9,6 +9,14 @@
 #               `bin/server.dart` through `DwLocalEnvironment` — no deploy, no
 #               machine, no domains
 #   <name>      a deployment: `dartway deploy setup|check|run --env <name>`
+#   kamal       instead of deployments, when Studio deploys this project with
+#               Kamal: what every environment shares. The environments
+#               themselves — server, domains, bundled or external storage and
+#               database, secrets — live in Studio (deploy/README.md, "Kamal")
+#
+# kamal:
+#   repo: git@github.com:your-org/your-project.git
+#   storage: true
 #
 #   dartway secret list --env local       what is set and what is missing
 #   dartway secret set <KEY> --env local  a value that is yours alone
