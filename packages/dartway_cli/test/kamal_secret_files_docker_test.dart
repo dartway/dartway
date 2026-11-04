@@ -4,16 +4,13 @@ library;
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:dartway_cli/src/deploy/deploy_target.dart';
+import 'package:dartway_cli/src/deploy/kamal_contract.dart';
 import 'package:dartway_cli/src/deploy/kamal.dart';
 import 'package:dartway_cli/src/deploy/kamal_secret_files.dart';
 import 'package:dartway_cli/src/deploy/secret_store.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
-import 'package:yaml/yaml.dart';
-
-import 'support/deploy_fixtures.dart';
 
 /// Real Kamal configuration, SSH/SCP and an isolated Docker daemon prove a
 /// host file reaches a container without joining its environment.
@@ -114,19 +111,29 @@ exec /usr/sbin/sshd -D -e -o PermitRootLogin=prohibit-password -o PasswordAuthen
       'shop_flutter/pubspec.lock',
       File('test/fixtures/kamal/hosted.lock').readAsStringSync(),
     );
-    write(
-      'deploy/config.yaml',
-      configYaml(
-        extra: '  requires:\n    files: [fcm.json]\n',
-      ).replaceFirst('203.0.113.10', '127.0.0.1'),
-    );
+    write('deploy/config.yaml', '''
+requires:
+  files: [fcm.json]
+kamal:
+  repo: git@github.com:acme/shop.git
+  deploy_user: deployer
+''');
     DwKamalGenerator(root).generate();
+    const variables = {
+      'STUDIO_ENVIRONMENT': 'stage',
+      'STUDIO_HOST': '127.0.0.1',
+      'STUDIO_SSH_USER': 'root',
+      'STUDIO_DOMAIN_API': 'api.example.com',
+      'STUDIO_DOMAIN_APP': 'app.example.com',
+      'STUDIO_BUNDLED_DATABASE': 'true',
+      'DW_TRUSTED_PROXY_NETWORKS': '172.18.0.0/16',
+    };
+    // The destination file is the runner's: Kamal requires one for `-d`, and
+    // here it also carries the runner's SSH credentials. Store and mount
+    // paths stay exactly as generated. No test-only path enters production
+    // code.
     final api = File(p.join(root.path, 'deploy/kamal/api.stage.yml'));
-    final config = Map<String, dynamic>.from(
-      loadYaml(api.readAsStringSync()) as YamlMap,
-    );
-    // Kamal resolves the runner's credentials; store and mount paths stay
-    // exactly as generated. No test-only path enters production code.
+    final config = <String, dynamic>{};
     final sshConfig = p.join(root.path, 'ssh_config');
     File(sshConfig).writeAsStringSync(
       'Host 127.0.0.1\n  UserKnownHostsFile ${ssh.knownHosts}\n',
@@ -147,15 +154,19 @@ exec /usr/sbin/sshd -D -e -o PermitRootLogin=prohibit-password -o PasswordAuthen
       [],
       workingDirectory: root.path,
       environment: {
+        ...variables,
         'KAMAL_DESTINATION': destination,
         'KAMAL_SERVICE': 'shop-api',
         'KAMAL_HOSTS': host,
       },
     );
-    final target = DwDeployTarget.load(
+    final target = DwKamalEnvironment.stack(
       projectRoot: root,
-      environment: 'staging',
-    );
+      manifest: DwKamalManifest.load(root),
+      name: 'stage',
+      variables: variables,
+      project: DwKamalProject.load(root),
+    ).target;
     final store = DwSecretStore(ssh: ssh, target: target);
     final source = File(p.join(root.path, 'fcm.json'));
     const first = '{"private_key":"first-test-key"}';
@@ -201,12 +212,17 @@ exec /usr/sbin/sshd -D -e -o PermitRootLogin=prohibit-password -o PasswordAuthen
 
     // Kamal produces the flags Docker receives; the test does not implement
     // a second translation of the generator's volume syntax.
-    final flags = await Process.run('ruby', [
-      '-rkamal',
-      '-rjson',
-      '-e',
-      'config = Kamal::Configuration.create_from(config_file: Pathname.new("deploy/kamal/api.yml"), destination: "stage"); puts JSON.generate(config.volume_args)',
-    ], workingDirectory: root.path);
+    final flags = await Process.run(
+      'ruby',
+      [
+        '-rkamal',
+        '-rjson',
+        '-e',
+        'config = Kamal::Configuration.create_from(config_file: Pathname.new("deploy/kamal/api.yml"), destination: "stage"); puts JSON.generate(config.volume_args)',
+      ],
+      workingDirectory: root.path,
+      environment: variables,
+    );
     expect(flags.exitCode, 0, reason: '${flags.stderr}');
     final mounts = (jsonDecode(flags.stdout as String) as List).cast<String>();
     final pull = await ssh.run('docker pull alpine:3.23 >/dev/null');

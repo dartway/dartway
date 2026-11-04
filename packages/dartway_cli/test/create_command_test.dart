@@ -7,7 +7,6 @@ import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
 import 'package:yaml/yaml.dart';
 
-import 'support/deploy_fixtures.dart';
 import 'support/test_process.dart';
 
 /// `dartway create` over this repository's own template: what a stranger's
@@ -128,7 +127,7 @@ void main() {
       final project = await create(['shop', '--local-repo', repository.path]);
       File(
         p.join(project.path, 'deploy/config.yaml'),
-      ).writeAsStringSync(configYaml());
+      ).writeAsStringSync('kamal:\n  repo: git@github.com:acme/shop.git\n');
       // Generation needs only the resolved CLI version, not a network resolution.
       File(p.join(project.path, 'shop_flutter/pubspec.lock')).writeAsStringSync(
         File('test/fixtures/kamal/hosted.lock').readAsStringSync(),

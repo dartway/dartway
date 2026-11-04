@@ -40,53 +40,66 @@ jobs:
           dartway create kamalcheck --framework-path "$GITHUB_WORKSPACE"
           cd kamalcheck/kamalcheck_flutter
           flutter pub get
-      - name: Configure destinations and generate their contract
+      - name: Configure the project and generate its environment-free contract
         run: |
           cd "$RUNNER_TEMP/kamal/kamalcheck"
           cat > deploy/config.yaml <<'YAML'
-          staging:
-            host: 203.0.113.10
-            ssh_user: root
-            os: ubuntu
+          kamal:
             repo: git@github.com:acme/kamalcheck.git
-            branch: master
-            ssl_email: ops@example.com
-            api_domain: api.example.com
-            app_domain: app.example.com
-            storage: bundled
-            storage_domain: files.example.com
-          production:
-            host: 203.0.113.20
-            ssh_user: deploy
-            os: ubuntu
-            repo: git@github.com:acme/kamalcheck.git
-            branch: release
-            ssl_email: ops@example.com
-            api_domain: api.production.example.com
-            app_domain: app.production.example.com
-            storage: bundled
-            storage_domain: files.production.example.com
+            storage: true
           YAML
           cd kamalcheck_flutter
           dart run dartway_cli:dartway deploy kamal
           dart run dartway_cli:dartway deploy kamal --check
-      - name: Validate every service and destination with Kamal 2.12
+          if ls ../deploy/kamal/*.*.yml 2>/dev/null; then
+            echo "destination files were generated" >&2
+            exit 1
+          fi
+      - name: Validate every service in three environments with Kamal 2.12
         run: |
           cd "$RUNNER_TEMP/kamal/kamalcheck"
           mkdir -p .kamal
           cat > .kamal/secrets-common <<'SECRETS'
           KAMAL_REGISTRY_PASSWORD=config-proof
           DW_DATABASE_PASSWORD=config-proof
+          DW_DATABASE_HOST=config-proof
+          DW_DATABASE_PORT=config-proof
+          DW_DATABASE_NAME=config-proof
+          DW_DATABASE_USER=config-proof
           DW_STORAGE_ACCESS_KEY=config-proof
           DW_STORAGE_SECRET_KEY=config-proof
           SECRETS
-          for destination in stage prod; do
-            for service in storage api web; do
+          # name host domain bundled-storage bundled-database
+          while read -r env host domain storage database; do
+            services="api web"
+            if [ "$storage" = true ]; then services="storage $services"; fi
+            for service in $services; do
+              # The runner's empty destination file (deploy/studio.yml > kamal).
+              [ -f "deploy/kamal/$service.$env.yml" ] || echo '{}' > "deploy/kamal/$service.$env.yml"
               docker run --rm -v "$PWD:/work:ro" -w /work \
+                -e STUDIO_ENVIRONMENT="$env" -e STUDIO_HOST="$host" \
+                -e STUDIO_SSH_USER=root \
+                -e STUDIO_DOMAIN_API="api.$domain" -e STUDIO_DOMAIN_APP="app.$domain" \
+                -e STUDIO_DOMAIN_FILES="files.$domain" \
+                -e STUDIO_BUNDLED_STORAGE="$storage" -e STUDIO_BUNDLED_DATABASE="$database" \
+                -e DW_TRUSTED_PROXY_NETWORKS=172.18.0.0/16 \
+                -e DW_STORAGE_ENDPOINT="https://s3.$domain" \
                 ghcr.io/basecamp/kamal:v2.12.0 \
-                config -c "deploy/kamal/$service.yml" -d "$destination"
+                config -c "deploy/kamal/$service.yml" -d "$env"
             done
-          done
+          done <<'ENVIRONMENTS'
+          stage 203.0.113.10 stage.example.com false true
+          prod 203.0.113.20 example.com false false
+          prod-ae 203.0.113.30 example.ae true true
+          ENVIRONMENTS
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+      - name: Render the contract with Kamal's own configuration classes
+        working-directory: packages/dartway_cli
+        run: |
+          gem install kamal -v 2.12.0 --no-document
+          dart test -t kamal --run-skipped test/kamal_erb_test.dart
       - name: Verify native runtime checks through the masked transport
         working-directory: packages/dartway_cli
         run: dart test -t docker --run-skipped test/kamal_runtime_docker_test.dart

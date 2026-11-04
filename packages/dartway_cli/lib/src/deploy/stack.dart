@@ -180,6 +180,15 @@ class DwStack {
   /// exactly as stated here before connecting.
   static const String databaseCaFileKey = 'DW_DATABASE_CA_FILE';
   static const String storageEndpointKey = 'DW_STORAGE_ENDPOINT';
+  static const String storageRegionKey = 'DW_STORAGE_REGION';
+  static const String storagePathStyleKey = 'DW_STORAGE_PATH_STYLE';
+
+  /// The ingress networks the server trusts forwarding headers from
+  /// (`trusted_proxy_networks`, or a Kamal environment's value).
+  static const String trustedProxyNetworksKey = 'DW_TRUSTED_PROXY_NETWORKS';
+
+  /// The browser origins the server admits: the app's own.
+  static const String allowedOriginsKey = 'DW_ALLOWED_ORIGINS';
   static const String storagePublicBucketKey = 'DW_STORAGE_PUBLIC_BUCKET';
   static const String storagePublicBaseUrlKey = 'DW_STORAGE_PUBLIC_BASE_URL';
   static const String storagePrivateBucketKey = 'DW_STORAGE_PRIVATE_BUCKET';
@@ -256,7 +265,7 @@ class DwStack {
     'DW_ENVIRONMENT': target.environment,
     'DW_HTTP_BEHIND_PROXY': 'true',
     if (target.trustedProxyNetworks.isNotEmpty)
-      'DW_TRUSTED_PROXY_NETWORKS': target.trustedProxyNetworks.join(','),
+      trustedProxyNetworksKey: target.trustedProxyNetworks.join(','),
     if (target.database == DwDatabaseMode.bundled) ...{
       databaseHostKey: postgresService,
       databasePortKey: '5432',
@@ -271,8 +280,8 @@ class DwStack {
       storagePublicBucketKey: publicBucketName,
       storagePublicBaseUrlKey: publicBaseUrl!,
       storagePrivateBucketKey: privateBucketName,
-      'DW_STORAGE_REGION': 'us-east-1',
-      'DW_STORAGE_PATH_STYLE': 'true',
+      storageRegionKey: 'us-east-1',
+      storagePathStyleKey: 'true',
       // The server reaches this storage only through the proxy's storage
       // host, and the proxy starts after the server — on a first deploy it
       // does not exist yet, and its certificate even less. So the server does

@@ -14,6 +14,7 @@ import 'secret_store.dart';
 import 'ssh_runner.dart';
 import 'stack.dart';
 import 'web_cache.dart';
+import 'kamal_contract.dart';
 import 'kamal_runtime_checks.dart';
 
 /// Where a check can run.
@@ -35,6 +36,7 @@ class DwDeployContext {
     DwSshRunner? ssh,
     DwDeployEngine? engine,
     this.version,
+    this.kamalEnvironment,
   }) : engine =
            engine ??
            (File(p.join(projectRoot.path, 'deploy/studio.yml')).existsSync()
@@ -55,6 +57,10 @@ class DwDeployContext {
 
   /// Full image SHA for native checks. Otherwise the checkout's HEAD is used.
   final String? version;
+
+  /// The Kamal environment [stack] was read from, with what the manifest
+  /// asks of it; null for Compose.
+  final DwKamalEnvironment? kamalEnvironment;
 
   late final DwKamalRuntime kamal = DwKamalRuntime(this);
 

@@ -4,6 +4,22 @@
 
 ### Breaking changes
 
+- **BREAKING (deploy):** the Kamal contract names no environment (#705).
+  `deploy/config.yaml > kamal` holds the project half (`repo`, `project`,
+  `deploy_user`, `storage`); a Kamal project keeps no deployment sections and
+  `deploy kamal` refuses them. One ERB configuration per service,
+  `deploy/kamal/<service>.yml`, reads `STUDIO_ENVIRONMENT`, `STUDIO_HOST`,
+  `STUDIO_SSH_USER`, `STUDIO_DOMAIN_<POINT>` and `STUDIO_BUNDLED_<COMPONENT>`
+  at deploy time; no destination files are generated. Kamal's destination is
+  the environment's name, so `stage` and `prod` keep every server-side name.
+  `deploy/studio.yml` drops `environments` and lists ingress points,
+  components, values and secrets an environment must give, plus the API
+  env-file template. `deploy check --env <name>` and the check image read an
+  environment from those variables. Images publishes every pushed or
+  hand-started CI success, without a branch list. The `deploy run` (Compose)
+  path is unchanged. See the
+  [migration note](../../docs/migrations/2026-11-04-kamal-environments-in-studio.md).
+
 - **BREAKING (check):** opt into Studio resources with `.dartway/design.json`.
   `designResourceCopied` rejects content-identical copies under app `assets/`;
   use the design link in the one asset dictionary instead. `designResourcesInvalid`

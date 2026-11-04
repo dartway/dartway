@@ -1,0 +1,3 @@
+kamal:
+  repo: git@github.com:acme/probe.git
+  storage: true

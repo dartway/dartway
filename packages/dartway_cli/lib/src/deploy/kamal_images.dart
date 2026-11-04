@@ -3,11 +3,14 @@ import 'dart:convert';
 import '../project_layout.dart';
 
 /// Image builds after the required CI workflow succeeds, including PR dry runs.
+///
+/// Every pushed or hand-started CI success publishes: which branch an
+/// environment deploys is Studio's, so the repository lists none. The
+/// branches CI runs on for a push are the ones that get images.
 String kamalImagesWorkflow(
   ProjectLayout layout,
   List<String> services,
   String imageRepository,
-  Iterable<String> branches,
 ) {
   final matrix = [
     for (final service in services)
@@ -26,11 +29,7 @@ String kamalImagesWorkflow(
   ];
   return _workflow
       .replaceAll('__MATRIX__', jsonEncode(matrix))
-      .replaceAll('__IMAGE_REPOSITORY__', imageRepository)
-      .replaceAll(
-        '__DEPLOYMENT_BRANCHES__',
-        jsonEncode(branches.toSet().toList()).replaceAll("'", "''"),
-      );
+      .replaceAll('__IMAGE_REPOSITORY__', imageRepository);
 }
 
 const _workflow = r'''name: Images
@@ -53,9 +52,7 @@ jobs:
   images:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_repository.full_name == github.repository &&
-      (github.event.workflow_run.event == 'pull_request' ||
-       contains(fromJSON('__DEPLOYMENT_BRANCHES__'), github.event.workflow_run.head_branch))
+      github.event.workflow_run.head_repository.full_name == github.repository
     name: images / ${{ matrix.service }}
     runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 45
@@ -95,7 +92,7 @@ jobs:
           REPOSITORY: __IMAGE_REPOSITORY__
           SHA: ${{ github.event.workflow_run.head_sha }}
           PUBLISH: >-
-            ${{ (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch') && contains(fromJSON('__DEPLOYMENT_BRANCHES__'), github.event.workflow_run.head_branch) }}
+            ${{ github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch' }}
         run: |
           tag="ghcr.io/${REPOSITORY}-${SERVICE}:${SHA}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
@@ -110,7 +107,7 @@ jobs:
             fi
           fi
 
-      - name: Build once, push on configured deployment branches
+      - name: Build once, push for pushed or hand-started CI
         if: steps.deployment.outputs.configured == 'true' && steps.image.outputs.exists != 'true'
         uses: docker/build-push-action@v6
         with:
