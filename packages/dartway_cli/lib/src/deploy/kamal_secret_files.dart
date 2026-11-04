@@ -17,8 +17,8 @@ require "shellwords"
 
 begin
   destination = ENV.fetch("KAMAL_DESTINATION")
-  unless %w[stage prod].include?(destination)
-    abort "Secret file check requires a stage or prod destination."
+  unless destination.match?(/\A[a-z0-9][a-z0-9_-]*\z/) && ENV["STUDIO_ENVIRONMENT"] == destination
+    abort "Secret file check requires the environment's destination (-d STUDIO_ENVIRONMENT)."
   end
   config = Kamal::Configuration.create_from(
     config_file: Pathname.new(File.expand_path("../../api.yml", __dir__)),
@@ -62,7 +62,7 @@ begin
     directory = Shellwords.escape(File.dirname(source))
     script += <<~SH
       if [ -L #{quoted} ] || [ ! -f #{quoted} ] || [ ! -s #{quoted} ]; then
-        echo #{Shellwords.escape("Missing, empty or invalid secret file #{File.basename(source)}. Deliver it with dartway secret put-file --env #{destination == 'stage' ? 'staging' : 'production'}.")} >&2
+        echo #{Shellwords.escape("Missing, empty or invalid secret file #{File.basename(source)}. Deliver it to #{File.dirname(source)} on every host of #{destination} before booting.")} >&2
         exit 1
       fi
       case "$(stat -c %a #{quoted})" in

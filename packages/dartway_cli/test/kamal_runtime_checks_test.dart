@@ -3,6 +3,8 @@ import 'dart:io';
 
 import 'package:dartway_cli/src/deploy/deploy_check.dart';
 import 'package:dartway_cli/src/deploy/kamal.dart';
+import 'package:dartway_cli/src/deploy/kamal_contract.dart';
+import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:dartway_cli/src/deploy/kamal_runtime_checks.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:path/path.dart' as p;
@@ -32,18 +34,14 @@ void main() {
       'shop_flutter/pubspec.lock',
       File('test/fixtures/kamal/hosted.lock').readAsStringSync(),
     );
-    write(
-      'deploy/config.yaml',
-      configYaml(
-        extra: '''
-  storage: bundled
-  storage_domain: files.example.com
-  trusted_proxy_networks: [172.18.0.0/16]
-  requires:
-    files: [account.json]
-''',
-      ),
-    );
+    write('deploy/config.yaml', '''
+requires:
+  files: [account.json]
+kamal:
+  repo: git@github.com:acme/shop.git
+  deploy_user: deployer
+  storage: true
+''');
     DwKamalGenerator(root).generate();
     containers = [
       for (final (index, service) in ['storage', 'api', 'web'].indexed)
@@ -141,6 +139,26 @@ void main() {
         {'Subnet': subnet},
       ])}\n';
 
+  const variables = {
+    'STUDIO_HOST': '203.0.113.10',
+    'STUDIO_SSH_USER': 'root',
+    'STUDIO_DOMAIN_API': 'api.example.com',
+    'STUDIO_DOMAIN_APP': 'app.example.com',
+    'STUDIO_DOMAIN_FILES': 'files.example.com',
+    'STUDIO_BUNDLED_STORAGE': 'true',
+    'STUDIO_BUNDLED_DATABASE': 'true',
+    'DW_TRUSTED_PROXY_NETWORKS': '172.18.0.0/16',
+  };
+
+  DwStack stage([Map<String, String> overrides = const {}]) =>
+      DwKamalEnvironment.stack(
+        projectRoot: root,
+        manifest: DwKamalManifest.load(root),
+        name: 'stage',
+        variables: {...variables, ...overrides},
+        project: DwKamalProject.load(root),
+      );
+
   (DwDeployContext, RecordingSsh) context({
     String? output,
     String version = _version,
@@ -154,13 +172,7 @@ void main() {
     return (
       DwDeployContext(
         projectRoot: root,
-        stack: stackFrom(
-          projectRoot: root,
-          extra:
-              '  storage: bundled\n  storage_domain: files.example.com\n'
-              '  trusted_proxy_networks: [172.18.0.0/16]\n'
-              '  requires:\n    files: [account.json]\n',
-        ),
+        stack: stage(),
         ssh: ssh,
         version: version,
       ),
@@ -232,22 +244,68 @@ void main() {
     expect((await check('kamal-routing')).passed, false);
   });
 
-  test('native ingress requires explicit trust before deployment', () async {
-    final (ctx, _) = context();
-    final untrusted = DwDeployContext(
-      projectRoot: root,
-      stack: stackFrom(
-        projectRoot: root,
-        extra: '  storage: bundled\n  storage_domain: files.example.com\n',
+  test('native ingress requires explicit trust before deployment', () {
+    expect(
+      () => stage({'DW_TRUSTED_PROXY_NETWORKS': ''}),
+      throwsA(
+        isA<StateError>().having(
+          (error) => error.message,
+          'message',
+          contains('DW_TRUSTED_PROXY_NETWORKS is not set'),
+        ),
       ),
-      ssh: ctx.ssh,
-      version: _version,
     );
-    final verdict = await dwKamalRemoteDeployChecks
-        .firstWhere((check) => check.id == 'kamal-proxy-trust')
-        .evaluate(untrusted);
-    expect(verdict.passed, false);
-    expect(verdict.detail, contains('trusted_proxy_networks'));
+  });
+
+  test(
+    'an environment with external storage runs no storage service',
+    () async {
+      final (ctx, ssh) = context();
+      final external = DwDeployContext(
+        projectRoot: root,
+        stack: stage({
+          'STUDIO_BUNDLED_STORAGE': 'false',
+          'DW_STORAGE_ENDPOINT': 'https://s3.example.net',
+        }),
+        ssh: ssh,
+        version: _version,
+      );
+      containers.removeAt(0);
+      routes.remove('shop-storage-web-stage');
+      final verdict = await dwKamalRemoteDeployChecks
+          .firstWhere((check) => check.id == 'stack-identity')
+          .evaluate(external);
+      expect(verdict.passed, true, reason: verdict.detail);
+      expect(verdict.detail, startsWith('2 native services'));
+      expect(ctx.engine, DwDeployEngine.kamal);
+    },
+  );
+
+  test('kamal-secrets names what the environment does not give', () {
+    final (ctx, _) = context();
+    final named = DwDeployContext(
+      projectRoot: root,
+      stack: ctx.stack,
+      kamalEnvironment: DwKamalEnvironment.resolve(
+        DwKamalManifest.load(root),
+        name: 'stage',
+        variables: variables,
+      ),
+    );
+    final missing = kamalSecretsVerdict(named, const {});
+    expect(missing.passed, false);
+    expect(missing.detail, contains('KAMAL_REGISTRY_PASSWORD'));
+    expect(missing.detail, contains('DW_STORAGE_SECRET_KEY'));
+    File(p.join(root.path, '.kamal/secrets-common'))
+      ..parent.createSync(recursive: true)
+      ..writeAsStringSync(
+        'KAMAL_REGISTRY_PASSWORD=\$(cat token)\n'
+        'DW_DATABASE_PASSWORD=x\nDW_STORAGE_ACCESS_KEY=x\n',
+      );
+    final partial = kamalSecretsVerdict(named, const {
+      'DW_STORAGE_SECRET_KEY': 'given',
+    });
+    expect(partial.passed, true, reason: partial.detail);
   });
 
   for (final (field, value) in <(String, Object)>[

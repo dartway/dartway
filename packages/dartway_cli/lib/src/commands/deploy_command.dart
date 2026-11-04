@@ -7,6 +7,7 @@ import '../checker/dw_check_type.dart';
 import '../deploy/deploy_check.dart';
 import '../deploy/deploy_stats.dart';
 import '../deploy/deploy_target.dart';
+import '../deploy/kamal_contract.dart';
 import '../deploy/remote_checks.dart';
 import '../deploy/kamal_runtime_checks.dart';
 import '../deploy/ssh_runner.dart';
@@ -136,6 +137,38 @@ DwStack resolveDeployStack(
     projectRoot: projectRoot,
     serverPackage: layout.serverPackage,
     flutterPackage: layout.flutterPackage,
+  );
+}
+
+/// The stack of a Kamal project's environment, read by name: what the
+/// environment must give comes from `deploy/studio.yml`, its values from the
+/// variables Studio sets ([DwStudioVariables]). No `deploy/config.yaml`
+/// section is read — a Kamal project has none.
+(DwStack, DwKamalEnvironment) resolveKamalStack(
+  Command<int> command,
+  ArgResults results,
+  Directory projectRoot, {
+  Map<String, String>? variables,
+}) {
+  final environment = variables ?? Platform.environment;
+  final name =
+      results.option('env') ?? environment[DwStudioVariables.environment];
+  if (name == null) {
+    command.usageException(
+      'Specify --env <environment>: the environment\'s name in Studio.',
+    );
+  }
+  final manifest = DwKamalManifest.load(projectRoot);
+  final stack = DwKamalEnvironment.stack(
+    projectRoot: projectRoot,
+    manifest: manifest,
+    name: name,
+    variables: environment,
+    project: DwKamalProject.load(projectRoot),
+  );
+  return (
+    stack,
+    DwKamalEnvironment.resolve(manifest, name: name, variables: environment),
   );
 }
 
@@ -349,7 +382,13 @@ class DeployStatsCommand extends Command<int> {
 class DeployCheckCommand extends Command<int> {
   DeployCheckCommand() {
     argParser
-      ..addOption('env', help: 'Environment declared in deploy/config.yaml.')
+      ..addOption(
+        'env',
+        help:
+            'Environment: a deploy/config.yaml section (Compose), or the '
+            "environment's name in Studio (Kamal; read with its STUDIO_* "
+            'variables).',
+      )
       ..addOption(
         'engine',
         allowed: ['compose', 'kamal'],
@@ -391,7 +430,20 @@ class DeployCheckCommand extends Command<int> {
   Future<int> run() async {
     final projectRoot = deployProjectRoot();
     final results = argResults!;
-    final stack = resolveDeployStack(this, results, projectRoot);
+    final engine = switch (results.option('engine')) {
+      final name? => DwDeployEngine.values.byName(name),
+      null =>
+        File('${projectRoot.path}/${DwKamalManifest.path}').existsSync()
+            ? DwDeployEngine.kamal
+            : DwDeployEngine.compose,
+    };
+    final DwStack stack;
+    DwKamalEnvironment? environment;
+    if (engine == DwDeployEngine.kamal) {
+      (stack, environment) = resolveKamalStack(this, results, projectRoot);
+    } else {
+      stack = resolveDeployStack(this, results, projectRoot);
+    }
     final target = stack.target;
 
     final offline = results.flag('local');
@@ -399,9 +451,8 @@ class DeployCheckCommand extends Command<int> {
     final context = DwDeployContext(
       projectRoot: projectRoot,
       stack: stack,
-      engine: results.option('engine') == null
-          ? null
-          : DwDeployEngine.values.byName(results.option('engine')!),
+      engine: engine,
+      kamalEnvironment: environment,
       version: results.option('version'),
       ssh: offline
           ? null
@@ -418,10 +469,16 @@ class DeployCheckCommand extends Command<int> {
       );
     }
     stdout
-      ..writeln('Deploy check [${target.environment}]')
+      ..writeln(
+        'Deploy check [${target.environment}]'
+        '${environment == null ? '' : ' (Kamal, from STUDIO_* variables)'}',
+      )
       ..writeln('  server:    $sshUser@${target.host}')
-      ..writeln('  runs as:   ${target.deployUser}')
-      ..writeln('  repo:      ${target.repo} [${target.branch}]')
+      ..writeln('  runs as:   ${target.deployUser}');
+    if (environment == null) {
+      stdout.writeln('  repo:      ${target.repo} [${target.branch}]');
+    }
+    stdout
       ..writeln('  packages:  ${stack.serverPackage}, ${stack.flutterPackage}')
       ..writeln('  api:       ${stack.apiOrigin}')
       ..writeln('  app:       ${stack.appOrigin}');
@@ -434,9 +491,14 @@ class DeployCheckCommand extends Command<int> {
       '  storage:   ${switch (target.storage) {
         DwStorageMode.none => 'none',
         DwStorageMode.bundled => 'bundled (RustFS) on ${stack.storageOrigin}, buckets ${stack.publicBucketName} (public) and ${stack.privateBucketName} (private)',
-        DwStorageMode.external => 'external (DW_STORAGE_* in the secret store)',
+        DwStorageMode.external => environment == null ? 'external (DW_STORAGE_* in the secret store)' : 'external (${environment.values[DwStack.storageEndpointKey]})',
       }}',
     );
+    if (environment != null) {
+      stdout.writeln(
+        '  database:  ${target.database == DwDatabaseMode.bundled ? 'bundled' : 'external'}',
+      );
+    }
 
     final tally = _Tally();
 

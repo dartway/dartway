@@ -19,7 +19,7 @@ class DeployKamalCommand extends Command<int> {
 
   @override
   String get description =>
-      'Generate Kamal destinations, the Studio manifest and CI image builds.';
+      'Generate the environment-free Kamal configs, the Studio manifest and CI image builds.';
 
   @override
   Future<int> run() async {

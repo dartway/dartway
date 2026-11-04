@@ -5,14 +5,14 @@ import 'dart:io';
 
 import 'package:dartway_cli/src/deploy/deploy_check.dart';
 import 'package:dartway_cli/src/deploy/kamal.dart';
+import 'package:dartway_cli/src/deploy/kamal_contract.dart';
+import 'package:dartway_cli/src/deploy/stack.dart';
 import 'package:dartway_cli/src/deploy/kamal_runtime_checks.dart';
 import 'package:dartway_cli/src/deploy/secret_store.dart';
 import 'package:dartway_cli/src/deploy/ssh_runner.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
-import 'package:yaml/yaml.dart';
 
-import 'support/deploy_fixtures.dart';
 
 /// Real Go routing, Docker inspection and forwarding chains inside an isolated
 /// daemon. No global kamal-proxy, network or application is changed on the host.
@@ -36,12 +36,29 @@ void main() {
         'shop_flutter/pubspec.lock',
         File('test/fixtures/kamal/hosted.lock').readAsStringSync(),
       );
-      const extra =
-          '  trusted_proxy_networks: [172.28.0.0/16]\n'
-          '  requires:\n    files: [firebase-service-account.json]\n';
-      write('deploy/config.yaml', configYaml(extra: extra));
+      write('deploy/config.yaml', '''
+requires:
+  files: [firebase-service-account.json]
+kamal:
+  repo: git@github.com:acme/shop.git
+  deploy_user: deployer
+''');
       final files = DwKamalGenerator(root).render();
       for (final entry in files.entries) write(entry.key, entry.value);
+      DwStack stage() => DwKamalEnvironment.stack(
+        projectRoot: root,
+        manifest: DwKamalManifest.load(root),
+        name: 'stage',
+        variables: const {
+          'STUDIO_HOST': '203.0.113.10',
+          'STUDIO_SSH_USER': 'root',
+          'STUDIO_DOMAIN_API': 'api.example.com',
+          'STUDIO_DOMAIN_APP': 'app.example.com',
+          'STUDIO_BUNDLED_DATABASE': 'true',
+          'DW_TRUSTED_PROXY_NETWORKS': '172.28.0.0/16',
+        },
+        project: DwKamalProject.load(root),
+      );
       write('fixture/api.conf', '''server {
  listen 8080;
  location = /health { return 200 "ok"; }
@@ -229,8 +246,6 @@ chmod 444 /fixture/key.pem
         'ghcr.io/acme/shop-web:$version',
       ])).trim();
       Future<void> route(String role, String target) async {
-        final base = loadYaml(files['deploy/kamal/$role.yml']!) as Map;
-        final proxy = base['proxy'] as Map;
         final targetName = (await inside([
           'inspect',
           '--format',
@@ -244,7 +259,7 @@ chmod 444 /fixture/key.pem
           'deploy',
           'shop-$role-web-stage',
           '--target',
-          '$targetName:${proxy['app_port']}',
+          '$targetName:${DwKamalContract.appPort(role)}',
           '--host',
           '$role.example.com'.replaceFirst('web.', 'app.'),
           '--tls',
@@ -254,7 +269,11 @@ chmod 444 /fixture/key.pem
           '/fixture/key.pem',
           '--health-check-path',
           role == 'web' ? '/' : '/health',
-          if (proxy['forward_headers'] == true) '--forward-headers',
+          // The generated API proxy forwards headers; web keeps the default.
+          if (files['deploy/kamal/$role.yml']!.contains(
+            'forward_headers: true',
+          ))
+            '--forward-headers',
         ]);
       }
 
@@ -263,7 +282,7 @@ chmod 444 /fixture/key.pem
       final ssh = _DaemonSsh(daemon);
       final context = DwDeployContext(
         projectRoot: root,
-        stack: stackFrom(projectRoot: root, extra: extra),
+        stack: stage(),
         ssh: ssh,
         version: version,
       );
@@ -354,7 +373,7 @@ chmod 444 /fixture/key.pem
       await route('api', old);
       final after = DwDeployContext(
         projectRoot: root,
-        stack: stackFrom(projectRoot: root, extra: extra),
+        stack: stage(),
         ssh: ssh,
         version: version,
       );
@@ -390,7 +409,7 @@ chmod 444 /fixture/key.pem
         await startApi(mounts);
         final invalid = DwDeployContext(
           projectRoot: root,
-          stack: stackFrom(projectRoot: root, extra: extra),
+          stack: stage(),
           ssh: ssh,
           version: version,
         );

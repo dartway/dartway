@@ -17,8 +17,10 @@ dartway deploy stats --env staging          # p50/p95 per call, costliest querie
 
 ## Kamal
 
-After configuring `staging` and/or `production` in `deploy/config.yaml` and
-resolving the packages, generate and commit the deployment contract:
+A project deployed by Studio describes what to deploy and no environment.
+Replace the deployment sections of `config.yaml` with one `kamal:` section
+(`repo:`, and `storage: true` when the project stores files), resolve the
+packages, then generate and commit the deployment contract:
 
 ```sh
 cd dartway_starter_flutter
@@ -27,42 +29,46 @@ dartway deploy kamal --check
 ```
 
 The template includes none of these generated files. This creates or refreshes
-`deploy/kamal/*`, `deploy/studio.yml` and
-`.github/workflows/images.yml`. Images runs after the required `CI` workflow
-succeeds. Image publication follows each deployment's `branch:`; enable CI
-pushes on those branches. CI defaults to `master` and `release`. The generated
+`deploy/kamal/<service>.yml` (one per service, no destination files),
+`deploy/studio.yml` and `.github/workflows/images.yml`. Images runs after the
+required `CI` workflow succeeds and publishes for CI runs started by a push or
+by hand; CI pushes on `master` and `release` by default. The generated
 workflow must first be merged into the default branch for `workflow_run` to
-trigger it. Unconfigured projects skip image builds. Fork PRs skip this privileged workflow;
-other PR builds do not push or write shared caches.
-Successful branch CI
-builds each image once for `linux/amd64` and pushes its commit SHA to GHCR;
-existing tags are skipped, and GHA caches keep unchanged Flutter SDK layers.
+trigger it. Unconfigured projects skip image builds. Fork PRs skip this
+privileged workflow; other PR builds do not push or write shared caches.
+Successful branch CI builds each image once for `linux/amd64` and pushes its
+commit SHA to GHCR; existing tags are skipped, and GHA caches keep unchanged
+Flutter SDK layers.
 
-Destinations are `stage` and `prod`. Kamal 2.12 runs kamal-proxy v0.10.2; the API
-owns the root of its API host. The web destination receives the API origin,
-then its nginx entrypoint proxies only `/dw/` to it. Server routes remain on
-the API host, so they never shadow Flutter pages. Web release builds use
-`Uri.base.origin`, so the same image serves both destinations without build
-arguments. The Studio binding validates tokens for the same app origin.
-A project name that cannot be used
-as a service name is refused with its value and the `project:` key to configure.
-Regenerate after changing deployment config;
-`--check` names any stale generated file.
+Environments live in Studio. When it deploys one, it sets `STUDIO_ENVIRONMENT`,
+`STUDIO_HOST`, `STUDIO_SSH_USER`, `STUDIO_DOMAIN_API`/`_APP`/`_FILES`,
+`STUDIO_BUNDLED_STORAGE`/`_DATABASE` and the values and secrets
+`deploy/studio.yml` names, and runs Kamal with `-d` set to the environment's
+name; a new environment needs no commit. Kamal 2.12 runs kamal-proxy v0.10.2;
+the API owns the root of its API host. The web service receives the API
+origin, then its nginx entrypoint proxies only `/dw/` to it. Server routes
+remain on the API host, so they never shadow Flutter pages. Web release builds
+use `Uri.base.origin`, so the same image serves every environment without
+build arguments. The Studio binding validates tokens for the same app origin.
+A project name that cannot be used as a service name is refused with its value
+and the `project:` key to configure. Regenerate after changing `kamal:` or
+`requires:`; `--check` names any stale generated file.
 
-Bundled RustFS is a service with its own TLS host; Postgres is an API accessory
-with no published host port.
-Studio supplies SSH keys, secret values and registry credentials, runs Kamal in
-manifest order, then runs the check image against a read-only checkout at
-`/project`. The check image tag follows the CLI lock: Git resolved SHA, path
-checkout HEAD, or pub.dev version. Server preparation and moving existing data
-belong to Studio and the project's migration. The existing `deploy run` flow
-below remains available until this project moves.
+Bundled RustFS is a service with its own TLS host, deployed only where storage
+is bundled; Postgres is an API accessory with no published host port, present
+only where the database is bundled. Studio supplies SSH keys, secret values
+and registry credentials, runs Kamal in manifest order, then runs the check
+image against a read-only checkout at `/project`. The check image tag follows
+the CLI lock: Git resolved SHA, path checkout HEAD, or pub.dev version. Server
+preparation and moving existing data belong to Studio and the project's
+migration. The existing `deploy run` flow below remains available until this
+project moves.
 
 ## What lives where
 
 | File | Owns |
 |---|---|
-| `config.yaml` | every environment of this project: `local` — what your own machine starts a server with — and each deployment's machine, repository, `api` / `app` / optional `site` hosts and optional storage. Plus `requires`, what the project needs wherever it runs |
+| `config.yaml` | `local` — what your own machine starts a server with — and, for `deploy run`, each deployment's machine, repository, `api` / `app` / optional `site` hosts and optional storage; for Studio's Kamal deploy, `kamal:` instead of deployments. Plus `requires`, what the project needs wherever it runs |
 | `../dartway_starter_server/Dockerfile` | the server image: `dart compile exe`, the binary as PID 1 |
 | `../dartway_starter_flutter/Dockerfile` | the web image; a release calls `Uri.base.origin` |
 | `../dartway_starter_flutter/nginx.conf` | how that image serves the build and includes the container-start API proxy routes — and above all **what a browser may keep** |

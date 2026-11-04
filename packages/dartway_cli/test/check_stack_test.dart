@@ -11,7 +11,7 @@ void main() {
   // point run against a checkout mounted read-only, with no package cache.
   final image = Platform.environment['DW_CHECK_STACK_IMAGE'];
   for (final storage in ['bundled', 'external']) {
-    for (final destination in ['stage', 'prod']) {
+    for (final destination in ['stage', 'prod', 'prod-ae']) {
       test(
         '$destination selects its probes for $storage storage on a read-only mount',
         () async {
@@ -20,7 +20,7 @@ void main() {
             isNotNull,
             reason: 'Set DW_CHECK_STACK_IMAGE to the built deploy/check image.',
           );
-          final source = Directory('test/fixtures/check_stack/$storage');
+          final source = Directory('test/fixtures/check_stack/project');
           final fixture = Directory.systemTemp.createTempSync(
             'dw-check-stack-',
           );
@@ -39,6 +39,14 @@ void main() {
             '--rm',
             '-v',
             '${fixture.path}:/project:ro',
+            // What the manifest's check.environment names, as Studio passes it.
+            for (final (name, value) in [
+              ('STUDIO_DOMAIN_API', 'api.$destination.invalid'),
+              ('STUDIO_DOMAIN_APP', 'app.$destination.invalid'),
+              if (storage == 'bundled')
+                ('STUDIO_DOMAIN_FILES', 'files.$destination.invalid'),
+              ('STUDIO_BUNDLED_STORAGE', '${storage == 'bundled'}'),
+            ]) ...['-e', '$name=$value'],
             image!,
             '--env',
             destination,
@@ -69,8 +77,10 @@ void main() {
             output,
             contains('cache policy of https://app.$destination.invalid'),
           );
-          final other = destination == 'stage' ? 'prod' : 'stage';
-          expect(output, isNot(contains('.$other.invalid')));
+          for (final other in ['stage', 'prod', 'prod-ae']) {
+            if (other == destination) continue;
+            expect(output, isNot(contains('.$other.invalid')));
+          }
           if (storage == 'bundled') {
             expect(
               output,

@@ -12,3 +12,8 @@ tags:
   docker:
     skip: "needs Docker and builds images; run with -t docker --run-skipped"
     timeout: 40m
+  # Renders the generated Kamal configuration with Ruby and the Kamal gem:
+  #   gem install kamal -v 2.12.0
+  #   dart test -t kamal --run-skipped test/kamal_erb_test.dart
+  kamal:
+    skip: "needs Ruby and the kamal 2.12.0 gem; run with -t kamal --run-skipped"
