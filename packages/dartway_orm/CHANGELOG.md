@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.0-dev.1
+## 0.25.0
 
 - Advance in lockstep with the core family; no API or wire changes in this package.
 

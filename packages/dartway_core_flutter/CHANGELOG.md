@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.0-dev.1
+## 0.25.0
 
 - Flutter errors now use the built-in persistent device queue and guarded
   server ingestion endpoint, feeding the existing durable alert outbox by
