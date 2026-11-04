@@ -279,6 +279,7 @@ authority rather than the caller's — **no `canRead` or `canUpload` is asked**:
 ```dart
 final bytes = await ctx.files.read(fileId);               // null: no confirmed file
 final link = await ctx.files.readLink(fileId);            // a short link another service can fetch
+final asset = await ctx.files.readLink(fileId, stable: true); // a browser-cached resource
 final made = await ctx.files.store(
   AcmeUpload.progressCard,
   accountId: profile.accountId,
@@ -290,6 +291,10 @@ final made = await ctx.files.store(
 
 - `read` and `readLink` reach a confirmed file, public or private. What the handler then gives a
   caller is its decision: never return the bytes or the link to someone who may not read the file.
+- `readLink(fileId, stable: true)` returns the same URL throughout one UTC day, with a
+  48-hour signature and `Cache-Control: private, max-age=86400, immutable`. Use it for
+  browser-cached `<img>`, `@font-face`, and CSS `url()` resources; the caller still authorizes
+  access before returning it. `stable` cannot be combined with `expires`.
 - `store` applies the purpose's rule as an upload does — the visibility picks the bucket; a size
   over `maxBytes` or a content type the rule does not list is an `ArgumentError`, a mistake in
   server code. The file's row is committed unconfirmed before the object is written and confirmed

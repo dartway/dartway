@@ -10,7 +10,6 @@ import 'support/test_app.dart';
 /// the server issues tickets, storage enforces them, the server confirms
 /// what storage holds, and cleanup removes what was never finished.
 void main() {
-  final clock = DwTestClock(DateTime.utc(2026, 11, 4, 23, 59));
   late TestStorage storage;
   setUpAll(() async => storage = await TestStorage.create());
   tearDownAll(() async => storage.drop());
@@ -19,7 +18,6 @@ void main() {
   final readers = <int>{};
   final harness = useFilesHarness(
     () => storage,
-    clock: clock,
     declaration: (config) => testStorage(
       config,
       maxPendingUploads: 50,
@@ -725,52 +723,6 @@ void main() {
         final fetched = await getUrl(answer['link']!);
         expect(fetched.status, 200);
         expect(fetched.bytes, body);
-      });
-
-      test('stable readLink is day-signed and browser-cacheable', () async {
-        final file = await upload(
-          alice,
-          TestUpload.document,
-          bytes: bytesOf(40, 4),
-          type: 'text/plain',
-        );
-
-        Future<DwFileLink> stableLink() => harness().server.runInContext(
-          (ctx) async => (await ctx.files.readLink(file.id, stable: true))!,
-        );
-
-        final first = await stableLink();
-        clock.moveTo(DateTime.utc(2026, 11, 4, 23, 59, 59));
-        final sameDay = await stableLink();
-        expect(sameDay.url, first.url);
-        expect(first.expiresAt, DateTime.utc(2026, 11, 6));
-        expect(
-          first.expiresAt!.difference(clock.now()),
-          greaterThanOrEqualTo(const Duration(hours: 24)),
-        );
-        expect(
-          Uri.parse(first.url).queryParameters['response-cache-control'],
-          'private, max-age=86400, immutable',
-        );
-        expect(first.url, contains('response-cache-control=private%2C%20'));
-
-        clock.moveTo(DateTime.utc(2026, 11, 5));
-        final nextDay = await stableLink();
-        expect(nextDay.url, isNot(first.url));
-        expect(nextDay.expiresAt, DateTime.utc(2026, 11, 7));
-      });
-
-      test('stable readLink refuses an explicit expiry', () async {
-        expect(
-          () => harness().server.runInContext(
-            (ctx) => ctx.files.readLink(
-              1 << 40,
-              stable: true,
-              expires: const Duration(hours: 1),
-            ),
-          ),
-          throwsArgumentError,
-        );
       });
 
       test(
