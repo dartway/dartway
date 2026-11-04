@@ -4,6 +4,14 @@
 
 ### Breaking changes
 
+- **BREAKING (deploy):** with DartWay CLI 0.27.0, every Compose
+  `dartway deploy run --env production` refuses to run unless the environment
+  has a `backup:` policy with an S3-compatible HTTPS `endpoint` and a region.
+  Deliver `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` with
+  `dartway secret set`, then rerun
+  `dartway deploy setup --env production`. `--skip-backup` is a journaled
+  emergency exception only (#686).
+
 - **BREAKING (check):** opt into Studio resources with `.dartway/design.json`.
   `designResourceCopied` rejects content-identical copies under app `assets/`;
   use the design link in the one asset dictionary instead. `designResourcesInvalid`
@@ -36,11 +44,6 @@
 
 - Prune local pre-deploy database dumps to the configured retention and copy
   only Sunday daily dumps into the weekly set (#688).
-
-- Configure daily and pre-deploy encrypted database backups, off-host upload,
-  host retention, freshness monitoring, and temporary restore verification;
-  every object-store operation uses the policy's required HTTPS endpoint and
-  region.
 
 - Fix: recognize local final command callbacks used only as `dw.action` work,
   detect parenthesized watched-read bindings, and accept feature-wide
