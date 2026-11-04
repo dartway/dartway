@@ -40,9 +40,10 @@ on:
     workflows: [CI]
     types: [completed]
 
-# Serialize retries of the same SHA so two runs cannot push it twice.
+# One build runs per branch and a newer pending run replaces an older one, so a
+# busy branch builds only its newest commit; a running build is never cancelled.
 concurrency:
-  group: images-${{ github.event.workflow_run.head_sha }}
+  group: images-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: false
 
 permissions:
