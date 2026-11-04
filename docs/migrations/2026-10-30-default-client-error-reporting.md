@@ -1,7 +1,7 @@
 ---
 title: Adopt default Flutter error delivery
 affects:
-  dartway_core_flutter: "0.25.0-dev.1"
+  dartway_core_flutter: "0.25.0"
 ---
 
 ## Who is affected

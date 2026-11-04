@@ -57,18 +57,24 @@ void main() {
   test(
     'valid anonymous reports enter alerts with server-derived context and signature',
     () async {
-      final answer = await send(report());
+      final value = report()..['errorType'] = 'AnonymousReportError';
+      final answer = await send(value);
       expect(answer.status, 204);
-      await eventually(() => harness().app.alerts.incidents.isNotEmpty);
-      final incident = harness().app.alerts.incidents.last;
+      const signature =
+          'client|android|AnonymousReportError|package:app/feature.dart:42|anon';
+      await eventually(
+        () => harness().app.alerts.incidents.any(
+          (incident) => incident.signature == signature,
+        ),
+      );
+      final incident = harness().app.alerts.incidents.singleWhere(
+        (incident) => incident.signature == signature,
+      );
       expect(incident.where, 'client android /checkout');
       expect(incident.accountId, isNull);
       expect('${incident.error}', contains('tenant: north'));
       expect('${incident.error}', isNot(contains('account: forged')));
-      expect(
-        incident.signature,
-        'client|android|StateError|package:app/feature.dart:42|anon',
-      );
+      expect(incident.signature, signature);
       expect(incident.signature, isNot(startsWith('command ')));
     },
   );
@@ -112,20 +118,19 @@ void main() {
   test('two signed-in accounts coalesce into one outbox row', () async {
     final (_, first) = await harness().signedIn('first-report@example.com');
     final (_, second) = await harness().signedIn('second-report@example.com');
-    expect(
-      (await send(report(device: 'first-account'), token: first.token)).status,
-      204,
-    );
-    expect(
-      (await send(
-        report(device: 'second-account'),
-        token: second.token,
-      )).status,
-      204,
-    );
+    final firstReport = report(device: 'first-account')
+      ..['errorType'] = 'CoalescingStateError';
+    final secondReport = report(device: 'second-account')
+      ..['errorType'] = 'CoalescingStateError';
+    expect((await send(firstReport, token: first.token)).status, 204);
+    expect((await send(secondReport, token: second.token)).status, 204);
     await eventually(() async {
       final rows = await harness().db.query(
-        "SELECT repeat_count FROM dw_alert_outbox WHERE signature = 'client|android|StateError|package:app/feature.dart:42|auth'",
+        'SELECT repeat_count FROM dw_alert_outbox WHERE signature = @signature',
+        params: {
+          'signature':
+              'client|android|CoalescingStateError|package:app/feature.dart:42|auth',
+        },
       );
       return rows.length == 1 && rows.single.get<int>('repeat_count') == 3;
     }, timeout: const Duration(seconds: 30));
