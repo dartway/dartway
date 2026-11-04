@@ -22,6 +22,10 @@
 
 ### Changes
 
+- Configure daily and pre-deploy encrypted database backups, off-host upload,
+  host retention, freshness monitoring, and temporary restore verification;
+  every object-store operation uses the policy's required HTTPS endpoint and
+  region (#686).
 - Fix: the generated `images.yml` groups its concurrency by head branch
   instead of head SHA, so a busy deploy branch keeps one pending image build
   of its newest commit instead of a queue; a running build is never cancelled.
