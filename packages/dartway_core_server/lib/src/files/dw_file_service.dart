@@ -72,12 +72,20 @@ abstract interface class DwFileService {
 
   /// A link to the confirmed file [fileId] that anyone holding it can read
   /// until [expires] passes (the storage's link lifetime by default); `null`
-  /// when there is none.
+  /// when there is none. With [stable], the signing time is the start of the
+  /// current UTC day and the link expires 48 hours later, so repeated calls
+  /// that day produce the same URL. Its response carries
+  /// `Cache-Control: private, max-age=86400, immutable` for browser caching.
+  /// [expires] and [stable] cannot be used together.
   ///
   /// For server code handing a private file to another service that fetches
   /// by URL. Like [read], it asks no `canRead`: it is the server's access,
   /// not the caller's — a client asks for a link with `DwGetFileLink`.
-  Future<DwFileLink?> readLink(int fileId, {Duration? expires});
+  Future<DwFileLink?> readLink(
+    int fileId, {
+    Duration? expires,
+    bool stable = false,
+  });
 
   /// Stores [bytes] as a new confirmed file of [purpose] owned by
   /// [accountId] — a file the server made, not one a client uploaded: a
@@ -621,8 +629,11 @@ final class DwUnconfiguredFiles implements DwFileService {
   Future<List<int>?> read(int fileId) async => _fail();
 
   @override
-  Future<DwFileLink?> readLink(int fileId, {Duration? expires}) async =>
-      _fail();
+  Future<DwFileLink?> readLink(
+    int fileId, {
+    Duration? expires,
+    bool stable = false,
+  }) async => _fail();
 
   @override
   Future<DwStoredFile> store(
@@ -746,10 +757,19 @@ final class _DwContextFiles implements DwFileService {
   }
 
   @override
-  Future<DwFileLink?> readLink(int fileId, {Duration? expires}) async {
+  Future<DwFileLink?> readLink(
+    int fileId, {
+    Duration? expires,
+    bool stable = false,
+  }) async {
+    if (stable && expires != null) {
+      throw ArgumentError('expires cannot be passed with stable');
+    }
     final file = await _confirmed(fileId);
     if (file == null) return null;
-    final lifetime = expires ?? _store.storage.linkLifetime;
+    final lifetime = stable
+        ? const Duration(hours: 48)
+        : expires ?? _store.storage.linkLifetime;
     if (lifetime <= Duration.zero ||
         lifetime > DwFileStorage.maxPresignedLifetime) {
       throw ArgumentError.value(
@@ -758,11 +778,14 @@ final class _DwContextFiles implements DwFileService {
         'must be positive and at most ${DwFileStorage.maxPresignedLifetime}',
       );
     }
-    final now = DateTime.now().toUtc();
+    final current = stable ? _ctx.now : DateTime.now().toUtc();
+    final now = stable
+        ? DateTime.utc(current.year, current.month, current.day)
+        : current;
     return DwFileLink(
       id: file.record.id,
       url:
-          '${_store.objects.presignGet(bucket: file.bucket, key: file.key, expires: lifetime, time: now, fileName: file.record.fileName)}',
+          '${_store.objects.presignGet(bucket: file.bucket, key: file.key, expires: lifetime, time: now, fileName: file.record.fileName, cacheControl: stable ? 'private, max-age=86400, immutable' : null)}',
       expiresAt: DateTime.fromMillisecondsSinceEpoch(
         now.millisecondsSinceEpoch ~/ 1000 * 1000,
         isUtc: true,

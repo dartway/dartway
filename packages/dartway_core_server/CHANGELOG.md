@@ -2,6 +2,9 @@
 
 ## 0.25.0-dev.1
 
+- Add day-stable `DwFileService.readLink` URLs with a 48-hour signature and
+  private, immutable one-day browser caching (#704).
+
 - Add authenticated, one-hour in-memory endpoint counters for Studio, with
   minute calls, errors and bounded-sample response-time percentiles, a current
   due-and-unclaimed/failed job-queue snapshot, exact retained coverage and

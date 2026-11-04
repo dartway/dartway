@@ -129,12 +129,14 @@ final class DwObjectStore {
     required DateTime time,
     String? fileName,
     bool attachment = false,
+    String? cacheControl,
   }) {
     final path = _path(bucket, key);
     final query = _signer.presignedQuery(
       method: 'GET',
       path: path,
       query: [
+        if (cacheControl != null) ('response-cache-control', cacheControl),
         if (fileName != null || attachment)
           (
             'response-content-disposition',
