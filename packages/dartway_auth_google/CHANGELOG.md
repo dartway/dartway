@@ -1,5 +1,6 @@
 ## 0.6.0
 
+- Targets DartWay 0.25.
 - **Web sign-in.** `DwGoogleSignInButton` is the button a person signs in with: on the web it is the one Google
   draws (`google_sign_in_web` `renderButton`), the only way a web sign-in starts; elsewhere it is the app's own
   (`builder`) or a plain outlined button. `DwGoogleAuth.signInCommands({registration, introduce})` turns every

@@ -2,6 +2,16 @@
 
 ## 0.25.0
 
+- Alerts now use a leased PostgreSQL outbox with retry and persisted signature
+  coalescing. Add the JSON-contract `DwHttpAlertSink`, Telegram proxy support,
+  and environment-only sink configuration (#682). Projects wire `alerts:`, `alertProject:` and
+  `alertEnvironment:` and deliver the sink's deploy secrets; without them
+  incidents reach only the server log. See the
+  [migration note](../../docs/migrations/2026-10-30-alert-outbox.md). HTTP deliveries distinguish
+  incidents from repeat follow-ups, bound diagnostic text, and require TLS off
+  the local host; Telegram failures keep bot and proxy credentials out of logs
+  and persisted retry errors.
+
 - Add authenticated, one-hour in-memory endpoint counters for Studio, with
   minute calls, errors and bounded-sample response-time percentiles, a current
   due-and-unclaimed/failed job-queue snapshot, exact retained coverage and
@@ -19,12 +29,6 @@
   coalescing. Malformed bodies consume the peer quota before parsing, incident
   locations are control-character safe, and signatures remain index-safe.
 
-- Alerts now use a leased PostgreSQL outbox with retry and persisted signature
-  coalescing. Add the JSON-contract `DwHttpAlertSink`, Telegram proxy support,
-  and environment-only sink configuration (#682). HTTP deliveries distinguish
-  incidents from repeat follow-ups, bound diagnostic text, and require TLS off
-  the local host; Telegram failures keep bot and proxy credentials out of logs
-  and persisted retry errors.
 - Add optional `DwAuthConfig.beforeCodeSignIn`: transactional admission before
   every code-authenticated session, including existing accounts. Refusal rolls
   back ticket consumption and new-account creation. No wire or schema change.
