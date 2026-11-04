@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.25.0-dev.1
+## 0.25.0
 
 - Add authenticated, one-hour in-memory endpoint counters for Studio, with
   minute calls, errors and bounded-sample response-time percentiles, a current

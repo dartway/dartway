@@ -1,7 +1,7 @@
 ---
 title: Wire durable server alerts
 affects:
-  dartway_core_server: "0.25.0-dev.1"
+  dartway_core_server: "0.25.0"
 ---
 
 ## Who is affected
