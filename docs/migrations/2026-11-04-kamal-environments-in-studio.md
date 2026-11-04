@@ -30,11 +30,19 @@ until the project regenerates. Projects that deploy with `dartway deploy run`
    section; if `deploy_user` differed, settle on one before continuing, because
    it names the directory every host's `requires.files` are mounted from.
 
-2. Move an environment's own `requires:` into the top-level `requires:`. Remove
-   from `requires.secrets` the storage names that are now non-secret values of
-   an external storage — `DW_STORAGE_ENDPOINT`, `DW_STORAGE_PUBLIC_BUCKET`,
-   `DW_STORAGE_PUBLIC_BASE_URL`, `DW_STORAGE_PRIVATE_BUCKET`,
-   `DW_STORAGE_REGION`, `DW_STORAGE_PATH_STYLE`; generation refuses them there.
+2. Move every environment's own `requires:` into the top-level `requires:`.
+   The result is the union: a secret one section alone required is now
+   required in every environment, so Studio must hold a value for it in each
+   (for u90, `REVENUECAT_WEBHOOK_AUTHORIZATION`, until now production-only).
+   Then remove from `requires.secrets` the names the contract already
+   provides; generation refuses them there:
+   - the database connection — `DW_DATABASE_HOST`, `DW_DATABASE_PORT`,
+     `DW_DATABASE_NAME`, `DW_DATABASE_USER`: derived for a bundled database,
+     and secrets of `components.database` for an external one;
+   - the storage names that are non-secret values of an external storage —
+     `DW_STORAGE_ENDPOINT`, `DW_STORAGE_PUBLIC_BUCKET`,
+     `DW_STORAGE_PUBLIC_BASE_URL`, `DW_STORAGE_PRIVATE_BUCKET`,
+     `DW_STORAGE_REGION`, `DW_STORAGE_PATH_STYLE`.
 
 3. Delete the `staging:` and `production:` sections. Keep `local:`,
    `requires:` and `migrations:`.

@@ -119,9 +119,10 @@ class DwKamalGenerator {
     if (clashing.isNotEmpty) {
       throw StateError(
         'deploy/config.yaml > requires > secrets: ${clashing.join(', ')} '
-        '${clashing.length == 1 ? 'is a value' : 'are values'} the Kamal '
-        'contract sets in env.clear — derived, or given by the environment '
-        'as a non-secret value (deploy/studio.yml). Remove '
+        '${clashing.length == 1 ? 'is a name' : 'are names'} the Kamal '
+        'contract already provides — derived in env.clear, a non-secret value '
+        'of the environment, or a secret of an external component '
+        '(deploy/studio.yml > components). Remove '
         '${clashing.length == 1 ? 'it' : 'them'} from requires.secrets.',
       );
     }
