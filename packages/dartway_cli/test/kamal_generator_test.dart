@@ -214,6 +214,10 @@ final routes = [
         expect(studio['services'], [if (bundled) 'storage', 'api', 'web']);
         expect(studio['environments'], ['stage', 'prod']);
         final workflow = yaml(files, '.github/workflows/images.yml');
+        expect(workflow['concurrency'], {
+          'group': 'images-\${{ github.event.workflow_run.head_branch }}',
+          'cancel-in-progress': false,
+        });
         final imageJob = workflow['jobs']['images'];
         const configuredBranches =
             '''contains(fromJSON('["master","production"]'), github.event.workflow_run.head_branch)''';
