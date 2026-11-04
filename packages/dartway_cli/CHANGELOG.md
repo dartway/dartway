@@ -30,6 +30,11 @@
 
 ### Changes
 
+- Fix: the generated `images.yml` groups its concurrency by head branch
+  instead of head SHA, so a busy deploy branch keeps one pending image build
+  of its newest commit instead of a queue; a running build is never cancelled.
+  `dartway deploy kamal --check` reports the old workflow as stale. See the
+  [migration note](../../docs/migrations/2026-11-04-images-workflow-branch-group.md) (#706).
 - Fix: Kamal's pre-app-boot secret-file hook checks readable files as the
   non-root deploy user and requires passwordless sudo only when that user
   cannot read the secret directory (#700).
