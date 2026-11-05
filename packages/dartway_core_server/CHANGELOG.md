@@ -2,6 +2,10 @@
 
 ## 0.26.0-dev.1
 
+- Keep counting calls, errors and exact maximum response time when a rewound
+  clock revisits a closed metrics bucket, without changing its finalized
+  percentiles or throwing from the call (#713).
+
 - Add day-stable `DwFileService.readLink` URLs with a 48-hour signature and
   private, immutable one-day browser caching (#704).
 

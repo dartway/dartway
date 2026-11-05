@@ -99,8 +99,13 @@ final class _CallBucket {
     calls++;
     if (status >= 500) errors++;
     final micros = elapsed.inMicroseconds;
-    if (micros > _maxMicros) _maxMicros = micros;
-    final samples = _micros!;
+    if (micros > _maxMicros) {
+      _maxMicros = micros;
+      _responseTimeMs?['max'] = micros / 1000;
+    }
+    final samples = _micros;
+    // A rewound clock can send a call to a bucket whose sample is finalized.
+    if (samples == null) return;
     if (samples.length < _sampleLimit) {
       samples.add(micros);
     } else {

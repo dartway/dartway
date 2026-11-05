@@ -42,6 +42,40 @@ void main() {
     ]);
   });
 
+  for (final closeWithRead in [false, true]) {
+    test('counts calls after clock rewind to a minute closed by '
+        '${closeWithRead ? 'read' : 'record'}', () {
+      final clock = DwTestClock(DateTime.utc(2026, 10, 31, 12));
+      final counters = DwServerCounters(clock: clock);
+      counters.record('CreateOrder', 200, const Duration(milliseconds: 10));
+      counters.record('CreateOrder', 200, const Duration(milliseconds: 30));
+
+      clock.advance(const Duration(minutes: 1));
+      if (closeWithRead) {
+        counters.read(null);
+      } else {
+        counters.record('CreateOrder', 200, const Duration(milliseconds: 20));
+      }
+
+      clock.moveTo(DateTime.utc(2026, 10, 31, 12, 0, 30));
+      counters.record('CreateOrder', 503, const Duration(milliseconds: 100));
+
+      clock.advance(const Duration(minutes: 2));
+      final expected = {
+        'minute': '2026-10-31T12:00:00.000Z',
+        'endpoints': {
+          'CreateOrder': {
+            'calls': 3,
+            'errors': 1,
+            'responseTimeMs': {'p50': 10.0, 'p95': 30.0, 'max': 100.0},
+          },
+        },
+      };
+      expect(counters.read(null).first, expected);
+      expect(counters.read(null).first, expected);
+    });
+  }
+
   test('returns every retained closed minute after a cursor', () {
     final clock = DwTestClock(DateTime.utc(2026, 10, 31, 12));
     final counters = DwServerCounters(clock: clock);
