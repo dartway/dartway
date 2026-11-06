@@ -33,8 +33,11 @@ reason. An app on a *newer* line than the server is not refused: the server is b
 does not know is answered as unknown.
 
 **The minimum lives in the code.** Whoever removes or renames anything an installed app sends or
-reads raises the breaking line of the shared package's version in the same pull request; nothing is
-set in an environment at deploy time. See [wire and versions](../2-core/wire-and-versions.md).
+reads first marks it with `@DwContractDeprecation`, ships that build, and records the commit the store
+build was built from with `dartway contract baseline --revision <sha|tag>` after both stores carry it.
+Only then may a later release remove it; an incompatible removal still raises the breaking line of the
+shared package's version. Nothing is set in an environment at deploy time. See
+[wire and versions](../2-core/wire-and-versions.md).
 
 ## Template app version
 

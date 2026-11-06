@@ -445,6 +445,8 @@ class ProjectCiContext {
     if (expression == 'github.event.repository.default_branch') {
       return defaultBranch;
     }
+    // This runner models a push run. GitHub leaves base_ref empty for pushes.
+    if (expression == 'github.base_ref') return '';
     if (_servicePort.firstMatch(expression) case final match?) {
       return servicePorts[match.group(1)]?[int.parse(match.group(2)!)]
           ?.toString();
@@ -509,7 +511,8 @@ class _Known {
     for (final match in _expression.allMatches(text)) {
       final expression = match.group(1)!.trim();
       if (expression == 'github.event.pull_request.base.sha' ||
-          expression == 'github.event.repository.default_branch') {
+          expression == 'github.event.repository.default_branch' ||
+          expression == 'github.base_ref') {
         continue;
       }
       if (_servicePort.firstMatch(expression) case final port?) {

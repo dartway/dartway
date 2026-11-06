@@ -639,7 +639,12 @@ final class _Run {
 
     void visitWire(WireType wire, ClassElement owner) {
       switch (wire) {
-        case EnumWire(open: false):
+        case EnumWire(open: false, sourcePath: final sourcePath)
+            when contexts.keys.any(
+              (package) =>
+                  p.equals(sourcePath, package.root) ||
+                  p.isWithin(package.root, sourcePath),
+            ):
           if (reportedEnums.add(wire.spelling)) {
             diagnostics.add(
               DwGenerationDiagnostic.at(

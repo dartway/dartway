@@ -59,6 +59,7 @@ final class EnumWire extends WireType {
     required super.nullable,
     required this.values,
     required this.open,
+    required this.sourcePath,
     this.deprecatedValues = const {},
     this.customNameEncoding = false,
   });
@@ -66,6 +67,7 @@ final class EnumWire extends WireType {
   final String spelling;
   final List<String> values;
   final bool open;
+  final String sourcePath;
   final Map<String, String> deprecatedValues;
   final bool customNameEncoding;
 }
@@ -245,6 +247,7 @@ final class WireTypeReader {
             if (field.isEnumConstant) field.name!,
         ],
         open: open,
+        sourcePath: element.library.firstFragment.source.fullName,
         deprecatedValues: deprecatedValues,
         // The generated part evaluates `.name` in this library. A custom
         // member or applicable visible extension can change that encoding;

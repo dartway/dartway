@@ -20,9 +20,10 @@ enum DataState { ready }
 enum ResultState { ready }
 enum InputState { ready }
 final class ItemRecord extends DwDataObject with _$ItemRecord {
-  const ItemRecord({required this.id, required this.state});
+  const ItemRecord({required this.id, required this.state, required this.keyKind});
   @override final int id;
   final DataState state;
+  final DwSessionKeyKind keyKind;
 }
 final class ResultRecord extends DwDataObject with _$ResultRecord {
   const ResultRecord({required this.id, required this.state});

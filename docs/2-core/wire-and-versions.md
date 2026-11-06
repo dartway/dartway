@@ -201,8 +201,9 @@ not make it wire-required. An open enum may gain values while retaining all old 
 default is breaking, except for the default added in the same change that marks a required field
 deprecated so the marked build can decode the field's later absence.
 
-Once both stores carry a build, run `dartway contract baseline`. It copies the
-generated descriptor, including the source commit, to `contract_baseline.json` beside the shared pubspec. With that file present,
+Once both stores carry a build, run `dartway contract baseline --revision <sha|tag>`, naming the commit
+the store build was built from. It reads the generated descriptor and shared version from that Git object and
+copies the descriptor, including the resolved source commit, to `contract_baseline.json` beside the shared pubspec. With that file present,
 ordinary checks keep the Git PR comparison and also judge the deployed server against the store
 build. Compatible additions stay on the current breaking line, so deploying the server does not
 answer that build with `426`.
@@ -212,7 +213,8 @@ Retirement is two releases. First mark a field, enum value, or call with
 both stores, update the baseline; only then may the member be removed. Both comparisons exempt a
 removal only when its mark is present in the trusted store baseline. A mark found only in the Git
 base or working tree never exempts it, and without a baseline at the trusted revision there is no
-exemption. An unmarked removal or rename fails by name. A marked field must have a default, and `since` cannot be newer than
+exemption. An unmarked removal or rename fails by name. A marked non-nullable field must have a default;
+a nullable field is accepted without one. `since` cannot be newer than
 the current contract version. Release CI runs `dartway check --release`: a mark already present in the baseline is
 then an error until the member is removed. There is only one retired layer.
 

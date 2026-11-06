@@ -19,6 +19,16 @@ final class ContractCommand extends Command<int> {
 }
 
 final class _ContractBaselineCommand extends Command<int> {
+  _ContractBaselineCommand() {
+    argParser.addOption(
+      'revision',
+      abbr: 'r',
+      mandatory: true,
+      valueHelp: 'sha|tag',
+      help: 'Git revision from which the store build was built.',
+    );
+  }
+
   @override
   String get name => 'baseline';
 
@@ -29,25 +39,12 @@ final class _ContractBaselineCommand extends Command<int> {
   @override
   int run() {
     final root = findPackageProjectRoot(Directory.current) ?? findProjectRoot();
-    final shared = root
+    final revision = argResults!['revision'] as String;
+    final sharedDirectories = root
         .listSync()
         .whereType<Directory>()
         .where((directory) => p.basename(directory.path).endsWith('_shared'))
-        .where(
-          (directory) => File(
-            p.join(directory.path, 'lib', 'generated', 'dw_contract.json'),
-          ).existsSync(),
-        )
         .toList();
-    if (shared.length != 1) {
-      throw StateError(
-        'Expected one shared package with lib/generated/dw_contract.json; found ${shared.length}.',
-      );
-    }
-    final source = File(
-      p.join(shared.single.path, 'lib', 'generated', 'dw_contract.json'),
-    );
-    final sourceRelative = p.relative(source.path, from: root.path);
     final gitTopLevel = Process.runSync('git', [
       'rev-parse',
       '--show-toplevel',
@@ -56,28 +53,42 @@ final class _ContractBaselineCommand extends Command<int> {
       throw StateError('Cannot record a baseline outside a Git repository.');
     }
     final gitRoot = Directory((gitTopLevel.stdout as String).trim());
-    final sourceInGit = p.posix.joinAll(
-      p.split(p.relative(source.path, from: gitRoot.path)),
-    );
-    final status = Process.runSync('git', [
-      'status',
-      '--porcelain',
-      '--',
-      sourceInGit,
+    final commit = Process.runSync('git', [
+      'rev-parse',
+      '--verify',
+      '$revision^{commit}',
     ], workingDirectory: gitRoot.path);
-    final headSource = Process.runSync('git', [
-      'show',
-      'HEAD:./$sourceInGit',
-    ], workingDirectory: gitRoot.path);
-    if (status.exitCode != 0 ||
-        (status.stdout as String).trim().isNotEmpty ||
-        headSource.exitCode != 0 ||
-        headSource.stdout != source.readAsStringSync()) {
+    if (commit.exitCode != 0) {
       throw StateError(
-        'Refusing to record $sourceRelative: it is dirty or differs from HEAD.',
+        'Revision `$revision` does not resolve to a Git commit.',
       );
     }
-    final descriptor = jsonDecode(source.readAsStringSync());
+    final resolvedCommit = (commit.stdout as String).trim();
+
+    String inGit(Directory directory, String path) => p.posix.joinAll(
+      p.split(p.relative(p.join(directory.path, path), from: gitRoot.path)),
+    );
+
+    ProcessResult show(Directory directory, String path) => Process.runSync(
+      'git',
+      ['show', '$resolvedCommit:${inGit(directory, path)}'],
+      workingDirectory: gitRoot.path,
+    );
+
+    final candidates = [
+      for (final directory in sharedDirectories)
+        (
+          directory: directory,
+          contract: show(directory, 'lib/generated/dw_contract.json'),
+        ),
+    ].where((candidate) => candidate.contract.exitCode == 0).toList();
+    if (candidates.length != 1) {
+      throw StateError(
+        'Expected revision `$revision` to contain one shared package with lib/generated/dw_contract.json; found ${candidates.length}.',
+      );
+    }
+    final shared = candidates.single.directory;
+    final descriptor = jsonDecode(candidates.single.contract.stdout as String);
     if (descriptor is! Map<String, dynamic> ||
         descriptor['format'] is! int ||
         descriptor['codec'] != 1 ||
@@ -91,8 +102,12 @@ final class _ContractBaselineCommand extends Command<int> {
         'The generated contract is unverified: ${descriptor['unverified']}.',
       );
     }
-    final pubspec = File(p.join(shared.single.path, 'pubspec.yaml'))
-        .readAsLinesSync()
+    final pubspecSource = show(shared, 'pubspec.yaml');
+    if (pubspecSource.exitCode != 0) {
+      throw StateError('Revision `$revision` has no shared pubspec.yaml.');
+    }
+    final pubspec = (pubspecSource.stdout as String)
+        .split('\n')
         .where((line) => line.startsWith('version:'))
         .map((line) => line.substring('version:'.length).trim())
         .single;
@@ -101,16 +116,8 @@ final class _ContractBaselineCommand extends Command<int> {
         'The generated contract is stale: its version differs from pubspec.yaml. Run `dartway generate` first.',
       );
     }
-    final commit = Process.runSync('git', [
-      'rev-parse',
-      '--verify',
-      'HEAD^{commit}',
-    ], workingDirectory: root.path);
-    if (commit.exitCode != 0) {
-      throw StateError('Cannot record a baseline outside a Git commit.');
-    }
-    descriptor['baselineCommit'] = (commit.stdout as String).trim();
-    final target = File(p.join(shared.single.path, 'contract_baseline.json'));
+    descriptor['baselineCommit'] = resolvedCommit;
+    final target = File(p.join(shared.path, 'contract_baseline.json'));
     target.writeAsStringSync(
       '${const JsonEncoder.withIndent('  ').convert(descriptor)}\n',
     );

@@ -282,7 +282,7 @@ dartway generate            # write
 dartway generate --check --contract-base <trusted-SHA>  # read-only freshness and compatibility
 dartway generate -v         # list every file written or removed
 dartway generate --release  # the release: raise the contract version once
-dartway contract baseline   # after the build is live in both stores
+dartway contract baseline --revision <sha|tag>  # commit the store build was built from
 dartway check --release     # release CI cleanup gate
 ```
 
@@ -314,10 +314,14 @@ package. The release CI then checks with an explicit `--contract-base` against t
 strictly, as before.
 
 The store baseline is `<shared>/contract_baseline.json`, a validated committed copy of the generated contract,
-its contract version, and the commit it was recorded from. With `--contract-base`, the gate reads
+its contract version, and the commit the store build was built from. `dartway contract baseline --revision
+<sha|tag>` reads both the descriptor and shared pubspec from that Git object, even when the working tree has
+moved ahead. With `--contract-base`, the gate reads
 this file from that trusted Git revision, never from the pull request working tree. Projects without it retain the Git-baseline behavior; adopt it only after
 the current build is live in both stores. Server release CI uses `dartway check --release` so a
-deprecation already delivered by that baseline cannot survive for another release.
+deprecation already delivered by that baseline cannot survive for another release. A baseline committed since
+the previous release is visible to the release check only after that commit is merged: a green release pull
+request does not prove those marks are clean; the push run on `release` does.
 
 ## `dartway format` — the pinned Dart, on what the branch changed
 

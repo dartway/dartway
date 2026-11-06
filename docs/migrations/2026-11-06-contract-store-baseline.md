@@ -29,10 +29,12 @@ the callback.
 After that app build is live in both stores, run:
 
 ```bash
-dartway contract baseline
+dartway contract baseline --revision <sha|tag>
 ```
 
-Commit `<project>_shared/contract_baseline.json`. Add `dartway check --release`
+Name the commit the store build was built from, not the current `HEAD` if development has moved on.
+The command reads the descriptor and shared version from that Git object. Commit
+`<project>_shared/contract_baseline.json`. Add `dartway check --release`
 to release CI. Ordinary pull requests continue to run `dartway check`; the
 release form additionally requires contract members whose deprecation mark is
 already in the store baseline to be removed.

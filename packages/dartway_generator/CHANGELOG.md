@@ -8,7 +8,8 @@
   Server-sent enums must be open; marked fields must survive absence. The
   two trusted-revision comparisons allow a removal only when its mark is in
   the store baseline; marked fields require a default, and strict enums in call
-  results are gated too (#716).
+  results are gated too. Strict framework and satellite enums remain governed
+  by their owning packages rather than blocking project generation (#716).
 
 ## 0.25.0
 

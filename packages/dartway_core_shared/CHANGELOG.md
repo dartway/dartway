@@ -2,10 +2,15 @@
 
 ## 0.26.0-dev.1
 
-- Add `@DwContractDeprecation(since:)` for the extend-only project contract lifecycle
-  and store-baseline gate (#716).
+### Breaking changes
+
 - Make `DwIdentifierKind` open with `unknown`, as required for enums sent in
   data objects and call results (#716).
+
+### Changes
+
+- Add `@DwContractDeprecation(since:)` for the extend-only project contract lifecycle
+  and store-baseline gate (#716).
 
 ## 0.25.0
 
