@@ -64,10 +64,19 @@ void main() {
       compareContracts(
         _contract(open: false),
         _contract(open: true),
+        removalBaseline: _contract(open: false),
+        comparison: 'store comparison',
+      ),
+      isEmpty,
+    );
+    expect(
+      compareContracts(
+        _contract(open: false),
+        _contract(open: true),
         removalBaseline: null,
         comparison: 'Git comparison',
       ),
-      isEmpty,
+      isNotEmpty,
     );
   });
 }

@@ -117,6 +117,10 @@ void main() { print(appProtocol.entryNamed('ExtraRecord')!.since); }
         }),
       );
       await project.generateClean();
+      project.writeFile(
+        'app_shared/contract_baseline.json',
+        project.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
       final release = baseline(project);
       git(project, ['branch', 'develop', release]);
       project.writeFile(

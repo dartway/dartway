@@ -208,7 +208,7 @@ build. Compatible additions stay on the current breaking line, so deploying the 
 answer that build with `426`.
 
 Retirement is two releases. First mark a field, enum value, or call with
-`@DwDeprecated(since: '<shared version>')` and stop using it. After the resulting client is live in
+`@DwContractDeprecation(since: '<shared version>')` and stop using it. After the resulting client is live in
 both stores, update the baseline; only then may the member be removed. Both comparisons exempt a
 removal only when its mark is present in the trusted store baseline. A mark found only in the Git
 base or working tree never exempts it, and without a baseline at the trusted revision there is no

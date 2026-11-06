@@ -219,7 +219,10 @@ final class WireTypeReader {
           final value = annotation.computeConstantValue();
           final annotationType = value?.type?.element;
           if (annotationType != null &&
-              DwFrameworkTypes.isCoreClass(annotationType, 'DwDeprecated')) {
+              DwFrameworkTypes.isCoreClass(
+                annotationType,
+                'DwContractDeprecation',
+              )) {
             final since = value?.getField('since')?.toStringValue();
             if (since != null) deprecatedValues[field.name!] = since;
           }

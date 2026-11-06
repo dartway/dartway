@@ -214,7 +214,8 @@ String? _deprecatedSince(Element? element) {
   for (final annotation in element.metadata.annotations) {
     final value = annotation.computeConstantValue();
     final type = value?.type?.element;
-    if (type != null && DwFrameworkTypes.isCoreClass(type, 'DwDeprecated')) {
+    if (type != null &&
+        DwFrameworkTypes.isCoreClass(type, 'DwContractDeprecation')) {
       return value?.getField('since')?.toStringValue();
     }
   }
@@ -668,6 +669,7 @@ List<String> compareContracts(
           .where((value) => removalMarks.contains('$path.$value'))
           .toSet();
       final openedForMigration =
+          removalBaseline != null &&
           a['open'] == false &&
           b['open'] == true &&
           next.difference(previous).every((value) => value == 'unknown');
@@ -696,7 +698,7 @@ List<String> compareContracts(
     if (b is! Map) {
       if (!removalMarks.contains(name)) {
         changes.add(
-          '$comparison: $name wire name removed/renamed without @DwDeprecated in the store baseline',
+          '$comparison: $name wire name removed/renamed without @DwContractDeprecation in the store baseline',
         );
       }
       continue;
@@ -726,7 +728,7 @@ List<String> compareContracts(
       if (!bf.containsKey(field)) {
         if (!removalMarks.contains('$name.$field')) {
           changes.add(
-            '$comparison: $name.$field field removed/renamed without @DwDeprecated in the store baseline',
+            '$comparison: $name.$field field removed/renamed without @DwContractDeprecation in the store baseline',
           );
         }
         continue;

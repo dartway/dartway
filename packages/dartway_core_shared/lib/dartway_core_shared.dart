@@ -17,7 +17,7 @@ export 'src/value/dw_calendar_day.dart';
 export 'src/value/dw_state_transitions.dart';
 export 'src/protocol/dw_api_response.dart';
 export 'src/protocol/dw_close_code.dart';
-export 'src/protocol/dw_deprecated.dart';
+export 'src/protocol/dw_contract_deprecation.dart';
 export 'src/protocol/dw_http_contract.dart';
 export 'src/protocol/dw_json_codec.dart';
 export 'src/protocol/dw_open_enum.dart';

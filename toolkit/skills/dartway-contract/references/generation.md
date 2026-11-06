@@ -46,7 +46,7 @@ Contract tests (round trip, `validate()`, `onUpdate`, channels): `dartway-testin
 After a build is live in both stores, `dartway contract baseline` commits the generated descriptor
 as `contract_baseline.json` next to the shared package pubspec. Additions that the baseline codecs tolerate do not raise
 the breaking line. Retire a field, enum value or call by marking it
-`@DwDeprecated(since: '<contract version>')`; removal is allowed only after that mark is in the store
+`@DwContractDeprecation(since: '<contract version>')`; removal is allowed only after that mark is in the store
 baseline. A marked field is nullable or has a default so the marked build survives its absence; its
 `since` is not newer than the contract version. Release CI runs `dartway check --release`, which requires marks already in the baseline to
 be removed. Never update the baseline while either store is still reviewing the build.

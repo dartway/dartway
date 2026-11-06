@@ -80,7 +80,7 @@ jobs:
           fi
           echo "CONTRACT_BASE=$base" >> "$GITHUB_ENV"
           if [ "$GITHUB_REF_NAME" = release ]; then
-            echo "CONTRACT_RELEASE_CHECK=--release-check" >> "$GITHUB_ENV"
+            echo "CONTRACT_RELEASE_CHECK=--release" >> "$GITHUB_ENV"
           fi
           echo "DW_DATABASE_PORT=$DB_PORT" >> "$GITHUB_ENV"
 

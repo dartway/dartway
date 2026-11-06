@@ -196,7 +196,22 @@ abstract final class DwCodeGenerator {
         contractBase,
         branch: releaseBranch,
       );
-      if (sharedPackage != null) {
+    } on Exception catch (error) {
+      if (verify) {
+        diagnostics.add(
+          DwGenerationDiagnostic(
+            'contract not verified: trusted Git revision could not be resolved: $error. Supply --contract-base with a trusted committed revision; no feature-tree seed is accepted.',
+            code: 'projectContractVersion',
+          ),
+        );
+        return finish();
+      }
+      stdout.writeln(
+        'Store comparison skipped: no trusted Git base could be resolved.',
+      );
+    }
+    try {
+      if (sharedPackage != null && baselineSha != null) {
         storeBaseline = readStoreContractBaseline(
           root: root,
           sha: baselineSha,
@@ -207,14 +222,14 @@ abstract final class DwCodeGenerator {
       if (verify) {
         diagnostics.add(
           DwGenerationDiagnostic(
-            'contract not verified: $error. Supply --contract-base with a trusted committed revision; no feature-tree seed is accepted.',
+            'contract not verified: contract_baseline.json could not be read from revision $baselineSha: $error.',
             code: 'projectContractVersion',
           ),
         );
         return finish();
       }
       stdout.writeln(
-        'Store comparison skipped: no trusted Git base could be resolved.',
+        'Store comparison skipped: contract_baseline.json could not be read from revision $baselineSha: $error.',
       );
     }
 
@@ -286,7 +301,14 @@ abstract final class DwCodeGenerator {
                 removalBaseline: storeBaseline,
                 comparison: 'store comparison',
               );
+              final storeNeedsReleaseRaise =
+                  releaseBranch != null &&
+                  storeChanges.isNotEmpty &&
+                  storeChanges.every(
+                    (change) => change.startsWith('raise `version:`'),
+                  );
               if (storeChanges.isNotEmpty &&
+                  !storeNeedsReleaseRaise &&
                   !storeVersion.isOlderLineThan(nextVersion)) {
                 diagnostics.add(
                   DwGenerationDiagnostic(
