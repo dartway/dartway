@@ -40,5 +40,9 @@ may use the same path as a server route.
 `auth:` defaults to `DwRouteAuth.none` — the route verifies its sender
 itself (a signature); `optional`/`required` read an `Authorization: Bearer` key like a call. A door acting for a signed-in
 person runs the call in process — `server.callAs(call, token:, idempotencyKey:)` — never over its own
-port. A route that rejects silently names the step that turned the request away with an enum value
+port. A public door that needs a per-peer ceiling declares
+`rateLimit: DwCallRateLimit(requests: …, burst: …)` on its `DwHttpRoute`; the
+framework applies the deployment's trusted-proxy boundary before auth or body
+reading and answers excess requests with 429 and `Retry-After`. Never derive a
+quota key from forwarding headers in the handler. A route that rejects silently names the step that turned the request away with an enum value
 (`foreignOrigin`, `versionMismatch`, `unknownType`), never a boolean, and carries no payload or secret.

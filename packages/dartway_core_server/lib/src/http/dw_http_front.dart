@@ -16,6 +16,7 @@ import '../server/dw_runtime.dart';
 import '../server/dw_server_settings.dart';
 import 'dw_http_request.dart';
 import 'dw_http_response.dart';
+import 'dw_peer_rate_limits.dart';
 import 'dw_reason_phrase.dart';
 import 'dw_request_body.dart';
 
@@ -29,7 +30,8 @@ final class DwHttpFront {
     required this.calls,
     required this.live,
     required List<DwHttpRoute> routes,
-  }) : _routes = _indexRoutes(routes);
+  }) : _routes = _indexRoutes(routes),
+       _routeRateLimits = DwPeerRateLimits(settings);
 
   late final DwServerCounters _counters;
 
@@ -40,6 +42,7 @@ final class DwHttpFront {
 
   /// Path → method (`null` for any) → route.
   final Map<String, Map<String?, DwHttpRoute>> _routes;
+  final DwPeerRateLimits _routeRateLimits;
 
   HttpServer? _server;
   bool _stopping = false;
@@ -199,10 +202,15 @@ final class DwHttpFront {
     await response.close();
   }
 
-  static bool _ingressRefusal(HttpRequest request, int status) =>
-      status == 429 &&
-      request.method == DwHttpContract.callMethod &&
-      request.uri.path.startsWith(DwHttpContract.pathPrefix);
+  bool _ingressRefusal(HttpRequest request, int status) {
+    if (status != 429) return false;
+    if (request.method == DwHttpContract.callMethod &&
+        request.uri.path.startsWith(DwHttpContract.pathPrefix)) {
+      return true;
+    }
+    final routes = _routes[request.uri.path];
+    return (routes?[request.method] ?? routes?[null])?.rateLimit != null;
+  }
 
   Future<(int, Map<String, String>, List<int>)> _call(
     HttpRequest request,
@@ -342,6 +350,21 @@ final class DwHttpFront {
       return _text(405, 'method not allowed', {
         'allow': byMethod.keys.whereType<String>().join(', '),
       });
+    }
+    final retryAfter = _routeRateLimits.checkRoute(
+      route,
+      request,
+      runtime.clock.now(),
+    );
+    if (retryAfter != null) {
+      final answer = DwApiResponse.refused(
+        DwCallRefusal.tooManyRequests(retryAfter),
+      );
+      return (
+        429,
+        {..._callHeaders, ...dwHttpHeadersFor(answer)},
+        _jsonUtf8.convert(answer.toJson()),
+      );
     }
     final where = 'route $route';
     final (sessionKey, refused) = await _routeSession(request, route, where);
