@@ -2,6 +2,10 @@
 
 ## 0.26.0-dev.1
 
+- Add optional per-peer `DwHttpRoute` rate limits, enforced before
+  authentication and body reading with the same trusted-proxy resolution and
+  429 refusal as registered-call quotas (#719).
+
 - Keep counting calls, errors and exact maximum response time when a rewound
   clock revisits a closed metrics bucket, without changing its finalized
   percentiles or throwing from the call (#713).

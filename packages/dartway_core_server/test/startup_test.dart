@@ -128,6 +128,30 @@ void main() {
       );
     }
 
+    test('a limited route behind an untrusted proxy fails startup', () async {
+      final found = await problems(
+        app.server(
+          unused,
+          settings: const DwServerSettings(behindProxy: true),
+          routes: [
+            DwHttpRoute.get(
+              '/limited',
+              (ctx, request) => DwHttpResponse.empty(),
+              rateLimit: const DwCallRateLimit(requests: 0),
+            ),
+          ],
+        ),
+      );
+      expect(
+        found,
+        contains('peer quotas behind a proxy require trustedProxyNetworks'),
+      );
+      expect(
+        found.any((problem) => problem.contains('requests must be positive')),
+        isTrue,
+      );
+    });
+
     test('a feature is named as its folder, once', () async {
       final found = await problems(
         DwAppServer(
