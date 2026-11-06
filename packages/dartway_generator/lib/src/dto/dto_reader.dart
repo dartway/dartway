@@ -126,6 +126,19 @@ final class DtoReader {
           type: type,
           spelling: spelling,
           defaultValue: defaultValue,
+          contractDeprecated: field.field.metadata.annotations.any((
+            annotation,
+          ) {
+            final annotationType = annotation
+                .computeConstantValue()
+                ?.type
+                ?.element;
+            return annotationType != null &&
+                DwFrameworkTypes.isCoreClass(
+                  annotationType,
+                  'DwContractDeprecation',
+                );
+          }),
         ),
       );
     }

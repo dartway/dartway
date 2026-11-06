@@ -211,6 +211,79 @@ final class ItemRecord extends DwDataObject with _$ItemRecord {
   );
 
   test(
+    'marked default value stays on wire for the unmarked store decoder',
+    () async {
+      const unmarkedSource = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, required this.title});
+  @override final int id;
+  final String title;
+}
+''';
+      const markedSource = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, this.title = 'retired'});
+  @override final int id;
+  @DwContractDeprecation(since: '0.1.0')
+  final String title;
+}
+''';
+      final project = TempProject.create(['app_shared']);
+      project.writeFile('app_shared/lib/src/item.dart', unmarkedSource);
+      await project.generateClean();
+      project.writeFile(
+        'app_shared/contract_baseline.json',
+        project.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
+      final storeRevision = baseline(project);
+
+      project.writeFile('app_shared/lib/src/item.dart', markedSource);
+      await project.generateClean();
+      project.writeFile('app_shared/bin/marked_encode.dart', r'''
+import 'dart:convert';
+import '../lib/src/item.dart';
+void main() => print(jsonEncode(const ItemRecord(id: 1).toJson()));
+''');
+      final encoded = await project.runScript(
+        'app_shared',
+        'bin/marked_encode.dart',
+      );
+      expect(encoded.exitCode, 0, reason: output(encoded));
+      expect(jsonDecode(encoded.stdout), {'id': 1, 'title': 'retired'});
+      final comparison = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        storeRevision,
+      ]);
+      expect(comparison.exitCode, 0, reason: output(comparison));
+
+      project.writeFile('app_shared/lib/src/item.dart', unmarkedSource);
+      await project.generateClean();
+      project.writeFile('app_shared/bin/store_decode.dart', '''
+import 'dart:convert';
+import '../lib/src/item.dart';
+void main() {
+  final item = \$ItemRecordFromJson(
+    jsonDecode(${jsonEncode(encoded.stdout.trim())}) as Map<String, Object?>,
+  );
+  print('\${item.id}:\${item.title}');
+}
+''');
+      final decoded = await project.runScript(
+        'app_shared',
+        'bin/store_decode.dart',
+      );
+      expect(decoded.exitCode, 0, reason: output(decoded));
+      expect(decoded.stdout, '1:retired\n');
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
     'ordinary generation warns only for an unreadable store baseline',
     () async {
       final withoutBaseline = TempProject.create(['app_shared']);

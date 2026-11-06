@@ -52,10 +52,12 @@ abstract final class DtoEmitter {
         patches.add(
           'DwJsonCodec.writePatch(json, $key, $self, (v) => $encode);',
         );
-      } else if (defaultValue != null) {
+      } else if (defaultValue != null && !field.contractDeprecated) {
         // Left off the wire when equal to its default, which the decoder
         // restores (D-041). A nullable field with a non-null default writes
-        // its null out: absent would mean the default.
+        // its null out: absent would mean the default. A field marked for
+        // contract retirement is deliberately excluded: old builds still
+        // require that key until the field is removed.
         final value = type.nullable
             ? _encodeNullable(type, self)
             : JsonCodecWriter.encodeValue(type, self);

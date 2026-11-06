@@ -49,8 +49,9 @@ After a build is live in both stores, `dartway contract baseline` commits the ge
 as `contract_baseline.json` next to the shared package pubspec. Additions that the baseline codecs tolerate do not raise
 the breaking line. Retire a field, enum value or call by marking it
 `@DwContractDeprecation(since: '<contract version>')`; removal is allowed only after that mark is in the store
-baseline. A marked field is nullable or has a default so the marked build survives its absence; its
-`since` is not newer than the contract version. Release CI runs `dartway check --release`, which requires marks already in the baseline to
+baseline. A marked field is always encoded, even when its value equals its default, so it stays on
+the wire until it is removed. It is nullable or has a default so the marked build survives its
+absence; its `since` is not newer than the contract version. Release CI runs `dartway check --release`, which requires marks already in the baseline to
 be removed. Never update the baseline while either store is still reviewing the build.
 
 `projectContractVersion` is an error when the generated project contract is incompatible at the

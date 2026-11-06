@@ -213,8 +213,9 @@ Retirement is two releases. First mark a field, enum value, or call with
 both stores, update the baseline; only then may the member be removed. Both comparisons exempt a
 removal only when its mark is present in the trusted store baseline. A mark found only in the Git
 base or working tree never exempts it, and without a baseline at the trusted revision there is no
-exemption. An unmarked removal or rename fails by name. A marked non-nullable field must have a default;
-a nullable field is accepted without one. `since` cannot be newer than
+exemption. An unmarked removal or rename fails by name. A marked field is always encoded, including
+when its value equals its default, and therefore stays on the wire until it is removed. A marked
+non-nullable field must have a default; a nullable field is accepted without one. `since` cannot be newer than
 the current contract version. Release CI runs `dartway check --release`: a mark already present in the baseline is
 then an error until the member is removed. There is only one retired layer.
 
