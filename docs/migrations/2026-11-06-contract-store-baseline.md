@@ -15,7 +15,13 @@ Projects that release a server before their mobile builds clear both stores.
 Applies when updating `dartway_cli` to `0.28.0` and the core family to
 `0.26.0-dev.1`.
 
-After the same app build is live in both stores, run:
+First open each server-sent enum and add only its `unknown` fallback. Generate
+and ship that app build. This adoption step is compatible both before and after
+a store baseline exists, so it does not raise the contract breaking line: a
+current server never stores or sends `unknown`, and an installed strict client
+therefore cannot meet it.
+
+After that app build is live in both stores, run:
 
 ```bash
 dartway contract baseline
@@ -43,9 +49,10 @@ final label = switch (state) {
 };
 ```
 
-Enums used only in fields sent by the client may remain strict. Ship this
-strict-to-open migration before adding any other enum value, then wait for the
-opened build to reach both stores and record its baseline.
+Enums used only in fields sent by the client may remain strict. Do not add any
+other enum value in the strict-to-open step: that combined change is breaking.
+Only after the opened build reaches both stores and its baseline is committed
+may a later server release add another value without raising the breaking line.
 
 ## How to check
 

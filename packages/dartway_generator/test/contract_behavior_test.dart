@@ -12,6 +12,107 @@ import 'support/temp_project.dart';
 
 void main() {
   test(
+    'real contract gates trust committed store baseline and enforce removals and stale marks',
+    () async {
+      const markedSource = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, this.title});
+  @override final int id;
+  @DwContractDeprecation(since: '0.1.0')
+  final String? title;
+}
+''';
+      const removedSource = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id});
+  @override final int id;
+}
+''';
+
+      final trusted = TempProject.create(['app_shared']);
+      trusted.writeFile('app_shared/lib/src/item.dart', markedSource);
+      await trusted.generateClean();
+      trusted.writeFile(
+        'app_shared/contract_baseline.json',
+        trusted.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
+      final trustedRevision = baseline(trusted);
+
+      trusted.writeFile(
+        'app_shared/contract_baseline.json',
+        '{"weakened":true}',
+      );
+      trusted.writeFile('app_shared/lib/src/item.dart', removedSource);
+      var report = await DwCodeGenerator.run(
+        trusted.root,
+        check: true,
+        contractBase: trustedRevision,
+        verifyContract: true,
+      );
+      expect(report.diagnostics, isEmpty);
+      File(trusted.path('app_shared/contract_baseline.json')).deleteSync();
+      report = await DwCodeGenerator.run(
+        trusted.root,
+        check: true,
+        contractBase: trustedRevision,
+        verifyContract: true,
+      );
+      expect(report.diagnostics, isEmpty);
+
+      final unmarked = TempProject.create(['app_shared']);
+      unmarked.writeFile(
+        'app_shared/lib/src/item.dart',
+        markedSource.replaceFirst(
+          "  @DwContractDeprecation(since: '0.1.0')\n",
+          '',
+        ),
+      );
+      await unmarked.generateClean();
+      unmarked.writeFile(
+        'app_shared/contract_baseline.json',
+        unmarked.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
+      final unmarkedRevision = baseline(unmarked);
+      unmarked.writeFile('app_shared/lib/src/item.dart', removedSource);
+      report = await DwCodeGenerator.run(
+        unmarked.root,
+        check: true,
+        contractBase: unmarkedRevision,
+        verifyContract: true,
+      );
+      expect(
+        report.diagnostics.map((diagnostic) => diagnostic.message).join('\n'),
+        contains('removed/renamed without @DwContractDeprecation'),
+      );
+
+      final stale = TempProject.create(['app_shared']);
+      stale.writeFile('app_shared/lib/src/item.dart', markedSource);
+      await stale.generateClean();
+      stale.writeFile(
+        'app_shared/contract_baseline.json',
+        stale.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
+      final staleRevision = baseline(stale);
+      report = await DwCodeGenerator.run(
+        stale.root,
+        check: true,
+        contractBase: staleRevision,
+        verifyContract: true,
+        releaseCheck: true,
+      );
+      expect(
+        report.diagnostics.map((diagnostic) => diagnostic.message).join('\n'),
+        contains('must be removed for release: ItemRecord.title'),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
     'new data objects retain their introduction version without raising the line',
     () async {
       final project = TempProject.create(['app_shared']);

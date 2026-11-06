@@ -48,16 +48,27 @@ final class _ContractBaselineCommand extends Command<int> {
       p.join(shared.single.path, 'lib', 'generated', 'dw_contract.json'),
     );
     final sourceRelative = p.relative(source.path, from: root.path);
+    final gitTopLevel = Process.runSync('git', [
+      'rev-parse',
+      '--show-toplevel',
+    ], workingDirectory: root.path);
+    if (gitTopLevel.exitCode != 0) {
+      throw StateError('Cannot record a baseline outside a Git repository.');
+    }
+    final gitRoot = Directory((gitTopLevel.stdout as String).trim());
+    final sourceInGit = p.posix.joinAll(
+      p.split(p.relative(source.path, from: gitRoot.path)),
+    );
     final status = Process.runSync('git', [
       'status',
       '--porcelain',
       '--',
-      sourceRelative,
-    ], workingDirectory: root.path);
+      sourceInGit,
+    ], workingDirectory: gitRoot.path);
     final headSource = Process.runSync('git', [
       'show',
-      'HEAD:$sourceRelative',
-    ], workingDirectory: root.path);
+      'HEAD:./$sourceInGit',
+    ], workingDirectory: gitRoot.path);
     if (status.exitCode != 0 ||
         (status.stdout as String).trim().isNotEmpty ||
         headSource.exitCode != 0 ||

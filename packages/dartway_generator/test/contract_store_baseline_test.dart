@@ -41,44 +41,86 @@ void main() {
     expect(staleDeprecations(baseline, _contract(fields: {})), isEmpty);
   });
 
-  test('only an open baseline permits an enum addition', () {
-    expect(
-      compareContracts(
+  test(
+    'open enums permit additions and strict-to-open permits only unknown',
+    () {
+      expect(
+        compareContracts(
+          _contract(open: false),
+          _contract(open: false, added: true),
+          removalBaseline: null,
+          comparison: 'Git comparison',
+        ),
+        isNotEmpty,
+      );
+      expect(
+        compareContracts(
+          _contract(open: true),
+          _contract(open: true, added: true),
+          removalBaseline: null,
+          comparison: 'Git comparison',
+        ),
+        isEmpty,
+      );
+      expect(
+        compareContracts(
+          _contract(open: false),
+          _contract(open: true),
+          removalBaseline: _contract(open: false),
+          comparison: 'store comparison',
+        ),
+        isEmpty,
+      );
+      expect(
+        compareContracts(
+          _contract(open: false),
+          _contract(open: true),
+          removalBaseline: null,
+          comparison: 'Git comparison',
+        ),
+        isEmpty,
+      );
+      for (final baseline in <Map<String, dynamic>?>[
+        null,
         _contract(open: false),
-        _contract(open: false, added: true),
-        removalBaseline: null,
-        comparison: 'Git comparison',
-      ),
-      isNotEmpty,
-    );
-    expect(
-      compareContracts(
-        _contract(open: true),
-        _contract(open: true, added: true),
-        removalBaseline: null,
-        comparison: 'Git comparison',
-      ),
-      isEmpty,
-    );
-    expect(
-      compareContracts(
+      ]) {
+        expect(
+          compareContracts(
+            _contract(open: false),
+            _contract(open: true, added: true),
+            removalBaseline: baseline,
+            comparison: baseline == null
+                ? 'Git comparison'
+                : 'store comparison',
+          ),
+          isNotEmpty,
+          reason: 'opening and adding a real value in one step stays breaking',
+        );
+      }
+    },
+  );
+
+  test(
+    'strict-to-open with only unknown is compatible with either baseline',
+    () {
+      for (final baseline in <Map<String, dynamic>?>[
+        null,
         _contract(open: false),
-        _contract(open: true),
-        removalBaseline: _contract(open: false),
-        comparison: 'store comparison',
-      ),
-      isEmpty,
-    );
-    expect(
-      compareContracts(
-        _contract(open: false),
-        _contract(open: true),
-        removalBaseline: null,
-        comparison: 'Git comparison',
-      ),
-      isNotEmpty,
-    );
-  });
+      ]) {
+        expect(
+          compareContracts(
+            _contract(open: false),
+            _contract(open: true),
+            removalBaseline: baseline,
+            comparison: baseline == null
+                ? 'Git comparison'
+                : 'store comparison',
+          ),
+          isEmpty,
+        );
+      }
+    },
+  );
 }
 
 Map<String, dynamic> _contract({

@@ -669,7 +669,6 @@ List<String> compareContracts(
           .where((value) => removalMarks.contains('$path.$value'))
           .toSet();
       final openedForMigration =
-          removalBaseline != null &&
           a['open'] == false &&
           b['open'] == true &&
           next.difference(previous).every((value) => value == 'unknown');

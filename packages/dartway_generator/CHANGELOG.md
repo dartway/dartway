@@ -2,6 +2,8 @@
 
 ## 0.26.0-dev.1
 
+### Breaking changes
+
 - Record open enums and versioned deprecations in project contract descriptors.
   Server-sent enums must be open; marked fields must survive absence. The
   both trusted-revision comparisons allow a removal only when its mark is in

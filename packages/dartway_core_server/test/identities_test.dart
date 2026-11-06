@@ -736,7 +736,9 @@ void main() {
       },
     );
 
-    for (final kind in DwIdentifierKind.values) {
+    for (final kind in DwIdentifierKind.values.where(
+      (kind) => kind != DwIdentifierKind.unknown,
+    )) {
       test(
         'occupied ${kind.name} refuses all fields before callback, without ghost account',
         () async {

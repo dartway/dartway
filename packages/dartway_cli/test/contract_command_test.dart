@@ -12,11 +12,12 @@ void main() {
     () async {
       final root = Directory.systemTemp.createTempSync('dw_contract_baseline_');
       addTearDown(() => root.deleteSync(recursive: true));
+      final project = Directory(p.join(root.path, 'projects', 'acme'));
       final shared = Directory(
-        p.join(root.path, 'acme_shared', 'lib', 'generated'),
+        p.join(project.path, 'acme_shared', 'lib', 'generated'),
       )..createSync(recursive: true);
       File(
-        p.join(root.path, 'acme_shared', 'pubspec.yaml'),
+        p.join(project.path, 'acme_shared', 'pubspec.yaml'),
       ).writeAsStringSync('name: acme_shared\nversion: 0.4.2\n');
       final descriptor = {
         'format': 2,
@@ -41,7 +42,7 @@ void main() {
       ], workingDirectory: root.path);
       final previous = Directory.current;
       try {
-        Directory.current = root;
+        Directory.current = Directory(p.join(project.path, 'acme_shared'));
         final runner = CommandRunner<int>('dartway', 'test')
           ..addCommand(ContractCommand());
         expect(await runner.run(['contract', 'baseline']), 0);
@@ -51,7 +52,7 @@ void main() {
       expect(
         jsonDecode(
           File(
-            p.join(root.path, 'acme_shared', 'contract_baseline.json'),
+            p.join(project.path, 'acme_shared', 'contract_baseline.json'),
           ).readAsStringSync(),
         ),
         containsPair('baselineCommit', isNotEmpty),
