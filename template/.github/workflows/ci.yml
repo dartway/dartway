@@ -79,7 +79,7 @@ jobs:
             base="$(git merge-base HEAD "origin/$DEFAULT_BRANCH")"
           fi
           echo "CONTRACT_BASE=$base" >> "$GITHUB_ENV"
-          if [ "$GITHUB_REF_NAME" = release ]; then
+          if [ "$GITHUB_REF_NAME" = release ] || [ "${{ github.base_ref }}" = release ]; then
             echo "CONTRACT_RELEASE_CHECK=--release" >> "$GITHUB_ENV"
           fi
           echo "DW_DATABASE_PORT=$DB_PORT" >> "$GITHUB_ENV"

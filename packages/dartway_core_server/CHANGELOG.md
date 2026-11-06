@@ -2,6 +2,9 @@
 
 ## 0.26.0-dev.1
 
+- Refuse the forward-compatible `DwIdentifierKind.unknown` on every identifier
+  input path before project normalization (#716).
+
 - Keep counting calls, errors and exact maximum response time when a rewound
   clock revisits a closed metrics bucket, without changing its finalized
   percentiles or throwing from the call (#713).

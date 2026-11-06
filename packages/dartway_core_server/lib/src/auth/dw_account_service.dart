@@ -148,6 +148,9 @@ final class DwAccountService {
     String fragment, {
     Set<DwIdentifierKind>? kinds,
   }) async {
+    if (kinds?.contains(DwIdentifierKind.unknown) ?? false) {
+      throw ArgumentError.value(kinds, 'kinds', 'must not contain unknown');
+    }
     if (fragment.isEmpty) {
       throw ArgumentError.value(fragment, 'fragment', 'must not be empty');
     }
@@ -714,11 +717,13 @@ final class DwAccountService {
   }
 
   String _normalize(DwIdentifierKind kind, String raw) =>
-      _auth.normalize(kind, raw) ??
+      (kind == DwIdentifierKind.unknown ? null : _auth.normalize(kind, raw)) ??
       (throw ArgumentError.value(
-        raw,
-        'rawIdentifier',
-        'not a valid ${kind.name} identifier for DwAuthConfig.normalize',
+        kind == DwIdentifierKind.unknown ? kind : raw,
+        kind == DwIdentifierKind.unknown ? 'kind' : 'rawIdentifier',
+        kind == DwIdentifierKind.unknown
+            ? 'unknown is not an input identifier kind'
+            : 'not a valid ${kind.name} identifier for DwAuthConfig.normalize',
       ));
 }
 

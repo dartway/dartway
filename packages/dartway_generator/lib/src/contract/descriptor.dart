@@ -504,7 +504,7 @@ void validateContract(Object? descriptor) {
         if ((f['type'] as Map)['nullable'] != true &&
             !f.containsKey('default')) {
           invalid(
-            '${entry.key}.${fieldEntry.key}: deprecated field requires a nullable type or a default so its codec can decode a payload without the field',
+            '${entry.key}.${fieldEntry.key}: deprecated field requires a default so its codec can decode a payload without the field',
           );
         }
       }

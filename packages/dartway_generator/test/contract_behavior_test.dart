@@ -11,6 +11,103 @@ import 'project_contract_test.dart' show git, generatorCli, itemSource;
 import 'support/temp_project.dart';
 
 void main() {
+  test('strict enums are gated only where the server can send them', () async {
+    final project = TempProject.create(['app_shared']);
+    project.writeFile('app_shared/lib/src/item.dart', r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+enum DataState { ready }
+enum ResultState { ready }
+enum InputState { ready }
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, required this.state});
+  @override final int id;
+  final DataState state;
+}
+final class ResultRecord extends DwDataObject with _$ResultRecord {
+  const ResultRecord({required this.id, required this.state});
+  @override final int id;
+  final ResultState state;
+}
+final class ReadState extends DwActionCommand<ResultRecord> with _$ReadState {
+  const ReadState();
+}
+final class WriteState extends DwActionCommand<void> with _$WriteState {
+  const WriteState({required this.state});
+  final InputState state;
+}
+''');
+    final report = await DwCodeGenerator.run(project.root);
+    final strict = report.diagnostics
+        .where((diagnostic) => diagnostic.code == 'strictWireEnum')
+        .toList();
+    expect(strict, hasLength(2));
+    expect(
+      strict.map((diagnostic) => diagnostic.message),
+      containsAll([contains('DataState'), contains('ResultState')]),
+    );
+  });
+
+  test('enum-value deprecations reach baseline and release gates', () async {
+    const marked = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+enum ItemState with DwOpenEnum {
+  unknown,
+  ready,
+  @DwContractDeprecation(since: '0.1.0') old,
+}
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, required this.state});
+  @override final int id;
+  final ItemState state;
+}
+''';
+    final project = TempProject.create(['app_shared']);
+    project.writeFile('app_shared/lib/src/item.dart', marked);
+    await project.generateClean();
+    final descriptor =
+        jsonDecode(
+              project.readFile('app_shared/lib/generated/dw_contract.json'),
+            )
+            as Map;
+    expect(
+      descriptor['objects']['ItemRecord']['fields']['state']['type']['deprecatedValues'],
+      {'old': '0.1.0'},
+    );
+    project.writeFile(
+      'app_shared/contract_baseline.json',
+      jsonEncode(descriptor),
+    );
+    final base = baseline(project);
+
+    var report = await DwCodeGenerator.run(
+      project.root,
+      check: true,
+      contractBase: base,
+      verifyContract: true,
+      releaseCheck: true,
+    );
+    expect(
+      report.diagnostics.map((diagnostic) => diagnostic.message).join('\n'),
+      contains('ItemRecord.state.old'),
+    );
+
+    project.writeFile(
+      'app_shared/lib/src/item.dart',
+      marked.replaceFirst(
+        "  @DwContractDeprecation(since: '0.1.0') old,\n",
+        '',
+      ),
+    );
+    report = await DwCodeGenerator.run(
+      project.root,
+      contractBase: base,
+      verifyContract: true,
+    );
+    expect(report.diagnostics, isEmpty);
+  });
+
   test(
     'real contract gates trust committed store baseline and enforce removals and stale marks',
     () async {

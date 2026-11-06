@@ -675,16 +675,12 @@ final class _Run {
           entry.$2.kind != DtoKind.command) {
         continue;
       }
-      final resultKind = [entry.$1.thisType, ...entry.$1.allSupertypes]
+      final resultKind = entry.$1.allSupertypes
           .where(
             (type) =>
-                type.element is ClassElement &&
-                DwFrameworkTypes.isFrom(
-                  type.element,
-                  DwFrameworkTypes.corePackage,
-                ),
+                DwFrameworkTypes.isCoreClass(type.element, 'DwActionCommand') ||
+                DwFrameworkTypes.isCoreClass(type.element, 'DwRequest'),
           )
-          .where((type) => type.typeArguments.isNotEmpty)
           .firstOrNull;
       if (resultKind == null) continue;
       final reader = WireTypeReader(LibraryNames(entry.$1.library));

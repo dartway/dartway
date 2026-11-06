@@ -21,6 +21,11 @@ a store baseline exists, so it does not raise the contract breaking line: a
 current server never stores or sends `unknown`, and an installed strict client
 therefore cannot meet it.
 
+This includes the framework's `DwIdentifierKind`: exhaustive switches must add
+`DwIdentifierKind.unknown`. A project's `normalize` callback must return `null`
+for that value; the framework refuses `unknown` as client input before calling
+the callback.
+
 After that app build is live in both stores, run:
 
 ```bash

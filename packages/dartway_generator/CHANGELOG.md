@@ -6,8 +6,9 @@
 
 - Record open enums and versioned deprecations in project contract descriptors.
   Server-sent enums must be open; marked fields must survive absence. The
-  both trusted-revision comparisons allow a removal only when its mark is in
-  the store baseline (#716).
+  two trusted-revision comparisons allow a removal only when its mark is in
+  the store baseline; marked fields require a default, and strict enums in call
+  results are gated too (#716).
 
 ## 0.25.0
 
