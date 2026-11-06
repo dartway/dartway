@@ -28,12 +28,14 @@ An installed build keeps calling with the contract it was built with, for weeks.
 With a `releaseBranch`, the next two paragraphs are the release's: a task keeps `version:` and its PR
 says which kind of change it is.
 
-Prefer the additive change. When a breaking one is unavoidable, **raise the breaking line of
-`__SHARED_PKG__/pubspec.yaml`'s `version:`** in the same change — the minor below 1.0, the major after —
-and regenerate: an app of an older line is then answered `426` and shows its update screen instead of
-failing call by call. A new data object must raise the shared version above the trusted base; a patch
-is enough. Other additive changes may keep the version. Nothing is set in an environment at deploy time: the minimum ships with the code. The commit and the PR say which kind of change it is,
-and a breaking one names the version it raises to.
+Prefer the additive change. Retire a field, enum value or call over two store releases: first mark it
+with `@DwContractDeprecation`, then remove it only after the marked build reaches both stores and its
+baseline is updated. **Raising the breaking line of `__SHARED_PKG__/pubspec.yaml`'s `version:` is the
+exception** for an unavoidable incompatible change — the minor below 1.0, the major after — and sends
+apps of the older line to the update screen with `426`. A new data object must raise the shared version
+above the trusted base; a patch is enough. Other additive changes may keep the version. Nothing is set
+in an environment at deploy time: the minimum ships with the code. The commit and the PR say which
+kind of change it is, and an exceptional breaking-line raise names the version it raises to.
 
 **Open enums** — every enum reachable from a data-object field or request/command result uses
 `with DwOpenEnum` and a value `unknown`, including statuses and roles. Handle `unknown` explicitly in

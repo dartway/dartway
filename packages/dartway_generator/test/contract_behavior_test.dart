@@ -211,6 +211,38 @@ final class ItemRecord extends DwDataObject with _$ItemRecord {
   );
 
   test(
+    'ordinary generation warns only for an unreadable store baseline',
+    () async {
+      final withoutBaseline = TempProject.create(['app_shared']);
+      withoutBaseline.writeFile('app_shared/lib/src/item.dart', itemSource());
+      await withoutBaseline.generateClean();
+      baseline(withoutBaseline);
+
+      var report = await DwCodeGenerator.run(withoutBaseline.root);
+      expect(report.diagnostics, isEmpty);
+
+      final unreadableBaseline = TempProject.create(['app_shared']);
+      unreadableBaseline.writeFile(
+        'app_shared/lib/src/item.dart',
+        itemSource(),
+      );
+      await unreadableBaseline.generateClean();
+      unreadableBaseline.writeFile(
+        'app_shared/contract_baseline.json',
+        '{not valid json',
+      );
+      baseline(unreadableBaseline);
+
+      report = await DwCodeGenerator.run(unreadableBaseline.root);
+      final warnings = report.diagnostics
+          .where((diagnostic) => diagnostic.isWarning)
+          .toList();
+      expect(warnings, hasLength(1));
+      expect(warnings.single.message, contains('Store comparison skipped'));
+    },
+  );
+
+  test(
     'new data objects retain their introduction version without raising the line',
     () async {
       final project = TempProject.create(['app_shared']);

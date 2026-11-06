@@ -22,6 +22,7 @@ dart pub global activate dartway_cli
 | `dartway setup-ai` | Installs or updates the AI toolkit in a project's `.claude/` |
 | `dartway update` | Carries a project onto a newer framework version, migration notes and all |
 | `dartway generate` | Runs the project's generator: DTO codecs, the protocol registry, row tables and schema |
+| `dartway contract baseline` | Records the contract build that is live in both stores |
 | `dartway format` | `dart format` on the Dart the project pins, over the files the branch changed |
 | `dartway check` | The conventions, enforced: layout, generated code, migrations |
 | `dartway dev` | The web app and the server on one origin, shaped like the deployment |

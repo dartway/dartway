@@ -10,7 +10,9 @@ Run as `dartway generate` (add `--check --contract-base <trusted-SHA>` to verify
 
 The compatibility gate compares source-derived codec models with Git objects at a fixed committed
 baseline, reusing the shared package breaking line. Incompatible or unverified results fail;
-regeneration cannot silently approve a breaking contract. Without a committed descriptor,
+normally a member is marked with `@DwContractDeprecation` and retired over two store releases.
+Raising the breaking line is the exception and sends old builds to the update screen. Regeneration
+cannot silently approve a breaking contract. Without a committed descriptor,
 [first descriptor adoption](../../docs/2-core/wire-and-versions.md#first-descriptor-adoption)
 can establish the baseline in the pin-move PR. Changed source blocks: land the pin move
 and descriptor first, then edit the contract in a following PR. No project setup scripts,

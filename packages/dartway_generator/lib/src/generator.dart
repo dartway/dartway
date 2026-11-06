@@ -206,9 +206,8 @@ abstract final class DwCodeGenerator {
         );
         return finish();
       }
-      stdout.writeln(
-        'Store comparison skipped: no trusted Git base could be resolved.',
-      );
+      // Ordinary non-verifying generation remains silent when it cannot
+      // resolve a trusted base and therefore cannot find a store baseline.
     }
     try {
       if (sharedPackage != null && baselineSha != null) {
@@ -228,8 +227,12 @@ abstract final class DwCodeGenerator {
         );
         return finish();
       }
-      stdout.writeln(
-        'Store comparison skipped: contract_baseline.json could not be read from revision $baselineSha: $error.',
+      diagnostics.add(
+        DwGenerationDiagnostic(
+          'Store comparison skipped: contract_baseline.json could not be read from revision $baselineSha: $error.',
+          code: 'projectContractVersion',
+          isWarning: true,
+        ),
       );
     }
 
@@ -373,7 +376,7 @@ abstract final class DwCodeGenerator {
                 DwGenerationDiagnostic(
                   changes.every((c) => c.startsWith('raise `version:`'))
                       ? 'project contract incompatible: ${changes.join('; ')}'
-                      : 'project contract incompatible: ${changes.join('; ')}. Baseline $baselineSha has ${previousVersion.text} (line ${previousVersion.line}); current ${nextVersion.text} keeps that line. Raise the shared package breaking line and regenerate; a patch/prerelease bump is insufficient.',
+                      : 'project contract incompatible: ${changes.join('; ')}. Baseline $baselineSha has ${previousVersion.text} (line ${previousVersion.line}); current ${nextVersion.text} keeps that line. First mark the field with @DwContractDeprecation and retire it over two store releases. Raising the shared package breaking line is the exception: it sends old builds to the update screen; a patch/prerelease bump is insufficient.',
                   code: 'projectContractVersion',
                 ),
               );

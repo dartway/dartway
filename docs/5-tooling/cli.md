@@ -22,7 +22,7 @@ dartway generate      # the project's own CLI, whatever version is on PATH
 
 A globally activated `dartway` is a second copy with a life of its own, and the two drift — a global
 CLI from before a release has no `generate` at all, while the project it is standing in has no
-other way to write `*.dw.dart`. So `generate`, `check`, `test`, `deploy`, `dev`, `stats` and
+other way to write `*.dw.dart`. So `generate`, `contract`, `check`, `test`, `deploy`, `dev`, `stats` and
 `format`, started by a `dartway` of another version, are not run by it: it runs the pinned one —
 from the directory it was typed in, so a relative path means the same, on the Dart of the Flutter
 `.fvmrc` pins — with the same arguments, stdio and exit code (a child ended by a signal is 128 plus
@@ -47,7 +47,7 @@ cannot drift from the code. This page does not restate every flag. It names the 
 before relying on them.
 
 The commands, as `packages/dartway_cli/bin/dartway.dart` registers them: `quickstart`, `doctor`,
-`create`, `setup-ai`, `update`, `generate`, `format`, `sync`, `check`, `dev`, `deploy`, `secret`,
+`create`, `setup-ai`, `update`, `generate`, `contract`, `format`, `sync`, `check`, `dev`, `deploy`, `secret`,
 `stats`, `test`. A
 usage error
 exits `64`; a refusal the command explains exits `1`.
