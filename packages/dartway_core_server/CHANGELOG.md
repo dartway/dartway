@@ -4,6 +4,9 @@
 
 - Refuse the forward-compatible `DwIdentifierKind.unknown` on every identifier
   input path before project normalization (#716).
+- Add optional per-peer `DwHttpRoute` rate limits, enforced before
+  authentication and body reading with the same trusted-proxy resolution and
+  429 refusal as registered-call quotas (#719).
 
 - Keep counting calls, errors and exact maximum response time when a rewound
   clock revisits a closed metrics bucket, without changing its finalized

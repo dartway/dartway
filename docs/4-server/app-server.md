@@ -216,6 +216,25 @@ and equivalent IPv6 spellings share a key. Broad trust such as `0.0.0.0/0` or
 API must not expose a public port that bypasses it. Enabling quotas with
 `behindProxy: true` and no trusted networks fails before migrations or listening.
 
+The same quota can protect an individual external route without changing its
+URL into a registered call:
+
+```dart
+DwHttpRoute.post(
+  '/oauth/register',
+  handleRegistration,
+  rateLimit: const DwCallRateLimit(requests: 10, burst: 5),
+)
+```
+
+`rateLimit` is optional on `DwHttpRoute.get`, `.post` and `.any`. Each declared
+route owns its quota. It is charged after the path and method match but before
+authentication, body reading or the handler. An over-quota request receives
+the same `tooManyRequests` refusal JSON, HTTP 429 and `Retry-After` as a call,
+and the handler does not run. Route and call quotas use the same trusted-proxy
+resolution described above; a limited route behind a proxy likewise requires
+`trustedProxyNetworks` at startup.
+
 The entry point wires the three environment fields shown above. Native Kamal
 sets `DW_HTTP_BEHIND_PROXY=true`; `trusted_proxy_networks` in public deployment
 configuration becomes `DW_TRUSTED_PROXY_NETWORKS`. Use the actual Docker network

@@ -611,7 +611,7 @@ final class DwAppServer {
   /// Problems with the declaration, empty when it is consistent.
   @internal
   List<String> validate() {
-    final problems = DwPeerRateLimits.problems(settings);
+    final problems = DwPeerRateLimits.problems(settings, routes);
     if (settings.deploymentVersion case final version?
         when !RegExp(r'^[0-9a-f]{40}$').hasMatch(version)) {
       problems.add('deploymentVersion must be an immutable full commit SHA');

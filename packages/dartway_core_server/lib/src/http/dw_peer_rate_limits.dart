@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:meta/meta.dart';
 
 import '../server/dw_server_settings.dart';
+import '../routes/dw_http_route.dart';
 import 'dw_call_rate_limit.dart';
 
 /// HTTP-only state; the call context never receives forwarding headers.
@@ -19,16 +20,27 @@ final class DwPeerRateLimits {
 
   final List<_ProxyNetwork> _networks;
   final Map<Type, _PeerQuota> _quotas;
+  final Map<DwHttpRoute, _PeerQuota> _routeQuotas = {};
 
-  static List<String> problems(DwServerSettings settings) {
+  static List<String> problems(
+    DwServerSettings settings, [
+    List<DwHttpRoute> routes = const [],
+  ]) {
+    final hasPeerQuotas =
+        settings.callRateLimits.isNotEmpty ||
+        routes.any((route) => route.rateLimit != null);
     final problems = <String>[
       if (settings.behindProxy &&
-          settings.callRateLimits.isNotEmpty &&
+          hasPeerQuotas &&
           settings.trustedProxyNetworks.isEmpty)
         'peer quotas behind a proxy require trustedProxyNetworks',
       for (final entry in settings.callRateLimits.entries)
         for (final problem in entry.value.problems)
           'call rate limit for ${entry.key}: $problem',
+      for (final route in routes)
+        if (route.rateLimit case final limit?)
+          for (final problem in limit.problems)
+            'rate limit for route $route: $problem',
     ];
     for (final network in settings.trustedProxyNetworks) {
       try {
@@ -46,6 +58,15 @@ final class DwPeerRateLimits {
   Duration? check(Type callType, HttpRequest request, DateTime now) {
     final quota = _quotas[callType];
     if (quota == null) return null;
+    final peer = peerKey(request);
+    if (peer == null) return const Duration(seconds: 1);
+    return quota.charge(peer, now);
+  }
+
+  Duration? checkRoute(DwHttpRoute route, HttpRequest request, DateTime now) {
+    final limit = route.rateLimit;
+    if (limit == null) return null;
+    final quota = _routeQuotas.putIfAbsent(route, () => _PeerQuota(limit));
     final peer = peerKey(request);
     if (peer == null) return const Duration(seconds: 1);
     return quota.charge(peer, now);

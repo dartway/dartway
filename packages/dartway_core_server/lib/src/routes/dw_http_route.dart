@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import '../context/dw_call_context.dart';
+import '../http/dw_call_rate_limit.dart';
 import '../http/dw_http_request.dart';
 import '../http/dw_http_response.dart';
 
@@ -9,10 +10,7 @@ import '../http/dw_http_response.dart';
 /// ([DwRouteAuth]), and without them otherwise. Publications and jobs are
 /// allowed; they are delivered when the route answers.
 typedef DwRouteHandler =
-    FutureOr<DwHttpResponse> Function(
-      DwCallContext ctx,
-      DwHttpRequest request,
-    );
+    FutureOr<DwHttpResponse> Function(DwCallContext ctx, DwHttpRequest request);
 
 /// An external HTTP door: a webhook, a payment callback, a file download.
 /// The app itself calls `POST /dw/<name>`; routes exist for callers that
@@ -28,26 +26,35 @@ typedef DwRouteHandler =
 /// `DwNotAuthenticatedException` with 401, and anything else with 500 and
 /// the incident id only — and an alert.
 final class DwHttpRoute {
-  const DwHttpRoute._(this.method, this.path, this.handle, this.auth);
+  const DwHttpRoute._(
+    this.method,
+    this.path,
+    this.handle,
+    this.auth,
+    this.rateLimit,
+  );
 
   DwHttpRoute.get(
     String path,
     DwRouteHandler handle, {
     DwRouteAuth auth = DwRouteAuth.none,
-  }) : this._('GET', path, handle, auth);
+    DwCallRateLimit? rateLimit,
+  }) : this._('GET', path, handle, auth, rateLimit);
 
   DwHttpRoute.post(
     String path,
     DwRouteHandler handle, {
     DwRouteAuth auth = DwRouteAuth.none,
-  }) : this._('POST', path, handle, auth);
+    DwCallRateLimit? rateLimit,
+  }) : this._('POST', path, handle, auth, rateLimit);
 
   /// Every method; a route of the same path with a specific method wins.
   DwHttpRoute.any(
     String path,
     DwRouteHandler handle, {
     DwRouteAuth auth = DwRouteAuth.none,
-  }) : this._(null, path, handle, auth);
+    DwCallRateLimit? rateLimit,
+  }) : this._(null, path, handle, auth, rateLimit);
 
   /// Upper case, or `null` for [DwHttpRoute.any].
   final String? method;
@@ -56,6 +63,9 @@ final class DwHttpRoute {
 
   /// Whether the route reads `Authorization: Bearer <token>` as a call does.
   final DwRouteAuth auth;
+
+  /// The per-peer quota for this route, or `null` when it is unlimited.
+  final DwCallRateLimit? rateLimit;
 
   @override
   String toString() => '${method ?? 'ANY'} $path';
