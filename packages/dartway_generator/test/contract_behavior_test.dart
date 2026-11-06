@@ -235,26 +235,24 @@ mixin _$ManualCodec on DwDataObject {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  test(
-    'native custom enum name encoding cannot silently pass the gate',
-    () async {
-      for (final custom in [
-        "extension ItemStateWireName on ItemState { String get name => 'renamed'; }",
-        "enum ItemState { ready; String get name => 'renamed'; }",
-      ]) {
-        final project = TempProject.create(['app_shared']);
-        const source = r'''
+  test('native custom enum name encoding cannot silently pass the gate', () async {
+    for (final custom in [
+      "extension ItemStateWireName on ItemState { String get name => 'renamed'; }",
+      "enum ItemState with DwOpenEnum { ready, unknown; String get name => 'renamed'; }",
+    ]) {
+      final project = TempProject.create(['app_shared']);
+      const source = r'''
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 part 'item.dw.dart';
-enum ItemState { ready }
+enum ItemState with DwOpenEnum { ready, unknown }
 final class ItemRecord extends DwDataObject with _$ItemRecord {
   const ItemRecord({required this.id, required this.state});
   @override final int id;
   final ItemState state;
 }
 ''';
-        project.writeFile('app_shared/lib/src/item.dart', source);
-        project.writeFile('app_shared/bin/enum_probe.dart', r'''
+      project.writeFile('app_shared/lib/src/item.dart', source);
+      project.writeFile('app_shared/bin/enum_probe.dart', r'''
 import '../lib/src/item.dart';
 void main() {
   final json = const ItemRecord(id: 1, state: ItemState.ready).toJson();
@@ -263,40 +261,41 @@ void main() {
   catch (e) { print(e.runtimeType); }
 }
 ''');
-        await project.generateClean();
-        final base = baseline(project);
-        final before = await project.runScript(
-          'app_shared',
-          'bin/enum_probe.dart',
-        );
-        expect(before.exitCode, 0, reason: output(before));
-        expect(before.stdout, 'ready\ndecoded\n');
-        project.writeFile(
-          'app_shared/lib/src/item.dart',
-          custom.startsWith('enum ')
-              ? source.replaceFirst('enum ItemState { ready }', custom)
-              : '$source\n$custom\n',
-        );
-        await project.generateClean();
-        final after = await project.runScript(
-          'app_shared',
-          'bin/enum_probe.dart',
-        );
-        expect(after.exitCode, 0, reason: output(after));
-        expect(after.stdout, 'renamed\nDwUnknownEnumValue\n');
-        final snapshot = bytes(project);
-        final result = await generatorCli(project, [
-          '--check',
-          '--contract-base',
-          base,
-        ]);
-        expect(result.exitCode, 3, reason: output(result));
-        expect(output(result), contains('custom enum name encoding'));
-        expect(bytes(project), snapshot);
-      }
-    },
-    timeout: const Timeout(Duration(minutes: 3)),
-  );
+      await project.generateClean();
+      final base = baseline(project);
+      final before = await project.runScript(
+        'app_shared',
+        'bin/enum_probe.dart',
+      );
+      expect(before.exitCode, 0, reason: output(before));
+      expect(before.stdout, 'ready\ndecoded\n');
+      project.writeFile(
+        'app_shared/lib/src/item.dart',
+        custom.startsWith('enum ')
+            ? source.replaceFirst(
+                'enum ItemState with DwOpenEnum { ready, unknown }',
+                custom,
+              )
+            : '$source\n$custom\n',
+      );
+      await project.generateClean();
+      final after = await project.runScript(
+        'app_shared',
+        'bin/enum_probe.dart',
+      );
+      expect(after.exitCode, 0, reason: output(after));
+      expect(after.stdout, 'renamed\ndecoded\n');
+      final snapshot = bytes(project);
+      final result = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        base,
+      ]);
+      expect(result.exitCode, 3, reason: output(result));
+      expect(output(result), contains('custom enum name encoding'));
+      expect(bytes(project), snapshot);
+    }
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
   for (final location in [
     'external',
@@ -321,7 +320,10 @@ void main() {
         );
         final enumFile = File(p.join(external.path, 'lib/state.dart'));
         enumFile.parent.createSync();
-        enumFile.writeAsStringSync('enum ItemState { ready }\n');
+        enumFile.writeAsStringSync('''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ItemState with DwOpenEnum { ready, unknown }
+''');
         final configFile = File(
           project.path('app_shared/.dart_tool/package_config.json'),
         );
@@ -376,7 +378,7 @@ void main() {
           'bin/enum_probe.dart',
         );
         expect(before.exitCode, 0, reason: output(before));
-        expect(before.stdout, 'DwUnknownEnumValue\n');
+        expect(before.stdout, 'decoded\n');
         File(
           project.path('app_shared/lib/generated/dw_contract.json'),
         ).deleteSync();
@@ -393,9 +395,10 @@ void main() {
             p.join(replacement.path, 'lib/state.dart'),
           );
           replacementEnum.parent.createSync();
-          replacementEnum.writeAsStringSync(
-            'enum ItemState { ready, archived }\n',
-          );
+          replacementEnum.writeAsStringSync('''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ItemState with DwOpenEnum { ready, archived, unknown }
+''');
           for (final entry in config['packages'] as List) {
             if ((entry as Map)['name'] == 'external_enum') {
               entry['rootUri'] = replacement.uri.toString();
@@ -422,7 +425,10 @@ packages:
           // The old in-repo files stay present and unchanged: only the resolved
           // dependency moved, so comparing the head lock alone would miss it.
         } else {
-          enumFile.writeAsStringSync('enum ItemState { ready, archived }\n');
+          enumFile.writeAsStringSync('''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ItemState with DwOpenEnum { ready, archived, unknown }
+''');
         }
         await project.generateClean();
         final after = await project.runScript(
@@ -979,21 +985,21 @@ void main() {
   );
 
   test(
-    'actual missing/default/null codecs expose changed defaults and strict enum additions',
+    'actual missing/default/null codecs expose changed defaults; old open clients decode additions as unknown',
     () async {
       final project = TempProject.create(['app_shared']);
       project.copyFixture('types');
       await project.generateClean();
-      final base = baseline(project);
       project.writeFile('app_shared/bin/default_probe.dart', r'''
 import '../lib/src/defaults.dart';
 import '../lib/src/catalog.dart';
 import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum OldColor with DwOpenEnum { red, green, blue, unknown }
 void main() {
   final a = $SettingsFromJson({'id':1,'createdAt':0});
   final b = $SettingsFromJson({'id':1,'createdAt':0,'label':null,'count':null});
   print('${a.count}:${a.label}:${b.count}:${b.label}:${a.toJson().containsKey("count")}');
-  try { DwJsonCodec.decodeEnum('archived', Color.values); print('enum:accepted'); } on DwUnknownEnumValue { print('enum:rejected'); }
+  print('enum:${DwJsonCodec.decodeEnum('archived', OldColor.values).name}');
 }
 ''');
       expect(
@@ -1001,8 +1007,16 @@ void main() {
           'app_shared',
           'bin/default_probe.dart',
         )).stdout,
-        '3:none:3:null:false\nenum:rejected\n',
+        '3:none:3:null:false\nenum:unknown\n',
       );
+      final descriptor = 'app_shared/lib/generated/dw_contract.json';
+      project.writeFile(
+        descriptor,
+        project
+            .readFile(descriptor)
+            .replaceFirst('"open": true', '"open": false'),
+      );
+      final strictBase = baseline(project);
       project.writeFile(
         'app_shared/lib/src/defaults.dart',
         project
@@ -1021,12 +1035,12 @@ void main() {
           'app_shared',
           'bin/default_probe.dart',
         )).stdout,
-        '4:none:4:null:false\nenum:accepted\n',
+        '4:none:4:null:false\nenum:unknown\n',
       );
       final result = await generatorCli(project, [
         '--check',
         '--contract-base',
-        base,
+        strictBase,
       ]);
       expect(result.exitCode, 3, reason: output(result));
       expect(
@@ -1131,7 +1145,7 @@ void main() {
       expect(renamed.exitCode, 3, reason: output(renamed));
       expect(
         output(renamed),
-        contains('RemoveItem: wire name removed/renamed'),
+        allOf(contains('RemoveItem'), contains('wire name removed/renamed')),
       );
       project.writeFile('app_shared/lib/src/catalog.dart', catalog);
       project.writeFile('app_shared/lib/src/item.dart', itemSource());
@@ -1398,10 +1412,10 @@ packages:
         final project = TempProject.create(['app_shared']);
         project.writeFile('app_shared/lib/src/item.dart', itemSource());
         project.writeFile('app_shared/README.md', 'contract documentation\n');
-        project.writeFile(
-          'app_shared/lib/generated/manual.dart',
-          'enum ManualState { ready }\n',
-        );
+        project.writeFile('app_shared/lib/generated/manual.dart', '''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ManualState with DwOpenEnum { ready, unknown }
+''');
         project.writeFile(
           'app_shared/test/manual.dw.dart',
           '// hand-written fixture\n',
@@ -1446,10 +1460,10 @@ final class ItemRecord extends DwDataObject with _$ItemRecord {
             binary.writeAsBytesSync([0, 254, 13, 10]);
           case 'generated-library':
             changed = 'app_shared/lib/generated/manual.dart';
-            project.writeFile(
-              changed,
-              'enum ManualState { ready, archived }\n',
-            );
+            project.writeFile(changed, '''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ManualState with DwOpenEnum { ready, archived, unknown }
+''');
           case 'manual-part':
             changed = 'app_shared/test/manual.dw.dart';
             // A filename, or a header forged at head, cannot turn source into output.
