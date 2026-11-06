@@ -259,10 +259,11 @@ jobs:
       context.resolve(
         r"${{ github.event.pull_request.base.sha }} "
         r"${{ github.event.repository.default_branch }} "
+        r"<${{ github.base_ref }}> "
         r"${{ job.services.postgres.ports['5432'] }} "
         r'${{ steps.fvm.outputs.version }}',
       ),
-      'abc123 main 49153 3.47.6',
+      'abc123 main <> 49153 3.47.6',
     );
     expect(
       () => context.resolve(r'${{ steps.fvm.outputs.channel }}'),

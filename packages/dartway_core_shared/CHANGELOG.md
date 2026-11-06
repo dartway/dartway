@@ -2,8 +2,15 @@
 
 ## 0.26.0-dev.1
 
-- Nothing changed here; the family moves in lockstep with stable `readLink`
-  links in `dartway_core_server` (#710).
+### Breaking changes
+
+- Make `DwIdentifierKind` open with `unknown`, as required for enums sent in
+  data objects and call results (#716).
+
+### Changes
+
+- Add `@DwContractDeprecation(since:)` for the extend-only project contract lifecycle
+  and store-baseline gate (#716).
 
 ## 0.25.0
 

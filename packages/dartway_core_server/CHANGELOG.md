@@ -2,6 +2,8 @@
 
 ## 0.26.0-dev.1
 
+- Refuse the forward-compatible `DwIdentifierKind.unknown` on every identifier
+  input path before project normalization (#716).
 - Add optional per-peer `DwHttpRoute` rate limits, enforced before
   authentication and body reading with the same trusted-proxy resolution and
   429 refusal as registered-call quotas (#719).

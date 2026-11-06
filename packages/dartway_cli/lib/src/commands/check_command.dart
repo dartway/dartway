@@ -46,6 +46,12 @@ class CheckCommand extends Command<int> {
         help:
             'Trusted committed Git baseline (default: merge-base with the configured project base branch).',
       )
+      ..addFlag(
+        'release',
+        negatable: false,
+        help:
+            'Release CI: require deprecations present in the store baseline to be removed.',
+      )
       ..addOption(
         'type',
         help:
@@ -231,6 +237,7 @@ class CheckCommand extends Command<int> {
       errorCount += DwGeneratedCodeInspector(
         serverPackageDir: layout?.serverPackageDir,
         contractBase: results.option('contract-base'),
+        release: results.flag('release'),
         filterType: filterType,
         filterSeverity: filterSeverity,
       ).run(tally: tally);

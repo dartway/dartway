@@ -41,6 +41,7 @@ class AuthStateModel {
   String get rawIdentifier => switch (kind) {
     DwIdentifierKind.phone => phoneRaw,
     DwIdentifierKind.email => emailRaw,
+    DwIdentifierKind.unknown => '',
   };
 
   /// [rawIdentifier] in the form the server stores it, or `null` while it is

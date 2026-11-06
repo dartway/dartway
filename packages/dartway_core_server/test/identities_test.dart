@@ -71,6 +71,47 @@ void main() {
         params: {'id': accountId},
       )).single.get<String>('identifier');
 
+  test('unknown identifier kinds are refused on every input path', () async {
+    final (signedIn, _) = await harness().signedIn('kind-guard@example.com');
+
+    for (final wireKind in ['unknown', 'fax']) {
+      final signIn = DwRequestCode.fromJson({
+        'kind': wireKind,
+        'identifier': 'not-normalized',
+      });
+      expect(signIn.kind, DwIdentifierKind.unknown);
+      expect(
+        (await harness().caller().call(signIn)).refusal,
+        DwCallRefusal(DwCoreRefusal.invalid, field: 'kind'),
+      );
+
+      final attach = DwRequestIdentifierCode.fromJson({
+        'kind': wireKind,
+        'identifier': 'not-normalized',
+      });
+      expect(
+        (await signedIn.call(attach)).refusal,
+        DwCallRefusal(DwCoreRefusal.invalid, field: 'kind'),
+      );
+    }
+
+    expect(
+      () => accounts().ensure(DwIdentifierKind.unknown, 'not-normalized'),
+      throwsArgumentError,
+    );
+    expect(
+      () => accounts().find(DwIdentifierKind.unknown, 'not-normalized'),
+      throwsArgumentError,
+    );
+    expect(
+      () => accounts().accountsMatching(
+        'anything',
+        kinds: {DwIdentifierKind.unknown},
+      ),
+      throwsArgumentError,
+    );
+  });
+
   List<String> values(List<DwIdentityInfo> identities) => [
     for (final identity in identities) '${identity.kindName}:${identity.value}',
   ];
@@ -736,7 +777,9 @@ void main() {
       },
     );
 
-    for (final kind in DwIdentifierKind.values) {
+    for (final kind in DwIdentifierKind.values.where(
+      (kind) => kind != DwIdentifierKind.unknown,
+    )) {
       test(
         'occupied ${kind.name} refuses all fields before callback, without ghost account',
         () async {

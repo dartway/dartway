@@ -50,6 +50,7 @@ abstract final class AuthIdentifier {
         final digits when digits.length >= 10 && digits.length <= 15 => digits,
         _ => null,
       },
+      DwIdentifierKind.unknown => null,
     };
   }
 

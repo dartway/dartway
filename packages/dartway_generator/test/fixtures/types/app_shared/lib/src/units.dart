@@ -2,7 +2,7 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 part 'units.dw.dart';
 
-enum Unit { kg, pcs }
+enum Unit with DwOpenEnum { kg, pcs, unknown }
 
 /// Imported by `catalog.dart` under a prefix.
 final class Dimensions extends DwDataObject with _$Dimensions {

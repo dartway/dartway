@@ -22,7 +22,7 @@ dartway generate      # the project's own CLI, whatever version is on PATH
 
 A globally activated `dartway` is a second copy with a life of its own, and the two drift — a global
 CLI from before a release has no `generate` at all, while the project it is standing in has no
-other way to write `*.dw.dart`. So `generate`, `check`, `test`, `deploy`, `dev`, `stats` and
+other way to write `*.dw.dart`. So `generate`, `contract`, `check`, `test`, `deploy`, `dev`, `stats` and
 `format`, started by a `dartway` of another version, are not run by it: it runs the pinned one —
 from the directory it was typed in, so a relative path means the same, on the Dart of the Flutter
 `.fvmrc` pins — with the same arguments, stdio and exit code (a child ended by a signal is 128 plus
@@ -47,7 +47,7 @@ cannot drift from the code. This page does not restate every flag. It names the 
 before relying on them.
 
 The commands, as `packages/dartway_cli/bin/dartway.dart` registers them: `quickstart`, `doctor`,
-`create`, `setup-ai`, `update`, `generate`, `format`, `sync`, `check`, `dev`, `deploy`, `secret`,
+`create`, `setup-ai`, `update`, `generate`, `contract`, `format`, `sync`, `check`, `dev`, `deploy`, `secret`,
 `stats`, `test`. A
 usage error
 exits `64`; a refusal the command explains exits `1`.
@@ -282,6 +282,8 @@ dartway generate            # write
 dartway generate --check --contract-base <trusted-SHA>  # read-only freshness and compatibility
 dartway generate -v         # list every file written or removed
 dartway generate --release  # the release: raise the contract version once
+dartway contract baseline --revision <sha|tag>  # commit the store build was built from
+dartway check --release     # release CI cleanup gate
 ```
 
 Runs `dartway_generator` over the project: DTO codecs (`*.dw.dart` parts) and the protocol registry
@@ -310,6 +312,16 @@ package `version:` — the next major (the next minor below 1.0) for an incompat
 minor (the next patch below 1.0) for a new data object — generates at it and runs `pub get` in every
 package. The release CI then checks with an explicit `--contract-base` against the release branch,
 strictly, as before.
+
+The store baseline is `<shared>/contract_baseline.json`, a validated committed copy of the generated contract,
+its contract version, and the commit the store build was built from. `dartway contract baseline --revision
+<sha|tag>` reads both the descriptor and shared pubspec from that Git object, even when the working tree has
+moved ahead. With `--contract-base`, the gate reads
+this file from that trusted Git revision, never from the pull request working tree. Projects without it retain the Git-baseline behavior; adopt it only after
+the current build is live in both stores. Server release CI uses `dartway check --release` so a
+deprecation already delivered by that baseline cannot survive for another release. A baseline committed since
+the previous release is visible to the release check only after that commit is merged: a green release pull
+request does not prove those marks are clean; the push run on `release` does.
 
 ## `dartway format` — the pinned Dart, on what the branch changed
 

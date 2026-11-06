@@ -91,10 +91,12 @@ __FINISH_CHECK__
 - Inspect a red against the intended behaviour and the base branch; for an intended change,
   apply the agent rules in `dartway-testing` §4.
 - `projectContractVersion`: incompatible or unverified is an error, never a skipped gate. Keep the
-  baseline SHA fixed after regeneration/feature commits; advance the shared breaking line for an
-  incompatible generated shape. A new data object requires a shared version above the base (a patch
-  is enough), with its introduction recorded by generation. Custom/domain/manual module behavior
-  still needs its own review.
+  baseline SHA fixed after regeneration/feature commits. Normally, mark a retiring field with
+  `@DwContractDeprecation` and remove it only after the marked build reaches both stores and the
+  baseline is updated — a two-release retirement. Advancing the shared breaking line is the
+  exception for an incompatible generated shape: it sends old builds to the update screen. A new
+  data object requires a shared version above the base (a patch is enough), with its introduction
+  recorded by generation. Custom/domain/manual module behavior still needs its own review.
 - `check`: read the features the task touched in its per-feature report, not only the counter;
   "migrations not checked" is not a pass.
 - `frameworkRefsDiverged` is fixed as its own change (`dartway-update`), not in this diff.

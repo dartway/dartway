@@ -1,13 +1,15 @@
 import '../protocol/dw_json_codec.dart';
+import '../protocol/dw_open_enum.dart';
 import '../protocol/dw_wire_protocol.dart';
 import '../result/dw_call_refusal.dart';
 import '../wire/dw_server_call.dart';
 import '../wire/dw_wire_object.dart';
 
 /// The kinds of identifier an account signs in with by one-time code.
-enum DwIdentifierKind {
+enum DwIdentifierKind with DwOpenEnum {
   phone,
-  email;
+  email,
+  unknown;
 
   /// The kind [identifier] is: an `@` makes it an e-mail, anything else a
   /// phone. It sorts, it does not validate — the project's

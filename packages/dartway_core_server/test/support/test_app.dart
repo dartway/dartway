@@ -269,6 +269,7 @@ final class TestApp {
         DwIdentifierKind.email => value.contains('@') ? value : null,
         DwIdentifierKind.phone =>
           RegExp(r'^\+\d{6,15}$').hasMatch(value) ? value : null,
+        DwIdentifierKind.unknown => null,
       };
     },
     allowedDeliveryHints: const {'sms'},

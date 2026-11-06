@@ -61,6 +61,7 @@ class IdentityChangeSheet extends ConsumerWidget {
                       ? l10n.invalidEmail
                       : null,
                 ),
+                DwIdentifierKind.unknown => const SizedBox.shrink(),
               },
               const Gap(AppSpace.s24),
               AppButton.primary(

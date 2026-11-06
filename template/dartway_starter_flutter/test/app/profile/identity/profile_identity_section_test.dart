@@ -49,6 +49,7 @@ void main() {
           DwIdentifierKind.email => fake.profile.copyWith(
             email: DwFieldPatch.set(request.identifier),
           ),
+          DwIdentifierKind.unknown => fake.profile,
         };
         call.publish(profileChannel, [fake.profile]);
         return DwCallOk(

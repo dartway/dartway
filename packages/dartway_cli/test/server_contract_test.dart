@@ -74,6 +74,31 @@ void main() {
       expect(inspector.notes, isEmpty);
     });
 
+    test('release check reaches the generator release gate', () {
+      late List<String> ran;
+      final inspector = DwGeneratedCodeInspector(
+        serverPackageDir: server,
+        contractBase: 'trusted-revision',
+        release: true,
+        probe: (arguments, workingDirectory) {
+          ran = arguments;
+          return ProcessResult(0, 3, '', 'stale deprecation');
+        },
+      );
+      expect(inspector.run(), 1);
+      expect(
+        ran,
+        containsAllInOrder([
+          '--check',
+          '--contract-base',
+          'trusted-revision',
+          '--release-check',
+        ]),
+      );
+      expect(inspector.findings, isEmpty);
+      expect(inspector.notes, isEmpty);
+    });
+
     test('every out-of-date and stale file is an error', () {
       final inspector = DwGeneratedCodeInspector(
         serverPackageDir: server,

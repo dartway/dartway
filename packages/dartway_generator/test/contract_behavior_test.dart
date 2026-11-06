@@ -11,6 +11,310 @@ import 'project_contract_test.dart' show git, generatorCli, itemSource;
 import 'support/temp_project.dart';
 
 void main() {
+  test('strict enums are gated only where the server can send them', () async {
+    final project = TempProject.create(['app_shared']);
+    project.writeFile('app_shared/lib/src/item.dart', r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+enum DataState { ready }
+enum ResultState { ready }
+enum InputState { ready }
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, required this.state, required this.keyKind});
+  @override final int id;
+  final DataState state;
+  final DwSessionKeyKind keyKind;
+}
+final class ResultRecord extends DwDataObject with _$ResultRecord {
+  const ResultRecord({required this.id, required this.state});
+  @override final int id;
+  final ResultState state;
+}
+final class ReadState extends DwActionCommand<ResultRecord> with _$ReadState {
+  const ReadState();
+}
+final class WriteState extends DwActionCommand<void> with _$WriteState {
+  const WriteState({required this.state});
+  final InputState state;
+}
+''');
+    final report = await DwCodeGenerator.run(project.root);
+    final strict = report.diagnostics
+        .where((diagnostic) => diagnostic.code == 'strictWireEnum')
+        .toList();
+    expect(strict, hasLength(2));
+    expect(
+      strict.map((diagnostic) => diagnostic.message),
+      containsAll([contains('DataState'), contains('ResultState')]),
+    );
+  });
+
+  test('enum-value deprecations reach baseline and release gates', () async {
+    const marked = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+enum ItemState with DwOpenEnum {
+  unknown,
+  ready,
+  @DwContractDeprecation(since: '0.1.0') old,
+}
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, required this.state});
+  @override final int id;
+  final ItemState state;
+}
+''';
+    final project = TempProject.create(['app_shared']);
+    project.writeFile('app_shared/lib/src/item.dart', marked);
+    await project.generateClean();
+    final descriptor =
+        jsonDecode(
+              project.readFile('app_shared/lib/generated/dw_contract.json'),
+            )
+            as Map;
+    expect(
+      descriptor['objects']['ItemRecord']['fields']['state']['type']['deprecatedValues'],
+      {'old': '0.1.0'},
+    );
+    project.writeFile(
+      'app_shared/contract_baseline.json',
+      jsonEncode(descriptor),
+    );
+    final base = baseline(project);
+
+    var report = await DwCodeGenerator.run(
+      project.root,
+      check: true,
+      contractBase: base,
+      verifyContract: true,
+      releaseCheck: true,
+    );
+    expect(
+      report.diagnostics.map((diagnostic) => diagnostic.message).join('\n'),
+      contains('ItemRecord.state.old'),
+    );
+
+    project.writeFile(
+      'app_shared/lib/src/item.dart',
+      marked.replaceFirst(
+        "  @DwContractDeprecation(since: '0.1.0') old,\n",
+        '',
+      ),
+    );
+    report = await DwCodeGenerator.run(
+      project.root,
+      contractBase: base,
+      verifyContract: true,
+    );
+    expect(report.diagnostics, isEmpty);
+  });
+
+  test(
+    'real contract gates trust committed store baseline and enforce removals and stale marks',
+    () async {
+      const markedSource = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, this.title});
+  @override final int id;
+  @DwContractDeprecation(since: '0.1.0')
+  final String? title;
+}
+''';
+      const removedSource = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id});
+  @override final int id;
+}
+''';
+
+      final trusted = TempProject.create(['app_shared']);
+      trusted.writeFile('app_shared/lib/src/item.dart', markedSource);
+      await trusted.generateClean();
+      trusted.writeFile(
+        'app_shared/contract_baseline.json',
+        trusted.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
+      final trustedRevision = baseline(trusted);
+
+      trusted.writeFile(
+        'app_shared/contract_baseline.json',
+        '{"weakened":true}',
+      );
+      trusted.writeFile('app_shared/lib/src/item.dart', removedSource);
+      var report = await DwCodeGenerator.run(
+        trusted.root,
+        check: true,
+        contractBase: trustedRevision,
+        verifyContract: true,
+      );
+      expect(report.diagnostics, isEmpty);
+      File(trusted.path('app_shared/contract_baseline.json')).deleteSync();
+      report = await DwCodeGenerator.run(
+        trusted.root,
+        check: true,
+        contractBase: trustedRevision,
+        verifyContract: true,
+      );
+      expect(report.diagnostics, isEmpty);
+
+      final unmarked = TempProject.create(['app_shared']);
+      unmarked.writeFile(
+        'app_shared/lib/src/item.dart',
+        markedSource.replaceFirst(
+          "  @DwContractDeprecation(since: '0.1.0')\n",
+          '',
+        ),
+      );
+      await unmarked.generateClean();
+      unmarked.writeFile(
+        'app_shared/contract_baseline.json',
+        unmarked.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
+      final unmarkedRevision = baseline(unmarked);
+      unmarked.writeFile('app_shared/lib/src/item.dart', removedSource);
+      report = await DwCodeGenerator.run(
+        unmarked.root,
+        check: true,
+        contractBase: unmarkedRevision,
+        verifyContract: true,
+      );
+      expect(
+        report.diagnostics.map((diagnostic) => diagnostic.message).join('\n'),
+        contains('removed/renamed without @DwContractDeprecation'),
+      );
+
+      final stale = TempProject.create(['app_shared']);
+      stale.writeFile('app_shared/lib/src/item.dart', markedSource);
+      await stale.generateClean();
+      stale.writeFile(
+        'app_shared/contract_baseline.json',
+        stale.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
+      final staleRevision = baseline(stale);
+      report = await DwCodeGenerator.run(
+        stale.root,
+        check: true,
+        contractBase: staleRevision,
+        verifyContract: true,
+        releaseCheck: true,
+      );
+      expect(
+        report.diagnostics.map((diagnostic) => diagnostic.message).join('\n'),
+        contains('must be removed for release: ItemRecord.title'),
+      );
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'marked default value stays on wire for the unmarked store decoder',
+    () async {
+      const unmarkedSource = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, required this.title});
+  @override final int id;
+  final String title;
+}
+''';
+      const markedSource = r'''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+part 'item.dw.dart';
+final class ItemRecord extends DwDataObject with _$ItemRecord {
+  const ItemRecord({required this.id, this.title = 'retired'});
+  @override final int id;
+  @DwContractDeprecation(since: '0.1.0')
+  final String title;
+}
+''';
+      final project = TempProject.create(['app_shared']);
+      project.writeFile('app_shared/lib/src/item.dart', unmarkedSource);
+      await project.generateClean();
+      project.writeFile(
+        'app_shared/contract_baseline.json',
+        project.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
+      final storeRevision = baseline(project);
+
+      project.writeFile('app_shared/lib/src/item.dart', markedSource);
+      await project.generateClean();
+      project.writeFile('app_shared/bin/marked_encode.dart', r'''
+import 'dart:convert';
+import '../lib/src/item.dart';
+void main() => print(jsonEncode(const ItemRecord(id: 1).toJson()));
+''');
+      final encoded = await project.runScript(
+        'app_shared',
+        'bin/marked_encode.dart',
+      );
+      expect(encoded.exitCode, 0, reason: output(encoded));
+      expect(jsonDecode(encoded.stdout), {'id': 1, 'title': 'retired'});
+      final comparison = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        storeRevision,
+      ]);
+      expect(comparison.exitCode, 0, reason: output(comparison));
+
+      project.writeFile('app_shared/lib/src/item.dart', unmarkedSource);
+      await project.generateClean();
+      project.writeFile('app_shared/bin/store_decode.dart', '''
+import 'dart:convert';
+import '../lib/src/item.dart';
+void main() {
+  final item = \$ItemRecordFromJson(
+    jsonDecode(${jsonEncode(encoded.stdout.trim())}) as Map<String, Object?>,
+  );
+  print('\${item.id}:\${item.title}');
+}
+''');
+      final decoded = await project.runScript(
+        'app_shared',
+        'bin/store_decode.dart',
+      );
+      expect(decoded.exitCode, 0, reason: output(decoded));
+      expect(decoded.stdout, '1:retired\n');
+    },
+    timeout: const Timeout(Duration(minutes: 3)),
+  );
+
+  test(
+    'ordinary generation warns only for an unreadable store baseline',
+    () async {
+      final withoutBaseline = TempProject.create(['app_shared']);
+      withoutBaseline.writeFile('app_shared/lib/src/item.dart', itemSource());
+      await withoutBaseline.generateClean();
+      baseline(withoutBaseline);
+
+      var report = await DwCodeGenerator.run(withoutBaseline.root);
+      expect(report.diagnostics, isEmpty);
+
+      final unreadableBaseline = TempProject.create(['app_shared']);
+      unreadableBaseline.writeFile(
+        'app_shared/lib/src/item.dart',
+        itemSource(),
+      );
+      await unreadableBaseline.generateClean();
+      unreadableBaseline.writeFile(
+        'app_shared/contract_baseline.json',
+        '{not valid json',
+      );
+      baseline(unreadableBaseline);
+
+      report = await DwCodeGenerator.run(unreadableBaseline.root);
+      final warnings = report.diagnostics
+          .where((diagnostic) => diagnostic.isWarning)
+          .toList();
+      expect(warnings, hasLength(1));
+      expect(warnings.single.message, contains('Store comparison skipped'));
+    },
+  );
+
   test(
     'new data objects retain their introduction version without raising the line',
     () async {
@@ -117,6 +421,10 @@ void main() { print(appProtocol.entryNamed('ExtraRecord')!.since); }
         }),
       );
       await project.generateClean();
+      project.writeFile(
+        'app_shared/contract_baseline.json',
+        project.readFile('app_shared/lib/generated/dw_contract.json'),
+      );
       final release = baseline(project);
       git(project, ['branch', 'develop', release]);
       project.writeFile(
@@ -235,26 +543,24 @@ mixin _$ManualCodec on DwDataObject {
     timeout: const Timeout(Duration(minutes: 3)),
   );
 
-  test(
-    'native custom enum name encoding cannot silently pass the gate',
-    () async {
-      for (final custom in [
-        "extension ItemStateWireName on ItemState { String get name => 'renamed'; }",
-        "enum ItemState { ready; String get name => 'renamed'; }",
-      ]) {
-        final project = TempProject.create(['app_shared']);
-        const source = r'''
+  test('native custom enum name encoding cannot silently pass the gate', () async {
+    for (final custom in [
+      "extension ItemStateWireName on ItemState { String get name => 'renamed'; }",
+      "enum ItemState with DwOpenEnum { ready, unknown; String get name => 'renamed'; }",
+    ]) {
+      final project = TempProject.create(['app_shared']);
+      const source = r'''
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 part 'item.dw.dart';
-enum ItemState { ready }
+enum ItemState with DwOpenEnum { ready, unknown }
 final class ItemRecord extends DwDataObject with _$ItemRecord {
   const ItemRecord({required this.id, required this.state});
   @override final int id;
   final ItemState state;
 }
 ''';
-        project.writeFile('app_shared/lib/src/item.dart', source);
-        project.writeFile('app_shared/bin/enum_probe.dart', r'''
+      project.writeFile('app_shared/lib/src/item.dart', source);
+      project.writeFile('app_shared/bin/enum_probe.dart', r'''
 import '../lib/src/item.dart';
 void main() {
   final json = const ItemRecord(id: 1, state: ItemState.ready).toJson();
@@ -263,40 +569,41 @@ void main() {
   catch (e) { print(e.runtimeType); }
 }
 ''');
-        await project.generateClean();
-        final base = baseline(project);
-        final before = await project.runScript(
-          'app_shared',
-          'bin/enum_probe.dart',
-        );
-        expect(before.exitCode, 0, reason: output(before));
-        expect(before.stdout, 'ready\ndecoded\n');
-        project.writeFile(
-          'app_shared/lib/src/item.dart',
-          custom.startsWith('enum ')
-              ? source.replaceFirst('enum ItemState { ready }', custom)
-              : '$source\n$custom\n',
-        );
-        await project.generateClean();
-        final after = await project.runScript(
-          'app_shared',
-          'bin/enum_probe.dart',
-        );
-        expect(after.exitCode, 0, reason: output(after));
-        expect(after.stdout, 'renamed\nDwUnknownEnumValue\n');
-        final snapshot = bytes(project);
-        final result = await generatorCli(project, [
-          '--check',
-          '--contract-base',
-          base,
-        ]);
-        expect(result.exitCode, 3, reason: output(result));
-        expect(output(result), contains('custom enum name encoding'));
-        expect(bytes(project), snapshot);
-      }
-    },
-    timeout: const Timeout(Duration(minutes: 3)),
-  );
+      await project.generateClean();
+      final base = baseline(project);
+      final before = await project.runScript(
+        'app_shared',
+        'bin/enum_probe.dart',
+      );
+      expect(before.exitCode, 0, reason: output(before));
+      expect(before.stdout, 'ready\ndecoded\n');
+      project.writeFile(
+        'app_shared/lib/src/item.dart',
+        custom.startsWith('enum ')
+            ? source.replaceFirst(
+                'enum ItemState with DwOpenEnum { ready, unknown }',
+                custom,
+              )
+            : '$source\n$custom\n',
+      );
+      await project.generateClean();
+      final after = await project.runScript(
+        'app_shared',
+        'bin/enum_probe.dart',
+      );
+      expect(after.exitCode, 0, reason: output(after));
+      expect(after.stdout, 'renamed\ndecoded\n');
+      final snapshot = bytes(project);
+      final result = await generatorCli(project, [
+        '--check',
+        '--contract-base',
+        base,
+      ]);
+      expect(result.exitCode, 3, reason: output(result));
+      expect(output(result), contains('custom enum name encoding'));
+      expect(bytes(project), snapshot);
+    }
+  }, timeout: const Timeout(Duration(minutes: 3)));
 
   for (final location in [
     'external',
@@ -321,7 +628,10 @@ void main() {
         );
         final enumFile = File(p.join(external.path, 'lib/state.dart'));
         enumFile.parent.createSync();
-        enumFile.writeAsStringSync('enum ItemState { ready }\n');
+        enumFile.writeAsStringSync('''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ItemState with DwOpenEnum { ready, unknown }
+''');
         final configFile = File(
           project.path('app_shared/.dart_tool/package_config.json'),
         );
@@ -376,7 +686,7 @@ void main() {
           'bin/enum_probe.dart',
         );
         expect(before.exitCode, 0, reason: output(before));
-        expect(before.stdout, 'DwUnknownEnumValue\n');
+        expect(before.stdout, 'decoded\n');
         File(
           project.path('app_shared/lib/generated/dw_contract.json'),
         ).deleteSync();
@@ -393,9 +703,10 @@ void main() {
             p.join(replacement.path, 'lib/state.dart'),
           );
           replacementEnum.parent.createSync();
-          replacementEnum.writeAsStringSync(
-            'enum ItemState { ready, archived }\n',
-          );
+          replacementEnum.writeAsStringSync('''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ItemState with DwOpenEnum { ready, archived, unknown }
+''');
           for (final entry in config['packages'] as List) {
             if ((entry as Map)['name'] == 'external_enum') {
               entry['rootUri'] = replacement.uri.toString();
@@ -422,7 +733,10 @@ packages:
           // The old in-repo files stay present and unchanged: only the resolved
           // dependency moved, so comparing the head lock alone would miss it.
         } else {
-          enumFile.writeAsStringSync('enum ItemState { ready, archived }\n');
+          enumFile.writeAsStringSync('''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ItemState with DwOpenEnum { ready, archived, unknown }
+''');
         }
         await project.generateClean();
         final after = await project.runScript(
@@ -979,21 +1293,21 @@ void main() {
   );
 
   test(
-    'actual missing/default/null codecs expose changed defaults and strict enum additions',
+    'actual missing/default/null codecs expose changed defaults; old open clients decode additions as unknown',
     () async {
       final project = TempProject.create(['app_shared']);
       project.copyFixture('types');
       await project.generateClean();
-      final base = baseline(project);
       project.writeFile('app_shared/bin/default_probe.dart', r'''
 import '../lib/src/defaults.dart';
 import '../lib/src/catalog.dart';
 import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum OldColor with DwOpenEnum { red, green, blue, unknown }
 void main() {
   final a = $SettingsFromJson({'id':1,'createdAt':0});
   final b = $SettingsFromJson({'id':1,'createdAt':0,'label':null,'count':null});
   print('${a.count}:${a.label}:${b.count}:${b.label}:${a.toJson().containsKey("count")}');
-  try { DwJsonCodec.decodeEnum('archived', Color.values); print('enum:accepted'); } on DwUnknownEnumValue { print('enum:rejected'); }
+  print('enum:${DwJsonCodec.decodeEnum('archived', OldColor.values).name}');
 }
 ''');
       expect(
@@ -1001,8 +1315,16 @@ void main() {
           'app_shared',
           'bin/default_probe.dart',
         )).stdout,
-        '3:none:3:null:false\nenum:rejected\n',
+        '3:none:3:null:false\nenum:unknown\n',
       );
+      final descriptor = 'app_shared/lib/generated/dw_contract.json';
+      project.writeFile(
+        descriptor,
+        project
+            .readFile(descriptor)
+            .replaceFirst('"open": true', '"open": false'),
+      );
+      final strictBase = baseline(project);
       project.writeFile(
         'app_shared/lib/src/defaults.dart',
         project
@@ -1021,12 +1343,12 @@ void main() {
           'app_shared',
           'bin/default_probe.dart',
         )).stdout,
-        '4:none:4:null:false\nenum:accepted\n',
+        '4:none:4:null:false\nenum:unknown\n',
       );
       final result = await generatorCli(project, [
         '--check',
         '--contract-base',
-        base,
+        strictBase,
       ]);
       expect(result.exitCode, 3, reason: output(result));
       expect(
@@ -1131,7 +1453,7 @@ void main() {
       expect(renamed.exitCode, 3, reason: output(renamed));
       expect(
         output(renamed),
-        contains('RemoveItem: wire name removed/renamed'),
+        allOf(contains('RemoveItem'), contains('wire name removed/renamed')),
       );
       project.writeFile('app_shared/lib/src/catalog.dart', catalog);
       project.writeFile('app_shared/lib/src/item.dart', itemSource());
@@ -1398,10 +1720,10 @@ packages:
         final project = TempProject.create(['app_shared']);
         project.writeFile('app_shared/lib/src/item.dart', itemSource());
         project.writeFile('app_shared/README.md', 'contract documentation\n');
-        project.writeFile(
-          'app_shared/lib/generated/manual.dart',
-          'enum ManualState { ready }\n',
-        );
+        project.writeFile('app_shared/lib/generated/manual.dart', '''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ManualState with DwOpenEnum { ready, unknown }
+''');
         project.writeFile(
           'app_shared/test/manual.dw.dart',
           '// hand-written fixture\n',
@@ -1446,10 +1768,10 @@ final class ItemRecord extends DwDataObject with _$ItemRecord {
             binary.writeAsBytesSync([0, 254, 13, 10]);
           case 'generated-library':
             changed = 'app_shared/lib/generated/manual.dart';
-            project.writeFile(
-              changed,
-              'enum ManualState { ready, archived }\n',
-            );
+            project.writeFile(changed, '''
+import 'package:dartway_core_shared/dartway_core_shared.dart';
+enum ManualState with DwOpenEnum { ready, archived, unknown }
+''');
           case 'manual-part':
             changed = 'app_shared/test/manual.dw.dart';
             // A filename, or a header forged at head, cannot turn source into output.

@@ -4,9 +4,9 @@ import 'package:dartway_example_shared/src/dartway_example_refusal.dart';
 
 part 'profile.dw.dart';
 
-enum UserRole { client, staff, admin }
+enum UserRole with DwOpenEnum { client, staff, admin, unknown }
 
-enum UserGender { female, male }
+enum UserGender with DwOpenEnum { female, male, unknown }
 
 /// A person as other members see them: the coach of a session, the author of
 /// a post or a message. Nothing on it is private.

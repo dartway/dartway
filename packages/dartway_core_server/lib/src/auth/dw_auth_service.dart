@@ -193,7 +193,9 @@ final class DwAuthService {
     DwIdentifierKind kind,
     String raw,
   ) =>
-      auth.normalize(kind, raw) ??
+      (kind == DwIdentifierKind.unknown
+          ? ctx.refuse(DwCoreRefusal.invalid, field: 'kind')
+          : auth.normalize(kind, raw)) ??
       ctx.refuse(DwCoreRefusal.invalid, field: 'identifier');
 
   /// Sends a code for [rawIdentifier] and answers its ticket — one path for

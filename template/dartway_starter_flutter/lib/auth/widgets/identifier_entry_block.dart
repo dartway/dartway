@@ -30,14 +30,16 @@ class IdentifierEntryBlock extends ConsumerWidget {
         SegmentedButton<DwIdentifierKind>(
           segments: [
             for (final kind in DwIdentifierKind.values)
-              ButtonSegment(
-                value: kind,
-                label: Text(l10n.identifierKind(kind.name)),
-                icon: Icon(switch (kind) {
-                  DwIdentifierKind.phone => Icons.phone_outlined,
-                  DwIdentifierKind.email => Icons.alternate_email,
-                }),
-              ),
+              if (kind != DwIdentifierKind.unknown)
+                ButtonSegment(
+                  value: kind,
+                  label: Text(l10n.identifierKind(kind.name)),
+                  icon: Icon(switch (kind) {
+                    DwIdentifierKind.phone => Icons.phone_outlined,
+                    DwIdentifierKind.email => Icons.alternate_email,
+                    DwIdentifierKind.unknown => Icons.help_outline,
+                  }),
+                ),
           ],
           selected: {state.kind},
           onSelectionChanged: (selected) =>
@@ -70,6 +72,7 @@ class IdentifierEntryBlock extends ConsumerWidget {
                 ? l10n.invalidEmail
                 : null,
           ),
+          DwIdentifierKind.unknown => const SizedBox.shrink(),
         },
         const Spacer(),
         AppButton.primary(

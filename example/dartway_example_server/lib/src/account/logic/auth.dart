@@ -17,6 +17,7 @@ abstract final class AccountAuth {
     normalize: (kind, raw) => switch (kind) {
       DwIdentifierKind.phone => AccountAuth.normalizePhone(raw),
       DwIdentifierKind.email => null, // the club signs in by phone only
+      DwIdentifierKind.unknown => null,
     },
 
     // Demo personas and store reviewers sign in with a fixed code set on

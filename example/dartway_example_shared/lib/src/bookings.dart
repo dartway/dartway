@@ -5,7 +5,7 @@ import 'package:dartway_example_shared/src/schedule.dart';
 
 part 'bookings.dw.dart';
 
-enum BookingStatus { booked, cancelled, attended }
+enum BookingStatus with DwOpenEnum { booked, cancelled, attended, unknown }
 
 const bookingTransitions = DwStateTransitions<BookingStatus>(
   initial: {BookingStatus.booked},

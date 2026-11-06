@@ -1,7 +1,9 @@
 # Auth and identity: who owns accounts, and what does a project decide?
 
 **The framework owns accounts, identities, session keys and code tickets** (D-007). It knows that
-someone signed in, with which phone number or e-mail address, and with which key. What that person
+someone signed in, with which phone number or e-mail address, and with which key. `DwIdentifierKind`
+has `phone`, `email`, and the forward-compatible `unknown` value; `unknown` is never accepted as
+client input. What that person
 is to the project — a profile, a role, consents — is the project's, in its own tables, referencing
 the account id.
 
@@ -19,7 +21,7 @@ is required to keep using that default.
 | Table | What it holds |
 |---|---|
 | `dw_account` | an id and a creation time — the framework's whole idea of a person |
-| `dw_identity` | identifiers an account signs in with: kind (`phone`, `email`, or a provider's name — `google`, `apple`), normalized value or the provider's subject id, `verified_at`, and for a provider identity `provider_email` — the normalized address its token last proved verified, kept only under `linkByVerifiedEmail`. Unique across accounts |
+| `dw_identity` | identifiers an account signs in with: kind (`phone`, `email`, or a provider's name — `google`, `apple`; never `DwIdentifierKind.unknown`), normalized value or the provider's subject id, `verified_at`, and for a provider identity `provider_email` — the normalized address its token last proved verified, kept only under `linkByVerifiedEmail`. Unique across accounts |
 | `dw_auth_key` | session keys: the SHA-256 of the token, kind (`app`, `personal`), label, last use, revocation |
 | `dw_code_ticket` | one row per code sent: the SHA-256 of the code, attempts, expiry, purpose (`signIn`, `attach`) |
 

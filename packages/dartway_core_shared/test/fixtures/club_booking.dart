@@ -2,7 +2,7 @@ import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 part 'club_booking.dw.dart';
 
-enum BookingStatus { booked, cancelled }
+enum BookingStatus with DwOpenEnum { booked, cancelled, unknown }
 
 /// Hand-written in the exact shape `dartway generate` produces, so the core's
 /// contract with generated code is exercised without the generator.

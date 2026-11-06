@@ -7,12 +7,14 @@ import 'package:analyzer/dart/analysis/formatter_options.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import 'analysis/framework.dart';
 import 'analysis/library_names.dart';
+import 'analysis/wire_type.dart';
 import 'contract/baseline.dart';
 import 'contract/descriptor.dart';
 import 'diagnostic.dart';
@@ -133,6 +135,7 @@ abstract final class DwCodeGenerator {
     String? contractBase,
     bool verifyContract = false,
     bool raiseVersion = false,
+    bool releaseCheck = false,
   }) async {
     if (raiseVersion && check) {
       throw ArgumentError('a release raises the version; it cannot be a check');
@@ -177,6 +180,10 @@ abstract final class DwCodeGenerator {
       skipped: check ? null : skipped,
     );
     if (diagnostics.any((d) => !d.isWarning)) return finish();
+    final sharedPackage = packages
+        .where((package) => package.role == DwPackageRole.shared)
+        .firstOrNull;
+    Map<String, dynamic>? storeBaseline;
     // Ordinary generation also needs trusted introduction metadata, but keeps
     // its existing non-verifying mode for new projects and unsupported codecs.
     // The check gate must still prove a baseline before accepting the output.
@@ -193,12 +200,40 @@ abstract final class DwCodeGenerator {
       if (verify) {
         diagnostics.add(
           DwGenerationDiagnostic(
-            'contract not verified: $error. Supply --contract-base with a trusted committed revision; no feature-tree seed is accepted.',
+            'contract not verified: trusted Git revision could not be resolved: $error. Supply --contract-base with a trusted committed revision; no feature-tree seed is accepted.',
             code: 'projectContractVersion',
           ),
         );
         return finish();
       }
+      // Ordinary non-verifying generation remains silent when it cannot
+      // resolve a trusted base and therefore cannot find a store baseline.
+    }
+    try {
+      if (sharedPackage != null && baselineSha != null) {
+        storeBaseline = readStoreContractBaseline(
+          root: root,
+          sha: baselineSha,
+          shared: sharedPackage,
+        );
+      }
+    } on Exception catch (error) {
+      if (verify) {
+        diagnostics.add(
+          DwGenerationDiagnostic(
+            'contract not verified: contract_baseline.json could not be read from revision $baselineSha: $error.',
+            code: 'projectContractVersion',
+          ),
+        );
+        return finish();
+      }
+      diagnostics.add(
+        DwGenerationDiagnostic(
+          'Store comparison skipped: contract_baseline.json could not be read from revision $baselineSha: $error.',
+          code: 'projectContractVersion',
+          isWarning: true,
+        ),
+      );
     }
 
     final collection = AnalysisContextCollection(
@@ -220,9 +255,7 @@ abstract final class DwCodeGenerator {
       }
       if (baselineSha != null) {
         try {
-          final shared = packages
-              .where((p) => p.role == DwPackageRole.shared)
-              .single;
+          final shared = sharedPackage!;
           final current =
               jsonDecode(
                     files
@@ -232,6 +265,7 @@ abstract final class DwCodeGenerator {
                   )
                   as Map<String, dynamic>;
           if (verify) validateContract(current);
+          final Map<String, dynamic> baselineDescriptor;
           final baseline = await readContractBaseline(
             root: root,
             sha: baselineSha,
@@ -244,7 +278,8 @@ abstract final class DwCodeGenerator {
             },
           );
           proof = baseline.proof;
-          introductions = contractIntroductions(baseline.descriptor, current);
+          baselineDescriptor = baseline.descriptor;
+          introductions = contractIntroductions(baselineDescriptor, current);
           final currentVersion = DwContractVersion.parse(
             current['contractVersion'] as String,
           );
@@ -256,13 +291,59 @@ abstract final class DwCodeGenerator {
             }
           }
           if (verify) {
+            if (storeBaseline != null) {
+              final storeVersion = DwContractVersion.parse(
+                storeBaseline['contractVersion'] as String,
+              );
+              final nextVersion = DwContractVersion.parse(
+                current['contractVersion'] as String,
+              );
+              final storeChanges = compareContracts(
+                storeBaseline,
+                current,
+                removalBaseline: storeBaseline,
+                comparison: 'store comparison',
+              );
+              final storeNeedsReleaseRaise =
+                  releaseBranch != null &&
+                  storeChanges.isNotEmpty &&
+                  storeChanges.every(
+                    (change) => change.startsWith('raise `version:`'),
+                  );
+              if (storeChanges.isNotEmpty &&
+                  !storeNeedsReleaseRaise &&
+                  !storeVersion.isOlderLineThan(nextVersion)) {
+                diagnostics.add(
+                  DwGenerationDiagnostic(
+                    'project contract incompatible with the store baseline: ${storeChanges.join('; ')}. Ship a tolerant/deprecated client and update the baseline first, or raise the shared package breaking line for an explicit exception.',
+                    code: 'projectContractVersion',
+                  ),
+                );
+              }
+              if (releaseCheck) {
+                final stale = staleDeprecations(storeBaseline, current);
+                if (stale.isNotEmpty) {
+                  diagnostics.add(
+                    DwGenerationDiagnostic(
+                      'store baseline already contains deprecated contract members that must be removed for release: ${stale.join(', ')}',
+                      code: 'projectContractVersion',
+                    ),
+                  );
+                }
+              }
+            }
             final previousVersion = DwContractVersion.parse(
-              baseline.descriptor['contractVersion'] as String,
+              baselineDescriptor['contractVersion'] as String,
             );
             final nextVersion = DwContractVersion.parse(
               current['contractVersion'] as String,
             );
-            final changes = compareContracts(baseline.descriptor, current);
+            final changes = compareContracts(
+              baselineDescriptor,
+              current,
+              removalBaseline: storeBaseline,
+              comparison: 'Git comparison',
+            );
             if (nextVersion.isOlderLineThan(previousVersion)) {
               throw const FormatException(
                 'shared package contract line moved backwards',
@@ -295,7 +376,7 @@ abstract final class DwCodeGenerator {
                 DwGenerationDiagnostic(
                   changes.every((c) => c.startsWith('raise `version:`'))
                       ? 'project contract incompatible: ${changes.join('; ')}'
-                      : 'project contract incompatible: ${changes.join('; ')}. Baseline $baselineSha has ${previousVersion.text} (line ${previousVersion.line}); current ${nextVersion.text} keeps that line. Raise the shared package breaking line and regenerate; a patch/prerelease bump is insufficient.',
+                      : 'project contract incompatible: ${changes.join('; ')}. Baseline $baselineSha has ${previousVersion.text} (line ${previousVersion.line}); current ${nextVersion.text} keeps that line. First mark the field with @DwContractDeprecation and retire it over two store releases. Raising the shared package breaking line is the exception: it sends old builds to the update screen; a patch/prerelease bump is insufficient.',
                   code: 'projectContractVersion',
                 ),
               );
@@ -503,6 +584,7 @@ final class _Run {
 
   List<GeneratedFile> emit() {
     _checkWireNames();
+    _checkServerSentEnums();
     _checkEntities();
     _relations = resolveRelations([
       for (final l in libraries)
@@ -547,6 +629,79 @@ final class _Run {
       }
     }
     return files;
+  }
+
+  void _checkServerSentEnums() {
+    final entries = <String, (ClassElement, DtoClass)>{
+      for (final library in libraries)
+        for (final (element, dto, _) in library.classes)
+          if (dto != null) dto.name: (element, dto),
+    };
+    final visitedDtos = <String>{};
+    final reportedEnums = <String>{};
+
+    void visitWire(WireType wire, ClassElement owner) {
+      switch (wire) {
+        case EnumWire(open: false, sourcePath: final sourcePath)
+            when contexts.keys.any(
+              (package) =>
+                  p.equals(sourcePath, package.root) ||
+                  p.isWithin(package.root, sourcePath),
+            ):
+          if (reportedEnums.add(wire.spelling)) {
+            diagnostics.add(
+              DwGenerationDiagnostic.at(
+                owner,
+                'enum `${wire.spelling}` is server-sent and must be open: add `with DwOpenEnum`, declare the value `unknown`, and handle it in exhaustive switches',
+                code: 'strictWireEnum',
+              ),
+            );
+          }
+        case DtoWire(core: false, wireName: final name):
+          final entry = entries[name];
+          if (visitedDtos.add(name) && entry != null) {
+            for (final field in entry.$2.fields) {
+              visitWire(field.type, entry.$1);
+            }
+          }
+        case ListWire(element: final inner):
+          visitWire(inner, owner);
+        case MapWire(value: final inner) || PatchWire(inner: final inner):
+          visitWire(inner, owner);
+        default:
+          break;
+      }
+    }
+
+    for (final entry in entries.values) {
+      if (entry.$2.kind == DtoKind.data && visitedDtos.add(entry.$2.name)) {
+        for (final field in entry.$2.fields) {
+          visitWire(field.type, entry.$1);
+        }
+      }
+      if (entry.$2.kind != DtoKind.request &&
+          entry.$2.kind != DtoKind.command) {
+        continue;
+      }
+      final resultKind = entry.$1.allSupertypes
+          .where(
+            (type) =>
+                DwFrameworkTypes.isCoreClass(type.element, 'DwActionCommand') ||
+                DwFrameworkTypes.isCoreClass(type.element, 'DwRequest'),
+          )
+          .firstOrNull;
+      if (resultKind == null) continue;
+      final reader = WireTypeReader(LibraryNames(entry.$1.library));
+      for (final argument in resultKind.typeArguments) {
+        if (argument is InterfaceType) {
+          try {
+            visitWire(reader.read(argument), entry.$1);
+          } on UnsupportedType {
+            // The ordinary descriptor validation reports unsupported results.
+          }
+        }
+      }
+    }
   }
 
   List<GeneratedFile> completeContracts(

@@ -9,6 +9,7 @@ final class DtoField implements ValueField {
     required this.type,
     required this.spelling,
     this.defaultValue,
+    required this.contractDeprecated,
   });
 
   @override
@@ -18,9 +19,13 @@ final class DtoField implements ValueField {
   @override
   final String spelling;
 
+  /// Whether the field must remain present on the wire while it is retired.
+  final bool contractDeprecated;
+
   /// The non-null constructor default (D-041): an absent field decodes to it,
-  /// and a value equal to it is left off the wire. `null` for a field without
-  /// one and for a patch, whose absence is already `DwFieldPatch.keep()`.
+  /// and a value equal to it is left off the wire unless [contractDeprecated]
+  /// keeps it present. `null` for a field without one and for a patch, whose
+  /// absence is already `DwFieldPatch.keep()`.
   final DtoDefault? defaultValue;
 }
 

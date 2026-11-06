@@ -106,11 +106,12 @@
           "type": {
             "kind": "enum",
             "nullable": false,
-            "open": false,
+            "open": true,
             "values": [
               "admin",
               "client",
-              "staff"
+              "staff",
+              "unknown"
             ]
           }
         }
@@ -373,13 +374,14 @@
           "type": {
             "kind": "enum",
             "nullable": false,
-            "open": false,
+            "open": true,
             "values": [
               "fire",
               "heart",
               "money",
               "thumbsDown",
-              "thumbsUp"
+              "thumbsUp",
+              "unknown"
             ]
           }
         }
@@ -862,11 +864,12 @@
           "type": {
             "kind": "enum",
             "nullable": true,
-            "open": false,
+            "open": true,
             "values": [
               "admin",
               "client",
-              "staff"
+              "staff",
+              "unknown"
             ]
           }
         },
@@ -1105,13 +1108,14 @@
           "type": {
             "kind": "enum",
             "nullable": true,
-            "open": false,
+            "open": true,
             "values": [
               "fire",
               "heart",
               "money",
               "thumbsDown",
-              "thumbsUp"
+              "thumbsUp",
+              "unknown"
             ]
           }
         }
@@ -1400,11 +1404,12 @@
           "type": {
             "kind": "enum",
             "nullable": false,
-            "open": false,
+            "open": true,
             "values": [
               "attended",
               "booked",
-              "cancelled"
+              "cancelled",
+              "unknown"
             ]
           }
         }
@@ -1463,10 +1468,11 @@
             "value": {
               "kind": "enum",
               "nullable": false,
-              "open": false,
+              "open": true,
               "values": [
                 "female",
-                "male"
+                "male",
+                "unknown"
               ]
             }
           }
@@ -1519,10 +1525,11 @@
           "type": {
             "kind": "enum",
             "nullable": true,
-            "open": false,
+            "open": true,
             "values": [
               "female",
-              "male"
+              "male",
+              "unknown"
             ]
           }
         },
@@ -1561,11 +1568,12 @@
           "type": {
             "kind": "enum",
             "nullable": false,
-            "open": false,
+            "open": true,
             "values": [
               "admin",
               "client",
-              "staff"
+              "staff",
+              "unknown"
             ]
           }
         }

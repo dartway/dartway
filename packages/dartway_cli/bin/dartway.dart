@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:args/command_runner.dart';
 import 'package:dartway_cli/src/commands/check_command.dart';
+import 'package:dartway_cli/src/commands/contract_command.dart';
 import 'package:dartway_cli/src/commands/create_command.dart';
 import 'package:dartway_cli/src/commands/deploy_command.dart';
 import 'package:dartway_cli/src/commands/dev_command.dart';
@@ -53,6 +54,7 @@ Future<void> main(List<String> args) async {
         ..addCommand(FormatCommand())
         ..addCommand(SyncCommand())
         ..addCommand(CheckCommand())
+        ..addCommand(ContractCommand())
         ..addCommand(DevCommand())
         ..addCommand(DeployCommand())
         ..addCommand(SecretCommand())

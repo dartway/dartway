@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:dartway_cli/src/deploy/kamal.dart';
+import 'package:dartway_cli/src/commands/check_command.dart';
 import 'package:glob/glob.dart';
 import 'package:path/path.dart' as p;
 import 'package:test/test.dart';
@@ -611,7 +612,7 @@ void main() {
         (
           'dartway check',
           'shop_flutter',
-          'dart run dartway_cli:dartway check $base',
+          'dart run dartway_cli:dartway check $base \$CONTRACT_RELEASE_CHECK',
         ),
       ],
     );
@@ -630,6 +631,30 @@ void main() {
         reason: '${gate['name']}',
       );
     }
+    final contractBaseStep =
+        steps.singleWhere((step) => step['name'] == 'Contract base')['run']
+            as String;
+    expect(contractBaseStep, contains('CONTRACT_RELEASE_CHECK=--release'));
+    final releaseArgument = RegExp(
+      r'CONTRACT_RELEASE_CHECK=(--[a-z-]+)',
+    ).firstMatch(contractBaseStep)![1]!;
+    final checkLine =
+        steps.singleWhere((step) => step['name'] == 'dartway check')['run']
+            as String;
+    final checkArguments = checkLine
+        .split(RegExp(r'\s+'))
+        .skipWhile((word) => word != 'check')
+        .skip(1)
+        .map(
+          (word) => switch (word) {
+            r'$CONTRACT_RELEASE_CHECK' => releaseArgument,
+            r'"$CONTRACT_BASE"' => 'trusted-base',
+            _ => word,
+          },
+        )
+        .toList();
+    final parsedCheck = CheckCommand().argParser.parse(checkArguments);
+    expect(parsedCheck.flag('release'), isTrue);
 
     // The toolchain is the one `.fvmrc` pins, not a second copy of it.
     final fvm = steps.singleWhere((step) => step['id'] == 'fvm');
