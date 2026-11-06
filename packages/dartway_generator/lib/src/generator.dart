@@ -7,12 +7,14 @@ import 'package:analyzer/dart/analysis/formatter_options.dart';
 import 'package:analyzer/dart/analysis/results.dart';
 import 'package:analyzer/dart/ast/ast.dart';
 import 'package:analyzer/dart/element/element.dart';
+import 'package:analyzer/dart/element/type.dart';
 import 'package:path/path.dart' as p;
 import 'package:yaml/yaml.dart';
 import 'package:dartway_core_shared/dartway_core_shared.dart';
 
 import 'analysis/framework.dart';
 import 'analysis/library_names.dart';
+import 'analysis/wire_type.dart';
 import 'contract/baseline.dart';
 import 'contract/descriptor.dart';
 import 'diagnostic.dart';
@@ -213,6 +215,13 @@ abstract final class DwCodeGenerator {
         contractBase,
         branch: releaseBranch,
       );
+      if (contractBase != null && sharedPackage != null) {
+        storeBaseline = readStoreContractBaseline(
+          root: root,
+          sha: baselineSha,
+          shared: sharedPackage,
+        );
+      }
     } on Exception catch (error) {
       if (verify) {
         diagnostics.add(
@@ -287,7 +296,12 @@ abstract final class DwCodeGenerator {
               final nextVersion = DwContractVersion.parse(
                 current['contractVersion'] as String,
               );
-              final storeChanges = compareContracts(storeBaseline, current);
+              final storeChanges = compareContracts(
+                storeBaseline,
+                current,
+                allowDeprecatedRemovals: true,
+                comparison: 'store comparison',
+              );
               if (storeChanges.isNotEmpty &&
                   !storeVersion.isOlderLineThan(nextVersion)) {
                 diagnostics.add(
@@ -315,7 +329,12 @@ abstract final class DwCodeGenerator {
             final nextVersion = DwContractVersion.parse(
               current['contractVersion'] as String,
             );
-            final changes = compareContracts(baselineDescriptor, current);
+            final changes = compareContracts(
+              baselineDescriptor,
+              current,
+              allowDeprecatedRemovals: false,
+              comparison: 'Git comparison',
+            );
             if (nextVersion.isOlderLineThan(previousVersion)) {
               throw const FormatException(
                 'shared package contract line moved backwards',
@@ -556,6 +575,7 @@ final class _Run {
 
   List<GeneratedFile> emit() {
     _checkWireNames();
+    _checkServerSentEnums();
     _checkEntities();
     _relations = resolveRelations([
       for (final l in libraries)
@@ -600,6 +620,78 @@ final class _Run {
       }
     }
     return files;
+  }
+
+  void _checkServerSentEnums() {
+    final entries = <String, (ClassElement, DtoClass)>{
+      for (final library in libraries)
+        for (final (element, dto, _) in library.classes)
+          if (dto != null) dto.name: (element, dto),
+    };
+    final visitedDtos = <String>{};
+    final reportedEnums = <String>{};
+
+    void visitWire(WireType wire, ClassElement owner) {
+      switch (wire) {
+        case EnumWire(open: false):
+          if (reportedEnums.add(wire.spelling)) {
+            diagnostics.add(
+              DwGenerationDiagnostic.at(
+                owner,
+                'enum `${wire.spelling}` is server-sent and must be open: add `with DwOpenEnum`, declare the value `unknown`, and handle it in exhaustive switches',
+                code: 'strictWireEnum',
+              ),
+            );
+          }
+        case DtoWire(core: false, wireName: final name):
+          final entry = entries[name];
+          if (visitedDtos.add(name) && entry != null) {
+            for (final field in entry.$2.fields) {
+              visitWire(field.type, entry.$1);
+            }
+          }
+        case ListWire(element: final inner):
+          visitWire(inner, owner);
+        case MapWire(value: final inner) || PatchWire(inner: final inner):
+          visitWire(inner, owner);
+        default:
+          break;
+      }
+    }
+
+    for (final entry in entries.values) {
+      if (entry.$2.kind == DtoKind.data && visitedDtos.add(entry.$2.name)) {
+        for (final field in entry.$2.fields) {
+          visitWire(field.type, entry.$1);
+        }
+      }
+      if (entry.$2.kind != DtoKind.request &&
+          entry.$2.kind != DtoKind.command) {
+        continue;
+      }
+      final resultKind = [entry.$1.thisType, ...entry.$1.allSupertypes]
+          .where(
+            (type) =>
+                type.element is ClassElement &&
+                DwFrameworkTypes.isFrom(
+                  type.element,
+                  DwFrameworkTypes.corePackage,
+                ),
+          )
+          .where((type) => type.typeArguments.isNotEmpty)
+          .firstOrNull;
+      if (resultKind == null) continue;
+      final reader = WireTypeReader(LibraryNames(entry.$1.library));
+      for (final argument in resultKind.typeArguments) {
+        if (argument is InterfaceType) {
+          try {
+            visitWire(reader.read(argument), entry.$1);
+          } on UnsupportedType {
+            // The ordinary descriptor validation reports unsupported results.
+          }
+        }
+      }
+    }
   }
 
   List<GeneratedFile> completeContracts(

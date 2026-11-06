@@ -7,7 +7,14 @@ part 'chat_messages.dw.dart';
 
 /// The reactions a staff member can put on a message: one each, replaced by
 /// the next one they choose.
-enum ChatReaction { heart, fire, thumbsUp, thumbsDown, money }
+enum ChatReaction with DwOpenEnum {
+  heart,
+  fire,
+  thumbsUp,
+  thumbsDown,
+  money,
+  unknown,
+}
 
 /// A message as quoted by a reply to it. A deleted message keeps its place
 /// in the replies — the link stays, the text does not.

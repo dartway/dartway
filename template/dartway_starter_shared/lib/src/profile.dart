@@ -5,9 +5,9 @@ import 'package:dartway_starter_shared/src/dartway_starter_refusal.dart';
 part 'profile.dw.dart';
 
 /// Access role: a member, or an administrator with the panel.
-enum UserRole { user, admin }
+enum UserRole with DwOpenEnum { user, admin, unknown }
 
-enum UserGender { female, male }
+enum UserGender with DwOpenEnum { female, male, unknown }
 
 /// A profile as its owner and the admins see it.
 ///

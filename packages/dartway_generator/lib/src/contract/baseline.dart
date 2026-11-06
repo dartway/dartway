@@ -133,6 +133,41 @@ final class ContractBaseline {
   final String proof;
 }
 
+/// Reads the store baseline from the trusted Git object. A feature checkout
+/// cannot weaken this gate by editing or deleting its working-tree copy.
+Map<String, dynamic>? readStoreContractBaseline({
+  required String root,
+  required String sha,
+  required DwProjectPackage shared,
+}) {
+  final gitRoot = _git(root, ['rev-parse', '--show-toplevel']).trim();
+  var packagePath = p.posix.joinAll(
+    p.split(p.relative(shared.root, from: gitRoot)),
+  );
+  var relative = p.posix.join(packagePath, 'contract_baseline.json');
+  var text = _tryGit(gitRoot, ['show', '$sha:$relative']);
+  if (text == null) {
+    final matches = <String>[];
+    for (final path in LineSplitter.split(
+      _git(gitRoot, ['ls-tree', '-r', '--name-only', sha]),
+    ).where((path) => p.posix.basename(path) == 'pubspec.yaml')) {
+      final metadata = loadYaml(_git(gitRoot, ['show', '$sha:$path']));
+      if (metadata is Map && metadata['name'] == shared.name) {
+        matches.add(p.posix.dirname(path));
+      }
+    }
+    if (matches.length == 1) {
+      packagePath = matches.single;
+      relative = p.posix.join(packagePath, 'contract_baseline.json');
+      text = _tryGit(gitRoot, ['show', '$sha:$relative']);
+    }
+  }
+  if (text == null) return null;
+  final value = jsonDecode(text);
+  validateContract(value);
+  return value as Map<String, dynamic>;
+}
+
 /// A committed descriptor always wins. Without one, adopt [current] only when
 /// the shared package and its in-repo path dependencies match Git blobs at [sha].
 Future<ContractBaseline> readContractBaseline({
@@ -151,7 +186,7 @@ Future<ContractBaseline> readContractBaseline({
       ),
     ),
   );
-  if (_tryGit(root, [
+  if (_tryGit(gitRoot, [
         'cat-file',
         '-e',
         '$sha:${p.posix.dirname(p.posix.dirname(p.posix.dirname(relative)))}/pubspec.yaml',
@@ -159,9 +194,9 @@ Future<ContractBaseline> readContractBaseline({
       null) {
     final matches = <String>[];
     for (final path in LineSplitter.split(
-      _git(root, ['ls-tree', '-r', '--name-only', sha]),
+      _git(gitRoot, ['ls-tree', '-r', '--name-only', sha]),
     ).where((path) => p.posix.basename(path) == 'pubspec.yaml')) {
-      final metadata = loadYaml(_git(root, ['show', '$sha:$path']));
+      final metadata = loadYaml(_git(gitRoot, ['show', '$sha:$path']));
       if (metadata is Map && metadata['name'] == shared.name) {
         matches.add(p.posix.dirname(path));
       }
@@ -173,12 +208,12 @@ Future<ContractBaseline> readContractBaseline({
     }
     relative = p.posix.join(matches.single, 'lib/generated/dw_contract.json');
   }
-  final text = _tryGit(root, ['show', '$sha:$relative']);
+  final text = _tryGit(gitRoot, ['show', '$sha:$relative']);
   if (text != null) {
     final value = jsonDecode(text);
     validateContract(value);
     final pubspec = loadYaml(
-      _git(root, [
+      _git(gitRoot, [
         'show',
         '$sha:${p.posix.dirname(p.posix.dirname(p.posix.dirname(relative)))}/pubspec.yaml',
       ]),

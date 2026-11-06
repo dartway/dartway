@@ -65,9 +65,10 @@
           "type": {
             "kind": "enum",
             "nullable": false,
-            "open": false,
+            "open": true,
             "values": [
               "admin",
+              "unknown",
               "user"
             ]
           }
@@ -173,9 +174,10 @@
           "type": {
             "kind": "enum",
             "nullable": true,
-            "open": false,
+            "open": true,
             "values": [
               "admin",
+              "unknown",
               "user"
             ]
           }
@@ -254,10 +256,11 @@
             "value": {
               "kind": "enum",
               "nullable": false,
-              "open": false,
+              "open": true,
               "values": [
                 "female",
-                "male"
+                "male",
+                "unknown"
               ]
             }
           }
@@ -346,10 +349,11 @@
           "type": {
             "kind": "enum",
             "nullable": false,
-            "open": false,
+            "open": true,
             "values": [
               "email",
-              "phone"
+              "phone",
+              "unknown"
             ]
           }
         },
@@ -409,10 +413,11 @@
           "type": {
             "kind": "enum",
             "nullable": true,
-            "open": false,
+            "open": true,
             "values": [
               "female",
-              "male"
+              "male",
+              "unknown"
             ]
           }
         },
@@ -444,9 +449,10 @@
           "type": {
             "kind": "enum",
             "nullable": false,
-            "open": false,
+            "open": true,
             "values": [
               "admin",
+              "unknown",
               "user"
             ]
           }

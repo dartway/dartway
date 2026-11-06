@@ -185,7 +185,7 @@ raises the version at the release instead: tasks generate at the current version
 branch, and `generate --release` raises it once (D-158, [CLI](../5-tooling/cli.md#dartway-generate--the-generated-code)).
 
 Field/wire-name removals and renames, recursive type/nullability/patch/default changes, resolved
-request/result-kind changes, strict-enum additions/removals and enum openness changes are breaking.
+request/result-kind changes, enum removals and open-to-strict changes are breaking.
 A new data object is additive, but the shared package's `version:` must be greater than the trusted
 base's version (a patch bump is enough). Its descriptor and generated protocol entry record `since`
 as that version. Existing objects retain the trusted base's `since`, or none for objects already
@@ -196,11 +196,13 @@ The descriptor moves to format 2 automatically on the next generation; no projec
 framework wire version bump is needed.
 
 New calls and nullable/defaulted/patch fields are codec-compatible: the new decoder accepts missing keys and the old decoder ignores extra keys. Dart `required` on a nullable field does
-not make it wire-required. An already-open enum may gain values while retaining all old names and
-`unknown`. A changed default is breaking even when both codecs omit the same JSON key.
+not make it wire-required. An open enum may gain values while retaining all old names and
+`unknown`. Changing a strict enum to open while adding only `unknown` is also compatible. A changed
+default is breaking, except for the default added in the same change that marks a required field
+deprecated so the marked build can decode the field's later absence.
 
 Once both stores carry a build, run `dartway contract baseline`. It copies the
-generated descriptor to `contract_baseline.json` beside the shared pubspec. With that file present,
+generated descriptor, including the source commit, to `contract_baseline.json` beside the shared pubspec. With that file present,
 ordinary checks keep the Git PR comparison and also judge the deployed server against the store
 build. Compatible additions stay on the current breaking line, so deploying the server does not
 answer that build with `426`.
@@ -208,15 +210,16 @@ answer that build with `426`.
 Retirement is two releases. First mark a field, enum value, or call with
 `@DwDeprecated(since: '<shared version>')` and stop using it. After the resulting client is live in
 both stores, update the baseline; only then may the member be removed. An unmarked removal or rename
-fails by name. Release CI runs `dartway check --release`: a mark already present in the baseline is
+fails by name. A marked field must be nullable or have a default, and `since` cannot be newer than
+the current contract version. Release CI runs `dartway check --release`: a mark already present in the baseline is
 then an error until the member is removed. There is only one retired layer.
 
-The descriptor records whether each enum decoder is tolerant. An open enum (`with DwOpenEnum` and
-an `unknown` value) reads an added name as `unknown`; unknown JSON object fields are ignored. A strict
-enum has no honest fallback: its decoder continues to throw `DwUnknownEnumValue`, and its new value
-remains incompatible until a tolerant build has reached both stores. A real break is still made
-explicit by raising the shared package breaking line after that build is live. A newer client on an
-older server remains accepted.
+The descriptor records openness in `open`. An enum reachable from a data-object field or a
+request/command result must use `with DwOpenEnum` and declare `unknown`; this lets every installed
+build read a value added later. Enums used only in client-sent input may remain strict. A baseline
+that was strict still rejects a new value: first ship the compatible strict-to-open change with only
+`unknown`, wait for that build to reach both stores, and update the baseline. Unknown JSON object
+fields remain ignored. A newer client on an older server remains accepted.
 
 For example, changing `CustomerCard({required this.id})` to
 `CustomerCard({required this.id, required this.title})` rejects the old `{ "id": 1 }` payload.

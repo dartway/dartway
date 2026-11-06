@@ -77,7 +77,6 @@ Map<String, Object?> describeContract(
           'kind': 'enum',
           'values': [...wire.values]..sort(),
           'open': wire.open,
-          'tolerant': wire.open,
           if (wire.deprecatedValues.isNotEmpty)
             'deprecatedValues': wire.deprecatedValues,
         });
@@ -307,14 +306,7 @@ void validateContract(Object? descriptor) {
       case 'enum':
         object(
           value,
-          {
-            'kind',
-            'nullable',
-            'values',
-            'open',
-            'tolerant',
-            'deprecatedValues',
-          },
+          {'kind', 'nullable', 'values', 'open', 'deprecatedValues'},
           {'kind', 'nullable', 'values', 'open'},
         );
         final values = value['values'];
@@ -323,7 +315,6 @@ void validateContract(Object? descriptor) {
             values.any((v) => v is! String) ||
             values.toSet().length != values.length ||
             value['open'] is! bool ||
-            (value.containsKey('tolerant') && value['tolerant'] is! bool) ||
             (value['open'] == true && !values.contains('unknown'))) {
           invalid('malformed enum');
         }
@@ -385,7 +376,14 @@ void validateContract(Object? descriptor) {
 
   final root = object(
     descriptor,
-    {'format', 'codec', 'contractVersion', 'objects', 'unverified'},
+    {
+      'format',
+      'codec',
+      'contractVersion',
+      'objects',
+      'unverified',
+      'baselineCommit',
+    },
     {'format', 'codec', 'contractVersion', 'objects', 'unverified'},
   );
   if (root['format'] is! int ||
@@ -396,6 +394,11 @@ void validateContract(Object? descriptor) {
   }
   if (root['contractVersion'] is! String) invalid('missing contract version');
   DwContractVersion.parse(root['contractVersion'] as String);
+  if (root.containsKey('baselineCommit') &&
+      (root['baselineCommit'] is! String ||
+          (root['baselineCommit'] as String).isEmpty)) {
+    invalid('malformed baseline commit');
+  }
   if (root['unverified'] is! List || (root['unverified'] as List).isNotEmpty) {
     invalid('unsupported/custom codecs: ${root['unverified']}');
   }
@@ -483,11 +486,26 @@ void validateContract(Object? descriptor) {
         shape['fields'] is! Map<String, dynamic>) {
       invalid('unsupported DTO kind/fields');
     }
-    for (final field in (shape['fields'] as Map<String, dynamic>).values) {
-      final f = object(field, {'type', 'default', 'deprecatedSince'}, {'type'});
+    for (final fieldEntry
+        in (shape['fields'] as Map<String, dynamic>).entries) {
+      final f = object(
+        fieldEntry.value,
+        {'type', 'default', 'deprecatedSince'},
+        {'type'},
+      );
       type(f['type']);
       if (f.containsKey('deprecatedSince')) {
-        DwContractVersion.parse(f['deprecatedSince'] as String);
+        final since = DwContractVersion.parse(f['deprecatedSince'] as String);
+        if (DwContractVersion.parse(root['contractVersion'] as String) <
+            since) {
+          invalid('field deprecation version exceeds contract version');
+        }
+        if ((f['type'] as Map)['nullable'] != true &&
+            !f.containsKey('default')) {
+          invalid(
+            '${entry.key}.${fieldEntry.key}: deprecated field requires a nullable type or a default so its codec can decode a payload without the field',
+          );
+        }
       }
     }
     if (shape.containsKey('since')) {
@@ -500,7 +518,10 @@ void validateContract(Object? descriptor) {
       }
     }
     if (shape.containsKey('deprecatedSince')) {
-      DwContractVersion.parse(shape['deprecatedSince'] as String);
+      final since = DwContractVersion.parse(shape['deprecatedSince'] as String);
+      if (DwContractVersion.parse(root['contractVersion'] as String) < since) {
+        invalid('object deprecation version exceeds contract version');
+      }
     }
     if (shape['kind'] == 'data') {
       if (shape.containsKey('result') || !shape.containsKey('identity')) {
@@ -598,14 +619,40 @@ void validateContract(Object? descriptor) {
   }
 
   references(objects);
+
+  void validateEnumMarks(Object? value) {
+    if (value is Map) {
+      if (value['deprecatedValues'] case final Map marks) {
+        final current = DwContractVersion.parse(
+          root['contractVersion'] as String,
+        );
+        for (final since in marks.values) {
+          if (current < DwContractVersion.parse(since as String)) {
+            invalid('enum-value deprecation version exceeds contract version');
+          }
+        }
+      }
+      for (final child in value.values) {
+        validateEnumMarks(child);
+      }
+    } else if (value is List) {
+      for (final child in value) {
+        validateEnumMarks(child);
+      }
+    }
+  }
+
+  validateEnumMarks(objects);
 }
 
 /// Conservative bidirectional codec compatibility. Domain semantics are out
 /// of scope; even an optional removal discards installed-client input.
 List<String> compareContracts(
   Map<String, dynamic> old,
-  Map<String, dynamic> current,
-) {
+  Map<String, dynamic> current, {
+  required bool allowDeprecatedRemovals,
+  required String comparison,
+}) {
   final changes = <String>[];
   bool equal(Object? a, Object? b) =>
       jsonEncode(canonical(a)) == jsonEncode(canonical(b));
@@ -616,9 +663,16 @@ List<String> compareContracts(
       final next = (b['values'] as List).toSet();
       final retired =
           ((a['deprecatedValues'] as Map?)?.keys ?? const <Object>[]).toSet();
-      return a['open'] == b['open'] &&
-          next.containsAll(previous.difference(retired)) &&
-          ((a['tolerant'] ?? a['open']) == true || previous.containsAll(next));
+      final openedForMigration =
+          a['open'] == false &&
+          b['open'] == true &&
+          next.difference(previous).every((value) => value == 'unknown');
+      if (a['open'] == true && b['open'] != true) return false;
+      if (!openedForMigration && a['open'] != b['open']) return false;
+      return next.containsAll(previous.difference(retired)) &&
+          (a['open'] == true ||
+              openedForMigration ||
+              previous.containsAll(next));
     }
     if (a['kind'] == 'list') {
       return compatibleType(a['element'] as Map, b['element'] as Map);
@@ -636,9 +690,9 @@ List<String> compareContracts(
     final a = entry.value as Map;
     final b = after[name];
     if (b is! Map) {
-      if (a['deprecatedSince'] == null) {
+      if (!allowDeprecatedRemovals || a['deprecatedSince'] == null) {
         changes.add(
-          '$name: wire name removed/renamed without @DwDeprecated in the store baseline',
+          '$comparison: $name wire name removed/renamed${allowDeprecatedRemovals ? ' without @DwDeprecated in the store baseline' : ''}',
         );
       }
       continue;
@@ -665,17 +719,26 @@ List<String> compareContracts(
     final bf = b['fields'] as Map;
     for (final field in af.keys) {
       if (!bf.containsKey(field)) {
-        if (af[field]['deprecatedSince'] == null) {
+        if (!allowDeprecatedRemovals || af[field]['deprecatedSince'] == null) {
           changes.add(
-            '$name.$field: field removed/renamed without @DwDeprecated in the store baseline',
+            '$comparison: $name.$field field removed/renamed${allowDeprecatedRemovals ? ' without @DwDeprecated in the store baseline' : ''}',
           );
         }
         continue;
       }
-      if (!compatibleType(af[field]['type'] as Map, bf[field]['type'] as Map) ||
-          !equal(af[field]['default'], bf[field]['default']) ||
-          (af[field] as Map).containsKey('default') !=
-              (bf[field] as Map).containsKey('default')) {
+      final oldField = af[field] as Map;
+      final newField = bf[field] as Map;
+      final addsSurvivalDefault =
+          oldField['deprecatedSince'] == null &&
+          newField['deprecatedSince'] != null &&
+          !oldField.containsKey('default') &&
+          newField.containsKey('default') &&
+          (oldField['type'] as Map)['nullable'] == false;
+      if (!compatibleType(oldField['type'] as Map, newField['type'] as Map) ||
+          (!addsSurvivalDefault &&
+              (!equal(oldField['default'], newField['default']) ||
+                  oldField.containsKey('default') !=
+                      newField.containsKey('default')))) {
         changes.add('$name.$field: type/nullability/patch/default changed');
       }
     }
@@ -685,7 +748,9 @@ List<String> compareContracts(
       if (t['nullable'] != true &&
           t['kind'] != 'patch' &&
           !f.containsKey('default')) {
-        changes.add('$name.$field: required field added');
+        changes.add(
+          '$comparison: $name.$field required field added; old builds ignore extra keys, but the new codec must still decode the old payload, so make the field nullable or give it a default',
+        );
       }
     }
   }

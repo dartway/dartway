@@ -9,6 +9,7 @@ const Map<ChatReaction, String> chatReactionSigns = {
   ChatReaction.thumbsUp: '👍',
   ChatReaction.thumbsDown: '👎',
   ChatReaction.money: '💰',
+  ChatReaction.unknown: '❓',
 };
 
 /// How long apart two messages of one author may be and still read as one

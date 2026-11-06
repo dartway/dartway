@@ -17,7 +17,7 @@ An installed build keeps calling with the contract it was built with, for weeks.
 | Change | An old build |
 |---|---|
 | a nullable, defaulted or patch field; a new call | generated codecs accept omitted fields and ignore extra keys |
-| a required non-null field without a default | old input or stored-client answers fail decoding |
+| a required non-null field without a default | the new codec cannot decode the old payload; add it nullable or defaulted |
 | a wire name/field removed or renamed; a type, nullability, patch or default changed | may reject or discard installed-client data; breaking |
 | a value added to a strict enum | an old decoder rejects it; breaking |
 | a value added to an already-open enum with all old values retained | old decoders read the new name as `unknown` |
@@ -35,10 +35,11 @@ failing call by call. A new data object must raise the shared version above the 
 is enough. Other additive changes may keep the version. Nothing is set in an environment at deploy time: the minimum ships with the code. The commit and the PR say which kind of change it is,
 and a breaking one names the version it raises to.
 
-**Open enums** — `with DwOpenEnum` and a value `unknown` — only for display values an unknown one can be
-shown neutrally for (a feed entry's kind), never for anything behaviour depends on (a status, a role).
-`unknown` is never stored in a row; a command carrying it back is answered `dw.updateRequired`, so keep
-open enums out of commands.
+**Open enums** — every enum reachable from a data-object field or request/command result uses
+`with DwOpenEnum` and a value `unknown`, including statuses and roles. Handle `unknown` explicitly in
+exhaustive switches. An enum reachable only from fields the client sends may stay strict. To migrate,
+add only `unknown`, ship that build, wait for both stores, and update the baseline before adding a
+real value.
 
 Contract tests (round trip, `validate()`, `onUpdate`, channels): `dartway-testing`.
 
@@ -46,7 +47,8 @@ After a build is live in both stores, `dartway contract baseline` commits the ge
 as `contract_baseline.json` next to the shared package pubspec. Additions that the baseline codecs tolerate do not raise
 the breaking line. Retire a field, enum value or call by marking it
 `@DwDeprecated(since: '<contract version>')`; removal is allowed only after that mark is in the store
-baseline. Release CI runs `dartway check --release`, which requires marks already in the baseline to
+baseline. A marked field is nullable or has a default so the marked build survives its absence; its
+`since` is not newer than the contract version. Release CI runs `dartway check --release`, which requires marks already in the baseline to
 be removed. Never update the baseline while either store is still reviewing the build.
 
 `projectContractVersion` is an error when the generated project contract is incompatible at the

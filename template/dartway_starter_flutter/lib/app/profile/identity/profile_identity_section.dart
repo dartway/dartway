@@ -47,13 +47,15 @@ class ProfileIdentitySection extends StatelessWidget
           AppText.body(l10n.identitySectionTitle),
           const Gap(AppSpace.s4),
           for (final kind in DwIdentifierKind.values)
-            _IdentityRow(
-              kind: kind,
-              value: switch (kind) {
-                DwIdentifierKind.phone => profile.phone,
-                DwIdentifierKind.email => profile.email,
-              },
-            ),
+            if (kind != DwIdentifierKind.unknown)
+              _IdentityRow(
+                kind: kind,
+                value: switch (kind) {
+                  DwIdentifierKind.phone => profile.phone,
+                  DwIdentifierKind.email => profile.email,
+                  DwIdentifierKind.unknown => null,
+                },
+              ),
         ],
       ),
     );
@@ -75,6 +77,7 @@ class _IdentityRow extends StatelessWidget {
       leading: Icon(switch (kind) {
         DwIdentifierKind.phone => Icons.phone_outlined,
         DwIdentifierKind.email => Icons.alternate_email,
+        DwIdentifierKind.unknown => Icons.help_outline,
       }),
       title: AppText.caption(l10n.identifierKind(kind.name)),
       subtitle: AppText.body(current ?? l10n.identityNotSet),

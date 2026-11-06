@@ -4,6 +4,8 @@
 
 - Add `@DwDeprecated(since:)` for the extend-only project contract lifecycle
   and store-baseline gate (#716).
+- Make `DwIdentifierKind` open with `unknown`, as required for enums sent in
+  data objects and call results (#716).
 
 ## 0.25.0
 

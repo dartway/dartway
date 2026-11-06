@@ -24,6 +24,7 @@ final class DwGenerationDiagnostic
     String message, {
     int? offset,
     bool isWarning = false,
+    String? code,
   }) {
     final fragment = element.firstFragment;
     final libraryFragment = fragment.libraryFragment!;
@@ -33,6 +34,7 @@ final class DwGenerationDiagnostic
     return DwGenerationDiagnostic(
       message,
       isWarning: isWarning,
+      code: code,
       path: libraryFragment.source.fullName,
       line: location.lineNumber,
       column: location.columnNumber,

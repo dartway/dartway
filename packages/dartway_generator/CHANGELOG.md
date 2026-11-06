@@ -2,9 +2,10 @@
 
 ## 0.26.0-dev.1
 
-- Record tolerant enum decoders and versioned deprecations in project contract
-  descriptors. A committed store baseline allows only marked removals and the
-  release check requires baseline deprecations to be removed (#716).
+- Record open enums and versioned deprecations in project contract descriptors.
+  Server-sent enums must be open; marked fields must survive absence. The
+  trusted-revision store comparison alone allows marked removals, while the Git
+  comparison stays strict (#716).
 
 ## 0.25.0
 

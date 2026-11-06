@@ -6,7 +6,7 @@ import 'units.dart' as units;
 
 part 'catalog.dw.dart';
 
-enum Color { red, green, blue }
+enum Color with DwOpenEnum { red, green, blue, unknown }
 
 /// An abstract base: not generated itself, its fields are inherited.
 abstract class Named extends DwDataObject {

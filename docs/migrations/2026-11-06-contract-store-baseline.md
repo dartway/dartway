@@ -30,6 +30,23 @@ Do not create the baseline from a build that is still under review in either
 store. Until the file is committed, the existing Git contract gate remains in
 effect.
 
+Open every enum that appears in a `DwDataObject` field or a request/command
+result, and add the fallback case to exhaustive switches:
+
+```dart
+enum DeliveryState with DwOpenEnum { pending, delivered, unknown }
+
+final label = switch (state) {
+  DeliveryState.pending => 'Pending',
+  DeliveryState.delivered => 'Delivered',
+  DeliveryState.unknown => 'Unknown',
+};
+```
+
+Enums used only in fields sent by the client may remain strict. Ship this
+strict-to-open migration before adding any other enum value, then wait for the
+opened build to reach both stores and record its baseline.
+
 ## How to check
 
 Run `dartway check`, then run the release-only cleanup gate with

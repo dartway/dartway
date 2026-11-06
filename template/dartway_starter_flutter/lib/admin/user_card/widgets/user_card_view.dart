@@ -49,6 +49,7 @@ class UserCardView extends StatelessWidget {
                   leading: Icon(switch (identifier.kind) {
                     DwIdentifierKind.phone => Icons.phone_outlined,
                     DwIdentifierKind.email => Icons.alternate_email,
+                    DwIdentifierKind.unknown => Icons.help_outline,
                   }),
                   title: AppText.body(identifier.value),
                   subtitle: AppText.caption(switch (identifier.verifiedAt) {

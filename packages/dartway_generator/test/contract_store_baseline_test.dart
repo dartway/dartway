@@ -5,10 +5,32 @@ void main() {
   test('an unmarked removal is rejected and a baseline mark permits it', () {
     final current = _contract(fields: {});
     expect(
-      compareContracts(_contract(), current),
+      compareContracts(
+        _contract(),
+        current,
+        allowDeprecatedRemovals: true,
+        comparison: 'store comparison',
+      ),
       contains(contains('OrderCard.title')),
     );
-    expect(compareContracts(_contract(deprecated: true), current), isEmpty);
+    expect(
+      compareContracts(
+        _contract(deprecated: true),
+        current,
+        allowDeprecatedRemovals: true,
+        comparison: 'store comparison',
+      ),
+      isEmpty,
+    );
+    expect(
+      compareContracts(
+        _contract(deprecated: true),
+        current,
+        allowDeprecatedRemovals: false,
+        comparison: 'Git comparison',
+      ),
+      contains(contains('Git comparison')),
+    );
   });
 
   test('release check rejects a deprecation that is still present', () {
@@ -19,11 +41,13 @@ void main() {
     expect(staleDeprecations(baseline, _contract(fields: {})), isEmpty);
   });
 
-  test('only a tolerant baseline permits an enum addition', () {
+  test('only an open baseline permits an enum addition', () {
     expect(
       compareContracts(
         _contract(open: false),
         _contract(open: false, added: true),
+        allowDeprecatedRemovals: false,
+        comparison: 'Git comparison',
       ),
       isNotEmpty,
     );
@@ -31,6 +55,17 @@ void main() {
       compareContracts(
         _contract(open: true),
         _contract(open: true, added: true),
+        allowDeprecatedRemovals: false,
+        comparison: 'Git comparison',
+      ),
+      isEmpty,
+    );
+    expect(
+      compareContracts(
+        _contract(open: false),
+        _contract(open: true),
+        allowDeprecatedRemovals: false,
+        comparison: 'Git comparison',
       ),
       isEmpty,
     );
@@ -59,9 +94,8 @@ Map<String, dynamic> _contract({
               'type': {
                 'kind': 'enum',
                 'nullable': false,
-                'values': ['unknown', 'ready', if (added) 'archived'],
+                'values': [if (open) 'unknown', 'ready', if (added) 'archived'],
                 'open': open,
-                'tolerant': open,
               },
             },
           },

@@ -28,6 +28,17 @@ void main() {
       File(
         p.join(shared.path, 'dw_contract.json'),
       ).writeAsStringSync(jsonEncode(descriptor));
+      Process.runSync('git', ['init'], workingDirectory: root.path);
+      Process.runSync('git', [
+        '-c',
+        'user.name=Test',
+        '-c',
+        'user.email=test@example.com',
+        'commit',
+        '--allow-empty',
+        '-m',
+        'base',
+      ], workingDirectory: root.path);
       final previous = Directory.current;
       try {
         Directory.current = root;
@@ -43,7 +54,7 @@ void main() {
             p.join(root.path, 'acme_shared', 'contract_baseline.json'),
           ).readAsStringSync(),
         ),
-        descriptor,
+        containsPair('baselineCommit', isNotEmpty),
       );
     },
   );
