@@ -22,6 +22,11 @@ the VM, in the app and on the web. The shared package of the reference project i
 
 Requests and commands share the sealed base `DwServerCall`; a project never extends it either.
 
+Every enum the server can send through a data object or a request/command
+result uses `with DwOpenEnum` and declares `unknown`, including status and role
+enums. Treat `unknown` conservatively. An enum used only in client-sent input
+may remain strict.
+
 **Every data object has an `id` — an `int` or a `String`, never nullable.** Updates arriving on a
 channel are merged into client state by it, so an object without an identity cannot be one. The id
 is usually a field; a singleton view declares a fixed getter

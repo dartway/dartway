@@ -183,26 +183,7 @@ abstract final class DwCodeGenerator {
     final sharedPackage = packages
         .where((package) => package.role == DwPackageRole.shared)
         .firstOrNull;
-    final storeBaselineFile = sharedPackage == null
-        ? null
-        : File(p.join(sharedPackage.root, 'contract_baseline.json'));
     Map<String, dynamic>? storeBaseline;
-    if (storeBaselineFile?.existsSync() ?? false) {
-      try {
-        storeBaseline =
-            jsonDecode(storeBaselineFile!.readAsStringSync())
-                as Map<String, dynamic>;
-        validateContract(storeBaseline);
-      } catch (error) {
-        diagnostics.add(
-          DwGenerationDiagnostic(
-            'contract not verified: malformed contract_baseline.json: $error',
-            code: 'projectContractVersion',
-          ),
-        );
-        return finish();
-      }
-    }
     // Ordinary generation also needs trusted introduction metadata, but keeps
     // its existing non-verifying mode for new projects and unsupported codecs.
     // The check gate must still prove a baseline before accepting the output.
@@ -215,7 +196,7 @@ abstract final class DwCodeGenerator {
         contractBase,
         branch: releaseBranch,
       );
-      if (contractBase != null && sharedPackage != null) {
+      if (sharedPackage != null) {
         storeBaseline = readStoreContractBaseline(
           root: root,
           sha: baselineSha,
@@ -232,6 +213,9 @@ abstract final class DwCodeGenerator {
         );
         return finish();
       }
+      stdout.writeln(
+        'Store comparison skipped: no trusted Git base could be resolved.',
+      );
     }
 
     final collection = AnalysisContextCollection(
@@ -299,7 +283,7 @@ abstract final class DwCodeGenerator {
               final storeChanges = compareContracts(
                 storeBaseline,
                 current,
-                allowDeprecatedRemovals: true,
+                removalBaseline: storeBaseline,
                 comparison: 'store comparison',
               );
               if (storeChanges.isNotEmpty &&
@@ -332,7 +316,7 @@ abstract final class DwCodeGenerator {
             final changes = compareContracts(
               baselineDescriptor,
               current,
-              allowDeprecatedRemovals: false,
+              removalBaseline: storeBaseline,
               comparison: 'Git comparison',
             );
             if (nextVersion.isOlderLineThan(previousVersion)) {

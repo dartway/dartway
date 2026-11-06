@@ -29,13 +29,13 @@ void main() {
         p.join(shared.path, 'dw_contract.json'),
       ).writeAsStringSync(jsonEncode(descriptor));
       Process.runSync('git', ['init'], workingDirectory: root.path);
+      Process.runSync('git', ['add', '.'], workingDirectory: root.path);
       Process.runSync('git', [
         '-c',
         'user.name=Test',
         '-c',
         'user.email=test@example.com',
         'commit',
-        '--allow-empty',
         '-m',
         'base',
       ], workingDirectory: root.path);

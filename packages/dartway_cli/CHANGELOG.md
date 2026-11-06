@@ -6,7 +6,8 @@
 
 - Add `dartway contract baseline` and `dartway check --release` for the
   extend-only store contract lifecycle. Baseline creation validates the
-  descriptor and records its source commit (#716).
+  clean, HEAD-matching descriptor and records HEAD; created-project release CI
+  runs the deprecation-cleanup gate (#716).
 
 ### Breaking changes
 

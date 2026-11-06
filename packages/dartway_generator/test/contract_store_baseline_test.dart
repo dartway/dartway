@@ -8,7 +8,7 @@ void main() {
       compareContracts(
         _contract(),
         current,
-        allowDeprecatedRemovals: true,
+        removalBaseline: _contract(),
         comparison: 'store comparison',
       ),
       contains(contains('OrderCard.title')),
@@ -17,7 +17,7 @@ void main() {
       compareContracts(
         _contract(deprecated: true),
         current,
-        allowDeprecatedRemovals: true,
+        removalBaseline: _contract(deprecated: true),
         comparison: 'store comparison',
       ),
       isEmpty,
@@ -26,7 +26,7 @@ void main() {
       compareContracts(
         _contract(deprecated: true),
         current,
-        allowDeprecatedRemovals: false,
+        removalBaseline: _contract(),
         comparison: 'Git comparison',
       ),
       contains(contains('Git comparison')),
@@ -46,7 +46,7 @@ void main() {
       compareContracts(
         _contract(open: false),
         _contract(open: false, added: true),
-        allowDeprecatedRemovals: false,
+        removalBaseline: null,
         comparison: 'Git comparison',
       ),
       isNotEmpty,
@@ -55,7 +55,7 @@ void main() {
       compareContracts(
         _contract(open: true),
         _contract(open: true, added: true),
-        allowDeprecatedRemovals: false,
+        removalBaseline: null,
         comparison: 'Git comparison',
       ),
       isEmpty,
@@ -64,7 +64,7 @@ void main() {
       compareContracts(
         _contract(open: false),
         _contract(open: true),
-        allowDeprecatedRemovals: false,
+        removalBaseline: null,
         comparison: 'Git comparison',
       ),
       isEmpty,

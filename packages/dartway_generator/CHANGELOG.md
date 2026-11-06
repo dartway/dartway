@@ -4,8 +4,8 @@
 
 - Record open enums and versioned deprecations in project contract descriptors.
   Server-sent enums must be open; marked fields must survive absence. The
-  trusted-revision store comparison alone allows marked removals, while the Git
-  comparison stays strict (#716).
+  both trusted-revision comparisons allow a removal only when its mark is in
+  the store baseline (#716).
 
 ## 0.25.0
 

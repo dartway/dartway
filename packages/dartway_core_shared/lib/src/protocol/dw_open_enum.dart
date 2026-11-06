@@ -1,17 +1,11 @@
 /// An enum whose values a newer build may add, and whose readers show what
 /// they do not know neutrally instead of stopping.
 ///
-/// **Every enum is strict unless marked.** A name this build does not know is
-/// then a sign the app is out of date: the client switches to "update the
-/// app" (`DwCoreRefusal.updateRequired`), because nothing it shows or does
-/// with such data can be trusted to have handled every case — which is what
-/// an enum is for.
-///
-/// Mark an enum open only when a value is **for display alone** and an
-/// unknown one can be shown neutrally or left out without anyone acting on
-/// it wrongly: the kind of an entry in an activity feed, the icon of a
-/// notification. Never when behaviour depends on the value — a status that
-/// decides what may happen next, a role, a permission, a kind of payment.
+/// Every enum the server can send in a data object or request/command result
+/// is open, so an installed build can read values introduced by a later
+/// server. Enums used only in client-sent input may remain strict. Application
+/// behaviour handles `unknown` conservatively, whether the enum represents a
+/// status, role, permission, or display value.
 ///
 /// ```dart
 /// enum IssueEventKind with DwOpenEnum { created, renamed, prioritized, unknown }

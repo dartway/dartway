@@ -79,6 +79,9 @@ jobs:
             base="$(git merge-base HEAD "origin/$DEFAULT_BRANCH")"
           fi
           echo "CONTRACT_BASE=$base" >> "$GITHUB_ENV"
+          if [ "$GITHUB_REF_NAME" = release ]; then
+            echo "CONTRACT_RELEASE_CHECK=--release-check" >> "$GITHUB_ENV"
+          fi
           echo "DW_DATABASE_PORT=$DB_PORT" >> "$GITHUB_ENV"
 
       # The locks are committed and held, as the deploy images hold them: CI
@@ -150,4 +153,4 @@ jobs:
       - name: dartway check
         if: ${{ !cancelled() && steps.deps.outcome == 'success' }}
         working-directory: dartway_starter_flutter
-        run: dart run dartway_cli:dartway check --contract-base "$CONTRACT_BASE"
+        run: dart run dartway_cli:dartway check --contract-base "$CONTRACT_BASE" $CONTRACT_RELEASE_CHECK

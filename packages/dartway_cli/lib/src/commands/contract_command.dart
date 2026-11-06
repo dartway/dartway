@@ -47,6 +47,25 @@ final class _ContractBaselineCommand extends Command<int> {
     final source = File(
       p.join(shared.single.path, 'lib', 'generated', 'dw_contract.json'),
     );
+    final sourceRelative = p.relative(source.path, from: root.path);
+    final status = Process.runSync('git', [
+      'status',
+      '--porcelain',
+      '--',
+      sourceRelative,
+    ], workingDirectory: root.path);
+    final headSource = Process.runSync('git', [
+      'show',
+      'HEAD:$sourceRelative',
+    ], workingDirectory: root.path);
+    if (status.exitCode != 0 ||
+        (status.stdout as String).trim().isNotEmpty ||
+        headSource.exitCode != 0 ||
+        headSource.stdout != source.readAsStringSync()) {
+      throw StateError(
+        'Refusing to record $sourceRelative: it is dirty or differs from HEAD.',
+      );
+    }
     final descriptor = jsonDecode(source.readAsStringSync());
     if (descriptor is! Map<String, dynamic> ||
         descriptor['format'] is! int ||

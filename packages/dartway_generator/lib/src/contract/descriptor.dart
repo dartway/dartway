@@ -650,19 +650,23 @@ void validateContract(Object? descriptor) {
 List<String> compareContracts(
   Map<String, dynamic> old,
   Map<String, dynamic> current, {
-  required bool allowDeprecatedRemovals,
+  required Map<String, dynamic>? removalBaseline,
   required String comparison,
 }) {
   final changes = <String>[];
+  final removalMarks = removalBaseline == null
+      ? const <String>{}
+      : _deprecationMarks(removalBaseline);
   bool equal(Object? a, Object? b) =>
       jsonEncode(canonical(a)) == jsonEncode(canonical(b));
-  bool compatibleType(Map a, Map b) {
+  bool compatibleType(String path, Map a, Map b) {
     if (a['kind'] != b['kind'] || a['nullable'] != b['nullable']) return false;
     if (a['kind'] == 'enum') {
       final previous = (a['values'] as List).toSet();
       final next = (b['values'] as List).toSet();
-      final retired =
-          ((a['deprecatedValues'] as Map?)?.keys ?? const <Object>[]).toSet();
+      final retired = previous
+          .where((value) => removalMarks.contains('$path.$value'))
+          .toSet();
       final openedForMigration =
           a['open'] == false &&
           b['open'] == true &&
@@ -675,10 +679,10 @@ List<String> compareContracts(
               previous.containsAll(next));
     }
     if (a['kind'] == 'list') {
-      return compatibleType(a['element'] as Map, b['element'] as Map);
+      return compatibleType(path, a['element'] as Map, b['element'] as Map);
     }
     if (a['kind'] == 'map' || a['kind'] == 'patch') {
-      return compatibleType(a['value'] as Map, b['value'] as Map);
+      return compatibleType(path, a['value'] as Map, b['value'] as Map);
     }
     return equal(a, b);
   }
@@ -690,9 +694,9 @@ List<String> compareContracts(
     final a = entry.value as Map;
     final b = after[name];
     if (b is! Map) {
-      if (!allowDeprecatedRemovals || a['deprecatedSince'] == null) {
+      if (!removalMarks.contains(name)) {
         changes.add(
-          '$comparison: $name wire name removed/renamed${allowDeprecatedRemovals ? ' without @DwDeprecated in the store baseline' : ''}',
+          '$comparison: $name wire name removed/renamed without @DwDeprecated in the store baseline',
         );
       }
       continue;
@@ -708,6 +712,7 @@ List<String> compareContracts(
           ar['kind'] != br['kind'] ||
           !(ar['arguments'] as List).indexed.every(
             (pair) => compatibleType(
+              '$name.result.${pair.$1}',
               pair.$2 as Map,
               (br['arguments'] as List)[pair.$1] as Map,
             ),
@@ -719,9 +724,9 @@ List<String> compareContracts(
     final bf = b['fields'] as Map;
     for (final field in af.keys) {
       if (!bf.containsKey(field)) {
-        if (!allowDeprecatedRemovals || af[field]['deprecatedSince'] == null) {
+        if (!removalMarks.contains('$name.$field')) {
           changes.add(
-            '$comparison: $name.$field field removed/renamed${allowDeprecatedRemovals ? ' without @DwDeprecated in the store baseline' : ''}',
+            '$comparison: $name.$field field removed/renamed without @DwDeprecated in the store baseline',
           );
         }
         continue;
@@ -734,7 +739,11 @@ List<String> compareContracts(
           !oldField.containsKey('default') &&
           newField.containsKey('default') &&
           (oldField['type'] as Map)['nullable'] == false;
-      if (!compatibleType(oldField['type'] as Map, newField['type'] as Map) ||
+      if (!compatibleType(
+            '$name.$field',
+            oldField['type'] as Map,
+            newField['type'] as Map,
+          ) ||
           (!addsSurvivalDefault &&
               (!equal(oldField['default'], newField['default']) ||
                   oldField.containsKey('default') !=
@@ -766,54 +775,79 @@ List<String> compareContracts(
   return changes..sort();
 }
 
+Set<String> _deprecationMarks(Map<String, dynamic> descriptor) {
+  final marks = <String>{};
+  void type(String path, Map value) {
+    if (value['deprecatedValues'] case final Map deprecated) {
+      marks.addAll(deprecated.keys.map((name) => '$path.$name'));
+    }
+    if (value['kind'] == 'list' && value['element'] is Map) {
+      type(path, value['element'] as Map);
+    } else if ((value['kind'] == 'map' || value['kind'] == 'patch') &&
+        value['value'] is Map) {
+      type(path, value['value'] as Map);
+    }
+  }
+
+  final objects = descriptor['objects'] as Map;
+  for (final entry in objects.entries) {
+    final object = entry.value as Map;
+    if (object['deprecatedSince'] != null) marks.add(entry.key as String);
+    for (final field in (object['fields'] as Map).entries) {
+      final path = '${entry.key}.${field.key}';
+      final value = field.value as Map;
+      if (value['deprecatedSince'] != null) marks.add(path);
+      type(path, value['type'] as Map);
+    }
+    if (object['result'] case final Map result) {
+      for (final argument in (result['arguments'] as List).indexed) {
+        type('${entry.key}.result.${argument.$1}', argument.$2 as Map);
+      }
+    }
+  }
+  return marks;
+}
+
 /// Members whose retirement mark has reached the store baseline but which
 /// still remain in source. Release CI requires the promised cleanup.
 List<String> staleDeprecations(
   Map<String, dynamic> baseline,
   Map<String, dynamic> current,
 ) {
-  final stale = <String>[];
-  final before = baseline['objects'] as Map<String, dynamic>;
-  final after = current['objects'] as Map<String, dynamic>;
-  for (final entry in before.entries) {
-    final oldObject = entry.value as Map;
-    final newObject = after[entry.key];
-    if (oldObject['deprecatedSince'] != null && newObject is Map) {
-      stale.add(entry.key);
-    }
-    if (newObject is! Map) continue;
-    final oldFields = oldObject['fields'] as Map;
-    final newFields = newObject['fields'] as Map;
-    void enumMarks(String path, Map oldType, Map newType) {
-      if (oldType['kind'] == 'enum' && newType['kind'] == 'enum') {
-        for (final value
-            in (oldType['deprecatedValues'] as Map? ?? const {}).keys) {
-          if ((newType['values'] as List).contains(value)) {
-            stale.add('$path.$value');
-          }
-        }
-      }
-      final child = oldType['kind'] == 'list' ? 'element' : 'value';
-      if (oldType[child] is Map && newType[child] is Map) {
-        enumMarks(path, oldType[child] as Map, newType[child] as Map);
-      }
-    }
+  final baselineMarks = _deprecationMarks(baseline);
+  final currentMembers = _contractMembers(current);
+  return baselineMarks.where(currentMembers.contains).toList()..sort();
+}
 
-    for (final field in oldFields.entries) {
-      if ((field.value as Map)['deprecatedSince'] != null &&
-          newFields.containsKey(field.key)) {
-        stale.add('${entry.key}.${field.key}');
-      }
-      if (newFields[field.key] case final Map newField) {
-        enumMarks(
-          '${entry.key}.${field.key}',
-          (field.value as Map)['type'] as Map,
-          newField['type'] as Map,
-        );
+Set<String> _contractMembers(Map<String, dynamic> descriptor) {
+  final members = <String>{};
+  void type(String path, Map value) {
+    if (value['kind'] == 'enum') {
+      members.addAll((value['values'] as List).map((name) => '$path.$name'));
+    }
+    if (value['kind'] == 'list' && value['element'] is Map) {
+      type(path, value['element'] as Map);
+    } else if ((value['kind'] == 'map' || value['kind'] == 'patch') &&
+        value['value'] is Map) {
+      type(path, value['value'] as Map);
+    }
+  }
+
+  for (final entry in (descriptor['objects'] as Map).entries) {
+    members.add(entry.key as String);
+    final object = entry.value as Map;
+    for (final field in (object['fields'] as Map).entries) {
+      final path = '${entry.key}.${field.key}';
+      members.add(path);
+      type(path, (field.value as Map)['type'] as Map);
+    }
+    if (object['result'] case final Map result) {
+      for (final argument in (result['arguments'] as List).indexed) {
+        type('${entry.key}.result.${argument.$1}', argument.$2 as Map);
       }
     }
   }
-  return stale..sort();
+  return members;
 }
 
 /// Introduction metadata comes only from the trusted descriptor. An object

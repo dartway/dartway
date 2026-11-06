@@ -611,7 +611,7 @@ void main() {
         (
           'dartway check',
           'shop_flutter',
-          'dart run dartway_cli:dartway check $base',
+          'dart run dartway_cli:dartway check $base \$CONTRACT_RELEASE_CHECK',
         ),
       ],
     );
@@ -630,6 +630,10 @@ void main() {
         reason: '${gate['name']}',
       );
     }
+    expect(
+      steps.singleWhere((step) => step['name'] == 'Contract base')['run'],
+      contains('CONTRACT_RELEASE_CHECK=--release-check'),
+    );
 
     // The toolchain is the one `.fvmrc` pins, not a second copy of it.
     final fvm = steps.singleWhere((step) => step['id'] == 'fvm');

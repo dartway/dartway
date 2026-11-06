@@ -209,14 +209,17 @@ answer that build with `426`.
 
 Retirement is two releases. First mark a field, enum value, or call with
 `@DwDeprecated(since: '<shared version>')` and stop using it. After the resulting client is live in
-both stores, update the baseline; only then may the member be removed. An unmarked removal or rename
-fails by name. A marked field must be nullable or have a default, and `since` cannot be newer than
+both stores, update the baseline; only then may the member be removed. Both comparisons exempt a
+removal only when its mark is present in the trusted store baseline. A mark found only in the Git
+base or working tree never exempts it, and without a baseline at the trusted revision there is no
+exemption. An unmarked removal or rename fails by name. A marked field must be nullable or have a default, and `since` cannot be newer than
 the current contract version. Release CI runs `dartway check --release`: a mark already present in the baseline is
 then an error until the member is removed. There is only one retired layer.
 
-The descriptor records openness in `open`. An enum reachable from a data-object field or a
-request/command result must use `with DwOpenEnum` and declare `unknown`; this lets every installed
-build read a value added later. Enums used only in client-sent input may remain strict. A baseline
+The descriptor records openness in `open`. Every enum reachable from a data-object field or a
+request/command result uses `with DwOpenEnum` and declares `unknown`; this applies equally to
+statuses, roles, permissions, and display values. Code handles `unknown` conservatively. Enums used
+only in client-sent input may remain strict. A baseline
 that was strict still rejects a new value: first ship the compatible strict-to-open change with only
 `unknown`, wait for that build to reach both stores, and update the baseline. Unknown JSON object
 fields remain ignored. A newer client on an older server remains accepted.
