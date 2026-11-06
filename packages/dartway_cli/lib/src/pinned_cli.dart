@@ -42,6 +42,7 @@ class DwPinnedCli {
   static const Set<String> projectCommands = {
     'generate',
     'check',
+    'contract',
     'test',
     'deploy',
     'dev',

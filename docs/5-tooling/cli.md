@@ -282,6 +282,8 @@ dartway generate            # write
 dartway generate --check --contract-base <trusted-SHA>  # read-only freshness and compatibility
 dartway generate -v         # list every file written or removed
 dartway generate --release  # the release: raise the contract version once
+dartway contract baseline   # after the build is live in both stores
+dartway check --release     # release CI cleanup gate
 ```
 
 Runs `dartway_generator` over the project: DTO codecs (`*.dw.dart` parts) and the protocol registry
@@ -310,6 +312,11 @@ package `version:` — the next major (the next minor below 1.0) for an incompat
 minor (the next patch below 1.0) for a new data object — generates at it and runs `pub get` in every
 package. The release CI then checks with an explicit `--contract-base` against the release branch,
 strictly, as before.
+
+The store baseline is `<shared>/contract_baseline.json`, a committed copy of the generated contract
+and its contract version. Projects without it retain the Git-baseline behavior; adopt it only after
+the current build is live in both stores. Server release CI uses `dartway check --release` so a
+deprecation already delivered by that baseline cannot survive for another release.
 
 ## `dartway format` — the pinned Dart, on what the branch changed
 

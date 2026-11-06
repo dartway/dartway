@@ -59,12 +59,14 @@ final class EnumWire extends WireType {
     required super.nullable,
     required this.values,
     required this.open,
+    this.deprecatedValues = const {},
     this.customNameEncoding = false,
   });
 
   final String spelling;
   final List<String> values;
   final bool open;
+  final Map<String, String> deprecatedValues;
   final bool customNameEncoding;
 }
 
@@ -209,6 +211,20 @@ final class WireTypeReader {
       final open = element.mixins.any(
         (mixin) => DwFrameworkTypes.isCoreClass(mixin.element, 'DwOpenEnum'),
       );
+      final deprecatedValues = <String, String>{};
+      for (final field in element.fields.where(
+        (field) => field.isEnumConstant,
+      )) {
+        for (final annotation in field.metadata.annotations) {
+          final value = annotation.computeConstantValue();
+          final annotationType = value?.type?.element;
+          if (annotationType != null &&
+              DwFrameworkTypes.isCoreClass(annotationType, 'DwDeprecated')) {
+            final since = value?.getField('since')?.toStringValue();
+            if (since != null) deprecatedValues[field.name!] = since;
+          }
+        }
+      }
       if (open &&
           !element.fields.any(
             (field) => field.isEnumConstant && field.name == 'unknown',
@@ -226,6 +242,7 @@ final class WireTypeReader {
             if (field.isEnumConstant) field.name!,
         ],
         open: open,
+        deprecatedValues: deprecatedValues,
         // The generated part evaluates `.name` in this library. A custom
         // member or applicable visible extension can change that encoding;
         // enum constants alone then cannot prove the wire contract.

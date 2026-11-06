@@ -2,8 +2,9 @@
 
 ## 0.26.0-dev.1
 
-- Nothing changed here; the family moves in lockstep with stable `readLink`
-  links in `dartway_core_server` (#710).
+- Record tolerant enum decoders and versioned deprecations in project contract
+  descriptors. A committed store baseline allows only marked removals and the
+  release check requires baseline deprecations to be removed (#716).
 
 ## 0.25.0
 

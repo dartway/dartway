@@ -77,6 +77,9 @@ Map<String, Object?> describeContract(
           'kind': 'enum',
           'values': [...wire.values]..sort(),
           'open': wire.open,
+          'tolerant': wire.open,
+          if (wire.deprecatedValues.isNotEmpty)
+            'deprecatedValues': wire.deprecatedValues,
         });
       case DtoWire():
         shape.addAll({'kind': 'dto', 'name': wire.wireName, 'core': wire.core});
@@ -142,10 +145,14 @@ Map<String, Object?> describeContract(
     }
     final shape = <String, Object?>{
       'kind': dto.kind.name,
+      'deprecatedSince': ?_deprecatedSince(element),
       'fields': {
         for (final field in dto.fields)
           field.name: {
             'type': type(field.type),
+            'deprecatedSince': ?_deprecatedSince(
+              element.getGetter(field.name)?.variable,
+            ),
             if (field.defaultValue != null)
               'default': field.defaultValue!.value,
           },
@@ -201,6 +208,18 @@ Map<String, Object?> describeContract(
     'objects': objects,
     'unverified': unsupported.toSet().toList()..sort(),
   };
+}
+
+String? _deprecatedSince(Element? element) {
+  if (element == null) return null;
+  for (final annotation in element.metadata.annotations) {
+    final value = annotation.computeConstantValue();
+    final type = value?.type?.element;
+    if (type != null && DwFrameworkTypes.isCoreClass(type, 'DwDeprecated')) {
+      return value?.getField('since')?.toStringValue();
+    }
+  }
+  return null;
 }
 
 // A name prefix is not provenance: project code can declare a `_$...` mixin.
@@ -288,7 +307,14 @@ void validateContract(Object? descriptor) {
       case 'enum':
         object(
           value,
-          {'kind', 'nullable', 'values', 'open'},
+          {
+            'kind',
+            'nullable',
+            'values',
+            'open',
+            'tolerant',
+            'deprecatedValues',
+          },
           {'kind', 'nullable', 'values', 'open'},
         );
         final values = value['values'];
@@ -297,8 +323,22 @@ void validateContract(Object? descriptor) {
             values.any((v) => v is! String) ||
             values.toSet().length != values.length ||
             value['open'] is! bool ||
+            (value.containsKey('tolerant') && value['tolerant'] is! bool) ||
             (value['open'] == true && !values.contains('unknown'))) {
           invalid('malformed enum');
+        }
+        if (value['deprecatedValues'] case final Map deprecated) {
+          if (deprecated.keys.any((key) => !values.contains(key)) ||
+              deprecated.values.any((since) {
+                try {
+                  DwContractVersion.parse(since as String);
+                  return false;
+                } catch (_) {
+                  return true;
+                }
+              })) {
+            invalid('malformed deprecated enum values');
+          }
         }
       case 'list':
         object(
@@ -434,6 +474,7 @@ void validateContract(Object? descriptor) {
         'fields',
         'identity',
         'result',
+        'deprecatedSince',
         if (root['format'] == 2) 'since',
       },
       {'kind', 'fields'},
@@ -443,8 +484,11 @@ void validateContract(Object? descriptor) {
       invalid('unsupported DTO kind/fields');
     }
     for (final field in (shape['fields'] as Map<String, dynamic>).values) {
-      final f = object(field, {'type', 'default'}, {'type'});
+      final f = object(field, {'type', 'default', 'deprecatedSince'}, {'type'});
       type(f['type']);
+      if (f.containsKey('deprecatedSince')) {
+        DwContractVersion.parse(f['deprecatedSince'] as String);
+      }
     }
     if (shape.containsKey('since')) {
       if (shape['kind'] != 'data' || shape['since'] is! String) {
@@ -454,6 +498,9 @@ void validateContract(Object? descriptor) {
       if (DwContractVersion.parse(root['contractVersion'] as String) < since) {
         invalid('data introduction version exceeds contract version');
       }
+    }
+    if (shape.containsKey('deprecatedSince')) {
+      DwContractVersion.parse(shape['deprecatedSince'] as String);
     }
     if (shape['kind'] == 'data') {
       if (shape.containsKey('result') || !shape.containsKey('identity')) {
@@ -567,9 +614,11 @@ List<String> compareContracts(
     if (a['kind'] == 'enum') {
       final previous = (a['values'] as List).toSet();
       final next = (b['values'] as List).toSet();
+      final retired =
+          ((a['deprecatedValues'] as Map?)?.keys ?? const <Object>[]).toSet();
       return a['open'] == b['open'] &&
-          next.containsAll(previous) &&
-          (a['open'] == true || previous.containsAll(next));
+          next.containsAll(previous.difference(retired)) &&
+          ((a['tolerant'] ?? a['open']) == true || previous.containsAll(next));
     }
     if (a['kind'] == 'list') {
       return compatibleType(a['element'] as Map, b['element'] as Map);
@@ -587,7 +636,11 @@ List<String> compareContracts(
     final a = entry.value as Map;
     final b = after[name];
     if (b is! Map) {
-      changes.add('$name: wire name removed/renamed');
+      if (a['deprecatedSince'] == null) {
+        changes.add(
+          '$name: wire name removed/renamed without @DwDeprecated in the store baseline',
+        );
+      }
       continue;
     }
     if (a['kind'] != b['kind'] || !equal(a['identity'], b['identity'])) {
@@ -612,7 +665,11 @@ List<String> compareContracts(
     final bf = b['fields'] as Map;
     for (final field in af.keys) {
       if (!bf.containsKey(field)) {
-        changes.add('$name.$field: field removed/renamed');
+        if (af[field]['deprecatedSince'] == null) {
+          changes.add(
+            '$name.$field: field removed/renamed without @DwDeprecated in the store baseline',
+          );
+        }
         continue;
       }
       if (!compatibleType(af[field]['type'] as Map, bf[field]['type'] as Map) ||
@@ -642,6 +699,56 @@ List<String> compareContracts(
     }
   }
   return changes..sort();
+}
+
+/// Members whose retirement mark has reached the store baseline but which
+/// still remain in source. Release CI requires the promised cleanup.
+List<String> staleDeprecations(
+  Map<String, dynamic> baseline,
+  Map<String, dynamic> current,
+) {
+  final stale = <String>[];
+  final before = baseline['objects'] as Map<String, dynamic>;
+  final after = current['objects'] as Map<String, dynamic>;
+  for (final entry in before.entries) {
+    final oldObject = entry.value as Map;
+    final newObject = after[entry.key];
+    if (oldObject['deprecatedSince'] != null && newObject is Map) {
+      stale.add(entry.key);
+    }
+    if (newObject is! Map) continue;
+    final oldFields = oldObject['fields'] as Map;
+    final newFields = newObject['fields'] as Map;
+    void enumMarks(String path, Map oldType, Map newType) {
+      if (oldType['kind'] == 'enum' && newType['kind'] == 'enum') {
+        for (final value
+            in (oldType['deprecatedValues'] as Map? ?? const {}).keys) {
+          if ((newType['values'] as List).contains(value)) {
+            stale.add('$path.$value');
+          }
+        }
+      }
+      final child = oldType['kind'] == 'list' ? 'element' : 'value';
+      if (oldType[child] is Map && newType[child] is Map) {
+        enumMarks(path, oldType[child] as Map, newType[child] as Map);
+      }
+    }
+
+    for (final field in oldFields.entries) {
+      if ((field.value as Map)['deprecatedSince'] != null &&
+          newFields.containsKey(field.key)) {
+        stale.add('${entry.key}.${field.key}');
+      }
+      if (newFields[field.key] case final Map newField) {
+        enumMarks(
+          '${entry.key}.${field.key}',
+          (field.value as Map)['type'] as Map,
+          newField['type'] as Map,
+        );
+      }
+    }
+  }
+  return stale..sort();
 }
 
 /// Introduction metadata comes only from the trusted descriptor. An object

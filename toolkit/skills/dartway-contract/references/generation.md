@@ -42,6 +42,13 @@ open enums out of commands.
 
 Contract tests (round trip, `validate()`, `onUpdate`, channels): `dartway-testing`.
 
+After a build is live in both stores, `dartway contract baseline` commits the generated descriptor
+as `contract_baseline.json` next to the shared package pubspec. Additions that the baseline codecs tolerate do not raise
+the breaking line. Retire a field, enum value or call by marking it
+`@DwDeprecated(since: '<contract version>')`; removal is allowed only after that mark is in the store
+baseline. Release CI runs `dartway check --release`, which requires marks already in the baseline to
+be removed. Never update the baseline while either store is still reviewing the build.
+
 `projectContractVersion` is an error when the generated project contract is incompatible at the
 same line or cannot be verified. The generator compares its resolved source models in memory with
 the descriptor read from the fixed Git commit; regeneration or editing the working JSON cannot

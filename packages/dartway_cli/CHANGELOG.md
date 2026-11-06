@@ -2,6 +2,11 @@
 
 ## 0.28.0
 
+### Changes
+
+- Add `dartway contract baseline` and `dartway check --release` for the
+  extend-only store contract lifecycle (#716).
+
 ### Breaking changes
 
 - **BREAKING (deploy):** the Kamal contract names no environment (#705).

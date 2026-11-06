@@ -133,6 +133,7 @@ abstract final class DwCodeGenerator {
     String? contractBase,
     bool verifyContract = false,
     bool raiseVersion = false,
+    bool releaseCheck = false,
   }) async {
     if (raiseVersion && check) {
       throw ArgumentError('a release raises the version; it cannot be a check');
@@ -177,6 +178,29 @@ abstract final class DwCodeGenerator {
       skipped: check ? null : skipped,
     );
     if (diagnostics.any((d) => !d.isWarning)) return finish();
+    final sharedPackage = packages
+        .where((package) => package.role == DwPackageRole.shared)
+        .firstOrNull;
+    final storeBaselineFile = sharedPackage == null
+        ? null
+        : File(p.join(sharedPackage.root, 'contract_baseline.json'));
+    Map<String, dynamic>? storeBaseline;
+    if (storeBaselineFile?.existsSync() ?? false) {
+      try {
+        storeBaseline =
+            jsonDecode(storeBaselineFile!.readAsStringSync())
+                as Map<String, dynamic>;
+        validateContract(storeBaseline);
+      } catch (error) {
+        diagnostics.add(
+          DwGenerationDiagnostic(
+            'contract not verified: malformed contract_baseline.json: $error',
+            code: 'projectContractVersion',
+          ),
+        );
+        return finish();
+      }
+    }
     // Ordinary generation also needs trusted introduction metadata, but keeps
     // its existing non-verifying mode for new projects and unsupported codecs.
     // The check gate must still prove a baseline before accepting the output.
@@ -220,9 +244,7 @@ abstract final class DwCodeGenerator {
       }
       if (baselineSha != null) {
         try {
-          final shared = packages
-              .where((p) => p.role == DwPackageRole.shared)
-              .single;
+          final shared = sharedPackage!;
           final current =
               jsonDecode(
                     files
@@ -232,6 +254,7 @@ abstract final class DwCodeGenerator {
                   )
                   as Map<String, dynamic>;
           if (verify) validateContract(current);
+          final Map<String, dynamic> baselineDescriptor;
           final baseline = await readContractBaseline(
             root: root,
             sha: baselineSha,
@@ -244,7 +267,8 @@ abstract final class DwCodeGenerator {
             },
           );
           proof = baseline.proof;
-          introductions = contractIntroductions(baseline.descriptor, current);
+          baselineDescriptor = baseline.descriptor;
+          introductions = contractIntroductions(baselineDescriptor, current);
           final currentVersion = DwContractVersion.parse(
             current['contractVersion'] as String,
           );
@@ -256,13 +280,42 @@ abstract final class DwCodeGenerator {
             }
           }
           if (verify) {
+            if (storeBaseline != null) {
+              final storeVersion = DwContractVersion.parse(
+                storeBaseline['contractVersion'] as String,
+              );
+              final nextVersion = DwContractVersion.parse(
+                current['contractVersion'] as String,
+              );
+              final storeChanges = compareContracts(storeBaseline, current);
+              if (storeChanges.isNotEmpty &&
+                  !storeVersion.isOlderLineThan(nextVersion)) {
+                diagnostics.add(
+                  DwGenerationDiagnostic(
+                    'project contract incompatible with the store baseline: ${storeChanges.join('; ')}. Ship a tolerant/deprecated client and update the baseline first, or raise the shared package breaking line for an explicit exception.',
+                    code: 'projectContractVersion',
+                  ),
+                );
+              }
+              if (releaseCheck) {
+                final stale = staleDeprecations(storeBaseline, current);
+                if (stale.isNotEmpty) {
+                  diagnostics.add(
+                    DwGenerationDiagnostic(
+                      'store baseline already contains deprecated contract members that must be removed for release: ${stale.join(', ')}',
+                      code: 'projectContractVersion',
+                    ),
+                  );
+                }
+              }
+            }
             final previousVersion = DwContractVersion.parse(
-              baseline.descriptor['contractVersion'] as String,
+              baselineDescriptor['contractVersion'] as String,
             );
             final nextVersion = DwContractVersion.parse(
               current['contractVersion'] as String,
             );
-            final changes = compareContracts(baseline.descriptor, current);
+            final changes = compareContracts(baselineDescriptor, current);
             if (nextVersion.isOlderLineThan(previousVersion)) {
               throw const FormatException(
                 'shared package contract line moved backwards',

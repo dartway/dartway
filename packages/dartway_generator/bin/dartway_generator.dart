@@ -23,7 +23,8 @@ Future<void> main(List<String> arguments) async {
     )
     ..addOption(
       'contract-base',
-      help: 'Trusted committed project baseline; resolved once to a SHA. Check defaults to the project base-branch merge-base.',
+      help:
+          'Trusted committed project baseline; resolved once to a SHA. Check defaults to the project base-branch merge-base.',
     )
     ..addFlag(
       'release',
@@ -31,6 +32,11 @@ Future<void> main(List<String> arguments) async {
       help:
           'The release: raise the shared package version to what the contract '
           'changes since the baseline ask for, then generate at that version.',
+    )
+    ..addFlag(
+      'release-check',
+      negatable: false,
+      help: 'Release CI: require baseline deprecations to have been removed.',
     )
     ..addOption(
       'sdk',
@@ -64,6 +70,7 @@ Future<void> main(List<String> arguments) async {
     contractBase: options.option('contract-base'),
     verifyContract: options.flag('check'),
     raiseVersion: options.flag('release'),
+    releaseCheck: options.flag('release-check'),
   );
 
   for (final diagnostic in report.diagnostics) {

@@ -199,6 +199,25 @@ New calls and nullable/defaulted/patch fields are codec-compatible: the new deco
 not make it wire-required. An already-open enum may gain values while retaining all old names and
 `unknown`. A changed default is breaking even when both codecs omit the same JSON key.
 
+Once both stores carry a build, run `dartway contract baseline`. It copies the
+generated descriptor to `contract_baseline.json` beside the shared pubspec. With that file present,
+ordinary checks keep the Git PR comparison and also judge the deployed server against the store
+build. Compatible additions stay on the current breaking line, so deploying the server does not
+answer that build with `426`.
+
+Retirement is two releases. First mark a field, enum value, or call with
+`@DwDeprecated(since: '<shared version>')` and stop using it. After the resulting client is live in
+both stores, update the baseline; only then may the member be removed. An unmarked removal or rename
+fails by name. Release CI runs `dartway check --release`: a mark already present in the baseline is
+then an error until the member is removed. There is only one retired layer.
+
+The descriptor records whether each enum decoder is tolerant. An open enum (`with DwOpenEnum` and
+an `unknown` value) reads an added name as `unknown`; unknown JSON object fields are ignored. A strict
+enum has no honest fallback: its decoder continues to throw `DwUnknownEnumValue`, and its new value
+remains incompatible until a tolerant build has reached both stores. A real break is still made
+explicit by raising the shared package breaking line after that build is live. A newer client on an
+older server remains accepted.
+
 For example, changing `CustomerCard({required this.id})` to
 `CustomerCard({required this.id, required this.title})` rejects the old `{ "id": 1 }` payload.
 Regenerating at shared version `0.7.2` or `0.7.3` remains red; change it to `0.8.0` and regenerate.

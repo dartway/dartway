@@ -49,6 +49,7 @@ class DwGeneratedCodeInspector {
   DwGeneratedCodeInspector({
     required this.serverPackageDir,
     this.contractBase,
+    this.release = false,
     DwDartProbe? probe,
     DwCheckType? filterType,
     DwCheckSeverity? filterSeverity,
@@ -66,6 +67,7 @@ class DwGeneratedCodeInspector {
 
   final Directory? serverPackageDir;
   final String? contractBase;
+  final bool release;
 
   final DwDartProbe _probe;
   final bool _freshnessEnabled;
@@ -94,6 +96,7 @@ class DwGeneratedCodeInspector {
       serverDir.parent.path,
       '--check',
       if (contractBase != null) ...['--contract-base', contractBase!],
+      if (release) '--release-check',
     ]);
     final result = arguments == null ? null : _probe(arguments, serverDir.path);
     final output = [
