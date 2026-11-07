@@ -9,6 +9,9 @@
   descriptor and shared version read from the required store-build
   `--revision`, then records its resolved commit; created-project release CI
   runs the deprecation-cleanup gate (#716).
+- The `pre-app-boot` secret file check reads `deploy/kamal/api.yml` from the
+  directory Kamal runs in: through a hooks symlink it missed the destination
+  config and refused to boot (#721).
 
 ### Breaking changes
 

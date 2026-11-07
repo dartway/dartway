@@ -21,7 +21,7 @@ begin
     abort "Secret file check requires the environment's destination (-d STUDIO_ENVIRONMENT)."
   end
   config = Kamal::Configuration.create_from(
-    config_file: Pathname.new(File.expand_path("../../api.yml", __dir__)),
+    config_file: Pathname.new(File.expand_path("deploy/kamal/api.yml")),
     destination: destination
   )
   unless ENV.fetch("KAMAL_SERVICE") == config.service
