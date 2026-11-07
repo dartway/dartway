@@ -429,6 +429,16 @@ final routes = [
       configure(top: 'requires:\n  files: [fcm.json]\n');
       final generator = DwKamalGenerator(root)..generate();
       final hook = File(p.join(root.path, kamalSecretFilesHookPath));
+      expect(
+        hook.readAsStringSync(),
+        allOf(
+          contains('File.expand_path("deploy/kamal/api.yml")'),
+          isNot(contains('__dir__')),
+        ),
+        reason:
+            'Studio runs hooks through a symlink into read-only source; the '
+            'destination config exists only in the working directory.',
+      );
       expect(generator.generate(check: true), isEmpty);
       if (!Platform.isWindows) {
         expect(hook.statSync().mode & 0x49, isNot(0));
