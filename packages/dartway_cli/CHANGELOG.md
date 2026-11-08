@@ -4,6 +4,9 @@
 
 ### Changes
 
+- Fix: the generated Kamal Images workflow skips pull-request CI at the job
+  level, before taking a runner, and builds only images it publishes after
+  pushed or hand-started CI (#727).
 - Add `dartway contract baseline` and `dartway check --release` for the
   extend-only store contract lifecycle. Baseline creation validates the
   descriptor and shared version read from the required store-build

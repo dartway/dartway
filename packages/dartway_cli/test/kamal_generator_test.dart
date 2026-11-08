@@ -501,7 +501,7 @@ final routes = [
     expect(Directory(p.join(root.path, 'deploy/kamal')).existsSync(), false);
   });
 
-  test('privileged image builds reject fork PRs and PRs cannot write caches', () {
+  test('privileged image builds reject CI from forks', () {
     final workflow = yaml(
       DwKamalGenerator(root).render(),
       '.github/workflows/images.yml',
@@ -514,39 +514,32 @@ final routes = [
       ),
     );
     final steps = (job['steps'] as YamlList).cast<YamlMap>();
-    final build = steps.singleWhere(
-      (step) => step['uses'] == 'docker/build-push-action@v6',
-    );
-    expect(
-      build['with']['cache-to'],
-      r"${{ steps.image.outputs.publish == 'true' && format('type=gha,mode=max,scope={0}', matrix.service) || '' }}",
-    );
     final checkout = steps.singleWhere(
       (step) => step['uses'] == 'actions/checkout@v4',
     );
     expect(checkout['with']['persist-credentials'], false);
   });
 
-  test(
-    'image publication follows pushed and hand-started CI, not a branch list',
-    () {
-      final workflow = yaml(
-        DwKamalGenerator(root).render(),
-        '.github/workflows/images.yml',
-      );
-      final job = workflow['jobs']['images'] as YamlMap;
-      expect(job['if'], isNot(contains('head_branch')));
-      expect(job['if'], contains("workflow_run.conclusion == 'success'"));
-      final image = (job['steps'] as YamlList).cast<YamlMap>().singleWhere(
-        (step) => step['id'] == 'image',
-      );
-      expect(
-        image['env']['PUBLISH'],
-        r"${{ github.event.workflow_run.event == 'push' || "
-        r"github.event.workflow_run.event == 'workflow_dispatch' }}",
-      );
-    },
-  );
+  test('images skip PR CI and publish pushed and hand-started CI', () {
+    final workflow = yaml(
+      DwKamalGenerator(root).render(),
+      '.github/workflows/images.yml',
+    );
+    final job = workflow['jobs']['images'] as YamlMap;
+    expect(job['if'], isNot(contains('head_branch')));
+    expect(job['if'], contains("workflow_run.conclusion == 'success'"));
+    expect(job['if'], contains("workflow_run.event == 'push'"));
+    expect(job['if'], contains("workflow_run.event == 'workflow_dispatch'"));
+    expect(job['if'], isNot(contains("workflow_run.event == 'pull_request'")));
+    final build = (job['steps'] as YamlList).cast<YamlMap>().singleWhere(
+      (step) => step['uses'] == 'docker/build-push-action@v6',
+    );
+    expect(build['with']['push'], true);
+    expect(
+      build['with']['cache-to'],
+      r'type=gha,mode=max,scope=${{ matrix.service }}',
+    );
+  });
 
   test('requires.secrets cannot name what the contract sets in env.clear', () {
     configure(

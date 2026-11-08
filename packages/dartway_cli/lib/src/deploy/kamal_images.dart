@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import '../project_layout.dart';
 
-/// Image builds after the required CI workflow succeeds, including PR dry runs.
+/// Image builds after pushed or hand-started required CI succeeds.
 ///
 /// Every pushed or hand-started CI success publishes: which branch an
 /// environment deploys is Studio's, so the repository lists none. The
@@ -53,7 +53,9 @@ jobs:
   images:
     if: >-
       github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_repository.full_name == github.repository
+      github.event.workflow_run.head_repository.full_name == github.repository &&
+      (github.event.workflow_run.event == 'push' ||
+       github.event.workflow_run.event == 'workflow_dispatch')
     name: images / ${{ matrix.service }}
     runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 45
@@ -78,7 +80,7 @@ jobs:
         if: steps.deployment.outputs.configured == 'true'
 
       - name: Registry login
-        if: steps.deployment.outputs.configured == 'true' && (github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch')
+        if: steps.deployment.outputs.configured == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -92,23 +94,18 @@ jobs:
           SERVICE: ${{ matrix.service }}
           REPOSITORY: __IMAGE_REPOSITORY__
           SHA: ${{ github.event.workflow_run.head_sha }}
-          PUBLISH: >-
-            ${{ github.event.workflow_run.event == 'push' || github.event.workflow_run.event == 'workflow_dispatch' }}
         run: |
           tag="ghcr.io/${REPOSITORY}-${SERVICE}:${SHA}"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
-          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
-          if [ "$PUBLISH" = true ]; then
-            if docker buildx imagetools inspect "$tag" > manifest.txt 2>&1; then
-              echo "Image already exists; skipping $tag"
-              echo "exists=true" >> "$GITHUB_OUTPUT"
-            elif ! grep -Eiq 'manifest unknown|not found|404' manifest.txt; then
-              cat manifest.txt
-              exit 1
-            fi
+          if docker buildx imagetools inspect "$tag" > manifest.txt 2>&1; then
+            echo "Image already exists; skipping $tag"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif ! grep -Eiq 'manifest unknown|not found|404' manifest.txt; then
+            cat manifest.txt
+            exit 1
           fi
 
-      - name: Build once, push for pushed or hand-started CI
+      - name: Build and push once
         if: steps.deployment.outputs.configured == 'true' && steps.image.outputs.exists != 'true'
         uses: docker/build-push-action@v6
         with:
@@ -116,11 +113,11 @@ jobs:
           file: ${{ matrix.dockerfile }}
           platforms: linux/amd64
           build-args: BUILD_NUMBER=${{ github.run_number }}
-          push: ${{ steps.image.outputs.publish == 'true' }}
+          push: true
           tags: ${{ steps.image.outputs.tag }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             service=${{ matrix.kamal_service }}
           cache-from: type=gha,scope=${{ matrix.service }}
-          cache-to: ${{ steps.image.outputs.publish == 'true' && format('type=gha,mode=max,scope={0}', matrix.service) || '' }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 ''';
