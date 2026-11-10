@@ -2,6 +2,8 @@
 
 ## 0.26.0-dev.1
 
+- Add the test-only `captureDwDesign` render-tree capture used by
+  `dartway design-check` (#730).
 - Nothing changed here; the family moves in lockstep with stable `readLink`
   links in `dartway_core_server` (#710).
 
