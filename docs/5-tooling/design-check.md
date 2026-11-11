@@ -19,15 +19,21 @@ The helper settles animations and records every visible render node's bounds,
 text, fill, stroke, corner radius, shadow, and text style. Keep data, clocks,
 images, and fonts deterministic just as for an ordinary golden test.
 
-The published HTML declares design sizes with one meta element per size:
+The published HTML declares design sizes and their Studio size class with one
+meta element per size:
 
 ```html
-<meta name="dw-viewport" content="1440x900">
-<meta name="dw-viewport" content="768x1024">
+<meta name="dw-viewport" content="expanded:1440x900">
+<meta name="dw-viewport" content="medium:768x1024">
 ```
 
 The command always adds a 375-pixel narrow capture, even when the HTML omits
 one, so fixed-width overflow cannot disappear from the check.
+
+This publication metadata is part of Studio's HTML contract: Studio must emit
+`compact`, `medium`, or `expanded` when it publishes each screen. Until its
+publisher is updated, the unclassified `WIDTHxHEIGHT` spelling remains valid,
+but it cannot bind a size-class-specific state.
 
 ## Run locally and in CI
 
@@ -49,3 +55,9 @@ The exit status is non-zero for a failed widget test, a missing capture, or an
 unexplained difference. Two-pixel font-metric variation, sub-pixel stroke and
 radius variation, and a translucent colour equivalent to its solid rendering
 are ignored; overflow at a narrow width is never ignored.
+
+To explain an intentional difference, pass `--acceptance path.json`. The file
+is a JSON list whose entries contain the exact `case`, `node`, and `message`
+from `report.json`, plus a non-empty `reason`. Accepted entries remain visible
+under `accepted` in the machine-readable report but do not make the command
+fail; stale or imprecise entries never suppress a new finding.

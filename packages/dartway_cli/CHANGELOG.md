@@ -6,7 +6,9 @@
 
 - Add `dartway design-check`: capture Studio HTML at an agreed Git commit and
   Flutter widget-test states at every design size, then emit one readable and
-  machine-readable difference report (#730).
+  machine-readable difference report. Capture painted nodes in the viewport,
+  size classes, truncation and stroke widths; validate the app viewport; and
+  allow reasoned exact finding acceptances (#730).
 - Fix: the generated Kamal Images workflow skips pull-request CI at the job
   level, before taking a runner, and builds only images it publishes after
   pushed or hand-started CI (#727).

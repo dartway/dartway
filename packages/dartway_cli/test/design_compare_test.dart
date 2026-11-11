@@ -8,10 +8,12 @@ void main() {
     String text = 'Save',
     String? fill = 'rgb(255, 255, 255)',
     String? stroke,
+    double? strokeWidth,
     String? shadow,
     String path = 'button',
     double radius = 8,
     bool overflow = false,
+    bool truncated = false,
     Map<String, Object?>? style,
   }) => DesignNode(
     path: path,
@@ -19,9 +21,11 @@ void main() {
     text: text,
     fill: fill,
     stroke: stroke,
+    strokeWidth: strokeWidth,
     radius: radius,
     shadow: shadow,
     overflow: overflow,
+    truncated: truncated,
     textStyle: style ?? const {'fontSize': 16.0, 'fontWeight': '600'},
   );
 
@@ -106,7 +110,7 @@ void main() {
       spec(
         node(
           rect: [24, 20, 120, 40],
-          text: 'Sa…',
+          truncated: true,
           fill: 'rgb(0, 0, 0)',
           radius: 14,
           overflow: true,
@@ -138,4 +142,29 @@ void main() {
       expect(compareDesignSpecs(spec(reference), spec(app)), isEmpty);
     },
   );
+
+  test('viewport and meaningful stroke width differences are found', () {
+    final findings = compareDesignSpecs(
+      spec(node(stroke: 'rgb(0, 0, 0)', strokeWidth: 1)),
+      spec(node(stroke: 'rgba(0, 0, 0, 1)', strokeWidth: 3), width: 400),
+    ).map((finding) => finding.message).join('\n');
+    expect(findings, contains('App viewport is 400x812 instead of 375x812'));
+    expect(findings, contains('Stroke width is 3 instead of 1'));
+  });
+
+  test('absent values have the same encoding on both capture sides', () {
+    expect(
+      compareDesignSpecs(
+        spec(
+          node(
+            text: '',
+            fill: 'rgba(0, 0, 0, 0)',
+            style: const {'color': 'rgba(0, 0, 0, 0)'},
+          ),
+        ),
+        spec(node(text: '', fill: null, style: const {'color': null})),
+      ),
+      isEmpty,
+    );
+  });
 }

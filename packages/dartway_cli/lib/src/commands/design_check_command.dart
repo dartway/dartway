@@ -34,6 +34,11 @@ class DesignCheckCommand extends Command<int> {
         'chrome',
         help:
             'Chrome/Chromium executable (otherwise CHROME_EXECUTABLE or PATH).',
+      )
+      ..addOption(
+        'acceptance',
+        help:
+            'JSON file of accepted findings, each with case, node, message, and reason.',
       );
   }
 
@@ -73,14 +78,17 @@ class DesignCheckCommand extends Command<int> {
         }
         final html = published.readAsStringSync();
         for (final viewport in _viewports(html)) {
-          final id =
-              '${p.basenameWithoutExtension(screen)}-${viewport.$1}x${viewport.$2}';
+          final screenId = p
+              .withoutExtension(screen)
+              .replaceAll(RegExp('[^A-Za-z0-9]+'), '-');
+          final sizeClass = viewport.$3 == null ? '' : '-${viewport.$3}';
+          final id = '$screenId$sizeClass-${viewport.$1}x${viewport.$2}';
           final reference = await captureDesignReferenceForTesting(
             output,
             chrome,
             id,
             published,
-            viewport,
+            (viewport.$1, viewport.$2),
           );
           captures.add(_Capture(screen, id, reference));
         }
@@ -128,9 +136,34 @@ class DesignCheckCommand extends Command<int> {
         'exitCode': test.exitCode,
       });
     }
+    final accepted = <Map<String, Object?>>[];
+    final acceptancePath = argResults!.option('acceptance');
+    if (acceptancePath != null) {
+      final rules =
+          (jsonDecode(File(p.join(root, acceptancePath)).readAsStringSync())
+                  as List)
+              .cast<Map>()
+              .map((value) => value.cast<String, Object?>())
+              .toList();
+      for (final finding in findings.toList()) {
+        final rule = rules.where((rule) {
+          final reason = rule['reason'];
+          return reason is String &&
+              reason.trim().isNotEmpty &&
+              rule['case'] == finding['viewport'] &&
+              rule['node'] == finding['node'] &&
+              rule['message'] == finding['message'];
+        }).firstOrNull;
+        if (rule != null) {
+          findings.remove(finding);
+          accepted.add({...finding, 'reason': rule['reason']});
+        }
+      }
+    }
     final report = {
       'commit': argResults!.option('commit'),
       'findings': findings,
+      'accepted': accepted,
     };
     File(p.join(output.path, 'report.json')).writeAsStringSync(
       '${const JsonEncoder.withIndent('  ').convert(report)}\n',
@@ -181,18 +214,25 @@ String _flutterExecutable() {
   return 'flutter.bat';
 }
 
-List<(int, int)> _viewports(String html) {
-  final values = <(int, int)>{};
+List<(int, int, String?)> _viewports(String html) {
+  final values = <(int, int, String?)>{};
   final pattern = RegExp(
-    r'''<meta[^>]+name=["']dw-viewport["'][^>]+content=["'](\d+)x(\d+)["']''',
+    r'''<meta[^>]+name=["']dw-viewport["'][^>]+content=["'](?:(compact|medium|expanded):)?(\d+)x(\d+)["']''',
     caseSensitive: false,
   );
   for (final match in pattern.allMatches(html))
-    values.add((int.parse(match.group(1)!), int.parse(match.group(2)!)));
-  values.add((
-    375,
-    values.isEmpty ? 812 : values.first.$2,
-  )); // narrow is mandatory
+    values.add((
+      int.parse(match.group(2)!),
+      int.parse(match.group(3)!),
+      match.group(1),
+    ));
+  if (!values.any((value) => value.$1 == 375)) {
+    values.add((
+      375,
+      values.isEmpty ? 812 : values.first.$2,
+      'compact',
+    )); // narrow is mandatory
+  }
   return values.toList()..sort((a, b) => a.$1.compareTo(b.$1));
 }
 
@@ -205,8 +245,29 @@ Future<DesignSpec> captureDesignReferenceForTesting(
 ) async {
   final referenceDir = Directory(p.join(output.path, 'reference'))
     ..createSync(recursive: true);
-  const script =
-      r'''<script>(async()=>{document.getAnimations().forEach(a=>a.finish());await document.fonts.ready;await Promise.all([...document.images].map(i=>i.complete?null:new Promise(r=>{i.onload=i.onerror=r})));const nodes=[...document.querySelectorAll('body *')].filter(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&r.width&&r.height&&(e.children.length===0&&e.textContent.trim()||e.tagName==='IMG'||s.backgroundColor!=='rgba(0, 0, 0, 0)'||parseFloat(s.borderWidth)||s.boxShadow!=='none')}).map(e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return{path:e.id?'#'+e.id:e.tagName.toLowerCase(),rect:[r.x,r.y,r.width,r.height],text:e.children.length?'':e.textContent.trim(),fill:s.backgroundColor,stroke:s.borderColor,radius:parseFloat(s.borderRadius)||0,shadow:s.boxShadow==='none'?null:s.boxShadow,textStyle:{fontFamily:s.fontFamily,fontSize:parseFloat(s.fontSize),fontWeight:s.fontWeight,lineHeight:parseFloat(s.lineHeight)||null,color:s.color},overflow:r.right>innerWidth||r.left<0}});const o=document.createElement('pre');o.id='dw-design-spec';o.hidden=true;const encoded=JSON.stringify({viewport:[innerWidth,innerHeight],nodes});o.dataset.spec=btoa(unescape(encodeURIComponent(encoded)));document.body.append(o)})()</script>''';
+  const script = r'''<script>(async()=>{
+await document.fonts.ready;
+await Promise.all([...document.images].map(i=>i.complete?null:new Promise(r=>{i.onload=i.onerror=r})));
+// Finishing an infinite Web Animation throws. Pause every animation first,
+// and finish only those for which a finite end time exists. Repeat once for
+// animations started by load handlers.
+for(let pass=0;pass<2;pass++) { for(const a of document.getAnimations()) {
+  try { const end=a.effect&&a.effect.getComputedTiming().endTime; if(Number.isFinite(end)) a.finish(); else a.pause(); } catch (_) { a.pause(); }
+} await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))); }
+const visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&parseFloat(s.opacity)!==0&&r.width>0&&r.height>0&&r.right>0&&r.bottom>0&&r.left<innerWidth&&r.top<innerHeight};
+const painted=e=>{const s=getComputedStyle(e);return e.children.length===0&&e.textContent.trim()||e.tagName==='IMG'||s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'||parseFloat(s.borderTopWidth)||s.boxShadow!=='none'};
+const nodes=[...document.querySelectorAll('body *')].filter(e=>visible(e)&&painted(e)).map(e=>{
+ const s=getComputedStyle(e),r=e.getBoundingClientRect(),leaf=e.children.length===0;
+ const full=leaf?e.textContent.trim():null;
+ const range=document.createRange(); range.selectNodeContents(e);
+ const textRect=full?range.getBoundingClientRect():null;
+ const truncated=!!full&&(e.scrollWidth>e.clientWidth||e.scrollHeight>e.clientHeight||!!textRect&&(textRect.right>r.right+.5||textRect.bottom>r.bottom+.5))&&(s.textOverflow==='ellipsis'||s.overflow==='hidden');
+ return {path:e.id?'#'+e.id:e.tagName.toLowerCase(),rect:[r.x,r.y,r.width,r.height],text:full||null,fill:s.backgroundColor,stroke:s.borderTopColor,strokeWidth:parseFloat(s.borderTopWidth)||0,radius:parseFloat(s.borderRadius)||0,shadow:s.boxShadow==='none'?null:s.boxShadow,textStyle:full?{fontFamily:s.fontFamily,fontSize:parseFloat(s.fontSize),fontWeight:s.fontWeight,lineHeight:parseFloat(s.lineHeight)||null,color:s.color}:{},overflow:r.right>innerWidth||r.left<0,truncated};
+});
+const o=document.createElement('pre');o.id='dw-design-spec';o.hidden=true;
+const encoded=JSON.stringify({viewport:[innerWidth,innerHeight],nodes});
+o.textContent=btoa(unescape(encodeURIComponent(encoded)));document.body.append(o)
+})()</script>''';
   final source = published.readAsStringSync().replaceFirst(
     RegExp(r'</body>', caseSensitive: false),
     '$script</body>',
@@ -242,7 +303,7 @@ Future<DesignSpec> captureDesignReferenceForTesting(
     throw StateError('Browser DOM capture failed for $id: ${result.stderr}');
   }
   final match = RegExp(
-    r'<pre id="dw-design-spec" data-spec="([^"]+)">',
+    r'<pre[^>]*id="dw-design-spec"[^>]*>([^<]+)</pre>',
     dotAll: true,
   ).firstMatch(result.stdout as String);
   if (match == null)

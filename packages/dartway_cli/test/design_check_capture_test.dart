@@ -4,11 +4,10 @@ import 'package:dartway_cli/src/commands/design_check_command.dart';
 import 'package:test/test.dart';
 
 void main() {
+  final chrome = _chrome();
   test(
     'capture preserves literal entities and applies relative stylesheets',
     () async {
-      final chrome = _chrome();
-      if (chrome == null) return;
       final directory = await Directory.systemTemp.createTemp(
         'dw-capture-test-',
       );
@@ -24,7 +23,7 @@ void main() {
 
       final spec = await captureDesignReferenceForTesting(
         output,
-        chrome,
+        chrome!,
         'entity-style-375x812',
         html,
         (375, 812),
@@ -35,6 +34,7 @@ void main() {
       expect(paragraph.fill, 'rgb(210, 211, 212)');
       expect(paragraph.textStyle['color'], 'rgb(12, 34, 56)');
     },
+    skip: chrome == null ? 'Chrome/Chromium is not installed.' : false,
   );
 }
 

@@ -13,6 +13,16 @@ class DesignFinding {
 /// strokes within one pixel and equivalent alpha-composited colours are noise.
 List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
   final findings = <DesignFinding>[];
+  if ((reference.viewport[0] - app.viewport[0]).abs() > .5 ||
+      (reference.viewport[1] - app.viewport[1]).abs() > .5) {
+    findings.add(
+      DesignFinding(
+        'viewport',
+        'App viewport is ${_number(app.viewport[0])}x${_number(app.viewport[1])} '
+            'instead of ${_number(reference.viewport[0])}x${_number(reference.viewport[1])}.',
+      ),
+    );
+  }
   final matches = _matchNodes(reference.nodes, app.nodes);
   for (final expected in reference.nodes) {
     final candidate = matches[expected];
@@ -58,6 +68,17 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
         ),
       );
     }
+    final strokeDelta =
+        (candidate.strokeWidth ?? 0) - (expected.strokeWidth ?? 0);
+    if (strokeDelta.abs() > 1) {
+      findings.add(
+        DesignFinding(
+          expected.path,
+          'Stroke width is ${_number(candidate.strokeWidth ?? 0)} instead of '
+          '${_number(expected.strokeWidth ?? 0)}.',
+        ),
+      );
+    }
     if (!_sameShadow(expected.shadow, candidate.shadow)) {
       findings.add(
         DesignFinding(expected.path, 'Shadow differs from the design.'),
@@ -69,6 +90,7 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
     }) {
       final a = expected.textStyle[key];
       final b = candidate.textStyle[key];
+      if (a == null && b == null) continue;
       final metric = key == 'fontSize' || key == 'lineHeight';
       if (metric && a is num && b is num && (a - b).abs() <= 2) continue;
       final same = key == 'color'
@@ -89,14 +111,18 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
         ),
       );
     }
-    if (candidate.text != expected.text) {
-      final ellipsis = candidate.text?.endsWith('…') ?? false;
+    if (candidate.truncated) {
       findings.add(
         DesignFinding(
           expected.path,
-          ellipsis
-              ? 'Text is truncated with an ellipsis: "${candidate.text}".'
-              : 'Text is "${candidate.text ?? ''}" instead of "${expected.text ?? ''}".',
+          'Text is truncated with an ellipsis: "${candidate.text ?? ''}".',
+        ),
+      );
+    } else if (_text(candidate.text) != _text(expected.text)) {
+      findings.add(
+        DesignFinding(
+          expected.path,
+          'Text is "${candidate.text ?? ''}" instead of "${expected.text ?? ''}".',
         ),
       );
     }
@@ -106,6 +132,8 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
   }
   return findings;
 }
+
+String? _text(String? value) => value == null || value.isEmpty ? null : value;
 
 Map<DesignNode, DesignNode> _matchNodes(
   List<DesignNode> reference,
@@ -145,6 +173,7 @@ String _number(double value) => value == value.roundToDouble()
     : value.toStringAsFixed(1);
 
 bool _sameColour(String? a, String? b) {
+  if (_transparent(a) && _transparent(b)) return true;
   if (a == b) return true;
   final first = _rgba(a);
   final second = _rgba(b);
@@ -159,6 +188,12 @@ bool _sameColour(String? a, String? b) {
     3,
     (i) => (x[i] - y[i]).abs(),
   ).every((difference) => difference <= 1);
+}
+
+bool _transparent(String? value) {
+  if (value == null || value == 'transparent') return true;
+  final rgba = _rgba(value);
+  return rgba != null && rgba[3] == 0;
 }
 
 List<int>? _rgba(String? colour) {
