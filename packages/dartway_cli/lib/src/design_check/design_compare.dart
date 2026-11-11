@@ -13,9 +13,9 @@ class DesignFinding {
 /// strokes within one pixel and equivalent alpha-composited colours are noise.
 List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
   final findings = <DesignFinding>[];
-  final unused = app.nodes.toList();
+  final matches = _matchNodes(reference.nodes, app.nodes);
   for (final expected in reference.nodes) {
-    final candidate = _takeMatch(expected, unused);
+    final candidate = matches[expected];
     if (candidate == null) {
       findings.add(DesignFinding(expected.path, 'Visible node is missing.'));
       continue;
@@ -58,7 +58,7 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
         ),
       );
     }
-    if (expected.shadow != candidate.shadow) {
+    if (!_sameShadow(expected.shadow, candidate.shadow)) {
       findings.add(
         DesignFinding(expected.path, 'Shadow differs from the design.'),
       );
@@ -71,7 +71,12 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
       final b = candidate.textStyle[key];
       final metric = key == 'fontSize' || key == 'lineHeight';
       if (metric && a is num && b is num && (a - b).abs() <= 2) continue;
-      if (a != b)
+      final same = key == 'color'
+          ? _sameColour(a as String?, b as String?)
+          : key == 'fontFamily'
+          ? _sameFontFamily(a as String?, b as String?)
+          : a == b;
+      if (!same)
         findings.add(
           DesignFinding(expected.path, 'Text $key is $b instead of $a.'),
         );
@@ -96,23 +101,40 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
       );
     }
   }
-  for (final node in unused) {
+  for (final node in app.nodes.where((node) => !matches.containsValue(node))) {
     findings.add(DesignFinding(node.path, 'Unexpected visible node.'));
   }
   return findings;
 }
 
-DesignNode? _takeMatch(DesignNode node, List<DesignNode> candidates) {
-  if (candidates.isEmpty) return null;
-  var best = candidates.where((item) => item.text == node.text).toList();
-  if (best.isEmpty)
-    best = candidates
-        .where((item) => item.path.split('/').last == node.path.split('/').last)
-        .toList();
-  if (best.isEmpty) best = candidates.toList();
-  best.sort((a, b) => _distance(node, a).compareTo(_distance(node, b)));
-  return candidates.removeAt(candidates.indexOf(best.first));
+Map<DesignNode, DesignNode> _matchNodes(
+  List<DesignNode> reference,
+  List<DesignNode> app,
+) {
+  final edges = <(DesignNode, DesignNode)>[
+    for (final expected in reference)
+      for (final actual in app) (expected, actual),
+  ]..sort((a, b) => _matchScore(a.$1, a.$2).compareTo(_matchScore(b.$1, b.$2)));
+  final result = <DesignNode, DesignNode>{};
+  final used = <DesignNode>{};
+  for (final edge in edges) {
+    if (result.containsKey(edge.$1) || used.contains(edge.$2)) continue;
+    result[edge.$1] = edge.$2;
+    used.add(edge.$2);
+  }
+  return result;
 }
+
+double _matchScore(DesignNode a, DesignNode b) {
+  final bothHaveText =
+      (a.text?.isNotEmpty ?? false) || (b.text?.isNotEmpty ?? false);
+  final textPenalty = bothHaveText && a.text != b.text ? 1000000.0 : 0.0;
+  final rolePenalty = _role(a.path) == _role(b.path) ? 0.0 : 1000.0;
+  return textPenalty + rolePenalty + _distance(a, b);
+}
+
+String _role(String path) =>
+    path.split('/').last.split('#').first.toLowerCase();
 
 double _distance(DesignNode a, DesignNode b) => math.sqrt(
   math.pow(a.rect[0] - b.rect[0], 2) + math.pow(a.rect[1] - b.rect[1], 2),
@@ -149,4 +171,73 @@ List<int>? _rgba(String? colour) {
     for (var i = 1; i <= 3; i++) int.parse(match.group(i)!),
     (double.parse(match.group(4) ?? '1') * 255).round(),
   ];
+}
+
+bool _sameFontFamily(String? a, String? b) {
+  if (a == b) return true;
+  Set<String> families(String? value) => value == null
+      ? const {}
+      : value
+            .split(',')
+            .map(
+              (part) => part
+                  .trim()
+                  .replaceAll(RegExp(r'''^['"]|['"]$'''), '')
+                  .toLowerCase(),
+            )
+            .where((part) => part.isNotEmpty)
+            .toSet();
+  return families(a).intersection(families(b)).isNotEmpty;
+}
+
+bool _sameShadow(String? a, String? b) {
+  if (a == b) return true;
+  final first = _shadow(a), second = _shadow(b);
+  if (first == null || second == null) return false;
+  return _sameColour(first.$1, second.$1) &&
+      List.generate(
+        4,
+        (i) => (first.$2[i] - second.$2[i]).abs(),
+      ).every((difference) => difference <= 1);
+}
+
+(String, List<double>)? _shadow(String? value) {
+  if (value == null || value == 'none') return null;
+  final css = RegExp(
+    r'^(rgba?\([^)]+\))\s+(-?[\d.]+)px\s+(-?[\d.]+)px\s+([\d.]+)px(?:\s+(-?[\d.]+)px)?$',
+  ).firstMatch(value.trim());
+  if (css != null) {
+    return (
+      css.group(1)!,
+      [for (var i = 2; i <= 5; i++) double.parse(css.group(i) ?? '0')],
+    );
+  }
+  final flutter = RegExp(
+    r'BoxShadow\(Color\(0x([0-9a-fA-F]{8})\), Offset\((-?[\d.]+), (-?[\d.]+)\), ([\d.]+), (-?[\d.]+)',
+  ).firstMatch(value.trim());
+  if (flutter != null) {
+    final hex = flutter.group(1)!;
+    final alpha = int.parse(hex.substring(0, 2), radix: 16) / 255;
+    final colour =
+        'rgba(${int.parse(hex.substring(2, 4), radix: 16)}, '
+        '${int.parse(hex.substring(4, 6), radix: 16)}, '
+        '${int.parse(hex.substring(6, 8), radix: 16)}, $alpha)';
+    return (
+      colour,
+      [for (var i = 2; i <= 5; i++) double.parse(flutter.group(i)!)],
+    );
+  }
+  final components = RegExp(
+    r'BoxShadow\(Color\(alpha: ([\d.]+), red: ([\d.]+), green: ([\d.]+), blue: ([\d.]+),[^)]*\), Offset\((-?[\d.]+), (-?[\d.]+)\), ([\d.]+), (-?[\d.]+)',
+  ).firstMatch(value.trim());
+  if (components == null) return null;
+  final colour =
+      'rgba(${(double.parse(components.group(2)!) * 255).round()}, '
+      '${(double.parse(components.group(3)!) * 255).round()}, '
+      '${(double.parse(components.group(4)!) * 255).round()}, '
+      '${components.group(1)})';
+  return (
+    colour,
+    [for (var i = 5; i <= 8; i++) double.parse(components.group(i)!)],
+  );
 }

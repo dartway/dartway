@@ -14,11 +14,16 @@ Future<File> captureDwDesign(
   WidgetTester tester, {
   required String caseId,
 }) async {
-  await tester.pumpAndSettle();
   const output = String.fromEnvironment('DW_DESIGN_CHECK_OUTPUT');
   if (output.isEmpty) {
     throw StateError('captureDwDesign must run through dartway design-check.');
   }
+  const requested = String.fromEnvironment('DW_DESIGN_CHECK_CASES');
+  final cases = requested.split(',').where((value) => value.isNotEmpty).toSet();
+  if (cases.isNotEmpty && !cases.contains(caseId)) {
+    throw StateError('Unknown design-check case id: $caseId.');
+  }
+  await tester.pumpAndSettle();
   final nodes = <Map<String, Object?>>[];
   void visit(Element element) {
     final render = element.renderObject;

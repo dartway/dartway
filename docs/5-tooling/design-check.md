@@ -39,9 +39,8 @@ dartway design-check \
   --screen dw_studio/blocks/account/screens/profile.html
 ```
 
-Chrome is found through `CHROME_EXECUTABLE` or `PATH`. The command checks out
-nothing: it reads each reference with `git show`, captures it headlessly after
-fonts, images, and animations settle, runs all bound widget tests once, and
+Chrome or Chromium 112 or newer is supported and found through `CHROME_EXECUTABLE` or `PATH`. The command materialises the publication commit in a temporary Git worktree so relative stylesheets, images, and fonts resolve, then captures each screen headlessly after
+fonts, images, and animations settle. Screenshot and DOM capture use separate browser invocations for reliable headless output. It then runs all bound widget tests once and
 writes `build/design-check/report.json`, `report.txt`, reference PNGs, and both
 node specs. Commit the publication SHA to the CI configuration (or provide it
 as a protected CI variable) and run the same command there.
