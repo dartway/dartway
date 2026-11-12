@@ -60,7 +60,7 @@ concurrency:
 jobs:
   context:
     name: Signing files excluded
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
@@ -75,7 +75,7 @@ jobs:
         run: dart test -t docker --run-skipped test/template_build_context_test.dart
 
   image:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
