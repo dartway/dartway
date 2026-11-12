@@ -113,6 +113,7 @@ class DesignCheckCommand extends Command<int> {
       argResults!.option('tests')!,
       '--dart-define=DW_DESIGN_CHECK_OUTPUT=${output.path}',
       '--dart-define=DW_DESIGN_CHECK_CASES=${captures.map((capture) => capture.id).join(',')}',
+      '--dart-define=DW_DESIGN_CHECK_ENABLED=true',
     ], workingDirectory: flutterRoot);
     stdout.write(test.stdout);
     stderr.write(test.stderr);
@@ -267,18 +268,25 @@ for(let pass=0;pass<2;pass++) { for(const a of document.getAnimations()) {
 } await new Promise(r=>{let frames=0; const next=()=>{if(++frames===2)r();else requestAnimationFrame(next)}; requestAnimationFrame(next); setTimeout(r,100);}); }
 const visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&parseFloat(s.opacity)!==0&&r.width>0&&r.height>0&&r.right>0&&r.bottom>0&&r.left<innerWidth&&r.top<innerHeight};
 const directText=e=>[...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join(' ').trim();
-const painted=e=>{const s=getComputedStyle(e);return e===document.body||directText(e)||e.tagName==='IMG'||e.tagName==='SVG'||s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'||parseFloat(s.borderTopWidth)||s.boxShadow!=='none'};
-const nodes=[document.body,...document.querySelectorAll('body *')].filter(e=>visible(e)&&painted(e)).map(e=>{
+const painted=e=>{const s=getComputedStyle(e);return e===document.body||e.tagName==='IMG'||e.tagName==='SVG'||s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'||parseFloat(s.borderTopWidth)||s.boxShadow!=='none'};
+const elements=[document.body,...document.querySelectorAll('body *')].filter(visible);
+const paintNodes=elements.filter(painted).map(e=>{
  const s=getComputedStyle(e),r=e.getBoundingClientRect();
- const full=directText(e)||null;
- const range=document.createRange(); range.selectNodeContents(e);
- const textRect=full?range.getBoundingClientRect():null;
- const truncated=!!full&&(e.scrollWidth>e.clientWidth||e.scrollHeight>e.clientHeight||!!textRect&&(textRect.right>r.right+.5||textRect.bottom>r.bottom+.5))&&(s.textOverflow==='ellipsis'||s.overflow==='hidden');
  const border=parseFloat(s.borderTopWidth)||0;
  const transparent=c=>c==='rgba(0, 0, 0, 0)'||c==='transparent';
  const fill=e===document.body&&transparent(s.backgroundColor)?(transparent(getComputedStyle(document.documentElement).backgroundColor)?'rgb(255, 255, 255)':getComputedStyle(document.documentElement).backgroundColor):s.backgroundColor;
- return {path:e.tagName==='SVG'?'image':e.id?'#'+e.id:e.tagName.toLowerCase(),rect:e===document.body?[0,0,innerWidth,innerHeight]:[r.x,r.y,r.width,r.height],text:full,fill,stroke:s.borderTopStyle!=='none'&&border>0?s.borderTopColor:null,strokeWidth:border,radius:parseFloat(s.borderRadius)||0,shadow:s.boxShadow==='none'?null:s.boxShadow,textStyle:full?{fontFamily:s.fontFamily,fontSize:parseFloat(s.fontSize),fontWeight:s.fontWeight,lineHeight:parseFloat(s.lineHeight)||null,color:s.color}:{},overflow:r.right>innerWidth||r.left<0,truncated};
+ return {path:e.tagName==='SVG'?'image':e.id?'#'+e.id:e.tagName.toLowerCase(),rect:e===document.body?[0,0,innerWidth,innerHeight]:[r.x,r.y,r.width,r.height],text:null,fill,stroke:s.borderTopStyle!=='none'&&border>0?s.borderTopColor:null,strokeWidth:border,radius:parseFloat(s.borderRadius)||0,shadow:s.boxShadow==='none'?null:s.boxShadow,textStyle:{},overflow:r.right>innerWidth||r.left<0,truncated:false};
 });
+// Text is a separate visual node, just as it is in Flutter's render tree.
+// The nearest element with direct text owns the whole inline run, so
+// "Hello <b>world</b>" remains one paragraph rather than two nodes.
+const textNodes=elements.filter(e=>directText(e)&&!elements.some(a=>a!==e&&a.contains(e)&&directText(a))).map(e=>{
+ const s=getComputedStyle(e),box=e.getBoundingClientRect(),range=document.createRange();range.selectNodeContents(e);
+ const r=range.getBoundingClientRect(),full=e.textContent.replace(/\s+/g,' ').trim();
+ const truncated=(e.scrollWidth>e.clientWidth||e.scrollHeight>e.clientHeight||r.right>box.right+.5||r.bottom>box.bottom+.5)&&(s.textOverflow==='ellipsis'||s.overflow==='hidden');
+ return {path:(e.id?'#'+e.id:e.tagName.toLowerCase())+'-text',rect:[r.x,r.y,r.width,r.height],text:full,fill:null,stroke:null,strokeWidth:null,radius:null,shadow:null,textStyle:{fontFamily:s.fontFamily,fontSize:parseFloat(s.fontSize),fontWeight:s.fontWeight,lineHeight:parseFloat(s.lineHeight)||null,color:s.color},overflow:r.right>innerWidth||r.left<0,truncated};
+});
+const nodes=[...paintNodes,...textNodes];
 const o=document.createElement('pre');o.id='dw-design-spec';o.hidden=true;
 const encoded=JSON.stringify({viewport:[innerWidth,innerHeight],nodes});
 o.textContent=btoa(unescape(encodeURIComponent(encoded)));document.body.append(o)

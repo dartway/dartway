@@ -189,6 +189,23 @@ void main() {
     expect(findings, contains('Stroke width is 3 instead of 1'));
   });
 
+  test('matching design overflow and truncation are not app findings', () {
+    expect(
+      compareDesignSpecs(
+        spec(node(text: 'Design label', overflow: true, truncated: true)),
+        spec(node(text: 'App label', overflow: true, truncated: true)),
+      ).map((finding) => finding.message),
+      contains('Text is "App label" instead of "Design label".'),
+    );
+    expect(
+      compareDesignSpecs(
+        spec(node(overflow: true, truncated: true)),
+        spec(node(overflow: true, truncated: true)),
+      ),
+      isEmpty,
+    );
+  });
+
   test('absent values have the same encoding on both capture sides', () {
     expect(
       compareDesignSpecs(

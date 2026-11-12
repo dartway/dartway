@@ -3,7 +3,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+/// Whether this test process was started by `dartway design-check`.
+const dwDesignCheckEnabled = bool.fromEnvironment('DW_DESIGN_CHECK_ENABLED');
 
 /// Captures the visible render tree for `dartway design-check`.
 ///
@@ -11,7 +15,7 @@ import 'package:flutter_test/flutter_test.dart';
 /// calls this function with the case id supplied by the command in
 /// `DW_DESIGN_CHECK_CASES`. The helper writes no golden assertion: the command
 /// compares every case and owns the single report and exit status.
-Future<File> captureDwDesign(
+Future<File?> captureDwDesign(
   WidgetTester tester, {
   required String caseId,
   String? outputDirectory,
@@ -20,7 +24,7 @@ Future<File> captureDwDesign(
   const configuredOutput = String.fromEnvironment('DW_DESIGN_CHECK_OUTPUT');
   final output = outputDirectory ?? configuredOutput;
   if (output.isEmpty) {
-    throw StateError('captureDwDesign must run through dartway design-check.');
+    return null;
   }
   const requested = String.fromEnvironment('DW_DESIGN_CHECK_CASES');
   final cases =
@@ -28,6 +32,10 @@ Future<File> captureDwDesign(
       requested.split(',').where((value) => value.isNotEmpty).toSet();
   if (cases.isNotEmpty && !cases.contains(caseId)) {
     throw StateError('Unknown design-check case id: $caseId.');
+  }
+  if (!_projectFontsLoaded) {
+    await _loadProjectFonts();
+    _projectFontsLoaded = true;
   }
   await tester.pumpAndSettle();
   final nodes = <Map<String, Object?>>[];
@@ -207,6 +215,25 @@ Future<File> captureDwDesign(
     })}\n',
   );
   return target;
+}
+
+var _projectFontsLoaded = false;
+
+Future<void> _loadProjectFonts() async {
+  String manifestSource;
+  try {
+    manifestSource = await rootBundle.loadString('FontManifest.json');
+  } on FlutterError {
+    return;
+  }
+  final manifest = (jsonDecode(manifestSource) as List).cast<Map>();
+  for (final entry in manifest) {
+    final loader = FontLoader(entry['family']! as String);
+    for (final font in (entry['fonts']! as List).cast<Map>()) {
+      loader.addFont(rootBundle.load(font['asset']! as String));
+    }
+    await loader.load();
+  }
 }
 
 String? _colour(Color? colour) => colour == null

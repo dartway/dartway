@@ -129,7 +129,7 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
           DesignFinding(expected.path, 'Text $key is $b instead of $a.'),
         );
     }
-    if (candidate.overflow) {
+    if (candidate.overflow && !expected.overflow) {
       findings.add(
         DesignFinding(
           expected.path,
@@ -137,14 +137,17 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
         ),
       );
     }
-    if (candidate.truncated) {
+    if (candidate.truncated != expected.truncated) {
       findings.add(
         DesignFinding(
           expected.path,
-          'Text is truncated with an ellipsis: "${candidate.text ?? ''}".',
+          candidate.truncated
+              ? 'Text is truncated with an ellipsis in the app but not in the design.'
+              : 'Text is truncated with an ellipsis in the design but not in the app.',
         ),
       );
-    } else if (_text(candidate.text) != _text(expected.text)) {
+    }
+    if (_text(candidate.text) != _text(expected.text)) {
       findings.add(
         DesignFinding(
           expected.path,

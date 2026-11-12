@@ -23,8 +23,8 @@ dependencies:
 
 dev_dependencies:
   # `DwFakeServer`: the command is sent through a real client against it.
-  dartway_client: ^0.26.0
-  dartway_core_flutter: ^0.26.0
+  dartway_client: ^0.27.0
+  dartway_core_flutter: ^0.27.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

@@ -20,7 +20,7 @@ void main() {
       final html = File('${directory.path}/screen.html')
         ..writeAsStringSync('''<!doctype html><html><head>
 <link rel="stylesheet" href="style.css"></head><body>
-<p>&amp;lt;literal&amp;gt;</p></body></html>''');
+<p>&amp;lt;literal&amp;gt; <b>mixed</b></p></body></html>''');
       final output = Directory('${directory.path}/output')..createSync();
 
       final spec = await captureDesignReferenceForTesting(
@@ -31,16 +31,18 @@ void main() {
         (375, 812),
       );
 
-      final paragraph = spec.nodes.singleWhere((node) => node.path == 'p');
-      expect(paragraph.text, '&lt;literal&gt;');
-      expect(paragraph.fill, 'rgb(210, 211, 212)');
+      final paint = spec.nodes.singleWhere((node) => node.path == 'p');
+      final paragraph = spec.nodes.singleWhere((node) => node.path == 'p-text');
+      expect(paragraph.text, '&lt;literal&gt; mixed');
+      expect(paint.fill, 'rgb(210, 211, 212)');
+      expect(paragraph.fill, isNull);
       expect(paragraph.stroke, isNull);
       expect(paragraph.textStyle['color'], 'rgb(12, 34, 56)');
+      expect(spec.nodes.where((node) => node.text != null), hasLength(1));
       final flutterText = DesignNode(
         path: 'RenderParagraph#0',
         rect: paragraph.rect,
         text: paragraph.text,
-        fill: paragraph.fill,
         textStyle: paragraph.textStyle,
       );
       expect(

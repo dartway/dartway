@@ -6,22 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  testWidgets('requires design-check output before settling the widget tree', (
-    tester,
-  ) async {
-    const output = String.fromEnvironment('DW_DESIGN_CHECK_OUTPUT');
-    if (output.isNotEmpty) return;
-    await expectLater(
-      captureDwDesign(tester, caseId: 'not-requested'),
-      throwsA(
-        isA<StateError>().having(
-          (error) => error.message,
-          'message',
-          contains('must run through dartway design-check'),
-        ),
-      ),
-    );
-  });
+  testWidgets(
+    'is a no-op outside design-check before settling the widget tree',
+    (tester) async {
+      const output = String.fromEnvironment('DW_DESIGN_CHECK_OUTPUT');
+      if (output.isNotEmpty) return;
+      expect(await captureDwDesign(tester, caseId: 'not-requested'), isNull);
+    },
+  );
 
   testWidgets('rejects a case id the command did not request', (tester) async {
     final output = Directory.systemTemp.createTempSync('dw-design-capture-');
@@ -79,7 +71,7 @@ void main() {
       caseId: 'capture-fixture',
       outputDirectory: output.path,
     );
-    final json = jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
+    final json = jsonDecode(file!.readAsStringSync()) as Map<String, Object?>;
     final nodes = (json['nodes']! as List).cast<Map<String, Object?>>();
     final text = nodes.singleWhere((node) => node['text'] != null);
     expect(text['truncated'], isTrue);
@@ -88,6 +80,40 @@ void main() {
     expect(
       nodes.any((node) => node['fill'] == 'rgba(171, 205, 239, 1.000)'),
       isTrue,
+    );
+  });
+
+  testWidgets('keeps a decorated label as separate paint and text nodes', (
+    tester,
+  ) async {
+    final output = Directory.systemTemp.createTempSync('dw-design-capture-');
+    addTearDown(() => output.deleteSync(recursive: true));
+    await tester.pumpWidget(
+      const Directionality(
+        textDirection: TextDirection.ltr,
+        child: Align(
+          alignment: Alignment.topLeft,
+          child: DecoratedBox(
+            decoration: BoxDecoration(color: Color(0xff123456)),
+            child: Padding(padding: EdgeInsets.all(12), child: Text('Badge')),
+          ),
+        ),
+      ),
+    );
+    final file = await captureDwDesign(
+      tester,
+      caseId: 'decorated-label',
+      outputDirectory: output.path,
+    );
+    final json = jsonDecode(file!.readAsStringSync()) as Map<String, Object?>;
+    final nodes = (json['nodes']! as List).cast<Map<String, Object?>>();
+    final paint = nodes.singleWhere((node) => node['fill'] != null);
+    final text = nodes.singleWhere((node) => node['text'] == 'Badge');
+    expect(paint['text'], isNull);
+    expect(text['fill'], isNull);
+    expect(
+      (paint['rect']! as List)[2],
+      greaterThan((text['rect']! as List)[2] as num),
     );
   });
 
@@ -125,7 +151,7 @@ void main() {
       caseId: 'material-fixture',
       outputDirectory: output.path,
     );
-    final json = jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
+    final json = jsonDecode(file!.readAsStringSync()) as Map<String, Object?>;
     final nodes = (json['nodes']! as List).cast<Map<String, Object?>>();
     expect(
       nodes.any((node) => node['path'].toString().startsWith('image#')),

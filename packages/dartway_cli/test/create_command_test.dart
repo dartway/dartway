@@ -111,6 +111,7 @@ void main() {
               'rootUri': Directory(
                 p.join(repository.path, 'packages', 'dartway_cli'),
               ).uri.toString(),
+              'packageUri': 'lib/',
             },
           ],
         }),

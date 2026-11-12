@@ -16,8 +16,14 @@ await captureDwDesign(tester, caseId: 'profile-375x812');
 ```
 
 The helper settles animations and records every visible render node's bounds,
-text, fill, stroke, corner radius, shadow, and text style. Keep data, clocks,
-images, and fonts deterministic just as for an ordinary golden test.
+text, fill, stroke, corner radius, shadow, and text style. Outside a
+`dartway design-check` run it returns `null` without settling or capturing, so
+these tests remain safe in an ordinary `flutter test` run. Keep data, clocks,
+and images deterministic. Declare the design's real font files under `fonts:`
+in the Flutter package's `pubspec.yaml`; the capture helper loads that manifest
+before it settles the screen. Do not use the Flutter test font for a design
+check: its metrics do not match the browser font even when `TextStyle` reports
+the browser family's name.
 
 The published HTML declares design sizes and their Studio size class with one
 meta element per size:

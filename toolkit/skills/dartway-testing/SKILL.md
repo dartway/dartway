@@ -271,5 +271,6 @@ For a screen bound to a published Studio HTML design, keep its static-state chec
 `test/design_check/`. Run them through `dartway design-check --commit <publication-sha> --screen
 <path>` rather than directly: the command requests every design viewport and the mandatory narrow
 viewport through `DW_DESIGN_CHECK_CASES`. Import `package:dartway_core_flutter/testing.dart`, pump the
-requested state and call `captureDwDesign(tester, caseId: caseId)`. The helper rejects case ids that
+requested state and call `captureDwDesign(tester, caseId: caseId)`. Outside the design-check command
+the helper returns `null`; during a capture it rejects case ids that
 the command did not request and writes the app-side node spec for the command's single report.
