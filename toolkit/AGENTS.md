@@ -86,6 +86,9 @@ pins: `dartway <command>` from the project root or `__FLUTTER_PKG__` — a `dart
 hands the command to the pinned one. Format with `dartway format` (the pinned Dart, changed files only),
 never a bare `dart format`.
 Without a global CLI, run the same command as `dart run dartway_cli:dartway <args>` from the project root.
+`design-check` resolves its test and report paths in `__FLUTTER_PKG__`; CI must
+install Chrome and fetch the publication commit rather than using a checkout
+too shallow for the temporary comparison worktree.
 PRs target `__BASE_BRANCH__`; integration uses `dartway sync`.
 
 ## Interaction

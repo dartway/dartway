@@ -14,47 +14,63 @@ import 'package:flutter_test/flutter_test.dart';
 Future<File> captureDwDesign(
   WidgetTester tester, {
   required String caseId,
+  String? outputDirectory,
+  Set<String>? requestedCases,
 }) async {
-  const output = String.fromEnvironment('DW_DESIGN_CHECK_OUTPUT');
+  const configuredOutput = String.fromEnvironment('DW_DESIGN_CHECK_OUTPUT');
+  final output = outputDirectory ?? configuredOutput;
   if (output.isEmpty) {
     throw StateError('captureDwDesign must run through dartway design-check.');
   }
   const requested = String.fromEnvironment('DW_DESIGN_CHECK_CASES');
-  final cases = requested.split(',').where((value) => value.isNotEmpty).toSet();
+  final cases =
+      requestedCases ??
+      requested.split(',').where((value) => value.isNotEmpty).toSet();
   if (cases.isNotEmpty && !cases.contains(caseId)) {
     throw StateError('Unknown design-check case id: $caseId.');
   }
   await tester.pumpAndSettle();
   final nodes = <Map<String, Object?>>[];
   final widgets = <RenderObject, Widget>{};
-  void index(Element element) {
+  final icons = <RenderObject>{};
+  void index(Element element, [bool beneathIcon = false]) {
     final render = element.renderObject;
     if (render != null) widgets[render] = element.widget;
-    element.visitChildren(index);
+    final icon = beneathIcon || element.widget is Icon;
+    if (render != null && icon) icons.add(render);
+    element.visitChildren((child) => index(child, icon));
   }
 
   tester.binding.rootElement!.visitChildren(index);
-  void visit(RenderObject render) {
+  void visit(RenderObject render, Rect clip) {
+    if (render is RenderOffstage && render.offstage ||
+        render is RenderOpacity && render.opacity == 0) {
+      return;
+    }
     if (render is RenderBox && render.attached && render.hasSize) {
       final origin = render.localToGlobal(Offset.zero);
       final rect = origin & render.size;
       final screen =
           Offset.zero & tester.view.physicalSize / tester.view.devicePixelRatio;
       final widget = widgets[render];
+      final clipped = rect.intersect(clip);
+      final icon = render is RenderParagraph && icons.contains(render);
       final visual =
-          render is RenderParagraph ||
+          render is RenderParagraph && !icon ||
           render is RenderDecoratedBox ||
           widget is ColoredBox ||
           render is RenderPhysicalModel ||
+          render is RenderPhysicalShape ||
+          icon ||
           render is RenderImage;
       if (visual &&
-          rect.overlaps(screen) &&
-          rect.width > 0 &&
-          rect.height > 0) {
+          clipped.overlaps(screen) &&
+          clipped.width > 0 &&
+          clipped.height > 0) {
         String? text;
         Map<String, Object?> textStyle = const {};
         var truncated = false;
-        if (render is RenderParagraph) {
+        if (render is RenderParagraph && !icon) {
           final style = render.text.style;
           text = render.text.toPlainText();
           textStyle = {
@@ -99,6 +115,21 @@ Future<File> captureDwDesign(
             shadow = decoration.boxShadow
                 ?.map((value) => value.toString())
                 .join(',');
+          } else if (decoration is ShapeDecoration) {
+            fill = decoration.color;
+            shadow = decoration.shadows
+                ?.map((value) => value.toString())
+                .join(',');
+            final shape = decoration.shape;
+            if (shape is RoundedRectangleBorder) {
+              stroke = shape.side.style == BorderStyle.none
+                  ? null
+                  : shape.side.color;
+              strokeWidth = shape.side.style == BorderStyle.none
+                  ? null
+                  : shape.side.width;
+              radius = shape.borderRadius.resolve(TextDirection.ltr).topLeft.x;
+            }
           }
         } else if (widget is ColoredBox) {
           fill = widget.color;
@@ -112,10 +143,34 @@ Future<File> captureDwDesign(
               offset: Offset(0, render.elevation),
             ).toString();
           }
+        } else if (render is RenderPhysicalShape) {
+          fill = render.color;
+          final clipper = render.clipper;
+          if (clipper is ShapeBorderClipper) {
+            final shape = clipper.shape;
+            if (shape is RoundedRectangleBorder) {
+              stroke = shape.side.style == BorderStyle.none
+                  ? null
+                  : shape.side.color;
+              strokeWidth = shape.side.style == BorderStyle.none
+                  ? null
+                  : shape.side.width;
+              radius = shape.borderRadius.resolve(TextDirection.ltr).topLeft.x;
+            }
+          }
+          if (render.elevation > 0) {
+            shadow = BoxShadow(
+              color: render.shadowColor,
+              blurRadius: render.elevation * 2,
+              offset: Offset(0, render.elevation),
+            ).toString();
+          }
         }
         nodes.add({
-          'path': '${render.runtimeType}#${nodes.length}',
-          'rect': [rect.left, rect.top, rect.width, rect.height],
+          'path': icon
+              ? 'image#${nodes.length}'
+              : '${render.runtimeType}#${nodes.length}',
+          'rect': [clipped.left, clipped.top, clipped.width, clipped.height],
           'text': text,
           'fill': _colour(fill),
           'stroke': _colour(stroke),
@@ -128,12 +183,21 @@ Future<File> captureDwDesign(
         });
       }
     }
-    render.visitChildren(visit);
+    render.visitChildren((child) {
+      var childClip = clip;
+      final localClip = render.describeApproximatePaintClip(child);
+      if (localClip != null && render is RenderBox) {
+        final topLeft = render.localToGlobal(localClip.topLeft);
+        final bottomRight = render.localToGlobal(localClip.bottomRight);
+        childClip = childClip.intersect(Rect.fromPoints(topLeft, bottomRight));
+      }
+      visit(child, childClip);
+    });
   }
 
   final root = tester.binding.renderViews.single.child;
-  if (root != null) visit(root);
   final size = tester.view.physicalSize / tester.view.devicePixelRatio;
+  if (root != null) visit(root, Offset.zero & size);
   final target = File('$output/app/$caseId.json')
     ..parent.createSync(recursive: true);
   target.writeAsStringSync(

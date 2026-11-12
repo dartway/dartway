@@ -30,15 +30,28 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
       findings.add(DesignFinding(expected.path, 'Visible node is missing.'));
       continue;
     }
+    final expectedParent = _parentOf(expected, reference.nodes);
+    final candidateParent = expectedParent == null
+        ? null
+        : matches[expectedParent];
     final labels = ['left', 'top', 'width', 'height'];
     for (var index = 0; index < 4; index++) {
-      final difference = candidate.rect[index] - expected.rect[index];
+      final expectedValue = index < 2 && expectedParent != null
+          ? expected.rect[index] - expectedParent.rect[index]
+          : expected.rect[index];
+      final candidateValue = index < 2 && candidateParent != null
+          ? candidate.rect[index] - candidateParent.rect[index]
+          : candidate.rect[index];
+      final difference = candidateValue - expectedValue;
       if (difference.abs() > 2) {
+        final label = index < 2 && expectedParent != null
+            ? 'Padding ${index == 0 ? 'left' : 'top'}'
+            : labels[index];
         findings.add(
           DesignFinding(
             expected.path,
-            '${labels[index]} is ${_number(candidate.rect[index])} instead of '
-            '${_number(expected.rect[index])} (${difference > 0 ? '+' : ''}${_number(difference)} px).',
+            '$label is ${_number(candidateValue)} instead of '
+            '${_number(expectedValue)} (${difference > 0 ? '+' : ''}${_number(difference)} px).',
           ),
         );
       }
@@ -52,7 +65,12 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
         ),
       );
     }
-    if (!_sameColour(expected.fill, candidate.fill)) {
+    if (!_sameColour(
+      expected.fill,
+      candidate.fill,
+      _backdrop(expected, reference.nodes),
+      _backdrop(candidate, app.nodes),
+    )) {
       findings.add(
         DesignFinding(
           expected.path,
@@ -60,7 +78,12 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
         ),
       );
     }
-    if (!_sameColour(expected.stroke, candidate.stroke)) {
+    if (!_sameColour(
+      expected.stroke,
+      candidate.stroke,
+      _backdrop(expected, reference.nodes),
+      _backdrop(candidate, app.nodes),
+    )) {
       findings.add(
         DesignFinding(
           expected.path,
@@ -91,8 +114,11 @@ List<DesignFinding> compareDesignSpecs(DesignSpec reference, DesignSpec app) {
       final a = expected.textStyle[key];
       final b = candidate.textStyle[key];
       if (a == null && b == null) continue;
-      final metric = key == 'fontSize' || key == 'lineHeight';
+      final metric = key == 'lineHeight';
       if (metric && a is num && b is num && (a - b).abs() <= 2) continue;
+      if (key == 'fontSize' && a is num && b is num && (a - b).abs() <= .5) {
+        continue;
+      }
       final same = key == 'color'
           ? _sameColour(a as String?, b as String?)
           : key == 'fontFamily'
@@ -172,22 +198,52 @@ String _number(double value) => value == value.roundToDouble()
     ? value.toInt().toString()
     : value.toStringAsFixed(1);
 
-bool _sameColour(String? a, String? b) {
+bool _sameColour(String? a, String? b, [String? backdropA, String? backdropB]) {
   if (_transparent(a) && _transparent(b)) return true;
   if (a == b) return true;
   final first = _rgba(a);
   final second = _rgba(b);
   if (first == null || second == null) return false;
-  // Treat a translucent colour as its equivalent solid rendering on white.
-  List<int> flatten(List<int> value) => [
-    for (var i = 0; i < 3; i++)
-      (value[i] * value[3] / 255 + 255 - value[3]).round(),
-  ];
-  final x = flatten(first), y = flatten(second);
+  List<int> flatten(List<int> value, String? backdrop) {
+    final behind = _rgba(backdrop) ?? const [255, 255, 255, 255];
+    return [
+      for (var i = 0; i < 3; i++)
+        (value[i] * value[3] / 255 + behind[i] * (255 - value[3]) / 255)
+            .round(),
+    ];
+  }
+
+  final x = flatten(first, backdropA), y = flatten(second, backdropB);
   return List.generate(
     3,
     (i) => (x[i] - y[i]).abs(),
   ).every((difference) => difference <= 1);
+}
+
+DesignNode? _parentOf(DesignNode node, List<DesignNode> nodes) {
+  final containers = nodes
+      .where(
+        (other) =>
+            !identical(other, node) &&
+            other.rect[0] <= node.rect[0] &&
+            other.rect[1] <= node.rect[1] &&
+            other.rect[0] + other.rect[2] >= node.rect[0] + node.rect[2] &&
+            other.rect[1] + other.rect[3] >= node.rect[1] + node.rect[3],
+      )
+      .toList();
+  containers.sort(
+    (a, b) => (a.rect[2] * a.rect[3]).compareTo(b.rect[2] * b.rect[3]),
+  );
+  return containers.firstOrNull;
+}
+
+String? _backdrop(DesignNode node, List<DesignNode> nodes) {
+  var parent = _parentOf(node, nodes);
+  while (parent != null) {
+    if (!_transparent(parent.fill)) return parent.fill;
+    parent = _parentOf(parent, nodes);
+  }
+  return null;
 }
 
 bool _transparent(String? value) {

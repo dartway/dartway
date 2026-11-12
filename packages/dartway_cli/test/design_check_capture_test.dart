@@ -1,6 +1,8 @@
 import 'dart:io';
 
 import 'package:dartway_cli/src/commands/design_check_command.dart';
+import 'package:dartway_cli/src/design_check/design_compare.dart';
+import 'package:dartway_cli/src/design_check/design_spec.dart';
 import 'package:test/test.dart';
 
 void main() {
@@ -32,7 +34,22 @@ void main() {
       final paragraph = spec.nodes.singleWhere((node) => node.path == 'p');
       expect(paragraph.text, '&lt;literal&gt;');
       expect(paragraph.fill, 'rgb(210, 211, 212)');
+      expect(paragraph.stroke, isNull);
       expect(paragraph.textStyle['color'], 'rgb(12, 34, 56)');
+      final flutterText = DesignNode(
+        path: 'RenderParagraph#0',
+        rect: paragraph.rect,
+        text: paragraph.text,
+        fill: paragraph.fill,
+        textStyle: paragraph.textStyle,
+      );
+      expect(
+        compareDesignSpecs(
+          DesignSpec(viewport: spec.viewport, nodes: [paragraph]),
+          DesignSpec(viewport: spec.viewport, nodes: [flutterText]),
+        ),
+        isEmpty,
+      );
     },
     skip: chrome == null ? 'Chrome/Chromium is not installed.' : false,
   );

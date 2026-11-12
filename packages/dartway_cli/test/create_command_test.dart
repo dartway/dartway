@@ -23,7 +23,10 @@ import 'support/test_process.dart';
 
 void main() {
   final repository = () {
-    var dir = Directory.current.absolute;
+    final git = Process.runSync('git', ['rev-parse', '--show-toplevel']);
+    var dir = git.exitCode == 0
+        ? Directory((git.stdout as String).trim()).absolute
+        : Directory.current.absolute;
     while (!Directory(p.join(dir.path, 'template')).existsSync() ||
         !Directory(p.join(dir.path, 'packages')).existsSync()) {
       final up = dir.parent;

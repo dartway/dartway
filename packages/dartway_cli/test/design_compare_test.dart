@@ -126,22 +126,59 @@ void main() {
     expect(findings, contains('Text fontSize'));
   });
 
-  test(
-    'sub-pixel styling, equivalent alpha colour, and small font metrics are noise',
-    () {
-      final reference = node(
-        fill: 'rgb(255, 127, 127)',
-        radius: 8,
-        style: const {'fontSize': 16.0, 'lineHeight': 20.0},
-      );
-      final app = node(
-        fill: 'rgba(255, 0, 0, 0.5)',
-        radius: 8.8,
-        style: const {'fontSize': 17.5, 'lineHeight': 22.0},
-      );
-      expect(compareDesignSpecs(spec(reference), spec(app)), isEmpty);
-    },
-  );
+  test('sub-pixel styling and small line-height differences are noise', () {
+    final reference = node(
+      fill: 'rgb(255, 127, 127)',
+      radius: 8,
+      style: const {'fontSize': 16.0, 'lineHeight': 20.0},
+    );
+    final app = node(
+      fill: 'rgba(255, 0, 0, 0.5)',
+      radius: 8.8,
+      style: const {'fontSize': 16.4, 'lineHeight': 22.0},
+    );
+    expect(compareDesignSpecs(spec(reference), spec(app)), isEmpty);
+  });
+
+  test('meaningful font-size changes are reported', () {
+    final findings = compareDesignSpecs(
+      spec(node(style: const {'fontSize': 16.0})),
+      spec(node(style: const {'fontSize': 17.5})),
+    );
+    expect(
+      findings.map((finding) => finding.message),
+      contains('Text fontSize is 17.5 instead of 16.0.'),
+    );
+  });
+
+  test('translucent colours are compared on their painted backdrop', () {
+    DesignSpec layered(String foreground) => DesignSpec(
+      viewport: [375, 812],
+      nodes: [
+        node(
+          path: 'body',
+          rect: [0, 0, 375, 812],
+          fill: 'rgb(0, 0, 0)',
+          text: '',
+        ),
+        node(path: 'card', fill: foreground),
+      ],
+    );
+    expect(
+      compareDesignSpecs(
+        layered('rgba(255, 255, 255, 0.5)'),
+        layered('rgb(128, 128, 128)'),
+      ),
+      isEmpty,
+    );
+    expect(
+      compareDesignSpecs(
+        layered('rgba(255, 255, 255, 0.5)'),
+        layered('rgb(255, 255, 255)'),
+      ),
+      isNotEmpty,
+    );
+  });
 
   test('viewport and meaningful stroke width differences are found', () {
     final findings = compareDesignSpecs(

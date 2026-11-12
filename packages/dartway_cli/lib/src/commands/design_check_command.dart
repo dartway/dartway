@@ -6,6 +6,7 @@ import 'package:path/path.dart' as p;
 
 import '../design_check/design_compare.dart';
 import '../design_check/design_spec.dart';
+import '../project_layout.dart';
 
 class DesignCheckCommand extends Command<int> {
   DesignCheckCommand() {
@@ -53,8 +54,14 @@ class DesignCheckCommand extends Command<int> {
     if (argResults!.multiOption('screen').isEmpty) {
       usageException('At least one --screen is required.');
     }
-    final root = Directory.current.path;
-    final output = Directory(p.join(root, argResults!.option('output')!))
+    final projectRoot = findPackageProjectRoot(Directory.current);
+    if (projectRoot == null) {
+      throw StateError('design-check must run inside a DartWay project.');
+    }
+    final layout = ProjectLayout.detect(projectRoot);
+    final root = layout.root.path;
+    final flutterRoot = layout.flutterPackageDir.path;
+    final output = Directory(p.join(flutterRoot, argResults!.option('output')!))
       ..createSync(recursive: true);
     final chrome =
         argResults!.option('chrome') ??
@@ -106,7 +113,7 @@ class DesignCheckCommand extends Command<int> {
       argResults!.option('tests')!,
       '--dart-define=DW_DESIGN_CHECK_OUTPUT=${output.path}',
       '--dart-define=DW_DESIGN_CHECK_CASES=${captures.map((capture) => capture.id).join(',')}',
-    ], workingDirectory: root);
+    ], workingDirectory: flutterRoot);
     stdout.write(test.stdout);
     stderr.write(test.stderr);
     final findings = <Map<String, Object?>>[];
@@ -140,7 +147,11 @@ class DesignCheckCommand extends Command<int> {
     final acceptancePath = argResults!.option('acceptance');
     if (acceptancePath != null) {
       final rules =
-          (jsonDecode(File(p.join(root, acceptancePath)).readAsStringSync())
+          (jsonDecode(
+                    File(
+                      p.join(flutterRoot, acceptancePath),
+                    ).readAsStringSync(),
+                  )
                   as List)
               .cast<Map>()
               .map((value) => value.cast<String, Object?>())
@@ -255,14 +266,18 @@ for(let pass=0;pass<2;pass++) { for(const a of document.getAnimations()) {
   try { const end=a.effect&&a.effect.getComputedTiming().endTime; if(Number.isFinite(end)) a.finish(); else a.pause(); } catch (_) { a.pause(); }
 } await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))); }
 const visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&parseFloat(s.opacity)!==0&&r.width>0&&r.height>0&&r.right>0&&r.bottom>0&&r.left<innerWidth&&r.top<innerHeight};
-const painted=e=>{const s=getComputedStyle(e);return e.children.length===0&&e.textContent.trim()||e.tagName==='IMG'||s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'||parseFloat(s.borderTopWidth)||s.boxShadow!=='none'};
-const nodes=[...document.querySelectorAll('body *')].filter(e=>visible(e)&&painted(e)).map(e=>{
- const s=getComputedStyle(e),r=e.getBoundingClientRect(),leaf=e.children.length===0;
- const full=leaf?e.textContent.trim():null;
+const directText=e=>[...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join(' ').trim();
+const painted=e=>{const s=getComputedStyle(e);return e===document.body||directText(e)||e.tagName==='IMG'||e.tagName==='SVG'||s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'||parseFloat(s.borderTopWidth)||s.boxShadow!=='none'};
+const nodes=[document.body,...document.querySelectorAll('body *')].filter(e=>visible(e)&&painted(e)).map(e=>{
+ const s=getComputedStyle(e),r=e.getBoundingClientRect();
+ const full=directText(e)||null;
  const range=document.createRange(); range.selectNodeContents(e);
  const textRect=full?range.getBoundingClientRect():null;
  const truncated=!!full&&(e.scrollWidth>e.clientWidth||e.scrollHeight>e.clientHeight||!!textRect&&(textRect.right>r.right+.5||textRect.bottom>r.bottom+.5))&&(s.textOverflow==='ellipsis'||s.overflow==='hidden');
- return {path:e.id?'#'+e.id:e.tagName.toLowerCase(),rect:[r.x,r.y,r.width,r.height],text:full||null,fill:s.backgroundColor,stroke:s.borderTopColor,strokeWidth:parseFloat(s.borderTopWidth)||0,radius:parseFloat(s.borderRadius)||0,shadow:s.boxShadow==='none'?null:s.boxShadow,textStyle:full?{fontFamily:s.fontFamily,fontSize:parseFloat(s.fontSize),fontWeight:s.fontWeight,lineHeight:parseFloat(s.lineHeight)||null,color:s.color}:{},overflow:r.right>innerWidth||r.left<0,truncated};
+ const border=parseFloat(s.borderTopWidth)||0;
+ const transparent=c=>c==='rgba(0, 0, 0, 0)'||c==='transparent';
+ const fill=e===document.body&&transparent(s.backgroundColor)?(transparent(getComputedStyle(document.documentElement).backgroundColor)?'rgb(255, 255, 255)':getComputedStyle(document.documentElement).backgroundColor):s.backgroundColor;
+ return {path:e.tagName==='SVG'?'image':e.id?'#'+e.id:e.tagName.toLowerCase(),rect:e===document.body?[0,0,innerWidth,innerHeight]:[r.x,r.y,r.width,r.height],text:full,fill,stroke:s.borderTopStyle!=='none'&&border>0?s.borderTopColor:null,strokeWidth:border,radius:parseFloat(s.borderRadius)||0,shadow:s.boxShadow==='none'?null:s.boxShadow,textStyle:full?{fontFamily:s.fontFamily,fontSize:parseFloat(s.fontSize),fontWeight:s.fontWeight,lineHeight:parseFloat(s.lineHeight)||null,color:s.color}:{},overflow:r.right>innerWidth||r.left<0,truncated};
 });
 const o=document.createElement('pre');o.id='dw-design-spec';o.hidden=true;
 const encoded=JSON.stringify({viewport:[innerWidth,innerHeight],nodes});

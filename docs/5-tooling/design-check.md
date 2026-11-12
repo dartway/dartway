@@ -49,10 +49,32 @@ Chrome or Chromium 112 or newer is supported and found through `CHROME_EXECUTABL
 fonts, images, and animations settle. Screenshot and DOM capture use separate browser invocations for reliable headless output. It then runs all bound widget tests once and
 writes `build/design-check/report.json`, `report.txt`, reference PNGs, and both
 node specs. Commit the publication SHA to the CI configuration (or provide it
-as a protected CI variable) and run the same command there.
+as a protected CI variable) and run the same command there. The checkout must
+fetch that commit: a shallow checkout that does not contain it cannot create
+the comparison worktree.
 
-The exit status is non-zero for a failed widget test, a missing capture, or an
-unexplained difference. Two-pixel font-metric variation, sub-pixel stroke and
+For GitHub Actions, install Chrome and fetch history before running from the
+project root (or from its Flutter package):
+
+```yaml
+- uses: actions/checkout@v4
+  with:
+    fetch-depth: 0
+- uses: browser-actions/setup-chrome@v1
+- name: Check published designs
+  working-directory: .
+  env:
+    DESIGN_PUBLICATION_COMMIT: ${{ vars.DESIGN_PUBLICATION_COMMIT }}
+  run: >-
+    dartway design-check
+    --commit "$DESIGN_PUBLICATION_COMMIT"
+    --screen dw_studio/blocks/account/screens/profile.html
+```
+
+Relative `--tests`, `--output`, and `--acceptance` paths are resolved in the
+Flutter package even when the command starts at the project root. The exit
+status is non-zero for a failed widget test, a missing capture, or an
+unexplained difference. Two-pixel line-height and box-metric variation, sub-pixel stroke and
 radius variation, and a translucent colour equivalent to its solid rendering
 are ignored; overflow at a narrow width is never ignored.
 

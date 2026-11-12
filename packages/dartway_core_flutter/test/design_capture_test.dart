@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:dartway_core_flutter/testing.dart';
 import 'package:flutter/material.dart';
@@ -23,10 +24,15 @@ void main() {
   });
 
   testWidgets('rejects a case id the command did not request', (tester) async {
-    const output = String.fromEnvironment('DW_DESIGN_CHECK_OUTPUT');
-    if (output.isEmpty) return;
+    final output = Directory.systemTemp.createTempSync('dw-design-capture-');
+    addTearDown(() => output.deleteSync(recursive: true));
     await expectLater(
-      captureDwDesign(tester, caseId: 'not-requested'),
+      captureDwDesign(
+        tester,
+        caseId: 'not-requested',
+        outputDirectory: output.path,
+        requestedCases: {'requested'},
+      ),
       throwsA(
         isA<StateError>().having(
           (error) => error.message,
@@ -40,8 +46,8 @@ void main() {
   testWidgets('captures effective text, paint, and real ellipsis state', (
     tester,
   ) async {
-    const output = String.fromEnvironment('DW_DESIGN_CHECK_OUTPUT');
-    if (output.isEmpty) return;
+    final output = Directory.systemTemp.createTempSync('dw-design-capture-');
+    addTearDown(() => output.deleteSync(recursive: true));
     await tester.pumpWidget(
       const Directionality(
         textDirection: TextDirection.ltr,
@@ -68,7 +74,11 @@ void main() {
         ),
       ),
     );
-    final file = await captureDwDesign(tester, caseId: 'capture-fixture');
+    final file = await captureDwDesign(
+      tester,
+      caseId: 'capture-fixture',
+      outputDirectory: output.path,
+    );
     final json = jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
     final nodes = (json['nodes']! as List).cast<Map<String, Object?>>();
     final text = nodes.singleWhere((node) => node['text'] != null);
@@ -79,5 +89,53 @@ void main() {
       nodes.any((node) => node['fill'] == 'rgba(171, 205, 239, 1.000)'),
       isTrue,
     );
+  });
+
+  testWidgets('captures material paint and excludes invisible subtrees', (
+    tester,
+  ) async {
+    final output = Directory.systemTemp.createTempSync('dw-design-capture-');
+    addTearDown(() => output.deleteSync(recursive: true));
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: Column(
+            children: [
+              Card(child: Text('Visible card')),
+              Icon(Icons.save),
+              DecoratedBox(
+                decoration: ShapeDecoration(
+                  color: Color(0xff123456),
+                  shape: RoundedRectangleBorder(
+                    side: BorderSide(color: Color(0xffabcdef)),
+                    borderRadius: BorderRadius.all(Radius.circular(7)),
+                  ),
+                ),
+                child: SizedBox(width: 20, height: 20),
+              ),
+              Offstage(child: Text('Offstage text')),
+              Opacity(opacity: 0, child: Text('Transparent text')),
+            ],
+          ),
+        ),
+      ),
+    );
+    final file = await captureDwDesign(
+      tester,
+      caseId: 'material-fixture',
+      outputDirectory: output.path,
+    );
+    final json = jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
+    final nodes = (json['nodes']! as List).cast<Map<String, Object?>>();
+    expect(
+      nodes.any((node) => node['path'].toString().startsWith('image#')),
+      isTrue,
+    );
+    expect(
+      nodes.any((node) => node['fill'] == 'rgba(18, 52, 86, 1.000)'),
+      isTrue,
+    );
+    expect(nodes.any((node) => node['text'] == 'Offstage text'), isFalse);
+    expect(nodes.any((node) => node['text'] == 'Transparent text'), isFalse);
   });
 }
