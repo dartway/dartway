@@ -66,7 +66,7 @@ env:
 
 jobs:
   analyze:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     env:
       DW_CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
@@ -94,7 +94,7 @@ jobs:
           DW_CHECKS_ONLY: ${{ steps.affected.outputs.only }}
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
@@ -154,7 +154,7 @@ jobs:
           DW_TEST_PART: ${{ matrix.part || '1/1' }}
 
   services:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     # The CLI's external test servers are the longest services suite: a job
     # of their own.
