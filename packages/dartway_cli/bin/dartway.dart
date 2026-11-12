@@ -6,6 +6,7 @@ import 'package:dartway_cli/src/commands/contract_command.dart';
 import 'package:dartway_cli/src/commands/create_command.dart';
 import 'package:dartway_cli/src/commands/deploy_command.dart';
 import 'package:dartway_cli/src/commands/dev_command.dart';
+import 'package:dartway_cli/src/commands/design_check_command.dart';
 import 'package:dartway_cli/src/commands/doctor_command.dart';
 import 'package:dartway_cli/src/commands/format_command.dart';
 import 'package:dartway_cli/src/commands/generate_command.dart';
@@ -56,6 +57,7 @@ Future<void> main(List<String> args) async {
         ..addCommand(CheckCommand())
         ..addCommand(ContractCommand())
         ..addCommand(DevCommand())
+        ..addCommand(DesignCheckCommand())
         ..addCommand(DeployCommand())
         ..addCommand(SecretCommand())
         ..addCommand(StatsCommand())

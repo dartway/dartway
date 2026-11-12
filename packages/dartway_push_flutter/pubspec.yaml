@@ -16,12 +16,12 @@ dependencies:
   flutter:
     sdk: flutter
 
-  dartway_core_flutter: ^0.26.0
+  dartway_core_flutter: ^0.27.0
   dartway_push_shared: ^0.11.0
 
 dev_dependencies:
   # `DwFakeServer`: the plugin registers through a real client against it.
-  dartway_client: ^0.26.0
+  dartway_client: ^0.27.0
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0

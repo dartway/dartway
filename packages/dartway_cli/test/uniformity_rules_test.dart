@@ -350,6 +350,11 @@ class B {}
       expect(problem('src/chat/chat_support.dart'), contains('helper'));
       expect(problem('support/harness_test.dart'), contains('test/support/'));
     });
+
+    test('design-check bindings do not need a production lib mirror', () {
+      expect(problem('design_check/profile_design_test.dart'), isNull);
+      expect(problem('design_check/profile_fixture.dart'), contains('helper'));
+    });
   });
 
   group('testLayout, scenarios and the move', () {

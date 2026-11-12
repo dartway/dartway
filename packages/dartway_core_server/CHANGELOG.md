@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.27.0
+
+- Advance in lockstep with the core family.
+
 ## 0.26.0
 
 - Refuse the forward-compatible `DwIdentifierKind.unknown` on every identifier

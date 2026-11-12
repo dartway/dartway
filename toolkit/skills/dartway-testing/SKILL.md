@@ -264,3 +264,15 @@ fixing the test or deleting it.
 **Re-running CI until green is not a fix.** It hides the flake and costs a full run each time.
 
 **A test that fails on every run is not flaky.** It is a red test; §5 and the gates apply.
+
+## Design checks
+
+For a screen bound to a published Studio HTML design, keep its static-state checks in
+`test/design_check/`. Run them through `dartway design-check --commit <publication-sha> --screen
+<path>` rather than directly: the command requests every design viewport and the mandatory narrow
+viewport through `dwDesignCheckCases`. Import `package:dartway_core_flutter/testing.dart`, loop over
+that list, set `tester.view.physicalSize` from each case's `width` and `height`, pump the requested
+state, and call `captureDwDesign(tester, caseId: captureCase.id)`. Never reconstruct the id from the
+screen name: it includes the complete repository path. Outside the design-check command
+the helper returns `null`; during a capture it rejects case ids that
+the command did not request and writes the app-side node spec for the command's single report.

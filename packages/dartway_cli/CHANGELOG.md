@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.29.0
+
+### Changes
+
+- Add `dartway design-check`: capture Studio HTML at an agreed Git commit and
+  Flutter widget-test states at every design size, then emit one readable and
+  machine-readable difference report. Capture painted nodes in the viewport,
+  size classes, truncation and stroke widths; validate the app viewport; and
+  allow reasoned exact finding acceptances. Case metadata is supplied to the
+  tests, inline SVG is captured, node matching includes role and size, and
+  available cases remain comparable after a widget-test failure (#730).
+
 ## 0.28.0
 
 ### Breaking changes

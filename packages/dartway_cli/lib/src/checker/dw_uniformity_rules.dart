@@ -345,6 +345,10 @@ class DwUniformityInspector {
       return 'a helper outside test/support/ — move it there, beside the '
           'harness, and import it relatively';
     }
+    // Design checks are command-owned static-state bindings rather than unit
+    // tests of a production library path. The command discovers this folder
+    // directly (and projects keep their fixture widgets in test/support/).
+    if (rel.startsWith('design_check/')) return null;
     final mirrored =
         '${rel.substring(0, rel.length - '_test.dart'.length)}.dart';
     if (!rel.endsWith('_acceptance_test.dart') && libFileExists(mirrored)) {

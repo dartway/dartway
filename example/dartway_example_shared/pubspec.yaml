@@ -7,7 +7,7 @@ environment:
   sdk: ^3.11.0
 
 dependencies:
-  dartway_core_shared: ^0.26.0
+  dartway_core_shared: ^0.27.0
   # Push categories and the token registration calls the app and server share.
   dartway_push_shared: ^0.11.0
   # Events, reports and dashboards: the analytics calls both sides speak.
