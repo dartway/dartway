@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build:
     name: example
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
     # CI runs on the pin, so without this job the floor is a sentence nobody
     # checks. Resolved without the committed lock, which the pin wrote.
     name: template on the floor
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
