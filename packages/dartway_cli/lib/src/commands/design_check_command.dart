@@ -264,7 +264,7 @@ await Promise.all([...document.images].map(i=>i.complete?null:new Promise(r=>{i.
 // animations started by load handlers.
 for(let pass=0;pass<2;pass++) { for(const a of document.getAnimations()) {
   try { const end=a.effect&&a.effect.getComputedTiming().endTime; if(Number.isFinite(end)) a.finish(); else a.pause(); } catch (_) { a.pause(); }
-} await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r))); }
+} await new Promise(r=>{let frames=0; const next=()=>{if(++frames===2)r();else requestAnimationFrame(next)}; requestAnimationFrame(next); setTimeout(r,100);}); }
 const visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&parseFloat(s.opacity)!==0&&r.width>0&&r.height>0&&r.right>0&&r.bottom>0&&r.left<innerWidth&&r.top<innerHeight};
 const directText=e=>[...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join(' ').trim();
 const painted=e=>{const s=getComputedStyle(e);return e===document.body||directText(e)||e.tagName==='IMG'||e.tagName==='SVG'||s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'||parseFloat(s.borderTopWidth)||s.boxShadow!=='none'};
@@ -321,8 +321,14 @@ o.textContent=btoa(unescape(encodeURIComponent(encoded)));document.body.append(o
     r'<pre[^>]*id="dw-design-spec"[^>]*>([^<]+)</pre>',
     dotAll: true,
   ).firstMatch(result.stdout as String);
-  if (match == null)
-    throw StateError('Published screen $id did not finish capture.');
+  if (match == null) {
+    final dom = result.stdout as String;
+    final excerpt = dom.length > 500 ? dom.substring(0, 500) : dom;
+    throw StateError(
+      'Published screen $id did not finish capture. '
+      'Chrome stderr: ${result.stderr}\nDOM: $excerpt',
+    );
+  }
   final encoded = utf8.decode(base64Decode(match.group(1)!));
   final spec = DesignSpec.decode(encoded);
   File(p.join(referenceDir.path, '$id.json')).writeAsStringSync(encoded);
