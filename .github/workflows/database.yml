@@ -64,7 +64,7 @@ concurrency:
 
 jobs:
   example:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 20
     # A job of its own, so a red one names which project without opening a log.
     name: example
@@ -102,7 +102,7 @@ jobs:
   # added, and a construct the runner does not know stops the job instead of
   # being skipped.
   template:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.DW_CI_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 40
     name: template
     steps:
