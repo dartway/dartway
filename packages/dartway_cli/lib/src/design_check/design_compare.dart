@@ -168,10 +168,29 @@ Map<DesignNode, DesignNode> _matchNodes(
   List<DesignNode> reference,
   List<DesignNode> app,
 ) {
-  final edges = <(DesignNode, DesignNode)>[
-    for (final expected in reference)
-      for (final actual in app) (expected, actual),
-  ]..sort((a, b) => _matchScore(a.$1, a.$2).compareTo(_matchScore(b.$1, b.$2)));
+  final edges =
+      <(DesignNode, DesignNode, int, int)>[
+        for (
+          var expectedIndex = 0;
+          expectedIndex < reference.length;
+          expectedIndex++
+        )
+          for (var actualIndex = 0; actualIndex < app.length; actualIndex++)
+            (
+              reference[expectedIndex],
+              app[actualIndex],
+              expectedIndex,
+              actualIndex,
+            ),
+      ]..sort((a, b) {
+        final score = _matchScore(
+          a.$1,
+          a.$2,
+        ).compareTo(_matchScore(b.$1, b.$2));
+        if (score != 0) return score;
+        final expected = a.$3.compareTo(b.$3);
+        return expected != 0 ? expected : a.$4.compareTo(b.$4);
+      });
   final result = <DesignNode, DesignNode>{};
   final used = <DesignNode>{};
   for (final edge in edges) {
@@ -187,14 +206,29 @@ double _matchScore(DesignNode a, DesignNode b) {
       (a.text?.isNotEmpty ?? false) || (b.text?.isNotEmpty ?? false);
   final textPenalty = bothHaveText && a.text != b.text ? 1000000.0 : 0.0;
   final rolePenalty = _role(a.path) == _role(b.path) ? 0.0 : 1000.0;
-  return textPenalty + rolePenalty + _distance(a, b);
+  return textPenalty + rolePenalty + _distance(a, b) + _sizeDistance(a, b);
 }
 
-String _role(String path) =>
-    path.split('/').last.split('#').first.toLowerCase();
+String _role(String path) {
+  final role = path.split('/').last.split('#').first.toLowerCase();
+  if (role == 'image' ||
+      role == 'img' ||
+      role == 'svg' ||
+      role == 'renderimage') {
+    return 'image';
+  }
+  if (role.endsWith('-text') || role == 'p' || role == 'renderparagraph') {
+    return 'text';
+  }
+  return 'box';
+}
 
 double _distance(DesignNode a, DesignNode b) => math.sqrt(
   math.pow(a.rect[0] - b.rect[0], 2) + math.pow(a.rect[1] - b.rect[1], 2),
+);
+
+double _sizeDistance(DesignNode a, DesignNode b) => math.sqrt(
+  math.pow(a.rect[2] - b.rect[2], 2) + math.pow(a.rect[3] - b.rect[3], 2),
 );
 
 String _number(double value) => value == value.roundToDouble()

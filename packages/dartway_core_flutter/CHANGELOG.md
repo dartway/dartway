@@ -4,7 +4,8 @@
 
 - Add the test-only `captureDwDesign` painted render-tree capture used by
   `dartway design-check`, including inherited effective text styles, text
-  truncation, `ColoredBox`/`Material` paints, and stroke widths (#730).
+  truncation, `ColoredBox`/`Material` paints, and stroke widths. Expose the
+  requested case ids and logical sizes through `dwDesignCheckCases` (#730).
 
 ## 0.26.0
 

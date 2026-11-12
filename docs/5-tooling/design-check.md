@@ -7,12 +7,19 @@ and deliberately does not compare transitions.
 ## Bind a screen
 
 Put widget tests in `test/design_check/`. Import
-`package:dartway_core_flutter/testing.dart`, pump the same static state for
-each case requested by `DW_DESIGN_CHECK_CASES`, set the test view to the case's
-width and height, then call:
+`package:dartway_core_flutter/testing.dart` and loop over
+`dwDesignCheckCases`. The command supplies the complete case id and logical
+view size, so the test does not reconstruct either from the repository path:
 
 ```dart
-await captureDwDesign(tester, caseId: 'profile-375x812');
+for (final captureCase in dwDesignCheckCases) {
+  tester.view.devicePixelRatio = 1;
+  tester.view.physicalSize = Size(captureCase.width, captureCase.height);
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+  await tester.pumpWidget(const MaterialApp(home: ProfileScreen()));
+  await captureDwDesign(tester, caseId: captureCase.id);
+}
 ```
 
 The helper settles animations and records every visible render node's bounds,
@@ -54,7 +61,8 @@ dartway design-check \
 Chrome or Chromium 112 or newer is supported and found through `CHROME_EXECUTABLE` or `PATH`. The command materialises the publication commit in a temporary Git worktree so relative stylesheets, images, and fonts resolve, then captures each screen headlessly after
 fonts, images, and animations settle. Screenshot and DOM capture use separate browser invocations for reliable headless output. It then runs all bound widget tests once and
 writes `build/design-check/report.json`, `report.txt`, reference PNGs, and both
-node specs. Commit the publication SHA to the CI configuration (or provide it
+node specs. Comparisons whose capture files exist still run when another widget
+test fails, and the report also records that test failure. Commit the publication SHA to the CI configuration (or provide it
 as a protected CI variable) and run the same command there. The checkout must
 fetch that commit: a shallow checkout that does not contain it cannot create
 the comparison worktree.

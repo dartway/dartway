@@ -97,7 +97,9 @@ class DesignCheckCommand extends Command<int> {
             published,
             (viewport.$1, viewport.$2),
           );
-          captures.add(_Capture(screen, id, reference));
+          captures.add(
+            _Capture(screen, id, viewport.$1, viewport.$2, reference),
+          );
         }
       }
     } finally {
@@ -112,33 +114,34 @@ class DesignCheckCommand extends Command<int> {
       'test',
       argResults!.option('tests')!,
       '--dart-define=DW_DESIGN_CHECK_OUTPUT=${output.path}',
-      '--dart-define=DW_DESIGN_CHECK_CASES=${captures.map((capture) => capture.id).join(',')}',
+      '--dart-define=DW_DESIGN_CHECK_CASES=${jsonEncode([
+        for (final capture in captures) {'id': capture.id, 'width': capture.width, 'height': capture.height},
+      ])}',
       '--dart-define=DW_DESIGN_CHECK_ENABLED=true',
     ], workingDirectory: flutterRoot);
     stdout.write(test.stdout);
     stderr.write(test.stderr);
     final findings = <Map<String, Object?>>[];
-    if (test.exitCode == 0) {
-      for (final capture in captures) {
-        final appFile = File(p.join(output.path, 'app', '${capture.id}.json'));
-        if (!appFile.existsSync()) {
-          findings.add({
-            'screen': capture.screen,
-            'viewport': capture.id,
-            'message': 'The widget test did not capture this case.',
-          });
-          continue;
-        }
-        final app = DesignSpec.decode(appFile.readAsStringSync());
-        for (final finding in compareDesignSpecs(capture.reference, app)) {
-          findings.add({
-            'screen': capture.screen,
-            'viewport': capture.id,
-            ...finding.toJson(),
-          });
-        }
+    for (final capture in captures) {
+      final appFile = File(p.join(output.path, 'app', '${capture.id}.json'));
+      if (!appFile.existsSync()) {
+        findings.add({
+          'screen': capture.screen,
+          'viewport': capture.id,
+          'message': 'The widget test did not capture this case.',
+        });
+        continue;
       }
-    } else {
+      final app = DesignSpec.decode(appFile.readAsStringSync());
+      for (final finding in compareDesignSpecs(capture.reference, app)) {
+        findings.add({
+          'screen': capture.screen,
+          'viewport': capture.id,
+          ...finding.toJson(),
+        });
+      }
+    }
+    if (test.exitCode != 0) {
       findings.add({
         'message': 'Flutter design-check tests failed.',
         'exitCode': test.exitCode,
@@ -268,14 +271,14 @@ for(let pass=0;pass<2;pass++) { for(const a of document.getAnimations()) {
 } await new Promise(r=>{let frames=0; const next=()=>{if(++frames===2)r();else requestAnimationFrame(next)}; requestAnimationFrame(next); setTimeout(r,100);}); }
 const visible=e=>{const s=getComputedStyle(e),r=e.getBoundingClientRect();return s.visibility!=='hidden'&&s.display!=='none'&&parseFloat(s.opacity)!==0&&r.width>0&&r.height>0&&r.right>0&&r.bottom>0&&r.left<innerWidth&&r.top<innerHeight};
 const directText=e=>[...e.childNodes].filter(n=>n.nodeType===Node.TEXT_NODE).map(n=>n.textContent).join(' ').trim();
-const painted=e=>{const s=getComputedStyle(e);return e===document.body||e.tagName==='IMG'||e.tagName==='SVG'||s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'||parseFloat(s.borderTopWidth)||s.boxShadow!=='none'};
+const painted=e=>{const s=getComputedStyle(e),tag=e.tagName.toLowerCase();return e===document.body||tag==='img'||tag==='svg'||s.backgroundColor!=='rgba(0, 0, 0, 0)'&&s.backgroundColor!=='transparent'||parseFloat(s.borderTopWidth)||s.boxShadow!=='none'};
 const elements=[document.body,...document.querySelectorAll('body *')].filter(visible);
 const paintNodes=elements.filter(painted).map(e=>{
  const s=getComputedStyle(e),r=e.getBoundingClientRect();
  const border=parseFloat(s.borderTopWidth)||0;
  const transparent=c=>c==='rgba(0, 0, 0, 0)'||c==='transparent';
  const fill=e===document.body&&transparent(s.backgroundColor)?(transparent(getComputedStyle(document.documentElement).backgroundColor)?'rgb(255, 255, 255)':getComputedStyle(document.documentElement).backgroundColor):s.backgroundColor;
- return {path:e.tagName==='SVG'?'image':e.id?'#'+e.id:e.tagName.toLowerCase(),rect:e===document.body?[0,0,innerWidth,innerHeight]:[r.x,r.y,r.width,r.height],text:null,fill,stroke:s.borderTopStyle!=='none'&&border>0?s.borderTopColor:null,strokeWidth:border,radius:parseFloat(s.borderRadius)||0,shadow:s.boxShadow==='none'?null:s.boxShadow,textStyle:{},overflow:r.right>innerWidth||r.left<0,truncated:false};
+ return {path:e.tagName.toLowerCase()==='svg'?'image':e.id?'#'+e.id:e.tagName.toLowerCase(),rect:e===document.body?[0,0,innerWidth,innerHeight]:[r.x,r.y,r.width,r.height],text:null,fill,stroke:s.borderTopStyle!=='none'&&border>0?s.borderTopColor:null,strokeWidth:border,radius:parseFloat(s.borderRadius)||0,shadow:s.boxShadow==='none'?null:s.boxShadow,textStyle:{},overflow:r.right>innerWidth||r.left<0,truncated:false};
 });
 // Text is a separate visual node, just as it is in Flutter's render tree.
 // The nearest element with direct text owns the whole inline run, so
@@ -344,8 +347,10 @@ o.textContent=btoa(unescape(encodeURIComponent(encoded)));document.body.append(o
 }
 
 class _Capture {
-  const _Capture(this.screen, this.id, this.reference);
+  const _Capture(this.screen, this.id, this.width, this.height, this.reference);
   final String screen;
   final String id;
+  final int width;
+  final int height;
   final DesignSpec reference;
 }

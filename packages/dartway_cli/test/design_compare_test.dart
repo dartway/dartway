@@ -99,10 +99,29 @@ void main() {
     );
   });
 
-  test(
-    'identical specs pass',
-    () => expect(compareDesignSpecs(spec(node()), spec(node())), isEmpty),
-  );
+  test('identical specs pass', () {
+    final nodes = [
+      for (var index = 0; index < 40; index++)
+        node(
+          text: '',
+          path: index.isEven ? 'div' : '#layer-$index',
+          rect: [0, 0, 400.0 - index, 800.0 - index],
+        ),
+    ];
+    final reference = DesignSpec(viewport: [400, 800], nodes: nodes);
+    final app = DesignSpec(
+      viewport: [400, 800],
+      nodes: [
+        for (var index = 0; index < nodes.length; index++)
+          node(
+            text: '',
+            path: 'RenderDecoratedBox#$index',
+            rect: List.of(nodes[index].rect),
+          ),
+      ],
+    );
+    expect(compareDesignSpecs(reference, app), isEmpty);
+  });
 
   test('meaningful geometry, text, style, and narrow overflow are found', () {
     final findings = compareDesignSpecs(

@@ -9,6 +9,39 @@ import 'package:flutter_test/flutter_test.dart';
 /// Whether this test process was started by `dartway design-check`.
 const dwDesignCheckEnabled = bool.fromEnvironment('DW_DESIGN_CHECK_ENABLED');
 
+/// A capture case requested by `dartway design-check`.
+class DwDesignCheckCase {
+  const DwDesignCheckCase({
+    required this.id,
+    required this.width,
+    required this.height,
+  });
+
+  final String id;
+  final double width;
+  final double height;
+}
+
+/// The cases and logical view sizes requested by `dartway design-check`.
+///
+/// A bound test normally loops over this list, pumps the screen's static
+/// state once per entry, and passes [DwDesignCheckCase.id] to
+/// [captureDwDesign]. It is empty during an ordinary `flutter test` run.
+List<DwDesignCheckCase> get dwDesignCheckCases {
+  const encoded = String.fromEnvironment('DW_DESIGN_CHECK_CASES');
+  if (encoded.isEmpty) return const [];
+  return (jsonDecode(encoded) as List)
+      .cast<Map>()
+      .map((value) {
+        return DwDesignCheckCase(
+          id: value['id']! as String,
+          width: (value['width']! as num).toDouble(),
+          height: (value['height']! as num).toDouble(),
+        );
+      })
+      .toList(growable: false);
+}
+
 /// Captures the visible render tree for `dartway design-check`.
 ///
 /// A bound widget test pumps its static state, calls [pumpAndSettle], then
@@ -29,7 +62,9 @@ Future<File?> captureDwDesign(
   const requested = String.fromEnvironment('DW_DESIGN_CHECK_CASES');
   final cases =
       requestedCases ??
-      requested.split(',').where((value) => value.isNotEmpty).toSet();
+      (requested.isEmpty
+          ? const <String>{}
+          : dwDesignCheckCases.map((value) => value.id).toSet());
   if (cases.isNotEmpty && !cases.contains(caseId)) {
     throw StateError('Unknown design-check case id: $caseId.');
   }
