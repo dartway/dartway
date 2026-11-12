@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.0-dev.1
+## 0.26.0
 
 ### Breaking changes
 

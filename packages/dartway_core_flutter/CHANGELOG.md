@@ -1,12 +1,13 @@
 # Changelog
 
-## 0.26.0-dev.1
+## 0.26.0
 
 - Add the test-only `captureDwDesign` painted render-tree capture used by
   `dartway design-check`, including inherited effective text styles, text
   truncation, `ColoredBox`/`Material` paints, and stroke widths (#730).
 - Nothing changed here; the family moves in lockstep with stable `readLink`
   links in `dartway_core_server` (#710).
+- Advance in lockstep with the core family.
 
 ## 0.25.0
 
