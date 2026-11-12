@@ -230,6 +230,26 @@ void main() {
   });
 
   group('the notes this repository ships', () {
+    test('notes for a cut release name its delivering plain version', () {
+      final root = monorepoRoot();
+      final read = readMigrationNotes(root);
+      final versions = readFrameworkVersions(root);
+
+      for (final note in read.notes) {
+        for (final entry in note.affects.entries) {
+          final current = versions[entry.key]!;
+          if (current.contains('-')) continue;
+          expect(
+            entry.value.startsWith('$current-'),
+            isFalse,
+            reason:
+                '${note.path} must name the delivering $current release '
+                'of ${entry.key} after its prerelease is cut',
+          );
+        }
+      }
+    });
+
     test('ships the CI lock gate to projects updating the CLI', () {
       final read = readMigrationNotes(monorepoRoot());
       final lockNotes = read.notes.where(

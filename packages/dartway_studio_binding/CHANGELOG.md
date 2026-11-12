@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.8.0
+
+- Targets DartWay 0.26
+
 ## 0.7.0
 
 - Targets DartWay 0.25.
