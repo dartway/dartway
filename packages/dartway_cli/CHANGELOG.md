@@ -2,20 +2,6 @@
 
 ## 0.28.0
 
-### Changes
-
-- Fix: the generated Kamal Images workflow skips pull-request CI at the job
-  level, before taking a runner, and builds only images it publishes after
-  pushed or hand-started CI (#727).
-- Add `dartway contract baseline` and `dartway check --release` for the
-  extend-only store contract lifecycle. Baseline creation validates the
-  descriptor and shared version read from the required store-build
-  `--revision`, then records its resolved commit; created-project release CI
-  runs the deprecation-cleanup gate (#716).
-- The `pre-app-boot` secret file check reads `deploy/kamal/api.yml` from the
-  directory Kamal runs in: through a hooks symlink it missed the destination
-  config and refused to boot (#721).
-
 ### Breaking changes
 
 - **BREAKING (deploy):** the Kamal contract names no environment (#705).
@@ -33,6 +19,20 @@
   hand-started CI success, without a branch list. The `deploy run` (Compose)
   path is unchanged. See the
   [migration note](../../docs/migrations/2026-11-04-kamal-environments-in-studio.md).
+
+### Changes
+
+- Fix: the generated Kamal Images workflow skips pull-request CI at the job
+  level, before taking a runner, and builds only images it publishes after
+  pushed or hand-started CI (#727).
+- Add `dartway contract baseline` and `dartway check --release` for the
+  extend-only store contract lifecycle. Baseline creation validates the
+  descriptor and shared version read from the required store-build
+  `--revision`, then records its resolved commit; created-project release CI
+  runs the deprecation-cleanup gate (#716).
+- The `pre-app-boot` secret file check reads `deploy/kamal/api.yml` from the
+  directory Kamal runs in: through a hooks symlink it missed the destination
+  config and refused to boot (#721).
 
 ## 0.27.0
 

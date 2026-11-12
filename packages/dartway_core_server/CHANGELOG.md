@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.26.0-dev.1
+## 0.26.0
 
 - Refuse the forward-compatible `DwIdentifierKind.unknown` on every identifier
   input path before project normalization (#716).

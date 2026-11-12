@@ -2,8 +2,8 @@
 title: Adopt the store contract baseline
 affects:
   dartway_cli: "0.28.0"
-  dartway_core_shared: "0.26.0-dev.1"
-  dartway_generator: "0.26.0-dev.1"
+  dartway_core_shared: "0.26.0"
+  dartway_generator: "0.26.0"
 ---
 
 ## Who is affected
@@ -13,7 +13,7 @@ Projects that release a server before their mobile builds clear both stores.
 ## What to change
 
 Applies when updating `dartway_cli` to `0.28.0` and the core family to
-`0.26.0-dev.1`.
+`0.26.0`.
 
 First open each server-sent enum and add only its `unknown` fallback. Generate
 and ship that app build. This adoption step is compatible both before and after

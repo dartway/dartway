@@ -1,3 +1,7 @@
+## 0.7.0
+
+- Targets DartWay 0.26
+
 ## 0.6.0
 
 - Targets DartWay 0.25.
